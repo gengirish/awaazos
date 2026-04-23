@@ -1,6 +1,6 @@
 import type { OrderSource, PaymentMethod, PaymentStatus, Prisma } from "@prisma/client";
 
-import { prisma } from "@/lib/prisma";
+import { withStatementTimeout } from "@/lib/db-timeout";
 
 export type TransactionListFilters = {
   page: number;
@@ -39,16 +39,18 @@ export async function listVendorTransactions(
       : {}),
   };
 
-  const [items, total] = await prisma.$transaction([
-    prisma.transaction.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      skip,
-      take: filters.limit,
-      include: listInclude,
-    }),
-    prisma.transaction.count({ where }),
-  ]);
+  const [items, total] = await withStatementTimeout(5_000, async (tx) => {
+    return Promise.all([
+      tx.transaction.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip,
+        take: filters.limit,
+        include: listInclude,
+      }),
+      tx.transaction.count({ where }),
+    ]);
+  });
 
   return { items, total };
 }

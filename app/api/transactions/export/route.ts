@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { istDayRangeFromQuery } from "@/lib/billing-period";
 import { paiseToRupees } from "@/lib/currency";
-import { prisma } from "@/lib/prisma";
+import { withStatementTimeout } from "@/lib/db-timeout";
 import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
@@ -78,14 +78,16 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Invalid date range" }, { status: 400 });
     }
 
-    const rows = await prisma.transaction.findMany({
-      where: {
-        vendorId: ctx.vendor.id,
-        createdAt: { gte: from, lte: to },
-      },
-      orderBy: { createdAt: "asc" },
-      include: { orderItems: true },
-    });
+    const rows = await withStatementTimeout(8_000, (tx) =>
+      tx.transaction.findMany({
+        where: {
+          vendorId: ctx.vendor.id,
+          createdAt: { gte: from, lte: to },
+        },
+        orderBy: { createdAt: "asc" },
+        include: { orderItems: true },
+      }),
+    );
 
     const lines: string[] = [
       "Bill#,Date,Time,Items,Subtotal,Discount,Tax,Total,Method,Status,Customer Phone (last 4),UPI Ref",

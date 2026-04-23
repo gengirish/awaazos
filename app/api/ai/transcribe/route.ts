@@ -2,8 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { Plan } from "@prisma/client";
 
+import { reserveSarvamMinutes } from "@/lib/ai-usage-guard";
 import { transcribeAudio, type SarvamLang } from "@/lib/sarvam";
-import { aiBurstRateLimit, aiRateLimit, tooManyRequests } from "@/lib/ratelimit";
+import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
@@ -25,9 +26,10 @@ export async function POST(req: NextRequest) {
     vendorId = ctx.vendor.id;
     requirePlan(ctx.vendor, Plan.STARTER);
 
-    const burst = await aiBurstRateLimit.check(ctx.vendor.id);
+    const aiLimiter = getAiLimiterForPlan(ctx.vendor.plan);
+    const burst = await aiLimiter.burst.check(ctx.vendor.id);
     if (!burst.ok) return tooManyRequests(burst, "ai-burst");
-    const sustained = await aiRateLimit.check(ctx.vendor.id);
+    const sustained = await aiLimiter.minute.check(ctx.vendor.id);
     if (!sustained.ok) return tooManyRequests(sustained, "ai");
 
     const form = await req.formData();
@@ -43,6 +45,17 @@ export async function POST(req: NextRequest) {
 
     if (!(audio instanceof Blob) || audio.size === 0) {
       return NextResponse.json({ error: "Missing audio" }, { status: 400 });
+    }
+
+    // Rough estimate: mobile WebM voice captures are often ~32kbps -> ~240KB/min.
+    const estimatedMinutes = Math.max(1 / 60, audio.size / 240_000);
+    const usage = await reserveSarvamMinutes({
+      vendorId: ctx.vendor.id,
+      plan: ctx.vendor.plan,
+      estimatedMinutes,
+    });
+    if (!usage.ok) {
+      return NextResponse.json({ error: usage.message, code: usage.code }, { status: 402 });
     }
 
     const { transcript } = await transcribeAudio(audio, lang);

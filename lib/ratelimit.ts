@@ -1,3 +1,4 @@
+import type { Plan } from "@prisma/client";
 import type { NextRequest } from "next/server";
 
 import { getRedis } from "@/lib/redis";
@@ -113,6 +114,34 @@ export const aiBurstRateLimit = makeLimiter({
   windowMs: 1_000,
   max: 4,
 });
+
+const PLAN_AI_LIMITS: Record<Plan, { perMinute: number; burstPerSecond: number }> = {
+  FREE: { perMinute: 10, burstPerSecond: 2 },
+  STARTER: { perMinute: 30, burstPerSecond: 4 },
+  PRO: { perMinute: 120, burstPerSecond: 12 },
+  ENTERPRISE: { perMinute: 300, burstPerSecond: 30 },
+};
+
+const perMinuteByPlan = new Map<Plan, Limiter>();
+const burstByPlan = new Map<Plan, Limiter>();
+
+/** Plan-tier fairness: higher plans get proportionally higher throughput. */
+export function getAiLimiterForPlan(plan: Plan): { minute: Limiter; burst: Limiter } {
+  let minute = perMinuteByPlan.get(plan);
+  let burst = burstByPlan.get(plan);
+  if (!minute || !burst) {
+    const cfg = PLAN_AI_LIMITS[plan];
+    minute = makeLimiter({ name: `ai-${plan.toLowerCase()}-min`, windowMs: 60_000, max: cfg.perMinute });
+    burst = makeLimiter({
+      name: `ai-${plan.toLowerCase()}-burst`,
+      windowMs: 1_000,
+      max: cfg.burstPerSecond,
+    });
+    perMinuteByPlan.set(plan, minute);
+    burstByPlan.set(plan, burst);
+  }
+  return { minute, burst };
+}
 
 /** 100 webhook events per source IP per minute — generous for legit gateways. */
 export const webhookRateLimit = makeLimiter({

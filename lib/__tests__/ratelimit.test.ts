@@ -12,6 +12,7 @@ vi.mock("@/lib/redis", () => ({
 
 import {
   getClientIp,
+  getAiLimiterForPlan,
   makeLimiter,
   tooManyRequests,
 } from "@/lib/ratelimit";
@@ -101,6 +102,18 @@ describe("ratelimit", () => {
       const body = (await r.json()) as { error: string; scope: string };
       expect(body.error).toBe("rate_limited");
       expect(body.scope).toBe("auth");
+    });
+  });
+
+  describe("plan-tier fairness", () => {
+    it("gives higher AI throughput to higher plans", () => {
+      const free = getAiLimiterForPlan("FREE");
+      const starter = getAiLimiterForPlan("STARTER");
+      const pro = getAiLimiterForPlan("PRO");
+
+      expect(free.minute.max).toBeLessThan(starter.minute.max);
+      expect(starter.minute.max).toBeLessThan(pro.minute.max);
+      expect(free.burst.max).toBeLessThan(pro.burst.max);
     });
   });
 });

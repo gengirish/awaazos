@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import { getIstTodayStart } from "@/lib/billing-period";
+import { withStatementTimeout } from "@/lib/db-timeout";
 import { logger } from "@/lib/logger";
-import { prisma } from "@/lib/prisma";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
 
 export const runtime = "nodejs";
@@ -46,23 +46,25 @@ export async function GET(req: NextRequest) {
       voiceParseLogs24h,
       receipts24h,
       receiptsSent24h,
-    ] = await Promise.all([
-      prisma.vendor.count(),
-      prisma.vendor.count({ where: { createdAt: { gte: since7d } } }),
-      prisma.vendor.count({ where: { createdAt: { gte: since30d } } }),
-      prisma.transaction.count({ where: { createdAt: { gte: todayIst } } }),
-      prisma.transaction.count({ where: { createdAt: { gte: since24h } } }),
-      prisma.transaction.aggregate({
-        where: { createdAt: { gte: since24h } },
-        _sum: { totalPaise: true },
-      }),
-      prisma.voiceParseLog.findMany({
-        where: { createdAt: { gte: since24h } },
-        select: { itemCount: true, latencyMs: true, escalated: true, confidence: true },
-      }),
-      prisma.receipt.count({ where: { createdAt: { gte: since24h } } }),
-      prisma.receipt.count({ where: { createdAt: { gte: since24h }, whatsappSent: true } }),
-    ]);
+    ] = await withStatementTimeout(8_000, async (tx) =>
+      Promise.all([
+        tx.vendor.count(),
+        tx.vendor.count({ where: { createdAt: { gte: since7d } } }),
+        tx.vendor.count({ where: { createdAt: { gte: since30d } } }),
+        tx.transaction.count({ where: { createdAt: { gte: todayIst } } }),
+        tx.transaction.count({ where: { createdAt: { gte: since24h } } }),
+        tx.transaction.aggregate({
+          where: { createdAt: { gte: since24h } },
+          _sum: { totalPaise: true },
+        }),
+        tx.voiceParseLog.findMany({
+          where: { createdAt: { gte: since24h } },
+          select: { itemCount: true, latencyMs: true, escalated: true, confidence: true },
+        }),
+        tx.receipt.count({ where: { createdAt: { gte: since24h } } }),
+        tx.receipt.count({ where: { createdAt: { gte: since24h }, whatsappSent: true } }),
+      ]),
+    );
 
     const voiceTotal = voiceParseLogs24h.length;
     const voiceSuccess = voiceParseLogs24h.filter((v) => v.itemCount > 0).length;

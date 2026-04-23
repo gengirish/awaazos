@@ -8,9 +8,10 @@ import {
   anthropicSonnet,
   parseOrderWithClaude,
 } from "@/lib/anthropic";
+import { reserveAnthropicTokens } from "@/lib/ai-usage-guard";
 import { getVoiceLogQueue } from "@/lib/queues";
 import { prisma } from "@/lib/prisma";
-import { aiBurstRateLimit, aiRateLimit, tooManyRequests } from "@/lib/ratelimit";
+import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
@@ -42,9 +43,10 @@ export async function POST(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
 
-    const burst = await aiBurstRateLimit.check(ctx.vendor.id);
+    const aiLimiter = getAiLimiterForPlan(ctx.vendor.plan);
+    const burst = await aiLimiter.burst.check(ctx.vendor.id);
     if (!burst.ok) return tooManyRequests(burst, "ai-burst");
-    const sustained = await aiRateLimit.check(ctx.vendor.id);
+    const sustained = await aiLimiter.minute.check(ctx.vendor.id);
     if (!sustained.ok) return tooManyRequests(sustained, "ai");
 
     const body = bodySchema.parse(await req.json());
@@ -54,6 +56,16 @@ export async function POST(req: NextRequest) {
       select: { id: true, name: true, aliases: true, priceInPaise: true },
       orderBy: { sortOrder: "asc" },
     });
+
+    const estimatedTokens = Math.ceil((JSON.stringify(menuRows).length + body.transcript.length) / 4) + 256;
+    const usage = await reserveAnthropicTokens({
+      vendorId: ctx.vendor.id,
+      plan: ctx.vendor.plan,
+      estimatedTokens,
+    });
+    if (!usage.ok) {
+      return NextResponse.json({ error: usage.message, code: usage.code }, { status: 402 });
+    }
 
     let modelUsed = ANTHROPIC_PRIMARY_MODEL;
     let escalated = false;
