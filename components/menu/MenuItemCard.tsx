@@ -61,6 +61,7 @@ export function MenuItemCard({ item, onEdit, onChanged }: MenuItemCardProps) {
               <p className="truncate font-semibold leading-tight text-foreground">{item.name}</p>
               <p className="text-sm text-muted-foreground">{formatINR(item.priceInPaise)}</p>
               <p className="text-xs text-muted-foreground">{item.category}</p>
+              {item.hsnCode ? <p className="text-xs text-muted-foreground">HSN/SAC: {item.hsnCode}</p> : null}
             </div>
           </div>
         </div>

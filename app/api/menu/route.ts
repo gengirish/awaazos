@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
         aliases: body.aliases,
         emoji: body.emoji,
         category: body.category,
+        hsnCode: body.hsnCode,
         isPopular: body.isPopular,
         isAvailable: body.isAvailable,
         sortOrder: nextOrder,

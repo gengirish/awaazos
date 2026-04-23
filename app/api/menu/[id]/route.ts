@@ -35,6 +35,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     if (body.aliasesCsv !== undefined) data.aliases = parseAliasesCsv(body.aliasesCsv);
     if (body.emoji !== undefined) data.emoji = body.emoji;
     if (body.category !== undefined) data.category = body.category;
+    if (body.hsnCode !== undefined) {
+      const hsn = body.hsnCode?.trim();
+      data.hsnCode = hsn ? hsn.toUpperCase() : null;
+    }
     if (body.isPopular !== undefined) data.isPopular = body.isPopular;
     if (body.isAvailable !== undefined) data.isAvailable = body.isAvailable;
     if (body.sortOrder !== undefined) data.sortOrder = body.sortOrder;

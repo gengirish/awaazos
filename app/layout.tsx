@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Baloo_2, Nunito } from "next/font/google";
+import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "@/components/providers";
 import "./globals.css";
@@ -31,6 +32,7 @@ export default function RootLayout({
       <body className={`${baloo.variable} ${nunito.variable} min-h-screen font-body antialiased`}>
         <Providers>
           {children}
+          <CookieConsentBanner />
           <Toaster richColors position="top-center" />
         </Providers>
       </body>

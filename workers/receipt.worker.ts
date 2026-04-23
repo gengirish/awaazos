@@ -14,7 +14,7 @@ export const receiptWorker = new Worker<SendReceiptJobPayload>(
     const tx = await prisma.transaction.findFirst({
       where: { id: transactionId, vendorId },
       include: {
-        orderItems: true,
+        orderItems: { include: { menuItem: { select: { hsnCode: true } } } },
         receipt: true,
         vendor: { include: { settings: true } },
       },
@@ -44,6 +44,7 @@ export const receiptWorker = new Worker<SendReceiptJobPayload>(
         name: o.name,
         qty: o.qty,
         priceInPaise: o.priceInPaise,
+        hsnCode: o.menuItem?.hsnCode ?? null,
       })),
       taxPaise: tx.taxPaise,
       totalPaise: tx.totalPaise,

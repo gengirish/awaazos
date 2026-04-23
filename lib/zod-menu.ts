@@ -29,6 +29,11 @@ const menuItemCreateFields = {
   aliasesCsv: z.string().optional(),
   emoji: z.string().max(8).optional(),
   category: z.string().trim().max(80).optional(),
+  hsnCode: z
+    .string()
+    .trim()
+    .max(16, "HSN/SAC must be at most 16 characters")
+    .optional(),
   isPopular: z.boolean().optional(),
   isAvailable: z.boolean().optional(),
 };
@@ -42,6 +47,7 @@ export const menuItemCreateSchema = menuItemCreateInputSchema.transform((data) =
   aliases: parseAliasesCsv(data.aliasesCsv),
   emoji: data.emoji ?? "🍽️",
   category: data.category?.trim() ? data.category.trim() : "General",
+  hsnCode: data.hsnCode?.trim() ? data.hsnCode.trim().toUpperCase() : null,
   isPopular: data.isPopular ?? false,
   isAvailable: data.isAvailable ?? true,
 }));
@@ -56,6 +62,7 @@ export const menuItemUpdateSchema = z
     aliasesCsv: z.string().optional(),
     emoji: z.string().max(8).optional(),
     category: z.string().trim().max(80).optional(),
+    hsnCode: z.string().trim().max(16).optional().nullable(),
     isPopular: z.boolean().optional(),
     isAvailable: z.boolean().optional(),
     sortOrder: z.coerce.number().int().optional(),
@@ -68,6 +75,7 @@ export const menuItemUpdateSchema = z
       d.aliasesCsv !== undefined ||
       d.emoji !== undefined ||
       d.category !== undefined ||
+      d.hsnCode !== undefined ||
       d.isPopular !== undefined ||
       d.isAvailable !== undefined ||
       d.sortOrder !== undefined,

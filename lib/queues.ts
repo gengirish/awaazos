@@ -48,8 +48,14 @@ export type SendReceiptJobPayload = {
   customerPhone: string;
 };
 
+export type RetentionRunJobPayload = {
+  requestedBy: "cron" | "admin";
+  requestedByUserId?: string;
+};
+
 let _voiceLogQueue: Queue<VoiceParseLogJobPayload> | null = null;
 let _receiptQueue: Queue<SendReceiptJobPayload> | null = null;
+let _retentionQueue: Queue<RetentionRunJobPayload> | null = null;
 
 /**
  * Default BullMQ job options applied to every enqueue site:
@@ -88,6 +94,17 @@ export function getReceiptQueue(): Queue<SendReceiptJobPayload> {
     });
   }
   return _receiptQueue;
+}
+
+/** Daily retention maintenance queue (voice logs 90d, receipts 7y). */
+export function getRetentionQueue(): Queue<RetentionRunJobPayload> {
+  if (!_retentionQueue) {
+    _retentionQueue = new Queue<RetentionRunJobPayload>("retention-maintenance", {
+      connection: getBullMqRedis(),
+      defaultJobOptions: DEFAULT_JOB_OPTS,
+    });
+  }
+  return _retentionQueue;
 }
 
 /** Exported so workers/index.ts can pass it to Worker constructors (same null-retry rules). */

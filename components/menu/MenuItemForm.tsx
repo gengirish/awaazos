@@ -68,6 +68,7 @@ const defaultCreateValues: Partial<MenuItemFormValues> = {
   aliasesCsv: "",
   emoji: "🍽️",
   category: "General",
+  hsnCode: "",
   isPopular: false,
   isAvailable: true,
 };
@@ -103,6 +104,7 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
         aliasesCsv: item.aliases.length ? item.aliases.join(", ") : "",
         emoji: item.emoji,
         category: item.category,
+        hsnCode: item.hsnCode ?? "",
         isPopular: item.isPopular,
         isAvailable: item.isAvailable,
       });
@@ -120,6 +122,7 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
           aliasesCsv: values.aliasesCsv,
           emoji: values.emoji,
           category: values.category,
+          hsnCode: values.hsnCode?.trim() || null,
           isPopular: values.isPopular,
           isAvailable: values.isAvailable,
         });
@@ -279,6 +282,20 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
                       ))}
                     </SelectContent>
                   </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="hsnCode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>HSN/SAC code (optional)</FormLabel>
+                  <FormControl>
+                    <Input autoComplete="off" placeholder="e.g. 2106 or 9963" {...field} value={field.value ?? ""} />
+                  </FormControl>
+                  <FormDescription>Used for GST-ready receipts and tax exports.</FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

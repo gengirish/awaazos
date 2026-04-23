@@ -55,6 +55,15 @@ describe("menuItemCreateSchema", () => {
     });
     expect(out.aliases).toEqual(["bhel puri", "spicy bhel"]);
   });
+
+  it("normalizes optional HSN/SAC to uppercase and trims it", () => {
+    const out = menuItemCreateSchema.parse({
+      name: "Masala Chai",
+      priceInRupees: 15,
+      hsnCode: " 9963 ",
+    });
+    expect(out.hsnCode).toBe("9963");
+  });
 });
 
 describe("menuItemCreateInputSchema + rupeesToPaise", () => {

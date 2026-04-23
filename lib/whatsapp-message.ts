@@ -5,7 +5,7 @@ export type ReceiptMessageInput = {
   billNumber: string;
   /** Transaction createdAt */
   createdAt: Date;
-  items: { name: string; qty: number; priceInPaise: number }[];
+  items: { name: string; qty: number; priceInPaise: number; hsnCode?: string | null }[];
   taxPaise: number;
   totalPaise: number;
   receiptFooter?: string | null;
@@ -38,6 +38,9 @@ export function formatWhatsAppReceiptMessage(input: ReceiptMessageInput): string
   for (const it of input.items) {
     const lineTotal = it.priceInPaise * it.qty;
     lines.push(`${it.qty} × ${it.name}     ${formatINR(lineTotal)}`);
+    if (it.hsnCode) {
+      lines.push(`  HSN/SAC: ${it.hsnCode}`);
+    }
   }
 
   lines.push("");

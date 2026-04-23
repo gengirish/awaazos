@@ -38,4 +38,17 @@ describe("formatWhatsAppReceiptMessage", () => {
     });
     expect(msg).not.toContain("Tax:");
   });
+
+  it("prints HSN/SAC lines when provided on receipt items", () => {
+    const msg = formatWhatsAppReceiptMessage({
+      vendorName: "Stall",
+      billNumber: "AWZ-20260423-0002",
+      createdAt: new Date("2026-04-23T10:00:00.000Z"),
+      items: [{ name: "Idli", qty: 2, priceInPaise: 3000, hsnCode: "2106" }],
+      taxPaise: 0,
+      totalPaise: 6000,
+      receiptFooter: null,
+    });
+    expect(msg).toContain("HSN/SAC: 2106");
+  });
 });
