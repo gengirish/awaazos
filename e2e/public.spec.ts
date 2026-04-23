@@ -35,7 +35,15 @@ test.describe("public surfaces", () => {
 });
 
 test.describe("auth-protected surfaces redirect to sign-in", () => {
-  for (const path of ["/menu", "/pos", "/transactions", "/settings/billing", "/onboarding"]) {
+  for (const path of [
+    "/menu",
+    "/pos",
+    "/transactions",
+    "/analytics",
+    "/settings",
+    "/settings/billing",
+    "/onboarding",
+  ]) {
     test(`${path} → /sign-in when unauthenticated`, async ({ page }) => {
       const resp = await page.goto(path);
       expect(resp?.status(), `${path} should reach a 200-ish final page`).toBeLessThan(400);
