@@ -2,7 +2,9 @@
 
 > **One-liner:** Voice-first POS in 22 Indian languages for India's 60 million micro-merchants. Speak the order, instant UPI QR, WhatsApp receipt. ₹0 to start.
 
-> **Demo:** https://awaazos.vercel.app · **Repo:** https://github.com/gengirish/awaazos
+> **▶ 60-second demo video:** https://youtu.be/<VIDEO_ID> _(storyboard: [DEMO_VIDEO.md](./DEMO_VIDEO.md))_
+>
+> **Live app:** https://awaazos.vercel.app · **Repo:** https://github.com/gengirish/awaazos
 >
 > **Founder:** [Girish Hiremath](https://girishbhiremath.vercel.app) · **Studio:** [IntelliForge AI](https://www.intelliforge.tech) · **Based in:** Hyderabad, India · **Aligned with:** Bharat AI Mission
 
@@ -18,29 +20,42 @@
 
 https://awaazos.vercel.app
 
-### 3. Demo video (60 seconds — script)
+### 3. Demo video (60 seconds)
+
+**▶ Watch:** https://youtu.be/<VIDEO_ID>
+
+**Canonical storyboard + production guide:** [DEMO_VIDEO.md](./DEMO_VIDEO.md) (8 scenes, full shot list, equipment + editing checklist)
+
+Abridged script for the YC form:
 
 ```
-[0–8s · phone shot, busy chai stall, monsoon evening, Mumbai]
-Voiceover: "Meet Ramesh. He sells 200 cups of chai a day. He does
-not own a POS. He cannot type. The English-only apps don't work for him."
+[0:00–0:07 · founder selfie, real chai stall in Hyderabad]
+Girish: "I'm Girish. India has 60 million micro-merchants.
+Zero of them want a typing-based POS."
 
-[8–22s · vendor opens awaazos.vercel.app/pos on a basic Android]
-Vendor (in Hindi, into the mic): "Do samosa, ek chai, aur ek vada pav."
-[on screen — cart fills in real time, ₹55 total]
+[0:07–0:15 · B-roll — paper bill book, cash on counter, vendor pouring chai]
+VO: "Right now, this is their stack. Paper. Memory. Dispute."
 
-[22–35s · customer pulls out phone, scans the UPI QR]
-[GPay shows ₹55 to Ramesh's UPI ID, payment success]
-[Vendor taps "Mark as Paid" — Bill AWZ-20260423-0247 generated]
-[Customer's WhatsApp ping — receipt arrives]
+[0:15–0:25 · phone screen — AwaazOS POS, mic button pulsing]
+Vendor (in Hindi, into the mic):
+"Do special chai, ek aloo samosa, ek mirchi bajji."
 
-[35–48s · Ramesh, end of day, scrolls /analytics on his phone]
-"₹4,127 today. Best seller: chai (47 cups). Voice orders: 89%.
-Yesterday: ₹3,210. Up 28%."
+[0:25–0:33 · cart fills in real time → ₹70.00]
+VO: "Two-second NLU. Hindi, Telugu, Kannada — twenty-two languages."
 
-[48–60s · over the chai stall sign, dusk]
-"AwaazOS. Bol. Bill. Becho.
-Built for Bharat. ₹0 to start."
+[0:33–0:42 · UPI QR modal, customer scans, Payment received ✓]
+VO: "Tap. UPI QR. Customer pays. Zero MDR."
+
+[0:42–0:50 · WhatsApp chat — receipt arrives with bill AWZ-20260423-0042]
+VO: "Receipt on WhatsApp. AWZ bill number. GST-ready.
+No app install for the customer."
+
+[0:50–0:55 · cut back to founder]
+Girish: "All in 22 Indian languages. Production-deployed today.
+awaazos.vercel.app."
+
+[0:55–1:00 · end card — logo, URL, IntelliForge AI, Bharat AI Mission]
+"Bol. Bill. Becho."
 ```
 
 ### 4. What is your company going to make?
@@ -214,7 +229,11 @@ The bet is simple: voice + UPI + WhatsApp is the *first* technology stack in Ind
 
          awaazos.vercel.app
               YC W26
+
+       ▶ 60s demo: youtu.be/<VIDEO_ID>
 ```
+
+> **Speaker note:** Open with the 60-second demo video first (full screen, sound on), then advance to slide 2. Storyboard + production guide: [DEMO_VIDEO.md](./DEMO_VIDEO.md).
 
 ---
 
@@ -480,6 +499,8 @@ YC has funded plenty of single founders who shipped (Drew at Dropbox, Patrick at
 │  ASK                                                             │
 │  Standard YC deal ($500K). 12 mo runway → 10K vendors,           │
 │  ₹54L ARR, Series A target Q1 2027.                              │
+│                                                                  │
+│  60-SEC DEMO  ▶  youtu.be/<VIDEO_ID>                             │
 │                                                                  │
 │  CONTACT                                                         │
 │  gen.girish@gmail.com · contact@intelliforge.tech                │

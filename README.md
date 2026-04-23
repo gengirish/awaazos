@@ -10,6 +10,18 @@
 
 ---
 
+## 🎬 60-Second Demo
+
+<!-- Once the video is published, replace <VIDEO_ID> in the two lines below. Storyboard: ./DEMO_VIDEO.md -->
+
+[![AwaazOS — 60-second demo](https://img.shields.io/badge/▶%20Watch-60s%20demo-red?style=for-the-badge)](https://youtu.be/<VIDEO_ID>)
+
+> Voice command in Hindi → cart fills in real time → UPI QR → WhatsApp receipt. Sixty seconds, end-to-end, on a real phone, in a real chai stall.
+>
+> _Production guide for shooting + editing + publishing this video lives in [`DEMO_VIDEO.md`](./DEMO_VIDEO.md)._
+
+---
+
 ## 🌐 Live demo
 
 | Surface | URL |
@@ -18,6 +30,7 @@
 | **Pricing** | https://awaazos.vercel.app/pricing |
 | **Sign up** | https://awaazos.vercel.app/sign-up |
 | **GitHub** | https://github.com/gengirish/awaazos |
+| **60s video demo** | https://youtu.be/<VIDEO_ID> _(coming soon — see [DEMO_VIDEO.md](./DEMO_VIDEO.md))_ |
 
 > 60-second test: sign up → onboard a stall → add 3 menu items → open `/pos` on your phone → tap the orange mic → say _"do samosa aur ek chai"_ → see the cart fill → scan the UPI QR → bill `AWZ-YYYYMMDD-0001` is generated atomically → check `/analytics`.
 
