@@ -1,13 +1,10 @@
 import { Worker } from "bullmq";
-import IORedis from "ioredis";
 
 import { prisma } from "@/lib/prisma";
-import type { SendReceiptJobPayload } from "@/lib/queues";
-import { requireEnv } from "@/lib/env";
+import { logger } from "@/lib/logger";
+import { getBullMqConnection, type SendReceiptJobPayload } from "@/lib/queues";
 import { sendWhatsappReceipt } from "@/lib/whatsapp";
 import { formatWhatsAppReceiptMessage } from "@/lib/whatsapp-message";
-
-const connection = new IORedis(requireEnv("REDIS_URL"), { maxRetriesPerRequest: null });
 
 export const receiptWorker = new Worker<SendReceiptJobPayload>(
   "send-receipt",
@@ -24,10 +21,18 @@ export const receiptWorker = new Worker<SendReceiptJobPayload>(
     });
 
     if (!tx || !tx.receipt) {
+      logger.warn(
+        { worker: "receipt", jobId: job.id, transactionId, vendorId },
+        "transaction or receipt not found; dropping job",
+      );
       return;
     }
 
     if (tx.receipt.whatsappSent) {
+      logger.info(
+        { worker: "receipt", jobId: job.id, transactionId },
+        "receipt already sent; idempotent skip",
+      );
       return;
     }
 
@@ -51,6 +56,8 @@ export const receiptWorker = new Worker<SendReceiptJobPayload>(
     });
 
     if (!ok) {
+      // BullMQ will retry per DEFAULT_JOB_OPTS (5 attempts, exp backoff).
+      // After exhaustion the job lands in the failed-jobs DLQ for 7 days.
       throw new Error("gupshup_send_failed");
     }
 
@@ -63,13 +70,39 @@ export const receiptWorker = new Worker<SendReceiptJobPayload>(
       },
     });
   },
-  { connection },
+  {
+    connection: getBullMqConnection(),
+    concurrency: 4,
+    // Bull lock — if the worker crashes mid-send, the job is reclaimed after
+    // 30s by another worker. Set higher than max upstream timeout (Gupshup 8s).
+    lockDuration: 30_000,
+  },
 );
 
 receiptWorker.on("failed", (job, err) => {
-  console.error(
-    "[receipt.worker] job failed",
-    job?.id,
-    err instanceof Error ? err.message : err,
+  logger.error(
+    {
+      worker: "receipt",
+      event: "job_failed",
+      jobId: job?.id,
+      attemptsMade: job?.attemptsMade,
+      attemptsTotal: job?.opts?.attempts,
+      error: err instanceof Error ? err.message : "unknown",
+    },
+    "receipt job failed",
+  );
+});
+
+receiptWorker.on("completed", (job) => {
+  logger.info(
+    { worker: "receipt", event: "job_completed", jobId: job.id, attemptsMade: job.attemptsMade },
+    "receipt job completed",
+  );
+});
+
+receiptWorker.on("error", (err) => {
+  logger.error(
+    { worker: "receipt", event: "worker_error", error: err.message },
+    "receipt worker error",
   );
 });

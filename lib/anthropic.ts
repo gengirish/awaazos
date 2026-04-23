@@ -78,12 +78,32 @@ export type ParseOrderResult = {
   raw: unknown;
 };
 
+/**
+ * Anthropic SDK clients. Per-request timeouts:
+ *  - Haiku: 8s (fast model, voice latency budget is ~3s p95)
+ *  - Sonnet: 15s (escalation tier; allowed slower for accuracy)
+ * SDK auto-retries 2x with exponential backoff on transient 5xx / network
+ * errors. Combined upper-bound: ~30s — caller (route handler) should not
+ * wait longer than that or the Vercel function timeout fires anyway.
+ */
+const ANTHROPIC_HAIKU_TIMEOUT_MS = 8_000;
+const ANTHROPIC_SONNET_TIMEOUT_MS = 15_000;
+const ANTHROPIC_MAX_RETRIES = 2;
+
 function getAnthropicHaikuInner(): Anthropic {
-  return new Anthropic({ apiKey: requireEnv("ANTHROPIC_API_KEY") });
+  return new Anthropic({
+    apiKey: requireEnv("ANTHROPIC_API_KEY"),
+    timeout: ANTHROPIC_HAIKU_TIMEOUT_MS,
+    maxRetries: ANTHROPIC_MAX_RETRIES,
+  });
 }
 
 function getAnthropicSonnetInner(): Anthropic {
-  return new Anthropic({ apiKey: requireEnv("ANTHROPIC_API_KEY") });
+  return new Anthropic({
+    apiKey: requireEnv("ANTHROPIC_API_KEY"),
+    timeout: ANTHROPIC_SONNET_TIMEOUT_MS,
+    maxRetries: ANTHROPIC_MAX_RETRIES,
+  });
 }
 
 let _haiku: Anthropic | null = null;

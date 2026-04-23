@@ -1,11 +1,8 @@
 import { Worker } from "bullmq";
-import IORedis from "ioredis";
 
-import type { VoiceParseLogJobPayload } from "@/lib/queues";
 import { prisma } from "@/lib/prisma";
-import { requireEnv } from "@/lib/env";
-
-const connection = new IORedis(requireEnv("REDIS_URL"), { maxRetriesPerRequest: null });
+import { logger } from "@/lib/logger";
+import { getBullMqConnection, type VoiceParseLogJobPayload } from "@/lib/queues";
 
 export const voiceLogWorker = new Worker<VoiceParseLogJobPayload>(
   "voice-parse-log",
@@ -16,6 +13,10 @@ export const voiceLogWorker = new Worker<VoiceParseLogJobPayload>(
       select: { id: true },
     });
     if (!vendor) {
+      logger.warn(
+        { worker: "voiceLog", jobId: job.id, vendorId: p.vendorId },
+        "vendor disappeared; dropping job",
+      );
       return;
     }
 
@@ -34,13 +35,29 @@ export const voiceLogWorker = new Worker<VoiceParseLogJobPayload>(
       },
     });
   },
-  { connection },
+  {
+    connection: getBullMqConnection(),
+    concurrency: 8,
+    lockDuration: 15_000,
+  },
 );
 
 voiceLogWorker.on("failed", (job, err) => {
-  console.error(
-    "[voiceLog.worker] job failed",
-    job?.id,
-    err instanceof Error ? err.message : err,
+  logger.error(
+    {
+      worker: "voiceLog",
+      event: "job_failed",
+      jobId: job?.id,
+      attemptsMade: job?.attemptsMade,
+      error: err instanceof Error ? err.message : "unknown",
+    },
+    "voice-parse-log job failed",
+  );
+});
+
+voiceLogWorker.on("error", (err) => {
+  logger.error(
+    { worker: "voiceLog", event: "worker_error", error: err.message },
+    "voice-parse-log worker error",
   );
 });

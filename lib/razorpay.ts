@@ -4,6 +4,9 @@ import type { Plan } from "@prisma/client";
 import Razorpay from "razorpay";
 
 import { requireEnv } from "@/lib/env";
+import { withTimeout } from "@/lib/with-timeout";
+
+const RAZORPAY_API_TIMEOUT_MS = 8_000;
 
 let razorpaySingleton: Razorpay | null = null;
 
@@ -61,13 +64,17 @@ export async function createSubscription({
 }): Promise<{ subscriptionId: string; shortUrl: string }> {
   const rz = getRazorpay();
   const plan_id = getRazorpayPlanIdForBillingPlan(planCode);
-  const sub = await rz.subscriptions.create({
-    plan_id,
-    total_count: 120,
-    customer_notify: 1,
-    quantity: 1,
-    notes: { vendorId },
-  });
+  const sub = await withTimeout(
+    rz.subscriptions.create({
+      plan_id,
+      total_count: 120,
+      customer_notify: 1,
+      quantity: 1,
+      notes: { vendorId },
+    }),
+    RAZORPAY_API_TIMEOUT_MS,
+    "razorpay.subscriptions.create",
+  );
   const subscriptionId = sub.id;
   const shortUrl = sub.short_url;
   if (!shortUrl) {
