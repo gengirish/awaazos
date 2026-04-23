@@ -1,0 +1,8 @@
+npm run precommit:checks
+
+if command -v gitleaks >/dev/null 2>&1; then
+  echo "Running gitleaks on staged changes..."
+  gitleaks protect --staged --redact --verbose
+else
+  echo "gitleaks binary not found locally; skipping local secret scan (CI enforces gitleaks)."
+fi
