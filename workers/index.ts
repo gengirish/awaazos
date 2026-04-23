@@ -10,6 +10,7 @@
  *    deploys (otherwise an in-flight WhatsApp send might be killed mid-fetch
  *    and the customer gets two receipts).
  */
+import { Sentry } from "./sentry";
 import { logger } from "@/lib/logger";
 import { receiptWorker } from "./receipt.worker";
 import { voiceLogWorker } from "./voiceLog.worker";
@@ -66,6 +67,7 @@ process.on("SIGINT", () => void shutdown("SIGINT"));
 
 process.on("uncaughtException", (err) => {
   logger.fatal({ event: "uncaught_exception", error: err.message, stack: err.stack }, "uncaughtException");
+  Sentry.captureException(err);
   void shutdown("uncaughtException");
 });
 
@@ -77,6 +79,26 @@ process.on("unhandledRejection", (reason) => {
     },
     "unhandledRejection",
   );
+  Sentry.captureException(reason instanceof Error ? reason : new Error(String(reason)));
   // Do NOT crash on unhandledRejection; the worker should keep running and
   // surface the error via the "failed" handler when BullMQ retries the job.
+});
+
+// Capture every BullMQ "failed" event into Sentry too — already logged via pino,
+// but Sentry gives us the dashboard + alerting + replay-by-attempt view.
+[receiptWorker, voiceLogWorker].forEach((w) => {
+  w.on("failed", (job, err) => {
+    Sentry.captureException(err, {
+      tags: {
+        worker: w.name,
+        jobName: job?.name,
+        finalAttempt: String(job?.attemptsMade === job?.opts?.attempts),
+      },
+      extra: {
+        jobId: job?.id,
+        attemptsMade: job?.attemptsMade,
+        attemptsTotal: job?.opts?.attempts,
+      },
+    });
+  });
 });
