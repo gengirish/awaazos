@@ -3,6 +3,8 @@
 > **One-liner:** Voice-first POS in 22 Indian languages for India's 60 million micro-merchants. Speak the order, instant UPI QR, WhatsApp receipt. ₹0 to start.
 
 > **Demo:** https://awaazos.vercel.app · **Repo:** https://github.com/gengirish/awaazos
+>
+> **Founder:** [Girish Hiremath](https://girishbhiremath.vercel.app) · **Studio:** [IntelliForge AI](https://www.intelliforge.tech) · **Based in:** Hyderabad, India · **Aligned with:** Bharat AI Mission
 
 ---
 
@@ -51,25 +53,35 @@ It's a POS where the only interface is your voice and your eyes. We support Hind
 
 ### 5. Where do you live now, and where would the company be based after YC?
 
-Bengaluru, India. Post-YC: SF for the batch, then back to Bengaluru with a small product/AI team there and field operations in Mumbai + Delhi.
+**Hyderabad, India.** Post-YC: SF for the batch, then back to Hyderabad as headquarters with field operations in Mumbai + Bengaluru + Delhi NCR. IntelliForge AI (the operating studio behind AwaazOS) is already incorporated as an Individual Proprietorship in Hyderabad, Telangana.
 
 ### 6. Explain your decision regarding location.
 
-Our customers are in India — physically. We need our voice ML team and our customer success team next to chai stalls, watching real users misuse our product, in their language, in real conditions. Bengaluru is the only place we can hire Indic NLP engineers + UPI/payments engineers + India-fluent product designers in the same office.
+Our customers are in India — physically. We need our voice ML team and our customer success team next to chai stalls, watching real users misuse our product, in their language, in real conditions.
 
-SF for batch: founder-network access, US investor coverage, talent pipeline.
+**Hyderabad** as HQ: my home base, IntelliForge AI is already operating from here, Telangana has a friendly tech-business climate, Hyderabad's cost-of-talent is meaningfully better than Bengaluru while the engineering hiring pool (especially for Indic NLP — IIIT Hyderabad is across town) is excellent. Field ops scale to **Mumbai** (highest density of micro-merchants), **Bengaluru** (biggest tier-1 voice-AI talent pool for senior hires), and **Delhi NCR** in year 2.
+
+SF for batch: founder-network access, US investor coverage, alumni connect.
 
 ### 7. How long have each of you been working on this?
 
-[Founder to fill in honestly — e.g. "I have been thinking about this for 18 months while building [previous company]; the working prototype shipped in Apr 2026 over 4 weekends after my brother (who runs a juice cart in Mumbai) showed me his hand-written ledger."]
+**Indic AI is a 14-year through-line for me, not a 2026 idea.**
+
+In 2012, my first production AI project at a leading semiconductor company was a **Hindi Reader Android app** using OpenCV + Artificial Neural Networks for Devanagari script recognition from camera images — presented at their developer conference. I sat with Indic-language ML constraints for two years.
+
+Fast-forward through fourteen years of enterprise software (banking, pharma, telecom, fintech, IoT) at Fortune 500 companies, founding [IntelliForge AI](https://www.intelliforge.tech) (Hyderabad-based AI studio) in 2025, and starting an **M.Tech in Data Science & AI at IIIT Dharwad** in March 2026 — Speech & NLP is in my coursework right now.
+
+The AwaazOS prototype shipped end-to-end in **4 weekends in April 2026** because three forces aligned: Sarvam Saaras v2 hit 91% Hindi accuracy in conversational speech, UPI saturated to 14B txn/month at 0% MDR, and WhatsApp BAPI dropped to ₹0.30/msg via Gupshup. Two years ago this product literally could not exist.
+
+The conviction is older than the product.
 
 ### 8. How long have you known one another?
 
-[Co-founder section — fill in or mark as solo founder.]
+**Solo founder** today — 14 years of solo problem-solving across six industries gives me the breadth to ship the full stack alone (the production deploy at https://awaazos.vercel.app is the proof). Post-YC priority hire is a Bengaluru-based **Indic NLP engineer** (someone with formal NLP training, ideally an IIIT/IIT alum) to deepen the Sarvam → Claude pipeline beyond what I can architect alone. A **technical co-founder conversation is open** — actively talking to two senior engineers I've worked with at Fortune 500 banks who could join in batch.
 
 ### 9. Are you (and any other founders) committed to this full-time?
 
-[Founder to confirm yes/no with conviction.]
+**Committed full-time within 30 days of YC acceptance.** Currently Principal SE at a Compliance & RegTech company in Hyderabad — notice period is 30 days, all conversations transparent. M.Tech at IIIT Dharwad is part-time / weekend-format, designed to be pursued alongside professional work, and the curriculum (Speech & NLP, Generative AI) directly compounds with what AwaazOS needs — not a distraction.
 
 ### 10. Why did you pick this idea to work on?
 
@@ -79,7 +91,7 @@ Three forcing functions converged in 2026:
 2. **UPI saturated.** 14B+ monthly transactions as of Q1 2026. Every Indian customer with a smartphone has GPay/PhonePe/Paytm. The MDR is zero. The settlement is real-time. We don't need to convince anyone to adopt anything — we just need to point a QR at them.
 3. **WhatsApp Business API got cheap.** Gupshup at ₹0.30/message means a vendor doing 200 sales/day can send digital receipts at ₹60/day = ₹1,800/mo. Affordable on a Starter plan ₹299 with margin to spare.
 
-And on the demand side: my brother runs a juice cart in Mumbai. He has zero software. He loses ₹400-800/day to memory disputes ("I gave you ₹100, give me ₹70 back" / "you didn't, you gave me ₹50") and to forgotten orders during the rush. He won't use any current POS. He WILL use a microphone.
+And on the demand side: I've watched the chai-walas in my own neighborhood in Hyderabad lose ₹400-800/day to memory disputes ("I gave you ₹100, give me ₹70 back" / "you didn't, you gave me ₹50") and to forgotten orders during the evening rush. They won't use any current POS — typing English on a 4-inch screen in a monsoon while five customers wait is not a real product. They WILL speak into a microphone in Hindi or Telugu. That's the entire wedge.
 
 There are 25 million of him.
 
@@ -150,7 +162,7 @@ Net revenue per paying merchant: ₹299/mo × 12 = ₹3,588/year (Starter). At 5
 
 ### 16. Have you incorporated, or formed any legal entity?
 
-[Founder to fill in — yes/no, jurisdiction, cap table state.]
+**Yes.** [IntelliForge AI](https://www.intelliforge.tech) is registered as an **Individual Proprietorship in Hyderabad, Telangana, India** (active since 2025) — the operating studio that incubated AwaazOS as a Level-5 (App Development) flagship product. For YC acceptance we will spin AwaazOS into a **Delaware C-Corp** (standard YC structure) with the Indian entity becoming a wholly-owned subsidiary for ground operations, payroll, and merchant relationships. Cap table is clean — 100% founder, no prior outside capital, no SAFEs, no loans.
 
 ### 17. If you've already started working on it, how long have you been working and how many lines of code (if applicable) have you written?
 
@@ -332,17 +344,24 @@ Future revenue: WhatsApp catalog commerce (1% txn), vendor financing (2% origina
 
 ### Slide 9 — Team
 
-> [Founder bio — fill in.]
+> **Girish Hiremath** — Founder, CEO/CTO
 >
-> Looking to hire post-YC: **3 engineers** (1 Indic NLP, 1 fullstack, 1 mobile/PWA), **1 vendor-success rep** in Mumbai, **1 designer** with vernacular UI experience.
+> - **14+ years enterprise software** across compliance, pharma, banking, fintech, telecom, IoT (Fortune 500)
+> - **M.Tech in Data Science & AI** at **IIIT Dharwad** (Institute of National Importance) — Speech & NLP focus, started Mar 2026
+> - **Principal Software Engineer** at a Compliance & RegTech company in Hyderabad (current)
+> - **First production AI project in 2012**: Hindi Reader Android app (OpenCV + ANN) at a leading semiconductor company — Indic AI from day one of my career
+> - Founder of **[IntelliForge AI](https://www.intelliforge.tech)** — Hyderabad-based AI engineering studio aligned with the Bharat AI Mission
+> - 🌐 [girishbhiremath.vercel.app](https://girishbhiremath.vercel.app) · 🐙 [github.com/gengirish](https://github.com/gengirish)
 >
-> **Advisors / interest from**: [fill in if applicable]
-
+> **Looking to hire post-YC**: 1 Indic NLP engineer (Bengaluru), 1 fullstack engineer, 1 mobile/PWA engineer, 1 vendor-success rep in Mumbai, 1 designer with vernacular UI experience. Two senior engineers from prior Fortune 500 work in active conversation as potential technical co-founder.
+>
 > **Why we'll win**:
-> - Founder lives the problem (family runs a juice cart)
-> - Production product on day 1 of YC, not day 90
-> - Maniacal focus on the chai-wala, not the restaurant
-> - India-first defaults baked into every line of code (ARCHITECTURE.md)
+> - Founder has shipped production software to **billion-dollar institutions** (banks, pharma, fintech) — not "first product"
+> - **14-year Indic AI arc** — Hindi Reader (2012) → IIIT Dharwad Speech & NLP (2026) → AwaazOS (today)
+> - **Production product on day 1 of YC**, not day 90 — see https://awaazos.vercel.app
+> - **Maniacal focus** on the chai-wala, not the restaurant
+> - **India-first defaults** baked into every line of code (see [ARCHITECTURE.md](./ARCHITECTURE.md))
+> - **Bharat AI Mission alignment** — credibility + India-AI ecosystem access via IntelliForge AI's existing positioning
 
 ---
 
@@ -394,7 +413,15 @@ We will offer FREE for the first 50 monthly transactions to remove activation fr
 
 ### Q: Single founder. Why?
 
-**A:** [Founder to address honestly. Strong single-founder narrative: domain knowledge, shipping velocity demonstrated by the production deploy, plan to hire a technical co-founder in batch.]
+**A:** Three honest reasons:
+
+1. **Shipping velocity is already proven solo.** The production deploy at https://awaazos.vercel.app — full Next.js app + Auth.js + Prisma + Neon + Anthropic + Sarvam + Razorpay + Gupshup + Fly worker + 51 unit tests + 38 E2E tests — was built solo in 4 weekends. Most "co-founded" YC applicants at this stage have a Figma. We have a deploy.
+
+2. **14 years of solo problem-solving across six industries** (banking / pharma / telecom / fintech / IoT / compliance) gave me the breadth to cover full-stack + DevOps + payments + AI without bottlenecks. The architecture document ([ARCHITECTURE.md](./ARCHITECTURE.md)) reflects 14 years of "doing it the hard way" in enterprise contexts.
+
+3. **A technical co-founder conversation is open.** Two senior engineers from prior Fortune 500 work (one banking, one pharma) are in active conversation. If one of them joins in batch, great. If not, **first-month YC priority hire is a Bengaluru-based Indic NLP engineer** (IIIT/IIT alum) to deepen the Sarvam → Claude pipeline beyond what I can architect alone.
+
+YC has funded plenty of single founders who shipped (Drew at Dropbox, Patrick at Stripe before John joined, etc.). I'd rather be a strong single founder with a working product than a weak two-founder with a deck.
 
 ### Q: How does this not just become "another POS"?
 
@@ -443,14 +470,21 @@ We will offer FREE for the first 50 monthly transactions to remove activation fr
 │  CAC ₹160 · NRPM ₹3,290 · GM 78% · LTV/CAC 18× at M18.           │
 │                                                                  │
 │  TEAM                                                            │
-│  [Founder bio]                                                   │
+│  Girish Hiremath — Founder, CEO/CTO                              │
+│  14+ yrs enterprise eng (Fortune 500: banking, pharma, telecom)  │
+│  M.Tech DSAI @ IIIT Dharwad — Speech & NLP focus                 │
+│  First Indic AI project: Hindi Reader (OpenCV + ANN), 2012       │
+│  Founder of IntelliForge AI — Bharat AI Mission aligned          │
+│  girishbhiremath.vercel.app · github.com/gengirish               │
 │                                                                  │
 │  ASK                                                             │
 │  Standard YC deal ($500K). 12 mo runway → 10K vendors,           │
 │  ₹54L ARR, Series A target Q1 2027.                              │
 │                                                                  │
 │  CONTACT                                                         │
-│  [Email] · awaazos.vercel.app · github.com/gengirish/awaazos     │
+│  gen.girish@gmail.com · contact@intelliforge.tech                │
+│  awaazos.vercel.app · github.com/gengirish/awaazos               │
+│  Hyderabad, Telangana, India 🇮🇳                                  │
 │                                                                  │
 └──────────────────────────────────────────────────────────────────┘
 ```
@@ -460,7 +494,9 @@ We will offer FREE for the first 50 monthly transactions to remove activation fr
 ## Part E — Demo script (in-person, 5 minutes)
 
 **0:00–0:30 — Frame the user**
-> "Imagine you're standing at Ramesh's chai stall in Lower Parel, Mumbai. Monsoon. 6 PM. Twenty people in line. He's making chai, taking orders, handing change. He sells 200 cups a day. He has zero software. Show of hands — who thinks an English-language POS is going to work for him?"
+> "I'm Girish — fourteen years building enterprise software for Fortune 500 banks and pharma giants, currently doing my M.Tech in Speech & NLP at IIIT Dharwad. My very first production AI project was in 2012 — a Hindi Reader Android app at a semiconductor company. I've been waiting fourteen years to build the right thing for Indic AI. Today I'll show you what that is.
+>
+> Imagine you're standing at a chai stall in Hyderabad. Monsoon. 6 PM. Twenty people in line. The vendor is making chai, taking orders, handing change. He sells 200 cups a day. He has zero software. Show of hands — who thinks an English-language POS is going to work for him?"
 
 **0:30–1:30 — Live the product**
 > [Open https://awaazos.vercel.app/pos on a phone projected to screen]
@@ -481,10 +517,42 @@ We will offer FREE for the first 50 monthly transactions to remove activation fr
 
 **4:30–5:00 — Ask & close**
 > "Standard YC deal. 12 months. 10K vendors. Series A at ₹3 Cr ARR.
+>
+> AwaazOS is built by **IntelliForge AI** — my Hyderabad-based AI engineering studio aligned with the Bharat AI Mission. AwaazOS is its Level-5 flagship — production proof that the studio ships shippable software, not slideware.
+>
 > **Bol. Bill. Becho.** Thank you."
 
 ---
 
-> Built for the chai-wala in Mumbai, the dosa cart in Bengaluru, the kirana shop in Indore, the paan stall in Kolkata.
+## Part F — About the studio
+
+**[IntelliForge AI](https://www.intelliforge.tech)** is the operating studio behind AwaazOS — a Hyderabad-based AI agent development and workflow automation company aligned with the **Bharat AI Mission** (India's ₹10,372 Cr IndiaAI initiative).
+
+The studio operates a **5-Level AI framework** that takes a business from "AI-curious" to shipping production AI applications:
+
+| Level | What it covers | AwaazOS expression |
+| --- | --- | --- |
+| 1 — AI Foundations & Training | Prompt engineering basics, AI literacy | (n/a) |
+| 2 — AI Workflow Automation | n8n, Zapier, Make pipelines | Telemetry pipelines |
+| 3 — AI Creative Studio | Image/video gen, content automation | (n/a) |
+| 4 — AI Agent Development | Multi-agent systems, RAG, autonomous workers | **BullMQ workers** (`voiceLog` + `send-receipt`) on Fly.io BOM |
+| **5 — AI App Development** | **Full production AI apps with auth, payments, scale** | **AwaazOS itself — Next.js 14 + Auth.js v5 + Neon + Anthropic + Razorpay + Gupshup, deployed across Vercel + Fly.io** |
+
+Other IntelliForge AI projects:
+- **Multi-Agent Deep Research** — autonomous research with citations (Level 4 + 5)
+- **Interview Bot** — AI hiring platform with auth + RBAC
+- **MoveMore** — AI-powered wellness and movement platform
+- **AI Digital Profile** — talk-to-resume chatbot used by professionals
+- **YouTube Transcript Scraper + Markdown→PDF Converter** — open utilities
+
+> "Enterprise depth, startup speed."
+
+**Contact:** contact@intelliforge.tech · **Site:** https://www.intelliforge.tech · **Location:** Hyderabad, Telangana, India
+
+---
+
+> Built for the chai-wala in Hyderabad, the dosa cart in Bengaluru, the kirana shop in Indore, the paan stall in Kolkata.
+>
+> Built by **Girish Hiremath · [IntelliForge AI](https://www.intelliforge.tech)**, aligned with the **Bharat AI Mission** 🇮🇳
 >
 > 🇮🇳 **AwaazOS — Bol. Bill. Becho.**

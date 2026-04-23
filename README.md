@@ -330,12 +330,52 @@ For internal contributors, the canonical agent guide is [`AGENTS.md`](./AGENTS.m
 
 ---
 
+## 👤 Founder
+
+**Girish Hiremath** — 14+ years of enterprise software engineering across **compliance, pharma, banking, fintech, telecom, and IoT** for Fortune 500 companies. Currently **Principal Software Engineer** at a Compliance & RegTech company in Hyderabad, while pursuing an **M.Tech in Data Science & AI at IIIT Dharwad** (Institute of National Importance) — coursework includes Speech & NLP, Generative AI, Computer Vision, Financial Analytics, and AI in Healthcare.
+
+Indic AI is a **14-year through-line**, not a 2026 hobby. First production AI project in 2012: a **Hindi Reader Android app** using OpenCV + Artificial Neural Networks at a leading semiconductor company, presented at their developer conference. AwaazOS is the natural culmination of that arc — banking-grade reliability, pharma-grade data integrity, fintech-grade payment rails, applied to a problem only an Indian engineer who's lived through paper bills at a chai stall can really see clearly.
+
+| | |
+| --- | --- |
+| 🌐 Portfolio | https://girishbhiremath.vercel.app |
+| 📧 Email | gen.girish@gmail.com |
+| 💼 LinkedIn | [linkedin.com/in/girishbhiremath](https://www.linkedin.com/in/girishbhiremath) |
+| 🐙 GitHub | [github.com/gengirish](https://github.com/gengirish) |
+
+---
+
+## 🏢 Built by IntelliForge AI
+
+AwaazOS is a flagship product of **[IntelliForge AI](https://www.intelliforge.tech)** — a Hyderabad-based AI engineering studio specializing in **AI agent development, workflow automation, and AI app development**, aligned with the **Bharat AI Mission** (India's ₹10,372 Cr IndiaAI initiative).
+
+IntelliForge ships across a **5-Level AI framework**:
+
+| Level | Focus | Where AwaazOS sits |
+| --- | --- | --- |
+| 1 | AI Foundations & Training | — |
+| 2 | AI Workflow Automation | — |
+| 3 | AI Creative Studio | — |
+| 4 | AI Agent Development | Receipt + voice-log workers |
+| **5** | **AI App Development** | **AwaazOS — production Next.js + Auth.js + Claude pipeline** |
+
+AwaazOS is **the proof** that the studio's 5-level framework ships real, working production software for India — not slideware. Other IntelliForge projects include Multi-Agent Deep Research, Interview Bot (AI hiring), MoveMore (AI wellness), AI Digital Profile, and several open automation tools.
+
+| | |
+| --- | --- |
+| 🌐 Site | https://www.intelliforge.tech |
+| 📧 Contact | contact@intelliforge.tech |
+| 📍 Location | Hyderabad, Telangana, India |
+| 🇮🇳 Mission | Aligned with Bharat AI Mission — democratizing AI for Tier-I, II, and III India |
+
+---
+
 ## 📄 License
 
-Proprietary. © 2026 AwaazOS. Code published for transparency, not for redistribution. Reach out for licensing or partnership.
+Proprietary. © 2026 AwaazOS · IntelliForge AI. Code published for transparency, not for redistribution. Reach out at **contact@intelliforge.tech** for licensing, partnership, or design-partner inquiries.
 
 ---
 
 ## 🇮🇳 Acknowledgements
 
-Built for the chai-wala in Mumbai, the dosa cart in Bengaluru, the kirana shop in Indore, and the paan stall in Kolkata. **Bol. Bill. Becho.**
+Built for the chai-wala in Hyderabad, the dosa cart in Bengaluru, the kirana shop in Indore, and the paan stall in Kolkata. **Bol. Bill. Becho.**
