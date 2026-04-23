@@ -1,0 +1,35 @@
+# Worker process — runs on Fly.io, not Vercel
+workers/
+
+# Local env (Vercel env vars are set via dashboard / CLI, not files)
+.env
+.env.local
+.env.*.local
+
+# Dev artefacts
+.next/
+node_modules/
+*.tsbuildinfo
+
+# Repo metadata that bloats deploys
+.cursor/
+.git/
+agent-transcripts/
+terminals/
+
+# Spec doc
+awaazos-cursor-prompt.md
+AGENTS.md
+
+# Tests (not needed at runtime)
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+playwright-report/
+test-results/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/

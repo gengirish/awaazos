@@ -1,0 +1,65 @@
+---
+description: Strict per-vendor data isolation — every read/write must scope to vendor.id
+alwaysApply: true
+---
+
+# Tenant Isolation — AwaazOS
+
+`Vendor` (Prisma model) is the tenant. `Vendor.id` IS the tenant id.
+A `User` (Auth.js) belongs to one or more vendors via `StaffMember`.
+
+## Mandatory pattern in every protected handler
+
+```ts
+import { requireVendorRole } from "@/lib/rbac";
+
+export async function GET(req: Request) {
+  const { user, vendor, staff } = await requireVendorRole("CASHIER");
+  // …all queries below MUST include vendorId: vendor.id
+}
+```
+
+## Reads
+
+```ts
+prisma.menuItem.findMany({ where: { vendorId: vendor.id, isAvailable: true } })
+```
+
+## Writes — ALWAYS use compound `where` to defeat ID forgery
+
+```ts
+// GOOD — even if attacker knows the id, the row is rejected unless it belongs to vendor
+prisma.menuItem.update({
+  where: { id: menuItemId, vendorId: vendor.id },
+  data:  { ... },
+});
+
+// BAD — vulnerable to IDOR
+prisma.menuItem.update({ where: { id: menuItemId }, data: { ... } });
+```
+
+## Multi-table writes
+
+Use `prisma.$transaction(async tx => { ... })` for any operation touching ≥2
+tables (e.g. Transaction + OrderItem + DailySummary + BillSequence + Receipt).
+
+## Active vendor selection (multi-vendor users)
+
+Resolved by `requireVendorRole()` in this order:
+1. `?vendor=<slug>` query param
+2. `awz_vendor` cookie
+3. First `StaffMember` by `createdAt` (and the cookie is set)
+
+## Cross-tenant reference rejection
+
+A staff member of Vendor A must never be able to read or write Vendor B's data
+even if they construct a request with B's IDs. Prefer compound `where` over
+post-fetch checks.
+
+## Tests
+
+For every list/detail/mutation route, add a Vitest case that:
+1. Creates two vendors V1, V2 with one menu item each.
+2. Authenticates as V1's owner.
+3. Attempts to read/update/delete V2's item.
+4. Asserts 404 (not 403 — don't leak existence).

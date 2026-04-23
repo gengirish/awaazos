@@ -1,74 +1,64 @@
-# ─── Dependencies ───────────────────────────────────────────────
-node_modules/
+# dependencies
+node_modules
 .pnp
 .pnp.js
 .yarn/install-state.gz
 
-# ─── Next.js ────────────────────────────────────────────────────
+# testing
+coverage
+playwright-report
+test-results
+
+# next.js
 .next/
 out/
-build/
-dist/
+build
+dist
+
+# production
+*.tsbuildinfo
 next-env.d.ts
 
-# ─── Production ─────────────────────────────────────────────────
-*.tsbuildinfo
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
 
-# ─── Environment ────────────────────────────────────────────────
+# env — REAL secrets live here (gitignored)
 .env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
-!.env.local.example
-!.env.example
 
-# ─── Prisma ─────────────────────────────────────────────────────
-prisma/migrations/dev.db*
-prisma/*.db
-prisma/*.db-journal
-
-# ─── Logs ───────────────────────────────────────────────────────
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-.pnpm-debug.log*
-logs/
-*.log
-
-# ─── Testing ────────────────────────────────────────────────────
-coverage/
-.nyc_output/
-playwright-report/
-test-results/
-
-# ─── Vercel ─────────────────────────────────────────────────────
+# vercel
 .vercel
 
-# ─── Editor & OS ────────────────────────────────────────────────
-.DS_Store
-Thumbs.db
-ehthumbs.db
-Desktop.ini
-$RECYCLE.BIN/
+# turbo
+.turbo
+
+# IDE
+.vscode/*
+!.vscode/extensions.json
+.idea
 *.swp
 *.swo
-*~
-.idea/
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
-!.vscode/launch.json
 
-# ─── Cursor / AI tooling ────────────────────────────────────────
-.cursor/
-.aider*
-.continue/
+# OS
+.DS_Store
+Thumbs.db
 
-# ─── Misc ───────────────────────────────────────────────────────
-.cache/
-.turbo/
-.eslintcache
-*.pem
-.history/
+# logs
+*.log
+logs
+
+# prisma
+prisma/migrations/dev/
+
+# uploads (local dev only)
+public/uploads
+tmp/
+
+# cursor agent transcripts inside the repo (if any get exported)
+.cursor/agent-transcripts/

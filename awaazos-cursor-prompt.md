@@ -36,9 +36,13 @@ collect payment via UPI QR.
 ```
 Frontend:       Next.js 14 App Router (TypeScript, strict mode)
 Styling:        Tailwind CSS + shadcn/ui
-Auth:           Clerk (multi-tenant, org-based — one org = one vendor workspace)
-Database:       Supabase (PostgreSQL)
-ORM:            Prisma
+Auth:           Auth.js v5 (NextAuth) + @auth/prisma-adapter + bcryptjs
+                Credentials provider · JWT sessions · two-layer RBAC
+                (platform UserRole · per-tenant StaffRole on Vendor)
+Database:       Neon (Serverless PostgreSQL)
+                — pooled URL for app runtime, direct URL for prisma migrate
+                — @neondatabase/serverless driver available for edge routes
+ORM:            Prisma (with neonConfig.fetchConnectionCache for cold starts)
 AI (NLU):       Claude Haiku 4.5 (primary parser) + Claude Sonnet 4.5 (fallback)
                 Anthropic prompt caching enabled for menu context (≥90% input discount)
 Voice Input:    Web Speech API for en-IN, hi-IN (free, browser-native)
@@ -47,7 +51,7 @@ Payments:       Razorpay (SaaS subscription billing + payment links)
 UPI QR:         api.qrserver.com (free) + Razorpay Payment Links (pro)
 Background:     BullMQ + Redis (WhatsApp receipt jobs, analytics aggregation)
 WhatsApp:       Gupshup API (receipt + notification delivery)
-Storage:        Supabase Storage (logos, PDF receipts)
+Storage:        Vercel Blob (logos, PDF receipts) — colocated with Vercel deploy
 Deploy:         Vercel (frontend + API routes) + Fly.io (BullMQ workers)
 Analytics:      Recharts (vendor dashboard)
 State:          Zustand (POS cart state)
@@ -66,8 +70,8 @@ awaazos/
 │   │   ├── pricing/page.tsx                # ₹0 / ₹299 / ₹799 plans
 │   │   └── features/page.tsx
 │   ├── (auth)/
-│   │   ├── sign-in/[[...sign-in]]/page.tsx
-│   │   └── sign-up/[[...sign-up]]/page.tsx
+│   │   ├── sign-in/page.tsx                # Custom Auth.js Credentials form
+│   │   └── sign-up/page.tsx                # Calls /api/auth/register then signIn()
 │   ├── (onboarding)/
 │   │   └── onboarding/page.tsx             # UPI ID + stall type + first menu items
 │   ├── (vendor)/
@@ -87,8 +91,12 @@ awaazos/
 │   │       ├── billing/page.tsx            # Razorpay subscription management
 │   │       └── staff/page.tsx              # Add cashier staff (Pro plan)
 │   └── api/
+│       ├── auth/
+│       │   ├── [...nextauth]/route.ts      # Auth.js handlers (GET, POST)
+│       │   └── register/route.ts           # POST: create User + Vendor + Staff(OWNER) in one tx
 │       ├── ai/
-│       │   └── parse-order/route.ts        # POST: Claude voice order parser
+│       │   ├── parse-order/route.ts        # POST: Claude voice order parser
+│       │   └── transcribe/route.ts         # POST: audio multipart → Sarvam STT (te/kn/ta)
 │       ├── upi/
 │       │   ├── generate-qr/route.ts        # POST: Generate UPI QR URL
 │       │   └── payment-link/route.ts       # POST: Razorpay Payment Link (Pro)
@@ -129,16 +137,20 @@ awaazos/
 │       ├── SubscriptionGate.tsx            # Plan check wrapper
 │       └── AwaazLogo.tsx                   # Brand logo with आवाज़ wordmark
 ├── lib/
-│   ├── anthropic.ts                        # Claude client singleton (Haiku + Sonnet)
+│   ├── anthropic.ts                        # Claude clients (Haiku + Sonnet) + tool-use helpers
 │   ├── sarvam.ts                           # Sarvam Saaras STT client (te/kn/ta)
-│   ├── prisma.ts                           # Prisma client singleton
-│   ├── supabase.ts                         # Supabase client (server + client)
+│   ├── prisma.ts                           # Prisma client singleton (Neon-pooled)
+│   ├── blob.ts                             # Vercel Blob upload helpers (logos, PDFs)
 │   ├── razorpay.ts                         # Razorpay client
 │   ├── gupshup.ts                          # WhatsApp API client
 │   ├── upi.ts                              # UPI deep link + QR URL builder
 │   ├── voice.ts                            # Web Speech API hook (useVoiceOrder)
 │   ├── currency.ts                         # Paise ↔ ₹ formatters (en-IN)
-│   └── clerk.ts                            # Clerk auth helpers + org context
+│   ├── auth.ts                             # NextAuth() + adapter + Credentials + requireUser()
+│   ├── auth.config.ts                      # Edge-safe NextAuthConfig (used by middleware)
+│   ├── rbac.ts                             # requirePlatformRole, requireVendorRole, AuthError
+│   ├── password.ts                         # bcrypt hash/verify (rounds = 12)
+│   └── zod-auth.ts                         # signInSchema, signUpSchema
 ├── hooks/
 │   ├── useVoiceOrder.ts                    # Mic → transcript → Claude → cart
 │   ├── useCart.ts                          # Zustand cart state
@@ -149,8 +161,14 @@ awaazos/
 ├── prisma/
 │   └── schema.prisma
 ├── workers/
-│   └── receipt.worker.ts                   # BullMQ: WhatsApp receipt delivery
-├── .cursorrules
+│   ├── receipt.worker.ts                   # BullMQ: WhatsApp receipt delivery
+│   └── voiceLog.worker.ts                  # BullMQ: VoiceParseLog persistence (off API path)
+├── types/
+│   ├── index.ts                            # Shared app types
+│   └── next-auth.d.ts                      # Module augmentation for Session/User/JWT
+├── middleware.ts                           # NextAuth(authConfig) — edge-safe
+├── .cursor/
+│   └── rules/                              # Per-folder .mdc rules (see "Rules layout" below)
 ├── .env.local.example
 └── CURSOR_PLAYBOOK.md
 ```
@@ -176,19 +194,20 @@ datasource db {
 
 model Vendor {
   id              String      @id @default(cuid())
-  clerkOrgId      String      @unique
+  slug            String      @unique                 // URL-safe handle, e.g. "ravis-bhel"
   name            String                              // Stall/shop name
   ownerName       String
   phone           String?                             // +91 format
   email           String?
   upiId           String?                             // e.g. vendor@okaxis
   upiName         String?                             // Name shown on UPI screen
-  logoUrl         String?                             // Supabase Storage URL
+  logoUrl         String?                             // Vercel Blob URL
   plan            Plan        @default(FREE)
   planExpiresAt   DateTime?
   stallType       StallType   @default(GENERAL)
   city            String?
   state           String      @default("Telangana")
+  gstin           String?                             // 15-char GST identifier (optional)
   isActive        Boolean     @default(true)
   onboardingDone  Boolean     @default(false)
   createdAt       DateTime    @default(now())
@@ -200,8 +219,10 @@ model Vendor {
   staff           StaffMember[]
   settings        VendorSettings?
   dailySummaries  DailySummary[]
+  billSequences   BillSequence[]
+  voiceParseLogs  VoiceParseLog[]
 
-  @@index([clerkOrgId])
+  @@index([slug])
   @@map("vendors")
 }
 
@@ -218,6 +239,7 @@ model VendorSettings {
   voiceLang             String   @default("en-IN")   // hi-IN, te-IN, kn-IN, ta-IN
   receiptFooter         String?                // "Thanks for visiting!"
   theme                 String   @default("orange")  // orange | green | blue | purple
+  hsnDefault            String?                // Default HSN/SAC code for menu items without one
   razorpaySubId         String?
   razorpayCustomerId    String?
 
@@ -239,6 +261,7 @@ model MenuItem {
   isPopular     Boolean     @default(false)
   sortOrder     Int         @default(0)
   imageUrl      String?
+  hsnCode       String?                             // HSN/SAC; falls back to VendorSettings.hsnDefault
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
@@ -310,7 +333,7 @@ model Receipt {
   whatsappSent    Boolean      @default(false)
   whatsappSentAt  DateTime?
   deliveredTo     String?                            // +91 phone number
-  pdfUrl          String?                            // Supabase Storage URL
+  pdfUrl          String?                            // Vercel Blob URL
   createdAt       DateTime     @default(now())
 
   @@index([vendorId, createdAt])
@@ -343,18 +366,125 @@ model StaffMember {
   id            String    @id @default(cuid())
   vendorId      String
   vendor        Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  clerkUserId   String
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   name          String
   phone         String?
   role          StaffRole @default(CASHIER)
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
 
-  @@unique([vendorId, clerkUserId])
+  @@unique([vendorId, userId])
+  @@index([userId])
   @@map("staff_members")
 }
 
+// ─── AUTH.JS v5 ─────────────────────────────────────────────────────
+// Standard adapter tables. @db.Text on OAuth token columns prevents
+// Postgres truncation on long Google ID tokens.
+
+model User {
+  id            String        @id @default(cuid())
+  name          String?
+  email         String        @unique
+  emailVerified DateTime?
+  image         String?
+  passwordHash  String?                             // null for OAuth-only users
+  role          UserRole      @default(USER)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  staffMemberships StaffMember[]
+
+  @@index([email])
+  @@map("users")
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  user              User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  @@unique([provider, providerAccountId])
+  @@map("accounts")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expires      DateTime
+
+  @@map("sessions")
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
+
+// ─── BILL SEQUENCE (atomic per-vendor-per-day counter) ─────────────
+// Used to generate AWZ-YYYYMMDD-NNNN deterministically without count() races.
+
+model BillSequence {
+  vendorId  String
+  vendor    Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  date      DateTime @db.Date
+  lastSeq   Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  @@id([vendorId, date])
+  @@map("bill_sequences")
+}
+
+// ─── VOICE PARSE LOG (training corpus + observability) ─────────────
+// Written async via BullMQ — never blocks /api/ai/parse-order response.
+// 90-day TTL via scheduled cleanup. NEVER store customer PII here.
+
+model VoiceParseLog {
+  id          String   @id @default(cuid())
+  vendorId    String
+  vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  transcript  String                                          // Voice transcript only
+  lang        String                                          // en-IN | hi-IN | te-IN | kn-IN | ta-IN
+  sttSource   String                                          // 'webspeech' | 'sarvam'
+  modelUsed   String                                          // 'claude-haiku-4-5' | 'claude-sonnet-4-5'
+  escalated   Boolean  @default(false)
+  itemCount   Int
+  confidence  String                                          // 'high' | 'medium' | 'low'
+  unmatched   String[] @default([])
+  latencyMs   Int
+  createdAt   DateTime @default(now())
+
+  @@index([vendorId, createdAt])
+  @@index([modelUsed, escalated])
+  @@map("voice_parse_logs")
+}
+
 // ─── ENUMS ──────────────────────────────────────────────────────────
+
+enum UserRole {
+  USER            // Default — vendors and their staff
+  ADMIN           // IntelliForge support / ops
+  SUPER_ADMIN     // Platform owners
+}
 
 enum Plan {
   FREE            // 50 transactions/month, 1 staff
@@ -415,8 +545,9 @@ enum StaffRole {
 You are building AwaazOS: a multi-tenant AI voice-powered POS and billing SaaS
 for Indian small vendors. Tagline: "Bol. Bill. Becho."
 
-Stack: Next.js 14 App Router · TypeScript · Prisma · Supabase · Clerk · 
-Tailwind CSS · shadcn/ui · Anthropic Claude API · Razorpay · Gupshup · BullMQ + Redis.
+Stack: Next.js 14 App Router · TypeScript · Prisma · Neon (serverless Postgres) ·
+Auth.js v5 · Tailwind CSS · shadcn/ui · Anthropic Claude API ·
+Sarvam Saaras STT · Razorpay · Gupshup · BullMQ + Redis · Vercel Blob.
 
 ## India-First Conventions — STRICTLY FOLLOW
 - ALL monetary values stored in PAISE (integer). Never Decimal for money.
@@ -428,12 +559,16 @@ Tailwind CSS · shadcn/ui · Anthropic Claude API · Razorpay · Gupshup · Bull
 - Tax: CGST + SGST (intra-state), IGST (inter-state), stored in paise
 
 ## Architecture Rules
-- Every API route starts with Clerk auth: const { userId, orgId } = auth()
-- Every DB query scoped to vendorId — NEVER cross-tenant data leaks
-- Always validate orgId matches vendorId before any DB operation
-- Use Prisma transactions for multi-table writes
+- Every protected API route starts with Auth.js + RBAC:
+    const { user, vendor } = await requireVendorRole('CASHIER')   // or 'OWNER' / 'MANAGER'
+- Every DB query scoped to vendor.id — NEVER cross-tenant data leaks
+- Reads:  prisma.x.findMany({ where: { vendorId: vendor.id, ... } })
+- Writes: prisma.x.update/delete({ where: { id, vendorId: vendor.id } })
+  (compound where guards against forged ids)
+- Use prisma.$transaction([...]) for multi-table writes
 - Monetary calculations: always integer arithmetic in paise, never floating point
-- Background jobs (WhatsApp receipts) via BullMQ — never block API response
+- Background jobs (WhatsApp receipts, voice parse logs) via BullMQ — never block API response
+- middleware.ts imports auth.config.ts ONLY (edge-safe). Prisma + Credentials live in auth.ts.
 
 ## Voice AI Rules (useVoiceOrder hook)
 - STT routing by VendorSettings.voiceLang:
@@ -474,10 +609,17 @@ Tailwind CSS · shadcn/ui · Anthropic Claude API · Razorpay · Gupshup · Bull
 - Toast notifications: sonner (already in shadcn/ui)
 
 ## Multi-Tenancy Rules
-- Clerk org = Vendor workspace. One org per vendor.
-- Clerk userId = staff member identity
-- VendorSettings auto-created on first org setup via webhook
-- Plan limits enforced server-side on every transaction creation
+- Vendor (Prisma model) = the tenant. Vendor.id IS the tenant id.
+- User (Auth.js) ↔ Vendor is many-to-many via StaffMember (with StaffRole).
+- A new sign-up creates User + Vendor + StaffMember(OWNER) in one prisma.$transaction
+  inside POST /api/auth/register — never split across requests.
+- VendorSettings auto-created in the same transaction as the Vendor.
+- session.user.id resolves to one or more vendors via StaffMember.
+  If a user belongs to >1 vendor, an active vendor is selected via:
+    1. ?vendor=<slug> query param, else
+    2. cookie `awz_vendor` (set on selection), else
+    3. first vendor by createdAt (auto-set cookie).
+- Plan limits enforced server-side on every transaction creation (see lib/rbac.ts).
 
 ## Component Rules
 - POS screen is mobile-first — designed for 390px width (vendor's phone)
@@ -498,49 +640,53 @@ Tailwind CSS · shadcn/ui · Anthropic Claude API · Razorpay · Gupshup · Bull
 ## 🔑 ENV VARIABLES (.env.local.example)
 
 ```bash
-# Database
-DATABASE_URL="postgresql://..."
-DIRECT_URL="postgresql://..."
+# ─── Database (Neon serverless Postgres) ──────────────────────────────
+# DATABASE_URL  = pooled connection (host contains '-pooler') for app runtime
+# DIRECT_URL    = direct connection (no '-pooler') for `prisma migrate` only
+# Get both from the Neon console → Connection Details → Show password.
+DATABASE_URL="postgresql://<user>:<password>@<endpoint>-pooler.<region>.aws.neon.tech/<db>?sslmode=require&channel_binding=require"
+DIRECT_URL="postgresql://<user>:<password>@<endpoint>.<region>.aws.neon.tech/<db>?sslmode=require&channel_binding=require"
 
-# Clerk
-NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=pk_test_...
-CLERK_SECRET_KEY=sk_test_...
-NEXT_PUBLIC_CLERK_SIGN_IN_URL=/sign-in
-NEXT_PUBLIC_CLERK_SIGN_UP_URL=/sign-up
-NEXT_PUBLIC_CLERK_AFTER_SIGN_IN_URL=/dashboard
-NEXT_PUBLIC_CLERK_AFTER_SIGN_UP_URL=/onboarding
-CLERK_WEBHOOK_SECRET=whsec_...
+# ─── Auth.js v5 ───────────────────────────────────────────────────────
+# Generate AUTH_SECRET with: openssl rand -base64 32
+AUTH_SECRET=
+AUTH_URL=http://localhost:3000          # required when NOT on Vercel (dev/Docker)
+AUTH_TRUST_HOST=true                    # required behind proxies without AUTH_URL
 
-# Anthropic (Haiku 4.5 primary, Sonnet 4.5 fallback)
+# ─── Anthropic (Haiku 4.5 primary, Sonnet 4.5 fallback) ──────────────
 ANTHROPIC_API_KEY=sk-ant-...
 ANTHROPIC_PRIMARY_MODEL=claude-haiku-4-5
 ANTHROPIC_FALLBACK_MODEL=claude-sonnet-4-5
 
-# Sarvam AI (STT for te-IN, kn-IN, ta-IN — Web Speech API is unreliable here)
+# ─── Sarvam AI (STT for te-IN, kn-IN, ta-IN) ─────────────────────────
 SARVAM_API_KEY=...
 SARVAM_STT_MODEL=saaras:v2
 
-# Razorpay
+# ─── Razorpay ─────────────────────────────────────────────────────────
 RAZORPAY_KEY_ID=rzp_test_...
 RAZORPAY_KEY_SECRET=...
 RAZORPAY_WEBHOOK_SECRET=...
 
-# Gupshup (WhatsApp)
+# ─── Gupshup (WhatsApp) ───────────────────────────────────────────────
 GUPSHUP_API_KEY=...
 GUPSHUP_APP_NAME=awaazos
 GUPSHUP_SRC_NUMBER=917XXXXXXXXX
 
-# Redis (BullMQ)
+# ─── Redis (BullMQ) ───────────────────────────────────────────────────
 REDIS_URL=redis://...
 
-# Supabase
-NEXT_PUBLIC_SUPABASE_URL=https://....supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=...
-SUPABASE_SERVICE_ROLE_KEY=...
+# ─── Vercel Blob (logos, PDF receipts) ────────────────────────────────
+# Auto-injected on Vercel deploys; set manually only for local dev.
+BLOB_READ_WRITE_TOKEN=
 
-# App
+# ─── App ──────────────────────────────────────────────────────────────
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 ```
+
+> **Where the real Neon credentials live:** never in `.env.local.example` (committed)
+> and never in git. Put the actual `DATABASE_URL` / `DIRECT_URL` in a gitignored
+> `.env.local`. The connection string shared in chat must be **rotated in the Neon
+> console** before going to production.
 
 ---
 
@@ -558,7 +704,9 @@ Create a new Next.js 14 App Router project called awaazos with TypeScript strict
 Install and configure:
 - tailwindcss, shadcn/ui (init with default theme, slate base)
 - @prisma/client, prisma
-- @clerk/nextjs
+- next-auth@beta, @auth/prisma-adapter, bcryptjs, @types/bcryptjs
+- @neondatabase/serverless    # for edge routes that need raw SQL
+- @vercel/blob                # logos, PDF receipts
 - @anthropic-ai/sdk
 - razorpay
 - bullmq, ioredis
@@ -567,11 +715,19 @@ Install and configure:
 - recharts
 - sonner
 - lucide-react
+- libphonenumber-js           # +91 phone validation
 
-Create the full directory structure as defined in the AwaazOS architecture.
-Create .env.local.example with all required variables.
-Create .cursorrules with AwaazOS rules.
-Initialize Prisma with the full schema.
+Do NOT install: @clerk/nextjs, @supabase/supabase-js, svix.
+
+Create the full directory structure as defined in the AwaazOS architecture
+(including middleware.ts at the root, types/next-auth.d.ts inside src/types,
+and the .cursor/rules/ folder).
+
+Create .env.local.example with all required variables (placeholders only —
+real Neon/Anthropic/Razorpay values go in gitignored .env.local).
+Create .cursorrules with AwaazOS rules (or split into per-folder .mdc rules
+under .cursor/rules/).
+Initialize Prisma with the full schema (see PRISMA SCHEMA section).
 Run prisma generate.
 ```
 
@@ -599,24 +755,92 @@ After schema is ready:
 
 ---
 
-### PROMPT 3 — Clerk Auth + Vendor Onboarding
+### PROMPT 3 — Auth.js v5 + Vendor Onboarding
 
 ```
-Set up Clerk multi-tenant auth for AwaazOS:
+Set up Auth.js v5 multi-tenant auth for AwaazOS. Use the
+auth-js-integration skill (Cursor skills) for the canonical edge-split
+pattern. Key principle: ONE prisma.$transaction creates User +
+Vendor + StaffMember(OWNER) + VendorSettings together — no webhooks.
 
-1. Configure middleware.ts to protect /(vendor) and /api routes
-2. Create sign-in and sign-up pages using Clerk components
-3. Create /app/(onboarding)/onboarding/page.tsx — 4-step wizard:
-   Step 1: Stall name + owner name + stall type
-   Step 2: UPI ID + UPI display name (with live QR preview)
-   Step 3: Add first 3 menu items (name, price, emoji)
-   Step 4: WhatsApp number for receipts (optional)
-4. Create Clerk webhook handler at /api/webhooks/clerk/route.ts:
-   - On organization.created: create Vendor + VendorSettings in DB
-   - On organizationMembership.created: create StaffMember
-5. Create /lib/clerk.ts with:
-   - getCurrentVendor(): Promise<Vendor> — from orgId
-   - assertVendorOwner(): throws if not OWNER role
+1. /lib/auth.config.ts (edge-safe, imported by middleware.ts):
+   - export const authConfig: NextAuthConfig
+   - pages: { signIn: '/sign-in' }
+   - providers: []   // empty — Credentials lives in auth.ts (Node only)
+   - callbacks.authorized({ auth, request }):
+       Block /(vendor)/* and /api/* (except /api/auth/*, /api/webhooks/*,
+       /api/ai/transcribe is auth-required)
+   - callbacks.jwt({ token, user }):
+       On first sign-in, copy user.id and user.role onto token
+   - callbacks.session({ session, token }):
+       session.user.id = token.sub; session.user.role = token.role
+
+2. /lib/auth.ts (Node):
+   - import authConfig from './auth.config'
+   - export const { handlers, auth, signIn, signOut } = NextAuth({
+       ...authConfig,
+       adapter: PrismaAdapter(prisma),
+       session: { strategy: 'jwt' },
+       providers: [Credentials({ ... verify with bcrypt against User.passwordHash })],
+     })
+   - export async function requireUser(): returns session.user or throws
+
+3. /lib/rbac.ts:
+   - export class AuthError extends Error { status: number }
+   - export async function requirePlatformRole(role: 'ADMIN'|'SUPER_ADMIN')
+   - export async function requireVendorRole(role: StaffRole, vendorIdOrSlug?: string):
+       Promise<{ user, vendor, staff }>
+       Resolves active vendor via:
+         (a) explicit arg, else
+         (b) ?vendor=<slug> on the request, else
+         (c) cookie 'awz_vendor', else
+         (d) first StaffMember by createdAt (sets cookie)
+       Throws AuthError(403) if staff.role weaker than required.
+
+4. /lib/password.ts:
+   - hashPassword(plain: string) → bcrypt rounds=12
+   - verifyPassword(plain, hash)
+
+5. /lib/zod-auth.ts:
+   - signInSchema  = { email, password }
+   - signUpSchema  = { email, password (min 8), name, stallName, stallType, phone? }
+
+6. /src/types/next-auth.d.ts (NOT at workspace root — that breaks TS resolution):
+   - declare module 'next-auth' to add { id, role } to Session.user
+   - declare module 'next-auth/jwt' to add { role } to JWT
+
+7. /middleware.ts:
+   - export { auth as middleware } = NextAuth(authConfig)
+   - matcher: ['/((?!_next/static|_next/image|favicon.ico|api/webhooks).*)']
+
+8. /app/api/auth/[...nextauth]/route.ts:
+   - export const { GET, POST } = handlers
+
+9. POST /app/api/auth/register/route.ts:
+   - Body validated by signUpSchema
+   - prisma.$transaction(async tx => {
+       const user   = await tx.user.create({ data: { email, name, passwordHash, role: 'USER' } })
+       const vendor = await tx.vendor.create({ data: { name: stallName, ownerName: name, stallType, slug } })
+       await tx.vendorSettings.create({ data: { vendorId: vendor.id } })
+       await tx.staffMember.create({ data: { vendorId: vendor.id, userId: user.id,
+                                              name, phone, role: 'OWNER' } })
+       return { userId: user.id, vendorId: vendor.id, vendorSlug: vendor.slug }
+     })
+   - Map Prisma P2002 (unique violation on email/slug) → HTTP 409
+   - Set 'awz_vendor' cookie to vendor.slug
+
+10. /app/(auth)/sign-in/page.tsx and /sign-up/page.tsx:
+    - Custom shadcn/ui forms (NOT Auth.js default pages)
+    - Wrap any useSearchParams() reader (?callbackUrl=) in <Suspense>
+    - On submit: signIn('credentials', { email, password, redirect: false, callbackUrl })
+    - On register success: immediately call signIn(...) so user lands on /onboarding
+
+11. /app/(onboarding)/onboarding/page.tsx — 4-step wizard:
+    Step 1: stall info already captured at sign-up → confirm + edit (city, state)
+    Step 2: UPI ID + UPI display name (with live QR preview using lib/upi.ts)
+    Step 3: Add first 3 menu items (name, price ₹, emoji, optional alias for voice)
+    Step 4: WhatsApp number (+91, validated via libphonenumber-js) + voiceLang select
+    On finish: PATCH /api/vendor → onboardingDone = true → redirect /pos
 ```
 
 ---
@@ -664,11 +888,20 @@ FALLBACK = Claude Sonnet 4.5 (only ~3% of calls, when Haiku is uncertain).
    - Sarvam Saaras v2 STT client (REST). Used for te-IN, kn-IN, ta-IN.
    - Function: transcribeAudio(blob, lang) → { transcript, confidence }
 
-3. POST /api/ai/parse-order/route.ts:
-   - Auth: require valid Clerk session + orgId, resolve vendorId
-   - Input: { transcript: string, lang: string }
+3. POST /api/ai/transcribe/route.ts (NEW — server STT for te/kn/ta):
+   - Auth: const { vendor } = await requireVendorRole('CASHIER')
+   - Input: multipart/form-data with field `audio` (Blob, .webm/.wav) + `lang`
+   - Reject langs other than te-IN | kn-IN | ta-IN (caller must use Web Speech for en/hi)
+   - Forward to Sarvam Saaras v2 via lib/sarvam.ts
+   - 5-second hard timeout → respond { error, fallback: 'quickadd' }
+   - Return: { transcript: string, durationMs: number }
+   - DO NOT log audio bytes; only log durationMs and lang.
+
+4. POST /api/ai/parse-order/route.ts:
+   - Auth: const { vendor } = await requireVendorRole('CASHIER')
+   - Input: { transcript: string, lang: string, sttSource: 'webspeech'|'sarvam' }
    - Fetch vendor's menu items from DB (id, name, aliases, priceInPaise,
-     isAvailable=true only)
+     isAvailable=true only) — scoped to vendor.id
    - SYSTEM PROMPT (schema-locked, no prose, with caching directive):
 
      "You parse Indian-vendor voice orders into JSON for a billing POS.
@@ -700,30 +933,37 @@ FALLBACK = Claude Sonnet 4.5 (only ~3% of calls, when Haiku is uncertain).
       {menuItemsJson}"
 
    - Send menu block with cache_control: { type: 'ephemeral' } so subsequent
-     calls within 5 min hit the prompt cache (90% input cost reduction)
+     calls within 5 min hit the prompt cache (~90% input cost reduction)
    - Set max_tokens: 512, temperature: 0.1
+   - PREFERRED: use Anthropic tool-use with a single tool `add_items` whose
+     input_schema matches the JSON schema above. Tool use guarantees
+     well-formed structured output and enables progressive UI updates
+     (each tool_use delta yields a complete item).
    - Call Haiku FIRST. Validate result with zod schema.
    - ESCALATE to Sonnet 4.5 if any of:
        (a) zod validation fails or JSON.parse throws
        (b) items is [] AND transcript word-count > 3
        (c) confidence === 'low' AND unmatched.length > 0
-   - Log: { vendorId, transcript, lang, modelUsed, latencyMs,
-            itemCount, confidence, escalated } for 90 days
+   - Enqueue (do not await) a BullMQ job 'voice-parse-log' with:
+       { vendorId, transcript, lang, sttSource, modelUsed, latencyMs,
+         itemCount, confidence, unmatched, escalated }
+     — written to VoiceParseLog by /workers/voiceLog.worker.ts. 90-day TTL.
    - Return: { items, unmatched, confidence, modelUsed }
 
-4. Custom hook /hooks/useVoiceOrder.ts:
+5. Custom hook /hooks/useVoiceOrder.ts:
    - Read voiceLang from VendorSettings (en-IN default)
    - STT routing:
-       en-IN, hi-IN          → Web Speech API (browser)
-       te-IN, kn-IN, ta-IN   → record audio → POST to Sarvam STT route
+       en-IN, hi-IN          → Web Speech API (browser, free)
+       te-IN, kn-IN, ta-IN   → MediaRecorder → POST to /api/ai/transcribe
+                               (PLAN GATE: only available on STARTER+ — see PROMPT 9)
    - States: idle | listening | transcribing | parsing | success | error
-   - On transcript ready: POST to /api/ai/parse-order
+   - On transcript ready: POST to /api/ai/parse-order with sttSource
    - Return: { startListening, stopListening, state, lastTranscript,
               parsedItems, unmatched, confidence }
    - If confidence === 'low': UI surfaces a 'Double-check this' banner
    - Fallback message + auto-show QuickAddGrid if STT unsupported
 
-5. Test cases (must all return correct items):
+6. Test cases (Vitest fixtures, all must return correct items):
    - "do bhel aur ek nimbu pani"        (Hindi, code-mixed numerals)
    - "one small bhel and two lemonades" (English)
    - "rendu large bhel"                  (Telugu)
@@ -782,11 +1022,22 @@ After payment marked: POST /api/transactions to create Transaction + OrderItems.
 Build the transaction and receipt system for AwaazOS:
 
 1. POST /api/transactions/route.ts:
-   - Create Transaction with OrderItems in Prisma transaction
-   - Auto-generate billNumber: AWZ-{YYYYMMDD}-{4-digit sequence per vendor per day}
-   - Update DailySummary (upsert) for today's date
-   - Queue WhatsApp receipt job if customerPhone provided
-   - Return created transaction with receipt number
+   - Auth: const { vendor } = await requireVendorRole('CASHIER')
+   - Plan-gate: enforce monthly txn limit per vendor.plan
+   - All steps INSIDE prisma.$transaction(async tx => { ... }):
+     a) Atomically advance the per-day sequence:
+          const seq = await tx.billSequence.upsert({
+            where:  { vendorId_date: { vendorId: vendor.id, date: todayDate } },
+            create: { vendorId: vendor.id, date: todayDate, lastSeq: 1 },
+            update: { lastSeq: { increment: 1 } },
+          })
+        billNumber = `AWZ-${YYYYMMDD}-${String(seq.lastSeq).padStart(4,'0')}`
+     b) Create Transaction with OrderItems
+     c) Upsert DailySummary for today's date
+     d) Create Receipt row (whatsappSent=false)
+   - After commit (outside the tx): if customerPhone provided AND vendor.plan ≥ STARTER,
+     enqueue BullMQ 'send-receipt' job
+   - Return: { transaction, receiptNumber }
 
 2. GET /api/transactions/route.ts:
    - Paginated list (20 per page) for current vendor
@@ -892,6 +1143,18 @@ Gate these features behind plan:
 - Razorpay payment links: PRO
 - CSV export: PRO
 - Analytics beyond 7 days: STARTER+
+- Sarvam STT (te-IN, kn-IN, ta-IN voice): STARTER+
+    Rationale: Sarvam is paid per audio-minute. FREE-tier vendors using te/kn/ta
+    must fall back to QuickAddGrid (typed entry). Web Speech (en-IN, hi-IN)
+    remains free on all plans.
+
+Implement plan-gate enforcement in /lib/rbac.ts:
+  requirePlan(vendor, minPlan: Plan): asserts vendor.plan >= minPlan
+And use it in:
+  - /api/ai/transcribe (Sarvam)
+  - /api/receipts/send (WhatsApp)
+  - /api/transactions (monthly txn cap)
+  - /api/upi/payment-link (Razorpay Links)
 ```
 
 ---
@@ -928,12 +1191,18 @@ Sections:
 6. Footer: IntelliForge AI branding + Bharat AI Mission badge
 
 Deployment checklist (add to CURSOR_PLAYBOOK.md):
-- Vercel: connect GitHub repo, add all env vars, deploy
-- Fly.io: deploy BullMQ worker (Dockerfile + fly.toml)
-- Supabase: run prisma migrate deploy
-- Clerk: configure production webhook URL
-- Razorpay: switch to live keys, configure webhook
-- Domain: point awaazos.in to Vercel
+- Vercel: connect GitHub repo, add all env vars (DATABASE_URL, DIRECT_URL,
+    AUTH_SECRET, ANTHROPIC_*, SARVAM_*, RAZORPAY_*, GUPSHUP_*, REDIS_URL,
+    BLOB_READ_WRITE_TOKEN). AUTH_URL is auto-detected on Vercel.
+- Vercel Blob: enable in project settings → BLOB_READ_WRITE_TOKEN auto-injected.
+- Neon: create prod branch, copy pooled+direct URLs into Vercel env.
+    Run `prisma migrate deploy` from local with DIRECT_URL set.
+- Fly.io: deploy BullMQ workers (receipt + voiceLog) — single Dockerfile,
+    one app, two process groups in fly.toml.
+- Auth.js: rotate AUTH_SECRET for prod (`openssl rand -base64 32`).
+- Razorpay: switch to live keys, configure webhook → /api/webhooks/razorpay.
+- Domain: point awaazos.in to Vercel; add to Razorpay allowed origins;
+    add to Auth.js trusted hosts (Vercel auto-handles this).
 ```
 
 ---
@@ -944,20 +1213,28 @@ Deployment checklist (add to CURSOR_PLAYBOOK.md):
 # AwaazOS — Cursor Playbook
 
 ## Build Order
-1. [ ] PROMPT 1 — Project Scaffold
+1. [ ] PROMPT 1 — Project Scaffold (Auth.js + Neon + Vercel Blob deps)
 2. [ ] PROMPT 2 — Prisma Schema + DB Setup
-3. [ ] PROMPT 3 — Clerk Auth + Onboarding
+3. [ ] PROMPT 3 — Auth.js v5 + Vendor Onboarding (single $transaction)
 4. [ ] PROMPT 4 — Menu Management CRUD
-5. [ ] PROMPT 5 — AI Voice Order Parser API
+5. [ ] PROMPT 5 — AI Voice Pipeline (Sarvam STT + Haiku/Sonnet two-tier)
 6. [ ] PROMPT 6 — POS Screen (Core Feature) ⭐
-7. [ ] PROMPT 7 — Transaction API + Receipt System
+7. [ ] PROMPT 7 — Transaction API + Receipt System (atomic BillSequence)
 8. [ ] PROMPT 8 — Analytics Dashboard
-9. [ ] PROMPT 9 — Razorpay Subscription + Plan Gates
+9. [ ] PROMPT 9 — Razorpay Subscription + Plan Gates (incl. Sarvam STARTER+)
 10. [ ] PROMPT 10 — Landing Page + Deployment
 
 ## Key Decisions Log
 - Money: ALWAYS paise (integer). Never Decimal. Never float.
 - Bill numbers: AWZ-YYYYMMDD-NNNN per vendor per day
+    Generated via atomic upsert on BillSequence inside the same prisma.$transaction
+    that creates the Transaction — eliminates count()-based race conditions.
+- Database: Neon serverless Postgres (pooled URL for runtime, direct URL for migrations)
+- Auth: Auth.js v5 (NextAuth) + Prisma adapter + bcrypt Credentials.
+    Vendor (Prisma) is the tenant. User × Vendor m2m via StaffMember.
+    Active vendor selection: ?vendor=<slug> → cookie → first by createdAt.
+    Sign-up creates User+Vendor+VendorSettings+StaffMember(OWNER) in one $transaction.
+- Storage: Vercel Blob (logos, PDF receipts) — no Supabase dependency.
 - Voice STT (language-routed):
     en-IN, hi-IN          → Web Speech API (free, browser-native)
     te-IN, kn-IN, ta-IN   → Sarvam Saaras v2 (browser STT unreliable here)
@@ -976,7 +1253,14 @@ Deployment checklist (add to CURSOR_PLAYBOOK.md):
     90 days of (transcript, parse) logs to fine-tune on.
 - QR: api.qrserver.com for FREE plan, Razorpay Payment Links for PRO
 - WhatsApp: BullMQ queue → Gupshup API (never block API response)
-- Auth: Clerk org = vendor tenant. One org per vendor.
+- Voice telemetry: VoiceParseLog (transcript + parse, NO PII) written async via
+    BullMQ 'voice-parse-log' worker. 90-day TTL. Future fine-tuning corpus.
+- Plan gate on Sarvam (te/kn/ta voice): STARTER+ only — Sarvam is paid per
+    audio-minute and would burn unit economics on FREE-tier abuse.
+- Offline POS: deferred to v1.1 (Serwist + Dexie + replay queue). Marketing
+    page asterisk on "Works Offline*" reflects this.
+- GST: gstin (Vendor), hsnDefault (VendorSettings), hsnCode (MenuItem) are
+    nullable day-1 to allow ₹20L+ vendors to upgrade later without migration.
 
 ## India Conventions Checklist
 - [ ] All prices in paise in DB
@@ -1018,4 +1302,4 @@ Deployment checklist (add to CURSOR_PLAYBOOK.md):
 **Built by:** IntelliForge AI, Hyderabad
 
 ---
-*Generated by IntelliForge AI | Cursor Kickoff Pack v1.0*
+*Generated by IntelliForge AI | Cursor Kickoff Pack v2.0 — Auth.js + Neon edition*

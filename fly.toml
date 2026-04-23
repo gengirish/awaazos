@@ -1,0 +1,22 @@
+# fly.toml app configuration file generated for awaazos-workers on 2026-04-23T10:58:20+05:30
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'awaazos-workers'
+primary_region = 'bom'
+kill_signal = 'SIGTERM'
+kill_timeout = '15s'
+
+[build]
+  dockerfile = 'Dockerfile.worker'
+
+[env]
+  NODE_ENV = 'production'
+
+[[vm]]
+  size = 'shared-cpu-1x'
+  memory = '512mb'
+  cpu_kind = 'shared'
+  cpus = 1
+  memory_mb = 512

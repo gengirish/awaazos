@@ -1,0 +1,281 @@
+"use client";
+
+import { useCallback, useRef, useState } from "react";
+
+type VoiceOrderState =
+  | "idle"
+  | "listening"
+  | "transcribing"
+  | "parsing"
+  | "success"
+  | "error";
+
+type SttSource = "webspeech" | "sarvam";
+
+type ParsedItem = {
+  menuItemId: string;
+  name: string;
+  priceInPaise: number;
+  qty: number;
+};
+
+interface WebSpeechRecognition extends EventTarget {
+  lang: string;
+  continuous: boolean;
+  interimResults: boolean;
+  maxAlternatives: number;
+  start: () => void;
+  stop: () => void;
+  abort: () => void;
+  onresult: ((this: WebSpeechRecognition, ev: VoiceSpeechRecognitionEvent) => void) | null;
+  onerror: ((this: WebSpeechRecognition, ev: VoiceSpeechErrorEvent) => void) | null;
+  onend: ((this: WebSpeechRecognition, ev: Event) => void) | null;
+}
+
+interface VoiceSpeechRecognitionEvent extends Event {
+  results: SpeechRecognitionResultList;
+}
+
+interface VoiceSpeechErrorEvent extends Event {
+  error: string;
+}
+
+declare global {
+  interface Window {
+    SpeechRecognition?: { new (): WebSpeechRecognition };
+    webkitSpeechRecognition?: { new (): WebSpeechRecognition };
+  }
+}
+
+const SARVAM_LANGS = new Set(["te-IN", "kn-IN", "ta-IN"]);
+const WEBSPEECH_LANGS = new Set(["en-IN", "hi-IN"]);
+
+function pickMimeType(): string | undefined {
+  if (typeof MediaRecorder === "undefined") return undefined;
+  const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
+  for (const t of candidates) {
+    if (MediaRecorder.isTypeSupported(t)) return t;
+  }
+  return undefined;
+}
+
+export function useVoiceOrder(options: { voiceLang: string }) {
+  const { voiceLang } = options;
+  const [state, setState] = useState<VoiceOrderState>("idle");
+  const [lastTranscript, setLastTranscript] = useState("");
+  const [parsedItems, setParsedItems] = useState<ParsedItem[]>([]);
+  const [unmatched, setUnmatched] = useState<string[]>([]);
+  const [confidence, setConfidence] = useState<"high" | "medium" | "low" | null>(null);
+  const [modelUsed, setModelUsed] = useState<string | null>(null);
+  const [errorReason, setErrorReason] = useState<string | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<BlobPart[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const recognitionRef = useRef<WebSpeechRecognition | null>(null);
+
+  const needsConfirmation = confidence === "low";
+
+  const parseTranscript = useCallback(async (transcript: string, sttSource: SttSource) => {
+    setState("parsing");
+    setLastTranscript(transcript);
+    try {
+      const res = await fetch("/api/ai/parse-order", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ transcript, lang: voiceLang, sttSource }),
+      });
+      if (!res.ok) {
+        setState("error");
+        setErrorReason("parse_failed");
+        return;
+      }
+      const data = (await res.json()) as {
+        items: ParsedItem[];
+        unmatched: string[];
+        confidence: "high" | "medium" | "low";
+        modelUsed: string;
+      };
+      setParsedItems(data.items);
+      setUnmatched(data.unmatched);
+      setConfidence(data.confidence);
+      setModelUsed(data.modelUsed);
+      setState("success");
+    } catch {
+      setState("error");
+      setErrorReason("parse_failed");
+    }
+  }, [voiceLang]);
+
+  const stopListening = useCallback(() => {
+    const rec = recognitionRef.current;
+    if (rec) {
+      try {
+        rec.stop();
+      } catch {
+        /* ignore */
+      }
+      recognitionRef.current = null;
+    }
+
+    const mr = mediaRecorderRef.current;
+    if (mr && mr.state !== "inactive") {
+      try {
+        mr.stop();
+      } catch {
+        /* ignore */
+      }
+    }
+  }, []);
+
+  const startListening = useCallback(async () => {
+    setErrorReason(null);
+    setParsedItems([]);
+    setUnmatched([]);
+    setConfidence(null);
+    setModelUsed(null);
+
+    if (WEBSPEECH_LANGS.has(voiceLang)) {
+      const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
+      if (!Ctor) {
+        setState("error");
+        setErrorReason("stt_unsupported");
+        return;
+      }
+
+      const recognition = new Ctor();
+      recognition.lang = voiceLang;
+      recognition.continuous = false;
+      recognition.interimResults = false;
+      recognition.maxAlternatives = 1;
+
+      recognition.onresult = (ev: VoiceSpeechRecognitionEvent) => {
+        const text = ev.results[0]?.[0]?.transcript?.trim() ?? "";
+        if (text) void parseTranscript(text, "webspeech");
+        else {
+          setState("idle");
+        }
+      };
+
+      recognition.onerror = () => {
+        setState("error");
+        setErrorReason("webspeech_error");
+      };
+
+      recognition.onend = () => {
+        recognitionRef.current = null;
+      };
+
+      recognitionRef.current = recognition;
+      setState("listening");
+      try {
+        recognition.start();
+      } catch {
+        setState("error");
+        setErrorReason("webspeech_error");
+      }
+      return;
+    }
+
+    if (SARVAM_LANGS.has(voiceLang)) {
+      setState("listening");
+      chunksRef.current = [];
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        streamRef.current = stream;
+        const mimeType = pickMimeType();
+        const mr = mimeType
+          ? new MediaRecorder(stream, { mimeType })
+          : new MediaRecorder(stream);
+        mediaRecorderRef.current = mr;
+
+        mr.ondataavailable = (e) => {
+          if (e.data.size > 0) chunksRef.current.push(e.data);
+        };
+
+        mr.onstop = () => {
+          stream.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+          mediaRecorderRef.current = null;
+
+          const blob = new Blob(chunksRef.current, {
+            type: mr.mimeType || "audio/webm",
+          });
+          chunksRef.current = [];
+
+          void (async () => {
+            setState("transcribing");
+            const form = new FormData();
+            form.append("audio", blob, "clip.webm");
+            form.append("lang", voiceLang);
+
+            try {
+              const res = await fetch("/api/ai/transcribe", {
+                method: "POST",
+                credentials: "include",
+                body: form,
+              });
+              const data = (await res.json()) as {
+                transcript?: string;
+                error?: string;
+                fallback?: string;
+              };
+
+              if (!res.ok && res.status === 400) {
+                setState("error");
+                setErrorReason("use_webspeech");
+                return;
+              }
+
+              if (data.error && !data.transcript) {
+                setState("error");
+                setErrorReason(data.fallback === "quickadd" ? "stt_degraded" : "transcribe_failed");
+                return;
+              }
+
+              const transcript = typeof data.transcript === "string" ? data.transcript.trim() : "";
+              if (!transcript) {
+                setState("error");
+                setErrorReason("empty_transcript");
+                return;
+              }
+
+              await parseTranscript(transcript, "sarvam");
+            } catch {
+              setState("error");
+              setErrorReason("transcribe_failed");
+            }
+          })();
+        };
+
+        mr.start();
+        setTimeout(() => {
+          if (mediaRecorderRef.current === mr && mr.state === "recording") {
+            mr.stop();
+          }
+        }, 12_000);
+      } catch {
+        setState("error");
+        setErrorReason("mic_denied");
+      }
+      return;
+    }
+
+    setState("error");
+    setErrorReason("unsupported_lang");
+  }, [parseTranscript, voiceLang]);
+
+  return {
+    startListening,
+    stopListening,
+    state,
+    lastTranscript,
+    parsedItems,
+    unmatched,
+    confidence,
+    modelUsed,
+    needsConfirmation,
+    errorReason,
+  };
+}

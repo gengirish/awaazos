@@ -1,0 +1,30 @@
+# AwaazOS BullMQ worker container — runs on Fly.io
+# Processes: voice-parse-log queue (and future receipt.worker, send-receipt, etc.)
+# Not a Next.js server — no HTTP port exposed.
+
+FROM node:20-alpine AS base
+RUN apk add --no-cache libc6-compat openssl ca-certificates
+WORKDIR /app
+
+# ── deps ────────────────────────────────────────────────────────────────
+COPY package.json package-lock.json ./
+COPY prisma ./prisma
+# Need devDeps because we run via tsx (avoids a tsc compile step)
+RUN npm ci --no-audit --no-fund \
+ && npx prisma generate \
+ && npm cache clean --force
+
+# ── source ──────────────────────────────────────────────────────────────
+COPY tsconfig.json ./
+COPY lib ./lib
+COPY workers ./workers
+
+# ── runtime user ────────────────────────────────────────────────────────
+RUN addgroup -S app && adduser -S app -G app && chown -R app:app /app
+USER app
+
+ENV NODE_ENV=production \
+    NODE_OPTIONS="--enable-source-maps"
+
+# tsx resolves `@/*` paths via tsconfig.json
+CMD ["npx", "tsx", "workers/index.ts"]

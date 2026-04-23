@@ -1,0 +1,53 @@
+# Anything not required by the worker container
+
+# Next.js + frontend (Vercel handles those)
+.next/
+.vercel/
+app/
+components/
+hooks/
+public/
+src/
+types/
+middleware.ts
+next.config.mjs
+next-env.d.ts
+postcss.config.js
+tailwind.config.ts
+components.json
+.eslintrc.json
+vitest.config.ts
+
+# node_modules — installed inside container
+node_modules/
+
+# Local env (Fly secrets supply these)
+.env
+.env.local
+.env.*.local
+.env.local.example
+
+# Repo metadata
+.git/
+.gitignore
+.cursor/
+agent-transcripts/
+terminals/
+
+# Tests + docs
+**/__tests__/
+**/*.test.ts
+**/*.test.tsx
+playwright-report/
+test-results/
+README.md
+AGENTS.md
+awaazos-cursor-prompt.md
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.tsbuildinfo
+*.log
