@@ -3,8 +3,12 @@ import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { NextResponse } from "next/server";
 
 import { hashPassword } from "@/lib/password";
+import { checkPasswordPolicy } from "@/lib/password-strength";
 import { prisma } from "@/lib/prisma";
+import { authRateLimit, getClientIp, tooManyRequests } from "@/lib/ratelimit";
 import { signUpSchema } from "@/lib/zod-auth";
+
+export const runtime = "nodejs";
 
 function slugBase(stallName: string): string {
   const s = stallName
@@ -27,6 +31,12 @@ function randomSuffix(): string {
 }
 
 export async function POST(req: Request) {
+  const ip = getClientIp(req);
+  const rl = await authRateLimit.check(ip);
+  if (!rl.ok) {
+    return tooManyRequests(rl, "register");
+  }
+
   let body: unknown;
   try {
     body = await req.json();
@@ -46,6 +56,15 @@ export async function POST(req: Request) {
   const name = parsed.data.name.trim();
   const stallName = parsed.data.stallName.trim();
   const { stallType, password } = parsed.data;
+
+  const policy = checkPasswordPolicy(password);
+  if (!policy.ok) {
+    return NextResponse.json(
+      { error: "Password policy violation", reason: policy.reason },
+      { status: 400 },
+    );
+  }
+
   const passwordHash = await hashPassword(password);
 
   let phoneE164: string | undefined;

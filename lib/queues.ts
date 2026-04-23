@@ -3,6 +3,32 @@ import IORedis from "ioredis";
 
 import { requireEnv } from "@/lib/env";
 
+/**
+ * BullMQ requires its own ioredis client with `maxRetriesPerRequest: null`
+ * (BullMQ uses blocking commands like BRPOPLPUSH that must not auto-retry).
+ * The general-purpose ratelimit/idempotency client (lib/redis.ts) uses
+ * snappy retry-2 settings instead, so the two clients have different
+ * config requirements and live separately by design.
+ */
+let _bullmqRedis: IORedis | null = null;
+function getBullMqRedis(): IORedis {
+  if (!_bullmqRedis) {
+    _bullmqRedis = new IORedis(requireEnv("REDIS_URL"), {
+      maxRetriesPerRequest: null,
+      enableReadyCheck: true,
+    });
+    _bullmqRedis.on("error", (err) => {
+      console.warn(
+        JSON.stringify({
+          event: "bullmq_redis_error",
+          error: err instanceof Error ? err.message : "unknown",
+        }),
+      );
+    });
+  }
+  return _bullmqRedis;
+}
+
 export type VoiceParseLogJobPayload = {
   vendorId: string;
   transcript: string;
@@ -22,16 +48,23 @@ export type SendReceiptJobPayload = {
   customerPhone: string;
 };
 
-let _redis: IORedis | null = null;
 let _voiceLogQueue: Queue<VoiceParseLogJobPayload> | null = null;
 let _receiptQueue: Queue<SendReceiptJobPayload> | null = null;
 
-function getRedisConnection(): IORedis {
-  if (!_redis) {
-    _redis = new IORedis(requireEnv("REDIS_URL"), { maxRetriesPerRequest: null });
-  }
-  return _redis;
-}
+/**
+ * Default BullMQ job options applied to every enqueue site:
+ *  - 5 attempts with exponential backoff (5s, 10s, 20s, 40s, 80s)
+ *  - failed jobs retained for 7 days for debugging via the Bull Board UI
+ *  - completed jobs retained at 100 newest for sanity checks
+ *
+ * Per-call overrides can extend this via the spread at enqueue time.
+ */
+export const DEFAULT_JOB_OPTS = {
+  attempts: 5,
+  backoff: { type: "exponential" as const, delay: 5_000 },
+  removeOnComplete: 100,
+  removeOnFail: { age: 7 * 24 * 3600, count: 1000 },
+} as const;
 
 /**
  * BullMQ queue for async VoiceParseLog writes. Lazily connects — do not import
@@ -40,7 +73,8 @@ function getRedisConnection(): IORedis {
 export function getVoiceLogQueue(): Queue<VoiceParseLogJobPayload> {
   if (!_voiceLogQueue) {
     _voiceLogQueue = new Queue<VoiceParseLogJobPayload>("voice-parse-log", {
-      connection: getRedisConnection(),
+      connection: getBullMqRedis(),
+      defaultJobOptions: DEFAULT_JOB_OPTS,
     });
   }
   return _voiceLogQueue;
@@ -49,8 +83,14 @@ export function getVoiceLogQueue(): Queue<VoiceParseLogJobPayload> {
 export function getReceiptQueue(): Queue<SendReceiptJobPayload> {
   if (!_receiptQueue) {
     _receiptQueue = new Queue<SendReceiptJobPayload>("send-receipt", {
-      connection: getRedisConnection(),
+      connection: getBullMqRedis(),
+      defaultJobOptions: DEFAULT_JOB_OPTS,
     });
   }
   return _receiptQueue;
+}
+
+/** Exported so workers/index.ts can pass it to Worker constructors (same null-retry rules). */
+export function getBullMqConnection(): IORedis {
+  return getBullMqRedis();
 }

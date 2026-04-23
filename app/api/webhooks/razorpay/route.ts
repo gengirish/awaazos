@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { prisma } from "@/lib/prisma";
 import { planFromRazorpayPlanId, verifyRazorpaySignature } from "@/lib/razorpay";
+import { getClientIp, tooManyRequests, webhookRateLimit } from "@/lib/ratelimit";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -51,6 +52,12 @@ async function resolveVendorId(entity: SubEntity): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req);
+  const rl = await webhookRateLimit.check(`razorpay:${ip}`);
+  if (!rl.ok) {
+    return tooManyRequests(rl, "webhook-razorpay");
+  }
+
   const rawBody = await req.text();
   const sig = req.headers.get("x-razorpay-signature");
   if (!verifyRazorpaySignature(rawBody, sig)) {

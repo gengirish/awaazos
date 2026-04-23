@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { Plan } from "@prisma/client";
 
 import { transcribeAudio, type SarvamLang } from "@/lib/sarvam";
+import { aiBurstRateLimit, aiRateLimit, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
@@ -23,6 +24,11 @@ export async function POST(req: NextRequest) {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
     vendorId = ctx.vendor.id;
     requirePlan(ctx.vendor, Plan.STARTER);
+
+    const burst = await aiBurstRateLimit.check(ctx.vendor.id);
+    if (!burst.ok) return tooManyRequests(burst, "ai-burst");
+    const sustained = await aiRateLimit.check(ctx.vendor.id);
+    if (!sustained.ok) return tooManyRequests(sustained, "ai");
 
     const form = await req.formData();
     const audio = form.get("audio");

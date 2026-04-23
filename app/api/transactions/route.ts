@@ -2,8 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { getIstMonthStart, getIstTodayStart, formatBillDateYYYYMMDD } from "@/lib/billing-period";
 import { PLAN_LIMITS } from "@/lib/constants";
+import { beginIdempotency, getIdempotencyKey } from "@/lib/idempotency";
 import { prisma } from "@/lib/prisma";
 import { getReceiptQueue } from "@/lib/queues";
+import { tooManyRequests, writeRateLimit } from "@/lib/ratelimit";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { parseTransactionListQuery } from "@/lib/transaction-list-params";
 import {
@@ -66,6 +68,32 @@ export async function POST(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
     const vendor = ctx.vendor;
+
+    const rl = await writeRateLimit.check(vendor.id);
+    if (!rl.ok) return tooManyRequests(rl, "transactions-write");
+
+    const idemKey = getIdempotencyKey(req);
+    let commitIdem: ((rec: { status: number; body: unknown }) => Promise<void>) | null = null;
+    if (idemKey) {
+      const outcome = await beginIdempotency({
+        scope: "transactions-create",
+        vendorId: vendor.id,
+        idempotencyKey: idemKey,
+      });
+      if (outcome.kind === "replay") {
+        return NextResponse.json(outcome.record.body, { status: outcome.record.status });
+      }
+      if (outcome.kind === "in_flight") {
+        return NextResponse.json(
+          { error: "request_in_flight", message: "Same Idempotency-Key is currently being processed." },
+          { status: 409 },
+        );
+      }
+      if (outcome.kind === "fresh") {
+        commitIdem = outcome.commit;
+      }
+      // "disabled" → silently proceed without idempotency.
+    }
 
     let json: unknown;
     try {
@@ -205,22 +233,25 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    const res = NextResponse.json(
-      {
-        transaction: {
-          id: transaction.id,
-          billNumber: transaction.billNumber,
-          totalPaise: transaction.totalPaise,
-          paymentMethod: transaction.paymentMethod,
-          paymentStatus: transaction.paymentStatus,
-          createdAt: transaction.createdAt,
-          paidAt: transaction.paidAt,
-        },
-        receiptNumber: receipt.receiptNumber,
-        whatsappQueued,
+    const responseBody = {
+      transaction: {
+        id: transaction.id,
+        billNumber: transaction.billNumber,
+        totalPaise: transaction.totalPaise,
+        paymentMethod: transaction.paymentMethod,
+        paymentStatus: transaction.paymentStatus,
+        createdAt: transaction.createdAt,
+        paidAt: transaction.paidAt,
       },
-      { status: 201 },
-    );
+      receiptNumber: receipt.receiptNumber,
+      whatsappQueued,
+    };
+
+    if (commitIdem) {
+      await commitIdem({ status: 201, body: responseBody });
+    }
+
+    const res = NextResponse.json(responseBody, { status: 201 });
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {
     if (err instanceof AuthError) {

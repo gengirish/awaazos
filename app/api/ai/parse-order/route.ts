@@ -10,6 +10,7 @@ import {
 } from "@/lib/anthropic";
 import { getVoiceLogQueue } from "@/lib/queues";
 import { prisma } from "@/lib/prisma";
+import { aiBurstRateLimit, aiRateLimit, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
@@ -40,6 +41,12 @@ export async function POST(req: NextRequest) {
 
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
+
+    const burst = await aiBurstRateLimit.check(ctx.vendor.id);
+    if (!burst.ok) return tooManyRequests(burst, "ai-burst");
+    const sustained = await aiRateLimit.check(ctx.vendor.id);
+    if (!sustained.ok) return tooManyRequests(sustained, "ai");
+
     const body = bodySchema.parse(await req.json());
 
     const menuRows = await prisma.menuItem.findMany({
