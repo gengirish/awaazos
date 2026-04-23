@@ -241,7 +241,7 @@ For every meaningful change:
 4. `vercel --prod --yes` — explicit CLI prod deploy for synchronous URL
 5. `BASE_URL=https://awaazos.vercel.app npx playwright test` — E2E against live
 
-See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system diagrams, [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md) for production monitoring/alerting setup, and [`PITCH.md`](./PITCH.md) for the YC pitch.
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system diagrams, [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md) for production monitoring/alerting setup, [`HARDENING.md`](./HARDENING.md) for the production hardening checklist, and [`PITCH.md`](./PITCH.md) for the YC pitch.
 
 ---
 
