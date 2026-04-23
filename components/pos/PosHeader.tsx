@@ -1,0 +1,30 @@
+import Link from "next/link";
+import { Settings } from "lucide-react";
+
+import { formatINR } from "@/lib/currency";
+
+export type PosHeaderProps = {
+  stallName: string;
+  todaysRevenuePaise: number;
+};
+
+export function PosHeader({ stallName, todaysRevenuePaise }: PosHeaderProps) {
+  return (
+    <header className="flex items-start justify-between gap-3 border-b border-border pb-4">
+      <div>
+        <h1 className="font-display text-xl font-semibold text-foreground">{stallName}</h1>
+        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Today (IST)</p>
+        <p className="font-mono text-lg font-semibold tabular-nums text-foreground">
+          {formatINR(todaysRevenuePaise)}
+        </p>
+      </div>
+      <Link
+        href="/settings/billing"
+        className="flex h-11 min-w-[44px] items-center justify-center rounded-md border border-input bg-background text-foreground ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        aria-label="Billing and settings"
+      >
+        <Settings className="h-5 w-5" aria-hidden />
+      </Link>
+    </header>
+  );
+}
