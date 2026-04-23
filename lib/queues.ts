@@ -16,8 +16,15 @@ export type VoiceParseLogJobPayload = {
   escalated: boolean;
 };
 
+export type SendReceiptJobPayload = {
+  transactionId: string;
+  vendorId: string;
+  customerPhone: string;
+};
+
 let _redis: IORedis | null = null;
 let _voiceLogQueue: Queue<VoiceParseLogJobPayload> | null = null;
+let _receiptQueue: Queue<SendReceiptJobPayload> | null = null;
 
 function getRedisConnection(): IORedis {
   if (!_redis) {
@@ -37,4 +44,13 @@ export function getVoiceLogQueue(): Queue<VoiceParseLogJobPayload> {
     });
   }
   return _voiceLogQueue;
+}
+
+export function getReceiptQueue(): Queue<SendReceiptJobPayload> {
+  if (!_receiptQueue) {
+    _receiptQueue = new Queue<SendReceiptJobPayload>("send-receipt", {
+      connection: getRedisConnection(),
+    });
+  }
+  return _receiptQueue;
 }

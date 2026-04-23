@@ -35,7 +35,7 @@ test.describe("public surfaces", () => {
 });
 
 test.describe("auth-protected surfaces redirect to sign-in", () => {
-  for (const path of ["/menu", "/pos", "/settings/billing", "/onboarding"]) {
+  for (const path of ["/menu", "/pos", "/transactions", "/settings/billing", "/onboarding"]) {
     test(`${path} → /sign-in when unauthenticated`, async ({ page }) => {
       const resp = await page.goto(path);
       expect(resp?.status(), `${path} should reach a 200-ish final page`).toBeLessThan(400);
@@ -51,6 +51,9 @@ test.describe("protected API routes refuse unauthenticated", () => {
     "/api/ai/parse-order",
     "/api/ai/transcribe",
     "/api/razorpay/create-subscription",
+    "/api/transactions",
+    "/api/transactions/export",
+    "/api/receipts/send",
   ]) {
     test(`${path} returns redirect or 401/403`, async ({ request }) => {
       const r = await request.get(path, { maxRedirects: 0, failOnStatusCode: false });
