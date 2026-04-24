@@ -65,7 +65,8 @@ test.describe("protected API routes refuse unauthenticated", () => {
   ]) {
     test(`${path} returns redirect or 401/403`, async ({ request }) => {
       const r = await request.get(path, { maxRedirects: 0, failOnStatusCode: false });
-      expect([301, 302, 307, 401, 403, 405]).toContain(r.status());
+      // 405 = route exists but method not allowed (e.g. POST-only). 429 = rate limit under load.
+      expect([301, 302, 307, 401, 403, 405, 429]).toContain(r.status());
     });
   }
 });

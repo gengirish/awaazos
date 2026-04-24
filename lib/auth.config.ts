@@ -22,7 +22,13 @@ export const authConfig = {
     authorized({ auth, request }) {
       const pathname = request.nextUrl.pathname;
       if (isPublicPath(pathname)) return true;
-      // /(vendor)/*, /api/* (except auth + webhook matcher exclusions), /onboarding, etc.
+      // App Router API routes: let handlers return JSON 401/403/402. If middleware
+      // returns false, Auth.js redirects to /sign-in; fetch() follows 302/307 and
+      // the response body is HTML, so clients calling /api/ai/* get JSON parse errors.
+      if (pathname.startsWith("/api/") && !pathname.startsWith("/api/auth")) {
+        return true;
+      }
+      // /(vendor)/*, /onboarding, etc. — require session; browser navigations redirect to sign-in
       return !!auth?.user;
     },
     async jwt({ token, user }) {
