@@ -2,26 +2,20 @@ import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 
+// HIDDEN — see PITCH.md "minimal product" cut list. Re-enable PRO when STARTER GA.
 const tiers = [
   {
     name: "FREE",
     price: "₹0",
-    blurb: "Start billing with core voice + UPI QR.",
+    blurb: "First 50 transactions free. Voice + UPI QR + WhatsApp receipts.",
     emphasis: false,
   },
   {
     name: "STARTER",
     price: "₹299",
     suffix: "/mo",
-    blurb: "WhatsApp receipts, deeper analytics, more languages.",
+    blurb: "Unlimited bills. The full single-stall product. Most vendors live here.",
     emphasis: true,
-  },
-  {
-    name: "PRO",
-    price: "₹799",
-    suffix: "/mo",
-    blurb: "Advanced tools for growing stalls and teams.",
-    emphasis: false,
   },
 ] as const;
 
@@ -33,9 +27,9 @@ export function PricingTeaser() {
           Simple plans for every vendor
         </h2>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          Pick what fits today — upgrade when your counter gets busier.
+          Start free. ₹299/mo when you outgrow it. No upsells.
         </p>
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
           {tiers.map((tier) => (
             <Card
               key={tier.name}
@@ -78,7 +72,7 @@ export function PricingTeaser() {
             href="/pricing"
             className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-base font-semibold text-awaaz-orange underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
           >
-            See full comparison →
+            See pricing →
           </Link>
         </div>
       </div>

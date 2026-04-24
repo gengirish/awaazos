@@ -5,7 +5,10 @@ import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
 
-type BillingTier = "FREE" | "STARTER" | "PRO";
+// HIDDEN — see PITCH.md "minimal product" cut list. Re-enable when STARTER GA.
+// Original union: "FREE" | "STARTER" | "PRO". PRO is hidden from the marketing surface
+// but the Razorpay route still accepts it server-side.
+type BillingTier = "FREE" | "STARTER";
 
 export function PricingPlanButtons({
   tier,
@@ -55,7 +58,7 @@ export function PricingPlanButtons({
   if (!signedIn) {
     return (
       <Button asChild className="min-h-11 w-full">
-        <Link href={href}>{tier === "STARTER" ? "Upgrade to Starter" : "Go Pro"}</Link>
+        <Link href={href}>Upgrade to Starter</Link>
       </Button>
     );
   }
@@ -68,7 +71,7 @@ export function PricingPlanButtons({
         disabled={pending}
         onClick={() => void startCheckout()}
       >
-        {pending ? "Redirecting…" : tier === "STARTER" ? "Upgrade to Starter" : "Go Pro"}
+        {pending ? "Redirecting…" : "Upgrade to Starter"}
       </Button>
       {error ? <p className="text-center text-sm text-destructive">{error}</p> : null}
     </div>

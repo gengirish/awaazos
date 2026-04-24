@@ -113,7 +113,7 @@ export function TransactionsTable({
 
   const exportTitle = useMemo(() => {
     if (canExportCsv) return undefined;
-    return "CSV export is available on Pro and Enterprise";
+    return "CSV export is available on a higher plan";
   }, [canExportCsv]);
 
   function buildListUrl(page: number) {

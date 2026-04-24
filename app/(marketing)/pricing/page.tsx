@@ -7,77 +7,39 @@ import { formatINR } from "@/lib/currency";
 
 export const metadata: Metadata = {
   title: "Pricing — AwaazOS",
-  description: "Simple plans for voice-first billing. Start free, upgrade when you grow.",
+  description: "₹299/mo. Speak the order. Print the bill. Take UPI. Done.",
 };
 
-function priceLabel(plan: "FREE" | "STARTER" | "PRO") {
+// HIDDEN — see PITCH.md "minimal product" cut list. Re-enable when STARTER GA.
+// PRO and ENTERPRISE remain in `lib/constants` (PLAN_PRICES_PAISE, PLAN_LIMITS, PLAN_RANK)
+// and in the Razorpay routes. We're only hiding them from the marketing surface for now.
+const VISIBLE_TIERS = ["FREE", "STARTER"] as const;
+type VisibleTier = (typeof VISIBLE_TIERS)[number];
+
+function priceLabel(plan: VisibleTier) {
   const paise = PLAN_PRICES_PAISE[plan];
   if (plan === "FREE") return formatINR(paise);
-  if (plan === "PRO" || plan === "STARTER") return `${formatINR(paise)}/mo`;
-  return formatINR(paise);
+  return `${formatINR(paise)}/mo`;
 }
 
 export default async function PricingPage() {
   const session = await auth();
   const signedIn = Boolean(session?.user);
 
-  const rows: { label: string; free: string; starter: string; pro: string }[] = [
-    {
-      label: "Bills per month",
-      free: String(PLAN_LIMITS.FREE.monthlyTxnCap ?? "—"),
-      starter: String(PLAN_LIMITS.STARTER.monthlyTxnCap ?? "—"),
-      pro: "Unlimited",
-    },
-    {
-      label: "Staff seats",
-      free: String(PLAN_LIMITS.FREE.maxStaff ?? "—"),
-      starter: String(PLAN_LIMITS.STARTER.maxStaff ?? "—"),
-      pro: "Unlimited",
-    },
-    {
-      label: "WhatsApp receipts",
-      free: PLAN_LIMITS.FREE.whatsapp ? "Yes" : "—",
-      starter: "Yes",
-      pro: "Yes",
-    },
-    {
-      label: "Razorpay payment links",
-      free: "—",
-      starter: "—",
-      pro: "Yes",
-    },
-    {
-      label: "CSV export",
-      free: "—",
-      starter: "—",
-      pro: "Yes",
-    },
-    {
-      label: "Sarvam STT (te/kn/ta)",
-      free: "—",
-      starter: "Yes",
-      pro: "Yes",
-    },
-    {
-      label: "Analytics history",
-      free: `${PLAN_LIMITS.FREE.analyticsDays} days`,
-      starter: `${PLAN_LIMITS.STARTER.analyticsDays} days`,
-      pro: `${PLAN_LIMITS.PRO.analyticsDays} days`,
-    },
-  ];
-
   return (
     <div className="min-h-screen bg-background px-4 py-10 md:px-6">
-      <div className="mx-auto max-w-5xl">
+      <div className="mx-auto max-w-3xl">
         <header className="mb-10 text-center">
-          <h1 className="font-display text-3xl font-semibold text-foreground md:text-4xl">Pricing</h1>
-          <p className="mt-2 text-muted-foreground">
-            Voice-first POS for Indian vendors. All prices in INR, excluding GST as applicable.
+          <h1 className="font-display text-4xl font-semibold text-foreground md:text-5xl">
+            ₹299/mo. Speak. Bill. Done.
+          </h1>
+          <p className="mt-3 text-muted-foreground">
+            Voice-first POS for Indian vendors. Start free, upgrade when your counter gets busy.
           </p>
         </header>
 
-        <div className="grid gap-6 md:grid-cols-3">
-          {(["FREE", "STARTER", "PRO"] as const).map((tier) => (
+        <div className="grid gap-6 md:grid-cols-2">
+          {VISIBLE_TIERS.map((tier) => (
             <section
               key={tier}
               className={`flex flex-col rounded-xl border bg-card p-6 shadow-sm ${
@@ -88,8 +50,7 @@ export default async function PricingPage() {
               <p className="mt-2 text-3xl font-bold tracking-tight">{priceLabel(tier)}</p>
               <p className="mt-4 text-sm text-muted-foreground">
                 {tier === "FREE" && "Try AwaazOS on your stall — voice billing and UPI QR."}
-                {tier === "STARTER" && "WhatsApp receipts, Sarvam STT, higher limits."}
-                {tier === "PRO" && "Payment links, CSV export, unlimited scale for busy counters."}
+                {tier === "STARTER" && "WhatsApp receipts, Sarvam STT in te/kn/ta, higher limits."}
               </p>
               <div className="mt-6 flex flex-1 flex-col justify-end gap-4">
                 <PricingPlanButtons tier={tier} signedIn={signedIn} />
@@ -98,6 +59,7 @@ export default async function PricingPage() {
           ))}
         </div>
 
+        {/* HIDDEN — see PITCH.md "minimal product" cut list. Re-enable when STARTER GA.
         <div className="mt-12 overflow-x-auto rounded-lg border">
           <table className="w-full min-w-[600px] border-collapse text-sm">
             <thead>
@@ -123,8 +85,9 @@ export default async function PricingPage() {
 
         <p className="mt-8 text-center text-sm text-muted-foreground">
           Need Enterprise (custom SLA, dedicated support)?{" "}
-          <span className="font-medium text-foreground">Contact us</span> — we&apos;ll tailor a plan.
+          <span className="font-medium text-foreground">Contact us</span> — we'll tailor a plan.
         </p>
+        */}
       </div>
     </div>
   );

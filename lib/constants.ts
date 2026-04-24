@@ -83,13 +83,25 @@ export const STALL_TYPES: { value: StallType; label: string }[] = [
   { value: "SERVICES", label: "Services" },
 ];
 
+/**
+ * Voice languages exposed in the user-facing picker (onboarding/settings).
+ *
+ * Intentionally restricted to en-IN + hi-IN for the YC pitch — these are the
+ * two locales where the Claude → Sarvam → cart pipeline is end-to-end solid.
+ *
+ * STT capability for te-IN / kn-IN / ta-IN is preserved in `hooks/useVoiceOrder.ts`
+ * (SARVAM_LANGS / WEBSPEECH_LANGS) and `lib/sarvam.ts` — they're just not surfaced
+ * in the picker. If a vendor has an older stored preference like `te-IN`, the
+ * picker normalises the rendered value to `hi-IN` while leaving the DB row
+ * untouched (see onboarding page for the `displayVoiceLang` derivation).
+ */
 export const VOICE_LANGUAGES = [
-  { value: "en-IN", label: "English (India)" },
-  { value: "hi-IN", label: "Hindi (हिन्दी)" },
-  { value: "te-IN", label: "Telugu (తెలుగు)" },
-  { value: "kn-IN", label: "Kannada (ಕನ್ನಡ)" },
-  { value: "ta-IN", label: "Tamil (தமிழ்)" },
+  { value: "en-IN", label: "English" },
+  { value: "hi-IN", label: "हिन्दी (Hindi)" },
 ] as const;
+
+/** Allowed picker values — used to normalise stale stored preferences at render time. */
+export const ALLOWED_VOICE_LANGS = VOICE_LANGUAGES.map((l) => l.value) as readonly string[];
 
 /** Brand tokens aligned with tailwind `brand.*` and VendorSettings.theme. */
 export const BRAND = {

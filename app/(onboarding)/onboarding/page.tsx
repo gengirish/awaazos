@@ -16,7 +16,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { STALL_TYPES, VOICE_LANGUAGES } from "@/lib/constants";
+import { ALLOWED_VOICE_LANGS, STALL_TYPES, VOICE_LANGUAGES } from "@/lib/constants";
 import { rupeesToPaise } from "@/lib/currency";
 import { buildQrUrl, buildUpiDeepLink } from "@/lib/upi";
 import type { StallType, Vendor, VendorSettings } from "@prisma/client";
@@ -342,7 +342,10 @@ export default function OnboardingPage() {
               </div>
               <div className="space-y-2">
                 <Label>Voice language</Label>
-                <Select value={voiceLang} onValueChange={setVoiceLang}>
+                <Select
+                  value={ALLOWED_VOICE_LANGS.includes(voiceLang) ? voiceLang : "hi-IN"}
+                  onValueChange={setVoiceLang}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

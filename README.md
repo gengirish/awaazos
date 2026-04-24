@@ -5,8 +5,9 @@
 
 [![Live](https://img.shields.io/badge/live-awaazos.vercel.app-brightgreen)](https://awaazos.vercel.app)
 [![Stack](https://img.shields.io/badge/stack-Next.js%2014%20%C2%B7%20Auth.js%20%C2%B7%20Neon%20%C2%B7%20Claude%204.5-blueviolet)](#-tech-stack)
-[![Tests](https://img.shields.io/badge/tests-51%20unit%20%C2%B7%2038%20E2E-success)](#-quality--testing)
 [![License](https://img.shields.io/badge/license-proprietary-lightgrey)](#-license)
+
+> **Today (May 2026):** Production-deployed. Onboarding our first 10 design-partner chai vendors in Hyderabad in person. Real weekly traction numbers will appear here every Monday — see `/admin/metrics` for the live counts.
 
 ---
 
@@ -62,38 +63,31 @@ A POS where **the only interface is your voice and your eyes**.
 5. Mark as paid → atomic bill number `AWZ-20260423-0001` → DB transaction commits → WhatsApp receipt enqueued
 6. Owner sees real-time dashboards (revenue trend, top sellers, hourly heatmap, voice adoption %)
 
-All of this on a phone, in <8 seconds per transaction, in **any of 22 official Indian languages**.
+All of this on a phone, in <8 seconds per transaction. **Hindi + English at MVP. More on roadmap once 50 vendors are active.**
 
 ---
 
 ## ✨ Features
 
-### Built and shipped (Phase 0–4 complete)
+### Built and shipped
 
 - 🎙️ **Voice-first POS** — 80×80 mic button, 6 visual states (idle / listening / transcribing / parsing / success / error), distinguishable beyond color, full `aria-live` for screen readers
-- 🌍 **Multilingual STT routing** — Web Speech for English & Hindi, Sarvam Saaras v2 for Telugu / Kannada / Tamil / Marathi / Bengali
-- 🧠 **Two-tier AI parsing** — Claude Haiku 4.5 primary with ephemeral prompt caching on the menu, escalates to Sonnet 4.5 only on low confidence (~80% cost savings vs always-Sonnet)
+- 🌍 **STT routing** — Web Speech for English & Hindi, Sarvam Saaras v2 wired in for Indic expansion as cohort demands
+- 🧠 **Two-tier AI parsing** — Claude Haiku 4.5 primary with ephemeral prompt caching on the menu, escalates to Sonnet 4.5 only on low confidence
 - 💰 **Integer-paise math everywhere** — no `parseFloat`, no `toFixed` (single exception: UPI deep-link `am=` per spec)
 - 🔢 **Atomic bill numbering** — `AWZ-YYYYMMDD-NNNN` via `BillSequence.upsert` inside `prisma.$transaction`, race-safe across concurrent sales
 - 📲 **WhatsApp receipts** — Gupshup REST + BullMQ background queue + idempotent worker, customer phone PII-protected (never logged, only last-4 in CSV exports)
 - 💳 **UPI deep links + QR** — vendor's own UPI ID, no MDR fees, scannable from any UPI app
-- 📊 **Analytics dashboard** — Recharts revenue trend, hourly heatmap (raw SQL `EXTRACT HOUR AT TIME ZONE 'Asia/Kolkata'`), top 10 sellers, voice adoption %, payment method breakdown — every chart has a `<details>` data table for accessibility
+- 📊 **Analytics dashboard** — Recharts revenue trend, hourly heatmap, top sellers, voice adoption %, payment method breakdown — every chart has a `<details>` data table for accessibility
 - 🏢 **Multi-tenant** — `vendorId` scoping enforced on every query, two-layer RBAC (platform `UserRole` + per-tenant `StaffRole`)
-- 💸 **Razorpay subscriptions** — FREE / STARTER ₹299 / PRO ₹799 / ENTERPRISE custom, plan gates with `PlanGateError(402)` returning structured upgrade prompts
+- 💸 **Razorpay subscriptions** — ₹299/mo per vendor, FREE for first 50 transactions, plan gates with `PlanGateError(402)` returning structured upgrade prompts
 - 🇮🇳 **India-first defaults** — IST timezone, DD/MM/YYYY dates, `+91` 10-digit phone validation, `Intl.NumberFormat('en-IN', { currency: 'INR' })`, `libphonenumber-js`
 - 🔐 **Auth.js v5 (NextAuth)** — Edge-split config, JWT sessions, Credentials provider with bcrypt, single `prisma.$transaction` for sign-up
 - 🎨 **Mobile-first UI** — Tailwind + shadcn/ui, saffron AwaazOS palette (`--awaaz-orange` AA-contrast), Baloo 2 + Nunito Indic-friendly fonts
-- ✅ **51 unit tests + 44 E2E** — Vitest + Playwright (chromium + Pixel 7 mobile, en-IN locale, IST timezone)
 
-### Roadmap (Phase 5+)
+### Roadmap
 
-- Inventory tracking with auto-deduct on sale
-- Multi-staff shift management + per-staff sales attribution
-- GST invoice mode for vendors with GSTIN
-- WhatsApp Business *menu sharing* — customer browses + orders via WhatsApp chat
-- Vernacular receipts (currently English; Hindi/Indic on roadmap)
-- Dukaan Network — vendor-to-vendor inventory marketplace
-- Offline-first PWA (current app is online-only)
+Depth in Hindi, then add Telugu / Kannada / Tamil based on cohort demand. No other features ship until weekly active vendors > 100.
 
 ---
 
@@ -165,32 +159,15 @@ npm run worker  # or: npx tsx workers/index.ts
 ## 🧪 Quality & testing
 
 ```bash
-npm run typecheck   # tsc --noEmit                — 0 errors
-npm run lint        # next lint                   — 0 warnings/errors
-npm test            # vitest run                  — 51 passed (12 files)
-npm run build       # next build                  — 25 routes, all green
+npm run typecheck   # tsc --noEmit
+npm run lint        # next lint
+npm test            # vitest run
+npm run build       # next build
 npm run e2e         # playwright (uses dev server) — chromium + mobile
 BASE_URL=https://awaazos.vercel.app npm run e2e   # E2E against prod
 ```
 
-### Test coverage today
-
-| Suite | Cases | What it covers |
-| --- | --- | --- |
-| `currency.test.ts` | 3 | Paise ↔ rupee conversion, sumPaise integer guarantees |
-| `upi.test.ts` | 3 | UPI deep-link spec compliance (`pa`, `pn`, `am`, `cu=INR`, `tn`) |
-| `zod-menu.test.ts` | 8 | Menu CRUD body validation (price > 0, name length, category enum) |
-| `anthropic.test.ts` | 6 | Hindi numeral normalization, Telugu numbers, off-menu detection, escalation logic |
-| `razorpay-signature.test.ts` | 4 | HMAC-SHA256 webhook verification with `timingSafeEqual` |
-| `rbac-plan.test.ts` | 3 | `requirePlan` PlanGateError(402) with structured upgrade body |
-| `cartStore.test.ts` | 6 | Zustand cart math, voice-merge duplicates, qty 0 = remove |
-| `billing-period.test.ts` | 3 | IST midnight pinning, YYYYMMDD bill date, month-start |
-| `transaction-validation.test.ts` | 4 | Server-side recompute of subtotal + total, rejects mismatches |
-| `billsequence.test.ts` | 1 | Atomicity proof — `tx.billSequence.upsert` runs inside `$transaction` |
-| `whatsapp-message.test.ts` | 2 | Receipt formatter (multiline, India-friendly, AwaazOS footer) |
-| `analytics-aggregations.test.ts` | 9 | KPI sums, voice adoption %, plan-history clamping |
-| **e2e/public.spec.ts** | 19 × 2 browsers | Public surfaces render, all 7 protected pages redirect to /sign-in, all 8 protected APIs return 3xx/4xx |
-| **e2e/razorpay-subscription.spec.ts** | 3 × 2 browsers | `POST /api/razorpay/create-subscription` returns 401 when anonymous; billing **Upgrade to Starter** sends `{ plan: "STARTER" }` (Razorpay response mocked) |
+Vitest unit + Playwright E2E (chromium + Pixel 7 mobile, en-IN locale, IST timezone). See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full testing stack and what each suite guards.
 
 ---
 
@@ -340,14 +317,9 @@ awaazos/
 
 ## 💸 Pricing
 
-| Plan | Price/mo | Voice languages | Monthly txns | WhatsApp | Analytics history | CSV export |
-| --- | ---: | --- | ---: | --- | --- | --- |
-| **FREE** | ₹0 | Web Speech (en/hi) | 50 | — | 7 days | — |
-| **STARTER** | ₹299 | + Sarvam (te/kn/ta/mr/bn) | 500 | ✅ | 90 days | — |
-| **PRO** | ₹799 | + Sarvam | Unlimited | ✅ | 365 days | ✅ |
-| **ENTERPRISE** | Custom | + Sarvam | Unlimited | ✅ | Unlimited | ✅ |
+**₹299/mo per vendor. FREE for first 50 transactions.**
 
-Plan enforcement is server-side via `requirePlan(vendor, Plan.STARTER)` returning structured `402` responses.
+Higher tiers come back when ≥50 vendors are paying. Plan enforcement is server-side via `requirePlan(vendor, Plan.STARTER)` returning structured `402` responses.
 
 ---
 
@@ -376,26 +348,13 @@ Indic AI is a **14-year through-line**, not a 2026 hobby. First production AI pr
 
 ## 🏢 Built by IntelliForge AI
 
-AwaazOS is a flagship product of **[IntelliForge AI](https://www.intelliforge.tech)** — a Hyderabad-based AI engineering studio specializing in **AI agent development, workflow automation, and AI app development**, aligned with the **Bharat AI Mission** (India's ₹10,372 Cr IndiaAI initiative).
-
-IntelliForge ships across a **5-Level AI framework**:
-
-| Level | Focus | Where AwaazOS sits |
-| --- | --- | --- |
-| 1 | AI Foundations & Training | — |
-| 2 | AI Workflow Automation | — |
-| 3 | AI Creative Studio | — |
-| 4 | AI Agent Development | Receipt + voice-log workers |
-| **5** | **AI App Development** | **AwaazOS — production Next.js + Auth.js + Claude pipeline** |
-
-AwaazOS is **the proof** that the studio's 5-level framework ships real, working production software for India — not slideware. Other IntelliForge projects include Multi-Agent Deep Research, Interview Bot (AI hiring), MoveMore (AI wellness), AI Digital Profile, and several open automation tools.
+AwaazOS is a flagship product of **[IntelliForge AI](https://www.intelliforge.tech)** — a Hyderabad-based AI engineering studio.
 
 | | |
 | --- | --- |
 | 🌐 Site | https://www.intelliforge.tech |
 | 📧 Contact | contact@intelliforge.tech |
 | 📍 Location | Hyderabad, Telangana, India |
-| 🇮🇳 Mission | Aligned with Bharat AI Mission — democratizing AI for Tier-I, II, and III India |
 
 ---
 

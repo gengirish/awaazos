@@ -14,7 +14,9 @@ export function BillingManageClient({
   currentPlan: Plan;
   hasRazorpaySubscription: boolean;
 }) {
-  const [pending, setPending] = useState<null | "cancel" | "starter" | "pro">(null);
+  // HIDDEN — see PITCH.md "minimal product" cut list. Re-enable when STARTER GA.
+  // Original pending union: null | "cancel" | "starter" | "pro".
+  const [pending, setPending] = useState<null | "cancel" | "starter">(null);
   const [message, setMessage] = useState<string | null>(null);
 
   async function postJson(url: string, body?: unknown) {
@@ -36,7 +38,6 @@ export function BillingManageClient({
     window.setTimeout(() => window.location.reload(), 800);
   }
 
-  const belowPro = PLAN_RANK[currentPlan] < PLAN_RANK.PRO;
   const belowStarter = PLAN_RANK[currentPlan] < PLAN_RANK.STARTER;
 
   return (
@@ -57,6 +58,7 @@ export function BillingManageClient({
           {pending === "starter" ? "Redirecting…" : "Upgrade to Starter"}
         </Button>
       ) : null}
+      {/* HIDDEN — see PITCH.md "minimal product" cut list. Re-enable when STARTER GA.
       {belowPro ? (
         <Button
           type="button"
@@ -73,6 +75,7 @@ export function BillingManageClient({
           {pending === "pro" ? "Redirecting…" : "Upgrade to Pro"}
         </Button>
       ) : null}
+      */}
       {hasRazorpaySubscription ? (
         <Button
           type="button"
@@ -89,7 +92,7 @@ export function BillingManageClient({
         </Button>
       ) : null}
       <Button asChild variant="ghost" className="min-h-11">
-        <Link href="/pricing">Compare all plans</Link>
+        <Link href="/pricing">View pricing</Link>
       </Button>
       {message ? <p className="w-full text-sm text-muted-foreground">{message}</p> : null}
     </div>
