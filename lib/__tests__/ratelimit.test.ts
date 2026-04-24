@@ -1,13 +1,16 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/env", () => ({
-  requireEnv: vi.fn(() => "redis://localhost:6379"),
-  env: { REDIS_URL: "redis://localhost:6379" } as Record<string, unknown>,
+  requireEnv: vi.fn(() => "https://example.upstash.io"),
+  env: {
+    UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+    UPSTASH_REDIS_REST_TOKEN: "tok",
+  } as Record<string, unknown>,
 }));
 
 const mockEval = vi.fn();
-vi.mock("@/lib/redis", () => ({
-  getRedis: () => ({ eval: mockEval }),
+vi.mock("@/lib/kv", () => ({
+  getKv: () => ({ eval: mockEval }),
 }));
 
 import {
@@ -63,8 +66,9 @@ describe("ratelimit", () => {
       await lim.check("alice");
       await lim.check("bob");
       const calls = mockEval.mock.calls;
-      expect(calls[0][2]).toBe("rl:auth:alice");
-      expect(calls[1][2]).toBe("rl:auth:bob");
+      // kv.eval(luaScript, [key], [now, windowMs, max])
+      expect((calls[0] as unknown[])[1]).toEqual(["rl:auth:alice"]);
+      expect((calls[1] as unknown[])[1]).toEqual(["rl:auth:bob"]);
     });
   });
 

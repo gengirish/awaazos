@@ -6,8 +6,8 @@ const redisMock = {
   expire: vi.fn(),
 };
 
-vi.mock("@/lib/redis", () => ({
-  getRedis: () => redisMock,
+vi.mock("@/lib/kv", () => ({
+  getKv: () => redisMock,
 }));
 
 import { reserveAnthropicTokens, reserveSarvamMinutes } from "@/lib/ai-usage-guard";

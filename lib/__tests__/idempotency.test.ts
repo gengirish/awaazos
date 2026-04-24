@@ -1,16 +1,19 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/lib/env", () => ({
-  requireEnv: vi.fn(() => "redis://localhost:6379"),
-  env: { REDIS_URL: "redis://localhost:6379" } as Record<string, unknown>,
+  requireEnv: vi.fn(() => "https://example.upstash.io"),
+  env: {
+    UPSTASH_REDIS_REST_URL: "https://example.upstash.io",
+    UPSTASH_REDIS_REST_TOKEN: "tok",
+  } as Record<string, unknown>,
 }));
 
 const redisMock = {
   set: vi.fn(),
   get: vi.fn(),
 };
-vi.mock("@/lib/redis", () => ({
-  getRedis: () => redisMock,
+vi.mock("@/lib/kv", () => ({
+  getKv: () => redisMock,
 }));
 
 import { beginIdempotency, getIdempotencyKey } from "@/lib/idempotency";
@@ -64,8 +67,8 @@ describe("idempotency", () => {
       const args = redisMock.set.mock.calls[0];
       expect(String(args[0])).toContain("idem:tx-create:v1:");
       expect(args[1]).toBe("__inflight__");
-      expect(args[2]).toBe("PX");
-      expect(args[4]).toBe("NX");
+      // @upstash/redis options object: { nx: true, px: 30_000 }
+      expect(args[2]).toEqual({ nx: true, px: 30_000 });
     });
 
     it("commit() writes the cached response with the long TTL", async () => {
@@ -79,9 +82,8 @@ describe("idempotency", () => {
       redisMock.set.mockResolvedValueOnce("OK");
       await out.commit({ status: 201, body: { ok: true } });
       const callArgs = redisMock.set.mock.calls[1];
-      expect(callArgs[1]).toContain('"status":201');
-      expect(callArgs[2]).toBe("EX");
-      expect(callArgs[3]).toBe(24 * 3600);
+      expect(String(callArgs[1])).toContain('"status":201');
+      expect(callArgs[2]).toEqual({ ex: 24 * 3600 });
     });
 
     it("returns 'replay' when the same key is replayed with a stored response", async () => {

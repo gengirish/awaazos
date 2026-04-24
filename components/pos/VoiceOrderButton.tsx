@@ -17,6 +17,10 @@ const ERROR_MESSAGES: Record<string, string> = {
   transcribe_failed: "Could not transcribe — try again or use the grid",
   stt_degraded: "Voice quality low — use the grid below",
   empty_transcript: "Did not catch that — try again",
+  network_error: "No internet for voice — check connection or use the grid",
+  no_speech_detected: "No speech heard — speak clearly and retry",
+  lang_not_supported_stt: "This language is not supported by your browser — try Chrome or use the grid",
+  voice_aborted: "Voice cancelled — tap to start again",
 };
 
 function mapError(reason: string | null): string {

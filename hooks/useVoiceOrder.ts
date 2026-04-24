@@ -2,6 +2,8 @@
 
 import { useCallback, useRef, useState } from "react";
 
+import { mapWebSpeechErrorCode, type VoiceErrorReason } from "@/lib/voice-error";
+
 type VoiceOrderState =
   | "idle"
   | "listening"
@@ -38,6 +40,7 @@ interface VoiceSpeechRecognitionEvent extends Event {
 
 interface VoiceSpeechErrorEvent extends Event {
   error: string;
+  message?: string;
 }
 
 declare global {
@@ -67,7 +70,7 @@ export function useVoiceOrder(options: { voiceLang: string }) {
   const [unmatched, setUnmatched] = useState<string[]>([]);
   const [confidence, setConfidence] = useState<"high" | "medium" | "low" | null>(null);
   const [modelUsed, setModelUsed] = useState<string | null>(null);
-  const [errorReason, setErrorReason] = useState<string | null>(null);
+  const [errorReason, setErrorReason] = useState<VoiceErrorReason | null>(null);
 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<BlobPart[]>([]);
@@ -158,9 +161,25 @@ export function useVoiceOrder(options: { voiceLang: string }) {
         }
       };
 
-      recognition.onerror = () => {
+      recognition.onerror = (ev: VoiceSpeechErrorEvent) => {
+        const reason = mapWebSpeechErrorCode(ev.error);
+        if (typeof console !== "undefined") {
+          console.warn(
+            JSON.stringify({
+              event: "webspeech_error",
+              code: ev.error || "unknown",
+              message: ev.message || "",
+              reason,
+              voiceLang,
+            }),
+          );
+        }
+        if (reason === "voice_aborted") {
+          setState("idle");
+          return;
+        }
         setState("error");
-        setErrorReason("webspeech_error");
+        setErrorReason(reason);
       };
 
       recognition.onend = () => {
