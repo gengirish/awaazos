@@ -1,21 +1,18 @@
 import type { Plan } from "@prisma/client";
 import type { NextRequest } from "next/server";
 
-import { getRedis } from "@/lib/redis";
+import { getKv } from "@/lib/kv";
 
 /**
- * Sliding-window rate limiter on top of ioredis.
+ * Sliding-window rate limiter backed by Upstash Redis HTTP client.
  *
- * Algorithm: sorted-set "log of timestamps". For each request:
- *   1. ZREMRANGEBYSCORE drop entries older than (now - window)
- *   2. ZCARD to count remaining entries
- *   3. If count < max, ZADD this request and allow; else deny with reset
+ * Algorithm: sorted-set "log of timestamps" evaluated atomically via Lua EVAL.
+ *   1. ZREMRANGEBYSCORE — drop entries older than (now - window)
+ *   2. ZCARD            — count remaining
+ *   3. If count < max   — ZADD this request and allow; else deny
  *
- * Atomic via a single EVAL — no race between count and add.
- *
- * Fail-open semantics: any Redis error returns ok=true with a warn log so a
- * Redis outage never blocks legitimate users (the trade-off for a payment-
- * critical product where false-deny is worse than false-allow).
+ * Fail-open semantics: any Redis error returns ok=true so a Redis outage
+ * never blocks legitimate users (payment-critical product trade-off).
  */
 
 const SLIDING_WINDOW_LUA = `
@@ -64,18 +61,19 @@ export function makeLimiter(opts: {
       const key = `rl:${opts.name}:${identifier}`;
       const now = Date.now();
       try {
-        const redis = getRedis();
-        const result = (await redis.eval(
+        const kv = getKv();
+        if (!kv) {
+          return { ok: true, limit: opts.max, remaining: opts.max, resetAt: now + opts.windowMs };
+        }
+        const result = await kv.eval<[number, number, number]>(
           SLIDING_WINDOW_LUA,
-          1,
-          key,
-          now.toString(),
-          opts.windowMs.toString(),
-          opts.max.toString(),
-        )) as [number, number, number];
-        const ok = result[0] === 1;
-        const remaining = Number(result[1]);
-        const resetAt = ok ? now + opts.windowMs : Number(result[2]) || now + opts.windowMs;
+          [key],
+          [now, opts.windowMs, opts.max],
+        );
+        const r = result as [number, number, number];
+        const ok = r[0] === 1;
+        const remaining = Number(r[1]);
+        const resetAt = ok ? now + opts.windowMs : Number(r[2]) || now + opts.windowMs;
         return { ok, limit: opts.max, remaining, resetAt };
       } catch (err) {
         console.warn(

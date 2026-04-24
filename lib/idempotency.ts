@@ -1,6 +1,6 @@
 import crypto from "node:crypto";
 
-import { getRedis } from "@/lib/redis";
+import { getKv } from "@/lib/kv";
 
 const TTL_SECONDS = 24 * 3600;
 const MIN_KEY_LEN = 8;
@@ -18,8 +18,6 @@ export type IdempotencyOutcome =
   | { kind: "disabled" };
 
 function redisKey(scope: string, vendorId: string, idemKey: string): string {
-  // Hash the user-supplied key so client-side typos can't collide with another
-  // vendor's keyspace (defense in depth — the scope already isolates by vendor).
   const h = crypto
     .createHash("sha256")
     .update(`${scope}:${vendorId}:${idemKey}`)
@@ -33,17 +31,11 @@ function redisKey(scope: string, vendorId: string, idemKey: string): string {
  *
  * Behaviour:
  *  - "fresh"     → first call. Caller must invoke commit() with the response
- *                  record (status + body). Subsequent calls with the same key
- *                  inside the TTL will replay the cached record.
- *  - "replay"    → a prior call already completed with this key. Caller MUST
- *                  return record.body with HTTP record.status verbatim.
- *  - "in_flight" → a concurrent call is mid-flight (reserved but not yet
- *                  committed). Caller should return 409 Conflict.
- *  - "disabled"  → Redis unreachable. Caller proceeds without idempotency
- *                  (fail-open — same trade-off as ratelimit).
- *
- * Reservation uses SET NX with a short PX so a crash mid-flight self-heals
- * within ~30s. The committed payload then overwrites with the long TTL.
+ *                  record (status + body).
+ *  - "replay"    → prior call already completed. Caller MUST return the cached
+ *                  body with HTTP record.status verbatim.
+ *  - "in_flight" → concurrent call is mid-flight. Return 409 Conflict.
+ *  - "disabled"  → Redis unreachable. Proceed without idempotency (fail-open).
  */
 export async function beginIdempotency(args: {
   scope: string;
@@ -52,21 +44,19 @@ export async function beginIdempotency(args: {
 }): Promise<IdempotencyOutcome> {
   const key = redisKey(args.scope, args.vendorId, args.idempotencyKey);
 
-  let redis: ReturnType<typeof getRedis>;
-  try {
-    redis = getRedis();
-  } catch {
-    return { kind: "disabled" };
-  }
+  const kv = getKv();
+  if (!kv) return { kind: "disabled" };
 
   try {
-    const reserved = await redis.set(key, "__inflight__", "PX", 30_000, "NX");
+    // SET NX PX — reserves the slot for 30s; self-heals if caller crashes.
+    const reserved = await kv.set(key, "__inflight__", { nx: true, px: 30_000 });
+
     if (reserved === "OK") {
       return {
         kind: "fresh",
         commit: async (record: IdempotentResponseRecord) => {
           try {
-            await redis.set(key, JSON.stringify(record), "EX", TTL_SECONDS);
+            await kv.set(key, JSON.stringify(record), { ex: TTL_SECONDS });
           } catch (err) {
             console.warn(
               JSON.stringify({
@@ -80,8 +70,7 @@ export async function beginIdempotency(args: {
       };
     }
 
-    // Reservation didn't go through — read the existing value
-    const existing = await redis.get(key);
+    const existing = await kv.get<string>(key);
     if (existing == null || existing === "__inflight__") {
       return { kind: "in_flight" };
     }
@@ -89,12 +78,12 @@ export async function beginIdempotency(args: {
       const parsed = JSON.parse(existing) as IdempotentResponseRecord;
       return { kind: "replay", record: parsed };
     } catch {
-      // Corrupt cache — treat as fresh so we don't deadlock; overwrite TTL.
-      await redis.set(key, "__inflight__", "PX", 30_000);
+      // Corrupt cache — overwrite and treat as fresh to avoid deadlock.
+      await kv.set(key, "__inflight__", { px: 30_000 });
       return {
         kind: "fresh",
         commit: async (record) => {
-          await redis.set(key, JSON.stringify(record), "EX", TTL_SECONDS);
+          await kv.set(key, JSON.stringify(record), { ex: TTL_SECONDS });
         },
       };
     }
@@ -116,7 +105,6 @@ export function getIdempotencyKey(req: Request): string | null {
   if (!raw) return null;
   const trimmed = raw.trim();
   if (trimmed.length < MIN_KEY_LEN || trimmed.length > MAX_KEY_LEN) return null;
-  // Allowed charset: alphanumeric, hyphen, underscore. Prevents header smuggling.
   if (!/^[A-Za-z0-9._-]+$/.test(trimmed)) return null;
   return trimmed;
 }

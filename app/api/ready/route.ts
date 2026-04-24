@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 
+import { getKv } from "@/lib/kv";
 import { prisma } from "@/lib/prisma";
-import { getRedis } from "@/lib/redis";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -43,8 +43,9 @@ export async function GET() {
   const probes = await Promise.all([
     probe("database", () => prisma.$queryRaw`SELECT 1`),
     probe("redis", async () => {
-      const r = getRedis();
-      const result = await r.ping();
+      const kv = getKv();
+      if (!kv) throw new Error("kv_not_configured");
+      const result = await kv.ping();
       if (result !== "PONG") throw new Error(`unexpected_ping=${result}`);
     }),
   ]);

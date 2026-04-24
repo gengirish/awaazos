@@ -1,6 +1,6 @@
 import type { Plan } from "@prisma/client";
 
-import { getRedis } from "@/lib/redis";
+import { getKv } from "@/lib/kv";
 
 type GuardResult = { ok: true } | { ok: false; code: string; message: string };
 
@@ -36,11 +36,12 @@ function globalSarvamCap(): number {
 }
 
 async function bumpCounter(key: string, delta: number, ttlSec: number): Promise<number> {
-  const redis = getRedis();
-  const next = await redis.incrby(key, delta);
-  const ttl = await redis.ttl(key);
+  const kv = getKv();
+  if (!kv) return 0;
+  const next = await kv.incrby(key, delta);
+  const ttl = await kv.ttl(key);
   if (ttl < 0) {
-    await redis.expire(key, ttlSec);
+    await kv.expire(key, ttlSec);
   }
   return next;
 }
@@ -48,6 +49,7 @@ async function bumpCounter(key: string, delta: number, ttlSec: number): Promise<
 /**
  * Reserve Anthropic tokens for this request.
  * Uses approximate prompt+response token estimate.
+ * Fail-open: if Redis is down, the check passes to avoid POS outages.
  */
 export async function reserveAnthropicTokens(args: {
   vendorId: string;
@@ -62,19 +64,25 @@ export async function reserveAnthropicTokens(args: {
   const globalKey = `usage:anthropic:global:${m}`;
 
   try {
+    const kv = getKv();
+    if (!kv) return { ok: true };
+
     const [vendorNext, globalNext] = await Promise.all([
       bumpCounter(vendorKey, delta, ttl),
       bumpCounter(globalKey, delta, ttl),
     ]);
     if (vendorNext > ANTHROPIC_VENDOR_MONTHLY_TOKEN_CAP[args.plan]) {
-      return { ok: false, code: "vendor_anthropic_cap_reached", message: "Monthly Anthropic cap reached for this plan." };
+      return {
+        ok: false,
+        code: "vendor_anthropic_cap_reached",
+        message: "Monthly Anthropic cap reached for this plan.",
+      };
     }
     if (globalNext > globalAnthropicCap()) {
       return { ok: false, code: "global_anthropic_cap_reached", message: "Platform Anthropic cap reached." };
     }
     return { ok: true };
   } catch {
-    // Fail-open to avoid POS outages if Redis is temporarily down.
     return { ok: true };
   }
 }
@@ -92,12 +100,19 @@ export async function reserveSarvamMinutes(args: {
   const globalKey = `usage:sarvam:global:${m}`;
 
   try {
+    const kv = getKv();
+    if (!kv) return { ok: true };
+
     const [vendorNext, globalNext] = await Promise.all([
       bumpCounter(vendorKey, delta, ttl),
       bumpCounter(globalKey, delta, ttl),
     ]);
     if (vendorNext > SARVAM_VENDOR_MONTHLY_MINUTE_CAP[args.plan]) {
-      return { ok: false, code: "vendor_sarvam_cap_reached", message: "Monthly Sarvam minute cap reached for this plan." };
+      return {
+        ok: false,
+        code: "vendor_sarvam_cap_reached",
+        message: "Monthly Sarvam minute cap reached for this plan.",
+      };
     }
     if (globalNext > globalSarvamCap()) {
       return { ok: false, code: "global_sarvam_cap_reached", message: "Platform Sarvam minute cap reached." };
@@ -107,4 +122,3 @@ export async function reserveSarvamMinutes(args: {
     return { ok: true };
   }
 }
-
