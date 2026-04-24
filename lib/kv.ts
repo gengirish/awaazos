@@ -20,8 +20,12 @@ let _initFailed = false;
 export function getKv(): Redis | null {
   if (_initFailed) return null;
   if (_kv) return _kv;
+  // Trim: Vercel CLI sometimes stores env values with trailing newlines when piping.
+  const url = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const token = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+  if (!url || !token) return null;
   try {
-    _kv = Redis.fromEnv();
+    _kv = new Redis({ url, token });
     return _kv;
   } catch {
     _initFailed = true;
