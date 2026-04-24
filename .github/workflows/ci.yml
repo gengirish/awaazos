@@ -52,6 +52,23 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     needs: quality
+    services:
+      postgres:
+        image: postgres:15-alpine
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: awaazos
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d awaazos"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/awaazos?schema=public
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/awaazos?schema=public
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -64,6 +81,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Prisma db push (E2E database)
+        run: npx prisma db push
 
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium

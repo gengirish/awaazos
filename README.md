@@ -83,7 +83,7 @@ All of this on a phone, in <8 seconds per transaction, in **any of 22 official I
 - 🇮🇳 **India-first defaults** — IST timezone, DD/MM/YYYY dates, `+91` 10-digit phone validation, `Intl.NumberFormat('en-IN', { currency: 'INR' })`, `libphonenumber-js`
 - 🔐 **Auth.js v5 (NextAuth)** — Edge-split config, JWT sessions, Credentials provider with bcrypt, single `prisma.$transaction` for sign-up
 - 🎨 **Mobile-first UI** — Tailwind + shadcn/ui, saffron AwaazOS palette (`--awaaz-orange` AA-contrast), Baloo 2 + Nunito Indic-friendly fonts
-- ✅ **51 unit tests + 38 E2E** — Vitest + Playwright (chromium + Pixel 7 mobile, en-IN locale, IST timezone)
+- ✅ **51 unit tests + 44 E2E** — Vitest + Playwright (chromium + Pixel 7 mobile, en-IN locale, IST timezone)
 
 ### Roadmap (Phase 5+)
 
@@ -190,6 +190,7 @@ BASE_URL=https://awaazos.vercel.app npm run e2e   # E2E against prod
 | `whatsapp-message.test.ts` | 2 | Receipt formatter (multiline, India-friendly, AwaazOS footer) |
 | `analytics-aggregations.test.ts` | 9 | KPI sums, voice adoption %, plan-history clamping |
 | **e2e/public.spec.ts** | 19 × 2 browsers | Public surfaces render, all 7 protected pages redirect to /sign-in, all 8 protected APIs return 3xx/4xx |
+| **e2e/razorpay-subscription.spec.ts** | 3 × 2 browsers | `POST /api/razorpay/create-subscription` returns 401 when anonymous; billing **Upgrade to Starter** sends `{ plan: "STARTER" }` (Razorpay response mocked) |
 
 ---
 
@@ -317,7 +318,9 @@ awaazos/
 │   ├── voiceLog.worker.ts         persists voice telemetry
 │   └── receipt.worker.ts          sends WhatsApp via Gupshup, idempotent
 ├── prisma/schema.prisma
-├── e2e/public.spec.ts             Playwright suite
+├── e2e/public.spec.ts             Playwright — public + auth gate smoke
+├── e2e/razorpay-subscription.spec.ts  Playwright — Razorpay subscription API + billing UI
+├── e2e/helpers/register-owner.ts  Shared E2E register + sign-in (cookie banner pre-dismissed)
 ├── middleware.ts                  Auth.js edge middleware
 ├── playwright.config.ts
 ├── vitest.config.ts
