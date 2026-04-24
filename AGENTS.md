@@ -28,7 +28,8 @@ prompts.
 | Payments | Razorpay subscriptions + UPI QR |
 | WhatsApp | Gupshup |
 | Storage | **Vercel Blob** (NOT Supabase Storage) |
-| Jobs | BullMQ + ioredis |
+| Jobs | BullMQ + **Redis TCP** (`REDIS_URL`, Fly workers) |
+| Serverless KV | **Upstash REST** (`UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`, Vercel — `lib/kv.ts`) |
 
 ## Project rules — applied automatically by Cursor
 

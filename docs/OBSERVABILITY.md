@@ -50,10 +50,12 @@ Public probe endpoints:
 - `GET /api/health`  -> liveness
 - `GET /api/ready`   -> readiness (DB + Redis)
 
+The **Redis** probe uses **`@upstash/redis`** over **HTTPS** (`UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`). It does **not** use the BullMQ **`REDIS_URL`** TCP connection (which is for Fly.io workers only).
+
 Expected:
 
 - `200` on healthy state
-- `/api/ready` returns `503` if any dependency is degraded
+- `/api/ready` returns `503` if any dependency is degraded (e.g. missing `UPSTASH_*` env, DB down)
 
 Recommended monitors:
 

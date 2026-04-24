@@ -56,9 +56,12 @@ This document summarizes the production-hardening pass executed across H1-H7.
 
 ## Remaining operational checklist
 
-- Rotate all secrets that were ever shared in chat history.
-- Re-auth git (`gh auth login`) and push queued hardening commits.
-- Deploy web + workers and run production E2E smoke suite.
-- Enable branch protection checks in GitHub settings.
+- Rotate any secrets that were ever pasted in chat, email, or tickets (Upstash, Neon, Razorpay, etc.).
+- Ensure **Vercel** has **`UPSTASH_REDIS_REST_URL`** + **`UPSTASH_REDIS_REST_TOKEN`** (REST API tab in Upstash). **`REDIS_URL`** on Vercel is only for BullMQ enqueue if you use a **public** TCP endpoint — not Fly `*.internal`.
+- Ensure **Fly workers** have **`REDIS_URL`** (TCP `rediss://` or `redis://`) for BullMQ.
+- Confirm **`GET /api/ready`** returns `200` with `redis` + `database` probes OK before investor demos.
+- Keep **`git push`** working (`gh auth login` / `gh auth setup-git` if HTTPS token expires).
+- Enable branch protection checks in GitHub settings (see `docs/BRANCH_PROTECTION.md`).
 - Configure status page and alert channels from `docs/OBSERVABILITY.md`.
+- Live demo walkthrough: `docs/DEMO_GUIDE.md`.
 

@@ -21,7 +21,7 @@
 
 - Is it frontend-only, API-only, worker-only, or shared dependency outage?
 - Is Neon reachable?
-- Is Redis reachable?
+- Is Redis reachable? (Vercel: **`UPSTASH_REDIS_*`** REST — rate limits & `/api/ready` probe; Fly: **`REDIS_URL`** TCP — BullMQ)
 - Are third-party providers degraded (Anthropic/Sarvam/Razorpay/Gupshup)?
 - Is rate-limiting rejecting legitimate traffic accidentally?
 

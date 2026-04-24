@@ -672,8 +672,12 @@ GUPSHUP_API_KEY=...
 GUPSHUP_APP_NAME=awaazos
 GUPSHUP_SRC_NUMBER=917XXXXXXXXX
 
-# ─── Redis (BullMQ) ───────────────────────────────────────────────────
-REDIS_URL=redis://...
+# ─── Redis ────────────────────────────────────────────────────────────
+# Vercel / serverless: Upstash REST (rate limits, idempotency, AI caps, /api/ready)
+UPSTASH_REDIS_REST_URL=https://<id>.upstash.io
+UPSTASH_REDIS_REST_TOKEN=...
+# Workers (Fly / local BullMQ): TCP connection
+REDIS_URL=redis://localhost:6379
 
 # ─── Vercel Blob (logos, PDF receipts) ────────────────────────────────
 # Auto-injected on Vercel deploys; set manually only for local dev.
@@ -1192,7 +1196,9 @@ Sections:
 
 Deployment checklist (add to CURSOR_PLAYBOOK.md):
 - Vercel: connect GitHub repo, add all env vars (DATABASE_URL, DIRECT_URL,
-    AUTH_SECRET, ANTHROPIC_*, SARVAM_*, RAZORPAY_*, GUPSHUP_*, REDIS_URL,
+    AUTH_SECRET, ANTHROPIC_*, SARVAM_*, RAZORPAY_*, GUPSHUP_*,
+    UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN,
+    optional REDIS_URL if API enqueues BullMQ via public TCP,
     BLOB_READ_WRITE_TOKEN). AUTH_URL is auto-detected on Vercel.
 - Vercel Blob: enable in project settings → BLOB_READ_WRITE_TOKEN auto-injected.
 - Neon: create prod branch, copy pooled+direct URLs into Vercel env.

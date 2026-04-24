@@ -25,7 +25,7 @@
 
 ## Verification
 
-- `GET /api/ready` passes (DB + Redis)
+- `GET /api/ready` passes (DB + Upstash REST Redis; workers still need TCP `REDIS_URL`)
 - POS create transaction works
 - Receipt queue and worker processing resume
 - `/api/_metrics` counters update as expected

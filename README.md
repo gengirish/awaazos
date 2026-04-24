@@ -19,6 +19,8 @@
 > Voice command in Hindi → cart fills in real time → UPI QR → WhatsApp receipt. Sixty seconds, end-to-end, on a real phone, in a real chai stall.
 >
 > _Production guide for shooting + editing + publishing this video lives in [`DEMO_VIDEO.md`](./DEMO_VIDEO.md)._
+>
+> _**Live** walkthroughs (Zoom / investor rooms): [`docs/DEMO_GUIDE.md`](./docs/DEMO_GUIDE.md)._
 
 ---
 
@@ -31,6 +33,7 @@
 | **Sign up** | https://awaazos.vercel.app/sign-up |
 | **GitHub** | https://github.com/gengirish/awaazos |
 | **60s video demo** | https://youtu.be/<VIDEO_ID> _(coming soon — see [DEMO_VIDEO.md](./DEMO_VIDEO.md))_ |
+| **Live demo script** | [docs/DEMO_GUIDE.md](./docs/DEMO_GUIDE.md) _(Zoom / investors)_ |
 
 > 60-second test: sign up → onboard a stall → add 3 menu items → open `/pos` on your phone → tap the orange mic → say _"do samosa aur ek chai"_ → see the cart fill → scan the UPI QR → bill `AWZ-YYYYMMDD-0001` is generated atomically → check `/analytics`.
 
@@ -106,7 +109,8 @@ All of this on a phone, in <8 seconds per transaction, in **any of 22 official I
 | **ORM** | Prisma | Type-safe, `$transaction` for atomicity, `upsert` for idempotency |
 | **AI / Voice** | Anthropic Claude Haiku 4.5 (primary) + Sonnet 4.5 (fallback), tool-use, prompt caching | Best Indic instruction-following at lowest cost |
 | **STT** | Sarvam Saaras v2 (Indic) + Web Speech API (en/hi) | Sarvam best for Indian languages; Web Speech free for browser-native |
-| **Background jobs** | BullMQ + Upstash Redis (via Fly.io) | Receipt sending, voice telemetry, retries with backoff |
+| **Background jobs** | BullMQ + Redis (Fly.io workers) | Receipt sending, voice telemetry, retries with backoff |
+| **Serverless KV** | [@upstash/redis](https://github.com/upstash/redis-js) HTTP on Vercel | Rate limits, idempotency keys, AI usage caps; no TCP from serverless |
 | **Payments** | Razorpay subscriptions + payment links | India-first, supports UPI / cards / wallets / EMI |
 | **Messaging** | Gupshup WhatsApp Business API | Cheapest verified WABA channel for India |
 | **Hosting** | Vercel (Next.js) + Fly.io BOM region (workers) | Edge for users, BOM for low-latency to Indian compute |
@@ -127,7 +131,9 @@ npm install
 cp .env.local.example .env.local
 # Required to boot: DATABASE_URL, AUTH_SECRET
 # Required for voice: ANTHROPIC_API_KEY (and SARVAM_API_KEY for non-en/hi)
-# Optional: RAZORPAY_*, GUPSHUP_*, REDIS_URL, BLOB_READ_WRITE_TOKEN
+# Optional: RAZORPAY_*, GUPSHUP_*, BLOB_READ_WRITE_TOKEN
+# Vercel production: UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN (see .env.local.example)
+# Workers (local/Fly): REDIS_URL (TCP rediss:// — BullMQ only)
 
 # 3. Push Prisma schema to your Neon DB
 npx prisma db push
@@ -194,8 +200,9 @@ The app is deployed today across two providers:
 | Service | Host | What runs there |
 | --- | --- | --- |
 | **Web** | Vercel (`awaazos.vercel.app`) | Next.js App Router, all `/api/*` routes, marketing + vendor pages |
-| **Workers** | Fly.io `awaazos-workers` (BOM region) | BullMQ workers for `voiceLog` + `send-receipt` queues |
-| **Redis** | Fly.io Upstash `awaazos-redis` (BOM) | BullMQ queue backend |
+| **Workers** | Fly.io `awaazos-workers` (BOM region) | BullMQ workers for `voiceLog` + `send-receipt` + retention |
+| **Redis (HTTP)** | Upstash REST (`UPSTASH_REDIS_*` on Vercel) | Rate limiting, idempotency, monthly AI caps, `/api/ready` Redis probe |
+| **Redis (TCP)** | Same or separate Upstash / Fly Redis (`REDIS_URL` on workers) | BullMQ only — persistent connection on Fly, **not** reachable from Vercel serverless |
 | **Database** | Neon Serverless Postgres (us-east-1) | All app data, `prisma.$transaction` boundaries |
 
 ### Deploy from scratch
@@ -207,17 +214,22 @@ vercel env add DATABASE_URL production    # paste Neon pooled URL
 vercel env add AUTH_SECRET production     # openssl rand -base64 32
 vercel env add AUTH_TRUST_HOST production # value: true
 vercel env add ANTHROPIC_API_KEY production
-# ... (add SARVAM_*, RAZORPAY_*, GUPSHUP_*, REDIS_URL, BLOB_READ_WRITE_TOKEN as needed)
+# Upstash REST (Vercel serverless — rate limits, idempotency, /api/ready)
+vercel env add UPSTASH_REDIS_REST_URL production   # https://....upstash.io
+vercel env add UPSTASH_REDIS_REST_TOKEN production
+# ... (add SARVAM_*, RAZORPAY_*, GUPSHUP_*, BLOB_READ_WRITE_TOKEN, SENTRY_* as needed)
+# Optional on Vercel: REDIS_URL only if you enqueue BullMQ from API routes using TCP (default uses ioredis + Fly secret)
 vercel --prod
 
 # 2. Fly.io workers
 flyctl launch --name awaazos-workers --region bom --no-deploy
+# Provision Redis with a TCP URL workers can hold open (Fly Redis, or Upstash rediss://)
 flyctl redis create --name awaazos-redis --org personal --region bom \
   --no-replicas --enable-eviction --enable-prodpack=false
-# copy the printed redis:// URL
+# copy the printed rediss:// or redis:// URL — private Fly URLs do NOT work from Vercel
 
 flyctl secrets set --app awaazos-workers \
-  REDIS_URL="redis://..." \
+  REDIS_URL="rediss://..." \
   DATABASE_URL="postgresql://..." \
   ANTHROPIC_API_KEY="..." \
   GUPSHUP_API_KEY="..." \
@@ -226,9 +238,8 @@ flyctl secrets set --app awaazos-workers \
 
 flyctl deploy --app awaazos-workers --remote-only --ha=false
 
-# 3. Sync REDIS_URL back to Vercel so /api/* can enqueue jobs
-echo "redis://..." | vercel env add REDIS_URL production
-vercel --prod
+# 3. If API routes enqueue BullMQ jobs, set REDIS_URL on Vercel to a **public** TCP Redis URL
+# (same Upstash database TCP endpoint as workers, or a dedicated instance). Do NOT use Fly *.internal URLs.
 ```
 
 ### Per-deploy workflow we follow
@@ -241,7 +252,7 @@ For every meaningful change:
 4. `vercel --prod --yes` — explicit CLI prod deploy for synchronous URL
 5. `BASE_URL=https://awaazos.vercel.app npx playwright test` — E2E against live
 
-See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system diagrams, [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md) for production monitoring/alerting setup, [`HARDENING.md`](./HARDENING.md) for the production hardening checklist, and [`PITCH.md`](./PITCH.md) for the YC pitch.
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system diagrams, [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md) for production monitoring/alerting setup, [`HARDENING.md`](./HARDENING.md) for the production hardening checklist, [`docs/DEMO_GUIDE.md`](./docs/DEMO_GUIDE.md) for live demo walkthroughs, and [`PITCH.md`](./PITCH.md) for the YC pitch.
 
 ---
 
@@ -294,7 +305,9 @@ awaazos/
 │   ├── sarvam.ts                  Saaras v2 STT client + AbortController timeout
 │   ├── razorpay.ts                Lazy singleton + HMAC verifier
 │   ├── whatsapp.ts + whatsapp-message.ts  Gupshup REST + receipt formatter
-│   ├── queues.ts                  BullMQ queue accessors (lazy Redis)
+│   ├── kv.ts                      Upstash REST Redis (Vercel — rate limit / idempotency / caps)
+│   ├── redis.ts                   ioredis singleton (TCP — optional enqueue path)
+│   ├── queues.ts                  BullMQ queue accessors (Fly worker connection)
 │   ├── cartStore.ts               Zustand POS cart
 │   ├── analytics-aggregations.ts  Pure helpers (KPI sums, plan clamp)
 │   ├── zod-auth.ts / zod-menu.ts / transaction-post-body.ts  Zod schemas

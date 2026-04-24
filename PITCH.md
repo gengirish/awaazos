@@ -2,7 +2,7 @@
 
 > **One-liner:** Voice-first POS in 22 Indian languages for India's 60 million micro-merchants. Speak the order, instant UPI QR, WhatsApp receipt. ₹0 to start.
 
-> **▶ 60-second demo video:** https://youtu.be/<VIDEO_ID> _(storyboard: [DEMO_VIDEO.md](./DEMO_VIDEO.md))_
+> **▶ 60-second demo video:** https://youtu.be/<VIDEO_ID> _(storyboard: [DEMO_VIDEO.md](./DEMO_VIDEO.md); live walkthrough: [docs/DEMO_GUIDE.md](./docs/DEMO_GUIDE.md))_
 >
 > **Live app:** https://awaazos.vercel.app · **Repo:** https://github.com/gengirish/awaazos
 >

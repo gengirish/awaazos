@@ -19,11 +19,12 @@ flowchart LR
         Edge[Edge Middleware<br/>Auth.js v5 · session check]
         Pages[Next.js RSC pages<br/>/marketing /vendor]
         APIs[/api/* route handlers<br/>Node runtime]
+        KvHttp[(Upstash REST<br/>UPSTASH_REDIS_*<br/>rate limit · idempotency)]
     end
 
     subgraph Fly[Fly.io · BOM region]
-        Workers[BullMQ Workers<br/>voiceLog · send-receipt<br/>Node 20 alpine · 512MB]
-        Redis[(Upstash Redis<br/>fly-awaazos-redis<br/>BullMQ queue)]
+        Workers[BullMQ Workers<br/>voiceLog · send-receipt · retention<br/>Node 20 alpine · 512MB]
+        Redis[(Redis TCP<br/>REDIS_URL<br/>BullMQ queues)]
     end
 
     subgraph Neon[Neon Serverless Postgres]
@@ -43,7 +44,8 @@ flowchart LR
     Edge --> APIs
     Pages --> Pool
     APIs --> Pool
-    APIs -->|enqueue| Redis
+    APIs -->|HTTP| KvHttp
+    APIs -->|enqueue TCP| Redis
     APIs -->|tool-use| Anthropic
     APIs -->|audio blob| Sarvam
     APIs -->|create sub| Razorpay
@@ -59,9 +61,9 @@ flowchart LR
 ### Why this split
 
 - **Vercel** handles the user-facing surface — Next.js RSC, edge middleware (10ms cold start), serverless API routes for short-lived work
-- **Fly.io BOM** handles long-running BullMQ workers (Vercel functions can't hold open Redis connections; Vercel Cron isn't great for retry-with-backoff workflows)
+- **Fly.io BOM** handles long-running BullMQ workers (Vercel functions are a poor fit for long-lived TCP + retry-heavy job consumers)
 - **Neon** is serverless Postgres — branchable per-PR previews, scales to zero, single-region today (us-east-1) to keep latency low for Vercel's serverless hop
-- **Upstash Redis on Fly** keeps the queue colocated with the workers (BOM ↔ BOM = sub-millisecond)
+- **Two Redis surfaces:** **`UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`** power `@upstash/redis` on Vercel (sliding-window rate limits, idempotency keys, monthly AI caps, `/api/ready` Redis probe). **`REDIS_URL`** (`rediss://` TCP) is for **BullMQ only** on Fly (and optionally on Vercel if you point at a **public** endpoint — never a Fly `*.internal` hostname).
 
 ### Latency budget (typical voice-to-bill flow)
 
@@ -137,6 +139,7 @@ erDiagram
         int sortOrder
         boolean isPopular
         boolean isAvailable
+        string hsnCode "optional HSN/SAC"
     }
     BillSequence {
         string vendorId PK_FK
@@ -384,7 +387,7 @@ requirePlan(vendor, Plan.STARTER);
 
 ## 6. Background jobs
 
-Two queues today, both BullMQ on Upstash Redis.
+BullMQ queues run on **Redis TCP** (`REDIS_URL`) consumed by **Fly.io** workers. Vercel uses **Upstash REST** (`lib/kv.ts`) for rate limiting and idempotency — not the same transport as BullMQ.
 
 ```mermaid
 flowchart LR
@@ -392,28 +395,37 @@ flowchart LR
         TxAPI[POST /api/transactions]
         ParseAPI[POST /api/ai/parse-order]
         ReceiptAPI[POST /api/receipts/send]
+        AdminRet[POST /api/admin/retention/run]
+        KvV[lib/kv.ts<br/>Upstash HTTP]
     end
-    subgraph Redis[Upstash Redis · BOM]
+    subgraph RedisTCP[Redis TCP · REDIS_URL]
         QSendReceipt[(send-receipt queue)]
         QVoiceLog[(voiceLog queue)]
+        QRetention[(retention queue)]
     end
     subgraph Fly[Fly worker · BOM]
         WorkerSend[receipt.worker.ts<br/>attempts:3 backoff:exp]
         WorkerLog[voiceLog.worker.ts]
+        WorkerRet[retention.worker.ts]
     end
     subgraph External
         Gup[Gupshup WhatsApp]
         DB[(Neon Postgres)]
     end
 
+    TxAPI --> KvV
+    ParseAPI --> KvV
+    AdminRet -->|enqueue| QRetention
     TxAPI -->|post-commit enqueue| QSendReceipt
     ReceiptAPI -->|enqueue| QSendReceipt
     ParseAPI -->|enqueue telemetry| QVoiceLog
     QSendReceipt --> WorkerSend
     QVoiceLog --> WorkerLog
+    QRetention --> WorkerRet
     WorkerSend --> Gup
     WorkerSend --> DB
     WorkerLog --> DB
+    WorkerRet --> DB
 ```
 
 ### Worker contracts
@@ -422,6 +434,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | `send-receipt` | `{ transactionId, vendorId, customerPhone }` | early-return if `Receipt.whatsappSent === true` | 3 attempts, exponential backoff 5s |
 | `voiceLog` | `{ vendorId, transcript, parsedItems, confidence, modelUsed, latencyMs }` | n/a (write-only telemetry) | 1 attempt, no retry |
+| `retention-maintenance` | `{ requestedBy }` | jobId dedupes daily admin enqueue | per `DEFAULT_JOB_OPTS` in `lib/queues.ts` |
 
 ---
 

@@ -1,5 +1,7 @@
 # AwaazOS — 60-Second YC Demo Video Storyboard
 
+> **Live meetings (Zoom / investors)?** Use **[`docs/DEMO_GUIDE.md`](./docs/DEMO_GUIDE.md)** — checklist + 5-minute talk track. This file is only for the **recorded** 60s film.
+
 > **Goal:** A 60-second video that gets a YC partner to open the live URL within 10 seconds of finishing it. Founder face for credibility, real Hindi voice command for proof, real UPI QR + WhatsApp receipt for "this actually works."
 >
 > **Hard rules (YC):** ≤ 60 seconds. Founder must appear on camera in the first 5–7s. Show the product working — not slides, not animations. Real device, real screen recording.
