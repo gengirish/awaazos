@@ -15,6 +15,7 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "worker": "tsx workers/index.ts",
+    "smoke:sarvam": "node scripts/sarvam-roundtrip.mjs",
     "precommit:checks": "lint-staged",
     "prepare": "husky"
   },

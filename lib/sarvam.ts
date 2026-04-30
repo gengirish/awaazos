@@ -3,6 +3,11 @@ import { requireEnv } from "@/lib/env";
 const SARVAM_STT_URL = "https://api.sarvam.ai/speech-to-text";
 const STT_TIMEOUT_MS = 5_000;
 
+// Sarvam deprecated `saaras:v2` in early 2026. Default to the newest Saaras
+// production model; allow override via env so we don't need a deploy to swap
+// model families if Sarvam ships another revision.
+const DEFAULT_STT_MODEL = "saaras:v3";
+
 export type SarvamLang = "te-IN" | "kn-IN" | "ta-IN";
 
 type SarvamSpeechToTextResponse = {
@@ -13,17 +18,19 @@ type SarvamSpeechToTextResponse = {
 };
 
 /**
- * Sarvam Saaras STT (REST). API key is read only when this runs (not at module load).
+ * Sarvam Saaras STT (REST). API key + model are read only when this runs
+ * (not at module load) so a missing env var never breaks `next build`.
  */
 export async function transcribeAudio(
   audio: Blob,
   lang: SarvamLang,
 ): Promise<{ transcript: string; confidence: number }> {
   const apiKey = requireEnv("SARVAM_API_KEY");
+  const model = (process.env.SARVAM_STT_MODEL || DEFAULT_STT_MODEL).trim();
 
   const body = new FormData();
   body.append("file", audio, "recording.webm");
-  body.append("model", "saaras:v2");
+  body.append("model", model);
   body.append("language_code", lang);
 
   const controller = new AbortController();
