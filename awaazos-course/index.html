@@ -1,0 +1,2205 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AwaazOS — Bol. Bill. Becho. — An interactive code tour</title>
+
+  <!-- Google Fonts: Bricolage Grotesque · DM Sans · JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,700;12..96,800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400;1,9..40,500&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+  <link rel="stylesheet" href="styles.css">
+
+  <style>
+    :root {
+      --color-accent:       #D94F30;
+      --color-accent-hover: #C4432A;
+      --color-accent-light: #FDEEE9;
+      --color-accent-muted: #E8836C;
+    }
+  </style>
+
+  <script src="main.js" defer></script>
+</head>
+<body>
+
+  <nav class="nav" id="nav">
+    <div class="progress-bar" id="progress-bar" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+    <div class="nav-inner">
+      <span class="nav-title">AwaazOS — Bol. Bill. Becho.</span>
+      <div class="nav-dots" id="nav-dots" role="tablist">
+        <button class="nav-dot" data-target="module-1" data-tooltip="Bol. Bill. Becho. — the 1.8-second journey" role="tab" aria-label="Module 1: Bol. Bill. Becho. — the 1.8-second journey"></button>
+        <button class="nav-dot" data-target="module-2" data-tooltip="The Cast — three providers, one alias" role="tab" aria-label="Module 2: The Cast — three providers, one alias"></button>
+        <button class="nav-dot" data-target="module-3" data-tooltip="Whose data is it? — multi-tenant isolation" role="tab" aria-label="Module 3: Whose data is it? — multi-tenant isolation"></button>
+        <button class="nav-dot" data-target="module-4" data-tooltip="Speech becomes structure — the AI pipeline" role="tab" aria-label="Module 4: Speech becomes structure — the AI pipeline"></button>
+        <button class="nav-dot" data-target="module-5" data-tooltip="Money in paise — the atomic transaction" role="tab" aria-label="Module 5: Money in paise — the atomic transaction"></button>
+        <button class="nav-dot" data-target="module-6" data-tooltip="After the sale — workers, webhooks, idempotency" role="tab" aria-label="Module 6: After the sale — workers, webhooks, idempotency"></button>
+      </div>
+    </div>
+  </nav>
+
+  <main id="main">
+    <!-- modules/*.html content is assembled here by build.sh / build.ps1 -->
+<section class="module" id="module-1" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">01</span>
+      <h1 class="module-title">Bol. Bill. Becho.</h1>
+      <p class="module-subtitle">A chai-wala in Hyderabad taps an orange button and says <em>&ldquo;do samosa aur ek chai.&rdquo;</em> Less than two seconds later, the customer&rsquo;s phone is showing a UPI QR code. This module follows every single thing that happens in between.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">What this thing actually does</h2>
+        <p>AwaazOS is a <span class="term" data-definition="Point-of-Sale software — the system a shop uses to ring up sales, take payment, and print a receipt.">point-of-sale system</span> for India&rsquo;s 25 million micro-merchants — chai stalls, dosa carts, paan shops, kirana stores. The kind of place where the owner takes orders verbally in Hindi or Telugu, and writing them down by hand loses about 15&ndash;20% of revenue every month.</p>
+        <p>The pitch is one line: <strong>tap a button, speak the order in any Indian language, get a bill and a UPI QR code.</strong> No typing. No menus to navigate. No English required.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎙️</div>
+          <div class="callout-content">
+            <strong class="callout-title">The whole product, in one sentence</strong>
+            <p>If a chai-wala can&rsquo;t take their first 100 voice orders without thinking, every other feature is a distraction. The codebase is organised around protecting that one experience.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A backstage tour</h2>
+        <p>Imagine you&rsquo;ve just watched a 90-minute play. The acting was great, but you have no idea what the stagehands were doing behind the curtain — the lighting cues, the prop swaps, the quick costume changes that made it all feel effortless.</p>
+        <p>This module is that backstage tour for one specific scene: the moment a vendor speaks an order. Everything else in the course unpacks one of these stagehands in detail.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Vendor taps the orange mic</strong>
+              <p>An 80&times;80 pixel button on a phone screen — large enough for a thumb covered in dosa batter.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>The phone listens</strong>
+              <p>For English &amp; Hindi, the browser does the speech-to-text for free. For Telugu / Kannada / Tamil, the audio gets sent to <span class="term" data-definition="Sarvam AI is an Indian AI company that builds speech-to-text models specifically tuned for Indian languages and accents — the equivalent of a translator who grew up in your village, not just one who studied your language at university.">Sarvam AI</span>.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Claude turns the words into items</strong>
+              <p>The transcript (<em>&ldquo;do samosa aur ek chai&rdquo;</em>) plus this vendor&rsquo;s exact menu goes to <span class="term" data-definition="An AI model from Anthropic — the language model used to understand the order. Like asking a smart assistant 'they said this, which menu items do they mean?'">Claude Haiku 4.5</span>. It returns structured items: <code>{ samosa: 2, chai: 1 }</code>.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <strong>The cart fills on screen</strong>
+              <p>The vendor sees the items appear, taps <strong>Collect Payment</strong>, and a UPI QR code fills the screen.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">5</div>
+            <div class="step-body">
+              <strong>Customer scans, pays, walks away</strong>
+              <p>The vendor taps <strong>Mark as Paid</strong>. Five database writes commit together as one. A WhatsApp receipt gets queued. The next order can start.</p>
+            </div>
+          </div>
+        </div>
+
+        <p style="margin-top: var(--space-6)">All five steps complete in roughly <strong>1.8 seconds</strong> on a median phone in Hyderabad. The next screens unpack each step.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Watch them talk to each other</h2>
+        <p>In a movie, every actor has lines. In a software system, every component has messages it sends to other components. Here&rsquo;s the conversation that happens behind one voice order — pretend you&rsquo;re reading a group chat between the cast.</p>
+
+        <div class="chat-window" id="chat-module1">
+          <div class="chat-messages">
+
+            <div class="chat-message" data-msg="0" data-sender="vendor" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">V</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Vendor</span>
+                <p>*taps mic* &ldquo;Do samosa aur ek chai.&rdquo;</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="1" data-sender="browser" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">B</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">Browser</span>
+                <p>I heard Hindi. I can do this one myself with the built-in Web Speech API. Transcribing&hellip;</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="2" data-sender="browser" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">B</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">Browser</span>
+                <p>Got the transcript: &ldquo;do samosa aur ek chai&rdquo;. Hey API, what menu items is that?</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="3" data-sender="api" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">Vercel API</span>
+                <p>Pulling Ravi&rsquo;s 18-item menu from the database. Sending it plus the transcript to Claude with caching turned on so the menu doesn&rsquo;t cost us tokens twice.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="4" data-sender="claude" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-4)">C</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-4)">Claude Haiku</span>
+                <p>Easy. <code>do</code> = 2, <code>ek</code> = 1. Returning a tool call: 2&times; samosa, 1&times; chai. Confidence: high.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="5" data-sender="api" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">Vercel API</span>
+                <p>Browser, here are the parsed items. Also &mdash; quietly logging this to the voice-telemetry queue so we can see how often Claude was right.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="6" data-sender="browser" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">B</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">Browser</span>
+                <p>Cart is filled. Vendor just tapped <em>Collect Payment</em>. Generating a UPI QR for ₹40&hellip;</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="7" data-sender="vendor" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">V</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Vendor</span>
+                <p>Customer scanned and paid. Tapping <em>Mark as Paid</em>.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="8" data-sender="api" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">Vercel API</span>
+                <p>Database, please do five writes as one transaction: bill number, the sale, the line items, today&rsquo;s rollup, and the receipt row. All-or-nothing.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="9" data-sender="db" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">D</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Neon Postgres</span>
+                <p>Committed. Bill <code>AWZ-20260430-0001</code>. Returning the receipt.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="10" data-sender="api" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">Vercel API</span>
+                <p>Now &mdash; outside the transaction &mdash; dropping a job in the WhatsApp queue. Vendor doesn&rsquo;t wait for that. Done. Bye!</p>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="chat-typing" id="chat-module1-typing" style="display:none">
+            <div class="chat-avatar" id="chat-module1-typing-avatar">?</div>
+            <div class="chat-typing-dots">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+
+          <div class="chat-controls">
+            <button class="btn chat-next-btn">Next message</button>
+            <button class="btn chat-all-btn">Play all</button>
+            <button class="btn chat-reset-btn">Replay</button>
+            <span class="chat-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The mic button — small code, lots of states</h2>
+        <p>The button itself is one of the most-touched pieces of the whole product. It has six visual states (idle, listening, transcribing, parsing, success, error) and every one is announced to screen readers. Here&rsquo;s the core of it.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · components/pos/VoiceOrderButton.tsx</span>
+<pre><code><span class="code-line"><span class="code-tag">&lt;button</span></span>
+<span class="code-line">  <span class="code-attr">type</span>=<span class="code-value">"button"</span></span>
+<span class="code-line">  <span class="code-attr">onClick</span>={() <span class="code-operator">=&gt;</span> {</span>
+<span class="code-line">    <span class="code-keyword">if</span> (state === <span class="code-string">"listening"</span>) <span class="code-function">stopListening</span>();</span>
+<span class="code-line">    <span class="code-keyword">else</span> <span class="code-function">startListening</span>();</span>
+<span class="code-line">  }}</span>
+<span class="code-line">  <span class="code-attr">aria-label</span>={label}</span>
+<span class="code-line">  <span class="code-attr">aria-pressed</span>={state === <span class="code-string">"listening"</span>}</span>
+<span class="code-line">  <span class="code-attr">className</span>={<span class="code-function">cn</span>(</span>
+<span class="code-line">    <span class="code-string">"relative flex h-20 w-20 shrink-0 ..."</span>,</span>
+<span class="code-line">    state === <span class="code-string">"idle"</span> &amp;&amp; <span class="code-string">"bg-primary ..."</span>,</span>
+<span class="code-line">    state === <span class="code-string">"listening"</span> &amp;&amp;</span>
+<span class="code-line">      <span class="code-string">"bg-destructive ... motion-safe:animate-pulse"</span>,</span>
+<span class="code-line">  )}</span>
+<span class="code-line"><span class="code-tag">&gt;</span></span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Make a clickable button on the page.</p>
+              <p class="tl">When tapped, ask: am I already listening? If yes, stop. If no, start.</p>
+              <p class="tl">Tell screen readers what the button currently means right now (idle? listening?). The label changes with the state.</p>
+              <p class="tl">Tell screen readers whether the button is &ldquo;pressed&rdquo; (which is what listening feels like).</p>
+              <p class="tl">Pick the visual look based on the state. Idle = solid orange. Listening = red with a pulse animation, but only if the user hasn&rsquo;t turned animations off.</p>
+              <p class="tl">The pulse only animates for users who haven&rsquo;t enabled the &ldquo;reduce motion&rdquo; accessibility setting on their phone.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">♿</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why every state has a label</strong>
+            <p>About 12% of Indian phone users have a vision impairment of some kind. <span class="term" data-definition="A piece of software (built into the phone, like VoiceOver on iOS or TalkBack on Android) that reads aloud what's on the screen for blind or low-vision users.">Screen readers</span> rely on <code>aria-label</code> and <code>aria-pressed</code> to narrate what just happened &mdash; without them, a blind chai-wala can&rsquo;t use the product. <em>Add accessibility on day one.</em></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A budget for every step</h2>
+        <p>Voice products live or die on latency. If a vendor has to wait three seconds after speaking, they&rsquo;ll go back to writing on paper. This codebase has a published time budget for every leg of the journey.</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🎤</div>
+            <h4 class="pattern-title">Browser → Server</h4>
+            <p class="pattern-desc"><strong>~80&nbsp;ms</strong> median. Just the network hop from the vendor&rsquo;s phone to <span class="term" data-definition="Vercel is the cloud company that runs the website and the server-side logic. Think of it as the landlord that rents AwaazOS the building it lives in.">Vercel</span>.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🗣️</div>
+            <h4 class="pattern-title">Speech → Text</h4>
+            <p class="pattern-desc"><strong>~1.2&nbsp;s</strong> for Indic languages via Sarvam. Free &amp; instant for English/Hindi via the browser.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🧠</div>
+            <h4 class="pattern-title">Text → Items</h4>
+            <p class="pattern-desc"><strong>~350&nbsp;ms</strong> for Claude Haiku to match the menu. Roughly the time it takes to blink three times.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">💾</div>
+            <h4 class="pattern-title">Save the sale</h4>
+            <p class="pattern-desc"><strong>~90&nbsp;ms</strong> to atomically write all five rows to <span class="term" data-definition="Postgres (or PostgreSQL) is a popular open-source database — it's where AwaazOS keeps every menu item, sale, and receipt permanently.">Postgres</span>.</p>
+          </div>
+        </div>
+
+        <p style="margin-top: var(--space-6)">Add it up: <strong>about 1.8 seconds</strong> from speech to QR code on a typical day. P95 (the slowest 5% of requests) tops out around 3.7 seconds.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Quick check</h2>
+        <p>You don&rsquo;t need to memorise the actors yet &mdash; we&rsquo;ll meet each of them properly in the next module. This is just to make sure the big picture clicked.</p>
+
+        <div class="quiz-container" id="quiz-module1">
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="The browser&rsquo;s built-in Web Speech API handles English and Hindi for free, so there&rsquo;s no API call until the transcript is ready. Sarvam only gets used for Telugu / Kannada / Tamil. This is why Hindi orders are noticeably faster than Telugu ones."
+               data-explanation-wrong="The browser does the speech-to-text itself for English and Hindi using the built-in Web Speech API &mdash; there&rsquo;s no Sarvam call at all in that path. Sarvam only kicks in for Telugu / Kannada / Tamil where the browser doesn&rsquo;t support those languages well.">
+            <h3 class="quiz-question">A vendor in Mumbai always speaks orders in Hindi. Their voice orders feel snappier than their Telugu-speaking friend in Hyderabad. Why?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Mumbai has better internet than Hyderabad.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The Hindi version of Claude is a different (faster) model.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Hindi skips the Sarvam round-trip &mdash; the browser does the speech-to-text locally.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Right. The five database writes (bill number, transaction, line items, daily summary, receipt) all run inside one prisma.$transaction block. If the queue is down, the WhatsApp enqueue fails, but it happens AFTER the commit &mdash; so the sale is already saved. The vendor can use a &ldquo;Resend&rdquo; button later. Module 6 unpacks this in detail."
+               data-explanation-wrong="The vendor experience is the priority &mdash; the sale itself completes inside the database transaction, before WhatsApp is even attempted. The WhatsApp send is a job we drop into a queue afterwards. If the queue is unreachable, the sale still went through, the vendor sees the receipt on screen, and they can resend WhatsApp manually later.">
+            <h3 class="quiz-question">A vendor reports: &ldquo;Sometimes the bill saves but the customer doesn&rsquo;t get a WhatsApp message.&rdquo; Where would you start looking?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The database &mdash; the sale must have failed to write.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The background queue or the WhatsApp service &mdash; the sale is saved separately from the message.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Claude &mdash; the order parser must have got the items wrong.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Yes. By the time a vendor speaks an order, two design decisions have already paid for themselves: (1) caching the menu in the prompt so Claude doesn&rsquo;t re-read it every call, and (2) using the cheap Haiku model first and only escalating to the bigger Sonnet on tricky orders. Together they cut per-order AI cost by ~70%, which is the whole reason ₹299/month is sustainable."
+               data-explanation-wrong="The cost story isn&rsquo;t about the database or hosting &mdash; those are basically rounding errors. The real per-order cost is what AwaazOS pays Anthropic each time Claude parses a transcript. Caching the menu and using Haiku before Sonnet are the two big levers.">
+            <h3 class="quiz-question">AwaazOS charges only ₹299/month per vendor. Which two engineering choices in the voice path most help that pricing work?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Prompt-caching the menu, and trying cheap Haiku before expensive Sonnet.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Using a cheaper database, and a smaller server.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Skipping accessibility features, and not running tests.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="btn quiz-check-btn" onclick="checkQuiz('quiz-module1')">Check answers</button>
+          <button class="btn quiz-reset-btn" onclick="resetQuiz('quiz-module1')">Try again</button>
+
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">What&rsquo;s coming next</h2>
+        <p>You&rsquo;ve seen the whole play. From here on, the course is a series of close-ups on individual stagehands.</p>
+        <div class="icon-rows">
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-2)">🎭</div>
+            <div>
+              <strong>Module 2 &mdash; The cast</strong>
+              <p>Why three different cloud providers? What does each one do?</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-3)">🔐</div>
+            <div>
+              <strong>Module 3 &mdash; Whose data is it?</strong>
+              <p>How does AwaazOS make sure Ravi&rsquo;s chai stall never sees Suresh&rsquo;s sales?</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-4)">🎙️</div>
+            <div>
+              <strong>Module 4 &mdash; Speech becomes structure</strong>
+              <p>The two-tier AI pipeline, prompt caching, and tool-use in detail.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-5)">💰</div>
+            <div>
+              <strong>Module 5 &mdash; Money in paise</strong>
+              <p>The atomic transaction that ties bill numbers, sales, and receipts together.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-1)">📨</div>
+            <div>
+              <strong>Module 6 &mdash; After the sale</strong>
+              <p>Workers, webhooks, retries, idempotency &mdash; the resilient back-of-house.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+<section class="module" id="module-2" style="background: var(--color-bg)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">02</span>
+      <h1 class="module-title">The Cast: three providers, one alias</h1>
+      <p class="module-subtitle">When you visit <code>awaazos.vercel.app</code>, it feels like one app. Behind the curtain, three different cloud companies and four external APIs are doing different jobs. Here&rsquo;s who does what &mdash; and, just as importantly, why none of them does everything.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The right tool for the job</h2>
+        <p>Picture a wood-working workshop. You have a circular saw for straight cuts, a router for edge profiles, a drill press for clean perpendicular holes. You wouldn&rsquo;t ask the circular saw to also drill holes &mdash; the result would be terrible at both jobs. You pick the specialist tool for each task.</p>
+        <p>AwaazOS is the same. Each provider in the stack is the best in the world at one specific thing. Putting everything on one provider would be slower, more expensive, or less reliable.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🛠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Engineers call this &ldquo;separation of concerns&rdquo;</strong>
+            <p>One component, one job. The benefit isn&rsquo;t academic &mdash; it&rsquo;s that when something breaks, you know exactly which specialist to call.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Click around the system</h2>
+        <p>Here&rsquo;s the whole production. Tap any box to see what it does and why it lives where it lives.</p>
+
+        <div class="arch-diagram">
+
+          <div class="arch-zone">
+            <h4 class="arch-zone-label">Vercel · the front of house</h4>
+            <div class="arch-component"
+                 data-desc="Edge middleware runs Auth.js v5 and decides — in about 10 milliseconds — whether the request needs a login or can pass through. It runs at the edge (close to the vendor's phone), so the check is nearly free.">
+              <div class="arch-icon">🛡️</div>
+              <span>Edge middleware</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="The actual web pages — the marketing site, /pos, /menu, /analytics. Server-side rendering with React Server Components, so the vendor's phone gets pre-built HTML instead of a blank page that loads JavaScript.">
+              <div class="arch-icon">🖥️</div>
+              <span>Next.js pages</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="The /api/* routes — these are short-lived server-side functions. Things like POST /api/transactions, POST /api/ai/parse-order. They wake up, do one job, and shut down. Vercel charges only when they run.">
+              <div class="arch-icon">⚡</div>
+              <span>API routes</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="A high-speed, HTTP-based key-value store from Upstash. Used for rate limiting (don't let one vendor make 1000 AI calls per second), idempotency keys (don't process the same Mark-As-Paid twice), and the monthly AI cost cap.">
+              <div class="arch-icon">⚡</div>
+              <span>Upstash REST KV</span>
+            </div>
+          </div>
+
+          <div class="arch-zone">
+            <h4 class="arch-zone-label">Fly.io · the back of house · BOM region</h4>
+            <div class="arch-component"
+                 data-desc="A small Linux box in Mumbai (BOM = Mumbai's airport code) that runs background workers. It picks up jobs like 'send this WhatsApp receipt' and 'log this voice telemetry' from a queue and runs them. Lives close to Indian users for low latency.">
+              <div class="arch-icon">⚙️</div>
+              <span>BullMQ workers</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="Redis with a persistent TCP connection — used by BullMQ as the job queue. Vercel serverless functions cannot hold this kind of connection open, which is exactly why workers live separately on Fly.">
+              <div class="arch-icon">🧵</div>
+              <span>Redis (TCP)</span>
+            </div>
+          </div>
+
+          <div class="arch-zone">
+            <h4 class="arch-zone-label">Neon · the long-term memory · Postgres</h4>
+            <div class="arch-component"
+                 data-desc="A serverless Postgres database — it scales to zero when nobody's using it (cheap), and to many machines under load (fast). Stores every menu item, every sale, every receipt. The single source of truth for vendor data.">
+              <div class="arch-icon">🗄️</div>
+              <span>Postgres (pooled)</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="A direct (non-pooled) connection used only by Prisma migrations — which need a long-lived connection that the pooler interferes with. Two URLs for one database, picked by the driver based on what it's doing.">
+              <div class="arch-icon">🔧</div>
+              <span>Direct conn (migrations)</span>
+            </div>
+          </div>
+
+          <div class="arch-zone">
+            <h4 class="arch-zone-label">External services · the freelancers</h4>
+            <div class="arch-component"
+                 data-desc="Anthropic — makers of the Claude AI models. Two models are used: Haiku 4.5 (fast, cheap, default) and Sonnet 4.5 (slower, smarter, only for hard orders). Both turn voice transcripts into menu items.">
+              <div class="arch-icon">🧠</div>
+              <span>Anthropic Claude</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="Sarvam AI — an Indian company that makes Saaras v2, a speech-to-text model trained on Telugu, Kannada, Tamil and other Indic languages. Used only when the browser can't do the transcription itself (i.e., not English/Hindi).">
+              <div class="arch-icon">🎙️</div>
+              <span>Sarvam Saaras v2</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="Razorpay — India's largest payments company. Handles ₹299/month subscription billing, and also generates UPI deep-links the customer scans. AwaazOS itself doesn't touch card numbers, ever.">
+              <div class="arch-icon">💳</div>
+              <span>Razorpay</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="Gupshup — sends WhatsApp messages over the official WhatsApp Business API. Cheaper than the alternatives in India. The receipt-sending workers on Fly call Gupshup; Vercel never does.">
+              <div class="arch-icon">💬</div>
+              <span>Gupshup WhatsApp</span>
+            </div>
+          </div>
+
+          <div class="arch-description" id="arch-desc">
+            👆 Tap any box above to see what it does and why it lives there.
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why the workers live somewhere else</h2>
+        <p>This is the most-asked question about the architecture. Here&rsquo;s the simple version: a Vercel <span class="term" data-definition="A server-side function that wakes up only when needed, does one job, and shuts down. It can't keep a long-lived connection open to anything because it doesn't stay alive long enough.">serverless function</span> is fast for short jobs, but it&rsquo;s a terrible fit for the kind of work that needs to wait around &mdash; like watching a queue for new WhatsApp jobs.</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">⚡</div>
+            <h4 class="pattern-title">Serverless (Vercel)</h4>
+            <p class="pattern-desc">Wakes up, runs for &lt;10 seconds, sleeps. Perfect for &ldquo;take this voice clip and parse it.&rdquo; Bad at &ldquo;wait around forever for jobs.&rdquo;</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">⚙️</div>
+            <h4 class="pattern-title">Long-running (Fly.io)</h4>
+            <p class="pattern-desc">A small Linux box that&rsquo;s always on. Holds a TCP connection to Redis. Picks up jobs the second they appear. Perfect for queue workers.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🗄️</div>
+            <h4 class="pattern-title">Database (Neon)</h4>
+            <p class="pattern-desc">Stores everything. Both Vercel and Fly read/write to the same Neon database &mdash; that&rsquo;s how the two halves of the system stay in sync.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">The two-Redis trick</strong>
+            <p>You&rsquo;ll see two Redis instances in the diagram. They&rsquo;re different on purpose. <span class="term" data-definition="Upstash is a serverless Redis provider. You talk to it over HTTP — every command is a regular web request. Perfect for Vercel because there's no connection to keep open.">Upstash REST</span> talks over HTTP and is used by Vercel for rate-limiting. Regular <span class="term" data-definition="TCP is the older, persistent kind of network connection — like a phone call you keep open. BullMQ needs this because it uses blocking commands (like 'wait until a new job arrives') that don't translate to HTTP.">TCP Redis</span> is used by BullMQ on Fly because BullMQ needs to keep a connection open. You can&rsquo;t use the wrong one in the wrong place.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The middleware in five lines</h2>
+        <p>Every single request that hits AwaazOS &mdash; whether it&rsquo;s a vendor visiting <code>/menu</code> or an API call to <code>/api/transactions</code> &mdash; passes through this tiny file first. It runs on Vercel&rsquo;s edge in roughly 10 milliseconds.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · middleware.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">import</span> NextAuth <span class="code-keyword">from</span> <span class="code-string">"next-auth"</span>;</span>
+<span class="code-line"><span class="code-keyword">import</span> { authConfig } <span class="code-keyword">from</span> <span class="code-string">"@/lib/auth.config"</span>;</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">export const</span> { auth: middleware } = <span class="code-function">NextAuth</span>(authConfig);</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">export const</span> config = {</span>
+<span class="code-line">  <span class="code-property">matcher</span>: [</span>
+<span class="code-line">    <span class="code-string">"/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/health|api/ready).*)"</span>,</span>
+<span class="code-line">  ],</span>
+<span class="code-line">};</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Bring in the <span class="term" data-definition="Auth.js (formerly NextAuth.js) is the open-source library AwaazOS uses for sign-in / sign-up / sessions. It replaces paid alternatives like Clerk and Auth0.">Auth.js</span> library and our shared auth settings.</p>
+              <p class="tl">Hand off the request to Auth.js. It checks the cookie for a valid session.</p>
+              <p class="tl">Tell Vercel <em>which</em> URLs this middleware should run on.</p>
+              <p class="tl">The <code>matcher</code> is a regex that says: &ldquo;run on every URL <strong>except</strong> static files, webhook callbacks (those verify themselves), and health-check probes (uptime monitors must reach them anonymously).&rdquo;</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Don&rsquo;t accidentally protect a webhook</strong>
+            <p>If <code>/api/webhooks/razorpay</code> were behind auth, Razorpay&rsquo;s servers (which don&rsquo;t have a vendor login) couldn&rsquo;t reach it &mdash; and subscriptions would silently break. Excluding webhooks from the matcher is a small line with big consequences.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Match the actor to the job</h2>
+        <p>Drag each component to the job it does. (On a phone, tap-and-drag works the same way.)</p>
+
+        <div class="dnd-container" id="dnd-module2">
+          <div class="dnd-chips">
+            <div class="dnd-chip" draggable="true" data-answer="vercel">Vercel</div>
+            <div class="dnd-chip" draggable="true" data-answer="fly">Fly.io</div>
+            <div class="dnd-chip" draggable="true" data-answer="neon">Neon Postgres</div>
+            <div class="dnd-chip" draggable="true" data-answer="anthropic">Anthropic Claude</div>
+            <div class="dnd-chip" draggable="true" data-answer="razorpay">Razorpay</div>
+            <div class="dnd-chip" draggable="true" data-answer="gupshup">Gupshup</div>
+          </div>
+          <div class="dnd-zones">
+            <div class="dnd-zone" data-correct="vercel">
+              <p class="dnd-zone-label">Runs the website &amp; API routes</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="fly">
+              <p class="dnd-zone-label">Runs background queue workers in Mumbai</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="neon">
+              <p class="dnd-zone-label">Stores every menu item, sale, &amp; receipt</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="anthropic">
+              <p class="dnd-zone-label">Turns a voice transcript into structured cart items</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="razorpay">
+              <p class="dnd-zone-label">Charges ₹299/month subscriptions &amp; verifies UPI payments</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="gupshup">
+              <p class="dnd-zone-label">Delivers receipts to the customer&rsquo;s WhatsApp</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:var(--space-3);margin-top:var(--space-4)">
+            <button class="btn" onclick="checkDnD('dnd-module2')">Check matches</button>
+            <button class="btn" onclick="resetDnD('dnd-module2')">Reset</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Quick check</h2>
+        <p>Less about memorising the cast list, more about the reasoning. If you can answer these, you can debug a lot of production issues.</p>
+
+        <div class="quiz-container" id="quiz-module2">
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="Yes. Vercel functions are short-lived — they shut down after a few seconds. BullMQ uses Redis commands like BRPOPLPUSH that block, waiting for a new job to arrive. A Vercel function would die before any job came in. That&rsquo;s the structural reason the workers must live somewhere with always-on processes (Fly).">
+            <h3 class="quiz-question">Why can&rsquo;t the WhatsApp-receipt worker just run on Vercel like the rest of the API?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Vercel doesn&rsquo;t support Node.js, only Python.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Gupshup blocks Vercel&rsquo;s IP addresses.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Vercel functions don&rsquo;t stay alive long enough to wait for queue jobs to arrive.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Right. The webhook (/api/webhooks/razorpay) is explicitly excluded from the auth middleware so Razorpay's anonymous server can POST to it. The webhook is protected differently — by checking an HMAC signature in the body, which only Razorpay can produce because they're the only other party that knows the shared secret.">
+            <h3 class="quiz-question">Razorpay needs to POST to <code>/api/webhooks/razorpay</code> when a subscription gets paid. There&rsquo;s no vendor logged in for those calls. How does the system handle that securely?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The webhook checks the request comes from a known Razorpay IP address.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The webhook is excluded from auth middleware and instead verifies an HMAC signature sent in the headers.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Razorpay is given a special vendor account it logs in with.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Yes. Vercel for the website + API, Fly for workers, Neon for the database — three providers. The big trade-off is the operational complexity: three dashboards, three billing accounts, three places to set environment variables. The benefit is that each one is the best at what it does, and you can swap any one out without touching the others. The codebase explicitly documents this trade-off in ARCHITECTURE.md.">
+            <h3 class="quiz-question">A new engineer asks: &ldquo;Why don&rsquo;t we just put everything on one provider to simplify operations?&rdquo; What&rsquo;s the strongest counter-argument from this codebase?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Each provider is the best in the world at one specific job. Bundling on one provider would compromise on at least one of: latency, cost, or reliability.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>One-provider setups don&rsquo;t scale past 10 vendors.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Vercel doesn&rsquo;t support Postgres, so you have to use a separate database anyway.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="btn quiz-check-btn" onclick="checkQuiz('quiz-module2')">Check answers</button>
+          <button class="btn quiz-reset-btn" onclick="resetQuiz('quiz-module2')">Try again</button>
+
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A useful mental shortcut</h2>
+        <div class="callout callout-accent">
+          <div class="callout-icon">🧭</div>
+          <div class="callout-content">
+            <strong class="callout-title">Where would I look for ___?</strong>
+            <p>When something breaks, the first question is always <em>which provider owns this?</em><br>
+            UI bugs &amp; slow page loads → <strong>Vercel logs</strong>.<br>
+            WhatsApp didn&rsquo;t arrive → <strong>Fly worker logs</strong>.<br>
+            Sale didn&rsquo;t save → <strong>Neon query logs</strong>.<br>
+            AI parse was wrong → <strong>VoiceParseLog table in Neon</strong>.<br>
+            Subscription stuck → <strong>Razorpay dashboard + webhook logs</strong>.<br>
+            Knowing this saves an hour every time something goes wrong.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+<section class="module" id="module-3" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">03</span>
+      <h1 class="module-title">Whose data is it?</h1>
+      <p class="module-subtitle">Ravi runs a chai stall. Suresh runs a dosa cart. They both use the same AwaazOS website, the same database, the same code. So how does the system <em>guarantee</em> Ravi will never see one rupee of Suresh&rsquo;s sales? This is the most important security idea in the codebase.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The apartment building</h2>
+        <p>Picture a 50-storey apartment building. There&rsquo;s one big front door for the whole building &mdash; you can&rsquo;t even step inside without buzzing in. Past that, each apartment has its own keycard reader.</p>
+        <p>Even if you live on floor 5 and have a working keycard, that card won&rsquo;t open the door on floor 7. The reader is configured to <em>only</em> accept the keycard for that specific apartment. You don&rsquo;t need to be a security guard to enforce this &mdash; the reader does it automatically.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🏢</div>
+          <div class="callout-content">
+            <strong class="callout-title">Two layers, on purpose</strong>
+            <p>The front door = <span class="term" data-definition="Authentication — proving who you are. In this app, that's signing in with your email and password.">authentication</span>. The keycard reader on each floor = <span class="term" data-definition="Authorization — deciding what you're allowed to do once you're signed in. Same as 'you have a card to apartment 5, you cannot enter apartment 7.'">authorization</span>. Mix them up and you get either a building you can&rsquo;t enter, or a building anyone can wander through.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The data model</h2>
+        <p>To make tenancy work, the database needs to know &ldquo;this menu item belongs to <em>which</em> shop?&rdquo; The answer is the <code>vendorId</code> column on (almost) every table.</p>
+
+        <div class="icon-rows">
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-3)">👤</div>
+            <div>
+              <strong>User</strong>
+              <p>A person with an email and password. Can be staff at one or many vendors.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-1)">🏪</div>
+            <div>
+              <strong>Vendor</strong>
+              <p>The tenant. The chai stall, dosa cart, kirana shop. <code>Vendor.id</code> is the apartment number.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-4)">🔗</div>
+            <div>
+              <strong>StaffMember</strong>
+              <p>The keycard. Joins one User to one Vendor with a role (OWNER, MANAGER, or CASHIER).</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-5)">🍛</div>
+            <div>
+              <strong>MenuItem, Transaction, Receipt&hellip;</strong>
+              <p>Every other row carries a <code>vendorId</code>. That column is the difference between Ravi&rsquo;s data and Suresh&rsquo;s.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🔑</div>
+          <div class="callout-content">
+            <strong class="callout-title">Two-layer roles</strong>
+            <p><strong>UserRole</strong> (USER, ADMIN, SUPER_ADMIN) is the platform role &mdash; AwaazOS internal staff.<br>
+            <strong>StaffRole</strong> (CASHIER, MANAGER, OWNER) is the per-vendor role. A user can be OWNER at one stall and CASHIER at another. Both roles exist for different reasons.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A request&rsquo;s journey through the building</h2>
+        <p>Tap <strong>Next step</strong> to follow what happens when Ravi loads <code>/menu</code> in his browser. Each step is a checkpoint. If any one fails, the request is bounced.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"actor-1","label":"Ravi&apos;s browser sends GET /menu with a session cookie."},
+          {"highlight":"actor-2","label":"Edge middleware checks: is there a valid session cookie? Yes — let it through.","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"actor-3","label":"The /menu route runs requireVendorRole(\"CASHIER\"). It reads the user from the session.","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"actor-4","label":"The DB returns Ravi&apos;s StaffMember rows — he&apos;s OWNER at &lsquo;ravis-chai&rsquo; and CASHIER at &lsquo;ravis-dosa&rsquo;.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"actor-3","label":"requireVendorRole picks the active vendor: query param ➜ cookie ➜ first membership.","packet":true,"from":"actor-4","to":"actor-3"},
+          {"highlight":"actor-3","label":"The handler runs. Every Prisma where: { vendorId: vendor.id }. Suresh&apos;s data is invisible."}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon" style="background: var(--color-actor-1); color: white">📱</div>
+              <span>Browser</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon" style="background: var(--color-actor-2); color: white">🛡️</div>
+              <span>Middleware</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon" style="background: var(--color-actor-3); color: white">🔐</div>
+              <span>requireVendorRole</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon" style="background: var(--color-actor-5); color: white">🗄️</div>
+              <span>Database</span>
+            </div>
+          </div>
+          <div class="flow-packet" id="flow-packet"></div>
+          <div class="flow-step-label" id="flow-label">Click &ldquo;Next Step&rdquo; to begin.</div>
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The function every protected route calls</h2>
+        <p>Almost every API route in this codebase starts with one line: <code>const ctx = await requireVendorRole("CASHIER", undefined, req)</code>. That helper does all the work. Here&rsquo;s the heart of it.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/rbac.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> session = <span class="code-keyword">await</span> <span class="code-function">auth</span>();</span>
+<span class="code-line"><span class="code-keyword">if</span> (!session?.user?.id) {</span>
+<span class="code-line">  <span class="code-keyword">throw new</span> <span class="code-function">AuthError</span>(<span class="code-number">401</span>, <span class="code-string">"Unauthorized"</span>);</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">const</span> memberships = <span class="code-keyword">await</span> prisma.staffMember.<span class="code-function">findMany</span>({</span>
+<span class="code-line">  <span class="code-property">where</span>: { <span class="code-property">userId</span>: user.id, <span class="code-property">isActive</span>: <span class="code-keyword">true</span> },</span>
+<span class="code-line">  <span class="code-property">include</span>: { <span class="code-property">vendor</span>: <span class="code-keyword">true</span> },</span>
+<span class="code-line">  <span class="code-property">orderBy</span>: { <span class="code-property">createdAt</span>: <span class="code-string">"asc"</span> },</span>
+<span class="code-line">});</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">if</span> (!memberships.length) {</span>
+<span class="code-line">  <span class="code-keyword">throw new</span> <span class="code-function">AuthError</span>(<span class="code-number">403</span>, <span class="code-string">"No vendor membership."</span>);</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">const</span> target = vendorIdOrSlug ?? querySlug ?? cookieSlug;</span>
+<span class="code-line"><span class="code-keyword">let</span> staff = target</span>
+<span class="code-line">  ? memberships.<span class="code-function">find</span>((m) <span class="code-operator">=&gt;</span> m.vendor.slug === target || m.vendorId === target)</span>
+<span class="code-line">  : memberships[<span class="code-number">0</span>];</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">if</span> (!<span class="code-function">staffRoleAtLeast</span>(staff.role, minRole)) {</span>
+<span class="code-line">  <span class="code-keyword">throw new</span> <span class="code-function">AuthError</span>(<span class="code-number">403</span>, <span class="code-string">"Requires staff role MANAGER or higher."</span>);</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Read the signed-in user from the session cookie.</p>
+              <p class="tl">No session? Bounce them with a <span class="term" data-definition="HTTP 401 — 'you didn't tell me who you are.' This is what the app returns when there's no session at all.">401 Unauthorized</span>.</p>
+              <p class="tl">Look up every active vendor this user is a staff member of (a person can work at multiple stalls).</p>
+              <p class="tl">No memberships at all? Bounce with <span class="term" data-definition="HTTP 403 — 'I know who you are, but you can't have this.' Different from 401, which means 'I don't even know who you are.'">403 Forbidden</span>.</p>
+              <p class="tl">Pick the active vendor: an explicit argument wins, then a URL <code>?vendor=</code> query parameter, then a cookie, then the oldest membership.</p>
+              <p class="tl">Find the matching <code>StaffMember</code> record for that vendor.</p>
+              <p class="tl">Check the user&rsquo;s role at this vendor is at least the minimum required (e.g., MANAGER).</p>
+              <p class="tl">Bounce with 403 if they&rsquo;re too junior. Otherwise return the user, vendor, and staff record &mdash; the route handler picks up from here.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The bug that costs companies millions</h2>
+        <p>One of these lines is a tenant-leak waiting to happen. Tap the line you think is dangerous.</p>
+
+        <div class="bug-challenge">
+          <h3>This API route lets a vendor edit a menu item by ID. Find the line that lets one vendor edit <em>any other vendor&rsquo;s</em> menu items.</h3>
+          <div class="bug-code">
+            <div class="bug-line" data-line="1" onclick="checkBugLine(this, false)"
+                 data-hint="This line is just reading auth context. It&rsquo;s correct.">
+              <span class="line-num">1</span>
+              <code><span class="code-keyword">const</span> ctx = <span class="code-keyword">await</span> <span class="code-function">requireVendorRole</span>(<span class="code-string">"MANAGER"</span>);</code>
+            </div>
+            <div class="bug-line" data-line="2" onclick="checkBugLine(this, false)"
+                 data-hint="Parsing the URL parameter — fine.">
+              <span class="line-num">2</span>
+              <code><span class="code-keyword">const</span> { id } = params;</code>
+            </div>
+            <div class="bug-line" data-line="3" onclick="checkBugLine(this, false)"
+                 data-hint="Validating the body with Zod — fine, prevents bad input.">
+              <span class="line-num">3</span>
+              <code><span class="code-keyword">const</span> body = menuItemSchema.<span class="code-function">parse</span>(<span class="code-keyword">await</span> req.<span class="code-function">json</span>());</code>
+            </div>
+            <div class="bug-line bug-target" data-line="4" onclick="checkBugLine(this, true)"
+                 data-explanation="The where clause filters only on `id` — there&rsquo;s nothing checking the row belongs to this vendor. If Ravi knows the ID of a menu item that belongs to Suresh&rsquo;s stall (which is a guessable string), he can edit it. The fix: change `where` to `{ id, vendorId: ctx.vendor.id }`. With that compound where, an attempt to update someone else&rsquo;s row simply returns &lsquo;no rows updated&rsquo; — a tidy 404, no leak.">
+              <span class="line-num">4</span>
+              <code><span class="code-keyword">await</span> prisma.menuItem.<span class="code-function">update</span>({ <span class="code-property">where</span>: { id }, <span class="code-property">data</span>: body });</code>
+            </div>
+            <div class="bug-line" data-line="5" onclick="checkBugLine(this, false)"
+                 data-hint="Returning the response — fine.">
+              <span class="line-num">5</span>
+              <code><span class="code-keyword">return</span> NextResponse.<span class="code-function">json</span>({ <span class="code-property">ok</span>: <span class="code-keyword">true</span> });</code>
+            </div>
+          </div>
+          <div class="bug-feedback" id="bug-feedback"></div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">🚨</div>
+          <div class="callout-content">
+            <strong class="callout-title"><span class="term" data-definition="Insecure Direct Object Reference — when a URL or API uses an ID like /api/items/abc123 and the server doesn't double-check that the user owns the thing with that ID. Asking AI to fix this is a great instruction: 'add vendorId to every where clause that touches multi-tenant data.'">IDOR</span> &mdash; the boring vulnerability that ships every year</h4>
+            <p>The fix is a single property: <code>where: { id, vendorId: ctx.vendor.id }</code>. With that compound <code>where</code>, even if Ravi <em>knows</em> Suresh&rsquo;s menu-item ID, the update silently affects zero rows &mdash; the database refuses because the combo doesn&rsquo;t exist. AwaazOS returns 404 (not 403) on these so attackers can&rsquo;t even confirm the ID is real.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The credentials check, in one block</h2>
+        <p>For sign-in, AwaazOS uses Auth.js with a Credentials provider &mdash; meaning email + password (no Google, no OTP yet). Here&rsquo;s the heart of the password check.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/auth.ts</span>
+<pre><code><span class="code-line"><span class="code-function">Credentials</span>({</span>
+<span class="code-line">  <span class="code-property">credentials</span>: { <span class="code-property">email</span>: {...}, <span class="code-property">password</span>: {...} },</span>
+<span class="code-line">  <span class="code-keyword">async</span> <span class="code-function">authorize</span>(credentials) {</span>
+<span class="code-line">    <span class="code-keyword">const</span> { email, password } = <span class="code-keyword">await</span> signInSchema.<span class="code-function">parseAsync</span>(credentials);</span>
+<span class="code-line">    <span class="code-keyword">const</span> normalizedEmail = email.<span class="code-function">trim</span>().<span class="code-function">toLowerCase</span>();</span>
+<span class="code-line">    <span class="code-keyword">const</span> user = <span class="code-keyword">await</span> prisma.user.<span class="code-function">findUnique</span>({</span>
+<span class="code-line">      <span class="code-property">where</span>: { <span class="code-property">email</span>: normalizedEmail },</span>
+<span class="code-line">      <span class="code-property">select</span>: { <span class="code-property">id</span>: <span class="code-keyword">true</span>, <span class="code-property">passwordHash</span>: <span class="code-keyword">true</span>, ... },</span>
+<span class="code-line">    });</span>
+<span class="code-line">    <span class="code-keyword">if</span> (!user?.passwordHash) <span class="code-keyword">return null</span>;</span>
+<span class="code-line">    <span class="code-keyword">if</span> (!(<span class="code-keyword">await</span> <span class="code-function">verifyPassword</span>(password, user.passwordHash))) <span class="code-keyword">return null</span>;</span>
+<span class="code-line">    <span class="code-keyword">return</span> { id: user.id, email: user.email, ... };</span>
+<span class="code-line">  },</span>
+<span class="code-line">})</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">We&rsquo;re telling Auth.js to use the email-and-password sign-in method.</p>
+              <p class="tl">When someone tries to sign in, validate the input against a <span class="term" data-definition="Zod is a TypeScript library that defines what valid input should look like (e.g., email is a string, has an @, password ≥ 8 chars). Bad input is rejected before it touches the database.">Zod schema</span> — bad input bounces here.</p>
+              <p class="tl">Trim the email and lowercase it so &ldquo;ravi@chai.com&rdquo; and &ldquo;Ravi@Chai.COM&rdquo; both find the same user.</p>
+              <p class="tl">Look up the user by email. Note the <code>select</code> &mdash; we ONLY pull the password hash and a few safe fields, not everything.</p>
+              <p class="tl">If we don&rsquo;t find a user, return <code>null</code> &mdash; Auth.js treats this as &ldquo;sign-in failed.&rdquo;</p>
+              <p class="tl">Compare the entered password with the stored hash using bcrypt. <span class="term" data-definition="bcrypt is a password-hashing function. It turns a password into a one-way scrambled string so even if the database is stolen, attackers can't read passwords. It's also deliberately slow, which makes brute-force attacks expensive.">Bcrypt</span> never decrypts the stored hash &mdash; it re-hashes the entered password and checks if it matches.</p>
+              <p class="tl">If everything checks out, return the user&rsquo;s safe-to-share fields. Auth.js puts these in the <span class="term" data-definition="A JWT (JSON Web Token) is a small string containing user info, signed by the server. It's stored in a cookie and sent on every request so the server can identify the user without re-checking the database every time.">JWT</span> session cookie.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Quick check</h2>
+        <p>If you can answer these, you&rsquo;ll catch the most common multi-tenant bugs in code review.</p>
+
+        <div class="quiz-container" id="quiz-module3">
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="404. Returning 403 (Forbidden) leaks information — it tells the attacker &ldquo;yes, the resource exists, you just can&rsquo;t see it.&rdquo; That&rsquo;s enough for an attacker to enumerate IDs across tenants. Returning 404 (Not Found) makes existence indistinguishable from non-existence — much safer."
+               data-explanation-wrong="The right answer is 404. The reasoning: 403 leaks the existence of the resource, which is information attackers use to enumerate IDs across tenants. AwaazOS deliberately returns 404 in cross-tenant denials so an attacker can&rsquo;t even confirm whether an ID is real.">
+            <h3 class="quiz-question">Ravi guesses Suresh&rsquo;s menu item ID and tries to edit it. The compound <code>where</code> means zero rows match. What HTTP status should the API return?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>200 OK with a friendly &ldquo;item not found&rdquo; message.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>403 Forbidden &mdash; we know the item exists, just not for this vendor.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>404 Not Found &mdash; don&rsquo;t even hint that the ID is real.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Right — and this is exactly the API routes case mentioned in auth.config. If middleware returned a redirect for unauth&rsquo;d API calls, the client&rsquo;s fetch() would follow the 302 and try to JSON-parse an HTML sign-in page, which crashes. So API routes pass through middleware and let the route handler return a clean JSON 401."
+               data-explanation-wrong="The reason is more subtle than &lsquo;security.&rsquo; If middleware redirected an unauth&rsquo;d API call to /sign-in, the client&rsquo;s fetch() would follow the redirect and try to parse an HTML page as JSON — which crashes. Letting the route handler return JSON 401 keeps API clients happy.">
+            <h3 class="quiz-question">In <code>auth.config.ts</code>, API routes (other than <code>/api/auth/*</code>) deliberately pass through the middleware unauthenticated. Why?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>API routes don&rsquo;t need authentication; only pages do.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>So that route handlers can return JSON 401, instead of the middleware redirecting an API client to an HTML sign-in page.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>To avoid checking the session twice in a row.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Yes. The bug is at the database query layer. The fix is mechanical: every Prisma where clause that touches multi-tenant data must include vendorId. Asking AI to do this surgically is straightforward — &lsquo;add `vendorId: ctx.vendor.id` to every where clause in this file.&rsquo; A linting rule or test that scans for `prisma.X.update({ where: { id: ... } })` without `vendorId` would catch it before merge."
+               data-explanation-wrong="The bug isn&rsquo;t in auth or middleware — those work fine. The bug is the database query missing a vendorId filter. Tightening the query is the smallest possible fix; the broader prevention is &ldquo;every multi-tenant where clause must include vendorId,&rdquo; which can be enforced by review or a custom lint rule.">
+            <h3 class="quiz-question">A teammate asks AI to write a new endpoint that updates a transaction by ID. The AI produces code that uses <code>where: { id }</code>. What&rsquo;s the right correction to ask for?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>&ldquo;Change the where clause to <code>{ id, vendorId: ctx.vendor.id }</code> so cross-tenant access fails at the database level.&rdquo;</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>&ldquo;Add a check at the top of the function: <code>if (vendorId !== ctx.vendor.id) throw 403</code>.&rdquo;</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>&ldquo;Add another middleware layer to inspect every request body for vendorId.&rdquo;</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="btn quiz-check-btn" onclick="checkQuiz('quiz-module3')">Check answers</button>
+          <button class="btn quiz-reset-btn" onclick="resetQuiz('quiz-module3')">Try again</button>
+
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+<section class="module" id="module-4" style="background: var(--color-bg)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">04</span>
+      <h1 class="module-title">Speech becomes structure</h1>
+      <p class="module-subtitle">When the vendor says <em>&ldquo;sat samosa, do chai, ek vada pav, pyaaz wala&rdquo;</em>, the computer first hears literal noise. By the time the cart fills, that noise is a structured list: <code>[{ id, name, qty, price }, &hellip;]</code>. This module follows the four steps that bridge those two worlds.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A translator with a sticky-note menu</h2>
+        <p>Imagine a market translator standing next to a vendor. They don&rsquo;t speak the customer&rsquo;s language perfectly &mdash; they need a <em>cheat sheet</em>. So the vendor sticks a copy of the menu next to them, with each item highlighted.</p>
+        <p>When a customer says &ldquo;two of those crispy onion ones,&rdquo; the translator glances at the sheet, points at <em>aloo bhujia</em>, and tells the vendor &ldquo;they want 2&times; aloo bhujia.&rdquo;</p>
+        <p>The cheat sheet is the <strong>cached menu</strong>. The translator is <strong>Claude</strong>. The pointing is <strong>tool-use</strong>. The whole module is making this metaphor literal.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">📌</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why every step in this pipeline costs money</strong>
+            <p>The voice path is the per-order unit cost of the product. AwaazOS charges only ₹299/month, so the engineering choices here aren&rsquo;t cosmetic &mdash; they&rsquo;re what makes the pricing possible.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Step 1: pick the right speech-to-text engine</h2>
+        <p>Two paths, decided by language. English and Hindi go through the browser&rsquo;s built-in <span class="term" data-definition="Web Speech API — a feature built into modern browsers (especially Chrome) that converts spoken words into text. It runs on the device and is free. It only supports a handful of widely-spoken languages well.">Web Speech API</span>. Telugu, Kannada, and Tamil go to Sarvam.</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📱</div>
+            <h4 class="pattern-title">Web Speech (en-IN, hi-IN)</h4>
+            <p class="pattern-desc"><strong>On-device. Free.</strong> No audio ever leaves the phone. The browser hands us back a text string in ~600&nbsp;ms.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🌐</div>
+            <h4 class="pattern-title">Sarvam Saaras v2 (te, kn, ta)</h4>
+            <p class="pattern-desc"><strong>Server round-trip.</strong> The browser records 5&ndash;12 seconds of audio, ships it to <code>/api/ai/transcribe</code>, which forwards it to Sarvam. Costs roughly 1.2 seconds and a paisa per call.</p>
+          </div>
+        </div>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · hooks/useVoiceOrder.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> SARVAM_LANGS = <span class="code-keyword">new</span> Set([<span class="code-string">"te-IN"</span>, <span class="code-string">"kn-IN"</span>, <span class="code-string">"ta-IN"</span>]);</span>
+<span class="code-line"><span class="code-keyword">const</span> WEBSPEECH_LANGS = <span class="code-keyword">new</span> Set([<span class="code-string">"en-IN"</span>, <span class="code-string">"hi-IN"</span>]);</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">if</span> (WEBSPEECH_LANGS.<span class="code-function">has</span>(voiceLang)) {</span>
+<span class="code-line">  <span class="code-keyword">const</span> Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;</span>
+<span class="code-line">  <span class="code-keyword">if</span> (!Ctor) { <span class="code-function">setState</span>(<span class="code-string">"error"</span>); <span class="code-keyword">return</span>; }</span>
+<span class="code-line">  <span class="code-keyword">const</span> recognition = <span class="code-keyword">new</span> <span class="code-function">Ctor</span>();</span>
+<span class="code-line">  recognition.lang = voiceLang;</span>
+<span class="code-line">  recognition.<span class="code-function">start</span>();</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">if</span> (SARVAM_LANGS.<span class="code-function">has</span>(voiceLang)) {</span>
+<span class="code-line">  <span class="code-keyword">const</span> stream = <span class="code-keyword">await</span> navigator.mediaDevices.<span class="code-function">getUserMedia</span>({ <span class="code-property">audio</span>: <span class="code-keyword">true</span> });</span>
+<span class="code-line">  <span class="code-keyword">const</span> mr = <span class="code-keyword">new</span> <span class="code-function">MediaRecorder</span>(stream, { mimeType });</span>
+<span class="code-line">  mr.<span class="code-function">start</span>();</span>
+<span class="code-line">  <span class="code-comment">// 12-second hard timeout — even if vendor forgets to stop</span></span>
+<span class="code-line">  <span class="code-function">setTimeout</span>(() <span class="code-operator">=&gt;</span> mr.<span class="code-function">stop</span>(), <span class="code-number">12_000</span>);</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Define two sets of languages — one handled in-browser, one handled by Sarvam.</p>
+              <p class="tl">For English/Hindi: ask the browser if it has a built-in speech recogniser. (Some don&rsquo;t.)</p>
+              <p class="tl">If yes, kick it off in this language. The text comes back via callbacks.</p>
+              <p class="tl">For Indic languages: ask the OS for microphone access. The browser pops the &ldquo;allow microphone?&rdquo; prompt.</p>
+              <p class="tl">Start recording into a Blob (a chunk of audio in memory).</p>
+              <p class="tl">Set a hard 12-second cap so we don&rsquo;t end up uploading a 10-minute clip if the vendor forgets to tap stop.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Step 2 &amp; 3: cache the menu, force a tool call</h2>
+        <p>Once we have the transcript, the menu plus transcript go to Claude. Two engineering choices make this cheap and reliable:</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">A</div>
+            <div class="step-body">
+              <strong>Cache the menu</strong>
+              <p>For a 30-item menu, the JSON is ~2KB. Marking it <code>cache_control: ephemeral</code> tells Anthropic &ldquo;this part doesn&rsquo;t change between calls &mdash; reuse it.&rdquo; The cache lives 5 minutes. During the lunch rush, every request after the first one pays ~75% less for that block.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">B</div>
+            <div class="step-body">
+              <strong>Force a tool call</strong>
+              <p>Instead of asking Claude for free-form JSON (which sometimes hallucinates trailing commas), we declare a <code>add_items</code> &ldquo;tool&rdquo; with a strict schema. Claude is forced to fill in <em>that exact shape</em>, so the answer is structured by construction.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/anthropic.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> message = <span class="code-keyword">await</span> modelClient.messages.<span class="code-function">create</span>({</span>
+<span class="code-line">  <span class="code-property">model</span>: modelName,</span>
+<span class="code-line">  <span class="code-property">max_tokens</span>: <span class="code-number">512</span>,</span>
+<span class="code-line">  <span class="code-property">temperature</span>: <span class="code-number">0.1</span>,</span>
+<span class="code-line">  <span class="code-property">system</span>: ORDER_PARSE_SYSTEM,</span>
+<span class="code-line">  <span class="code-property">tools</span>: [ADD_ITEMS_TOOL],</span>
+<span class="code-line">  <span class="code-property">tool_choice</span>: { <span class="code-property">type</span>: <span class="code-string">"tool"</span>, <span class="code-property">name</span>: <span class="code-string">"add_items"</span>, <span class="code-property">disable_parallel_tool_use</span>: <span class="code-keyword">true</span> },</span>
+<span class="code-line">  <span class="code-property">messages</span>: [</span>
+<span class="code-line">    {</span>
+<span class="code-line">      <span class="code-property">role</span>: <span class="code-string">"user"</span>,</span>
+<span class="code-line">      <span class="code-property">content</span>: [</span>
+<span class="code-line">        {</span>
+<span class="code-line">          <span class="code-property">type</span>: <span class="code-string">"text"</span>,</span>
+<span class="code-line">          <span class="code-property">text</span>: <span class="code-string">`Authoritative menu (JSON):\n${menuJson}`</span>,</span>
+<span class="code-line">          <span class="code-property">cache_control</span>: { <span class="code-property">type</span>: <span class="code-string">"ephemeral"</span> },</span>
+<span class="code-line">        },</span>
+<span class="code-line">        {</span>
+<span class="code-line">          <span class="code-property">type</span>: <span class="code-string">"text"</span>,</span>
+<span class="code-line">          <span class="code-property">text</span>: <span class="code-string">`Customer transcript (${lang}):\n${transcript}`</span>,</span>
+<span class="code-line">        },</span>
+<span class="code-line">      ],</span>
+<span class="code-line">    },</span>
+<span class="code-line">  ],</span>
+<span class="code-line">});</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Send a message to Claude. The model name is passed in &mdash; same code path for Haiku and Sonnet.</p>
+              <p class="tl">Cap the answer at 512 <span class="term" data-definition="A token is roughly 4 characters or 3/4 of a word — the unit Claude charges by. Capping max_tokens prevents a runaway response from costing too much.">tokens</span>. Order parsing answers are tiny.</p>
+              <p class="tl">Set <span class="term" data-definition="Temperature controls how creative the model is. 0 = always picks the most likely word; 1 = more variety. For parsing structured data, low temperature is more reliable.">temperature</span> to 0.1 — we want consistent, boring, deterministic outputs.</p>
+              <p class="tl">Give Claude one tool it&rsquo;s allowed to use: <code>add_items</code>. The schema lives in a separate constant.</p>
+              <p class="tl">Force Claude to call this exact tool, exactly once. No free-form text. No parallel calls.</p>
+              <p class="tl">First content block: the vendor&rsquo;s menu as JSON. The magic line is <code>cache_control: ephemeral</code>.</p>
+              <p class="tl">That line tells Anthropic &ldquo;remember this block&rdquo; for the next 5 minutes. Subsequent requests during a busy lunch rush pay ~75% less for the same menu.</p>
+              <p class="tl">Second content block: the transcript itself. This part changes every call, so it&rsquo;s NOT cached.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Watch a request flow through the pipeline</h2>
+        <p>This is the same trip taken in module 1, but zoomed in on the AI part. Each step is one network or in-memory hop.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"actor-1","label":"Vendor speaks: &lsquo;do samosa aur ek chai&rsquo;"},
+          {"highlight":"actor-2","label":"Browser does Web Speech (Hindi). Transcript: &lsquo;do samosa aur ek chai&rsquo;","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"actor-3","label":"POST /api/ai/parse-order with transcript + lang","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"actor-3","label":"API loads vendor&apos;s menu from Postgres + checks rate limit + reserves token budget"},
+          {"highlight":"actor-4","label":"Claude Haiku 4.5 (cached menu + transcript). Returns add_items tool call.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"actor-3","label":"Confidence is &lsquo;high&rsquo; — no escalation needed. Sonnet stays asleep.","packet":true,"from":"actor-4","to":"actor-3"},
+          {"highlight":"actor-5","label":"Async fire-and-forget: drop a VoiceParseLog job in the queue (no await).","packet":true,"from":"actor-3","to":"actor-5"},
+          {"highlight":"actor-2","label":"Response arrives at the browser. Cart fills. Total ~1.8s.","packet":true,"from":"actor-3","to":"actor-2"}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon" style="background: var(--color-actor-1); color: white">🗣️</div>
+              <span>Vendor</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon" style="background: var(--color-actor-2); color: white">📱</div>
+              <span>Browser</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon" style="background: var(--color-actor-3); color: white">⚡</div>
+              <span>API route</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon" style="background: var(--color-actor-4); color: white">🧠</div>
+              <span>Claude</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-5">
+              <div class="flow-actor-icon" style="background: var(--color-actor-5); color: white">📥</div>
+              <span>Telemetry queue</span>
+            </div>
+          </div>
+          <div class="flow-packet" id="flow-packet"></div>
+          <div class="flow-step-label" id="flow-label">Click &ldquo;Next Step&rdquo; to begin.</div>
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Step 4: when does the senior translator get called?</h2>
+        <p>Haiku covers ~85% of orders. The other 15% &mdash; long, code-mixed, ambiguous &mdash; get escalated to Sonnet. The decision happens in one small function.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · app/api/ai/parse-order/route.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">function</span> <span class="code-function">shouldEscalate</span>(</span>
+<span class="code-line">  result: <span class="code-function">Awaited</span>&lt;<span class="code-function">ReturnType</span>&lt;<span class="code-keyword">typeof</span> parseOrderWithClaude&gt;&gt;,</span>
+<span class="code-line">  transcript: <span class="code-keyword">string</span>,</span>
+<span class="code-line">): <span class="code-keyword">boolean</span> {</span>
+<span class="code-line">  <span class="code-keyword">const</span> words = <span class="code-function">wordCount</span>(transcript);</span>
+<span class="code-line">  <span class="code-keyword">if</span> (result.items.length === <span class="code-number">0</span> &amp;&amp; words &gt; <span class="code-number">3</span>) <span class="code-keyword">return true</span>;</span>
+<span class="code-line">  <span class="code-keyword">if</span> (result.confidence === <span class="code-string">"low"</span> &amp;&amp; result.unmatched.length &gt; <span class="code-number">0</span>) <span class="code-keyword">return true</span>;</span>
+<span class="code-line">  <span class="code-keyword">return false</span>;</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">A function that returns &ldquo;true&rdquo; if we should re-run the parse with the smarter (and pricier) model.</p>
+              <p class="tl">It looks at Haiku&rsquo;s answer and the original transcript.</p>
+              <p class="tl">First trigger: Haiku found nothing, but the customer said more than 3 words. They probably ordered <em>something</em> &mdash; let Sonnet take another look.</p>
+              <p class="tl">Second trigger: Haiku flagged low confidence AND there are phrases it couldn&rsquo;t map. Sonnet&rsquo;s extra reasoning is worth the cost here.</p>
+              <p class="tl">Otherwise, trust Haiku. Sonnet stays asleep.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">A pattern with a name</strong>
+            <p>This is called a <strong>cascade</strong> or <strong>two-tier model routing</strong>. Cheap-and-fast for the 85% case, smart-and-slow for the 15% edge cases. You can apply this to any AI feature: try the small model first, escalate only when needed. Easy to ask AI for: <em>&ldquo;add a confidence-based escalation from Haiku to Sonnet for this endpoint.&rdquo;</em></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Indic numerals — the prompt&rsquo;s secret sauce</h2>
+        <p>Vendors don&rsquo;t say &ldquo;two&rdquo; &mdash; they say <em>do</em>, <em>rendu</em>, <em>eradu</em>, <em>onnu</em>. The model needs to know these mean numbers. So the system prompt teaches it.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/anthropic.ts (system prompt excerpt)</span>
+<pre><code><span class="code-line">Normalize Indic numerals:</span>
+<span class="code-line">- hi: ek=1, do=2, teen=3, char=4, paanch=5</span>
+<span class="code-line">- te: okati=1, rendu=2, moodu=3, naalugu=4, aidu=5</span>
+<span class="code-line">- kn: ondu=1, eradu=2, mooru=3, naalku=4, aidu=5</span>
+<span class="code-line">- ta: onnu=1, rendu=2, moonu=3, naangu=4, anju=5</span>
+<span class="code-line"></span>
+<span class="code-line">Put any phrase you could NOT confidently map into unmatched.</span>
+<span class="code-line">confidence = low if unmatched.length &gt; 0 OR the transcript is ambiguous.</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">A small, hand-crafted lookup table embedded in the system prompt.</p>
+              <p class="tl">Each line is one language &mdash; spoken numerals 1 through 5 in Hindi, Telugu, Kannada, and Tamil.</p>
+              <p class="tl">The model uses these as anchor points. (LLMs are good at extrapolating beyond explicit examples.)</p>
+              <p class="tl">Crucial rule: if any phrase doesn&rsquo;t map to a menu item, list it in <code>unmatched</code> rather than guessing wrong.</p>
+              <p class="tl">If anything ended up in <code>unmatched</code>, the model must mark confidence as &ldquo;low&rdquo; &mdash; which (per the previous screen) triggers escalation to Sonnet.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Quick check</h2>
+
+        <div class="quiz-container" id="quiz-module4">
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="The transcript is in a separate, NON-cached block. Only the menu (which doesn&rsquo;t change between orders) is cached. This is the whole point of putting them in different content blocks — Anthropic&rsquo;s cache is per-block, not per-message. If you cached the transcript, the cache would never hit, because every transcript is different."
+               data-explanation-wrong="The cache_control flag goes on the menu block, not the transcript. The transcript changes every order, so it can&rsquo;t be cached. The pattern is: put the slow-changing thing (menu) in one block with cache_control, put the fast-changing thing (transcript) in a separate block without cache_control. Both go in the same request.">
+            <h3 class="quiz-question">Why is the transcript NOT included in the cached block, even though it&rsquo;s sent in the same Anthropic call as the cached menu?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Anthropic doesn&rsquo;t allow more than one cached block per request.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Caching the transcript would expose customer PII.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The transcript is different every call, so caching it would never hit. Only the menu (slow-changing) benefits from caching.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Right. Switching to Sonnet-for-everything is the simplest fix and would probably help, but it eliminates the whole reason ₹299/mo works. The smarter move is to look at VoiceParseLog rows where the parse was wrong — was it a missing alias? A new menu item the vendor added? A regional word the prompt doesn&rsquo;t teach? Often a one-line tweak fixes whole classes of misparses without spending more on inference."
+               data-explanation-wrong="Switching to Sonnet-for-everything is the easy answer but it doubles AI cost per order — that&rsquo;s the kind of decision that breaks the unit economics. The smarter first move is to look at the VoiceParseLog telemetry to see WHAT was misparsed: a missing alias on a menu item? An Indic numeral the prompt doesn&rsquo;t cover? Often the fix is a tiny content change.">
+            <h3 class="quiz-question">A vendor complains that voice orders are misparsed too often. The temptation is to switch entirely to Sonnet. What should you investigate first?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Switch to Sonnet — accuracy beats cost.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Pull the VoiceParseLog rows and see what specifically was misparsed before changing models.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Ask the vendor to switch to English voice orders.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Yes. tool_choice forces Claude to call the add_items tool with a typed schema. The result is parsed by Zod on the server. If Claude returns malformed data, Zod throws — caught by the try/catch — and the route returns an error rather than passing garbage downstream. Free-form JSON would work most of the time but occasionally produces trailing commas, wrong types, or invented fields. Tool-use eliminates that whole class of bug."
+               data-explanation-wrong="The right answer is the schema validation chain. Tool-use forces Claude into a typed shape, then Zod re-validates on the server. If anything is off, Zod throws and the route returns an error — no malformed data reaches the cart. Free-form JSON can&rsquo;t give you that guarantee.">
+            <h3 class="quiz-question">If Claude returns malformed JSON one time in a thousand, what protects the cart from being filled with garbage?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Forced tool-use with a strict JSON Schema, plus Zod re-validation on the server side.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The browser has a try/catch around <code>JSON.parse</code>.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Sonnet always re-parses Haiku&rsquo;s output as a safety net.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="btn quiz-check-btn" onclick="checkQuiz('quiz-module4')">Check answers</button>
+          <button class="btn quiz-reset-btn" onclick="resetQuiz('quiz-module4')">Try again</button>
+
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A note on what doesn&rsquo;t go to Claude</h2>
+        <div class="callout callout-warning">
+          <div class="callout-icon">🔒</div>
+          <div class="callout-content">
+            <strong class="callout-title">Customer phone numbers never reach the LLM</strong>
+            <p>Only the <code>transcript</code> and <code>menu JSON</code> are sent to Anthropic. Customer phone, name, and UPI reference are scrubbed at the boundary &mdash; they exist in Postgres for re-sending receipts, but they never appear in a prompt or a log line. This is a rule baked into the project&rsquo;s <span class="term" data-definition="A markdown file in .cursor/rules/ that the AI coding assistant follows automatically when generating code. It enforces things like 'never send PII to LLMs' and 'always use paise for money' on every PR.">Cursor rules</span> &mdash; meaning the AI coding assistant itself enforces it on every PR.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+<section class="module" id="module-5" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">05</span>
+      <h1 class="module-title">Money in paise &mdash; the atomic transaction</h1>
+      <p class="module-subtitle">When the vendor taps <strong>Mark as Paid</strong>, five things must happen to the database. They have to either all succeed together or all fail together &mdash; never four out of five. This module is about the two disciplines that make that possible: integer paise math, and a five-step database transaction.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Synchronised swimmers</h2>
+        <p>Picture a synchronised swimming team. On the count of three, all five swimmers dive together. They&rsquo;re trained for one rule: if even one swimmer hesitates, none of them dive. They re-set, count again, dive together. The judges either see five splashes or zero. Never four.</p>
+        <p>Database transactions work exactly like this. AwaazOS&rsquo;s &ldquo;Mark as Paid&rdquo; bundles five separate writes into one transaction:</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Get the next bill number</strong>
+              <p>Atomically increment today&rsquo;s counter for this vendor. Becomes <code>AWZ-20260430-0001</code>.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Insert the Transaction row</strong>
+              <p>Subtotal, tax, total, payment method, payment status &mdash; all in paise.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Insert each OrderItem</strong>
+              <p>One row per line in the cart, with the price <em>snapshotted</em> at sale time.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <strong>Bump the DailySummary</strong>
+              <p>Add this sale to today&rsquo;s rollup so the analytics dashboard updates immediately.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">5</div>
+            <div class="step-body">
+              <strong>Create the Receipt row</strong>
+              <p>Marker that this transaction&rsquo;s receipt has not yet been sent on WhatsApp.</p>
+            </div>
+          </div>
+        </div>
+
+        <p style="margin-top: var(--space-6)">If any one of these fails, all five roll back &mdash; the database returns to exactly the state it was in before the swimmer climbed onto the platform. No half-recorded sales. No bill numbers wasted. Ever.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why paise, not rupees</h2>
+        <p>Before we touch the transaction, we have to talk about the unit of money. AwaazOS stores every monetary amount as an integer number of <span class="term" data-definition="The Indian currency&rsquo;s smallest unit. ₹1 = 100 paise. AwaazOS stores ₹20 as the integer 2000 (paise) — never as 20.0 (a float) — to dodge floating-point precision errors that compound across many transactions.">paise</span>. ₹20 is the integer <code>2000</code>. ₹99.50 is <code>9950</code>. Never decimals.</p>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">💸</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why floats are forbidden for money</strong>
+            <p>Computers store decimal numbers like <code>0.1</code> and <code>0.2</code> approximately. Try this in any browser console: <code>0.1 + 0.2 === 0.3</code> evaluates to <code>false</code>. Add a tiny rounding error to a million sales and you&rsquo;re off by hundreds of rupees, with no way to find which sale caused it. Integer paise dodges the entire problem.</p>
+          </div>
+        </div>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/currency.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">export function</span> <span class="code-function">rupeesToPaise</span>(rupees: <span class="code-keyword">number</span>): <span class="code-keyword">number</span> {</span>
+<span class="code-line">  <span class="code-keyword">if</span> (!Number.<span class="code-function">isFinite</span>(rupees)) {</span>
+<span class="code-line">    <span class="code-keyword">throw new</span> <span class="code-function">Error</span>(<span class="code-string">"Invalid rupee amount"</span>);</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="code-keyword">const</span> scaled = rupees * <span class="code-number">100</span>;</span>
+<span class="code-line">  <span class="code-keyword">const</span> rounded = Math.<span class="code-function">round</span>(scaled);</span>
+<span class="code-line">  <span class="code-keyword">if</span> (Math.<span class="code-function">abs</span>(scaled - rounded) &gt; <span class="code-number">1e-9</span>) {</span>
+<span class="code-line">    <span class="code-keyword">throw new</span> <span class="code-function">Error</span>(<span class="code-string">"Rupee amount must have at most 2 decimal places"</span>);</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="code-keyword">return</span> rounded;</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">export function</span> <span class="code-function">formatINR</span>(paise: <span class="code-keyword">number</span>): <span class="code-keyword">string</span> {</span>
+<span class="code-line">  <span class="code-keyword">if</span> (!Number.<span class="code-function">isInteger</span>(paise)) {</span>
+<span class="code-line">    <span class="code-keyword">throw new</span> <span class="code-function">Error</span>(<span class="code-string">"paise must be an integer"</span>);</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="code-keyword">const</span> rupees = <span class="code-function">paiseToRupees</span>(paise);</span>
+<span class="code-line">  <span class="code-keyword">return new</span> Intl.<span class="code-function">NumberFormat</span>(<span class="code-string">"en-IN"</span>, {</span>
+<span class="code-line">    <span class="code-property">style</span>: <span class="code-string">"currency"</span>,</span>
+<span class="code-line">    <span class="code-property">currency</span>: <span class="code-string">"INR"</span>,</span>
+<span class="code-line">    <span class="code-property">minimumFractionDigits</span>: <span class="code-number">2</span>,</span>
+<span class="code-line">    <span class="code-property">maximumFractionDigits</span>: <span class="code-number">2</span>,</span>
+<span class="code-line">  }).<span class="code-function">format</span>(rupees);</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Convert rupees (a friendly number like <code>20.5</code>) into paise (the integer <code>2050</code>).</p>
+              <p class="tl">Reject anything that isn&rsquo;t a finite number &mdash; <code>NaN</code>, <code>Infinity</code>, etc.</p>
+              <p class="tl">Multiply by 100 to scale into paise.</p>
+              <p class="tl">Round to the nearest integer (in case the multiplication produced a tiny float artefact).</p>
+              <p class="tl">If the difference between the multiplication result and the rounded integer is bigger than a tiny epsilon, the user passed something like ₹20.005 &mdash; reject it explicitly rather than silently rounding.</p>
+              <p class="tl">Format paise back into a display string. Used everywhere on the screen.</p>
+              <p class="tl">Use the browser&rsquo;s built-in <code>en-IN</code> formatter so we get correct Indian grouping (₹1,23,456 with the lakh comma in the right place) for free.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The five swimmers, in code</h2>
+        <p>Here&rsquo;s the heart of <code>POST /api/transactions</code> &mdash; the five writes wrapped in a single <code>prisma.$transaction</code> call.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · app/api/transactions/route.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> { transaction, receipt } = <span class="code-keyword">await</span> prisma.<span class="code-function">$transaction</span>(<span class="code-keyword">async</span> (tx) <span class="code-operator">=&gt;</span> {</span>
+<span class="code-line">  <span class="code-keyword">const</span> seq = <span class="code-keyword">await</span> tx.billSequence.<span class="code-function">upsert</span>({</span>
+<span class="code-line">    <span class="code-property">where</span>: { <span class="code-property">vendorId_date</span>: { <span class="code-property">vendorId</span>: vendor.id, <span class="code-property">date</span>: today } },</span>
+<span class="code-line">    <span class="code-property">create</span>: { <span class="code-property">vendorId</span>: vendor.id, <span class="code-property">date</span>: today, <span class="code-property">lastSeq</span>: <span class="code-number">1</span> },</span>
+<span class="code-line">    <span class="code-property">update</span>: { <span class="code-property">lastSeq</span>: { <span class="code-property">increment</span>: <span class="code-number">1</span> } },</span>
+<span class="code-line">  });</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">const</span> ymd = <span class="code-function">formatBillDateYYYYMMDD</span>(today);</span>
+<span class="code-line">  <span class="code-keyword">const</span> billNumber = <span class="code-string">`AWZ-${ymd}-${String(seq.lastSeq).padStart(4, "0")}`</span>;</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">const</span> transactionRow = <span class="code-keyword">await</span> tx.transaction.<span class="code-function">create</span>({</span>
+<span class="code-line">    <span class="code-property">data</span>: {</span>
+<span class="code-line">      <span class="code-property">vendorId</span>: vendor.id, billNumber,</span>
+<span class="code-line">      <span class="code-property">subtotalPaise</span>: body.subtotalPaise, <span class="code-property">taxPaise</span>: body.taxPaise, <span class="code-property">totalPaise</span>: body.totalPaise,</span>
+<span class="code-line">      <span class="code-property">orderItems</span>: { <span class="code-property">create</span>: body.items.<span class="code-function">map</span>((i) <span class="code-operator">=&gt;</span> ({</span>
+<span class="code-line">        <span class="code-property">menuItemId</span>: i.menuItemId, <span class="code-property">name</span>: i.name,</span>
+<span class="code-line">        <span class="code-property">priceInPaise</span>: i.priceInPaise, <span class="code-property">qty</span>: i.qty,</span>
+<span class="code-line">        <span class="code-property">totalPaise</span>: i.priceInPaise * i.qty,</span>
+<span class="code-line">      })) },</span>
+<span class="code-line">    },</span>
+<span class="code-line">  });</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">await</span> tx.dailySummary.<span class="code-function">upsert</span>({ <span class="code-comment">/* increment all aggregates */</span> });</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">const</span> receiptRow = <span class="code-keyword">await</span> tx.receipt.<span class="code-function">create</span>({</span>
+<span class="code-line">    <span class="code-property">data</span>: { <span class="code-property">transactionId</span>: transactionRow.id, <span class="code-property">vendorId</span>: vendor.id, <span class="code-property">receiptNumber</span>: billNumber, <span class="code-property">whatsappSent</span>: <span class="code-keyword">false</span> },</span>
+<span class="code-line">  });</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">return</span> { transaction: transactionRow, receipt: receiptRow };</span>
+<span class="code-line">});</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Open a database transaction. Everything inside the curly braces will commit together &mdash; or roll back together if anything throws.</p>
+              <p class="tl">Step 1 &mdash; <span class="term" data-definition="Upsert = update if exists, insert if not. Combined with `increment: 1`, it guarantees there&rsquo;s exactly one counter row per (vendor, day) and that incrementing it is atomic — no two simultaneous sales can ever get the same bill number.">Upsert</span> the bill counter for (this vendor, today). If it doesn&rsquo;t exist, create it at 1. If it does, add 1 atomically.</p>
+              <p class="tl">Format today&rsquo;s date in IST as YYYYMMDD. Build the bill number string &mdash; e.g., <code>AWZ-20260430-0001</code>.</p>
+              <p class="tl">Step 2 &mdash; insert the Transaction row with all the paise totals.</p>
+              <p class="tl">Step 3 &mdash; nested inside, insert one OrderItem per cart line. Note <code>name</code> and <code>priceInPaise</code> are <em>copied</em> here, not joined &mdash; the bill is a snapshot, not a live link to the menu.</p>
+              <p class="tl">Step 4 &mdash; bump today&rsquo;s rollup row so analytics see the sale immediately.</p>
+              <p class="tl">Step 5 &mdash; create the Receipt row, with a flag saying WhatsApp hasn&rsquo;t been sent yet (a worker will flip that later).</p>
+              <p class="tl">If we got here, all five swimmers dove together. The transaction commits. We return the rows for the response.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The atomic dive, animated</h2>
+        <p>Step through what happens inside a single <code>$transaction</code> call.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"actor-1","label":"BEGIN — Postgres opens a private workspace where uncommitted writes are invisible to other queries."},
+          {"highlight":"actor-2","label":"Step 1: BillSequence upsert. Today&apos;s counter goes 0 → 1.","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"actor-3","label":"Step 2: Transaction insert + nested OrderItem inserts.","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"actor-4","label":"Step 3: DailySummary upsert. Today&apos;s totals tick up.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"actor-5","label":"Step 4: Receipt insert with whatsappSent: false.","packet":true,"from":"actor-4","to":"actor-5"},
+          {"highlight":"actor-1","label":"COMMIT — all five writes become visible to the rest of the app at the exact same instant. Bill AWZ-20260430-0001 is real.","packet":true,"from":"actor-5","to":"actor-1"}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon" style="background: var(--color-actor-3); color: white">🗄️</div>
+              <span>Postgres</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon" style="background: var(--color-actor-4); color: white">🔢</div>
+              <span>BillSequence</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon" style="background: var(--color-actor-1); color: white">🧾</div>
+              <span>Transaction</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon" style="background: var(--color-actor-5); color: white">📊</div>
+              <span>DailySummary</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-5">
+              <div class="flow-actor-icon" style="background: var(--color-actor-2); color: white">📨</div>
+              <span>Receipt</span>
+            </div>
+          </div>
+          <div class="flow-packet" id="flow-packet"></div>
+          <div class="flow-step-label" id="flow-label">Click &ldquo;Next Step&rdquo; to begin.</div>
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">⚛️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Engineers call this property &ldquo;atomicity&rdquo;</strong>
+            <p>It&rsquo;s the &ldquo;A&rdquo; in <span class="term" data-definition="ACID = Atomicity, Consistency, Isolation, Durability — the four guarantees a database transaction provides. Atomicity is the &lsquo;all or nothing&rsquo; one. The other three are why we trust databases with money in the first place.">ACID</span>. The whole reason real businesses store money in databases like Postgres rather than in spreadsheets or in-memory caches: the transaction either commits in full or doesn&rsquo;t happen at all. Cosmic rays could flip a bit, the server could die mid-write &mdash; either way, the database never ends up in a half-state.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The one allowed <code>toFixed</code></h2>
+        <p>The rule of the codebase: <code>toFixed</code>, <code>parseFloat</code>, and <code>Number()</code> on price strings are banned. There&rsquo;s exactly one place in the entire codebase where <code>toFixed</code> is allowed &mdash; building the UPI deep-link, because the UPI specification literally requires decimal rupees in the URL.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/upi.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">export function</span> <span class="code-function">buildUpiDeepLink</span>({ upiId, name, amountRupees, billRef }: BuildUpiDeepLinkParams): <span class="code-keyword">string</span> {</span>
+<span class="code-line">  <span class="code-keyword">const</span> am = amountRupees.<span class="code-function">toFixed</span>(<span class="code-number">2</span>);</span>
+<span class="code-line">  <span class="code-keyword">const</span> params = <span class="code-keyword">new</span> <span class="code-function">URLSearchParams</span>({</span>
+<span class="code-line">    <span class="code-property">pa</span>: upiId,</span>
+<span class="code-line">    <span class="code-property">pn</span>: name,</span>
+<span class="code-line">    am,</span>
+<span class="code-line">    <span class="code-property">cu</span>: <span class="code-string">"INR"</span>,</span>
+<span class="code-line">    <span class="code-property">tn</span>: billRef,</span>
+<span class="code-line">  });</span>
+<span class="code-line">  <span class="code-keyword">return</span> <span class="code-string">`upi://pay?${params.toString()}`</span>;</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Build the URL that the customer&rsquo;s phone interprets as &ldquo;open my UPI app, fill in this payment.&rdquo;</p>
+              <p class="tl">The UPI spec says the <code>am</code> parameter must be in decimal rupees with two decimal places &mdash; e.g., <code>40.00</code>, not <code>4000</code>. So we use <code>toFixed(2)</code> here, and only here.</p>
+              <p class="tl">Pack the parameters into a URL: <code>pa</code> = payee address (vendor&rsquo;s UPI ID), <code>pn</code> = payee name, <code>am</code> = amount, <code>cu</code> = currency, <code>tn</code> = transaction note (the bill number).</p>
+              <p class="tl">Return <code>upi://pay?...</code>. The browser turns this into a QR code; the customer scans it with GPay / PhonePe / Paytm.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📜</div>
+          <div class="callout-content">
+            <strong class="callout-title">A grep that runs on every build</strong>
+            <p>To stop new <code>toFixed</code>s from sneaking in, the project recommends a CI check: <code>rg -l "toFixed" --glob '!lib/upi.ts' --glob '!*.md' app/ components/ lib/ workers/</code>. If that command finds anything, the build fails &mdash; the only allowed exception is the file above.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Server-side recompute</h2>
+        <p>The browser sends the cart and totals to the server. But the server doesn&rsquo;t trust them &mdash; it recomputes them and rejects the request if they don&rsquo;t match. This is one extra check that prevents an entire category of bugs.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · app/api/transactions/route.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> body = parsed.data;</span>
+<span class="code-line"><span class="code-keyword">const</span> totals = <span class="code-function">checkTransactionTotals</span>(body);</span>
+<span class="code-line"><span class="code-keyword">if</span> (!totals.ok) {</span>
+<span class="code-line">  <span class="code-keyword">return</span> NextResponse.<span class="code-function">json</span>({ <span class="code-property">error</span>: totals.code, <span class="code-property">code</span>: totals.code }, { <span class="code-property">status</span>: <span class="code-number">400</span> });</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">const</span> cap = PLAN_LIMITS[vendor.plan].monthlyTxnCap;</span>
+<span class="code-line"><span class="code-keyword">if</span> (cap !== <span class="code-keyword">null</span>) {</span>
+<span class="code-line">  <span class="code-keyword">const</span> monthStart = <span class="code-function">getIstMonthStart</span>();</span>
+<span class="code-line">  <span class="code-keyword">const</span> count = <span class="code-keyword">await</span> prisma.transaction.<span class="code-function">count</span>({</span>
+<span class="code-line">    <span class="code-property">where</span>: { <span class="code-property">vendorId</span>: vendor.id, <span class="code-property">createdAt</span>: { <span class="code-property">gte</span>: monthStart } },</span>
+<span class="code-line">  });</span>
+<span class="code-line">  <span class="code-keyword">if</span> (count &gt;= cap) {</span>
+<span class="code-line">    <span class="code-keyword">throw new</span> <span class="code-function">AuthError</span>(<span class="code-number">402</span>, <span class="code-string">"monthly_txn_cap_reached"</span>);</span>
+<span class="code-line">  }</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Body has been validated by Zod (shape is right). Now check the math.</p>
+              <p class="tl"><code>checkTransactionTotals</code> recomputes <code>subtotal + tax - discount</code> on the server and compares with what the browser sent.</p>
+              <p class="tl">If they don&rsquo;t match, return 400 &mdash; either the cart is corrupted or someone tampered with it. Either way, refuse to charge.</p>
+              <p class="tl">Look up this vendor&rsquo;s plan-cap (e.g., FREE = 50 transactions/month).</p>
+              <p class="tl">Count this month&rsquo;s transactions, in IST.</p>
+              <p class="tl">If they&rsquo;re at the cap, refuse with <span class="term" data-definition="HTTP 402 — Payment Required. Almost never used for actual payment, but AwaazOS uses it to mean &lsquo;upgrade your plan to do this.&rsquo; The frontend catches the 402 and shows an upgrade button.">HTTP 402</span>. The frontend catches it and shows an upgrade prompt.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Quick check</h2>
+
+        <div class="quiz-container" id="quiz-module5">
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Right. The four other writes (Transaction, OrderItems, DailySummary, Receipt) all roll back. Critically — and this is the real magic — the BillSequence upsert that incremented the counter ALSO rolls back. So the next attempt gets bill number 0001 again, not 0002. No bill numbers are ever wasted, no sales are ever half-recorded.">
+            <h3 class="quiz-question">Mid-transaction, the database server crashes after the bill counter increments to <code>5</code> but before the Receipt row is created. What does AwaazOS look like once Postgres comes back online?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The next sale gets bill number 6, since 5 was already used.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The whole transaction rolls back &mdash; including the counter increment. The next sale gets bill number 5 again.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Bill 5 is half-recorded; an admin has to manually clean it up.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="Yes. OrderItem.name and OrderItem.priceInPaise are SNAPSHOTTED at sale time — copied into the row, not joined back to MenuItem. If the menu price changes from ₹20 to ₹22 next week, last week&rsquo;s receipts still show ₹20. This is the difference between accurate historical bills and breaking the customer&rsquo;s trust.">
+            <h3 class="quiz-question">A vendor changes the price of <em>chai</em> from ₹20 to ₹22. What happens to last week&rsquo;s receipts?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>They retroactively show ₹22 because they&rsquo;re joined to MenuItem.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The vendor must re-issue them at the new price.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>They still show ₹20, because the price was snapshotted onto the OrderItem at sale time.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Yes. ₹19.99 stored as a float and added a few times produces 39.97999999..., not 39.98. That&rsquo;s the famous JavaScript floating-point bug. Storing as integer paise (1999 + 1999 = 3998) makes the math exact. The codebase explicitly bans `parseFloat`, `Number(price)`, and `toFixed` for this reason — the only allowed exception is the UPI deep-link, where the UPI spec mandates decimal rupees.">
+            <h3 class="quiz-question">Why does the codebase ban <code>parseFloat</code> and <code>toFixed</code> for monetary math (with one specific exception)?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Floating-point representations are approximate; over many sales the rounding errors compound into real money lost.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It&rsquo;s a stylistic preference; both work the same.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>TypeScript doesn&rsquo;t support floats.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="btn quiz-check-btn" onclick="checkQuiz('quiz-module5')">Check answers</button>
+          <button class="btn quiz-reset-btn" onclick="resetQuiz('quiz-module5')">Try again</button>
+
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+
+<section class="module" id="module-6" style="background: var(--color-bg)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">06</span>
+      <h1 class="module-title">After the sale</h1>
+      <p class="module-subtitle">The customer walked away. The vendor is already taking the next order. But the WhatsApp receipt hasn&rsquo;t sent yet. Razorpay&rsquo;s server is about to POST a webhook with no logged-in user. Network calls will fail and retry. This module is about the part of the system that has to keep working even when nobody&rsquo;s looking.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A postal sorting facility</h2>
+        <p>Picture a postal sorting depot at 2 AM. Letters keep arriving on conveyor belts. Some get delivered immediately, some need a second sorting pass, some get returned to sender. The depot isn&rsquo;t magic &mdash; it&rsquo;s built around three boring rules:</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">📬</div>
+            <h4 class="pattern-title">Durable mailbag</h4>
+            <p class="pattern-desc">Once a letter goes in the mailbag (the queue), it can&rsquo;t fall out. Even if the depot building catches fire, the bag&rsquo;s contents survive on disk.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🔁</div>
+            <h4 class="pattern-title">Retries with patience</h4>
+            <p class="pattern-desc">Recipient&rsquo;s door is locked? Try again in 5 seconds, then 10, then 20. Never just give up. Never just try again instantly forever.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🪪</div>
+            <h4 class="pattern-title">Tracking ID per letter</h4>
+            <p class="pattern-desc">Same letter showing up twice? Check the tracking ID. If we already delivered it, just discard the second copy. Don&rsquo;t bother the recipient.</p>
+          </div>
+        </div>
+
+        <p style="margin-top: var(--space-6)">In AwaazOS, the mailbag is <span class="term" data-definition="BullMQ is a Node.js library that turns a Redis instance into a job queue with retries, scheduling, and worker management. It&rsquo;s the &lsquo;mailbag&rsquo; that holds WhatsApp jobs, voice telemetry jobs, and retention jobs.">BullMQ</span>. The post office is the Fly.io worker. The tracking ID is the <code>whatsappSent</code> flag. Let&rsquo;s zoom in.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The hand-off, message by message</h2>
+        <p>Watch the conversation between the API route, the queue, the worker, and Gupshup as a single WhatsApp receipt makes its way to the customer.</p>
+
+        <div class="chat-window" id="chat-module6">
+          <div class="chat-messages">
+
+            <div class="chat-message" data-msg="0" data-sender="api" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">API route</span>
+                <p>The five-step transaction committed. Bill <code>AWZ-20260430-0001</code> exists. Customer phone is <code>+91…43210</code>.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="1" data-sender="api" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">API route</span>
+                <p>Hey queue, drop a job: <code>{ transactionId, vendorId, customerPhone }</code>. Don&rsquo;t make me wait &mdash; the vendor needs to take the next order.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="2" data-sender="queue" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-4)">Q</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-4)">Redis (BullMQ)</span>
+                <p>Job stored. ack&rsquo;d. Worker can pick it up whenever &mdash; if you crash now, the job survives.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="3" data-sender="worker" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Receipt worker (Fly)</span>
+                <p>Picking up job. Loading transaction <code>AWZ-20260430-0001</code> + receipt + vendor settings &mdash; scoped by vendorId.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="4" data-sender="worker" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Receipt worker (Fly)</span>
+                <p>Quick check: <code>receipt.whatsappSent === true</code>? No. OK, this is a fresh delivery. Formatting the multiline message.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="5" data-sender="worker" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Receipt worker (Fly)</span>
+                <p>Hey Gupshup, please WhatsApp this receipt to <code>+91…43210</code>. 8-second timeout.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="6" data-sender="gupshup" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">G</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Gupshup</span>
+                <p>504 timeout from carrier. Sorry.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="7" data-sender="worker" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Receipt worker (Fly)</span>
+                <p>Throwing &ldquo;gupshup_send_failed&rdquo;. BullMQ will retry with exponential backoff: 5s, 10s, 20s, 40s, 80s. After 5 attempts, the job lands in the dead-letter pile for 7 days for me to investigate.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="8" data-sender="worker" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Receipt worker (Fly)</span>
+                <p>(40 seconds later) Retrying. Loading the same row. Same idempotency check &mdash; <code>whatsappSent</code> is still false. Sending again.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="9" data-sender="gupshup" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">G</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Gupshup</span>
+                <p>200 OK. Delivered. Message ID <code>msg_xyz</code>.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="10" data-sender="worker" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Receipt worker (Fly)</span>
+                <p>Updating receipt: <code>whatsappSent: true, whatsappSentAt: now, deliveredTo: +91…43210</code>. If this exact job somehow gets retried later, the idempotency check will catch it and skip.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="11" data-sender="customer" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">C</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">Customer&rsquo;s WhatsApp</span>
+                <p>📱 *ding* &mdash; receipt received from Ravi&rsquo;s Chai. Total ₹40.</p>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="chat-typing" id="chat-module6-typing" style="display:none">
+            <div class="chat-avatar" id="chat-module6-typing-avatar">?</div>
+            <div class="chat-typing-dots">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+
+          <div class="chat-controls">
+            <button class="btn chat-next-btn">Next message</button>
+            <button class="btn chat-all-btn">Play all</button>
+            <button class="btn chat-reset-btn">Replay</button>
+            <span class="chat-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The idempotency check, in seven lines</h2>
+        <p>The single most important part of the worker is also the smallest. If a job runs twice (because of a retry, a network blip, or anything else), the customer should get exactly one WhatsApp message &mdash; not two.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · workers/receipt.worker.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> tx = <span class="code-keyword">await</span> prisma.transaction.<span class="code-function">findFirst</span>({</span>
+<span class="code-line">  <span class="code-property">where</span>: { <span class="code-property">id</span>: transactionId, <span class="code-property">vendorId</span> },</span>
+<span class="code-line">  <span class="code-property">include</span>: { <span class="code-property">orderItems</span>: { <span class="code-comment">/* ... */</span> }, <span class="code-property">receipt</span>: <span class="code-keyword">true</span>, <span class="code-property">vendor</span>: { <span class="code-property">include</span>: { <span class="code-property">settings</span>: <span class="code-keyword">true</span> } } },</span>
+<span class="code-line">});</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">if</span> (!tx || !tx.receipt) {</span>
+<span class="code-line">  logger.<span class="code-function">warn</span>({ transactionId, vendorId }, <span class="code-string">"transaction or receipt not found; dropping job"</span>);</span>
+<span class="code-line">  <span class="code-keyword">return</span>;</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">if</span> (tx.receipt.whatsappSent) {</span>
+<span class="code-line">  logger.<span class="code-function">info</span>({ transactionId }, <span class="code-string">"receipt already sent; idempotent skip"</span>);</span>
+<span class="code-line">  <span class="code-keyword">return</span>;</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Look up the transaction <em>by transactionId AND vendorId</em>. (The same compound-where pattern as Module 3 &mdash; even the worker can&rsquo;t cross tenants.)</p>
+              <p class="tl">Pull in everything we need to format the message: line items, the receipt row, vendor name &amp; settings.</p>
+              <p class="tl">If the row doesn&rsquo;t exist (deleted? wrong ID?), just drop the job. We can&rsquo;t send a message about a sale that doesn&rsquo;t exist.</p>
+              <p class="tl"><strong>The idempotency check.</strong> If <code>whatsappSent</code> is already <code>true</code>, somebody already delivered this. Quietly return without sending again.</p>
+              <p class="tl">Log it for visibility, but treat it as a normal outcome &mdash; no retries, no errors. The job is &ldquo;done.&rdquo;</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🔁</div>
+          <div class="callout-content">
+            <strong class="callout-title">Engineers call this &ldquo;at-least-once with idempotency&rdquo;</strong>
+            <p>Distributed systems can&rsquo;t guarantee a job runs <em>exactly</em> once &mdash; networks fail, machines crash, ack&rsquo;s get lost. So the next-best thing is: guarantee jobs run <em>at least</em> once, and design every worker so re-runs are safe. The <code>whatsappSent</code> flag is the &ldquo;safe to re-run&rdquo; design here.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The webhook with no login</h2>
+        <p>Razorpay needs to tell us when a vendor pays for their subscription. They POST to <code>/api/webhooks/razorpay</code> &mdash; but their server doesn&rsquo;t have a vendor session. Anyone on the internet could try to POST the same URL. So how do we know it&rsquo;s really Razorpay?</p>
+        <p>By checking a <span class="term" data-definition="HMAC = Hash-based Message Authentication Code. A way to prove a message came from someone who knows a shared secret, without sending the secret. Razorpay and AwaazOS both know a webhook secret; Razorpay signs the body with it; AwaazOS recomputes the signature and only accepts the request if it matches.">HMAC signature</span>. Razorpay signs the request body with a shared secret. We re-compute the signature on our end and compare. Only the real Razorpay can produce a matching signature.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · app/api/webhooks/razorpay/route.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> rawBody = <span class="code-keyword">await</span> req.<span class="code-function">text</span>();</span>
+<span class="code-line"><span class="code-keyword">const</span> sig = req.headers.<span class="code-function">get</span>(<span class="code-string">"x-razorpay-signature"</span>);</span>
+<span class="code-line"><span class="code-keyword">if</span> (!<span class="code-function">verifyRazorpaySignature</span>(rawBody, sig)) {</span>
+<span class="code-line">  <span class="code-keyword">return</span> NextResponse.<span class="code-function">json</span>({}, { <span class="code-property">status</span>: <span class="code-number">401</span> });</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">let</span> body: <span class="code-keyword">unknown</span>;</span>
+<span class="code-line"><span class="code-keyword">try</span> {</span>
+<span class="code-line">  body = JSON.<span class="code-function">parse</span>(rawBody) <span class="code-keyword">as</span> <span class="code-keyword">unknown</span>;</span>
+<span class="code-line">} <span class="code-keyword">catch</span> {</span>
+<span class="code-line">  console.<span class="code-function">warn</span>(<span class="code-string">"[webhooks/razorpay] invalid json"</span>);</span>
+<span class="code-line">  <span class="code-keyword">return</span> NextResponse.<span class="code-function">json</span>({ <span class="code-property">ok</span>: <span class="code-keyword">true</span> });</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Read the request body as <em>raw text</em>. Critical: do not parse to JSON yet. Different JSON libraries reorder keys, which would break signature verification.</p>
+              <p class="tl">Read the header where Razorpay puts the signature.</p>
+              <p class="tl">Verify: re-compute HMAC-SHA256 of the raw body using our shared secret, and compare against the header. Comparison uses <code>crypto.timingSafeEqual</code> to defeat <span class="term" data-definition="A timing attack measures how long a string comparison takes — a normal `===` returns faster when the first character mismatches than when the strings are nearly identical. crypto.timingSafeEqual takes the same time regardless, so attackers can&rsquo;t learn the secret one byte at a time.">timing attacks</span>.</p>
+              <p class="tl">If the signature doesn&rsquo;t match, return 401 with an empty body &mdash; don&rsquo;t even confirm the URL exists.</p>
+              <p class="tl">Only NOW it&rsquo;s safe to JSON.parse the body, since we&rsquo;ve verified the sender.</p>
+              <p class="tl">If the JSON is malformed (which shouldn&rsquo;t happen post-signature-check), shrug and return 200 OK so Razorpay doesn&rsquo;t spam-retry.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">🔐</div>
+          <div class="callout-content">
+            <strong class="callout-title">Verify before you read</strong>
+            <p>The single most common webhook bug: trusting the body before checking the signature. The signature check goes <em>first</em>, before any database lookup, before any JSON parse, before any business logic. If the signature is wrong, you bounce without doing <em>any</em> work that could be exploited.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Plan gates &mdash; HTTP 402 in disguise</h2>
+        <p>Some features are paid-only &mdash; WhatsApp receipts (STARTER+), CSV exports (PRO+), unlimited transactions (PRO+). Rather than scattering <code>if (vendor.plan === "FREE") return ...</code> through the code, AwaazOS uses a single helper that throws a structured error.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/rbac.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">export class</span> PlanGateError <span class="code-keyword">extends</span> AuthError {</span>
+<span class="code-line">  <span class="code-function">constructor</span>(</span>
+<span class="code-line">    <span class="code-keyword">public readonly</span> required: Plan,</span>
+<span class="code-line">    <span class="code-keyword">public readonly</span> current: Plan,</span>
+<span class="code-line">  ) {</span>
+<span class="code-line">    <span class="code-function">super</span>(<span class="code-number">402</span>, <span class="code-string">"Plan upgrade required"</span>);</span>
+<span class="code-line">    <span class="code-keyword">this</span>.name = <span class="code-string">"PlanGateError"</span>;</span>
+<span class="code-line">  }</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">export function</span> <span class="code-function">requirePlan</span>(vendor: { plan: Plan }, minPlan: Plan): <span class="code-keyword">void</span> {</span>
+<span class="code-line">  <span class="code-keyword">if</span> (PLAN_RANK[vendor.plan] &lt; PLAN_RANK[minPlan]) {</span>
+<span class="code-line">    <span class="code-keyword">throw new</span> <span class="code-function">PlanGateError</span>(minPlan, vendor.plan);</span>
+<span class="code-line">  }</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Define a special error class that carries both the required plan and the current plan.</p>
+              <p class="tl">It uses HTTP 402 (&ldquo;Payment Required&rdquo;) as its status code. The frontend listens for 402s and shows an upgrade button automatically.</p>
+              <p class="tl">A one-line guard: <code>requirePlan(vendor, "STARTER")</code>. If the vendor&rsquo;s plan is too low, throw the error &mdash; the route handler&rsquo;s try/catch translates it into a structured 402 response.</p>
+              <p class="tl">The error carries enough context for the upgrade prompt to say &ldquo;you&rsquo;re on FREE, this needs STARTER&rdquo; rather than a generic &ldquo;please upgrade.&rdquo;</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💳</div>
+          <div class="callout-content">
+            <strong class="callout-title">Plan capabilities at a glance</strong>
+            <p>FREE: 50 transactions/month, no WhatsApp, 7 days of analytics.<br>
+            STARTER: 500 transactions/month, WhatsApp on, 90 days of analytics.<br>
+            PRO: unlimited transactions, CSV export, 365 days of analytics.<br>
+            One table in <code>lib/constants.ts</code>; the whole app reads from it.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Quick check</h2>
+
+        <div class="quiz-container" id="quiz-module6">
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="The HMAC signature would no longer match — because the (valid) raw body and the (now-different) re-computed body differ. The handler returns 401 without doing any work. The reason rawBody is read as TEXT, not JSON, is to dodge the &lsquo;parser reorders keys&rsquo; problem that would break a legitimate webhook&rsquo;s signature.">
+            <h3 class="quiz-question">An attacker grabs a real Razorpay webhook URL out of network logs and POSTs a forged body claiming the vendor&rsquo;s plan was upgraded. What stops the upgrade from going through?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The webhook checks the request comes from a Razorpay IP address.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The auth middleware blocks any unauthenticated request to <code>/api/*</code>.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The HMAC signature won&rsquo;t match a forged body, because the attacker doesn&rsquo;t have the shared webhook secret. The handler returns 401 before doing anything.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Yes. BullMQ retries on its own, with exponential backoff (5s, 10s, 20s, 40s, 80s up to 5 attempts). The worker just throws on failure — that&rsquo;s the signal to retry. After the 5th attempt, the job lands in the failed-jobs DLQ for 7 days where an admin can investigate. NEVER write your own retry loop inside the worker — that defeats the queue&rsquo;s scheduling and you can lose jobs on crash.">
+            <h3 class="quiz-question">A teammate suggests adding a <code>while (true)</code> retry loop inside the WhatsApp worker, so it keeps trying immediately until success. What should you push back with?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Sounds good &mdash; merge it.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Push back: BullMQ already retries with exponential backoff (5s, 10s, 20s, 40s, 80s) and tracks failed jobs in a <span class="term" data-definition="Dead-Letter Queue. Where jobs go when they&rsquo;ve failed all their retry attempts. Lets you investigate and replay them later instead of silently losing them.">DLQ</span>. A worker should fail loudly and return; the queue handles patience.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Push back: Gupshup blocks rapid retries.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Yes. The receipt.whatsappSent flag means a re-run is safe — it&rsquo;ll see the flag is true and quietly return. So the WhatsApp enqueue happens AFTER the prisma.$transaction commits — outside the swimmer formation from Module 5. If the queue is unreachable in that moment, the sale still completes and the cashier can resend manually later. If the enqueue WAS inside the transaction, a queue blip would roll back the sale itself — much worse.">
+            <h3 class="quiz-question">The WhatsApp enqueue happens <em>outside</em> the prisma.$transaction in <code>POST /api/transactions</code>. Why?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>So that a queue outage doesn&rsquo;t roll back the sale itself. The worker&rsquo;s idempotency check makes &ldquo;at-least-once&rdquo; delivery safe even if the enqueue happened multiple times.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Because Prisma can&rsquo;t talk to Redis from inside a transaction.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>To avoid sending the WhatsApp before the customer pays.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="btn quiz-check-btn" onclick="checkQuiz('quiz-module6')">Check answers</button>
+          <button class="btn quiz-reset-btn" onclick="resetQuiz('quiz-module6')">Try again</button>
+
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Where to go from here</h2>
+        <p>You&rsquo;ve seen all six layers: the user journey, the cast of services, multi-tenant isolation, the AI pipeline, the atomic transaction, and the resilient back-of-house. The patterns you&rsquo;ve picked up apply far beyond this one product.</p>
+
+        <div class="icon-rows">
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-1)">🎯</div>
+            <div>
+              <strong>Steering AI better</strong>
+              <p>You can now ask for &ldquo;a two-tier model cascade&rdquo; or &ldquo;a compound where with vendorId&rdquo; and the AI will know what you mean.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-2)">🐛</div>
+            <div>
+              <strong>Debugging faster</strong>
+              <p>When something breaks, you know which provider to look at, and which patterns are likely to be involved.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-3)">🏗️</div>
+            <div>
+              <strong>Making smarter architecture calls</strong>
+              <p>You&rsquo;ve seen the trade-offs &mdash; serverless vs always-on, integer vs float for money, sync vs async work, atomic vs eventual consistency.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-5)">🇮🇳</div>
+            <div>
+              <strong>Bol. Bill. Becho.</strong>
+              <p>And next time you&rsquo;re at a chai stall in Hyderabad and the vendor pulls out a phone with an orange mic button &mdash; you&rsquo;ll know exactly what&rsquo;s about to happen behind the scenes.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
+  </main>
+
+</body>
+</html>

@@ -1,0 +1,372 @@
+<section class="module" id="module-5" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">05</span>
+      <h1 class="module-title">Money in paise &mdash; the atomic transaction</h1>
+      <p class="module-subtitle">When the vendor taps <strong>Mark as Paid</strong>, five things must happen to the database. They have to either all succeed together or all fail together &mdash; never four out of five. This module is about the two disciplines that make that possible: integer paise math, and a five-step database transaction.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Synchronised swimmers</h2>
+        <p>Picture a synchronised swimming team. On the count of three, all five swimmers dive together. They&rsquo;re trained for one rule: if even one swimmer hesitates, none of them dive. They re-set, count again, dive together. The judges either see five splashes or zero. Never four.</p>
+        <p>Database transactions work exactly like this. AwaazOS&rsquo;s &ldquo;Mark as Paid&rdquo; bundles five separate writes into one transaction:</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Get the next bill number</strong>
+              <p>Atomically increment today&rsquo;s counter for this vendor. Becomes <code>AWZ-20260430-0001</code>.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>Insert the Transaction row</strong>
+              <p>Subtotal, tax, total, payment method, payment status &mdash; all in paise.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Insert each OrderItem</strong>
+              <p>One row per line in the cart, with the price <em>snapshotted</em> at sale time.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <strong>Bump the DailySummary</strong>
+              <p>Add this sale to today&rsquo;s rollup so the analytics dashboard updates immediately.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">5</div>
+            <div class="step-body">
+              <strong>Create the Receipt row</strong>
+              <p>Marker that this transaction&rsquo;s receipt has not yet been sent on WhatsApp.</p>
+            </div>
+          </div>
+        </div>
+
+        <p style="margin-top: var(--space-6)">If any one of these fails, all five roll back &mdash; the database returns to exactly the state it was in before the swimmer climbed onto the platform. No half-recorded sales. No bill numbers wasted. Ever.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why paise, not rupees</h2>
+        <p>Before we touch the transaction, we have to talk about the unit of money. AwaazOS stores every monetary amount as an integer number of <span class="term" data-definition="The Indian currency&rsquo;s smallest unit. ₹1 = 100 paise. AwaazOS stores ₹20 as the integer 2000 (paise) — never as 20.0 (a float) — to dodge floating-point precision errors that compound across many transactions.">paise</span>. ₹20 is the integer <code>2000</code>. ₹99.50 is <code>9950</code>. Never decimals.</p>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">💸</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why floats are forbidden for money</strong>
+            <p>Computers store decimal numbers like <code>0.1</code> and <code>0.2</code> approximately. Try this in any browser console: <code>0.1 + 0.2 === 0.3</code> evaluates to <code>false</code>. Add a tiny rounding error to a million sales and you&rsquo;re off by hundreds of rupees, with no way to find which sale caused it. Integer paise dodges the entire problem.</p>
+          </div>
+        </div>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/currency.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">export function</span> <span class="code-function">rupeesToPaise</span>(rupees: <span class="code-keyword">number</span>): <span class="code-keyword">number</span> {</span>
+<span class="code-line">  <span class="code-keyword">if</span> (!Number.<span class="code-function">isFinite</span>(rupees)) {</span>
+<span class="code-line">    <span class="code-keyword">throw new</span> <span class="code-function">Error</span>(<span class="code-string">"Invalid rupee amount"</span>);</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="code-keyword">const</span> scaled = rupees * <span class="code-number">100</span>;</span>
+<span class="code-line">  <span class="code-keyword">const</span> rounded = Math.<span class="code-function">round</span>(scaled);</span>
+<span class="code-line">  <span class="code-keyword">if</span> (Math.<span class="code-function">abs</span>(scaled - rounded) &gt; <span class="code-number">1e-9</span>) {</span>
+<span class="code-line">    <span class="code-keyword">throw new</span> <span class="code-function">Error</span>(<span class="code-string">"Rupee amount must have at most 2 decimal places"</span>);</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="code-keyword">return</span> rounded;</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">export function</span> <span class="code-function">formatINR</span>(paise: <span class="code-keyword">number</span>): <span class="code-keyword">string</span> {</span>
+<span class="code-line">  <span class="code-keyword">if</span> (!Number.<span class="code-function">isInteger</span>(paise)) {</span>
+<span class="code-line">    <span class="code-keyword">throw new</span> <span class="code-function">Error</span>(<span class="code-string">"paise must be an integer"</span>);</span>
+<span class="code-line">  }</span>
+<span class="code-line">  <span class="code-keyword">const</span> rupees = <span class="code-function">paiseToRupees</span>(paise);</span>
+<span class="code-line">  <span class="code-keyword">return new</span> Intl.<span class="code-function">NumberFormat</span>(<span class="code-string">"en-IN"</span>, {</span>
+<span class="code-line">    <span class="code-property">style</span>: <span class="code-string">"currency"</span>,</span>
+<span class="code-line">    <span class="code-property">currency</span>: <span class="code-string">"INR"</span>,</span>
+<span class="code-line">    <span class="code-property">minimumFractionDigits</span>: <span class="code-number">2</span>,</span>
+<span class="code-line">    <span class="code-property">maximumFractionDigits</span>: <span class="code-number">2</span>,</span>
+<span class="code-line">  }).<span class="code-function">format</span>(rupees);</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Convert rupees (a friendly number like <code>20.5</code>) into paise (the integer <code>2050</code>).</p>
+              <p class="tl">Reject anything that isn&rsquo;t a finite number &mdash; <code>NaN</code>, <code>Infinity</code>, etc.</p>
+              <p class="tl">Multiply by 100 to scale into paise.</p>
+              <p class="tl">Round to the nearest integer (in case the multiplication produced a tiny float artefact).</p>
+              <p class="tl">If the difference between the multiplication result and the rounded integer is bigger than a tiny epsilon, the user passed something like ₹20.005 &mdash; reject it explicitly rather than silently rounding.</p>
+              <p class="tl">Format paise back into a display string. Used everywhere on the screen.</p>
+              <p class="tl">Use the browser&rsquo;s built-in <code>en-IN</code> formatter so we get correct Indian grouping (₹1,23,456 with the lakh comma in the right place) for free.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The five swimmers, in code</h2>
+        <p>Here&rsquo;s the heart of <code>POST /api/transactions</code> &mdash; the five writes wrapped in a single <code>prisma.$transaction</code> call.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · app/api/transactions/route.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> { transaction, receipt } = <span class="code-keyword">await</span> prisma.<span class="code-function">$transaction</span>(<span class="code-keyword">async</span> (tx) <span class="code-operator">=&gt;</span> {</span>
+<span class="code-line">  <span class="code-keyword">const</span> seq = <span class="code-keyword">await</span> tx.billSequence.<span class="code-function">upsert</span>({</span>
+<span class="code-line">    <span class="code-property">where</span>: { <span class="code-property">vendorId_date</span>: { <span class="code-property">vendorId</span>: vendor.id, <span class="code-property">date</span>: today } },</span>
+<span class="code-line">    <span class="code-property">create</span>: { <span class="code-property">vendorId</span>: vendor.id, <span class="code-property">date</span>: today, <span class="code-property">lastSeq</span>: <span class="code-number">1</span> },</span>
+<span class="code-line">    <span class="code-property">update</span>: { <span class="code-property">lastSeq</span>: { <span class="code-property">increment</span>: <span class="code-number">1</span> } },</span>
+<span class="code-line">  });</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">const</span> ymd = <span class="code-function">formatBillDateYYYYMMDD</span>(today);</span>
+<span class="code-line">  <span class="code-keyword">const</span> billNumber = <span class="code-string">`AWZ-${ymd}-${String(seq.lastSeq).padStart(4, "0")}`</span>;</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">const</span> transactionRow = <span class="code-keyword">await</span> tx.transaction.<span class="code-function">create</span>({</span>
+<span class="code-line">    <span class="code-property">data</span>: {</span>
+<span class="code-line">      <span class="code-property">vendorId</span>: vendor.id, billNumber,</span>
+<span class="code-line">      <span class="code-property">subtotalPaise</span>: body.subtotalPaise, <span class="code-property">taxPaise</span>: body.taxPaise, <span class="code-property">totalPaise</span>: body.totalPaise,</span>
+<span class="code-line">      <span class="code-property">orderItems</span>: { <span class="code-property">create</span>: body.items.<span class="code-function">map</span>((i) <span class="code-operator">=&gt;</span> ({</span>
+<span class="code-line">        <span class="code-property">menuItemId</span>: i.menuItemId, <span class="code-property">name</span>: i.name,</span>
+<span class="code-line">        <span class="code-property">priceInPaise</span>: i.priceInPaise, <span class="code-property">qty</span>: i.qty,</span>
+<span class="code-line">        <span class="code-property">totalPaise</span>: i.priceInPaise * i.qty,</span>
+<span class="code-line">      })) },</span>
+<span class="code-line">    },</span>
+<span class="code-line">  });</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">await</span> tx.dailySummary.<span class="code-function">upsert</span>({ <span class="code-comment">/* increment all aggregates */</span> });</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">const</span> receiptRow = <span class="code-keyword">await</span> tx.receipt.<span class="code-function">create</span>({</span>
+<span class="code-line">    <span class="code-property">data</span>: { <span class="code-property">transactionId</span>: transactionRow.id, <span class="code-property">vendorId</span>: vendor.id, <span class="code-property">receiptNumber</span>: billNumber, <span class="code-property">whatsappSent</span>: <span class="code-keyword">false</span> },</span>
+<span class="code-line">  });</span>
+<span class="code-line"></span>
+<span class="code-line">  <span class="code-keyword">return</span> { transaction: transactionRow, receipt: receiptRow };</span>
+<span class="code-line">});</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Open a database transaction. Everything inside the curly braces will commit together &mdash; or roll back together if anything throws.</p>
+              <p class="tl">Step 1 &mdash; <span class="term" data-definition="Upsert = update if exists, insert if not. Combined with `increment: 1`, it guarantees there&rsquo;s exactly one counter row per (vendor, day) and that incrementing it is atomic — no two simultaneous sales can ever get the same bill number.">Upsert</span> the bill counter for (this vendor, today). If it doesn&rsquo;t exist, create it at 1. If it does, add 1 atomically.</p>
+              <p class="tl">Format today&rsquo;s date in IST as YYYYMMDD. Build the bill number string &mdash; e.g., <code>AWZ-20260430-0001</code>.</p>
+              <p class="tl">Step 2 &mdash; insert the Transaction row with all the paise totals.</p>
+              <p class="tl">Step 3 &mdash; nested inside, insert one OrderItem per cart line. Note <code>name</code> and <code>priceInPaise</code> are <em>copied</em> here, not joined &mdash; the bill is a snapshot, not a live link to the menu.</p>
+              <p class="tl">Step 4 &mdash; bump today&rsquo;s rollup row so analytics see the sale immediately.</p>
+              <p class="tl">Step 5 &mdash; create the Receipt row, with a flag saying WhatsApp hasn&rsquo;t been sent yet (a worker will flip that later).</p>
+              <p class="tl">If we got here, all five swimmers dove together. The transaction commits. We return the rows for the response.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The atomic dive, animated</h2>
+        <p>Step through what happens inside a single <code>$transaction</code> call.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"actor-1","label":"BEGIN — Postgres opens a private workspace where uncommitted writes are invisible to other queries."},
+          {"highlight":"actor-2","label":"Step 1: BillSequence upsert. Today&apos;s counter goes 0 → 1.","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"actor-3","label":"Step 2: Transaction insert + nested OrderItem inserts.","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"actor-4","label":"Step 3: DailySummary upsert. Today&apos;s totals tick up.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"actor-5","label":"Step 4: Receipt insert with whatsappSent: false.","packet":true,"from":"actor-4","to":"actor-5"},
+          {"highlight":"actor-1","label":"COMMIT — all five writes become visible to the rest of the app at the exact same instant. Bill AWZ-20260430-0001 is real.","packet":true,"from":"actor-5","to":"actor-1"}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon" style="background: var(--color-actor-3); color: white">🗄️</div>
+              <span>Postgres</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon" style="background: var(--color-actor-4); color: white">🔢</div>
+              <span>BillSequence</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon" style="background: var(--color-actor-1); color: white">🧾</div>
+              <span>Transaction</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon" style="background: var(--color-actor-5); color: white">📊</div>
+              <span>DailySummary</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-5">
+              <div class="flow-actor-icon" style="background: var(--color-actor-2); color: white">📨</div>
+              <span>Receipt</span>
+            </div>
+          </div>
+          <div class="flow-packet" id="flow-packet"></div>
+          <div class="flow-step-label" id="flow-label">Click &ldquo;Next Step&rdquo; to begin.</div>
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">⚛️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Engineers call this property &ldquo;atomicity&rdquo;</strong>
+            <p>It&rsquo;s the &ldquo;A&rdquo; in <span class="term" data-definition="ACID = Atomicity, Consistency, Isolation, Durability — the four guarantees a database transaction provides. Atomicity is the &lsquo;all or nothing&rsquo; one. The other three are why we trust databases with money in the first place.">ACID</span>. The whole reason real businesses store money in databases like Postgres rather than in spreadsheets or in-memory caches: the transaction either commits in full or doesn&rsquo;t happen at all. Cosmic rays could flip a bit, the server could die mid-write &mdash; either way, the database never ends up in a half-state.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The one allowed <code>toFixed</code></h2>
+        <p>The rule of the codebase: <code>toFixed</code>, <code>parseFloat</code>, and <code>Number()</code> on price strings are banned. There&rsquo;s exactly one place in the entire codebase where <code>toFixed</code> is allowed &mdash; building the UPI deep-link, because the UPI specification literally requires decimal rupees in the URL.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/upi.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">export function</span> <span class="code-function">buildUpiDeepLink</span>({ upiId, name, amountRupees, billRef }: BuildUpiDeepLinkParams): <span class="code-keyword">string</span> {</span>
+<span class="code-line">  <span class="code-keyword">const</span> am = amountRupees.<span class="code-function">toFixed</span>(<span class="code-number">2</span>);</span>
+<span class="code-line">  <span class="code-keyword">const</span> params = <span class="code-keyword">new</span> <span class="code-function">URLSearchParams</span>({</span>
+<span class="code-line">    <span class="code-property">pa</span>: upiId,</span>
+<span class="code-line">    <span class="code-property">pn</span>: name,</span>
+<span class="code-line">    am,</span>
+<span class="code-line">    <span class="code-property">cu</span>: <span class="code-string">"INR"</span>,</span>
+<span class="code-line">    <span class="code-property">tn</span>: billRef,</span>
+<span class="code-line">  });</span>
+<span class="code-line">  <span class="code-keyword">return</span> <span class="code-string">`upi://pay?${params.toString()}`</span>;</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Build the URL that the customer&rsquo;s phone interprets as &ldquo;open my UPI app, fill in this payment.&rdquo;</p>
+              <p class="tl">The UPI spec says the <code>am</code> parameter must be in decimal rupees with two decimal places &mdash; e.g., <code>40.00</code>, not <code>4000</code>. So we use <code>toFixed(2)</code> here, and only here.</p>
+              <p class="tl">Pack the parameters into a URL: <code>pa</code> = payee address (vendor&rsquo;s UPI ID), <code>pn</code> = payee name, <code>am</code> = amount, <code>cu</code> = currency, <code>tn</code> = transaction note (the bill number).</p>
+              <p class="tl">Return <code>upi://pay?...</code>. The browser turns this into a QR code; the customer scans it with GPay / PhonePe / Paytm.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">📜</div>
+          <div class="callout-content">
+            <strong class="callout-title">A grep that runs on every build</strong>
+            <p>To stop new <code>toFixed</code>s from sneaking in, the project recommends a CI check: <code>rg -l "toFixed" --glob '!lib/upi.ts' --glob '!*.md' app/ components/ lib/ workers/</code>. If that command finds anything, the build fails &mdash; the only allowed exception is the file above.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Server-side recompute</h2>
+        <p>The browser sends the cart and totals to the server. But the server doesn&rsquo;t trust them &mdash; it recomputes them and rejects the request if they don&rsquo;t match. This is one extra check that prevents an entire category of bugs.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · app/api/transactions/route.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> body = parsed.data;</span>
+<span class="code-line"><span class="code-keyword">const</span> totals = <span class="code-function">checkTransactionTotals</span>(body);</span>
+<span class="code-line"><span class="code-keyword">if</span> (!totals.ok) {</span>
+<span class="code-line">  <span class="code-keyword">return</span> NextResponse.<span class="code-function">json</span>({ <span class="code-property">error</span>: totals.code, <span class="code-property">code</span>: totals.code }, { <span class="code-property">status</span>: <span class="code-number">400</span> });</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">const</span> cap = PLAN_LIMITS[vendor.plan].monthlyTxnCap;</span>
+<span class="code-line"><span class="code-keyword">if</span> (cap !== <span class="code-keyword">null</span>) {</span>
+<span class="code-line">  <span class="code-keyword">const</span> monthStart = <span class="code-function">getIstMonthStart</span>();</span>
+<span class="code-line">  <span class="code-keyword">const</span> count = <span class="code-keyword">await</span> prisma.transaction.<span class="code-function">count</span>({</span>
+<span class="code-line">    <span class="code-property">where</span>: { <span class="code-property">vendorId</span>: vendor.id, <span class="code-property">createdAt</span>: { <span class="code-property">gte</span>: monthStart } },</span>
+<span class="code-line">  });</span>
+<span class="code-line">  <span class="code-keyword">if</span> (count &gt;= cap) {</span>
+<span class="code-line">    <span class="code-keyword">throw new</span> <span class="code-function">AuthError</span>(<span class="code-number">402</span>, <span class="code-string">"monthly_txn_cap_reached"</span>);</span>
+<span class="code-line">  }</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Body has been validated by Zod (shape is right). Now check the math.</p>
+              <p class="tl"><code>checkTransactionTotals</code> recomputes <code>subtotal + tax - discount</code> on the server and compares with what the browser sent.</p>
+              <p class="tl">If they don&rsquo;t match, return 400 &mdash; either the cart is corrupted or someone tampered with it. Either way, refuse to charge.</p>
+              <p class="tl">Look up this vendor&rsquo;s plan-cap (e.g., FREE = 50 transactions/month).</p>
+              <p class="tl">Count this month&rsquo;s transactions, in IST.</p>
+              <p class="tl">If they&rsquo;re at the cap, refuse with <span class="term" data-definition="HTTP 402 — Payment Required. Almost never used for actual payment, but AwaazOS uses it to mean &lsquo;upgrade your plan to do this.&rsquo; The frontend catches the 402 and shows an upgrade button.">HTTP 402</span>. The frontend catches it and shows an upgrade prompt.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Quick check</h2>
+
+        <div class="quiz-container" id="quiz-module5">
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Right. The four other writes (Transaction, OrderItems, DailySummary, Receipt) all roll back. Critically — and this is the real magic — the BillSequence upsert that incremented the counter ALSO rolls back. So the next attempt gets bill number 0001 again, not 0002. No bill numbers are ever wasted, no sales are ever half-recorded.">
+            <h3 class="quiz-question">Mid-transaction, the database server crashes after the bill counter increments to <code>5</code> but before the Receipt row is created. What does AwaazOS look like once Postgres comes back online?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The next sale gets bill number 6, since 5 was already used.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The whole transaction rolls back &mdash; including the counter increment. The next sale gets bill number 5 again.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Bill 5 is half-recorded; an admin has to manually clean it up.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="Yes. OrderItem.name and OrderItem.priceInPaise are SNAPSHOTTED at sale time — copied into the row, not joined back to MenuItem. If the menu price changes from ₹20 to ₹22 next week, last week&rsquo;s receipts still show ₹20. This is the difference between accurate historical bills and breaking the customer&rsquo;s trust.">
+            <h3 class="quiz-question">A vendor changes the price of <em>chai</em> from ₹20 to ₹22. What happens to last week&rsquo;s receipts?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>They retroactively show ₹22 because they&rsquo;re joined to MenuItem.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The vendor must re-issue them at the new price.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>They still show ₹20, because the price was snapshotted onto the OrderItem at sale time.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Yes. ₹19.99 stored as a float and added a few times produces 39.97999999..., not 39.98. That&rsquo;s the famous JavaScript floating-point bug. Storing as integer paise (1999 + 1999 = 3998) makes the math exact. The codebase explicitly bans `parseFloat`, `Number(price)`, and `toFixed` for this reason — the only allowed exception is the UPI deep-link, where the UPI spec mandates decimal rupees.">
+            <h3 class="quiz-question">Why does the codebase ban <code>parseFloat</code> and <code>toFixed</code> for monetary math (with one specific exception)?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Floating-point representations are approximate; over many sales the rounding errors compound into real money lost.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>It&rsquo;s a stylistic preference; both work the same.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>TypeScript doesn&rsquo;t support floats.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="btn quiz-check-btn" onclick="checkQuiz('quiz-module5')">Check answers</button>
+          <button class="btn quiz-reset-btn" onclick="resetQuiz('quiz-module5')">Try again</button>
+
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

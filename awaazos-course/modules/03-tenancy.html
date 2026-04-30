@@ -1,0 +1,320 @@
+<section class="module" id="module-3" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">03</span>
+      <h1 class="module-title">Whose data is it?</h1>
+      <p class="module-subtitle">Ravi runs a chai stall. Suresh runs a dosa cart. They both use the same AwaazOS website, the same database, the same code. So how does the system <em>guarantee</em> Ravi will never see one rupee of Suresh&rsquo;s sales? This is the most important security idea in the codebase.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The apartment building</h2>
+        <p>Picture a 50-storey apartment building. There&rsquo;s one big front door for the whole building &mdash; you can&rsquo;t even step inside without buzzing in. Past that, each apartment has its own keycard reader.</p>
+        <p>Even if you live on floor 5 and have a working keycard, that card won&rsquo;t open the door on floor 7. The reader is configured to <em>only</em> accept the keycard for that specific apartment. You don&rsquo;t need to be a security guard to enforce this &mdash; the reader does it automatically.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🏢</div>
+          <div class="callout-content">
+            <strong class="callout-title">Two layers, on purpose</strong>
+            <p>The front door = <span class="term" data-definition="Authentication — proving who you are. In this app, that's signing in with your email and password.">authentication</span>. The keycard reader on each floor = <span class="term" data-definition="Authorization — deciding what you're allowed to do once you're signed in. Same as 'you have a card to apartment 5, you cannot enter apartment 7.'">authorization</span>. Mix them up and you get either a building you can&rsquo;t enter, or a building anyone can wander through.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The data model</h2>
+        <p>To make tenancy work, the database needs to know &ldquo;this menu item belongs to <em>which</em> shop?&rdquo; The answer is the <code>vendorId</code> column on (almost) every table.</p>
+
+        <div class="icon-rows">
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-3)">👤</div>
+            <div>
+              <strong>User</strong>
+              <p>A person with an email and password. Can be staff at one or many vendors.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-1)">🏪</div>
+            <div>
+              <strong>Vendor</strong>
+              <p>The tenant. The chai stall, dosa cart, kirana shop. <code>Vendor.id</code> is the apartment number.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-4)">🔗</div>
+            <div>
+              <strong>StaffMember</strong>
+              <p>The keycard. Joins one User to one Vendor with a role (OWNER, MANAGER, or CASHIER).</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-5)">🍛</div>
+            <div>
+              <strong>MenuItem, Transaction, Receipt&hellip;</strong>
+              <p>Every other row carries a <code>vendorId</code>. That column is the difference between Ravi&rsquo;s data and Suresh&rsquo;s.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">🔑</div>
+          <div class="callout-content">
+            <strong class="callout-title">Two-layer roles</strong>
+            <p><strong>UserRole</strong> (USER, ADMIN, SUPER_ADMIN) is the platform role &mdash; AwaazOS internal staff.<br>
+            <strong>StaffRole</strong> (CASHIER, MANAGER, OWNER) is the per-vendor role. A user can be OWNER at one stall and CASHIER at another. Both roles exist for different reasons.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A request&rsquo;s journey through the building</h2>
+        <p>Tap <strong>Next step</strong> to follow what happens when Ravi loads <code>/menu</code> in his browser. Each step is a checkpoint. If any one fails, the request is bounced.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"actor-1","label":"Ravi&apos;s browser sends GET /menu with a session cookie."},
+          {"highlight":"actor-2","label":"Edge middleware checks: is there a valid session cookie? Yes — let it through.","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"actor-3","label":"The /menu route runs requireVendorRole(\"CASHIER\"). It reads the user from the session.","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"actor-4","label":"The DB returns Ravi&apos;s StaffMember rows — he&apos;s OWNER at &lsquo;ravis-chai&rsquo; and CASHIER at &lsquo;ravis-dosa&rsquo;.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"actor-3","label":"requireVendorRole picks the active vendor: query param ➜ cookie ➜ first membership.","packet":true,"from":"actor-4","to":"actor-3"},
+          {"highlight":"actor-3","label":"The handler runs. Every Prisma where: { vendorId: vendor.id }. Suresh&apos;s data is invisible."}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon" style="background: var(--color-actor-1); color: white">📱</div>
+              <span>Browser</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon" style="background: var(--color-actor-2); color: white">🛡️</div>
+              <span>Middleware</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon" style="background: var(--color-actor-3); color: white">🔐</div>
+              <span>requireVendorRole</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon" style="background: var(--color-actor-5); color: white">🗄️</div>
+              <span>Database</span>
+            </div>
+          </div>
+          <div class="flow-packet" id="flow-packet"></div>
+          <div class="flow-step-label" id="flow-label">Click &ldquo;Next Step&rdquo; to begin.</div>
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The function every protected route calls</h2>
+        <p>Almost every API route in this codebase starts with one line: <code>const ctx = await requireVendorRole("CASHIER", undefined, req)</code>. That helper does all the work. Here&rsquo;s the heart of it.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/rbac.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> session = <span class="code-keyword">await</span> <span class="code-function">auth</span>();</span>
+<span class="code-line"><span class="code-keyword">if</span> (!session?.user?.id) {</span>
+<span class="code-line">  <span class="code-keyword">throw new</span> <span class="code-function">AuthError</span>(<span class="code-number">401</span>, <span class="code-string">"Unauthorized"</span>);</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">const</span> memberships = <span class="code-keyword">await</span> prisma.staffMember.<span class="code-function">findMany</span>({</span>
+<span class="code-line">  <span class="code-property">where</span>: { <span class="code-property">userId</span>: user.id, <span class="code-property">isActive</span>: <span class="code-keyword">true</span> },</span>
+<span class="code-line">  <span class="code-property">include</span>: { <span class="code-property">vendor</span>: <span class="code-keyword">true</span> },</span>
+<span class="code-line">  <span class="code-property">orderBy</span>: { <span class="code-property">createdAt</span>: <span class="code-string">"asc"</span> },</span>
+<span class="code-line">});</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">if</span> (!memberships.length) {</span>
+<span class="code-line">  <span class="code-keyword">throw new</span> <span class="code-function">AuthError</span>(<span class="code-number">403</span>, <span class="code-string">"No vendor membership."</span>);</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">const</span> target = vendorIdOrSlug ?? querySlug ?? cookieSlug;</span>
+<span class="code-line"><span class="code-keyword">let</span> staff = target</span>
+<span class="code-line">  ? memberships.<span class="code-function">find</span>((m) <span class="code-operator">=&gt;</span> m.vendor.slug === target || m.vendorId === target)</span>
+<span class="code-line">  : memberships[<span class="code-number">0</span>];</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">if</span> (!<span class="code-function">staffRoleAtLeast</span>(staff.role, minRole)) {</span>
+<span class="code-line">  <span class="code-keyword">throw new</span> <span class="code-function">AuthError</span>(<span class="code-number">403</span>, <span class="code-string">"Requires staff role MANAGER or higher."</span>);</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Read the signed-in user from the session cookie.</p>
+              <p class="tl">No session? Bounce them with a <span class="term" data-definition="HTTP 401 — 'you didn't tell me who you are.' This is what the app returns when there's no session at all.">401 Unauthorized</span>.</p>
+              <p class="tl">Look up every active vendor this user is a staff member of (a person can work at multiple stalls).</p>
+              <p class="tl">No memberships at all? Bounce with <span class="term" data-definition="HTTP 403 — 'I know who you are, but you can't have this.' Different from 401, which means 'I don't even know who you are.'">403 Forbidden</span>.</p>
+              <p class="tl">Pick the active vendor: an explicit argument wins, then a URL <code>?vendor=</code> query parameter, then a cookie, then the oldest membership.</p>
+              <p class="tl">Find the matching <code>StaffMember</code> record for that vendor.</p>
+              <p class="tl">Check the user&rsquo;s role at this vendor is at least the minimum required (e.g., MANAGER).</p>
+              <p class="tl">Bounce with 403 if they&rsquo;re too junior. Otherwise return the user, vendor, and staff record &mdash; the route handler picks up from here.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The bug that costs companies millions</h2>
+        <p>One of these lines is a tenant-leak waiting to happen. Tap the line you think is dangerous.</p>
+
+        <div class="bug-challenge">
+          <h3>This API route lets a vendor edit a menu item by ID. Find the line that lets one vendor edit <em>any other vendor&rsquo;s</em> menu items.</h3>
+          <div class="bug-code">
+            <div class="bug-line" data-line="1" onclick="checkBugLine(this, false)"
+                 data-hint="This line is just reading auth context. It&rsquo;s correct.">
+              <span class="line-num">1</span>
+              <code><span class="code-keyword">const</span> ctx = <span class="code-keyword">await</span> <span class="code-function">requireVendorRole</span>(<span class="code-string">"MANAGER"</span>);</code>
+            </div>
+            <div class="bug-line" data-line="2" onclick="checkBugLine(this, false)"
+                 data-hint="Parsing the URL parameter — fine.">
+              <span class="line-num">2</span>
+              <code><span class="code-keyword">const</span> { id } = params;</code>
+            </div>
+            <div class="bug-line" data-line="3" onclick="checkBugLine(this, false)"
+                 data-hint="Validating the body with Zod — fine, prevents bad input.">
+              <span class="line-num">3</span>
+              <code><span class="code-keyword">const</span> body = menuItemSchema.<span class="code-function">parse</span>(<span class="code-keyword">await</span> req.<span class="code-function">json</span>());</code>
+            </div>
+            <div class="bug-line bug-target" data-line="4" onclick="checkBugLine(this, true)"
+                 data-explanation="The where clause filters only on `id` — there&rsquo;s nothing checking the row belongs to this vendor. If Ravi knows the ID of a menu item that belongs to Suresh&rsquo;s stall (which is a guessable string), he can edit it. The fix: change `where` to `{ id, vendorId: ctx.vendor.id }`. With that compound where, an attempt to update someone else&rsquo;s row simply returns &lsquo;no rows updated&rsquo; — a tidy 404, no leak.">
+              <span class="line-num">4</span>
+              <code><span class="code-keyword">await</span> prisma.menuItem.<span class="code-function">update</span>({ <span class="code-property">where</span>: { id }, <span class="code-property">data</span>: body });</code>
+            </div>
+            <div class="bug-line" data-line="5" onclick="checkBugLine(this, false)"
+                 data-hint="Returning the response — fine.">
+              <span class="line-num">5</span>
+              <code><span class="code-keyword">return</span> NextResponse.<span class="code-function">json</span>({ <span class="code-property">ok</span>: <span class="code-keyword">true</span> });</code>
+            </div>
+          </div>
+          <div class="bug-feedback" id="bug-feedback"></div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">🚨</div>
+          <div class="callout-content">
+            <strong class="callout-title"><span class="term" data-definition="Insecure Direct Object Reference — when a URL or API uses an ID like /api/items/abc123 and the server doesn't double-check that the user owns the thing with that ID. Asking AI to fix this is a great instruction: 'add vendorId to every where clause that touches multi-tenant data.'">IDOR</span> &mdash; the boring vulnerability that ships every year</h4>
+            <p>The fix is a single property: <code>where: { id, vendorId: ctx.vendor.id }</code>. With that compound <code>where</code>, even if Ravi <em>knows</em> Suresh&rsquo;s menu-item ID, the update silently affects zero rows &mdash; the database refuses because the combo doesn&rsquo;t exist. AwaazOS returns 404 (not 403) on these so attackers can&rsquo;t even confirm the ID is real.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The credentials check, in one block</h2>
+        <p>For sign-in, AwaazOS uses Auth.js with a Credentials provider &mdash; meaning email + password (no Google, no OTP yet). Here&rsquo;s the heart of the password check.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/auth.ts</span>
+<pre><code><span class="code-line"><span class="code-function">Credentials</span>({</span>
+<span class="code-line">  <span class="code-property">credentials</span>: { <span class="code-property">email</span>: {...}, <span class="code-property">password</span>: {...} },</span>
+<span class="code-line">  <span class="code-keyword">async</span> <span class="code-function">authorize</span>(credentials) {</span>
+<span class="code-line">    <span class="code-keyword">const</span> { email, password } = <span class="code-keyword">await</span> signInSchema.<span class="code-function">parseAsync</span>(credentials);</span>
+<span class="code-line">    <span class="code-keyword">const</span> normalizedEmail = email.<span class="code-function">trim</span>().<span class="code-function">toLowerCase</span>();</span>
+<span class="code-line">    <span class="code-keyword">const</span> user = <span class="code-keyword">await</span> prisma.user.<span class="code-function">findUnique</span>({</span>
+<span class="code-line">      <span class="code-property">where</span>: { <span class="code-property">email</span>: normalizedEmail },</span>
+<span class="code-line">      <span class="code-property">select</span>: { <span class="code-property">id</span>: <span class="code-keyword">true</span>, <span class="code-property">passwordHash</span>: <span class="code-keyword">true</span>, ... },</span>
+<span class="code-line">    });</span>
+<span class="code-line">    <span class="code-keyword">if</span> (!user?.passwordHash) <span class="code-keyword">return null</span>;</span>
+<span class="code-line">    <span class="code-keyword">if</span> (!(<span class="code-keyword">await</span> <span class="code-function">verifyPassword</span>(password, user.passwordHash))) <span class="code-keyword">return null</span>;</span>
+<span class="code-line">    <span class="code-keyword">return</span> { id: user.id, email: user.email, ... };</span>
+<span class="code-line">  },</span>
+<span class="code-line">})</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">We&rsquo;re telling Auth.js to use the email-and-password sign-in method.</p>
+              <p class="tl">When someone tries to sign in, validate the input against a <span class="term" data-definition="Zod is a TypeScript library that defines what valid input should look like (e.g., email is a string, has an @, password ≥ 8 chars). Bad input is rejected before it touches the database.">Zod schema</span> — bad input bounces here.</p>
+              <p class="tl">Trim the email and lowercase it so &ldquo;ravi@chai.com&rdquo; and &ldquo;Ravi@Chai.COM&rdquo; both find the same user.</p>
+              <p class="tl">Look up the user by email. Note the <code>select</code> &mdash; we ONLY pull the password hash and a few safe fields, not everything.</p>
+              <p class="tl">If we don&rsquo;t find a user, return <code>null</code> &mdash; Auth.js treats this as &ldquo;sign-in failed.&rdquo;</p>
+              <p class="tl">Compare the entered password with the stored hash using bcrypt. <span class="term" data-definition="bcrypt is a password-hashing function. It turns a password into a one-way scrambled string so even if the database is stolen, attackers can't read passwords. It's also deliberately slow, which makes brute-force attacks expensive.">Bcrypt</span> never decrypts the stored hash &mdash; it re-hashes the entered password and checks if it matches.</p>
+              <p class="tl">If everything checks out, return the user&rsquo;s safe-to-share fields. Auth.js puts these in the <span class="term" data-definition="A JWT (JSON Web Token) is a small string containing user info, signed by the server. It's stored in a cookie and sent on every request so the server can identify the user without re-checking the database every time.">JWT</span> session cookie.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Quick check</h2>
+        <p>If you can answer these, you&rsquo;ll catch the most common multi-tenant bugs in code review.</p>
+
+        <div class="quiz-container" id="quiz-module3">
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="404. Returning 403 (Forbidden) leaks information — it tells the attacker &ldquo;yes, the resource exists, you just can&rsquo;t see it.&rdquo; That&rsquo;s enough for an attacker to enumerate IDs across tenants. Returning 404 (Not Found) makes existence indistinguishable from non-existence — much safer."
+               data-explanation-wrong="The right answer is 404. The reasoning: 403 leaks the existence of the resource, which is information attackers use to enumerate IDs across tenants. AwaazOS deliberately returns 404 in cross-tenant denials so an attacker can&rsquo;t even confirm whether an ID is real.">
+            <h3 class="quiz-question">Ravi guesses Suresh&rsquo;s menu item ID and tries to edit it. The compound <code>where</code> means zero rows match. What HTTP status should the API return?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>200 OK with a friendly &ldquo;item not found&rdquo; message.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>403 Forbidden &mdash; we know the item exists, just not for this vendor.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>404 Not Found &mdash; don&rsquo;t even hint that the ID is real.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Right — and this is exactly the API routes case mentioned in auth.config. If middleware returned a redirect for unauth&rsquo;d API calls, the client&rsquo;s fetch() would follow the 302 and try to JSON-parse an HTML sign-in page, which crashes. So API routes pass through middleware and let the route handler return a clean JSON 401."
+               data-explanation-wrong="The reason is more subtle than &lsquo;security.&rsquo; If middleware redirected an unauth&rsquo;d API call to /sign-in, the client&rsquo;s fetch() would follow the redirect and try to parse an HTML page as JSON — which crashes. Letting the route handler return JSON 401 keeps API clients happy.">
+            <h3 class="quiz-question">In <code>auth.config.ts</code>, API routes (other than <code>/api/auth/*</code>) deliberately pass through the middleware unauthenticated. Why?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>API routes don&rsquo;t need authentication; only pages do.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>So that route handlers can return JSON 401, instead of the middleware redirecting an API client to an HTML sign-in page.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>To avoid checking the session twice in a row.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Yes. The bug is at the database query layer. The fix is mechanical: every Prisma where clause that touches multi-tenant data must include vendorId. Asking AI to do this surgically is straightforward — &lsquo;add `vendorId: ctx.vendor.id` to every where clause in this file.&rsquo; A linting rule or test that scans for `prisma.X.update({ where: { id: ... } })` without `vendorId` would catch it before merge."
+               data-explanation-wrong="The bug isn&rsquo;t in auth or middleware — those work fine. The bug is the database query missing a vendorId filter. Tightening the query is the smallest possible fix; the broader prevention is &ldquo;every multi-tenant where clause must include vendorId,&rdquo; which can be enforced by review or a custom lint rule.">
+            <h3 class="quiz-question">A teammate asks AI to write a new endpoint that updates a transaction by ID. The AI produces code that uses <code>where: { id }</code>. What&rsquo;s the right correction to ask for?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>&ldquo;Change the where clause to <code>{ id, vendorId: ctx.vendor.id }</code> so cross-tenant access fails at the database level.&rdquo;</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>&ldquo;Add a check at the top of the function: <code>if (vendorId !== ctx.vendor.id) throw 403</code>.&rdquo;</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>&ldquo;Add another middleware layer to inspect every request body for vendorId.&rdquo;</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="btn quiz-check-btn" onclick="checkQuiz('quiz-module3')">Check answers</button>
+          <button class="btn quiz-reset-btn" onclick="resetQuiz('quiz-module3')">Try again</button>
+
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

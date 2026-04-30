@@ -1,0 +1,384 @@
+<section class="module" id="module-1" style="background: var(--color-bg-warm)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">01</span>
+      <h1 class="module-title">Bol. Bill. Becho.</h1>
+      <p class="module-subtitle">A chai-wala in Hyderabad taps an orange button and says <em>&ldquo;do samosa aur ek chai.&rdquo;</em> Less than two seconds later, the customer&rsquo;s phone is showing a UPI QR code. This module follows every single thing that happens in between.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">What this thing actually does</h2>
+        <p>AwaazOS is a <span class="term" data-definition="Point-of-Sale software — the system a shop uses to ring up sales, take payment, and print a receipt.">point-of-sale system</span> for India&rsquo;s 25 million micro-merchants — chai stalls, dosa carts, paan shops, kirana stores. The kind of place where the owner takes orders verbally in Hindi or Telugu, and writing them down by hand loses about 15&ndash;20% of revenue every month.</p>
+        <p>The pitch is one line: <strong>tap a button, speak the order in any Indian language, get a bill and a UPI QR code.</strong> No typing. No menus to navigate. No English required.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🎙️</div>
+          <div class="callout-content">
+            <strong class="callout-title">The whole product, in one sentence</strong>
+            <p>If a chai-wala can&rsquo;t take their first 100 voice orders without thinking, every other feature is a distraction. The codebase is organised around protecting that one experience.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A backstage tour</h2>
+        <p>Imagine you&rsquo;ve just watched a 90-minute play. The acting was great, but you have no idea what the stagehands were doing behind the curtain — the lighting cues, the prop swaps, the quick costume changes that made it all feel effortless.</p>
+        <p>This module is that backstage tour for one specific scene: the moment a vendor speaks an order. Everything else in the course unpacks one of these stagehands in detail.</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">1</div>
+            <div class="step-body">
+              <strong>Vendor taps the orange mic</strong>
+              <p>An 80&times;80 pixel button on a phone screen — large enough for a thumb covered in dosa batter.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">2</div>
+            <div class="step-body">
+              <strong>The phone listens</strong>
+              <p>For English &amp; Hindi, the browser does the speech-to-text for free. For Telugu / Kannada / Tamil, the audio gets sent to <span class="term" data-definition="Sarvam AI is an Indian AI company that builds speech-to-text models specifically tuned for Indian languages and accents — the equivalent of a translator who grew up in your village, not just one who studied your language at university.">Sarvam AI</span>.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">3</div>
+            <div class="step-body">
+              <strong>Claude turns the words into items</strong>
+              <p>The transcript (<em>&ldquo;do samosa aur ek chai&rdquo;</em>) plus this vendor&rsquo;s exact menu goes to <span class="term" data-definition="An AI model from Anthropic — the language model used to understand the order. Like asking a smart assistant 'they said this, which menu items do they mean?'">Claude Haiku 4.5</span>. It returns structured items: <code>{ samosa: 2, chai: 1 }</code>.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">4</div>
+            <div class="step-body">
+              <strong>The cart fills on screen</strong>
+              <p>The vendor sees the items appear, taps <strong>Collect Payment</strong>, and a UPI QR code fills the screen.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">5</div>
+            <div class="step-body">
+              <strong>Customer scans, pays, walks away</strong>
+              <p>The vendor taps <strong>Mark as Paid</strong>. Five database writes commit together as one. A WhatsApp receipt gets queued. The next order can start.</p>
+            </div>
+          </div>
+        </div>
+
+        <p style="margin-top: var(--space-6)">All five steps complete in roughly <strong>1.8 seconds</strong> on a median phone in Hyderabad. The next screens unpack each step.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Watch them talk to each other</h2>
+        <p>In a movie, every actor has lines. In a software system, every component has messages it sends to other components. Here&rsquo;s the conversation that happens behind one voice order — pretend you&rsquo;re reading a group chat between the cast.</p>
+
+        <div class="chat-window" id="chat-module1">
+          <div class="chat-messages">
+
+            <div class="chat-message" data-msg="0" data-sender="vendor" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">V</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Vendor</span>
+                <p>*taps mic* &ldquo;Do samosa aur ek chai.&rdquo;</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="1" data-sender="browser" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">B</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">Browser</span>
+                <p>I heard Hindi. I can do this one myself with the built-in Web Speech API. Transcribing&hellip;</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="2" data-sender="browser" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">B</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">Browser</span>
+                <p>Got the transcript: &ldquo;do samosa aur ek chai&rdquo;. Hey API, what menu items is that?</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="3" data-sender="api" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">Vercel API</span>
+                <p>Pulling Ravi&rsquo;s 18-item menu from the database. Sending it plus the transcript to Claude with caching turned on so the menu doesn&rsquo;t cost us tokens twice.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="4" data-sender="claude" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-4)">C</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-4)">Claude Haiku</span>
+                <p>Easy. <code>do</code> = 2, <code>ek</code> = 1. Returning a tool call: 2&times; samosa, 1&times; chai. Confidence: high.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="5" data-sender="api" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">Vercel API</span>
+                <p>Browser, here are the parsed items. Also &mdash; quietly logging this to the voice-telemetry queue so we can see how often Claude was right.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="6" data-sender="browser" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">B</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">Browser</span>
+                <p>Cart is filled. Vendor just tapped <em>Collect Payment</em>. Generating a UPI QR for ₹40&hellip;</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="7" data-sender="vendor" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">V</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Vendor</span>
+                <p>Customer scanned and paid. Tapping <em>Mark as Paid</em>.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="8" data-sender="api" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">Vercel API</span>
+                <p>Database, please do five writes as one transaction: bill number, the sale, the line items, today&rsquo;s rollup, and the receipt row. All-or-nothing.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="9" data-sender="db" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">D</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Neon Postgres</span>
+                <p>Committed. Bill <code>AWZ-20260430-0001</code>. Returning the receipt.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="10" data-sender="api" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">Vercel API</span>
+                <p>Now &mdash; outside the transaction &mdash; dropping a job in the WhatsApp queue. Vendor doesn&rsquo;t wait for that. Done. Bye!</p>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="chat-typing" id="chat-module1-typing" style="display:none">
+            <div class="chat-avatar" id="chat-module1-typing-avatar">?</div>
+            <div class="chat-typing-dots">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+
+          <div class="chat-controls">
+            <button class="btn chat-next-btn">Next message</button>
+            <button class="btn chat-all-btn">Play all</button>
+            <button class="btn chat-reset-btn">Replay</button>
+            <span class="chat-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The mic button — small code, lots of states</h2>
+        <p>The button itself is one of the most-touched pieces of the whole product. It has six visual states (idle, listening, transcribing, parsing, success, error) and every one is announced to screen readers. Here&rsquo;s the core of it.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · components/pos/VoiceOrderButton.tsx</span>
+<pre><code><span class="code-line"><span class="code-tag">&lt;button</span></span>
+<span class="code-line">  <span class="code-attr">type</span>=<span class="code-value">"button"</span></span>
+<span class="code-line">  <span class="code-attr">onClick</span>={() <span class="code-operator">=&gt;</span> {</span>
+<span class="code-line">    <span class="code-keyword">if</span> (state === <span class="code-string">"listening"</span>) <span class="code-function">stopListening</span>();</span>
+<span class="code-line">    <span class="code-keyword">else</span> <span class="code-function">startListening</span>();</span>
+<span class="code-line">  }}</span>
+<span class="code-line">  <span class="code-attr">aria-label</span>={label}</span>
+<span class="code-line">  <span class="code-attr">aria-pressed</span>={state === <span class="code-string">"listening"</span>}</span>
+<span class="code-line">  <span class="code-attr">className</span>={<span class="code-function">cn</span>(</span>
+<span class="code-line">    <span class="code-string">"relative flex h-20 w-20 shrink-0 ..."</span>,</span>
+<span class="code-line">    state === <span class="code-string">"idle"</span> &amp;&amp; <span class="code-string">"bg-primary ..."</span>,</span>
+<span class="code-line">    state === <span class="code-string">"listening"</span> &amp;&amp;</span>
+<span class="code-line">      <span class="code-string">"bg-destructive ... motion-safe:animate-pulse"</span>,</span>
+<span class="code-line">  )}</span>
+<span class="code-line"><span class="code-tag">&gt;</span></span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Make a clickable button on the page.</p>
+              <p class="tl">When tapped, ask: am I already listening? If yes, stop. If no, start.</p>
+              <p class="tl">Tell screen readers what the button currently means right now (idle? listening?). The label changes with the state.</p>
+              <p class="tl">Tell screen readers whether the button is &ldquo;pressed&rdquo; (which is what listening feels like).</p>
+              <p class="tl">Pick the visual look based on the state. Idle = solid orange. Listening = red with a pulse animation, but only if the user hasn&rsquo;t turned animations off.</p>
+              <p class="tl">The pulse only animates for users who haven&rsquo;t enabled the &ldquo;reduce motion&rdquo; accessibility setting on their phone.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">♿</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why every state has a label</strong>
+            <p>About 12% of Indian phone users have a vision impairment of some kind. <span class="term" data-definition="A piece of software (built into the phone, like VoiceOver on iOS or TalkBack on Android) that reads aloud what's on the screen for blind or low-vision users.">Screen readers</span> rely on <code>aria-label</code> and <code>aria-pressed</code> to narrate what just happened &mdash; without them, a blind chai-wala can&rsquo;t use the product. <em>Add accessibility on day one.</em></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A budget for every step</h2>
+        <p>Voice products live or die on latency. If a vendor has to wait three seconds after speaking, they&rsquo;ll go back to writing on paper. This codebase has a published time budget for every leg of the journey.</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🎤</div>
+            <h4 class="pattern-title">Browser → Server</h4>
+            <p class="pattern-desc"><strong>~80&nbsp;ms</strong> median. Just the network hop from the vendor&rsquo;s phone to <span class="term" data-definition="Vercel is the cloud company that runs the website and the server-side logic. Think of it as the landlord that rents AwaazOS the building it lives in.">Vercel</span>.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🗣️</div>
+            <h4 class="pattern-title">Speech → Text</h4>
+            <p class="pattern-desc"><strong>~1.2&nbsp;s</strong> for Indic languages via Sarvam. Free &amp; instant for English/Hindi via the browser.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-4)">
+            <div class="pattern-icon" style="background: var(--color-actor-4)">🧠</div>
+            <h4 class="pattern-title">Text → Items</h4>
+            <p class="pattern-desc"><strong>~350&nbsp;ms</strong> for Claude Haiku to match the menu. Roughly the time it takes to blink three times.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">💾</div>
+            <h4 class="pattern-title">Save the sale</h4>
+            <p class="pattern-desc"><strong>~90&nbsp;ms</strong> to atomically write all five rows to <span class="term" data-definition="Postgres (or PostgreSQL) is a popular open-source database — it's where AwaazOS keeps every menu item, sale, and receipt permanently.">Postgres</span>.</p>
+          </div>
+        </div>
+
+        <p style="margin-top: var(--space-6)">Add it up: <strong>about 1.8 seconds</strong> from speech to QR code on a typical day. P95 (the slowest 5% of requests) tops out around 3.7 seconds.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Quick check</h2>
+        <p>You don&rsquo;t need to memorise the actors yet &mdash; we&rsquo;ll meet each of them properly in the next module. This is just to make sure the big picture clicked.</p>
+
+        <div class="quiz-container" id="quiz-module1">
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="The browser&rsquo;s built-in Web Speech API handles English and Hindi for free, so there&rsquo;s no API call until the transcript is ready. Sarvam only gets used for Telugu / Kannada / Tamil. This is why Hindi orders are noticeably faster than Telugu ones."
+               data-explanation-wrong="The browser does the speech-to-text itself for English and Hindi using the built-in Web Speech API &mdash; there&rsquo;s no Sarvam call at all in that path. Sarvam only kicks in for Telugu / Kannada / Tamil where the browser doesn&rsquo;t support those languages well.">
+            <h3 class="quiz-question">A vendor in Mumbai always speaks orders in Hindi. Their voice orders feel snappier than their Telugu-speaking friend in Hyderabad. Why?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Mumbai has better internet than Hyderabad.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The Hindi version of Claude is a different (faster) model.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Hindi skips the Sarvam round-trip &mdash; the browser does the speech-to-text locally.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Right. The five database writes (bill number, transaction, line items, daily summary, receipt) all run inside one prisma.$transaction block. If the queue is down, the WhatsApp enqueue fails, but it happens AFTER the commit &mdash; so the sale is already saved. The vendor can use a &ldquo;Resend&rdquo; button later. Module 6 unpacks this in detail."
+               data-explanation-wrong="The vendor experience is the priority &mdash; the sale itself completes inside the database transaction, before WhatsApp is even attempted. The WhatsApp send is a job we drop into a queue afterwards. If the queue is unreachable, the sale still went through, the vendor sees the receipt on screen, and they can resend WhatsApp manually later.">
+            <h3 class="quiz-question">A vendor reports: &ldquo;Sometimes the bill saves but the customer doesn&rsquo;t get a WhatsApp message.&rdquo; Where would you start looking?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The database &mdash; the sale must have failed to write.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The background queue or the WhatsApp service &mdash; the sale is saved separately from the message.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Claude &mdash; the order parser must have got the items wrong.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Yes. By the time a vendor speaks an order, two design decisions have already paid for themselves: (1) caching the menu in the prompt so Claude doesn&rsquo;t re-read it every call, and (2) using the cheap Haiku model first and only escalating to the bigger Sonnet on tricky orders. Together they cut per-order AI cost by ~70%, which is the whole reason ₹299/month is sustainable."
+               data-explanation-wrong="The cost story isn&rsquo;t about the database or hosting &mdash; those are basically rounding errors. The real per-order cost is what AwaazOS pays Anthropic each time Claude parses a transcript. Caching the menu and using Haiku before Sonnet are the two big levers.">
+            <h3 class="quiz-question">AwaazOS charges only ₹299/month per vendor. Which two engineering choices in the voice path most help that pricing work?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Prompt-caching the menu, and trying cheap Haiku before expensive Sonnet.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Using a cheaper database, and a smaller server.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Skipping accessibility features, and not running tests.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="btn quiz-check-btn" onclick="checkQuiz('quiz-module1')">Check answers</button>
+          <button class="btn quiz-reset-btn" onclick="resetQuiz('quiz-module1')">Try again</button>
+
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">What&rsquo;s coming next</h2>
+        <p>You&rsquo;ve seen the whole play. From here on, the course is a series of close-ups on individual stagehands.</p>
+        <div class="icon-rows">
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-2)">🎭</div>
+            <div>
+              <strong>Module 2 &mdash; The cast</strong>
+              <p>Why three different cloud providers? What does each one do?</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-3)">🔐</div>
+            <div>
+              <strong>Module 3 &mdash; Whose data is it?</strong>
+              <p>How does AwaazOS make sure Ravi&rsquo;s chai stall never sees Suresh&rsquo;s sales?</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-4)">🎙️</div>
+            <div>
+              <strong>Module 4 &mdash; Speech becomes structure</strong>
+              <p>The two-tier AI pipeline, prompt caching, and tool-use in detail.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-5)">💰</div>
+            <div>
+              <strong>Module 5 &mdash; Money in paise</strong>
+              <p>The atomic transaction that ties bill numbers, sales, and receipts together.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-1)">📨</div>
+            <div>
+              <strong>Module 6 &mdash; After the sale</strong>
+              <p>Workers, webhooks, retries, idempotency &mdash; the resilient back-of-house.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

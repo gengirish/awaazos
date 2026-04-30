@@ -1,0 +1,323 @@
+<section class="module" id="module-2" style="background: var(--color-bg)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">02</span>
+      <h1 class="module-title">The Cast: three providers, one alias</h1>
+      <p class="module-subtitle">When you visit <code>awaazos.vercel.app</code>, it feels like one app. Behind the curtain, three different cloud companies and four external APIs are doing different jobs. Here&rsquo;s who does what &mdash; and, just as importantly, why none of them does everything.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The right tool for the job</h2>
+        <p>Picture a wood-working workshop. You have a circular saw for straight cuts, a router for edge profiles, a drill press for clean perpendicular holes. You wouldn&rsquo;t ask the circular saw to also drill holes &mdash; the result would be terrible at both jobs. You pick the specialist tool for each task.</p>
+        <p>AwaazOS is the same. Each provider in the stack is the best in the world at one specific thing. Putting everything on one provider would be slower, more expensive, or less reliable.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🛠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Engineers call this &ldquo;separation of concerns&rdquo;</strong>
+            <p>One component, one job. The benefit isn&rsquo;t academic &mdash; it&rsquo;s that when something breaks, you know exactly which specialist to call.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Click around the system</h2>
+        <p>Here&rsquo;s the whole production. Tap any box to see what it does and why it lives where it lives.</p>
+
+        <div class="arch-diagram">
+
+          <div class="arch-zone">
+            <h4 class="arch-zone-label">Vercel · the front of house</h4>
+            <div class="arch-component"
+                 data-desc="Edge middleware runs Auth.js v5 and decides — in about 10 milliseconds — whether the request needs a login or can pass through. It runs at the edge (close to the vendor's phone), so the check is nearly free.">
+              <div class="arch-icon">🛡️</div>
+              <span>Edge middleware</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="The actual web pages — the marketing site, /pos, /menu, /analytics. Server-side rendering with React Server Components, so the vendor's phone gets pre-built HTML instead of a blank page that loads JavaScript.">
+              <div class="arch-icon">🖥️</div>
+              <span>Next.js pages</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="The /api/* routes — these are short-lived server-side functions. Things like POST /api/transactions, POST /api/ai/parse-order. They wake up, do one job, and shut down. Vercel charges only when they run.">
+              <div class="arch-icon">⚡</div>
+              <span>API routes</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="A high-speed, HTTP-based key-value store from Upstash. Used for rate limiting (don't let one vendor make 1000 AI calls per second), idempotency keys (don't process the same Mark-As-Paid twice), and the monthly AI cost cap.">
+              <div class="arch-icon">⚡</div>
+              <span>Upstash REST KV</span>
+            </div>
+          </div>
+
+          <div class="arch-zone">
+            <h4 class="arch-zone-label">Fly.io · the back of house · BOM region</h4>
+            <div class="arch-component"
+                 data-desc="A small Linux box in Mumbai (BOM = Mumbai's airport code) that runs background workers. It picks up jobs like 'send this WhatsApp receipt' and 'log this voice telemetry' from a queue and runs them. Lives close to Indian users for low latency.">
+              <div class="arch-icon">⚙️</div>
+              <span>BullMQ workers</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="Redis with a persistent TCP connection — used by BullMQ as the job queue. Vercel serverless functions cannot hold this kind of connection open, which is exactly why workers live separately on Fly.">
+              <div class="arch-icon">🧵</div>
+              <span>Redis (TCP)</span>
+            </div>
+          </div>
+
+          <div class="arch-zone">
+            <h4 class="arch-zone-label">Neon · the long-term memory · Postgres</h4>
+            <div class="arch-component"
+                 data-desc="A serverless Postgres database — it scales to zero when nobody's using it (cheap), and to many machines under load (fast). Stores every menu item, every sale, every receipt. The single source of truth for vendor data.">
+              <div class="arch-icon">🗄️</div>
+              <span>Postgres (pooled)</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="A direct (non-pooled) connection used only by Prisma migrations — which need a long-lived connection that the pooler interferes with. Two URLs for one database, picked by the driver based on what it's doing.">
+              <div class="arch-icon">🔧</div>
+              <span>Direct conn (migrations)</span>
+            </div>
+          </div>
+
+          <div class="arch-zone">
+            <h4 class="arch-zone-label">External services · the freelancers</h4>
+            <div class="arch-component"
+                 data-desc="Anthropic — makers of the Claude AI models. Two models are used: Haiku 4.5 (fast, cheap, default) and Sonnet 4.5 (slower, smarter, only for hard orders). Both turn voice transcripts into menu items.">
+              <div class="arch-icon">🧠</div>
+              <span>Anthropic Claude</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="Sarvam AI — an Indian company that makes Saaras v2, a speech-to-text model trained on Telugu, Kannada, Tamil and other Indic languages. Used only when the browser can't do the transcription itself (i.e., not English/Hindi).">
+              <div class="arch-icon">🎙️</div>
+              <span>Sarvam Saaras v2</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="Razorpay — India's largest payments company. Handles ₹299/month subscription billing, and also generates UPI deep-links the customer scans. AwaazOS itself doesn't touch card numbers, ever.">
+              <div class="arch-icon">💳</div>
+              <span>Razorpay</span>
+            </div>
+            <div class="arch-component"
+                 data-desc="Gupshup — sends WhatsApp messages over the official WhatsApp Business API. Cheaper than the alternatives in India. The receipt-sending workers on Fly call Gupshup; Vercel never does.">
+              <div class="arch-icon">💬</div>
+              <span>Gupshup WhatsApp</span>
+            </div>
+          </div>
+
+          <div class="arch-description" id="arch-desc">
+            👆 Tap any box above to see what it does and why it lives there.
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Why the workers live somewhere else</h2>
+        <p>This is the most-asked question about the architecture. Here&rsquo;s the simple version: a Vercel <span class="term" data-definition="A server-side function that wakes up only when needed, does one job, and shuts down. It can't keep a long-lived connection open to anything because it doesn't stay alive long enough.">serverless function</span> is fast for short jobs, but it&rsquo;s a terrible fit for the kind of work that needs to wait around &mdash; like watching a queue for new WhatsApp jobs.</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">⚡</div>
+            <h4 class="pattern-title">Serverless (Vercel)</h4>
+            <p class="pattern-desc">Wakes up, runs for &lt;10 seconds, sleeps. Perfect for &ldquo;take this voice clip and parse it.&rdquo; Bad at &ldquo;wait around forever for jobs.&rdquo;</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-5)">
+            <div class="pattern-icon" style="background: var(--color-actor-5)">⚙️</div>
+            <h4 class="pattern-title">Long-running (Fly.io)</h4>
+            <p class="pattern-desc">A small Linux box that&rsquo;s always on. Holds a TCP connection to Redis. Picks up jobs the second they appear. Perfect for queue workers.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🗄️</div>
+            <h4 class="pattern-title">Database (Neon)</h4>
+            <p class="pattern-desc">Stores everything. Both Vercel and Fly read/write to the same Neon database &mdash; that&rsquo;s how the two halves of the system stay in sync.</p>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">The two-Redis trick</strong>
+            <p>You&rsquo;ll see two Redis instances in the diagram. They&rsquo;re different on purpose. <span class="term" data-definition="Upstash is a serverless Redis provider. You talk to it over HTTP — every command is a regular web request. Perfect for Vercel because there's no connection to keep open.">Upstash REST</span> talks over HTTP and is used by Vercel for rate-limiting. Regular <span class="term" data-definition="TCP is the older, persistent kind of network connection — like a phone call you keep open. BullMQ needs this because it uses blocking commands (like 'wait until a new job arrives') that don't translate to HTTP.">TCP Redis</span> is used by BullMQ on Fly because BullMQ needs to keep a connection open. You can&rsquo;t use the wrong one in the wrong place.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The middleware in five lines</h2>
+        <p>Every single request that hits AwaazOS &mdash; whether it&rsquo;s a vendor visiting <code>/menu</code> or an API call to <code>/api/transactions</code> &mdash; passes through this tiny file first. It runs on Vercel&rsquo;s edge in roughly 10 milliseconds.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · middleware.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">import</span> NextAuth <span class="code-keyword">from</span> <span class="code-string">"next-auth"</span>;</span>
+<span class="code-line"><span class="code-keyword">import</span> { authConfig } <span class="code-keyword">from</span> <span class="code-string">"@/lib/auth.config"</span>;</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">export const</span> { auth: middleware } = <span class="code-function">NextAuth</span>(authConfig);</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">export const</span> config = {</span>
+<span class="code-line">  <span class="code-property">matcher</span>: [</span>
+<span class="code-line">    <span class="code-string">"/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/health|api/ready).*)"</span>,</span>
+<span class="code-line">  ],</span>
+<span class="code-line">};</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Bring in the <span class="term" data-definition="Auth.js (formerly NextAuth.js) is the open-source library AwaazOS uses for sign-in / sign-up / sessions. It replaces paid alternatives like Clerk and Auth0.">Auth.js</span> library and our shared auth settings.</p>
+              <p class="tl">Hand off the request to Auth.js. It checks the cookie for a valid session.</p>
+              <p class="tl">Tell Vercel <em>which</em> URLs this middleware should run on.</p>
+              <p class="tl">The <code>matcher</code> is a regex that says: &ldquo;run on every URL <strong>except</strong> static files, webhook callbacks (those verify themselves), and health-check probes (uptime monitors must reach them anonymously).&rdquo;</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">⚠️</div>
+          <div class="callout-content">
+            <strong class="callout-title">Don&rsquo;t accidentally protect a webhook</strong>
+            <p>If <code>/api/webhooks/razorpay</code> were behind auth, Razorpay&rsquo;s servers (which don&rsquo;t have a vendor login) couldn&rsquo;t reach it &mdash; and subscriptions would silently break. Excluding webhooks from the matcher is a small line with big consequences.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Match the actor to the job</h2>
+        <p>Drag each component to the job it does. (On a phone, tap-and-drag works the same way.)</p>
+
+        <div class="dnd-container" id="dnd-module2">
+          <div class="dnd-chips">
+            <div class="dnd-chip" draggable="true" data-answer="vercel">Vercel</div>
+            <div class="dnd-chip" draggable="true" data-answer="fly">Fly.io</div>
+            <div class="dnd-chip" draggable="true" data-answer="neon">Neon Postgres</div>
+            <div class="dnd-chip" draggable="true" data-answer="anthropic">Anthropic Claude</div>
+            <div class="dnd-chip" draggable="true" data-answer="razorpay">Razorpay</div>
+            <div class="dnd-chip" draggable="true" data-answer="gupshup">Gupshup</div>
+          </div>
+          <div class="dnd-zones">
+            <div class="dnd-zone" data-correct="vercel">
+              <p class="dnd-zone-label">Runs the website &amp; API routes</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="fly">
+              <p class="dnd-zone-label">Runs background queue workers in Mumbai</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="neon">
+              <p class="dnd-zone-label">Stores every menu item, sale, &amp; receipt</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="anthropic">
+              <p class="dnd-zone-label">Turns a voice transcript into structured cart items</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="razorpay">
+              <p class="dnd-zone-label">Charges ₹299/month subscriptions &amp; verifies UPI payments</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+            <div class="dnd-zone" data-correct="gupshup">
+              <p class="dnd-zone-label">Delivers receipts to the customer&rsquo;s WhatsApp</p>
+              <div class="dnd-zone-target">Drop here</div>
+            </div>
+          </div>
+          <div style="display:flex;gap:var(--space-3);margin-top:var(--space-4)">
+            <button class="btn" onclick="checkDnD('dnd-module2')">Check matches</button>
+            <button class="btn" onclick="resetDnD('dnd-module2')">Reset</button>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Quick check</h2>
+        <p>Less about memorising the cast list, more about the reasoning. If you can answer these, you can debug a lot of production issues.</p>
+
+        <div class="quiz-container" id="quiz-module2">
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="Yes. Vercel functions are short-lived — they shut down after a few seconds. BullMQ uses Redis commands like BRPOPLPUSH that block, waiting for a new job to arrive. A Vercel function would die before any job came in. That&rsquo;s the structural reason the workers must live somewhere with always-on processes (Fly).">
+            <h3 class="quiz-question">Why can&rsquo;t the WhatsApp-receipt worker just run on Vercel like the rest of the API?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Vercel doesn&rsquo;t support Node.js, only Python.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Gupshup blocks Vercel&rsquo;s IP addresses.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Vercel functions don&rsquo;t stay alive long enough to wait for queue jobs to arrive.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Right. The webhook (/api/webhooks/razorpay) is explicitly excluded from the auth middleware so Razorpay's anonymous server can POST to it. The webhook is protected differently — by checking an HMAC signature in the body, which only Razorpay can produce because they're the only other party that knows the shared secret.">
+            <h3 class="quiz-question">Razorpay needs to POST to <code>/api/webhooks/razorpay</code> when a subscription gets paid. There&rsquo;s no vendor logged in for those calls. How does the system handle that securely?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The webhook checks the request comes from a known Razorpay IP address.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The webhook is excluded from auth middleware and instead verifies an HMAC signature sent in the headers.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Razorpay is given a special vendor account it logs in with.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Yes. Vercel for the website + API, Fly for workers, Neon for the database — three providers. The big trade-off is the operational complexity: three dashboards, three billing accounts, three places to set environment variables. The benefit is that each one is the best at what it does, and you can swap any one out without touching the others. The codebase explicitly documents this trade-off in ARCHITECTURE.md.">
+            <h3 class="quiz-question">A new engineer asks: &ldquo;Why don&rsquo;t we just put everything on one provider to simplify operations?&rdquo; What&rsquo;s the strongest counter-argument from this codebase?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Each provider is the best in the world at one specific job. Bundling on one provider would compromise on at least one of: latency, cost, or reliability.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>One-provider setups don&rsquo;t scale past 10 vendors.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Vercel doesn&rsquo;t support Postgres, so you have to use a separate database anyway.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="btn quiz-check-btn" onclick="checkQuiz('quiz-module2')">Check answers</button>
+          <button class="btn quiz-reset-btn" onclick="resetQuiz('quiz-module2')">Try again</button>
+
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A useful mental shortcut</h2>
+        <div class="callout callout-accent">
+          <div class="callout-icon">🧭</div>
+          <div class="callout-content">
+            <strong class="callout-title">Where would I look for ___?</strong>
+            <p>When something breaks, the first question is always <em>which provider owns this?</em><br>
+            UI bugs &amp; slow page loads → <strong>Vercel logs</strong>.<br>
+            WhatsApp didn&rsquo;t arrive → <strong>Fly worker logs</strong>.<br>
+            Sale didn&rsquo;t save → <strong>Neon query logs</strong>.<br>
+            AI parse was wrong → <strong>VoiceParseLog table in Neon</strong>.<br>
+            Subscription stuck → <strong>Razorpay dashboard + webhook logs</strong>.<br>
+            Knowing this saves an hour every time something goes wrong.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

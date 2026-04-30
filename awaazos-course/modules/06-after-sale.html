@@ -1,0 +1,405 @@
+<section class="module" id="module-6" style="background: var(--color-bg)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">06</span>
+      <h1 class="module-title">After the sale</h1>
+      <p class="module-subtitle">The customer walked away. The vendor is already taking the next order. But the WhatsApp receipt hasn&rsquo;t sent yet. Razorpay&rsquo;s server is about to POST a webhook with no logged-in user. Network calls will fail and retry. This module is about the part of the system that has to keep working even when nobody&rsquo;s looking.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A postal sorting facility</h2>
+        <p>Picture a postal sorting depot at 2 AM. Letters keep arriving on conveyor belts. Some get delivered immediately, some need a second sorting pass, some get returned to sender. The depot isn&rsquo;t magic &mdash; it&rsquo;s built around three boring rules:</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-1)">
+            <div class="pattern-icon" style="background: var(--color-actor-1)">📬</div>
+            <h4 class="pattern-title">Durable mailbag</h4>
+            <p class="pattern-desc">Once a letter goes in the mailbag (the queue), it can&rsquo;t fall out. Even if the depot building catches fire, the bag&rsquo;s contents survive on disk.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">🔁</div>
+            <h4 class="pattern-title">Retries with patience</h4>
+            <p class="pattern-desc">Recipient&rsquo;s door is locked? Try again in 5 seconds, then 10, then 20. Never just give up. Never just try again instantly forever.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🪪</div>
+            <h4 class="pattern-title">Tracking ID per letter</h4>
+            <p class="pattern-desc">Same letter showing up twice? Check the tracking ID. If we already delivered it, just discard the second copy. Don&rsquo;t bother the recipient.</p>
+          </div>
+        </div>
+
+        <p style="margin-top: var(--space-6)">In AwaazOS, the mailbag is <span class="term" data-definition="BullMQ is a Node.js library that turns a Redis instance into a job queue with retries, scheduling, and worker management. It&rsquo;s the &lsquo;mailbag&rsquo; that holds WhatsApp jobs, voice telemetry jobs, and retention jobs.">BullMQ</span>. The post office is the Fly.io worker. The tracking ID is the <code>whatsappSent</code> flag. Let&rsquo;s zoom in.</p>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The hand-off, message by message</h2>
+        <p>Watch the conversation between the API route, the queue, the worker, and Gupshup as a single WhatsApp receipt makes its way to the customer.</p>
+
+        <div class="chat-window" id="chat-module6">
+          <div class="chat-messages">
+
+            <div class="chat-message" data-msg="0" data-sender="api" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">API route</span>
+                <p>The five-step transaction committed. Bill <code>AWZ-20260430-0001</code> exists. Customer phone is <code>+91…43210</code>.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="1" data-sender="api" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-3)">A</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-3)">API route</span>
+                <p>Hey queue, drop a job: <code>{ transactionId, vendorId, customerPhone }</code>. Don&rsquo;t make me wait &mdash; the vendor needs to take the next order.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="2" data-sender="queue" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-4)">Q</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-4)">Redis (BullMQ)</span>
+                <p>Job stored. ack&rsquo;d. Worker can pick it up whenever &mdash; if you crash now, the job survives.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="3" data-sender="worker" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Receipt worker (Fly)</span>
+                <p>Picking up job. Loading transaction <code>AWZ-20260430-0001</code> + receipt + vendor settings &mdash; scoped by vendorId.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="4" data-sender="worker" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Receipt worker (Fly)</span>
+                <p>Quick check: <code>receipt.whatsappSent === true</code>? No. OK, this is a fresh delivery. Formatting the multiline message.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="5" data-sender="worker" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Receipt worker (Fly)</span>
+                <p>Hey Gupshup, please WhatsApp this receipt to <code>+91…43210</code>. 8-second timeout.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="6" data-sender="gupshup" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">G</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Gupshup</span>
+                <p>504 timeout from carrier. Sorry.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="7" data-sender="worker" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Receipt worker (Fly)</span>
+                <p>Throwing &ldquo;gupshup_send_failed&rdquo;. BullMQ will retry with exponential backoff: 5s, 10s, 20s, 40s, 80s. After 5 attempts, the job lands in the dead-letter pile for 7 days for me to investigate.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="8" data-sender="worker" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Receipt worker (Fly)</span>
+                <p>(40 seconds later) Retrying. Loading the same row. Same idempotency check &mdash; <code>whatsappSent</code> is still false. Sending again.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="9" data-sender="gupshup" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-1)">G</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-1)">Gupshup</span>
+                <p>200 OK. Delivered. Message ID <code>msg_xyz</code>.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="10" data-sender="worker" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-5)">W</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-5)">Receipt worker (Fly)</span>
+                <p>Updating receipt: <code>whatsappSent: true, whatsappSentAt: now, deliveredTo: +91…43210</code>. If this exact job somehow gets retried later, the idempotency check will catch it and skip.</p>
+              </div>
+            </div>
+
+            <div class="chat-message" data-msg="11" data-sender="customer" style="display:none">
+              <div class="chat-avatar" style="background: var(--color-actor-2)">C</div>
+              <div class="chat-bubble">
+                <span class="chat-sender" style="color: var(--color-actor-2)">Customer&rsquo;s WhatsApp</span>
+                <p>📱 *ding* &mdash; receipt received from Ravi&rsquo;s Chai. Total ₹40.</p>
+              </div>
+            </div>
+
+          </div>
+
+          <div class="chat-typing" id="chat-module6-typing" style="display:none">
+            <div class="chat-avatar" id="chat-module6-typing-avatar">?</div>
+            <div class="chat-typing-dots">
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+              <span class="typing-dot"></span>
+            </div>
+          </div>
+
+          <div class="chat-controls">
+            <button class="btn chat-next-btn">Next message</button>
+            <button class="btn chat-all-btn">Play all</button>
+            <button class="btn chat-reset-btn">Replay</button>
+            <span class="chat-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The idempotency check, in seven lines</h2>
+        <p>The single most important part of the worker is also the smallest. If a job runs twice (because of a retry, a network blip, or anything else), the customer should get exactly one WhatsApp message &mdash; not two.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · workers/receipt.worker.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> tx = <span class="code-keyword">await</span> prisma.transaction.<span class="code-function">findFirst</span>({</span>
+<span class="code-line">  <span class="code-property">where</span>: { <span class="code-property">id</span>: transactionId, <span class="code-property">vendorId</span> },</span>
+<span class="code-line">  <span class="code-property">include</span>: { <span class="code-property">orderItems</span>: { <span class="code-comment">/* ... */</span> }, <span class="code-property">receipt</span>: <span class="code-keyword">true</span>, <span class="code-property">vendor</span>: { <span class="code-property">include</span>: { <span class="code-property">settings</span>: <span class="code-keyword">true</span> } } },</span>
+<span class="code-line">});</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">if</span> (!tx || !tx.receipt) {</span>
+<span class="code-line">  logger.<span class="code-function">warn</span>({ transactionId, vendorId }, <span class="code-string">"transaction or receipt not found; dropping job"</span>);</span>
+<span class="code-line">  <span class="code-keyword">return</span>;</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">if</span> (tx.receipt.whatsappSent) {</span>
+<span class="code-line">  logger.<span class="code-function">info</span>({ transactionId }, <span class="code-string">"receipt already sent; idempotent skip"</span>);</span>
+<span class="code-line">  <span class="code-keyword">return</span>;</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Look up the transaction <em>by transactionId AND vendorId</em>. (The same compound-where pattern as Module 3 &mdash; even the worker can&rsquo;t cross tenants.)</p>
+              <p class="tl">Pull in everything we need to format the message: line items, the receipt row, vendor name &amp; settings.</p>
+              <p class="tl">If the row doesn&rsquo;t exist (deleted? wrong ID?), just drop the job. We can&rsquo;t send a message about a sale that doesn&rsquo;t exist.</p>
+              <p class="tl"><strong>The idempotency check.</strong> If <code>whatsappSent</code> is already <code>true</code>, somebody already delivered this. Quietly return without sending again.</p>
+              <p class="tl">Log it for visibility, but treat it as a normal outcome &mdash; no retries, no errors. The job is &ldquo;done.&rdquo;</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">🔁</div>
+          <div class="callout-content">
+            <strong class="callout-title">Engineers call this &ldquo;at-least-once with idempotency&rdquo;</strong>
+            <p>Distributed systems can&rsquo;t guarantee a job runs <em>exactly</em> once &mdash; networks fail, machines crash, ack&rsquo;s get lost. So the next-best thing is: guarantee jobs run <em>at least</em> once, and design every worker so re-runs are safe. The <code>whatsappSent</code> flag is the &ldquo;safe to re-run&rdquo; design here.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">The webhook with no login</h2>
+        <p>Razorpay needs to tell us when a vendor pays for their subscription. They POST to <code>/api/webhooks/razorpay</code> &mdash; but their server doesn&rsquo;t have a vendor session. Anyone on the internet could try to POST the same URL. So how do we know it&rsquo;s really Razorpay?</p>
+        <p>By checking a <span class="term" data-definition="HMAC = Hash-based Message Authentication Code. A way to prove a message came from someone who knows a shared secret, without sending the secret. Razorpay and AwaazOS both know a webhook secret; Razorpay signs the body with it; AwaazOS recomputes the signature and only accepts the request if it matches.">HMAC signature</span>. Razorpay signs the request body with a shared secret. We re-compute the signature on our end and compare. Only the real Razorpay can produce a matching signature.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · app/api/webhooks/razorpay/route.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> rawBody = <span class="code-keyword">await</span> req.<span class="code-function">text</span>();</span>
+<span class="code-line"><span class="code-keyword">const</span> sig = req.headers.<span class="code-function">get</span>(<span class="code-string">"x-razorpay-signature"</span>);</span>
+<span class="code-line"><span class="code-keyword">if</span> (!<span class="code-function">verifyRazorpaySignature</span>(rawBody, sig)) {</span>
+<span class="code-line">  <span class="code-keyword">return</span> NextResponse.<span class="code-function">json</span>({}, { <span class="code-property">status</span>: <span class="code-number">401</span> });</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">let</span> body: <span class="code-keyword">unknown</span>;</span>
+<span class="code-line"><span class="code-keyword">try</span> {</span>
+<span class="code-line">  body = JSON.<span class="code-function">parse</span>(rawBody) <span class="code-keyword">as</span> <span class="code-keyword">unknown</span>;</span>
+<span class="code-line">} <span class="code-keyword">catch</span> {</span>
+<span class="code-line">  console.<span class="code-function">warn</span>(<span class="code-string">"[webhooks/razorpay] invalid json"</span>);</span>
+<span class="code-line">  <span class="code-keyword">return</span> NextResponse.<span class="code-function">json</span>({ <span class="code-property">ok</span>: <span class="code-keyword">true</span> });</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Read the request body as <em>raw text</em>. Critical: do not parse to JSON yet. Different JSON libraries reorder keys, which would break signature verification.</p>
+              <p class="tl">Read the header where Razorpay puts the signature.</p>
+              <p class="tl">Verify: re-compute HMAC-SHA256 of the raw body using our shared secret, and compare against the header. Comparison uses <code>crypto.timingSafeEqual</code> to defeat <span class="term" data-definition="A timing attack measures how long a string comparison takes — a normal `===` returns faster when the first character mismatches than when the strings are nearly identical. crypto.timingSafeEqual takes the same time regardless, so attackers can&rsquo;t learn the secret one byte at a time.">timing attacks</span>.</p>
+              <p class="tl">If the signature doesn&rsquo;t match, return 401 with an empty body &mdash; don&rsquo;t even confirm the URL exists.</p>
+              <p class="tl">Only NOW it&rsquo;s safe to JSON.parse the body, since we&rsquo;ve verified the sender.</p>
+              <p class="tl">If the JSON is malformed (which shouldn&rsquo;t happen post-signature-check), shrug and return 200 OK so Razorpay doesn&rsquo;t spam-retry.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-warning">
+          <div class="callout-icon">🔐</div>
+          <div class="callout-content">
+            <strong class="callout-title">Verify before you read</strong>
+            <p>The single most common webhook bug: trusting the body before checking the signature. The signature check goes <em>first</em>, before any database lookup, before any JSON parse, before any business logic. If the signature is wrong, you bounce without doing <em>any</em> work that could be exploited.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Plan gates &mdash; HTTP 402 in disguise</h2>
+        <p>Some features are paid-only &mdash; WhatsApp receipts (STARTER+), CSV exports (PRO+), unlimited transactions (PRO+). Rather than scattering <code>if (vendor.plan === "FREE") return ...</code> through the code, AwaazOS uses a single helper that throws a structured error.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/rbac.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">export class</span> PlanGateError <span class="code-keyword">extends</span> AuthError {</span>
+<span class="code-line">  <span class="code-function">constructor</span>(</span>
+<span class="code-line">    <span class="code-keyword">public readonly</span> required: Plan,</span>
+<span class="code-line">    <span class="code-keyword">public readonly</span> current: Plan,</span>
+<span class="code-line">  ) {</span>
+<span class="code-line">    <span class="code-function">super</span>(<span class="code-number">402</span>, <span class="code-string">"Plan upgrade required"</span>);</span>
+<span class="code-line">    <span class="code-keyword">this</span>.name = <span class="code-string">"PlanGateError"</span>;</span>
+<span class="code-line">  }</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">export function</span> <span class="code-function">requirePlan</span>(vendor: { plan: Plan }, minPlan: Plan): <span class="code-keyword">void</span> {</span>
+<span class="code-line">  <span class="code-keyword">if</span> (PLAN_RANK[vendor.plan] &lt; PLAN_RANK[minPlan]) {</span>
+<span class="code-line">    <span class="code-keyword">throw new</span> <span class="code-function">PlanGateError</span>(minPlan, vendor.plan);</span>
+<span class="code-line">  }</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Define a special error class that carries both the required plan and the current plan.</p>
+              <p class="tl">It uses HTTP 402 (&ldquo;Payment Required&rdquo;) as its status code. The frontend listens for 402s and shows an upgrade button automatically.</p>
+              <p class="tl">A one-line guard: <code>requirePlan(vendor, "STARTER")</code>. If the vendor&rsquo;s plan is too low, throw the error &mdash; the route handler&rsquo;s try/catch translates it into a structured 402 response.</p>
+              <p class="tl">The error carries enough context for the upgrade prompt to say &ldquo;you&rsquo;re on FREE, this needs STARTER&rdquo; rather than a generic &ldquo;please upgrade.&rdquo;</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💳</div>
+          <div class="callout-content">
+            <strong class="callout-title">Plan capabilities at a glance</strong>
+            <p>FREE: 50 transactions/month, no WhatsApp, 7 days of analytics.<br>
+            STARTER: 500 transactions/month, WhatsApp on, 90 days of analytics.<br>
+            PRO: unlimited transactions, CSV export, 365 days of analytics.<br>
+            One table in <code>lib/constants.ts</code>; the whole app reads from it.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Quick check</h2>
+
+        <div class="quiz-container" id="quiz-module6">
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="The HMAC signature would no longer match — because the (valid) raw body and the (now-different) re-computed body differ. The handler returns 401 without doing any work. The reason rawBody is read as TEXT, not JSON, is to dodge the &lsquo;parser reorders keys&rsquo; problem that would break a legitimate webhook&rsquo;s signature.">
+            <h3 class="quiz-question">An attacker grabs a real Razorpay webhook URL out of network logs and POSTs a forged body claiming the vendor&rsquo;s plan was upgraded. What stops the upgrade from going through?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The webhook checks the request comes from a Razorpay IP address.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The auth middleware blocks any unauthenticated request to <code>/api/*</code>.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The HMAC signature won&rsquo;t match a forged body, because the attacker doesn&rsquo;t have the shared webhook secret. The handler returns 401 before doing anything.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Yes. BullMQ retries on its own, with exponential backoff (5s, 10s, 20s, 40s, 80s up to 5 attempts). The worker just throws on failure — that&rsquo;s the signal to retry. After the 5th attempt, the job lands in the failed-jobs DLQ for 7 days where an admin can investigate. NEVER write your own retry loop inside the worker — that defeats the queue&rsquo;s scheduling and you can lose jobs on crash.">
+            <h3 class="quiz-question">A teammate suggests adding a <code>while (true)</code> retry loop inside the WhatsApp worker, so it keeps trying immediately until success. What should you push back with?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Sounds good &mdash; merge it.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Push back: BullMQ already retries with exponential backoff (5s, 10s, 20s, 40s, 80s) and tracks failed jobs in a <span class="term" data-definition="Dead-Letter Queue. Where jobs go when they&rsquo;ve failed all their retry attempts. Lets you investigate and replay them later instead of silently losing them.">DLQ</span>. A worker should fail loudly and return; the queue handles patience.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Push back: Gupshup blocks rapid retries.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Yes. The receipt.whatsappSent flag means a re-run is safe — it&rsquo;ll see the flag is true and quietly return. So the WhatsApp enqueue happens AFTER the prisma.$transaction commits — outside the swimmer formation from Module 5. If the queue is unreachable in that moment, the sale still completes and the cashier can resend manually later. If the enqueue WAS inside the transaction, a queue blip would roll back the sale itself — much worse.">
+            <h3 class="quiz-question">The WhatsApp enqueue happens <em>outside</em> the prisma.$transaction in <code>POST /api/transactions</code>. Why?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>So that a queue outage doesn&rsquo;t roll back the sale itself. The worker&rsquo;s idempotency check makes &ldquo;at-least-once&rdquo; delivery safe even if the enqueue happened multiple times.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Because Prisma can&rsquo;t talk to Redis from inside a transaction.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>To avoid sending the WhatsApp before the customer pays.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="btn quiz-check-btn" onclick="checkQuiz('quiz-module6')">Check answers</button>
+          <button class="btn quiz-reset-btn" onclick="resetQuiz('quiz-module6')">Try again</button>
+
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Where to go from here</h2>
+        <p>You&rsquo;ve seen all six layers: the user journey, the cast of services, multi-tenant isolation, the AI pipeline, the atomic transaction, and the resilient back-of-house. The patterns you&rsquo;ve picked up apply far beyond this one product.</p>
+
+        <div class="icon-rows">
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-1)">🎯</div>
+            <div>
+              <strong>Steering AI better</strong>
+              <p>You can now ask for &ldquo;a two-tier model cascade&rdquo; or &ldquo;a compound where with vendorId&rdquo; and the AI will know what you mean.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-2)">🐛</div>
+            <div>
+              <strong>Debugging faster</strong>
+              <p>When something breaks, you know which provider to look at, and which patterns are likely to be involved.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-3)">🏗️</div>
+            <div>
+              <strong>Making smarter architecture calls</strong>
+              <p>You&rsquo;ve seen the trade-offs &mdash; serverless vs always-on, integer vs float for money, sync vs async work, atomic vs eventual consistency.</p>
+            </div>
+          </div>
+          <div class="icon-row">
+            <div class="icon-circle" style="background: var(--color-actor-5)">🇮🇳</div>
+            <div>
+              <strong>Bol. Bill. Becho.</strong>
+              <p>And next time you&rsquo;re at a chai stall in Hyderabad and the vendor pulls out a phone with an orange mic button &mdash; you&rsquo;ll know exactly what&rsquo;s about to happen behind the scenes.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>

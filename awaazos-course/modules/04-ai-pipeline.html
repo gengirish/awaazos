@@ -1,0 +1,348 @@
+<section class="module" id="module-4" style="background: var(--color-bg)">
+  <div class="module-content">
+
+    <header class="module-header animate-in">
+      <span class="module-number">04</span>
+      <h1 class="module-title">Speech becomes structure</h1>
+      <p class="module-subtitle">When the vendor says <em>&ldquo;sat samosa, do chai, ek vada pav, pyaaz wala&rdquo;</em>, the computer first hears literal noise. By the time the cart fills, that noise is a structured list: <code>[{ id, name, qty, price }, &hellip;]</code>. This module follows the four steps that bridge those two worlds.</p>
+    </header>
+
+    <div class="module-body">
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A translator with a sticky-note menu</h2>
+        <p>Imagine a market translator standing next to a vendor. They don&rsquo;t speak the customer&rsquo;s language perfectly &mdash; they need a <em>cheat sheet</em>. So the vendor sticks a copy of the menu next to them, with each item highlighted.</p>
+        <p>When a customer says &ldquo;two of those crispy onion ones,&rdquo; the translator glances at the sheet, points at <em>aloo bhujia</em>, and tells the vendor &ldquo;they want 2&times; aloo bhujia.&rdquo;</p>
+        <p>The cheat sheet is the <strong>cached menu</strong>. The translator is <strong>Claude</strong>. The pointing is <strong>tool-use</strong>. The whole module is making this metaphor literal.</p>
+
+        <div class="callout callout-accent">
+          <div class="callout-icon">📌</div>
+          <div class="callout-content">
+            <strong class="callout-title">Why every step in this pipeline costs money</strong>
+            <p>The voice path is the per-order unit cost of the product. AwaazOS charges only ₹299/month, so the engineering choices here aren&rsquo;t cosmetic &mdash; they&rsquo;re what makes the pricing possible.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Step 1: pick the right speech-to-text engine</h2>
+        <p>Two paths, decided by language. English and Hindi go through the browser&rsquo;s built-in <span class="term" data-definition="Web Speech API — a feature built into modern browsers (especially Chrome) that converts spoken words into text. It runs on the device and is free. It only supports a handful of widely-spoken languages well.">Web Speech API</span>. Telugu, Kannada, and Tamil go to Sarvam.</p>
+
+        <div class="pattern-cards">
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-2)">
+            <div class="pattern-icon" style="background: var(--color-actor-2)">📱</div>
+            <h4 class="pattern-title">Web Speech (en-IN, hi-IN)</h4>
+            <p class="pattern-desc"><strong>On-device. Free.</strong> No audio ever leaves the phone. The browser hands us back a text string in ~600&nbsp;ms.</p>
+          </div>
+          <div class="pattern-card" style="border-top: 3px solid var(--color-actor-3)">
+            <div class="pattern-icon" style="background: var(--color-actor-3)">🌐</div>
+            <h4 class="pattern-title">Sarvam Saaras v2 (te, kn, ta)</h4>
+            <p class="pattern-desc"><strong>Server round-trip.</strong> The browser records 5&ndash;12 seconds of audio, ships it to <code>/api/ai/transcribe</code>, which forwards it to Sarvam. Costs roughly 1.2 seconds and a paisa per call.</p>
+          </div>
+        </div>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · hooks/useVoiceOrder.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> SARVAM_LANGS = <span class="code-keyword">new</span> Set([<span class="code-string">"te-IN"</span>, <span class="code-string">"kn-IN"</span>, <span class="code-string">"ta-IN"</span>]);</span>
+<span class="code-line"><span class="code-keyword">const</span> WEBSPEECH_LANGS = <span class="code-keyword">new</span> Set([<span class="code-string">"en-IN"</span>, <span class="code-string">"hi-IN"</span>]);</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">if</span> (WEBSPEECH_LANGS.<span class="code-function">has</span>(voiceLang)) {</span>
+<span class="code-line">  <span class="code-keyword">const</span> Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;</span>
+<span class="code-line">  <span class="code-keyword">if</span> (!Ctor) { <span class="code-function">setState</span>(<span class="code-string">"error"</span>); <span class="code-keyword">return</span>; }</span>
+<span class="code-line">  <span class="code-keyword">const</span> recognition = <span class="code-keyword">new</span> <span class="code-function">Ctor</span>();</span>
+<span class="code-line">  recognition.lang = voiceLang;</span>
+<span class="code-line">  recognition.<span class="code-function">start</span>();</span>
+<span class="code-line">}</span>
+<span class="code-line"></span>
+<span class="code-line"><span class="code-keyword">if</span> (SARVAM_LANGS.<span class="code-function">has</span>(voiceLang)) {</span>
+<span class="code-line">  <span class="code-keyword">const</span> stream = <span class="code-keyword">await</span> navigator.mediaDevices.<span class="code-function">getUserMedia</span>({ <span class="code-property">audio</span>: <span class="code-keyword">true</span> });</span>
+<span class="code-line">  <span class="code-keyword">const</span> mr = <span class="code-keyword">new</span> <span class="code-function">MediaRecorder</span>(stream, { mimeType });</span>
+<span class="code-line">  mr.<span class="code-function">start</span>();</span>
+<span class="code-line">  <span class="code-comment">// 12-second hard timeout — even if vendor forgets to stop</span></span>
+<span class="code-line">  <span class="code-function">setTimeout</span>(() <span class="code-operator">=&gt;</span> mr.<span class="code-function">stop</span>(), <span class="code-number">12_000</span>);</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Define two sets of languages — one handled in-browser, one handled by Sarvam.</p>
+              <p class="tl">For English/Hindi: ask the browser if it has a built-in speech recogniser. (Some don&rsquo;t.)</p>
+              <p class="tl">If yes, kick it off in this language. The text comes back via callbacks.</p>
+              <p class="tl">For Indic languages: ask the OS for microphone access. The browser pops the &ldquo;allow microphone?&rdquo; prompt.</p>
+              <p class="tl">Start recording into a Blob (a chunk of audio in memory).</p>
+              <p class="tl">Set a hard 12-second cap so we don&rsquo;t end up uploading a 10-minute clip if the vendor forgets to tap stop.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Step 2 &amp; 3: cache the menu, force a tool call</h2>
+        <p>Once we have the transcript, the menu plus transcript go to Claude. Two engineering choices make this cheap and reliable:</p>
+
+        <div class="step-cards stagger-children">
+          <div class="step-card animate-in">
+            <div class="step-num">A</div>
+            <div class="step-body">
+              <strong>Cache the menu</strong>
+              <p>For a 30-item menu, the JSON is ~2KB. Marking it <code>cache_control: ephemeral</code> tells Anthropic &ldquo;this part doesn&rsquo;t change between calls &mdash; reuse it.&rdquo; The cache lives 5 minutes. During the lunch rush, every request after the first one pays ~75% less for that block.</p>
+            </div>
+          </div>
+          <div class="step-card animate-in">
+            <div class="step-num">B</div>
+            <div class="step-body">
+              <strong>Force a tool call</strong>
+              <p>Instead of asking Claude for free-form JSON (which sometimes hallucinates trailing commas), we declare a <code>add_items</code> &ldquo;tool&rdquo; with a strict schema. Claude is forced to fill in <em>that exact shape</em>, so the answer is structured by construction.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/anthropic.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">const</span> message = <span class="code-keyword">await</span> modelClient.messages.<span class="code-function">create</span>({</span>
+<span class="code-line">  <span class="code-property">model</span>: modelName,</span>
+<span class="code-line">  <span class="code-property">max_tokens</span>: <span class="code-number">512</span>,</span>
+<span class="code-line">  <span class="code-property">temperature</span>: <span class="code-number">0.1</span>,</span>
+<span class="code-line">  <span class="code-property">system</span>: ORDER_PARSE_SYSTEM,</span>
+<span class="code-line">  <span class="code-property">tools</span>: [ADD_ITEMS_TOOL],</span>
+<span class="code-line">  <span class="code-property">tool_choice</span>: { <span class="code-property">type</span>: <span class="code-string">"tool"</span>, <span class="code-property">name</span>: <span class="code-string">"add_items"</span>, <span class="code-property">disable_parallel_tool_use</span>: <span class="code-keyword">true</span> },</span>
+<span class="code-line">  <span class="code-property">messages</span>: [</span>
+<span class="code-line">    {</span>
+<span class="code-line">      <span class="code-property">role</span>: <span class="code-string">"user"</span>,</span>
+<span class="code-line">      <span class="code-property">content</span>: [</span>
+<span class="code-line">        {</span>
+<span class="code-line">          <span class="code-property">type</span>: <span class="code-string">"text"</span>,</span>
+<span class="code-line">          <span class="code-property">text</span>: <span class="code-string">`Authoritative menu (JSON):\n${menuJson}`</span>,</span>
+<span class="code-line">          <span class="code-property">cache_control</span>: { <span class="code-property">type</span>: <span class="code-string">"ephemeral"</span> },</span>
+<span class="code-line">        },</span>
+<span class="code-line">        {</span>
+<span class="code-line">          <span class="code-property">type</span>: <span class="code-string">"text"</span>,</span>
+<span class="code-line">          <span class="code-property">text</span>: <span class="code-string">`Customer transcript (${lang}):\n${transcript}`</span>,</span>
+<span class="code-line">        },</span>
+<span class="code-line">      ],</span>
+<span class="code-line">    },</span>
+<span class="code-line">  ],</span>
+<span class="code-line">});</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">Send a message to Claude. The model name is passed in &mdash; same code path for Haiku and Sonnet.</p>
+              <p class="tl">Cap the answer at 512 <span class="term" data-definition="A token is roughly 4 characters or 3/4 of a word — the unit Claude charges by. Capping max_tokens prevents a runaway response from costing too much.">tokens</span>. Order parsing answers are tiny.</p>
+              <p class="tl">Set <span class="term" data-definition="Temperature controls how creative the model is. 0 = always picks the most likely word; 1 = more variety. For parsing structured data, low temperature is more reliable.">temperature</span> to 0.1 — we want consistent, boring, deterministic outputs.</p>
+              <p class="tl">Give Claude one tool it&rsquo;s allowed to use: <code>add_items</code>. The schema lives in a separate constant.</p>
+              <p class="tl">Force Claude to call this exact tool, exactly once. No free-form text. No parallel calls.</p>
+              <p class="tl">First content block: the vendor&rsquo;s menu as JSON. The magic line is <code>cache_control: ephemeral</code>.</p>
+              <p class="tl">That line tells Anthropic &ldquo;remember this block&rdquo; for the next 5 minutes. Subsequent requests during a busy lunch rush pay ~75% less for the same menu.</p>
+              <p class="tl">Second content block: the transcript itself. This part changes every call, so it&rsquo;s NOT cached.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Watch a request flow through the pipeline</h2>
+        <p>This is the same trip taken in module 1, but zoomed in on the AI part. Each step is one network or in-memory hop.</p>
+
+        <div class="flow-animation" data-steps='[
+          {"highlight":"actor-1","label":"Vendor speaks: &lsquo;do samosa aur ek chai&rsquo;"},
+          {"highlight":"actor-2","label":"Browser does Web Speech (Hindi). Transcript: &lsquo;do samosa aur ek chai&rsquo;","packet":true,"from":"actor-1","to":"actor-2"},
+          {"highlight":"actor-3","label":"POST /api/ai/parse-order with transcript + lang","packet":true,"from":"actor-2","to":"actor-3"},
+          {"highlight":"actor-3","label":"API loads vendor&apos;s menu from Postgres + checks rate limit + reserves token budget"},
+          {"highlight":"actor-4","label":"Claude Haiku 4.5 (cached menu + transcript). Returns add_items tool call.","packet":true,"from":"actor-3","to":"actor-4"},
+          {"highlight":"actor-3","label":"Confidence is &lsquo;high&rsquo; — no escalation needed. Sonnet stays asleep.","packet":true,"from":"actor-4","to":"actor-3"},
+          {"highlight":"actor-5","label":"Async fire-and-forget: drop a VoiceParseLog job in the queue (no await).","packet":true,"from":"actor-3","to":"actor-5"},
+          {"highlight":"actor-2","label":"Response arrives at the browser. Cart fills. Total ~1.8s.","packet":true,"from":"actor-3","to":"actor-2"}
+        ]'>
+          <div class="flow-actors">
+            <div class="flow-actor" id="flow-actor-1">
+              <div class="flow-actor-icon" style="background: var(--color-actor-1); color: white">🗣️</div>
+              <span>Vendor</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-2">
+              <div class="flow-actor-icon" style="background: var(--color-actor-2); color: white">📱</div>
+              <span>Browser</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-3">
+              <div class="flow-actor-icon" style="background: var(--color-actor-3); color: white">⚡</div>
+              <span>API route</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-4">
+              <div class="flow-actor-icon" style="background: var(--color-actor-4); color: white">🧠</div>
+              <span>Claude</span>
+            </div>
+            <div class="flow-actor" id="flow-actor-5">
+              <div class="flow-actor-icon" style="background: var(--color-actor-5); color: white">📥</div>
+              <span>Telemetry queue</span>
+            </div>
+          </div>
+          <div class="flow-packet" id="flow-packet"></div>
+          <div class="flow-step-label" id="flow-label">Click &ldquo;Next Step&rdquo; to begin.</div>
+          <div class="flow-controls">
+            <button class="btn flow-next-btn">Next step</button>
+            <button class="btn flow-reset-btn">Restart</button>
+            <span class="flow-progress"></span>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Step 4: when does the senior translator get called?</h2>
+        <p>Haiku covers ~85% of orders. The other 15% &mdash; long, code-mixed, ambiguous &mdash; get escalated to Sonnet. The decision happens in one small function.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · app/api/ai/parse-order/route.ts</span>
+<pre><code><span class="code-line"><span class="code-keyword">function</span> <span class="code-function">shouldEscalate</span>(</span>
+<span class="code-line">  result: <span class="code-function">Awaited</span>&lt;<span class="code-function">ReturnType</span>&lt;<span class="code-keyword">typeof</span> parseOrderWithClaude&gt;&gt;,</span>
+<span class="code-line">  transcript: <span class="code-keyword">string</span>,</span>
+<span class="code-line">): <span class="code-keyword">boolean</span> {</span>
+<span class="code-line">  <span class="code-keyword">const</span> words = <span class="code-function">wordCount</span>(transcript);</span>
+<span class="code-line">  <span class="code-keyword">if</span> (result.items.length === <span class="code-number">0</span> &amp;&amp; words &gt; <span class="code-number">3</span>) <span class="code-keyword">return true</span>;</span>
+<span class="code-line">  <span class="code-keyword">if</span> (result.confidence === <span class="code-string">"low"</span> &amp;&amp; result.unmatched.length &gt; <span class="code-number">0</span>) <span class="code-keyword">return true</span>;</span>
+<span class="code-line">  <span class="code-keyword">return false</span>;</span>
+<span class="code-line">}</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">A function that returns &ldquo;true&rdquo; if we should re-run the parse with the smarter (and pricier) model.</p>
+              <p class="tl">It looks at Haiku&rsquo;s answer and the original transcript.</p>
+              <p class="tl">First trigger: Haiku found nothing, but the customer said more than 3 words. They probably ordered <em>something</em> &mdash; let Sonnet take another look.</p>
+              <p class="tl">Second trigger: Haiku flagged low confidence AND there are phrases it couldn&rsquo;t map. Sonnet&rsquo;s extra reasoning is worth the cost here.</p>
+              <p class="tl">Otherwise, trust Haiku. Sonnet stays asleep.</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="callout callout-info">
+          <div class="callout-icon">💡</div>
+          <div class="callout-content">
+            <strong class="callout-title">A pattern with a name</strong>
+            <p>This is called a <strong>cascade</strong> or <strong>two-tier model routing</strong>. Cheap-and-fast for the 85% case, smart-and-slow for the 15% edge cases. You can apply this to any AI feature: try the small model first, escalate only when needed. Easy to ask AI for: <em>&ldquo;add a confidence-based escalation from Haiku to Sonnet for this endpoint.&rdquo;</em></p>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Indic numerals — the prompt&rsquo;s secret sauce</h2>
+        <p>Vendors don&rsquo;t say &ldquo;two&rdquo; &mdash; they say <em>do</em>, <em>rendu</em>, <em>eradu</em>, <em>onnu</em>. The model needs to know these mean numbers. So the system prompt teaches it.</p>
+
+        <div class="translation-block animate-in">
+          <div class="translation-code">
+            <span class="translation-label">CODE · lib/anthropic.ts (system prompt excerpt)</span>
+<pre><code><span class="code-line">Normalize Indic numerals:</span>
+<span class="code-line">- hi: ek=1, do=2, teen=3, char=4, paanch=5</span>
+<span class="code-line">- te: okati=1, rendu=2, moodu=3, naalugu=4, aidu=5</span>
+<span class="code-line">- kn: ondu=1, eradu=2, mooru=3, naalku=4, aidu=5</span>
+<span class="code-line">- ta: onnu=1, rendu=2, moonu=3, naangu=4, anju=5</span>
+<span class="code-line"></span>
+<span class="code-line">Put any phrase you could NOT confidently map into unmatched.</span>
+<span class="code-line">confidence = low if unmatched.length &gt; 0 OR the transcript is ambiguous.</span></code></pre>
+          </div>
+          <div class="translation-english">
+            <span class="translation-label">PLAIN ENGLISH</span>
+            <div class="translation-lines">
+              <p class="tl">A small, hand-crafted lookup table embedded in the system prompt.</p>
+              <p class="tl">Each line is one language &mdash; spoken numerals 1 through 5 in Hindi, Telugu, Kannada, and Tamil.</p>
+              <p class="tl">The model uses these as anchor points. (LLMs are good at extrapolating beyond explicit examples.)</p>
+              <p class="tl">Crucial rule: if any phrase doesn&rsquo;t map to a menu item, list it in <code>unmatched</code> rather than guessing wrong.</p>
+              <p class="tl">If anything ended up in <code>unmatched</code>, the model must mark confidence as &ldquo;low&rdquo; &mdash; which (per the previous screen) triggers escalation to Sonnet.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">Quick check</h2>
+
+        <div class="quiz-container" id="quiz-module4">
+
+          <div class="quiz-question-block"
+               data-correct="opt-c"
+               data-explanation-right="The transcript is in a separate, NON-cached block. Only the menu (which doesn&rsquo;t change between orders) is cached. This is the whole point of putting them in different content blocks — Anthropic&rsquo;s cache is per-block, not per-message. If you cached the transcript, the cache would never hit, because every transcript is different."
+               data-explanation-wrong="The cache_control flag goes on the menu block, not the transcript. The transcript changes every order, so it can&rsquo;t be cached. The pattern is: put the slow-changing thing (menu) in one block with cache_control, put the fast-changing thing (transcript) in a separate block without cache_control. Both go in the same request.">
+            <h3 class="quiz-question">Why is the transcript NOT included in the cached block, even though it&rsquo;s sent in the same Anthropic call as the cached menu?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Anthropic doesn&rsquo;t allow more than one cached block per request.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Caching the transcript would expose customer PII.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The transcript is different every call, so caching it would never hit. Only the menu (slow-changing) benefits from caching.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-b"
+               data-explanation-right="Right. Switching to Sonnet-for-everything is the simplest fix and would probably help, but it eliminates the whole reason ₹299/mo works. The smarter move is to look at VoiceParseLog rows where the parse was wrong — was it a missing alias? A new menu item the vendor added? A regional word the prompt doesn&rsquo;t teach? Often a one-line tweak fixes whole classes of misparses without spending more on inference."
+               data-explanation-wrong="Switching to Sonnet-for-everything is the easy answer but it doubles AI cost per order — that&rsquo;s the kind of decision that breaks the unit economics. The smarter first move is to look at the VoiceParseLog telemetry to see WHAT was misparsed: a missing alias on a menu item? An Indic numeral the prompt doesn&rsquo;t cover? Often the fix is a tiny content change.">
+            <h3 class="quiz-question">A vendor complains that voice orders are misparsed too often. The temptation is to switch entirely to Sonnet. What should you investigate first?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Switch to Sonnet — accuracy beats cost.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Pull the VoiceParseLog rows and see what specifically was misparsed before changing models.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Ask the vendor to switch to English voice orders.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <div class="quiz-question-block"
+               data-correct="opt-a"
+               data-explanation-right="Yes. tool_choice forces Claude to call the add_items tool with a typed schema. The result is parsed by Zod on the server. If Claude returns malformed data, Zod throws — caught by the try/catch — and the route returns an error rather than passing garbage downstream. Free-form JSON would work most of the time but occasionally produces trailing commas, wrong types, or invented fields. Tool-use eliminates that whole class of bug."
+               data-explanation-wrong="The right answer is the schema validation chain. Tool-use forces Claude into a typed shape, then Zod re-validates on the server. If anything is off, Zod throws and the route returns an error — no malformed data reaches the cart. Free-form JSON can&rsquo;t give you that guarantee.">
+            <h3 class="quiz-question">If Claude returns malformed JSON one time in a thousand, what protects the cart from being filled with garbage?</h3>
+            <div class="quiz-options">
+              <button class="quiz-option" data-value="opt-a" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Forced tool-use with a strict JSON Schema, plus Zod re-validation on the server side.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-b" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>The browser has a try/catch around <code>JSON.parse</code>.</span>
+              </button>
+              <button class="quiz-option" data-value="opt-c" onclick="selectOption(this)">
+                <div class="quiz-option-radio"></div>
+                <span>Sonnet always re-parses Haiku&rsquo;s output as a safety net.</span>
+              </button>
+            </div>
+            <div class="quiz-feedback"></div>
+          </div>
+
+          <button class="btn quiz-check-btn" onclick="checkQuiz('quiz-module4')">Check answers</button>
+          <button class="btn quiz-reset-btn" onclick="resetQuiz('quiz-module4')">Try again</button>
+
+        </div>
+      </section>
+
+      <section class="screen animate-in">
+        <h2 class="screen-heading">A note on what doesn&rsquo;t go to Claude</h2>
+        <div class="callout callout-warning">
+          <div class="callout-icon">🔒</div>
+          <div class="callout-content">
+            <strong class="callout-title">Customer phone numbers never reach the LLM</strong>
+            <p>Only the <code>transcript</code> and <code>menu JSON</code> are sent to Anthropic. Customer phone, name, and UPI reference are scrubbed at the boundary &mdash; they exist in Postgres for re-sending receipts, but they never appear in a prompt or a log line. This is a rule baked into the project&rsquo;s <span class="term" data-definition="A markdown file in .cursor/rules/ that the AI coding assistant follows automatically when generating code. It enforces things like 'never send PII to LLMs' and 'always use paise for money' on every PR.">Cursor rules</span> &mdash; meaning the AI coding assistant itself enforces it on every PR.</p>
+          </div>
+        </div>
+      </section>
+
+    </div>
+  </div>
+</section>
