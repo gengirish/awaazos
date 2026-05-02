@@ -80,13 +80,30 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise }:
       >
         Skip to main content
       </a>
-      <nav className="mb-4 flex items-center justify-between md:hidden" aria-label="POS navigation">
+      <nav
+        className="mb-4 flex items-center justify-between gap-2"
+        aria-label="POS navigation"
+      >
         <Link
           href="/menu"
-          className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background hover:bg-accent"
+          className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
           Menu
         </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/transactions"
+            className="hidden min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:inline-flex"
+          >
+            Transactions
+          </Link>
+          <Link
+            href="/analytics"
+            className="hidden min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:inline-flex"
+          >
+            Analytics
+          </Link>
+        </div>
       </nav>
       <PosHeader stallName={vendor.name} todaysRevenuePaise={todaysRevenuePaise} />
       <main id="main-pos" className="mt-6 flex flex-col gap-8">

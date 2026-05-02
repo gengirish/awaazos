@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useMemo } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -41,11 +42,25 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
 
   if (items.length === 0) {
     return (
-      <section aria-labelledby="quick-add-heading" className="rounded-lg border border-dashed p-6 text-center">
+      <section
+        aria-labelledby="quick-add-heading"
+        className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-6 text-center"
+      >
         <h2 id="quick-add-heading" className="font-display text-lg font-semibold text-foreground">
           No items yet
         </h2>
-        <p className="mt-1 text-sm text-muted-foreground">Add menu items to use Quick Add.</p>
+        <p className="text-sm text-muted-foreground">
+          Add menu items so cashiers can tap or speak them into the cart.
+        </p>
+        <Link
+          href="/menu"
+          className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Open menu &rarr;
+        </Link>
+        <p className="text-xs text-muted-foreground">
+          Tip: items marked unavailable on /menu will not appear here.
+        </p>
       </section>
     );
   }
