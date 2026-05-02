@@ -12,7 +12,7 @@ type VoiceOrderState =
   | "success"
   | "error";
 
-type SttSource = "webspeech" | "sarvam";
+type SttSource = "webspeech" | "sarvam" | "nvidia";
 
 type ParsedItem = {
   menuItemId: string;
@@ -52,6 +52,13 @@ declare global {
 
 const SARVAM_LANGS = new Set(["te-IN", "kn-IN", "ta-IN"]);
 const WEBSPEECH_LANGS = new Set(["en-IN", "hi-IN"]);
+const NVIDIA_LANGS = new Set(["en-IN", "hi-IN"]);
+
+// Build-time public flag. When `true`, hi-IN/en-IN are routed through the
+// MediaRecorder + /api/ai/transcribe path (server forwards to NVIDIA Parakeet)
+// instead of the in-browser Web Speech API. Set on Vercel for A/B testing.
+const NVIDIA_FALLBACK_ENABLED =
+  process.env.NEXT_PUBLIC_VOICE_NVIDIA_FALLBACK === "true";
 
 function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
@@ -139,7 +146,14 @@ export function useVoiceOrder(options: { voiceLang: string }) {
     setConfidence(null);
     setModelUsed(null);
 
-    if (WEBSPEECH_LANGS.has(voiceLang)) {
+    // Recorder path is used for: Sarvam langs always, NVIDIA langs only when
+    // the public fallback flag is on. Web Speech path is the default for
+    // hi-IN/en-IN unless the flag flips it.
+    const useRecorder =
+      SARVAM_LANGS.has(voiceLang) ||
+      (NVIDIA_FALLBACK_ENABLED && NVIDIA_LANGS.has(voiceLang));
+
+    if (!useRecorder && WEBSPEECH_LANGS.has(voiceLang)) {
       const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
       if (!Ctor) {
         setState("error");
@@ -197,7 +211,7 @@ export function useVoiceOrder(options: { voiceLang: string }) {
       return;
     }
 
-    if (SARVAM_LANGS.has(voiceLang)) {
+    if (useRecorder) {
       setState("listening");
       chunksRef.current = [];
       try {
@@ -239,6 +253,7 @@ export function useVoiceOrder(options: { voiceLang: string }) {
                 transcript?: string;
                 error?: string;
                 fallback?: string;
+                sttSource?: SttSource;
               };
 
               if (!res.ok && res.status === 400) {
@@ -260,7 +275,12 @@ export function useVoiceOrder(options: { voiceLang: string }) {
                 return;
               }
 
-              await parseTranscript(transcript, "sarvam");
+              // Server tells us which engine handled the audio; fall back to
+              // a sensible default keyed on the lang group if the field is
+              // absent (older deploy still in flight, browser cache, etc.).
+              const reportedSource: SttSource =
+                data.sttSource ?? (SARVAM_LANGS.has(voiceLang) ? "sarvam" : "nvidia");
+              await parseTranscript(transcript, reportedSource);
             } catch {
               setState("error");
               setErrorReason("transcribe_failed");

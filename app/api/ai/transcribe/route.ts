@@ -3,7 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { Plan } from "@prisma/client";
 
 import { reserveSarvamMinutes } from "@/lib/ai-usage-guard";
-import { transcribeAudio, type SarvamLang } from "@/lib/sarvam";
+import { transcribeAudio as transcribeViaSarvam, type SarvamLang } from "@/lib/sarvam";
+import { transcribeAudio as transcribeViaNvidia, type NvidiaLang } from "@/lib/nvidia";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
 
@@ -11,15 +12,26 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const SARVAM_LANGS = ["te-IN", "kn-IN", "ta-IN"] as const satisfies readonly SarvamLang[];
+const NVIDIA_LANGS = ["en-IN", "hi-IN"] as const satisfies readonly NvidiaLang[];
 
 function isSarvamLang(s: string): s is SarvamLang {
   return (SARVAM_LANGS as readonly string[]).includes(s);
+}
+
+function isNvidiaLang(s: string): s is NvidiaLang {
+  return (NVIDIA_LANGS as readonly string[]).includes(s);
+}
+
+function nvidiaConfigured(): boolean {
+  const key = process.env.NVIDIA_API_KEY;
+  return typeof key === "string" && key.startsWith("nvapi-");
 }
 
 export async function POST(req: NextRequest) {
   const started = Date.now();
   let vendorId = "";
   let lang = "";
+  let sttSource: "sarvam" | "nvidia" | null = null;
 
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
@@ -36,29 +48,49 @@ export async function POST(req: NextRequest) {
     const audio = form.get("audio");
     lang = typeof form.get("lang") === "string" ? (form.get("lang") as string) : "";
 
-    if (!isSarvamLang(lang)) {
+    const sarvam = isSarvamLang(lang);
+    const nvidia = !sarvam && isNvidiaLang(lang) && nvidiaConfigured();
+
+    if (!sarvam && !nvidia) {
       return NextResponse.json(
-        { error: "use_webspeech", supportedLangs: [...SARVAM_LANGS] },
+        {
+          error: "use_webspeech",
+          supportedLangs: [
+            ...SARVAM_LANGS,
+            ...(nvidiaConfigured() ? NVIDIA_LANGS : []),
+          ],
+        },
         { status: 400 },
       );
     }
+
+    sttSource = sarvam ? "sarvam" : "nvidia";
 
     if (!(audio instanceof Blob) || audio.size === 0) {
       return NextResponse.json({ error: "Missing audio" }, { status: 400 });
     }
 
-    // Rough estimate: mobile WebM voice captures are often ~32kbps -> ~240KB/min.
-    const estimatedMinutes = Math.max(1 / 60, audio.size / 240_000);
-    const usage = await reserveSarvamMinutes({
-      vendorId: ctx.vendor.id,
-      plan: ctx.vendor.plan,
-      estimatedMinutes,
-    });
-    if (!usage.ok) {
-      return NextResponse.json({ error: usage.message, code: usage.code }, { status: 402 });
+    let transcript: string;
+
+    if (sarvam) {
+      // Rough estimate: mobile WebM voice captures are often ~32kbps -> ~240KB/min.
+      const estimatedMinutes = Math.max(1 / 60, audio.size / 240_000);
+      const usage = await reserveSarvamMinutes({
+        vendorId: ctx.vendor.id,
+        plan: ctx.vendor.plan,
+        estimatedMinutes,
+      });
+      if (!usage.ok) {
+        return NextResponse.json({ error: usage.message, code: usage.code }, { status: 402 });
+      }
+      ({ transcript } = await transcribeViaSarvam(audio, lang as SarvamLang));
+    } else {
+      // NVIDIA path: hosted Parakeet via NVCF. v0 uses the rate-limiter only as
+      // a quota guard. TODO: add a generic STT-minutes counter once we know
+      // real-world usage shapes.
+      ({ transcript } = await transcribeViaNvidia(audio, lang as NvidiaLang));
     }
 
-    const { transcript } = await transcribeAudio(audio, lang);
     const durationMs = Date.now() - started;
 
     console.log(
@@ -66,12 +98,13 @@ export async function POST(req: NextRequest) {
         route: "/api/ai/transcribe",
         vendorId,
         lang,
+        sttSource,
         durationMs,
         success: true,
       }),
     );
 
-    return NextResponse.json({ transcript, durationMs });
+    return NextResponse.json({ transcript, durationMs, sttSource });
   } catch (err) {
     if (err instanceof PlanGateError) {
       return NextResponse.json(
@@ -80,7 +113,7 @@ export async function POST(req: NextRequest) {
           code: "plan_upgrade_required",
           requiredPlan: err.required,
           currentPlan: err.current,
-          feature: "sarvam_stt",
+          feature: sttSource === "nvidia" ? "nvidia_stt" : "sarvam_stt",
         },
         { status: err.status },
       );
@@ -96,6 +129,7 @@ export async function POST(req: NextRequest) {
         route: "/api/ai/transcribe",
         vendorId: vendorId || undefined,
         lang: lang || undefined,
+        sttSource,
         durationMs,
         success: false,
       }),

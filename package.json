@@ -16,6 +16,7 @@
     "db:studio": "prisma studio",
     "worker": "tsx workers/index.ts",
     "smoke:sarvam": "node scripts/sarvam-roundtrip.mjs",
+    "smoke:nvidia": "node scripts/nvidia-smoke.mjs",
     "precommit:checks": "lint-staged",
     "prepare": "husky"
   },
