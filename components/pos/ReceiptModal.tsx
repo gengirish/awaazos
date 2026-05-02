@@ -48,23 +48,34 @@ export function ReceiptModal({
 
   async function sendWhatsApp() {
     const trimmed = phone.replace(/\s/g, "");
+    const e164 = trimmed.startsWith("+") ? trimmed : `+91${trimmed.replace(/^\+?91/, "")}`;
     try {
       const res = await fetch("/api/receipts/send", {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          billNumber,
-          customerPhone: trimmed.startsWith("+") ? trimmed : `+91${trimmed.replace(/^\+?91/, "")}`,
-        }),
+        body: JSON.stringify({ billNumber, customerPhone: e164 }),
       });
-      if (res.ok) {
-        toast.success("Receipt request sent.");
-      } else {
-        toast.warning("Receipts API not ready yet — we logged your request locally.");
+      const data = (await res.json().catch(() => ({}))) as {
+        queued?: boolean;
+        error?: string;
+        code?: string;
+      };
+      if (res.ok && data.queued) {
+        toast.success("Receipt sent on WhatsApp.");
+        return;
       }
+      if (res.status === 402 && data.code === "plan_upgrade_required") {
+        toast.error("WhatsApp receipts require a paid plan.");
+        return;
+      }
+      if (res.status === 400 && data.code === "whatsapp_not_configured") {
+        toast.error("Add a WhatsApp number in Settings first.");
+        return;
+      }
+      toast.error(data.error ?? "Could not send WhatsApp receipt.");
     } catch {
-      toast.warning("Could not reach receipt service — try again later.");
+      toast.error("Could not reach receipt service — try again.");
     }
   }
 

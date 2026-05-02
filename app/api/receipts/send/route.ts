@@ -9,10 +9,16 @@ import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const bodySchema = z.object({
-  transactionId: z.string().min(1),
-  customerPhone: z.string().optional(),
-});
+const bodySchema = z
+  .object({
+    transactionId: z.string().min(1).optional(),
+    billNumber: z.string().min(1).optional(),
+    customerPhone: z.string().optional(),
+  })
+  .refine((b) => Boolean(b.transactionId || b.billNumber), {
+    message: "Either transactionId or billNumber is required",
+    path: ["transactionId"],
+  });
 
 const jobOpts = {
   attempts: 3,
@@ -58,8 +64,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
     }
 
+    // Vendor-scoped lookup defeats ID forgery for both identifiers — a staff
+    // member of vendor A cannot resend vendor B's receipt by guessing either
+    // a transactionId or a billNumber.
+    const where = parsed.data.transactionId
+      ? { id: parsed.data.transactionId, vendorId: ctx.vendor.id }
+      : { billNumber: parsed.data.billNumber!, vendorId: ctx.vendor.id };
+
     const transaction = await prisma.transaction.findFirst({
-      where: { id: parsed.data.transactionId, vendorId: ctx.vendor.id },
+      where,
       include: { receipt: true },
     });
 
