@@ -103,6 +103,22 @@ export const VOICE_LANGUAGES = [
 /** Allowed picker values — used to normalise stale stored preferences at render time. */
 export const ALLOWED_VOICE_LANGS = VOICE_LANGUAGES.map((l) => l.value) as readonly string[];
 
+/**
+ * All voice-language codes the system can store / route. The user-facing picker
+ * is intentionally narrower (`ALLOWED_VOICE_LANGS`), but te/kn/ta are kept in
+ * the schema for legacy `VendorSettings.voiceLang` rows and the Sarvam STT
+ * code path. Any new value MUST also be added to `WEBSPEECH_LANGS` /
+ * `SARVAM_LANGS` in `hooks/useVoiceOrder.ts`.
+ */
+export const SUPPORTED_VOICE_LANGS = [
+  "en-IN",
+  "hi-IN",
+  "te-IN",
+  "kn-IN",
+  "ta-IN",
+] as const;
+export type SupportedVoiceLang = (typeof SUPPORTED_VOICE_LANGS)[number];
+
 /** Brand tokens aligned with tailwind `brand.*` and VendorSettings.theme. */
 export const BRAND = {
   primary: "#FF6B00",

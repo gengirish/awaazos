@@ -5,7 +5,17 @@ import { AlertCircle, Check, Loader2, Mic } from "lucide-react";
 
 import { useVoiceOrder } from "@/hooks/useVoiceOrder";
 import { useCartStore } from "@/lib/cartStore";
+import { VOICE_LANGUAGES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
+
+function voiceLangBadgeLabel(lang: string): string {
+  const known = VOICE_LANGUAGES.find((l) => l.value === lang);
+  if (known) return known.label;
+  if (lang === "te-IN") return "తెలుగు";
+  if (lang === "kn-IN") return "ಕನ್ನಡ";
+  if (lang === "ta-IN") return "தமிழ்";
+  return lang;
+}
 
 const ERROR_MESSAGES: Record<string, string> = {
   stt_unsupported: "Voice not supported — use the grid below",
@@ -89,11 +99,20 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
                 ? mapError(errorReason)
                 : "Voice order";
 
+  const langLabel = voiceLangBadgeLabel(voiceLang);
+
   return (
     <section className="flex flex-col items-center gap-2" aria-labelledby="voice-order-heading">
       <h2 id="voice-order-heading" className="sr-only">
         Voice order
       </h2>
+      <div
+        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
+        aria-label={`Voice language: ${langLabel}`}
+      >
+        <span aria-hidden>🎙️</span>
+        <span>{langLabel}</span>
+      </div>
       {unmatched.length > 0 ? (
         <p className="w-full text-center text-xs text-muted-foreground">
           Not on menu: {unmatched.join(", ")}

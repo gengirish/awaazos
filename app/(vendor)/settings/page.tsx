@@ -1,20 +1,29 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { VoiceLanguageClient } from "@/components/settings/VoiceLanguageClient";
+import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
+  let vendorId: string;
   try {
-    await requireVendorRole("CASHIER");
+    const ctx = await requireVendorRole("CASHIER");
+    vendorId = ctx.vendor.id;
   } catch (e) {
     if (e instanceof AuthError) {
       redirect("/sign-in");
     }
     throw e;
   }
+
+  const settings = await prisma.vendorSettings.findUnique({
+    where: { vendorId },
+    select: { voiceLang: true },
+  });
 
   return (
     <div className="min-h-screen bg-background p-4 pb-10 md:p-6">
@@ -30,7 +39,10 @@ export default async function SettingsPage() {
       </header>
 
       <main id="main" className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
-        <Link href="/settings/billing" className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <Link
+          href="/settings/billing"
+          className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
           <Card className="h-full transition-colors hover:bg-muted/40">
             <CardHeader>
               <CardTitle className="font-display text-lg">Billing</CardTitle>
@@ -38,11 +50,17 @@ export default async function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
-        <Card className="h-full border-dashed opacity-80">
+
+        <Card className="h-full sm:col-span-2">
           <CardHeader>
-            <CardTitle className="font-display text-lg">Vendor profile</CardTitle>
-            <CardDescription>Coming soon — stall details and branding.</CardDescription>
+            <CardTitle className="font-display text-lg">Voice & language</CardTitle>
+            <CardDescription>
+              Pick the language your counter staff will speak when using the POS mic.
+            </CardDescription>
           </CardHeader>
+          <CardContent>
+            <VoiceLanguageClient initialVoiceLang={settings?.voiceLang ?? "en-IN"} />
+          </CardContent>
         </Card>
       </main>
     </div>

@@ -2,6 +2,7 @@ import { Prisma, StallType } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { SUPPORTED_VOICE_LANGS } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { requireVendorRole } from "@/lib/rbac";
 
@@ -13,7 +14,7 @@ const patchSchema = z.object({
   upiName: z.string().trim().max(120).optional().nullable(),
   onboardingDone: z.boolean().optional(),
   whatsappNumber: z.string().trim().max(20).optional().nullable(),
-  voiceLang: z.string().trim().min(5).max(12).optional(),
+  voiceLang: z.enum(SUPPORTED_VOICE_LANGS).optional(),
   menuItems: z
     .array(
       z.object({
