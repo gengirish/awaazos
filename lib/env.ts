@@ -23,6 +23,7 @@ const envSchema = z.object({
   ANTHROPIC_API_KEY: z.string().optional(),
   SARVAM_API_KEY: z.string().optional(),
   NVIDIA_API_KEY: z.string().startsWith("nvapi-").optional(),
+  OPENAI_API_KEY: z.string().startsWith("sk-").optional(),
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),

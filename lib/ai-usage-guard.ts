@@ -27,12 +27,23 @@ const SARVAM_VENDOR_MONTHLY_MINUTE_CAP: Record<Plan, number> = {
   ENTERPRISE: 20_000,
 };
 
+const OPENAI_STT_VENDOR_MONTHLY_MINUTE_CAP: Record<Plan, number> = {
+  FREE: 0,
+  STARTER: 1_200,
+  PRO: 6_000,
+  ENTERPRISE: 20_000,
+};
+
 function globalAnthropicCap(): number {
   return Number(process.env.GLOBAL_ANTHROPIC_MONTHLY_TOKEN_CAP ?? 200_000_000);
 }
 
 function globalSarvamCap(): number {
   return Number(process.env.GLOBAL_SARVAM_MONTHLY_MINUTE_CAP ?? 100_000);
+}
+
+function globalOpenaiSttCap(): number {
+  return Number(process.env.GLOBAL_OPENAI_STT_MONTHLY_MINUTE_CAP ?? 50_000);
 }
 
 async function bumpCounter(key: string, delta: number, ttlSec: number): Promise<number> {
@@ -116,6 +127,46 @@ export async function reserveSarvamMinutes(args: {
     }
     if (globalNext > globalSarvamCap()) {
       return { ok: false, code: "global_sarvam_cap_reached", message: "Platform Sarvam minute cap reached." };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: true };
+  }
+}
+
+/** Reserve OpenAI STT usage in whole minutes (rounded up). */
+export async function reserveOpenaiSttMinutes(args: {
+  vendorId: string;
+  plan: Plan;
+  estimatedMinutes: number;
+}): Promise<GuardResult> {
+  const delta = Math.max(1, Math.ceil(args.estimatedMinutes));
+  const m = monthKey();
+  const ttl = secondsUntilMonthEnd();
+  const vendorKey = `usage:openai-stt:vendor:${args.vendorId}:${m}`;
+  const globalKey = `usage:openai-stt:global:${m}`;
+
+  try {
+    const kv = getKv();
+    if (!kv) return { ok: true };
+
+    const [vendorNext, globalNext] = await Promise.all([
+      bumpCounter(vendorKey, delta, ttl),
+      bumpCounter(globalKey, delta, ttl),
+    ]);
+    if (vendorNext > OPENAI_STT_VENDOR_MONTHLY_MINUTE_CAP[args.plan]) {
+      return {
+        ok: false,
+        code: "vendor_openai_stt_cap_reached",
+        message: "Monthly OpenAI STT minute cap reached for this plan.",
+      };
+    }
+    if (globalNext > globalOpenaiSttCap()) {
+      return {
+        ok: false,
+        code: "global_openai_stt_cap_reached",
+        message: "Platform OpenAI STT minute cap reached.",
+      };
     }
     return { ok: true };
   } catch {

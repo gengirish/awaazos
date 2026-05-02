@@ -2,24 +2,40 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { Plan } from "@prisma/client";
 
-import { reserveSarvamMinutes } from "@/lib/ai-usage-guard";
+import { reserveOpenaiSttMinutes, reserveSarvamMinutes } from "@/lib/ai-usage-guard";
 import { transcribeAudio as transcribeViaSarvam, type SarvamLang } from "@/lib/sarvam";
 import { transcribeAudio as transcribeViaNvidia, type NvidiaLang } from "@/lib/nvidia";
+import {
+  transcribeAudio as transcribeViaOpenai,
+  type OpenaiSttLang,
+} from "@/lib/openai-stt";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
+type SttSource = "sarvam" | "openai" | "nvidia";
+
 const SARVAM_LANGS = ["te-IN", "kn-IN", "ta-IN"] as const satisfies readonly SarvamLang[];
-const NVIDIA_LANGS = ["en-IN", "hi-IN"] as const satisfies readonly NvidiaLang[];
+// en/hi langs share the same set across OpenAI and NVIDIA today; keep one
+// canonical list and narrow at the call site.
+const FALLBACK_LANGS = ["en-IN", "hi-IN"] as const satisfies readonly (
+  | NvidiaLang
+  | OpenaiSttLang
+)[];
 
 function isSarvamLang(s: string): s is SarvamLang {
   return (SARVAM_LANGS as readonly string[]).includes(s);
 }
 
-function isNvidiaLang(s: string): s is NvidiaLang {
-  return (NVIDIA_LANGS as readonly string[]).includes(s);
+function isFallbackLang(s: string): s is NvidiaLang & OpenaiSttLang {
+  return (FALLBACK_LANGS as readonly string[]).includes(s);
+}
+
+function openaiConfigured(): boolean {
+  const key = process.env.OPENAI_API_KEY;
+  return typeof key === "string" && key.startsWith("sk-");
 }
 
 function nvidiaConfigured(): boolean {
@@ -27,11 +43,27 @@ function nvidiaConfigured(): boolean {
   return typeof key === "string" && key.startsWith("nvapi-");
 }
 
+/**
+ * Pick the STT provider for the given language.
+ *
+ * Priority for en-IN / hi-IN: OpenAI (preferred) → NVIDIA (legacy) → reject.
+ * te-IN / kn-IN / ta-IN always go to Sarvam (Parakeet/OpenAI Whisper lose
+ * to Sarvam on Indic code-mixing in our internal evals).
+ */
+function pickProvider(lang: string): SttSource | null {
+  if (isSarvamLang(lang)) return "sarvam";
+  if (isFallbackLang(lang)) {
+    if (openaiConfigured()) return "openai";
+    if (nvidiaConfigured()) return "nvidia";
+  }
+  return null;
+}
+
 export async function POST(req: NextRequest) {
   const started = Date.now();
   let vendorId = "";
   let lang = "";
-  let sttSource: "sarvam" | "nvidia" | null = null;
+  let sttSource: SttSource | null = null;
 
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
@@ -48,33 +80,29 @@ export async function POST(req: NextRequest) {
     const audio = form.get("audio");
     lang = typeof form.get("lang") === "string" ? (form.get("lang") as string) : "";
 
-    const sarvam = isSarvamLang(lang);
-    const nvidia = !sarvam && isNvidiaLang(lang) && nvidiaConfigured();
+    sttSource = pickProvider(lang);
 
-    if (!sarvam && !nvidia) {
+    if (!sttSource) {
+      const fallbackLangs = openaiConfigured() || nvidiaConfigured() ? FALLBACK_LANGS : [];
       return NextResponse.json(
         {
           error: "use_webspeech",
-          supportedLangs: [
-            ...SARVAM_LANGS,
-            ...(nvidiaConfigured() ? NVIDIA_LANGS : []),
-          ],
+          supportedLangs: [...SARVAM_LANGS, ...fallbackLangs],
         },
         { status: 400 },
       );
     }
 
-    sttSource = sarvam ? "sarvam" : "nvidia";
-
     if (!(audio instanceof Blob) || audio.size === 0) {
       return NextResponse.json({ error: "Missing audio" }, { status: 400 });
     }
 
+    // Rough estimate: mobile WebM voice captures are often ~32kbps -> ~240KB/min.
+    const estimatedMinutes = Math.max(1 / 60, audio.size / 240_000);
+
     let transcript: string;
 
-    if (sarvam) {
-      // Rough estimate: mobile WebM voice captures are often ~32kbps -> ~240KB/min.
-      const estimatedMinutes = Math.max(1 / 60, audio.size / 240_000);
+    if (sttSource === "sarvam") {
       const usage = await reserveSarvamMinutes({
         vendorId: ctx.vendor.id,
         plan: ctx.vendor.plan,
@@ -84,10 +112,20 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: usage.message, code: usage.code }, { status: 402 });
       }
       ({ transcript } = await transcribeViaSarvam(audio, lang as SarvamLang));
+    } else if (sttSource === "openai") {
+      const usage = await reserveOpenaiSttMinutes({
+        vendorId: ctx.vendor.id,
+        plan: ctx.vendor.plan,
+        estimatedMinutes,
+      });
+      if (!usage.ok) {
+        return NextResponse.json({ error: usage.message, code: usage.code }, { status: 402 });
+      }
+      ({ transcript } = await transcribeViaOpenai(audio, lang as OpenaiSttLang));
     } else {
-      // NVIDIA path: hosted Parakeet via NVCF. v0 uses the rate-limiter only as
-      // a quota guard. TODO: add a generic STT-minutes counter once we know
-      // real-world usage shapes.
+      // NVIDIA: legacy fallback. v0 uses the rate-limiter only as a quota
+      // guard. Kept on tree until we're certain OpenAI is durable enough as
+      // the primary; reverse priority in pickProvider() if needed.
       ({ transcript } = await transcribeViaNvidia(audio, lang as NvidiaLang));
     }
 
@@ -107,13 +145,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ transcript, durationMs, sttSource });
   } catch (err) {
     if (err instanceof PlanGateError) {
+      const featureBySource: Record<SttSource, string> = {
+        sarvam: "sarvam_stt",
+        openai: "openai_stt",
+        nvidia: "nvidia_stt",
+      };
       return NextResponse.json(
         {
           error: err.message,
           code: "plan_upgrade_required",
           requiredPlan: err.required,
           currentPlan: err.current,
-          feature: sttSource === "nvidia" ? "nvidia_stt" : "sarvam_stt",
+          feature: sttSource ? featureBySource[sttSource] : "sarvam_stt",
         },
         { status: err.status },
       );
@@ -135,9 +178,6 @@ export async function POST(req: NextRequest) {
       }),
     );
 
-    return NextResponse.json(
-      { error: message, fallback: "quickadd" },
-      { status: 200 },
-    );
+    return NextResponse.json({ error: message, fallback: "quickadd" }, { status: 200 });
   }
 }
