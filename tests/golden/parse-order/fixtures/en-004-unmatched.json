@@ -1,0 +1,12 @@
+{
+  "id": "en-004-unmatched",
+  "lang": "en-IN",
+  "transcript": "give me a pizza and one samosa",
+  "expected": {
+    "items": [{ "menuItemId": "samosa", "qty": 1 }],
+    "unmatched": ["pizza"],
+    "minConfidence": "low"
+  },
+  "tags": ["english", "unmatched", "partial-success"],
+  "notes": "Pizza is not on the menu — must be reported as unmatched, not silently dropped, AND should drag confidence to low."
+}

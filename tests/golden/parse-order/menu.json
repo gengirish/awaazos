@@ -1,0 +1,134 @@
+[
+  {
+    "id": "bhel-puri",
+    "name": "Bhel Puri",
+    "aliases": ["bhel", "bhelpuri", "bhel poori"],
+    "priceInPaise": 5000
+  },
+  {
+    "id": "small-bhel",
+    "name": "Small Bhel",
+    "aliases": ["small bhel puri", "mini bhel"],
+    "priceInPaise": 3000
+  },
+  {
+    "id": "samosa",
+    "name": "Samosa",
+    "aliases": ["singara"],
+    "priceInPaise": 2000
+  },
+  {
+    "id": "pani-puri",
+    "name": "Pani Puri",
+    "aliases": ["puchka", "golgappa", "puri", "pani-puri"],
+    "priceInPaise": 5000
+  },
+  {
+    "id": "vada-pav",
+    "name": "Vada Pav",
+    "aliases": ["vadapav", "wada pav"],
+    "priceInPaise": 3000
+  },
+  {
+    "id": "dabeli",
+    "name": "Dabeli",
+    "aliases": ["kutchi dabeli"],
+    "priceInPaise": 4000
+  },
+  {
+    "id": "kachori",
+    "name": "Kachori",
+    "aliases": ["kachauri"],
+    "priceInPaise": 2500
+  },
+  {
+    "id": "masala-dosa",
+    "name": "Masala Dosa",
+    "aliases": ["dosa", "masaal dosa"],
+    "priceInPaise": 8000
+  },
+  {
+    "id": "idli-sambar",
+    "name": "Idli Sambar",
+    "aliases": ["idli", "iddli", "idly"],
+    "priceInPaise": 6000
+  },
+  {
+    "id": "vada-sambar",
+    "name": "Vada Sambar",
+    "aliases": ["medu vada", "vada"],
+    "priceInPaise": 5500
+  },
+  {
+    "id": "chana-bhatura",
+    "name": "Chana Bhatura",
+    "aliases": ["chole bhature", "chana bhature"],
+    "priceInPaise": 12000
+  },
+  {
+    "id": "pulao",
+    "name": "Veg Pulao",
+    "aliases": ["pulav", "pilaf"],
+    "priceInPaise": 11000
+  },
+  {
+    "id": "nimbu-pani",
+    "name": "Nimbu Pani",
+    "aliases": ["lemonade", "lemon water", "shikanji"],
+    "priceInPaise": 3000
+  },
+  {
+    "id": "masala-chai",
+    "name": "Masala Chai",
+    "aliases": ["chai", "tea", "cutting chai"],
+    "priceInPaise": 1500
+  },
+  {
+    "id": "filter-coffee",
+    "name": "Filter Coffee",
+    "aliases": ["coffee", "kaapi", "filter kaapi"],
+    "priceInPaise": 2500
+  },
+  {
+    "id": "lassi",
+    "name": "Sweet Lassi",
+    "aliases": ["meethi lassi", "punjabi lassi"],
+    "priceInPaise": 4000
+  },
+  {
+    "id": "fresh-juice",
+    "name": "Fresh Orange Juice",
+    "aliases": ["orange juice", "santra juice", "juice"],
+    "priceInPaise": 5000
+  },
+  {
+    "id": "jalebi",
+    "name": "Jalebi",
+    "aliases": ["jilipi", "jilebi"],
+    "priceInPaise": 3500
+  },
+  {
+    "id": "gulab-jamun",
+    "name": "Gulab Jamun",
+    "aliases": ["jamun", "gulab"],
+    "priceInPaise": 4500
+  },
+  {
+    "id": "kulfi",
+    "name": "Malai Kulfi",
+    "aliases": ["kulfi falooda", "malai-kulfi"],
+    "priceInPaise": 5000
+  },
+  {
+    "id": "papad",
+    "name": "Papad",
+    "aliases": ["papadum", "appalam"],
+    "priceInPaise": 1000
+  },
+  {
+    "id": "raita",
+    "name": "Boondi Raita",
+    "aliases": ["raita", "boondi"],
+    "priceInPaise": 3500
+  }
+]

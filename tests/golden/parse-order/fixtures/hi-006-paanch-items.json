@@ -1,0 +1,15 @@
+{
+  "id": "hi-006-paanch-items",
+  "lang": "hi-IN",
+  "transcript": "paanch samosa do kachori",
+  "expected": {
+    "items": [
+      { "menuItemId": "samosa", "qty": 5 },
+      { "menuItemId": "kachori", "qty": 2 }
+    ],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["hindi", "indic-numerals", "no-conjunction"],
+  "notes": "'paanch'=5. The transcript has no conjunction between items — model must still parse two distinct line items."
+}

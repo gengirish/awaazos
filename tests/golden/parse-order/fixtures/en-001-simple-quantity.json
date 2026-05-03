@@ -1,0 +1,15 @@
+{
+  "id": "en-001-simple-quantity",
+  "lang": "en-IN",
+  "transcript": "one small bhel and two lemonades",
+  "expected": {
+    "items": [
+      { "menuItemId": "small-bhel", "qty": 1 },
+      { "menuItemId": "nimbu-pani", "qty": 2 }
+    ],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["english", "basic-quantity", "alias-resolution"],
+  "notes": "Baseline fixture from .cursor/rules/voice-ai.mdc — 'lemonade' is a Nimbu Pani alias."
+}

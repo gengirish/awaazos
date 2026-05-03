@@ -1,0 +1,12 @@
+{
+  "id": "en-002-default-qty",
+  "lang": "en-IN",
+  "transcript": "one masala dosa please",
+  "expected": {
+    "items": [{ "menuItemId": "masala-dosa", "qty": 1 }],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["english", "polite-phrase", "single-item"],
+  "notes": "Tests that politeness particles ('please') do not appear as unmatched."
+}

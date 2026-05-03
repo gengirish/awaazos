@@ -1,0 +1,12 @@
+{
+  "id": "te-004-aidu-papad",
+  "lang": "te-IN",
+  "transcript": "aidu appalam",
+  "expected": {
+    "items": [{ "menuItemId": "papad", "qty": 5 }],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["telugu", "indic-numerals", "regional-alias"],
+  "notes": "'aidu'=5; 'appalam' is the South Indian name for papad — must hit the alias."
+}

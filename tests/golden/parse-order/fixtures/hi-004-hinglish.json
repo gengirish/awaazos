@@ -1,0 +1,15 @@
+{
+  "id": "hi-004-hinglish",
+  "lang": "hi-IN",
+  "transcript": "do plate samosa aur teen chai dena",
+  "expected": {
+    "items": [
+      { "menuItemId": "samosa", "qty": 2 },
+      { "menuItemId": "masala-chai", "qty": 3 }
+    ],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["hindi", "hinglish", "code-mixing", "indic-numerals"],
+  "notes": "'plate' is a serving classifier in Indian Hindi, not a menu item. Common code-mixing pattern."
+}

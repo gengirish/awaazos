@@ -1,0 +1,12 @@
+{
+  "id": "ta-002-moonu-vada",
+  "lang": "ta-IN",
+  "transcript": "moonu medu vada kuduthuru",
+  "expected": {
+    "items": [{ "menuItemId": "vada-sambar", "qty": 3 }],
+    "unmatched": [],
+    "minConfidence": "medium"
+  },
+  "tags": ["tamil", "indic-numerals", "alias-resolution"],
+  "notes": "'moonu'=3 (Tamil). 'kuduthuru'='give' (verb), not an item — must be ignored."
+}

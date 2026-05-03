@@ -1,0 +1,15 @@
+{
+  "id": "ta-001-rendu-idli",
+  "lang": "ta-IN",
+  "transcript": "rendu idly oru kaapi",
+  "expected": {
+    "items": [
+      { "menuItemId": "idli-sambar", "qty": 2 },
+      { "menuItemId": "filter-coffee", "qty": 1 }
+    ],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["tamil", "indic-numerals", "alias-resolution"],
+  "notes": "'rendu'=2 (Tamil shares this with Telugu). 'oru'=1 in Tamil. 'idly' (with y) is a common spelling variant."
+}

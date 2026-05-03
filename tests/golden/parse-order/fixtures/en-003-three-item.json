@@ -1,0 +1,16 @@
+{
+  "id": "en-003-three-item",
+  "lang": "en-IN",
+  "transcript": "two samosas, one chai and a papad",
+  "expected": {
+    "items": [
+      { "menuItemId": "samosa", "qty": 2 },
+      { "menuItemId": "masala-chai", "qty": 1 },
+      { "menuItemId": "papad", "qty": 1 }
+    ],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["english", "multi-item", "indefinite-article"],
+  "notes": "'a papad' must resolve to qty 1, not be dropped or treated as zero."
+}

@@ -1,0 +1,12 @@
+{
+  "id": "kn-003-naalku-juice",
+  "lang": "kn-IN",
+  "transcript": "naalku santra juice",
+  "expected": {
+    "items": [{ "menuItemId": "fresh-juice", "qty": 4 }],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["kannada", "indic-numerals", "alias-resolution"],
+  "notes": "'naalku'=4. 'santra juice' is the Kannada+Hindi mix for orange juice; matches the fresh-juice alias."
+}

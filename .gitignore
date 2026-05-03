@@ -62,3 +62,7 @@ tmp/
 
 # cursor agent transcripts inside the repo (if any get exported)
 .cursor/agent-transcripts/
+.env*.local
+
+# golden parse-order test artifacts
+tests/golden/parse-order/.last-run/

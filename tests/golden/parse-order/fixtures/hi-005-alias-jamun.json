@@ -1,0 +1,15 @@
+{
+  "id": "hi-005-alias-jamun",
+  "lang": "hi-IN",
+  "transcript": "char jamun aur ek lassi",
+  "expected": {
+    "items": [
+      { "menuItemId": "gulab-jamun", "qty": 4 },
+      { "menuItemId": "lassi", "qty": 1 }
+    ],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["hindi", "alias-resolution", "indic-numerals"],
+  "notes": "'jamun' alone is an alias for gulab-jamun. 'char'=4."
+}

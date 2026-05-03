@@ -1,0 +1,12 @@
+{
+  "id": "te-001-rendu-bhel",
+  "lang": "te-IN",
+  "transcript": "rendu large bhel",
+  "expected": {
+    "items": [{ "menuItemId": "bhel-puri", "qty": 2 }],
+    "unmatched": [],
+    "minConfidence": "medium"
+  },
+  "tags": ["telugu", "indic-numerals", "size-modifier", "baseline-from-rule"],
+  "notes": "Baseline from .cursor/rules/voice-ai.mdc. 'rendu'=2 in Telugu. We don't model 'large' as a separate SKU — bhel-puri is the canonical size, small-bhel is the smaller size. Original rule fixture says 'large bhel×2' which we interpret as 'rendu bhel-puri', the standard-size."
+}

@@ -1,0 +1,15 @@
+{
+  "id": "en-005-numeric-words",
+  "lang": "en-IN",
+  "transcript": "three jalebis and four gulab jamuns",
+  "expected": {
+    "items": [
+      { "menuItemId": "jalebi", "qty": 3 },
+      { "menuItemId": "gulab-jamun", "qty": 4 }
+    ],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["english", "numeric-words", "plural-noun"],
+  "notes": "English number words ('three', 'four') must convert to integers; plural 's' on jalebis/jamuns ignored."
+}

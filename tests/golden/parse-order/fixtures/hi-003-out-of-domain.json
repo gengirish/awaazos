@@ -1,0 +1,12 @@
+{
+  "id": "hi-003-out-of-domain",
+  "lang": "hi-IN",
+  "transcript": "scooty chahiye",
+  "expected": {
+    "items": [],
+    "unmatched": ["scooty chahiye"],
+    "minConfidence": "low"
+  },
+  "tags": ["hindi", "out-of-domain", "low-confidence", "baseline-from-rule"],
+  "notes": "Baseline from .cursor/rules/voice-ai.mdc. The customer wants a scooter, not food — must NOT pattern-match a similar menu item."
+}

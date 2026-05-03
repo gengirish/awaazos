@@ -1,0 +1,15 @@
+{
+  "id": "hi-001-indic-numerals",
+  "lang": "hi-IN",
+  "transcript": "do bhel aur ek nimbu pani",
+  "expected": {
+    "items": [
+      { "menuItemId": "bhel-puri", "qty": 2 },
+      { "menuItemId": "nimbu-pani", "qty": 1 }
+    ],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["hindi", "indic-numerals", "code-mixing", "baseline-from-rule"],
+  "notes": "Baseline from .cursor/rules/voice-ai.mdc. 'do'=2, 'ek'=1, 'aur'=conjunction, NOT a menu item."
+}

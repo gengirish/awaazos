@@ -1,0 +1,15 @@
+{
+  "id": "kn-001-eradu-dosa",
+  "lang": "kn-IN",
+  "transcript": "eradu masala dosa mattu ondu kaapi",
+  "expected": {
+    "items": [
+      { "menuItemId": "masala-dosa", "qty": 2 },
+      { "menuItemId": "filter-coffee", "qty": 1 }
+    ],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["kannada", "indic-numerals", "alias-resolution"],
+  "notes": "'eradu'=2, 'ondu'=1, 'mattu'=and. 'kaapi' is the regional alias for filter coffee."
+}

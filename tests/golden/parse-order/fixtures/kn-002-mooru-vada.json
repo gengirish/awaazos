@@ -1,0 +1,12 @@
+{
+  "id": "kn-002-mooru-vada",
+  "lang": "kn-IN",
+  "transcript": "mooru medu vada onde plate",
+  "expected": {
+    "items": [{ "menuItemId": "vada-sambar", "qty": 3 }],
+    "unmatched": [],
+    "minConfidence": "medium"
+  },
+  "tags": ["kannada", "indic-numerals", "alias-resolution", "qty-classifier"],
+  "notes": "'mooru'=3. 'medu vada' is the alias. 'onde plate' is a serving classifier — must NOT be parsed as another item or change the qty."
+}

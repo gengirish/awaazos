@@ -1,0 +1,12 @@
+{
+  "id": "en-006-empty-cart",
+  "lang": "en-IN",
+  "transcript": "thanks have a nice day",
+  "expected": {
+    "items": [],
+    "unmatched": ["thanks have a nice day"],
+    "minConfidence": "low"
+  },
+  "tags": ["english", "non-order", "polite-noise"],
+  "notes": "A purely conversational utterance should produce zero items and low confidence — protects against the model hallucinating items."
+}

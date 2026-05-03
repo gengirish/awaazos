@@ -19,6 +19,8 @@
     "smoke:nvidia": "node scripts/nvidia-smoke.mjs",
     "smoke:openai": "node scripts/openai-stt-smoke.mjs",
     "smoke:groq": "node scripts/groq-stt-smoke.mjs",
+    "test:golden": "vitest run tests/golden/parse-order/live.test.ts",
+    "test:golden:validate": "vitest run tests/golden/parse-order/validate.test.ts",
     "precommit:checks": "lint-staged",
     "prepare": "husky"
   },

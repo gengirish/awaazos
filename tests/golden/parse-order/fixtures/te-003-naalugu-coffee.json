@@ -1,0 +1,15 @@
+{
+  "id": "te-003-naalugu-coffee",
+  "lang": "te-IN",
+  "transcript": "naalugu filter coffee mariyu rendu idli",
+  "expected": {
+    "items": [
+      { "menuItemId": "filter-coffee", "qty": 4 },
+      { "menuItemId": "idli-sambar", "qty": 2 }
+    ],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["telugu", "indic-numerals", "alias-resolution"],
+  "notes": "'naalugu'=4, 'rendu'=2, 'mariyu'=and. 'filter coffee' resolves directly; 'idli' is the short alias."
+}

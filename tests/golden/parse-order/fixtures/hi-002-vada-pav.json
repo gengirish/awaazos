@@ -1,0 +1,12 @@
+{
+  "id": "hi-002-vada-pav",
+  "lang": "hi-IN",
+  "transcript": "ek vada pav",
+  "expected": {
+    "items": [{ "menuItemId": "vada-pav", "qty": 1 }],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["hindi", "single-item", "compound-name", "baseline-from-rule"],
+  "notes": "Baseline from .cursor/rules/voice-ai.mdc. 'vada pav' is a compound; must not be split."
+}

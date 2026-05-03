@@ -1,0 +1,12 @@
+{
+  "id": "hi-007-disfluency",
+  "lang": "hi-IN",
+  "transcript": "do, uh, do nahi teen samosa dena",
+  "expected": {
+    "items": [{ "menuItemId": "samosa", "qty": 3 }],
+    "unmatched": [],
+    "minConfidence": "medium"
+  },
+  "tags": ["hindi", "disfluency", "self-correction"],
+  "notes": "Vendor self-corrects from 2 to 3. Final qty must be 3, not 2 or 5. Disfluencies are a real-world stress test."
+}

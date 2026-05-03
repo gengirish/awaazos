@@ -1,0 +1,15 @@
+{
+  "id": "te-002-moodu-samosa",
+  "lang": "te-IN",
+  "transcript": "moodu samosa, okati chai",
+  "expected": {
+    "items": [
+      { "menuItemId": "samosa", "qty": 3 },
+      { "menuItemId": "masala-chai", "qty": 1 }
+    ],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["telugu", "indic-numerals", "multi-item", "baseline-from-rule"],
+  "notes": "Baseline from .cursor/rules/voice-ai.mdc. 'moodu'=3, 'okati'=1."
+}

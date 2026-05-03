@@ -1,0 +1,12 @@
+{
+  "id": "hi-008-mixed-unmatched",
+  "lang": "hi-IN",
+  "transcript": "ek samosa aur ek burger dena",
+  "expected": {
+    "items": [{ "menuItemId": "samosa", "qty": 1 }],
+    "unmatched": ["burger"],
+    "minConfidence": "low"
+  },
+  "tags": ["hindi", "partial-success", "unmatched"],
+  "notes": "Burger is not on the menu. The samosa must still be billed correctly even when one item fails to match."
+}

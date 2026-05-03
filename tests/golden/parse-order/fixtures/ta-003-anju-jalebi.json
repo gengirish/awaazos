@@ -1,0 +1,12 @@
+{
+  "id": "ta-003-anju-jalebi",
+  "lang": "ta-IN",
+  "transcript": "anju jilipi mattum",
+  "expected": {
+    "items": [{ "menuItemId": "jalebi", "qty": 5 }],
+    "unmatched": [],
+    "minConfidence": "high"
+  },
+  "tags": ["tamil", "indic-numerals", "alias-resolution"],
+  "notes": "'anju'=5 (Tamil). 'jilipi' is the Tamil pronunciation/alias for jalebi. 'mattum'=only/just."
+}
