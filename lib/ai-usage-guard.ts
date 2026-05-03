@@ -34,6 +34,17 @@ const OPENAI_STT_VENDOR_MONTHLY_MINUTE_CAP: Record<Plan, number> = {
   ENTERPRISE: 20_000,
 };
 
+// Groq Whisper is ~⅛ the cost of OpenAI mini, so per-vendor caps are
+// proportionally larger. These are still defensive ceilings rather than
+// expected steady-state usage — Groq is layer-2, only fires when primary
+// fails or trips its breaker.
+const GROQ_STT_VENDOR_MONTHLY_MINUTE_CAP: Record<Plan, number> = {
+  FREE: 0,
+  STARTER: 2_400,
+  PRO: 12_000,
+  ENTERPRISE: 40_000,
+};
+
 function globalAnthropicCap(): number {
   return Number(process.env.GLOBAL_ANTHROPIC_MONTHLY_TOKEN_CAP ?? 200_000_000);
 }
@@ -44,6 +55,10 @@ function globalSarvamCap(): number {
 
 function globalOpenaiSttCap(): number {
   return Number(process.env.GLOBAL_OPENAI_STT_MONTHLY_MINUTE_CAP ?? 50_000);
+}
+
+function globalGroqSttCap(): number {
+  return Number(process.env.GLOBAL_GROQ_STT_MONTHLY_MINUTE_CAP ?? 200_000);
 }
 
 async function bumpCounter(key: string, delta: number, ttlSec: number): Promise<number> {
@@ -166,6 +181,46 @@ export async function reserveOpenaiSttMinutes(args: {
         ok: false,
         code: "global_openai_stt_cap_reached",
         message: "Platform OpenAI STT minute cap reached.",
+      };
+    }
+    return { ok: true };
+  } catch {
+    return { ok: true };
+  }
+}
+
+/** Reserve Groq STT usage in whole minutes (rounded up). */
+export async function reserveGroqSttMinutes(args: {
+  vendorId: string;
+  plan: Plan;
+  estimatedMinutes: number;
+}): Promise<GuardResult> {
+  const delta = Math.max(1, Math.ceil(args.estimatedMinutes));
+  const m = monthKey();
+  const ttl = secondsUntilMonthEnd();
+  const vendorKey = `usage:groq-stt:vendor:${args.vendorId}:${m}`;
+  const globalKey = `usage:groq-stt:global:${m}`;
+
+  try {
+    const kv = getKv();
+    if (!kv) return { ok: true };
+
+    const [vendorNext, globalNext] = await Promise.all([
+      bumpCounter(vendorKey, delta, ttl),
+      bumpCounter(globalKey, delta, ttl),
+    ]);
+    if (vendorNext > GROQ_STT_VENDOR_MONTHLY_MINUTE_CAP[args.plan]) {
+      return {
+        ok: false,
+        code: "vendor_groq_stt_cap_reached",
+        message: "Monthly Groq STT minute cap reached for this plan.",
+      };
+    }
+    if (globalNext > globalGroqSttCap()) {
+      return {
+        ok: false,
+        code: "global_groq_stt_cap_reached",
+        message: "Platform Groq STT minute cap reached.",
       };
     }
     return { ok: true };

@@ -12,7 +12,7 @@ type VoiceOrderState =
   | "success"
   | "error";
 
-type SttSource = "webspeech" | "sarvam" | "openai" | "nvidia";
+type SttSource = "webspeech" | "sarvam" | "openai" | "groq" | "nvidia";
 
 type ParsedItem = {
   menuItemId: string;

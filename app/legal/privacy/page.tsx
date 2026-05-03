@@ -9,7 +9,7 @@ export default function PrivacyPage() {
   return (
     <>
       <h1>Privacy Policy</h1>
-      <p>Last updated: 02 May 2026</p>
+      <p>Last updated: 03 May 2026</p>
       <p>
         AwaazOS is built by IntelliForge AI in Hyderabad, India. This policy explains how we collect, use, and
         protect data when you use AwaazOS.
@@ -41,9 +41,11 @@ export default function PrivacyPage() {
         <li>Neon (PostgreSQL database)</li>
         <li>Upstash Redis / Fly.io (queues and workers)</li>
         <li>
-          Anthropic, Sarvam, and OpenAI (AI/STT processing). For OpenAI, we operate under a
-          Zero-Data-Retention agreement: voice clips are processed in-memory and discarded
-          immediately, not stored or used for model training.
+          Anthropic, Sarvam, OpenAI, and (when enabled) Groq for AI / speech-to-text
+          processing. For OpenAI, we operate under a Zero-Data-Retention agreement: voice
+          clips are processed in-memory and discarded immediately, not stored or used for
+          model training. Groq is invoked only as a fallback when the primary provider is
+          unavailable.
         </li>
         <li>Razorpay (payments and billing subscriptions)</li>
         <li>Gupshup (WhatsApp receipts)</li>

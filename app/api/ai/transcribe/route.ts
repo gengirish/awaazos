@@ -2,24 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { Plan } from "@prisma/client";
 
-import { reserveOpenaiSttMinutes, reserveSarvamMinutes } from "@/lib/ai-usage-guard";
+import {
+  reserveGroqSttMinutes,
+  reserveOpenaiSttMinutes,
+  reserveSarvamMinutes,
+} from "@/lib/ai-usage-guard";
+import { getBreaker } from "@/lib/circuit-breaker";
 import { transcribeAudio as transcribeViaSarvam, type SarvamLang } from "@/lib/sarvam";
 import { transcribeAudio as transcribeViaNvidia, type NvidiaLang } from "@/lib/nvidia";
 import {
   transcribeAudio as transcribeViaOpenai,
   type OpenaiSttLang,
 } from "@/lib/openai-stt";
+import {
+  transcribeAudio as transcribeViaGroq,
+  type GroqSttLang,
+} from "@/lib/groq-stt";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type SttSource = "sarvam" | "openai" | "nvidia";
+type SttSource = "sarvam" | "openai" | "nvidia" | "groq";
 
 const SARVAM_LANGS = ["te-IN", "kn-IN", "ta-IN"] as const satisfies readonly SarvamLang[];
-// en/hi langs share the same set across OpenAI and NVIDIA today; keep one
-// canonical list and narrow at the call site.
 const FALLBACK_LANGS = ["en-IN", "hi-IN"] as const satisfies readonly (
   | NvidiaLang
   | OpenaiSttLang
@@ -43,27 +50,83 @@ function nvidiaConfigured(): boolean {
   return typeof key === "string" && key.startsWith("nvapi-");
 }
 
+function groqConfigured(): boolean {
+  const key = process.env.GROQ_API_KEY;
+  return typeof key === "string" && key.startsWith("gsk_");
+}
+
 /**
- * Pick the STT provider for the given language.
+ * Build the per-language provider cascade.
  *
- * Priority for en-IN / hi-IN: OpenAI (preferred) → NVIDIA (legacy) → reject.
- * te-IN / kn-IN / ta-IN always go to Sarvam (Parakeet/OpenAI Whisper lose
- * to Sarvam on Indic code-mixing in our internal evals).
+ * te/kn/ta:    Sarvam → Groq          (Sarvam wins on Indic code-mixing,
+ *                                       Groq is a multilingual safety net)
+ * en/hi:       OpenAI → Groq → NVIDIA (OpenAI = best WER, Groq = decorrelated
+ *                                       cloud, NVIDIA = legacy)
+ *
+ * Each step is gated by its own circuit breaker. Tripped breakers are skipped
+ * with no upstream call so cascades degrade instantly when a provider is hot.
  */
-function pickProvider(lang: string): SttSource | null {
-  if (isSarvamLang(lang)) return "sarvam";
-  if (isFallbackLang(lang)) {
-    if (openaiConfigured()) return "openai";
-    if (nvidiaConfigured()) return "nvidia";
+function buildCascade(lang: string): SttSource[] {
+  const out: SttSource[] = [];
+  if (isSarvamLang(lang)) {
+    out.push("sarvam");
+    if (groqConfigured()) out.push("groq");
+  } else if (isFallbackLang(lang)) {
+    if (openaiConfigured()) out.push("openai");
+    if (groqConfigured()) out.push("groq");
+    if (nvidiaConfigured()) out.push("nvidia");
   }
-  return null;
+  return out;
+}
+
+type AttemptResult =
+  | { ok: true; provider: SttSource; transcript: string; durationMs: number }
+  | { ok: false; provider: SttSource; reason: "breaker_open" | "quota" | "error"; code?: string; message?: string };
+
+async function callProvider(
+  provider: SttSource,
+  audio: Blob,
+  lang: string,
+): Promise<{ transcript: string }> {
+  switch (provider) {
+    case "sarvam":
+      return transcribeViaSarvam(audio, lang as SarvamLang);
+    case "openai":
+      return transcribeViaOpenai(audio, lang as OpenaiSttLang);
+    case "groq":
+      return transcribeViaGroq(audio, lang as GroqSttLang);
+    case "nvidia":
+      return transcribeViaNvidia(audio, lang as NvidiaLang);
+  }
+}
+
+async function reserveQuota(
+  provider: SttSource,
+  vendorId: string,
+  plan: Plan,
+  estimatedMinutes: number,
+): Promise<{ ok: true } | { ok: false; code: string; message: string }> {
+  switch (provider) {
+    case "sarvam":
+      return reserveSarvamMinutes({ vendorId, plan, estimatedMinutes });
+    case "openai":
+      return reserveOpenaiSttMinutes({ vendorId, plan, estimatedMinutes });
+    case "groq":
+      return reserveGroqSttMinutes({ vendorId, plan, estimatedMinutes });
+    case "nvidia":
+      // Legacy path; v0 deliberately does not enforce a per-vendor minute
+      // cap because traffic is gated to the rate limiter only. Add one if
+      // we ever reverse the OpenAI/NVIDIA priority again.
+      return { ok: true };
+  }
 }
 
 export async function POST(req: NextRequest) {
   const started = Date.now();
   let vendorId = "";
   let lang = "";
-  let sttSource: SttSource | null = null;
+  let lastSource: SttSource | null = null;
+  const attempts: AttemptResult[] = [];
 
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
@@ -80,10 +143,11 @@ export async function POST(req: NextRequest) {
     const audio = form.get("audio");
     lang = typeof form.get("lang") === "string" ? (form.get("lang") as string) : "";
 
-    sttSource = pickProvider(lang);
-
-    if (!sttSource) {
-      const fallbackLangs = openaiConfigured() || nvidiaConfigured() ? FALLBACK_LANGS : [];
+    const cascade = buildCascade(lang);
+    if (cascade.length === 0) {
+      const fallbackLangs = openaiConfigured() || nvidiaConfigured() || groqConfigured()
+        ? FALLBACK_LANGS
+        : [];
       return NextResponse.json(
         {
           error: "use_webspeech",
@@ -100,55 +164,91 @@ export async function POST(req: NextRequest) {
     // Rough estimate: mobile WebM voice captures are often ~32kbps -> ~240KB/min.
     const estimatedMinutes = Math.max(1 / 60, audio.size / 240_000);
 
-    let transcript: string;
+    for (const provider of cascade) {
+      lastSource = provider;
+      const breaker = getBreaker(`stt:${provider}`);
 
-    if (sttSource === "sarvam") {
-      const usage = await reserveSarvamMinutes({
-        vendorId: ctx.vendor.id,
-        plan: ctx.vendor.plan,
-        estimatedMinutes,
-      });
-      if (!usage.ok) {
-        return NextResponse.json({ error: usage.message, code: usage.code }, { status: 402 });
+      if (!(await breaker.allow())) {
+        attempts.push({ ok: false, provider, reason: "breaker_open" });
+        continue;
       }
-      ({ transcript } = await transcribeViaSarvam(audio, lang as SarvamLang));
-    } else if (sttSource === "openai") {
-      const usage = await reserveOpenaiSttMinutes({
-        vendorId: ctx.vendor.id,
-        plan: ctx.vendor.plan,
-        estimatedMinutes,
-      });
+
+      const usage = await reserveQuota(provider, ctx.vendor.id, ctx.vendor.plan, estimatedMinutes);
       if (!usage.ok) {
-        return NextResponse.json({ error: usage.message, code: usage.code }, { status: 402 });
+        attempts.push({
+          ok: false,
+          provider,
+          reason: "quota",
+          code: usage.code,
+          message: usage.message,
+        });
+        continue;
       }
-      ({ transcript } = await transcribeViaOpenai(audio, lang as OpenaiSttLang));
-    } else {
-      // NVIDIA: legacy fallback. v0 uses the rate-limiter only as a quota
-      // guard. Kept on tree until we're certain OpenAI is durable enough as
-      // the primary; reverse priority in pickProvider() if needed.
-      ({ transcript } = await transcribeViaNvidia(audio, lang as NvidiaLang));
+
+      const t0 = Date.now();
+      try {
+        const { transcript } = await callProvider(provider, audio, lang);
+        const elapsed = Date.now() - t0;
+        await breaker.recordSuccess();
+        attempts.push({ ok: true, provider, transcript, durationMs: elapsed });
+
+        const durationMs = Date.now() - started;
+        console.log(
+          JSON.stringify({
+            route: "/api/ai/transcribe",
+            vendorId,
+            lang,
+            sttSource: provider,
+            providerDurationMs: elapsed,
+            durationMs,
+            attempts: attempts.map((a) =>
+              a.ok ? { provider: a.provider, ok: true, ms: a.durationMs }
+                   : { provider: a.provider, ok: false, reason: a.reason },
+            ),
+            success: true,
+          }),
+        );
+
+        return NextResponse.json({ transcript, durationMs, sttSource: provider });
+      } catch (providerErr) {
+        await breaker.recordFailure();
+        attempts.push({
+          ok: false,
+          provider,
+          reason: "error",
+          message: providerErr instanceof Error ? providerErr.message : "unknown",
+        });
+      }
     }
 
+    // Whole cascade exhausted. Last resort is the client's QuickAddGrid.
     const durationMs = Date.now() - started;
-
     console.log(
       JSON.stringify({
         route: "/api/ai/transcribe",
         vendorId,
         lang,
-        sttSource,
+        sttSource: lastSource,
         durationMs,
-        success: true,
+        attempts: attempts.map((a) =>
+          a.ok ? { provider: a.provider, ok: true, ms: a.durationMs }
+               : { provider: a.provider, ok: false, reason: a.reason },
+        ),
+        success: false,
+        cascadeExhausted: true,
       }),
     );
-
-    return NextResponse.json({ transcript, durationMs, sttSource });
+    return NextResponse.json(
+      { error: "all_providers_failed", fallback: "quickadd" },
+      { status: 200 },
+    );
   } catch (err) {
     if (err instanceof PlanGateError) {
       const featureBySource: Record<SttSource, string> = {
         sarvam: "sarvam_stt",
         openai: "openai_stt",
         nvidia: "nvidia_stt",
+        groq: "groq_stt",
       };
       return NextResponse.json(
         {
@@ -156,7 +256,7 @@ export async function POST(req: NextRequest) {
           code: "plan_upgrade_required",
           requiredPlan: err.required,
           currentPlan: err.current,
-          feature: sttSource ? featureBySource[sttSource] : "sarvam_stt",
+          feature: lastSource ? featureBySource[lastSource] : "sarvam_stt",
         },
         { status: err.status },
       );
@@ -172,7 +272,7 @@ export async function POST(req: NextRequest) {
         route: "/api/ai/transcribe",
         vendorId: vendorId || undefined,
         lang: lang || undefined,
-        sttSource,
+        sttSource: lastSource,
         durationMs,
         success: false,
       }),

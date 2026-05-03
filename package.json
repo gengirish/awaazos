@@ -18,6 +18,7 @@
     "smoke:sarvam": "node scripts/sarvam-roundtrip.mjs",
     "smoke:nvidia": "node scripts/nvidia-smoke.mjs",
     "smoke:openai": "node scripts/openai-stt-smoke.mjs",
+    "smoke:groq": "node scripts/groq-stt-smoke.mjs",
     "precommit:checks": "lint-staged",
     "prepare": "husky"
   },
