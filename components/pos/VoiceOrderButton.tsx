@@ -120,9 +120,10 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
       ) : null}
       <button
         type="button"
+        disabled={state === "parsing" || state === "transcribing"}
         onClick={() => {
           if (state === "listening") stopListening();
-          else startListening();
+          else if (state === "idle" || state === "success" || state === "error") startListening();
         }}
         aria-label={label}
         aria-pressed={state === "listening"}
@@ -133,7 +134,7 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
             "bg-destructive text-destructive-foreground ring-2 ring-white/90 motion-safe:animate-pulse",
           state === "listening" && reducedMotion && "motion-safe:animate-none",
           (state === "transcribing" || state === "parsing") &&
-            "bg-purple-600 text-white ring-purple-300 dark:bg-purple-700",
+            "bg-purple-600 text-white ring-purple-300 dark:bg-purple-700 cursor-wait",
           state === "success" && "bg-green-600 text-white ring-green-300",
           state === "error" && "bg-muted text-muted-foreground ring-border",
         )}

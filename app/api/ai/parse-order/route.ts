@@ -10,6 +10,10 @@ import {
 } from "@/lib/anthropic";
 import { reserveAnthropicTokens } from "@/lib/ai-usage-guard";
 import { getVoiceLogQueue } from "@/lib/queues";
+import {
+  alignParsedItemsToMenu,
+  rescueMatchFromTranscript,
+} from "@/lib/parse-order-align";
 import { prisma } from "@/lib/prisma";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
@@ -33,6 +37,8 @@ function shouldEscalate(
 ): boolean {
   const words = wordCount(transcript);
   if (result.items.length === 0 && words > 3) return true;
+  // Short misheard orders (e.g. "less bill" → Lassi) — Haiku often gives up silently.
+  if (result.items.length === 0 && words >= 2 && result.unmatched.length === 0) return true;
   if (result.confidence === "low" && result.unmatched.length > 0) return true;
   return false;
 }
@@ -107,6 +113,19 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 
+    let items = alignParsedItemsToMenu(menuRows, parsed.items);
+    let unmatched = parsed.unmatched;
+    let confidence = parsed.confidence;
+
+    if (items.length === 0 && wordCount(body.transcript) >= 2) {
+      const rescued = rescueMatchFromTranscript(menuRows, body.transcript);
+      if (rescued.items.length > 0) {
+        items = rescued.items;
+        unmatched = rescued.unmatched;
+        confidence = "low";
+      }
+    }
+
     const latencyMs = Date.now() - t0;
 
     try {
@@ -119,9 +138,9 @@ export async function POST(req: NextRequest) {
           sttSource: body.sttSource,
           modelUsed,
           latencyMs,
-          itemCount: parsed.items.length,
-          confidence: parsed.confidence,
-          unmatched: parsed.unmatched,
+          itemCount: items.length,
+          confidence,
+          unmatched,
           escalated,
         },
         { attempts: 1, removeOnComplete: true },
@@ -134,9 +153,9 @@ export async function POST(req: NextRequest) {
     }
 
     const res = NextResponse.json({
-      items: parsed.items,
-      unmatched: parsed.unmatched,
-      confidence: parsed.confidence,
+      items,
+      unmatched,
+      confidence,
       modelUsed,
     });
     if (ctx.setVendorCookie) {

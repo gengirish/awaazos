@@ -88,10 +88,17 @@ export function useVoiceOrder(options: { voiceLang: string }) {
   const chunksRef = useRef<BlobPart[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const recognitionRef = useRef<WebSpeechRecognition | null>(null);
+  const parseAbortRef = useRef<AbortController | null>(null);
+  const parseGenerationRef = useRef(0);
 
   const needsConfirmation = confidence === "low";
 
   const parseTranscript = useCallback(async (transcript: string, sttSource: SttSource) => {
+    parseAbortRef.current?.abort();
+    const controller = new AbortController();
+    parseAbortRef.current = controller;
+    const generation = ++parseGenerationRef.current;
+
     setState("parsing");
     setLastTranscript(transcript);
     try {
@@ -100,7 +107,14 @@ export function useVoiceOrder(options: { voiceLang: string }) {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ transcript, lang: voiceLang, sttSource }),
+        signal: controller.signal,
       });
+      if (generation !== parseGenerationRef.current) return;
+      if (res.status === 429) {
+        setState("error");
+        setErrorReason("network_error");
+        return;
+      }
       if (!res.ok) {
         setState("error");
         setErrorReason("parse_failed");
@@ -112,12 +126,20 @@ export function useVoiceOrder(options: { voiceLang: string }) {
         confidence: "high" | "medium" | "low";
         modelUsed: string;
       };
+      if (generation !== parseGenerationRef.current) return;
       setParsedItems(data.items);
       setUnmatched(data.unmatched);
       setConfidence(data.confidence);
       setModelUsed(data.modelUsed);
+      if (data.items.length === 0) {
+        setState("error");
+        setErrorReason(data.unmatched.length > 0 ? "parse_failed" : "empty_transcript");
+        return;
+      }
       setState("success");
-    } catch {
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") return;
+      if (generation !== parseGenerationRef.current) return;
       setState("error");
       setErrorReason("parse_failed");
     }
@@ -145,6 +167,8 @@ export function useVoiceOrder(options: { voiceLang: string }) {
   }, []);
 
   const startListening = useCallback(async () => {
+    if (state === "parsing" || state === "transcribing") return;
+
     setErrorReason(null);
     setParsedItems([]);
     setUnmatched([]);
@@ -309,7 +333,7 @@ export function useVoiceOrder(options: { voiceLang: string }) {
 
     setState("error");
     setErrorReason("unsupported_lang");
-  }, [parseTranscript, voiceLang]);
+  }, [parseTranscript, state, voiceLang]);
 
   return {
     startListening,

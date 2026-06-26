@@ -200,10 +200,11 @@ export function getBreaker(name: string, override: BreakerConfig = {}): CircuitB
 
     async recordSuccess(now = Date.now()): Promise<void> {
       const rec = await readState();
-      if (rec.state === "half_open") {
-        // Probe succeeded: clear the rolling window so accumulated failures
-        // from the previous outage don't re-trip the breaker on the next
-        // request. Then transition back to CLOSED.
+      if (rec.state === "half_open" || rec.state === "open") {
+        // Probe succeeded. Also handles the race where a concurrent probe
+        // already failed and reset state to OPEN before this success was
+        // recorded — the successful call confirms the provider is up, so
+        // close the breaker regardless.
         await resetWindow(now);
         await writeState({ state: "closed", openedAt: 0 });
         return;

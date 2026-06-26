@@ -3,6 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { Plan } from "@prisma/client";
 
 import {
+  releaseGroqSttMinutes,
+  releaseOpenaiSttMinutes,
+  releaseSarvamMinutes,
   reserveGroqSttMinutes,
   reserveOpenaiSttMinutes,
   reserveSarvamMinutes,
@@ -121,6 +124,23 @@ async function reserveQuota(
   }
 }
 
+async function releaseQuota(
+  provider: SttSource,
+  vendorId: string,
+  estimatedMinutes: number,
+): Promise<void> {
+  switch (provider) {
+    case "sarvam":
+      return releaseSarvamMinutes({ vendorId, estimatedMinutes });
+    case "openai":
+      return releaseOpenaiSttMinutes({ vendorId, estimatedMinutes });
+    case "groq":
+      return releaseGroqSttMinutes({ vendorId, estimatedMinutes });
+    case "nvidia":
+      return;
+  }
+}
+
 export async function POST(req: NextRequest) {
   const started = Date.now();
   let vendorId = "";
@@ -131,7 +151,6 @@ export async function POST(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
     vendorId = ctx.vendor.id;
-    requirePlan(ctx.vendor, Plan.STARTER);
 
     const aiLimiter = getAiLimiterForPlan(ctx.vendor.plan);
     const burst = await aiLimiter.burst.check(ctx.vendor.id);
@@ -142,6 +161,10 @@ export async function POST(req: NextRequest) {
     const form = await req.formData();
     const audio = form.get("audio");
     lang = typeof form.get("lang") === "string" ? (form.get("lang") as string) : "";
+
+    // Plan gate after lang is parsed so the PlanGateError catch can report
+    // the right feature for the vendor's language.
+    requirePlan(ctx.vendor, Plan.STARTER);
 
     const cascade = buildCascade(lang);
     if (cascade.length === 0) {
@@ -211,7 +234,10 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({ transcript, durationMs, sttSource: provider });
       } catch (providerErr) {
-        await breaker.recordFailure();
+        await Promise.all([
+          breaker.recordFailure(),
+          releaseQuota(provider, ctx.vendor.id, estimatedMinutes),
+        ]);
         attempts.push({
           ok: false,
           provider,
@@ -256,7 +282,11 @@ export async function POST(req: NextRequest) {
           code: "plan_upgrade_required",
           requiredPlan: err.required,
           currentPlan: err.current,
-          feature: lastSource ? featureBySource[lastSource] : "sarvam_stt",
+          feature: lastSource
+            ? featureBySource[lastSource]
+            : isFallbackLang(lang)
+              ? "openai_stt"
+              : "sarvam_stt",
         },
         { status: err.status },
       );

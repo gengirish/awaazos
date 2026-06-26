@@ -13,8 +13,8 @@ import {
 import { ALLOWED_VOICE_LANGS, VOICE_LANGUAGES } from "@/lib/constants";
 
 const VOICE_LANG_HINT: Record<string, string> = {
-  "en-IN": "Web Speech API · works in Chrome / Edge on Android & desktop",
-  "hi-IN": "Web Speech API · हिन्दी · works in Chrome / Edge on Android & desktop",
+  "en-IN": "Web Speech API · best for English orders. For Hindi/Hinglish item names, prefer हिन्दी below.",
+  "hi-IN": "Web Speech API · हिन्दी · recommended when you speak Hindi or Hinglish item names",
 };
 
 export type VoiceLanguageClientProps = {

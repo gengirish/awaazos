@@ -72,6 +72,16 @@ async function bumpCounter(key: string, delta: number, ttlSec: number): Promise<
   return next;
 }
 
+async function unbumpCounter(key: string, delta: number): Promise<void> {
+  const kv = getKv();
+  if (!kv) return;
+  try {
+    await kv.incrby(key, -delta);
+  } catch {
+    /* fail-open */
+  }
+}
+
 /**
  * Reserve Anthropic tokens for this request.
  * Uses approximate prompt+response token estimate.
@@ -93,10 +103,7 @@ export async function reserveAnthropicTokens(args: {
     const kv = getKv();
     if (!kv) return { ok: true };
 
-    const [vendorNext, globalNext] = await Promise.all([
-      bumpCounter(vendorKey, delta, ttl),
-      bumpCounter(globalKey, delta, ttl),
-    ]);
+    const vendorNext = await bumpCounter(vendorKey, delta, ttl);
     if (vendorNext > ANTHROPIC_VENDOR_MONTHLY_TOKEN_CAP[args.plan]) {
       return {
         ok: false,
@@ -104,7 +111,9 @@ export async function reserveAnthropicTokens(args: {
         message: "Monthly Anthropic cap reached for this plan.",
       };
     }
+    const globalNext = await bumpCounter(globalKey, delta, ttl);
     if (globalNext > globalAnthropicCap()) {
+      await unbumpCounter(vendorKey, delta);
       return { ok: false, code: "global_anthropic_cap_reached", message: "Platform Anthropic cap reached." };
     }
     return { ok: true };
@@ -129,10 +138,7 @@ export async function reserveSarvamMinutes(args: {
     const kv = getKv();
     if (!kv) return { ok: true };
 
-    const [vendorNext, globalNext] = await Promise.all([
-      bumpCounter(vendorKey, delta, ttl),
-      bumpCounter(globalKey, delta, ttl),
-    ]);
+    const vendorNext = await bumpCounter(vendorKey, delta, ttl);
     if (vendorNext > SARVAM_VENDOR_MONTHLY_MINUTE_CAP[args.plan]) {
       return {
         ok: false,
@@ -140,13 +146,26 @@ export async function reserveSarvamMinutes(args: {
         message: "Monthly Sarvam minute cap reached for this plan.",
       };
     }
+    const globalNext = await bumpCounter(globalKey, delta, ttl);
     if (globalNext > globalSarvamCap()) {
+      await unbumpCounter(vendorKey, delta);
       return { ok: false, code: "global_sarvam_cap_reached", message: "Platform Sarvam minute cap reached." };
     }
     return { ok: true };
   } catch {
     return { ok: true };
   }
+}
+
+export async function releaseSarvamMinutes(args: {
+  vendorId: string;
+  estimatedMinutes: number;
+}): Promise<void> {
+  const delta = Math.max(1, Math.ceil(args.estimatedMinutes));
+  const m = monthKey();
+  const vendorKey = `usage:sarvam:vendor:${args.vendorId}:${m}`;
+  const globalKey = `usage:sarvam:global:${m}`;
+  await Promise.all([unbumpCounter(vendorKey, delta), unbumpCounter(globalKey, delta)]);
 }
 
 /** Reserve OpenAI STT usage in whole minutes (rounded up). */
@@ -165,10 +184,7 @@ export async function reserveOpenaiSttMinutes(args: {
     const kv = getKv();
     if (!kv) return { ok: true };
 
-    const [vendorNext, globalNext] = await Promise.all([
-      bumpCounter(vendorKey, delta, ttl),
-      bumpCounter(globalKey, delta, ttl),
-    ]);
+    const vendorNext = await bumpCounter(vendorKey, delta, ttl);
     if (vendorNext > OPENAI_STT_VENDOR_MONTHLY_MINUTE_CAP[args.plan]) {
       return {
         ok: false,
@@ -176,7 +192,9 @@ export async function reserveOpenaiSttMinutes(args: {
         message: "Monthly OpenAI STT minute cap reached for this plan.",
       };
     }
+    const globalNext = await bumpCounter(globalKey, delta, ttl);
     if (globalNext > globalOpenaiSttCap()) {
+      await unbumpCounter(vendorKey, delta);
       return {
         ok: false,
         code: "global_openai_stt_cap_reached",
@@ -187,6 +205,17 @@ export async function reserveOpenaiSttMinutes(args: {
   } catch {
     return { ok: true };
   }
+}
+
+export async function releaseOpenaiSttMinutes(args: {
+  vendorId: string;
+  estimatedMinutes: number;
+}): Promise<void> {
+  const delta = Math.max(1, Math.ceil(args.estimatedMinutes));
+  const m = monthKey();
+  const vendorKey = `usage:openai-stt:vendor:${args.vendorId}:${m}`;
+  const globalKey = `usage:openai-stt:global:${m}`;
+  await Promise.all([unbumpCounter(vendorKey, delta), unbumpCounter(globalKey, delta)]);
 }
 
 /** Reserve Groq STT usage in whole minutes (rounded up). */
@@ -205,10 +234,7 @@ export async function reserveGroqSttMinutes(args: {
     const kv = getKv();
     if (!kv) return { ok: true };
 
-    const [vendorNext, globalNext] = await Promise.all([
-      bumpCounter(vendorKey, delta, ttl),
-      bumpCounter(globalKey, delta, ttl),
-    ]);
+    const vendorNext = await bumpCounter(vendorKey, delta, ttl);
     if (vendorNext > GROQ_STT_VENDOR_MONTHLY_MINUTE_CAP[args.plan]) {
       return {
         ok: false,
@@ -216,7 +242,9 @@ export async function reserveGroqSttMinutes(args: {
         message: "Monthly Groq STT minute cap reached for this plan.",
       };
     }
+    const globalNext = await bumpCounter(globalKey, delta, ttl);
     if (globalNext > globalGroqSttCap()) {
+      await unbumpCounter(vendorKey, delta);
       return {
         ok: false,
         code: "global_groq_stt_cap_reached",
@@ -227,4 +255,15 @@ export async function reserveGroqSttMinutes(args: {
   } catch {
     return { ok: true };
   }
+}
+
+export async function releaseGroqSttMinutes(args: {
+  vendorId: string;
+  estimatedMinutes: number;
+}): Promise<void> {
+  const delta = Math.max(1, Math.ceil(args.estimatedMinutes));
+  const m = monthKey();
+  const vendorKey = `usage:groq-stt:vendor:${args.vendorId}:${m}`;
+  const globalKey = `usage:groq-stt:global:${m}`;
+  await Promise.all([unbumpCounter(vendorKey, delta), unbumpCounter(globalKey, delta)]);
 }

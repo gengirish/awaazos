@@ -12,15 +12,26 @@ const ORDER_PARSE_SYSTEM = `You parse Indian-vendor voice orders into structured
 Use the add_items tool exactly once. Match items by name OR aliases (case-insensitive).
 Default qty = 1 when not specified.
 
-Normalize Indic numerals:
+The transcript comes from speech-to-text and is often wrong — match phonetically to menu
+names/aliases (e.g. "hum ka panna" → Nimbu Panna, "less bill" → Lassi, "sharbat" variants).
+Prefer the closest menu item over returning empty items.
+
+Normalize numerals:
+- English: one=1, two=2, three=3, four=4, five=5
 - hi: ek=1, do=2, teen=3, char=4, paanch=5
 - te: okati=1, rendu=2, moodu=3, naalugu=4, aidu=5
 - kn: ondu=1, eradu=2, mooru=3, naalku=4, aidu=5
 - ta: onnu=1, rendu=2, moonu=3, naangu=4, anju=5
 
+Serving classifiers are NOT menu items: plate, piece, cup, glass, bowl, order, bill.
+"do plate samosa" → samosa qty 2 (ignore "plate").
+
 Put any phrase you could NOT confidently map into unmatched.
 confidence = low if unmatched.length > 0 OR the transcript is ambiguous.
-Return items: [] if nothing matches.
+Return items: [] only when nothing on the menu plausibly matches.
+
+menuItemId MUST be an id from the menu JSON — never invent ids.
+priceInPaise MUST be copied exactly from the matched menu row.
 
 The authoritative menu JSON is provided in a separate user message block (cached).`;
 
@@ -56,8 +67,8 @@ const addItemsResultSchema = z.object({
     z.object({
       menuItemId: z.string(),
       name: z.string(),
-      priceInPaise: z.number().int(),
-      qty: z.number().int().min(1),
+      priceInPaise: z.coerce.number().int(),
+      qty: z.coerce.number().int().min(1),
     }),
   ),
   unmatched: z.array(z.string()),
