@@ -1,0 +1,8 @@
+{
+  "id": "ta-002-moonu-vada",
+  "lang": "ta-IN",
+  "audioFile": "ta-002-moonu-vada.webm",
+  "expectedTranscript": "moonu medu vada kuduthuru",
+  "parseOrderFixtureId": "ta-002-moonu-vada",
+  "tags": ["tamil", "indic-numerals"]
+}

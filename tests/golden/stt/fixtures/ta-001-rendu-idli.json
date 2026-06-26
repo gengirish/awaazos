@@ -1,0 +1,8 @@
+{
+  "id": "ta-001-rendu-idli",
+  "lang": "ta-IN",
+  "audioFile": "ta-001-rendu-idli.webm",
+  "expectedTranscript": "rendu idly oru kaapi",
+  "parseOrderFixtureId": "ta-001-rendu-idli",
+  "tags": ["tamil", "indic-numerals"]
+}

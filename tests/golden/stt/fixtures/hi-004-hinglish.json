@@ -1,0 +1,8 @@
+{
+  "id": "hi-004-hinglish",
+  "lang": "hi-IN",
+  "audioFile": "hi-004-hinglish.webm",
+  "expectedTranscript": "do plate samosa aur teen chai dena",
+  "parseOrderFixtureId": "hi-004-hinglish",
+  "tags": ["hindi", "code-mixing"]
+}

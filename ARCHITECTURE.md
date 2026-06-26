@@ -273,6 +273,43 @@ sequenceDiagram
 
 Vendors say _"ek"_, _"do"_, _"teen"_, _"sat"_ in Hindi; _"oka"_, _"rendu"_, _"moodu"_ in Telugu; _"ondu"_, _"eradu"_ in Kannada. The Claude prompt includes a 1-page normalization guide as a system message, plus a trained-into-the-tool-schema constraint that `qty` must be a positive integer. Edge cases (fractional like _"adha samosa"_ → 0.5) are rejected by the tool schema and fall back to operator confirmation.
 
+### ADR: STT and NLU are separate concerns
+
+**Status:** Accepted · **Date:** 2026-06-26
+
+**Context.** Voice billing is two problems: (1) turn audio into text, (2) turn text + menu into a cart. It is tempting to route both through a single LLM because OpenAI exposes models named `gpt-4o-mini-transcribe` and because a general model can “sort of” do both steps. That coupling raises cost, latency, and privacy surface for work that dedicated ASR already solves well.
+
+**Decision.**
+
+| Layer | Job | Technology | Needs LLM? |
+| --- | --- | --- | --- |
+| **STT** | audio → transcript | Web Speech · Sarvam · OpenAI transcribe · Groq Whisper · self-hosted Whisper (`services/whisper-stt`) | **No** — ASR only |
+| **NLU** | transcript + menu → `{ items, unmatched, confidence }` | Claude Haiku 4.5 → Sonnet 4.5 (`add_items` tool-use) | **Yes** — menu matching, qty extraction, alias resolution |
+
+```
+mic → STT (ASR) → transcript string → parse-order (LLM) → cart
+```
+
+- **Never** send audio to Anthropic. Only `transcript` + `menu` enter the LLM prompt (`security-first.mdc`).
+- **Never** use Claude for transcription. Haiku/Sonnet run only in `/api/ai/parse-order`.
+- OpenAI `gpt-4o-mini-transcribe` is an **ASR API**, not the order parser — same slot as Groq Whisper or Sarvam.
+- Self-hosted Whisper (`lib/whisper-stt.ts` → `services/whisper-stt`) is an **optional last-resort STT tier** on Fly, gated by `WHISPER_STT_URL`. It does not replace Sarvam for te/kn/ta until golden STT pass rates match (see `tests/golden/stt/README.md`).
+
+**STT cascade (server path, when Web Speech is skipped or unavailable):**
+
+| Lang | Order |
+| --- | --- |
+| `te-IN`, `kn-IN`, `ta-IN` | Sarvam → Groq → Whisper (self-hosted) |
+| `en-IN`, `hi-IN` | OpenAI → Groq → NVIDIA (legacy) → Whisper (self-hosted) |
+
+Each hop has its own circuit breaker and (where applicable) minute quota. Whisper is omitted from the cascade when `WHISPER_STT_URL` is unset.
+
+**Consequences.**
+
+- Python + `faster-whisper` can replace or supplement cloud STT without touching the NLU stack.
+- New STT backends must pass `tests/golden/stt` (transcript quality) **before** cutover; new parse-order backends must pass `tests/golden/parse-order` (cart quality).
+- Product differentiation stays in NLU (Indic numerals, aliases, unmatched detection), not in re-implementing ASR.
+
 ---
 
 ## 4. POS transaction flow

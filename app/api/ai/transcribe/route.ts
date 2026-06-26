@@ -21,18 +21,24 @@ import {
   transcribeAudio as transcribeViaGroq,
   type GroqSttLang,
 } from "@/lib/groq-stt";
+import {
+  transcribeAudio as transcribeViaWhisper,
+  whisperSttConfigured,
+  type WhisperSttLang,
+} from "@/lib/whisper-stt";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type SttSource = "sarvam" | "openai" | "nvidia" | "groq";
+type SttSource = "sarvam" | "openai" | "nvidia" | "groq" | "whisper";
 
 const SARVAM_LANGS = ["te-IN", "kn-IN", "ta-IN"] as const satisfies readonly SarvamLang[];
 const FALLBACK_LANGS = ["en-IN", "hi-IN"] as const satisfies readonly (
   | NvidiaLang
   | OpenaiSttLang
+  | WhisperSttLang
 )[];
 
 function isSarvamLang(s: string): s is SarvamLang {
@@ -61,10 +67,8 @@ function groqConfigured(): boolean {
 /**
  * Build the per-language provider cascade.
  *
- * te/kn/ta:    Sarvam → Groq          (Sarvam wins on Indic code-mixing,
- *                                       Groq is a multilingual safety net)
- * en/hi:       OpenAI → Groq → NVIDIA (OpenAI = best WER, Groq = decorrelated
- *                                       cloud, NVIDIA = legacy)
+ * te/kn/ta:    Sarvam → Groq → Whisper (self-hosted)
+ * en/hi:       OpenAI → Groq → NVIDIA → Whisper (self-hosted)
  *
  * Each step is gated by its own circuit breaker. Tripped breakers are skipped
  * with no upstream call so cascades degrade instantly when a provider is hot.
@@ -79,6 +83,7 @@ function buildCascade(lang: string): SttSource[] {
     if (groqConfigured()) out.push("groq");
     if (nvidiaConfigured()) out.push("nvidia");
   }
+  if (whisperSttConfigured()) out.push("whisper");
   return out;
 }
 
@@ -100,6 +105,8 @@ async function callProvider(
       return transcribeViaGroq(audio, lang as GroqSttLang);
     case "nvidia":
       return transcribeViaNvidia(audio, lang as NvidiaLang);
+    case "whisper":
+      return transcribeViaWhisper(audio, lang as WhisperSttLang);
   }
 }
 
@@ -121,6 +128,9 @@ async function reserveQuota(
       // cap because traffic is gated to the rate limiter only. Add one if
       // we ever reverse the OpenAI/NVIDIA priority again.
       return { ok: true };
+    case "whisper":
+      // Self-hosted; cost is infra, not per-minute API billing.
+      return { ok: true };
   }
 }
 
@@ -137,6 +147,8 @@ async function releaseQuota(
     case "groq":
       return releaseGroqSttMinutes({ vendorId, estimatedMinutes });
     case "nvidia":
+      return;
+    case "whisper":
       return;
   }
 }
@@ -275,6 +287,7 @@ export async function POST(req: NextRequest) {
         openai: "openai_stt",
         nvidia: "nvidia_stt",
         groq: "groq_stt",
+        whisper: "whisper_stt",
       };
       return NextResponse.json(
         {

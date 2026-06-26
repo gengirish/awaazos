@@ -1,0 +1,8 @@
+{
+  "id": "hi-002-vada-pav",
+  "lang": "hi-IN",
+  "audioFile": "hi-002-vada-pav.webm",
+  "expectedTranscript": "ek vada pav",
+  "parseOrderFixtureId": "hi-002-vada-pav",
+  "tags": ["hindi", "single-item"]
+}

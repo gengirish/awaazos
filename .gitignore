@@ -66,3 +66,8 @@ tmp/
 
 # golden parse-order test artifacts
 tests/golden/parse-order/.last-run/
+
+# golden STT test artifacts + synthetic audio clips (record in-house)
+tests/golden/stt/.last-run/
+tests/golden/stt/audio/*
+!tests/golden/stt/audio/.gitkeep

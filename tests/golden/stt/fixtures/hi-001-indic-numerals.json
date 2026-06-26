@@ -1,0 +1,9 @@
+{
+  "id": "hi-001-indic-numerals",
+  "lang": "hi-IN",
+  "audioFile": "hi-001-indic-numerals.webm",
+  "expectedTranscript": "do bhel aur ek nimbu pani",
+  "parseOrderFixtureId": "hi-001-indic-numerals",
+  "tags": ["hindi", "indic-numerals", "baseline"],
+  "notes": "Mirror of parse-order hi-001. Record synthetic clip — no customer audio."
+}

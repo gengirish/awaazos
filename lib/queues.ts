@@ -33,7 +33,7 @@ export type VoiceParseLogJobPayload = {
   vendorId: string;
   transcript: string;
   lang: string;
-  sttSource: "webspeech" | "sarvam" | "openai" | "groq" | "nvidia";
+  sttSource: "webspeech" | "sarvam" | "openai" | "groq" | "nvidia" | "whisper";
   modelUsed: string;
   latencyMs: number;
   itemCount: number;

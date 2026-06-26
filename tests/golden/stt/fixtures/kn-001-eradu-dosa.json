@@ -1,0 +1,8 @@
+{
+  "id": "kn-001-eradu-dosa",
+  "lang": "kn-IN",
+  "audioFile": "kn-001-eradu-dosa.webm",
+  "expectedTranscript": "eradu masala dosa mattu ondu kaapi",
+  "parseOrderFixtureId": "kn-001-eradu-dosa",
+  "tags": ["kannada", "indic-numerals"]
+}

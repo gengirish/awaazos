@@ -19,8 +19,11 @@
     "smoke:nvidia": "node scripts/nvidia-smoke.mjs",
     "smoke:openai": "node scripts/openai-stt-smoke.mjs",
     "smoke:groq": "node scripts/groq-stt-smoke.mjs",
+    "smoke:whisper": "node scripts/whisper-stt-smoke.mjs",
     "test:golden": "vitest run tests/golden/parse-order/live.test.ts",
     "test:golden:validate": "vitest run tests/golden/parse-order/validate.test.ts",
+    "test:golden:stt": "vitest run tests/golden/stt/live.test.ts",
+    "test:golden:stt:validate": "vitest run tests/golden/stt/validate.test.ts",
     "precommit:checks": "lint-staged",
     "prepare": "husky"
   },

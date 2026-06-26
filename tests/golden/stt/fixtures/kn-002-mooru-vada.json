@@ -1,0 +1,8 @@
+{
+  "id": "kn-002-mooru-vada",
+  "lang": "kn-IN",
+  "audioFile": "kn-002-mooru-vada.webm",
+  "expectedTranscript": "mooru medu vada onde plate",
+  "parseOrderFixtureId": "kn-002-mooru-vada",
+  "tags": ["kannada", "indic-numerals"]
+}

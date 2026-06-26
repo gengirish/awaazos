@@ -13,6 +13,14 @@ alwaysApply: false
 | `en-IN`, `hi-IN` | Web Speech API (browser, free, all plans) |
 | `te-IN`, `kn-IN`, `ta-IN` | Sarvam Saaras v2 via `/api/ai/transcribe` (STARTER+ only) |
 
+**STT vs NLU:** STT turns audio → text (ASR only — no Claude). NLU
+(`/api/ai/parse-order`) turns text + menu → cart (Claude Haiku/Sonnet).
+Self-hosted Whisper (`lib/whisper-stt.ts`) is an optional last-resort STT tier
+when `WHISPER_STT_URL` is set — never used for menu matching.
+
+Server STT cascade (when Web Speech skipped): te/kn/ta → Sarvam → Groq →
+Whisper; en/hi → OpenAI → Groq → NVIDIA → Whisper.
+
 FREE-tier vendors with te/kn/ta selected → fall back to QuickAddGrid + show
 upgrade nudge. Never auto-charge by routing them to Sarvam.
 

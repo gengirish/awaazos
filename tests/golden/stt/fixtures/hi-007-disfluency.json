@@ -1,0 +1,10 @@
+{
+  "id": "hi-007-disfluency",
+  "lang": "hi-IN",
+  "audioFile": "hi-007-disfluency.webm",
+  "expectedTranscript": "do, uh, do nahi teen samosa dena",
+  "minSimilarity": 0.8,
+  "parseOrderFixtureId": "hi-007-disfluency",
+  "tags": ["hindi", "disfluency"],
+  "notes": "Lower similarity threshold — fillers may be dropped by some ASR backends."
+}

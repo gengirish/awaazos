@@ -1,0 +1,8 @@
+{
+  "id": "te-001-rendu-bhel",
+  "lang": "te-IN",
+  "audioFile": "te-001-rendu-bhel.webm",
+  "expectedTranscript": "rendu large bhel",
+  "parseOrderFixtureId": "te-001-rendu-bhel",
+  "tags": ["telugu", "indic-numerals"]
+}

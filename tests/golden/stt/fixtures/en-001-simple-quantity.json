@@ -1,0 +1,8 @@
+{
+  "id": "en-001-simple-quantity",
+  "lang": "en-IN",
+  "audioFile": "en-001-simple-quantity.webm",
+  "expectedTranscript": "one small bhel and two lemonades",
+  "parseOrderFixtureId": "en-001-simple-quantity",
+  "tags": ["english", "basic-quantity"]
+}

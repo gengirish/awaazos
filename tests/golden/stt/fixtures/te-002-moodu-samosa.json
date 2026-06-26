@@ -1,0 +1,8 @@
+{
+  "id": "te-002-moodu-samosa",
+  "lang": "te-IN",
+  "audioFile": "te-002-moodu-samosa.webm",
+  "expectedTranscript": "moodu samosa okati chai",
+  "parseOrderFixtureId": "te-002-moodu-samosa",
+  "tags": ["telugu", "indic-numerals", "multi-item"]
+}
