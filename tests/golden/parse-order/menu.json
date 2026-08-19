@@ -1,134 +1,178 @@
 [
   {
     "id": "bhel-puri",
+    "slug": "bhel-puri",
     "name": "Bhel Puri",
     "aliases": ["bhel", "bhelpuri", "bhel poori"],
+    "tags": ["street-food", "snacks", "chaat"],
     "priceInPaise": 5000
   },
   {
     "id": "small-bhel",
+    "slug": "small-bhel",
     "name": "Small Bhel",
     "aliases": ["small bhel puri", "mini bhel"],
+    "tags": ["street-food", "snacks", "chaat"],
     "priceInPaise": 3000
   },
   {
     "id": "samosa",
+    "slug": "samosa",
     "name": "Samosa",
     "aliases": ["singara"],
+    "tags": ["street-food", "snacks", "fried"],
     "priceInPaise": 2000
   },
   {
     "id": "pani-puri",
+    "slug": "pani-puri",
     "name": "Pani Puri",
     "aliases": ["puchka", "golgappa", "puri", "pani-puri"],
+    "tags": ["street-food", "snacks", "chaat"],
     "priceInPaise": 5000
   },
   {
     "id": "vada-pav",
+    "slug": "vada-pav",
     "name": "Vada Pav",
     "aliases": ["vadapav", "wada pav"],
+    "tags": ["street-food", "snacks", "fried"],
     "priceInPaise": 3000
   },
   {
     "id": "dabeli",
+    "slug": "dabeli",
     "name": "Dabeli",
     "aliases": ["kutchi dabeli"],
+    "tags": ["street-food", "snacks"],
     "priceInPaise": 4000
   },
   {
     "id": "kachori",
+    "slug": "kachori",
     "name": "Kachori",
     "aliases": ["kachauri"],
+    "tags": ["street-food", "snacks", "fried"],
     "priceInPaise": 2500
   },
   {
     "id": "masala-dosa",
+    "slug": "masala-dosa",
     "name": "Masala Dosa",
     "aliases": ["dosa", "masaal dosa"],
+    "tags": ["south-indian", "breakfast", "mains"],
     "priceInPaise": 8000
   },
   {
     "id": "idli-sambar",
+    "slug": "idli-sambar",
     "name": "Idli Sambar",
     "aliases": ["idli", "iddli", "idly"],
+    "tags": ["south-indian", "breakfast"],
     "priceInPaise": 6000
   },
   {
     "id": "vada-sambar",
+    "slug": "vada-sambar",
     "name": "Vada Sambar",
     "aliases": ["medu vada", "vada"],
+    "tags": ["south-indian", "breakfast", "fried"],
     "priceInPaise": 5500
   },
   {
     "id": "chana-bhatura",
+    "slug": "chana-bhatura",
     "name": "Chana Bhatura",
     "aliases": ["chole bhature", "chana bhature"],
+    "tags": ["north-indian", "mains", "fried"],
     "priceInPaise": 12000
   },
   {
     "id": "pulao",
+    "slug": "veg-pulao",
     "name": "Veg Pulao",
     "aliases": ["pulav", "pilaf"],
+    "tags": ["north-indian", "mains", "rice"],
     "priceInPaise": 11000
   },
   {
     "id": "nimbu-pani",
+    "slug": "nimbu-pani",
     "name": "Nimbu Pani",
     "aliases": ["lemonade", "lemon water", "shikanji"],
+    "tags": ["drinks", "cold", "refreshing"],
     "priceInPaise": 3000
   },
   {
     "id": "masala-chai",
+    "slug": "masala-chai",
     "name": "Masala Chai",
     "aliases": ["chai", "tea", "cutting chai"],
+    "tags": ["drinks", "hot", "tea"],
     "priceInPaise": 1500
   },
   {
     "id": "filter-coffee",
+    "slug": "filter-coffee",
     "name": "Filter Coffee",
     "aliases": ["coffee", "kaapi", "filter kaapi"],
+    "tags": ["drinks", "hot", "coffee"],
     "priceInPaise": 2500
   },
   {
     "id": "lassi",
+    "slug": "sweet-lassi",
     "name": "Sweet Lassi",
     "aliases": ["meethi lassi", "punjabi lassi"],
+    "tags": ["drinks", "cold", "sweet"],
     "priceInPaise": 4000
   },
   {
     "id": "fresh-juice",
+    "slug": "fresh-orange-juice",
     "name": "Fresh Orange Juice",
     "aliases": ["orange juice", "santra juice", "juice"],
+    "tags": ["drinks", "cold", "fresh"],
     "priceInPaise": 5000
   },
   {
     "id": "jalebi",
+    "slug": "jalebi",
     "name": "Jalebi",
     "aliases": ["jilipi", "jilebi"],
+    "tags": ["sweets", "desserts", "fried"],
     "priceInPaise": 3500
   },
   {
     "id": "gulab-jamun",
+    "slug": "gulab-jamun",
     "name": "Gulab Jamun",
     "aliases": ["jamun", "gulab"],
+    "tags": ["sweets", "desserts"],
     "priceInPaise": 4500
   },
   {
     "id": "kulfi",
+    "slug": "malai-kulfi",
     "name": "Malai Kulfi",
     "aliases": ["kulfi falooda", "malai-kulfi"],
+    "tags": ["sweets", "desserts", "cold"],
     "priceInPaise": 5000
   },
   {
     "id": "papad",
+    "slug": "papad",
     "name": "Papad",
     "aliases": ["papadum", "appalam"],
+    "tags": ["sides", "snacks", "crispy"],
     "priceInPaise": 1000
   },
   {
     "id": "raita",
+    "slug": "boondi-raita",
     "name": "Boondi Raita",
     "aliases": ["raita", "boondi"],
+    "tags": ["sides", "cooling"],
     "priceInPaise": 3500
   }
 ]

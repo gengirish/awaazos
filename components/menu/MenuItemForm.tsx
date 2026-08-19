@@ -2,7 +2,8 @@
 
 import type { MenuItem } from "@prisma/client";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useEffect, useMemo } from "react";
+import Image from "next/image";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -61,6 +62,10 @@ const FOOD_EMOJIS = [
 
 const MENU_CATEGORIES = ["General", "Snacks", "Beverages", "Meals", "Desserts"] as const;
 
+/** Mirrors the server-side allowlist in app/api/menu/[id]/image/route.ts. */
+const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
+const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
+
 export type MenuItemFormValues = z.input<typeof menuItemCreateInputSchema>;
 
 const defaultCreateValues: Partial<MenuItemFormValues> = {
@@ -90,6 +95,14 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
     return base;
   }, [item]);
 
+  // The photo is not part of the RHF schema: it round-trips through
+  // /api/menu/[id]/image, which needs an item id. On edit we upload
+  // immediately; on create we hold the file and upload once the id exists.
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [pendingFile, setPendingFile] = useState<File | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+
   const form = useForm<MenuItemFormValues>({
     resolver: zodResolver(menuItemCreateInputSchema),
     defaultValues: defaultCreateValues as MenuItemFormValues,
@@ -97,6 +110,9 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
 
   useEffect(() => {
     if (!open) return;
+    setImageUrl(item?.imageUrl ?? null);
+    setPendingFile(null);
+    setImageBusy(false);
     if (item) {
       form.reset({
         name: item.name,
@@ -112,6 +128,77 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
       form.reset(defaultCreateValues as MenuItemFormValues);
     }
   }, [open, item, form]);
+
+  function validateImage(file: File): string | null {
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return "Use a JPEG, PNG or WebP photo";
+    if (file.size > MAX_IMAGE_BYTES) return "Photo must be 4MB or smaller";
+    return null;
+  }
+
+  /** POSTs to the upload route; returns the stored URL, or null on failure. */
+  async function uploadImage(itemId: string, file: File): Promise<string | null> {
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch(`/api/menu/${itemId}/image`, { method: "POST", body: fd });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      toast.error(typeof json.error === "string" ? json.error : "Could not upload photo");
+      return null;
+    }
+    return typeof json?.data?.imageUrl === "string" ? json.data.imageUrl : null;
+  }
+
+  async function onPickFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    // Clear the input so re-picking the same file still fires a change event.
+    e.target.value = "";
+    if (!file) return;
+    const problem = validateImage(file);
+    if (problem) {
+      toast.error(problem);
+      return;
+    }
+    if (isEdit && item) {
+      setImageBusy(true);
+      try {
+        const url = await uploadImage(item.id, file);
+        if (url) {
+          setImageUrl(url);
+          toast.success("Photo updated");
+          onSaved();
+        }
+      } catch {
+        toast.error("Could not upload photo");
+      } finally {
+        setImageBusy(false);
+      }
+    } else {
+      setPendingFile(file);
+    }
+  }
+
+  async function removePhoto() {
+    if (pendingFile) {
+      setPendingFile(null);
+      return;
+    }
+    if (!item || !imageUrl) return;
+    setImageBusy(true);
+    try {
+      const res = await fetch(`/api/menu/${item.id}/image`, { method: "DELETE" });
+      if (!res.ok) {
+        toast.error("Could not remove photo");
+        return;
+      }
+      setImageUrl(null);
+      toast.success("Photo removed");
+      onSaved();
+    } catch {
+      toast.error("Could not remove photo");
+    } finally {
+      setImageBusy(false);
+    }
+  }
 
   async function onSubmit(values: MenuItemFormValues) {
     try {
@@ -149,6 +236,11 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
           return;
         }
         toast.success("Menu item created");
+        // The item exists now, so the held photo finally has an id to attach to.
+        // A failed upload has already toasted; the item itself is still saved.
+        if (pendingFile && typeof json?.data?.id === "string") {
+          await uploadImage(json.data.id, pendingFile);
+        }
       }
       onOpenChange(false);
       onSaved();
@@ -236,6 +328,83 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
                 </FormItem>
               )}
             />
+            <div className="space-y-2" role="group" aria-labelledby="menu-item-photo-label">
+              <p className="text-sm font-medium leading-none" id="menu-item-photo-label">
+                Photo (optional)
+              </p>
+              {imageUrl ? (
+                <Image
+                  src={imageUrl}
+                  alt={`Current photo of ${item?.name ?? "this item"}`}
+                  width={96}
+                  height={96}
+                  sizes="96px"
+                  className="h-24 w-24 rounded-md border object-cover"
+                />
+              ) : null}
+              {pendingFile ? (
+                <p className="text-sm text-foreground" aria-live="polite">
+                  Selected: {pendingFile.name} — uploads when you create the item.
+                </p>
+              ) : null}
+              <div className="flex flex-wrap gap-2">
+                <label
+                  htmlFor="menu-item-photo"
+                  className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium ring-offset-background transition-colors hover:bg-accent focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+                >
+                  {imageUrl || pendingFile ? "Change photo" : "Choose photo"}
+                </label>
+                <input
+                  id="menu-item-photo"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={imageBusy}
+                  onChange={onPickFile}
+                />
+                {/*
+                  Separate camera input: `capture` restricts the picker to the
+                  camera on both iOS and Android, so it cannot be the only entry
+                  point — vendors also need the gallery.
+                */}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="sr-only"
+                  aria-hidden
+                  tabIndex={-1}
+                  disabled={imageBusy}
+                  onChange={onPickFile}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11 sm:hidden"
+                  disabled={imageBusy}
+                  onClick={() => cameraInputRef.current?.click()}
+                >
+                  Take photo
+                </Button>
+                {imageUrl || pendingFile ? (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11"
+                    disabled={imageBusy}
+                    onClick={removePhoto}
+                  >
+                    Remove photo
+                  </Button>
+                ) : null}
+              </div>
+              <p className="text-xs text-muted-foreground" aria-live="polite">
+                {imageBusy
+                  ? "Uploading photo…"
+                  : "JPEG, PNG or WebP, up to 4MB. Shown instead of the emoji on the POS grid."}
+              </p>
+            </div>
             <FormField
               control={form.control}
               name="priceInRupees"

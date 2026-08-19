@@ -2,13 +2,35 @@ import { z } from "zod";
 
 import { rupeesToPaise } from "@/lib/currency";
 
+/** Split a comma-separated string into a deduplicated, trimmed array. */
+function parseCsvToArray(csv: string | undefined): string[] {
+  if (csv == null || csv.trim() === "") return [];
+  return Array.from(new Set(csv.split(",").map((s) => s.trim()).filter((s) => s.length > 0)));
+}
+
 /** Split comma-separated aliases for voice matching. */
 export function parseAliasesCsv(csv: string | undefined): string[] {
-  if (csv == null || csv.trim() === "") return [];
-  return csv
-    .split(",")
-    .map((s) => s.trim())
-    .filter((s) => s.length > 0);
+  return parseCsvToArray(csv);
+}
+
+/** Split comma-separated tags for filtering and Claude context. */
+export function parseTagsCsv(csv: string | undefined): string[] {
+  return parseCsvToArray(csv);
+}
+
+/**
+ * Menu photos live in Vercel Blob (uploaded via POST /api/menu/[id]/image).
+ * Anything else is rejected: next/image only allowlists that host in
+ * `next.config.mjs`, so a foreign URL would render as a broken tile, and
+ * accepting arbitrary URLs makes the field an injection surface.
+ */
+export function isMenuImageUrl(url: string): boolean {
+  try {
+    const u = new URL(url);
+    return u.protocol === "https:" && u.hostname.endsWith(".public.blob.vercel-storage.com");
+  } catch {
+    return false;
+  }
 }
 
 function preprocessRupeesInput(val: unknown): unknown {
@@ -27,6 +49,7 @@ const menuItemCreateFields = {
       .refine((n) => Number.isFinite(n) && n > 0, "Price must be greater than 0"),
   ),
   aliasesCsv: z.string().optional(),
+  tagsCsv: z.string().optional(),
   emoji: z.string().max(8).optional(),
   category: z.string().trim().max(80).optional(),
   hsnCode: z
@@ -45,6 +68,7 @@ export const menuItemCreateSchema = menuItemCreateInputSchema.transform((data) =
   name: data.name,
   priceInPaise: rupeesToPaise(data.priceInRupees),
   aliases: parseAliasesCsv(data.aliasesCsv),
+  tags: parseTagsCsv(data.tagsCsv),
   emoji: data.emoji ?? "🍽️",
   category: data.category?.trim() ? data.category.trim() : "General",
   hsnCode: data.hsnCode?.trim() ? data.hsnCode.trim().toUpperCase() : null,
@@ -60,12 +84,21 @@ export const menuItemUpdateSchema = z
       .refine((n) => Number.isFinite(n) && n > 0, "Price must be greater than 0")
       .optional(),
     aliasesCsv: z.string().optional(),
+    tagsCsv: z.string().optional(),
     emoji: z.string().max(8).optional(),
     category: z.string().trim().max(80).optional(),
     hsnCode: z.string().trim().max(16).optional().nullable(),
     isPopular: z.boolean().optional(),
     isAvailable: z.boolean().optional(),
     sortOrder: z.coerce.number().int().optional(),
+    // `null` clears the photo; the upload route sets it, the form can unset it.
+    imageUrl: z
+      .string()
+      .trim()
+      .max(2048)
+      .refine(isMenuImageUrl, "Image URL must be a Vercel Blob URL")
+      .nullable()
+      .optional(),
   })
   .strict()
   .refine(
@@ -73,12 +106,14 @@ export const menuItemUpdateSchema = z
       d.name !== undefined ||
       d.priceInRupees !== undefined ||
       d.aliasesCsv !== undefined ||
+      d.tagsCsv !== undefined ||
       d.emoji !== undefined ||
       d.category !== undefined ||
       d.hsnCode !== undefined ||
       d.isPopular !== undefined ||
       d.isAvailable !== undefined ||
-      d.sortOrder !== undefined,
+      d.sortOrder !== undefined ||
+      d.imageUrl !== undefined,
     { message: "At least one field is required", path: ["_root"] },
   );
 

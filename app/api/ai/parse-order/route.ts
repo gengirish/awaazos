@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
 
     const menuRows = await prisma.menuItem.findMany({
       where: { vendorId: ctx.vendor.id, isAvailable: true },
-      select: { id: true, name: true, aliases: true, priceInPaise: true },
+      select: { id: true, slug: true, name: true, aliases: true, tags: true, priceInPaise: true },
       orderBy: { sortOrder: "asc" },
     });
 

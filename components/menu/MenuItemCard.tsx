@@ -1,6 +1,7 @@
 "use client";
 
 import type { MenuItem } from "@prisma/client";
+import Image from "next/image";
 import { Pencil, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -54,9 +55,26 @@ export function MenuItemCard({ item, onEdit, onChanged }: MenuItemCardProps) {
       <CardContent className="flex flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
           <div className="flex min-w-0 flex-1 items-start gap-2">
-            <span className="text-2xl leading-none" aria-hidden>
-              {item.emoji}
-            </span>
+            {/*
+              Decorative: the item name is already rendered as text right next
+              to it, and the card sits inside a labelled draggable wrapper —
+              an alt here would only duplicate the name.
+            */}
+            {item.imageUrl ? (
+              <Image
+                src={item.imageUrl}
+                alt=""
+                aria-hidden
+                width={56}
+                height={56}
+                sizes="56px"
+                className="h-14 w-14 shrink-0 rounded-md object-cover"
+              />
+            ) : (
+              <span className="text-2xl leading-none" aria-hidden>
+                {item.emoji}
+              </span>
+            )}
             <div className="min-w-0">
               <p className="truncate font-semibold leading-tight text-foreground">{item.name}</p>
               <p className="text-sm text-muted-foreground">{formatINR(item.priceInPaise)}</p>

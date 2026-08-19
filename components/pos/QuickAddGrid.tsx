@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { useMemo } from "react";
 
@@ -15,6 +16,8 @@ export type MenuTile = {
   priceInPaise: number;
   isPopular: boolean;
   category: string;
+  /** Optional photo. Absent (or null) falls back to `emoji`. */
+  imageUrl?: string | null;
 };
 
 export type QuickAddGridProps = {
@@ -97,9 +100,29 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
                     })
                   }
                 >
-                  <span className="text-2xl leading-none" aria-hidden>
-                    {it.emoji}
-                  </span>
+                  {/*
+                    Decorative on purpose. This button has no aria-label, so its
+                    accessible name is computed from its text content —
+                    "{name} {formatINR(price)}", which e2e/pos-ui.spec.ts selects
+                    by. An empty alt (plus aria-hidden) keeps the photo out of
+                    that name, exactly as the emoji span already is.
+                    40px thumbnails keep the grid cheap on metered mobile data.
+                  */}
+                  {it.imageUrl ? (
+                    <Image
+                      src={it.imageUrl}
+                      alt=""
+                      aria-hidden
+                      width={40}
+                      height={40}
+                      sizes="40px"
+                      className="h-10 w-10 rounded-md object-cover"
+                    />
+                  ) : (
+                    <span className="text-2xl leading-none" aria-hidden>
+                      {it.emoji}
+                    </span>
+                  )}
                   <span className="line-clamp-2 w-full text-center text-sm font-medium text-foreground">
                     {it.name}
                   </span>

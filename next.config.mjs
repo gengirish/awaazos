@@ -10,7 +10,7 @@ const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://api.qrserver.com https://*.razorpay.com",
+  "img-src 'self' data: blob: https://api.qrserver.com https://*.razorpay.com https://*.public.blob.vercel-storage.com",
   "font-src 'self' data:",
   "connect-src 'self' https://api.anthropic.com https://api.sarvam.ai https://api.razorpay.com https://*.razorpay.com https://api.gupshup.io https://*.sentry.io",
   "frame-src https://api.razorpay.com https://*.razorpay.com",
@@ -46,6 +46,12 @@ const nextConfig = {
         protocol: "https",
         hostname: "api.qrserver.com",
         pathname: "/v1/create-qr-code/**",
+      },
+      {
+        // Vercel Blob store for menu item photos (POST /api/menu/[id]/image).
+        protocol: "https",
+        hostname: "*.public.blob.vercel-storage.com",
+        pathname: "/**",
       },
     ],
   },
