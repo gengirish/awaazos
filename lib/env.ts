@@ -28,6 +28,8 @@ const envSchema = z.object({
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  AGENTMAIL_API_KEY: z.string().optional(),
+  AGENTMAIL_INBOX_ID: z.string().optional(),
   GUPSHUP_API_KEY: z.string().optional(),
   GUPSHUP_APP_NAME: z.string().optional(),
   GUPSHUP_SOURCE_NUMBER: z.string().optional(),
