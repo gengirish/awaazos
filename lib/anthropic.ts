@@ -9,12 +9,15 @@ export const ANTHROPIC_FALLBACK_MODEL =
   process.env.ANTHROPIC_FALLBACK_MODEL ?? "claude-sonnet-4-5";
 
 const ORDER_PARSE_SYSTEM = `You parse Indian-vendor voice orders into structured data for a billing POS.
-Use the add_items tool exactly once. Match items by name OR aliases (case-insensitive).
+Use the add_items tool exactly once. Match items by name, aliases, OR slug (case-insensitive).
 Default qty = 1 when not specified.
 
 The transcript comes from speech-to-text and is often wrong — match phonetically to menu
 names/aliases (e.g. "hum ka panna" → Nimbu Panna, "less bill" → Lassi, "sharbat" variants).
 Prefer the closest menu item over returning empty items.
+
+Items may include a "tags" array (e.g. ["drinks","cold","seasonal"]) — use tags to resolve
+ambiguous phrases like "ek cold wala do" or "kuch meetha". Match the most relevant tagged item.
 
 Normalize numerals:
 - English: one=1, two=2, three=3, four=4, five=5
@@ -26,11 +29,20 @@ Normalize numerals:
 Serving classifiers are NOT menu items: plate, piece, cup, glass, bowl, order, bill.
 "do plate samosa" → samosa qty 2 (ignore "plate").
 
+Size and quality words (large, small, medium, regular, bada, chota, half, full, extra)
+are handled the same way, with one check first: if the menu has its own row for that
+size, match that row — "one small bhel" → Small Bhel. Otherwise the word describes the
+matched item rather than naming a separate thing: absorb it into that item and never
+report a bare size word as unmatched — "rendu large bhel" → Bhel Puri qty 2.
+
 Put any phrase you could NOT confidently map into unmatched.
 confidence = low if unmatched.length > 0 OR the transcript is ambiguous.
 Return items: [] only when nothing on the menu plausibly matches.
+A transcript that orders nothing at all — greeting, thanks, farewell, small talk,
+filler — is not a silent empty cart: return items: [], put the whole transcript into
+unmatched as one string, and set confidence low.
 
-menuItemId MUST be an id from the menu JSON — never invent ids.
+menuItemId MUST be the "id" value from the menu JSON — never invent ids, never use "slug".
 priceInPaise MUST be copied exactly from the matched menu row.
 
 The authoritative menu JSON is provided in a separate user message block (cached).`;
@@ -77,8 +89,10 @@ const addItemsResultSchema = z.object({
 
 export type MenuItemForParse = {
   id: string;
+  slug?: string | null;
   name: string;
   aliases: string[];
+  tags?: string[];
   priceInPaise: number;
 };
 
@@ -143,8 +157,10 @@ function stableMenuJson(menuItems: MenuItemForParse[]): string {
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((m) => ({
       id: m.id,
+      ...(m.slug ? { slug: m.slug } : {}),
       name: m.name,
       aliases: [...m.aliases].sort((x, y) => x.localeCompare(y)),
+      ...(m.tags?.length ? { tags: [...m.tags].sort() } : {}),
       priceInPaise: m.priceInPaise,
     }));
   return JSON.stringify(normalized);
