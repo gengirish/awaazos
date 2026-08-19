@@ -276,12 +276,28 @@ export function TransactionsTable({
           Page {initialPage} of {totalPages} · {initialTotal} total
         </p>
         <div className="flex gap-2">
-          <Button type="button" variant="outline" disabled={initialPage <= 1} asChild>
-            <Link href={buildListUrl(initialPage - 1)}>Previous</Link>
-          </Button>
-          <Button type="button" variant="outline" disabled={!initialHasMore} asChild>
-            <Link href={buildListUrl(initialPage + 1)}>Next</Link>
-          </Button>
+          {initialPage > 1 ? (
+            <Button type="button" variant="outline" asChild>
+              <Link href={buildListUrl(initialPage - 1)} className="no-underline">
+                Previous
+              </Link>
+            </Button>
+          ) : (
+            <Button type="button" variant="outline" disabled title="You are on the first page">
+              Previous
+            </Button>
+          )}
+          {initialHasMore ? (
+            <Button type="button" variant="outline" asChild>
+              <Link href={buildListUrl(initialPage + 1)} className="no-underline">
+                Next
+              </Link>
+            </Button>
+          ) : (
+            <Button type="button" variant="outline" disabled title="You are on the last page">
+              Next
+            </Button>
+          )}
         </div>
       </div>
 

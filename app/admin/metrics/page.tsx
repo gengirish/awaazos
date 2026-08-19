@@ -2,8 +2,8 @@ import { notFound } from "next/navigation";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAdminMetrics } from "@/lib/admin-metrics";
-import { auth } from "@/lib/auth";
 import { formatINR } from "@/lib/currency";
+import { AuthError, requirePlatformRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin metrics — AwaazOS" };
@@ -33,10 +33,14 @@ function deltaClass(tone: "pos" | "neg" | "zero"): string {
 }
 
 export default async function AdminMetricsPage() {
-  const session = await auth();
-  const role = session?.user?.role;
-  if (role !== "ADMIN" && role !== "SUPER_ADMIN") {
-    notFound();
+  // Re-read the User row rather than trusting `session.user.role` off the JWT, so a
+  // role revoked in the database takes effect immediately instead of at token expiry.
+  try {
+    await requirePlatformRole("ADMIN");
+  } catch (err) {
+    // 404, not 403 — never disclose that this admin surface exists.
+    if (err instanceof AuthError) notFound();
+    throw err;
   }
 
   const metrics = await getAdminMetrics();

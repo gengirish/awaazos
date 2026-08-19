@@ -56,8 +56,14 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     if (err instanceof PlanGateError) {
       return NextResponse.json(
-        { error: err.message, requiredPlan: err.required, currentPlan: err.current },
-        { status: 402 },
+        {
+          error: err.message,
+          code: "plan_upgrade_required",
+          requiredPlan: err.required,
+          currentPlan: err.current,
+          feature: "razorpay_subscription",
+        },
+        { status: err.status },
       );
     }
     if (err instanceof AuthError) {
