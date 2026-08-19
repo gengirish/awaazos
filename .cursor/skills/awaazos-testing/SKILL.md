@@ -10,7 +10,7 @@ description: Testing conventions for AwaazOS — Vitest unit/integration tests +
 - **Vitest** — unit + integration (Prisma against test schema)
 - **@testing-library/react + jsdom** — component tests
 - **Playwright** — E2E for the POS happy path
-- **axe-core** (`@axe-core/playwright`) — accessibility audits
+- **Accessibility** — currently manual only (semantic roles, `aria-live`, chart `<details>` data tables). No automated axe audits: `@axe-core/playwright` is _not_ installed.
 
 ## Mandatory test coverage
 
@@ -65,19 +65,30 @@ it("never produces duplicate bill numbers under concurrent writes", async () => 
 
 ## Playwright happy path
 
-Located at `e2e/pos-happy-path.spec.ts`. Must cover:
+Located at `e2e/pos-ui.spec.ts`. Covers:
 1. Sign in as test vendor owner
 2. Navigate to /pos
-3. Click a menu item in QuickAddGrid (skip mic in CI)
-4. Click "Collect Payment"
-5. Verify UPI QR renders (image with valid `data-testid="upi-qr"`)
-6. Enter UTR ref, click "Mark as Paid"
-7. Verify success toast + cart cleared
-8. Verify a Transaction row exists in DB with correct totalPaise
+3. Click a QuickAddGrid item. Its accessible name is `"{name} {formatINR(price)}"` (e.g. `Samosa ₹15.00`) because the emoji span is `aria-hidden` — anchor the regex (`/^Samosa/`) so short names do not match longer ones. Skip the mic in CI: headless Chromium has no SpeechRecognition.
+4. Click `Collect payment` — note the lowercase p; it is also the UpiQRModal dialog title, so disambiguate by role
+5. Verify UPI QR renders — `page.getByAltText("UPI payment QR code")` (equivalently `getByRole("img", { name: "UPI payment QR code" })`); there is no `data-testid` on it
+6. Choose **Cash**, then `/Mark as paid/` (the accessible name carries a trailing ✓, so `{ exact: true }` fails)
+   - The UPI path is **not** drivable for a freshly registered vendor: `/api/auth/register` never sets `upiId`, and `UpiQRModal` disables the button while `payMode === "UPI" && !effectiveUpiId`. Complete onboarding or `PATCH /api/vendor` first if you need to test UPI.
+7. Verify the receipt shows a bill matching `/AWZ-\d{8}-\d{4}/`, then `/New order/` clears the cart
+8. Verify totals server-side — see `e2e/pos-transaction.spec.ts` for the API-level bill-number, paise-total and tampering assertions
 
-## Accessibility audit
+## Accessibility audit — NOT YET IMPLEMENTED
+
+There are **no automated accessibility tests in this repo today**, and `@axe-core/playwright`
+is **not installed** (the `axe-core` in `node_modules` is only a transitive dependency of
+`eslint-plugin-jsx-a11y`). A11y is currently enforced by review + the `.cursor/rules` a11y
+conventions, not by CI.
+
+Do not write `injectAxe` / `checkA11y` calls until someone runs
+`npm i -D @axe-core/playwright` and wires the suite into `npm run e2e`. Once that lands, the
+intended shape is:
 
 ```ts
+// requires: npm i -D @axe-core/playwright  (not installed yet)
 import { injectAxe, checkA11y } from "@axe-core/playwright";
 
 test("POS screen passes axe", async ({ page }) => {
@@ -89,10 +100,14 @@ test("POS screen passes axe", async ({ page }) => {
 
 ## Test database
 
-- Use a separate Neon branch for tests, OR a local Postgres via Docker
-- `vitest.setup.ts` runs `prisma migrate deploy` against `TEST_DATABASE_URL`
-- Each test file gets a fresh transaction (rolled back in `afterEach`)
+- E2E needs a real Postgres — a local one via Docker, or a separate Neon branch. CI provisions `postgres:15-alpine` as a service and runs `npx prisma db push` before Playwright.
+- There is **no Vitest database setup**: `vitest.config.ts` declares no `setupFiles`, no `vitest.setup.ts` exists, and `TEST_DATABASE_URL` is referenced nowhere. Every test under `lib/__tests__/` is a pure-function or mocked-Prisma test.
+- So there is no per-test transaction rollback either. E2E specs isolate themselves instead by registering a uniquely-suffixed vendor per test (`registerVendor()` in `e2e/helpers/vendor.ts`).
 
 ## CI
 
-GitHub Actions: typecheck → lint → vitest → build → playwright (on a Vercel preview URL). Fail fast.
+`.github/workflows/ci.yml`, three jobs:
+
+- **quality** — lint → typecheck → vitest → build
+- **e2e** — needs `quality`. Provisions a `postgres:15-alpine` service, runs `npx prisma db push`, installs chromium, then `npm run e2e`. Playwright starts `npm run dev` itself via `webServer` in `playwright.config.ts` — it does **not** run against a Vercel preview URL. Set `BASE_URL` to aim a run at a deployed environment instead.
+- **security** — gitleaks full-history scan + `npm audit --audit-level=high`

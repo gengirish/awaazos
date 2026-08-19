@@ -89,6 +89,8 @@ All of this on a phone, in <8 seconds per transaction. **Hindi + English at MVP.
 
 Depth in Hindi, then add Telugu / Kannada / Tamil based on cohort demand. No other features ship until weekly active vendors > 100.
 
+_Also planned, not shipped:_ automated accessibility audits in CI (`@axe-core/playwright` is not installed today — a11y is hand-checked against the `aria-live`, contrast, and chart-data-table work listed above).
+
 ---
 
 ## 🏗️ Tech stack
@@ -109,7 +111,7 @@ Depth in Hindi, then add Telugu / Kannada / Tamil based on cohort demand. No oth
 | **Messaging** | Gupshup WhatsApp Business API | Cheapest verified WABA channel for India |
 | **Hosting** | Vercel (Next.js) + Fly.io BOM region (workers) | Edge for users, BOM for low-latency to Indian compute |
 | **Storage** | Vercel Blob | Vendor logos, future menu item photos |
-| **Testing** | Vitest (unit) + Playwright (E2E) + axe-core (a11y) | Fast unit, real-browser E2E, accessibility CI |
+| **Testing** | Vitest (unit) + Playwright (E2E — chromium + Pixel 7 mobile, `en-IN` locale, `Asia/Kolkata` timezone) | Fast unit feedback, real-browser E2E on the exact locale and timezone vendors run in |
 
 ---
 
