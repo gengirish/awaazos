@@ -53,6 +53,31 @@ export function requirePlan(vendor: { plan: Plan }, minPlan: Plan): void {
   }
 }
 
+/**
+ * Reject a session that was minted before the account's last password change.
+ *
+ * Auth.js JWT sessions are stateless, so resetting a password cannot revoke an
+ * already-issued token on its own. This is the enforcement half of
+ * `User.passwordChangedAt`, which POST /api/auth/reset-password writes.
+ *
+ * It lives here rather than in the `jwt` callback because that callback is in
+ * lib/auth.config.ts, which must stay edge-safe (no Prisma) — see
+ * .cursor/rules/auth-rbac.mdc. Every protected route already funnels through
+ * these two guards, so this is the natural chokepoint.
+ *
+ * Fail-safe: only rejects when BOTH timestamps are present, so accounts that
+ * have never reset a password are never locked out.
+ */
+function assertSessionNotStale(
+  user: { passwordChangedAt: Date | null },
+  tokenIssuedAt: number | undefined,
+): void {
+  if (!user.passwordChangedAt || typeof tokenIssuedAt !== "number") return;
+  // `iat` is seconds since epoch; allow 5s of clock skew between issuer and reader.
+  if (tokenIssuedAt * 1000 + 5_000 < user.passwordChangedAt.getTime()) {
+    throw new AuthError(401, "Session expired. Please sign in again.");
+  }
+}
 export async function requirePlatformRole(role: UserRole): Promise<{ user: NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>> }> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -62,6 +87,7 @@ export async function requirePlatformRole(role: UserRole): Promise<{ user: NonNu
   if (!user) {
     throw new AuthError(401, "Unauthorized");
   }
+  assertSessionNotStale(user, session.user.tokenIssuedAt);
   if (!userRoleAtLeast(user.role, role)) {
     throw new AuthError(403, `Requires platform role ${role}.`);
   }
@@ -90,6 +116,7 @@ export async function requireVendorRole(
   if (!user) {
     throw new AuthError(401, "Unauthorized");
   }
+  assertSessionNotStale(user, session.user.tokenIssuedAt);
 
   const memberships = await prisma.staffMember.findMany({
     where: { userId: user.id, isActive: true },

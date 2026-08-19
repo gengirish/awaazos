@@ -73,7 +73,9 @@ model MenuItem {
   vendorId      String
   vendor        Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
   name          String                              // Display name
+  slug          String?                             // URL/log-safe handle, e.g. "mohabbatein-sharbat" (unique per vendor)
   aliases       String[]    @default([])            // Voice recognition aliases (e.g. ["bhel", "lays bhel"])
+  tags          String[]    @default([])            // Flexible labels for filtering & Claude context (e.g. ["drinks","cold"])
   emoji         String      @default("🍽️")
   category      String      @default("General")
   priceInPaise  Int                                 // ALWAYS store in paise. ₹20 = 2000
@@ -87,6 +89,7 @@ model MenuItem {
 
   orderItems    OrderItem[]
 
+  @@unique([vendorId, slug])
   @@index([vendorId, isAvailable])
   @@map("menu_items")
 }
@@ -210,6 +213,7 @@ model User {
   emailVerified DateTime?
   image         String?
   passwordHash  String?                             // null for OAuth-only users
+  passwordChangedAt DateTime?                        // set on password reset; enforcement is a follow-up (see lib/rbac.ts)
   role          UserRole      @default(USER)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
@@ -217,10 +221,27 @@ model User {
   accounts      Account[]
   sessions      Session[]
   staffMemberships StaffMember[]
+  passwordResetTokens PasswordResetToken[]
 
   @@index([email])
   @@map("users")
 }
+
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique                      // SHA-256 of the emailed token; raw token is never stored
+  expiresAt DateTime
+  usedAt    DateTime?                              // single-use: set the moment the token is burned
+  requestIp String?
+  createdAt DateTime  @default(now())
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
+}
+
 
 model Account {
   id                String  @id @default(cuid())

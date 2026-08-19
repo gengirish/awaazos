@@ -6,6 +6,8 @@ declare module "next-auth" {
     user: {
       id: string;
       role: UserRole;
+      /** JWT `iat` (seconds). Compared against User.passwordChangedAt in lib/rbac.ts. */
+      tokenIssuedAt?: number;
     } & DefaultSession["user"];
   }
 }

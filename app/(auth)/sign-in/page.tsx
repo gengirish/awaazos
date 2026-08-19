@@ -77,6 +77,14 @@ function SignInForm() {
               onChange={(e) => setPassword(e.target.value)}
             />
           </div>
+          <div className="flex justify-end">
+            <Link
+              href="/forgot-password"
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              Forgot password?
+            </Link>
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col gap-3 sm:flex-row sm:justify-between">
           <Button type="submit" className="w-full sm:w-auto" disabled={submitting}>
