@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatINR, rupeesToPaise, sumPaise } from "./currency";
+import { formatINR, formatINRCompact, rupeesToPaise, sumPaise } from "./currency";
 
 describe("currency", () => {
   it("rupeesToPaise throws on more than 2 decimal places", () => {
@@ -10,6 +10,13 @@ describe("currency", () => {
   it("formatINR uses en-IN grouping (amounts are paise)", () => {
     expect(formatINR(200_000)).toBe("₹2,000.00");
     expect(formatINR(123456789)).toBe("₹12,34,567.89");
+  });
+
+  it("formatINRCompact drops the paise only when there are none", () => {
+    expect(formatINRCompact(5000)).toBe("₹50");
+    expect(formatINRCompact(200_000)).toBe("₹2,000");
+    expect(formatINRCompact(1250)).toBe("₹12.50");
+    expect(formatINRCompact(0)).toBe("₹0");
   });
 
   it("sumPaise sums integers", () => {

@@ -34,6 +34,24 @@ export function formatINR(paise: number): string {
   }).format(rupees);
 }
 
+/**
+ * Menu-board formatting: `₹50` for a whole-rupee price, `₹12.50` when there
+ * really are paise. Display only — never use this on a bill, a receipt, or an
+ * export, where `formatINR()`'s fixed two decimals are what reconciles.
+ */
+export function formatINRCompact(paise: number): string {
+  if (!Number.isInteger(paise)) {
+    throw new Error("paise must be an integer");
+  }
+  if (paise % 100 !== 0) return formatINR(paise);
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(paiseToRupees(paise));
+}
+
 export function sumPaise(items: number[]): number {
   let total = 0;
   for (const p of items) {
