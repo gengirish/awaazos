@@ -123,6 +123,12 @@ Every Prisma `where` touching tenant data must include `vendorId` — **use a co
 mutations** (`where: { id, vendorId: vendor.id }`), never a post-fetch ownership check.
 Cross-tenant misses return **404, not 403** — don't leak existence.
 
+The single exception to "every protected handler starts with `requireVendorRole`" is the public
+storefront `app/s/[slug]` — the only unauthenticated route that reads tenant data. It is gated on
+`VendorSettings.publishStorefront` (default `false`), 404s rather than 403s when a vendor has not
+opted in, and its Prisma `select` is a hand-written allowlist: `Vendor.phone` / `Vendor.email` must
+never appear on it.
+
 Two role axes: platform `UserRole` (`USER < ADMIN < SUPER_ADMIN`) and per-tenant `StaffRole`
 (`CASHIER < MANAGER < OWNER`). Plan gates are separate again: `requirePlan(vendor, Plan.STARTER)`
 throws `PlanGateError` (402) carrying `{ required, current }` so the UI can render an upgrade CTA.

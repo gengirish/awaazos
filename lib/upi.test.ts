@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildQrUrl, buildUpiDeepLink } from "./upi";
+import { buildQrUrl, buildUpiCollectLink, buildUpiDeepLink } from "./upi";
 
 describe("upi", () => {
   it("buildUpiDeepLink encodes UPI params", () => {
@@ -20,5 +20,37 @@ describe("upi", () => {
     const url = buildQrUrl("upi://pay?pa=x&pn=y&am=1.00&cu=INR&tn=z", 256);
     expect(url).toContain("size=256x256");
     expect(url).toContain(encodeURIComponent("upi://pay?pa=x&pn=y&am=1.00&cu=INR&tn=z"));
+  });
+});
+
+describe("buildUpiCollectLink", () => {
+  function paramsOf(link: string): URLSearchParams {
+    return new URLSearchParams(link.slice("upi://pay?".length));
+  }
+
+  it("omits the amount so the customer enters it in their UPI app", () => {
+    const params = paramsOf(buildUpiCollectLink({ upiId: "ravi@okaxis", name: "Ravi Bhel" }));
+    expect(params.get("am")).toBeNull();
+    expect(params.get("tn")).toBeNull();
+  });
+
+  it("carries payee address, payee name and INR", () => {
+    const params = paramsOf(buildUpiCollectLink({ upiId: "ravi@okaxis", name: "Ravi Bhel" }));
+    expect(params.get("pa")).toBe("ravi@okaxis");
+    expect(params.get("pn")).toBe("Ravi Bhel");
+    expect(params.get("cu")).toBe("INR");
+  });
+
+  it("percent-encodes names that would otherwise break the query string", () => {
+    const link = buildUpiCollectLink({ upiId: "a@b", name: "Chai & Co #1" });
+    expect(link).not.toContain("&Co");
+    expect(paramsOf(link).get("pn")).toBe("Chai & Co #1");
+  });
+
+  it("survives the QR wrapper intact", () => {
+    const link = buildUpiCollectLink({ upiId: "ravi@okaxis", name: "Ravi Bhel" });
+    const qr = buildQrUrl(link, 220);
+    expect(qr).toContain("size=220x220");
+    expect(decodeURIComponent(qr.split("&data=")[1])).toBe(link);
   });
 });

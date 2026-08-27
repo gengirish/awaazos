@@ -60,6 +60,7 @@ model VendorSettings {
   receiptFooter         String?                // "Thanks for visiting!"
   theme                 String   @default("orange")  // orange | green | blue | purple
   hsnDefault            String?                // Default HSN/SAC code for menu items without one
+  publishStorefront     Boolean  @default(false)  // Opt-in: expose /s/<vendor slug> to the public
   razorpaySubId         String?
   razorpayCustomerId    String?
 

@@ -9,6 +9,10 @@ function isPublicPath(pathname: string): boolean {
   if (pathname === "/reset-password" || pathname.startsWith("/reset-password/")) return true;
   if (pathname === "/pricing" || pathname.startsWith("/pricing/")) return true;
   if (pathname === "/features" || pathname.startsWith("/features/")) return true;
+  // Public vendor storefronts. Opt-in per vendor: the route itself 404s unless
+  // VendorSettings.publishStorefront is true, so this allowlist exposes nothing
+  // on its own.
+  if (pathname.startsWith("/s/")) return true;
   if (pathname.startsWith("/api/auth")) return true;
   return false;
 }

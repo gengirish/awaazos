@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { StorefrontClient } from "@/components/settings/StorefrontClient";
 import { VoiceLanguageClient } from "@/components/settings/VoiceLanguageClient";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
@@ -20,10 +21,17 @@ export default async function SettingsPage() {
     throw e;
   }
 
-  const settings = await prisma.vendorSettings.findUnique({
-    where: { vendorId },
-    select: { voiceLang: true },
-  });
+  const [settings, vendor, availableItemCount] = await Promise.all([
+    prisma.vendorSettings.findUnique({
+      where: { vendorId },
+      select: { voiceLang: true, publishStorefront: true },
+    }),
+    prisma.vendor.findUnique({
+      where: { id: vendorId },
+      select: { slug: true, upiId: true },
+    }),
+    prisma.menuItem.count({ where: { vendorId, isAvailable: true } }),
+  ]);
 
   return (
     <div className="min-h-screen bg-background p-4 pb-10 md:p-6">
@@ -50,6 +58,23 @@ export default async function SettingsPage() {
             </CardHeader>
           </Card>
         </Link>
+
+        <Card className="h-full sm:col-span-2">
+          <CardHeader>
+            <CardTitle className="font-display text-lg">Public storefront</CardTitle>
+            <CardDescription>
+              Share your menu as a web page customers can open from a QR or a WhatsApp link.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <StorefrontClient
+              slug={vendor?.slug ?? ""}
+              initialPublished={settings?.publishStorefront ?? false}
+              hasUpiId={Boolean(vendor?.upiId)}
+              availableItemCount={availableItemCount}
+            />
+          </CardContent>
+        </Card>
 
         <Card className="h-full sm:col-span-2">
           <CardHeader>

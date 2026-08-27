@@ -15,6 +15,7 @@ const patchSchema = z.object({
   onboardingDone: z.boolean().optional(),
   whatsappNumber: z.string().trim().max(20).optional().nullable(),
   voiceLang: z.enum(SUPPORTED_VOICE_LANGS).optional(),
+  publishStorefront: z.boolean().optional(),
   menuItems: z
     .array(
       z.object({
@@ -105,6 +106,9 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.voiceLang !== undefined) {
         settingsUpdate.voiceLang = vendorFields.voiceLang;
+      }
+      if (vendorFields.publishStorefront !== undefined) {
+        settingsUpdate.publishStorefront = vendorFields.publishStorefront;
       }
       if (vendorFields.onboardingDone === true && vendorFields.whatsappNumber) {
         settingsUpdate.sendWhatsappReceipt = true;
