@@ -19,9 +19,9 @@ export function PosHeader({ stallName, todaysRevenuePaise }: PosHeaderProps) {
         </p>
       </div>
       <Link
-        href="/settings/billing"
+        href="/settings"
         className="flex h-11 min-w-[44px] items-center justify-center rounded-md border border-input bg-background text-foreground ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        aria-label="Billing and settings"
+        aria-label="Settings"
       >
         <Settings className="h-5 w-5" aria-hidden />
       </Link>
