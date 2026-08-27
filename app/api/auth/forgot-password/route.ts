@@ -19,6 +19,24 @@ const bodySchema = z.object({
 });
 
 /**
+ * Base origin for the reset link. Deliberately env-only: the request `Host`
+ * header is attacker-controlled, and trusting it here turns password reset
+ * into a token-exfiltration primitive (host header injection).
+ *
+ * `VERCEL_PROJECT_PRODUCTION_URL` is injected by Vercel and is not
+ * user-controllable, so it is a safe last resort before the dev default.
+ */
+function resetLinkBase(): string {
+  const explicit = process.env.AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL;
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const base =
+    explicit ??
+    (vercel ? `https://${vercel}` : undefined) ??
+    "http://localhost:3000";
+  return base.replace(/\/$/, "");
+}
+
+/**
  * POST /api/auth/forgot-password
  *
  * Public. ALWAYS returns `{ ok: true }` — bad JSON, unknown email, rate
@@ -76,9 +94,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         },
       });
 
-      const base = (process.env.AUTH_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000")
-        .replace(/\/$/, "");
-      const url = `${base}/reset-password?token=${token}`;
+      const url = `${resetLinkBase()}/reset-password?token=${token}`;
 
       await sendPasswordResetEmail({ to: user.email, name: user.name, url, expiresAt });
     }
