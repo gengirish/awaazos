@@ -10,14 +10,22 @@ test.describe("public surfaces", () => {
     await expect(page.getByRole("link", { name: /(get started|sign up)/i }).first()).toBeVisible();
   });
 
-  test("pricing page lists FREE / STARTER / PRO with paise-correct rupee amounts", async ({ page }) => {
+  test("pricing page lists FREE and STARTER with paise-correct rupee amounts", async ({ page }) => {
     await page.goto("/pricing");
     await expect(page.getByText(/FREE/i).first()).toBeVisible();
     await expect(page.getByText(/STARTER/i).first()).toBeVisible();
-    await expect(page.getByText(/PRO/i).first()).toBeVisible();
     await expect(page.getByText(/₹\s*0/).first()).toBeVisible();
     await expect(page.getByText(/₹\s*299/).first()).toBeVisible();
-    await expect(page.getByText(/₹\s*799/).first()).toBeVisible();
+  });
+
+  test("PRO stays off the marketing surface until STARTER is GA", async ({ page }) => {
+    await page.goto("/pricing");
+    // VISIBLE_TIERS in app/(marketing)/pricing/page.tsx is ["FREE", "STARTER"] —
+    // PRO is a deliberate cut (PITCH.md "minimal product"), not an oversight.
+    // PLAN_PRICES_PAISE still carries 79900 for gates, so only the marketing
+    // surface should be free of it.
+    await expect(page.getByText(/₹\s*799/)).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /^pro$/i })).toHaveCount(0);
   });
 
   test("sign-in form renders email + password + submit", async ({ page }) => {
