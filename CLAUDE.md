@@ -15,6 +15,28 @@ npm run lint           # next lint
 npm test               # vitest run
 npm run build          # next build
 npm run e2e            # playwright (auto-starts dev server unless BASE_URL is set)
+```
+
+### E2E writes real rows — never point it at production
+
+The suite registers vendors, creates menu items and rings up sales. `.env` is what
+both Prisma and Next read, so running `npm run e2e` with production `DATABASE_URL`
+in it seeds junk into the live database. Use a throwaway Postgres, same image CI uses:
+
+```bash
+docker run -d --name awaazos-e2e -p 5433:5432 -e POSTGRES_USER=ci -e POSTGRES_PASSWORD=ci -e POSTGRES_DB=awaazos postgres:15-alpine
+
+export DATABASE_URL="postgresql://ci:ci@localhost:5433/awaazos?schema=public"
+export DIRECT_URL="$DATABASE_URL"
+npx prisma db push --skip-generate
+npx playwright test --project=chromium
+
+docker rm -f awaazos-e2e     # when done
+```
+
+Exported vars win: Next does not overwrite an env var that is already set.
+`BASE_URL=https://…` runs the read-only specs against a deployment, but the
+vendor-creating specs will write to whatever database that deployment uses.
 
 npx prisma db push     # apply schema to Neon (no migration files in this repo)
 npm run db:studio

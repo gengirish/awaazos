@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/vendor";
 
@@ -7,17 +7,25 @@ import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/
  * these tests are as much about what does NOT render as what does.
  */
 
-async function vendorSlug(page: import("@playwright/test").Page): Promise<string> {
+/** The QR image comes from api.qrserver.com; stub it so CI never needs egress. */
+async function stubQrService(page: Page): Promise<void> {
+  const onePixelPng = Buffer.from(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+    "base64",
+  );
+  await page.route("**://api.qrserver.com/**", (route) =>
+    route.fulfill({ status: 200, contentType: "image/png", body: onePixelPng }),
+  );
+}
+
+async function vendorSlug(page: Page): Promise<string> {
   const res = await page.request.get("/api/vendor");
   expect(res.status(), "GET /api/vendor should succeed for a signed-in owner").toBe(200);
   const body = (await res.json()) as { vendor: { slug: string } };
   return body.vendor.slug;
 }
 
-async function setPublished(
-  page: import("@playwright/test").Page,
-  publishStorefront: boolean,
-): Promise<void> {
+async function setPublished(page: Page, publishStorefront: boolean): Promise<void> {
   const res = await page.request.patch("/api/vendor", {
     data: { publishStorefront },
     headers: { "Content-Type": "application/json" },
@@ -82,5 +90,114 @@ test.describe("public storefront", () => {
   test("an unknown slug 404s", async ({ page }) => {
     const res = await page.goto("/s/no-such-stall-abcxyz");
     expect(res?.status()).toBe(404);
+  });
+
+  test("unavailable items are withheld from the public page", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    await createVendorSession(page, request, "storefront-avail", "/menu");
+    const slug = await vendorSlug(page);
+    const sold = await createMenuItem(page, { name: "Sold Out Jalebi", priceInRupees: 40 });
+    await createMenuItem(page, { name: "In Stock Poha", priceInRupees: 25 });
+
+    const patch = await page.request.patch(`/api/menu/${sold.id}`, {
+      data: { isAvailable: false },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(patch.ok(), "marking an item unavailable").toBe(true);
+
+    await setPublished(page, true);
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const anonPage = await anon.newPage();
+    try {
+      await anonPage.goto(`/s/${slug}`);
+      await expect(anonPage.getByText("In Stock Poha")).toBeVisible();
+      // A customer must not be able to order what the stall has run out of,
+      // and the item name should not leak onto the page at all.
+      await expect(anonPage.getByText("Sold Out Jalebi")).toHaveCount(0);
+    } finally {
+      await anon.close();
+    }
+  });
+
+  test("the UPI QR appears only once the vendor has a UPI ID", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    await createVendorSession(page, request, "storefront-upi", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, { name: "Cutting Chai", priceInRupees: 10 });
+    await setPublished(page, true);
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const anonPage = await anon.newPage();
+    await stubQrService(anonPage);
+
+    try {
+      // register() does not set a UPI ID, so the pay block must be absent
+      // rather than rendering a QR that resolves to nobody.
+      await anonPage.goto(`/s/${slug}`);
+      await expect(anonPage.getByRole("heading", { name: /scan to pay/i })).toHaveCount(0);
+
+      const patch = await page.request.patch("/api/vendor", {
+        data: { upiId: "e2e-stall@okaxis", upiName: "E2E Stall" },
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(patch.ok(), "saving a UPI ID").toBe(true);
+
+      await anonPage.goto(`/s/${slug}`);
+      await expect(anonPage.getByRole("heading", { name: /scan to pay/i })).toBeVisible();
+      await expect(anonPage.getByRole("img", { name: /UPI QR code/i })).toBeVisible();
+    } finally {
+      await anon.close();
+    }
+  });
+
+  test("an owner can publish from the Settings UI, not just the API", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    await createVendorSession(page, request, "storefront-ui", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, { name: "Misal Pav", priceInRupees: 60 });
+
+    await page.goto("/settings");
+    const toggle = page.getByRole("switch", { name: /publish/i });
+    await expect(toggle).toBeVisible();
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+    // The link only appears once published — it is the thing the vendor shares.
+    await expect(page.getByText(`/s/${slug}`)).toBeVisible();
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const anonPage = await anon.newPage();
+    try {
+      const res = await anonPage.goto(`/s/${slug}`);
+      expect(res?.status(), "the UI toggle must actually publish").toBe(200);
+      await expect(anonPage.getByText("Misal Pav")).toBeVisible();
+    } finally {
+      await anon.close();
+    }
+  });
+
+  test("the POS gear reaches Settings, so the storefront control is discoverable", async ({
+    page,
+    request,
+  }) => {
+    await createVendorSession(page, request, "storefront-nav", "/menu");
+    await createMenuItem(page, { name: "Idli", priceInRupees: 30 });
+
+    await page.goto("/pos");
+    await page.getByRole("link", { name: "Settings" }).click();
+
+    await expect(page).toHaveURL(/\/settings$/);
+    await expect(page.getByRole("switch", { name: /publish/i })).toBeVisible();
   });
 });
