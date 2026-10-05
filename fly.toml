@@ -14,7 +14,7 @@ kill_timeout = '15s'
 [env]
   NODE_ENV = 'production'
   # Public storefront origin for the "Order again" link in WhatsApp receipts.
-  NEXT_PUBLIC_APP_URL = 'https://awaazos.vercel.app'
+  NEXT_PUBLIC_APP_URL = 'https://awaazos.intelliforge.tech'
 
 [[vm]]
   size = 'shared-cpu-1x'
