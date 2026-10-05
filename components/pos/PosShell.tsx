@@ -90,7 +90,13 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise }:
         >
           Menu
         </Link>
-        <div className="flex items-center gap-2">
+        <Link
+          href="/drops"
+          className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Drops
+        </Link>
+        <div className="ml-auto flex items-center gap-2">
           <Link
             href="/transactions"
             className="hidden min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:inline-flex"

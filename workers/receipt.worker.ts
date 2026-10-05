@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { getBullMqConnection, type SendReceiptJobPayload } from "@/lib/queues";
 import { sendWhatsappReceipt } from "@/lib/whatsapp";
-import { formatWhatsAppReceiptMessage } from "@/lib/whatsapp-message";
+import { formatWhatsAppReceiptMessage, receiptStorefrontUrl } from "@/lib/whatsapp-message";
 
 export const receiptWorker = new Worker<SendReceiptJobPayload>(
   "send-receipt",
@@ -49,6 +49,14 @@ export const receiptWorker = new Worker<SendReceiptJobPayload>(
       taxPaise: tx.taxPaise,
       totalPaise: tx.totalPaise,
       receiptFooter: tx.vendor.settings?.receiptFooter,
+      fssaiNumber: tx.vendor.settings?.fssaiNumber,
+      // Runs on Fly: no VERCEL_* vars here, so the link is omitted unless the
+      // public origin is configured explicitly.
+      storefrontUrl: receiptStorefrontUrl({
+        slug: tx.vendor.slug,
+        publishStorefront: tx.vendor.settings?.publishStorefront,
+        baseUrl: process.env.NEXT_PUBLIC_APP_URL ?? process.env.AUTH_URL,
+      }),
     });
 
     const { ok } = await sendWhatsappReceipt({

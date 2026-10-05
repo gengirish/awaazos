@@ -13,56 +13,65 @@ datasource db {
 // ─── VENDOR (Tenant) ────────────────────────────────────────────────
 
 model Vendor {
-  id              String      @id @default(cuid())
-  slug            String      @unique                 // URL-safe handle, e.g. "ravis-bhel"
-  name            String                              // Stall/shop name
-  ownerName       String
-  phone           String?                             // +91 format
-  email           String?
-  upiId           String?                             // e.g. vendor@okaxis
-  upiName         String?                             // Name shown on UPI screen
-  logoUrl         String?                             // Vercel Blob URL
-  plan            Plan        @default(FREE)
-  planExpiresAt   DateTime?
-  stallType       StallType   @default(GENERAL)
-  city            String?
-  state           String      @default("Telangana")
-  gstin           String?                             // 15-char GST identifier (optional)
-  isActive        Boolean     @default(true)
-  onboardingDone  Boolean     @default(false)
-  createdAt       DateTime    @default(now())
-  updatedAt       DateTime    @updatedAt
+  id             String    @id @default(cuid())
+  slug           String    @unique // URL-safe handle, e.g. "ravis-bhel"
+  name           String // Stall/shop name
+  ownerName      String
+  phone          String? // +91 format
+  email          String?
+  upiId          String? // e.g. vendor@okaxis
+  upiName        String? // Name shown on UPI screen
+  logoUrl        String? // Vercel Blob URL
+  plan           Plan      @default(FREE)
+  planExpiresAt  DateTime?
+  stallType      StallType @default(GENERAL)
+  city           String?
+  state          String    @default("Telangana")
+  gstin          String? // 15-char GST identifier (optional)
+  isActive       Boolean   @default(true)
+  onboardingDone Boolean   @default(false)
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
-  menuItems       MenuItem[]
-  transactions    Transaction[]
-  receipts        Receipt[]
-  staff           StaffMember[]
-  settings        VendorSettings?
-  dailySummaries  DailySummary[]
-  billSequences   BillSequence[]
-  voiceParseLogs  VoiceParseLog[]
+  menuItems      MenuItem[]
+  transactions   Transaction[]
+  receipts       Receipt[]
+  staff          StaffMember[]
+  settings       VendorSettings?
+  dailySummaries DailySummary[]
+  billSequences  BillSequence[]
+  voiceParseLogs VoiceParseLog[]
+  drops          Drop[]
 
   @@index([slug])
   @@map("vendors")
 }
 
 model VendorSettings {
-  id                    String   @id @default(cuid())
-  vendorId              String   @unique
-  vendor                Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  sendWhatsappReceipt   Boolean  @default(false)
-  autoPrintReceipt      Boolean  @default(false)
-  taxEnabled            Boolean  @default(false)
-  taxPercent            Decimal  @default(0)   @db.Decimal(5, 2)
-  discountEnabled       Boolean  @default(false)
-  whatsappNumber        String?                // +91XXXXXXXXXX
-  voiceLang             String   @default("en-IN")   // hi-IN, te-IN, kn-IN, ta-IN
-  receiptFooter         String?                // "Thanks for visiting!"
-  theme                 String   @default("orange")  // orange | green | blue | purple
-  hsnDefault            String?                // Default HSN/SAC code for menu items without one
-  publishStorefront     Boolean  @default(false)  // Opt-in: expose /s/<vendor slug> to the public
-  razorpaySubId         String?
-  razorpayCustomerId    String?
+  id                       String  @id @default(cuid())
+  vendorId                 String  @unique
+  vendor                   Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  sendWhatsappReceipt      Boolean @default(false)
+  autoPrintReceipt         Boolean @default(false)
+  taxEnabled               Boolean @default(false)
+  taxPercent               Decimal @default(0) @db.Decimal(5, 2)
+  discountEnabled          Boolean @default(false)
+  whatsappNumber           String? // +91XXXXXXXXXX
+  voiceLang                String  @default("en-IN") // hi-IN, te-IN, kn-IN, ta-IN
+  receiptFooter            String? // "Thanks for visiting!"
+  theme                    String  @default("orange") // orange | green | blue | purple
+  hsnDefault               String? // Default HSN/SAC code for menu items without one
+  publishStorefront        Boolean @default(false) // Opt-in: expose /s/<vendor slug> to the public
+  fssaiNumber              String? // 14-digit FSSAI registration; shown on storefront + receipts
+  acceptPayOnDelivery      Boolean @default(true) // Storefront: allow cash/UPI on delivery instead of paying upfront
+  // Vendor-owned Razorpay account for storefront payments (money goes to the
+  // vendor, never through the platform). Secrets are AES-256-GCM encrypted with
+  // PAYMENT_KEYS_ENCRYPTION_KEY (lib/secret-box.ts) — never stored or logged raw.
+  razorpayKeyId            String?
+  razorpayKeySecretEnc     String?
+  razorpayWebhookSecretEnc String?
+  razorpaySubId            String?
+  razorpayCustomerId       String?
 
   @@map("vendor_settings")
 }
@@ -70,76 +79,195 @@ model VendorSettings {
 // ─── MENU ───────────────────────────────────────────────────────────
 
 model MenuItem {
-  id            String      @id @default(cuid())
-  vendorId      String
-  vendor        Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  name          String                              // Display name
-  slug          String?                             // URL/log-safe handle, e.g. "mohabbatein-sharbat" (unique per vendor)
-  aliases       String[]    @default([])            // Voice recognition aliases (e.g. ["bhel", "lays bhel"])
-  tags          String[]    @default([])            // Flexible labels for filtering & Claude context (e.g. ["drinks","cold"])
-  emoji         String      @default("🍽️")
-  category      String      @default("General")
-  priceInPaise  Int                                 // ALWAYS store in paise. ₹20 = 2000
-  isAvailable   Boolean     @default(true)
-  isPopular     Boolean     @default(false)
-  sortOrder     Int         @default(0)
-  imageUrl      String?
-  hsnCode       String?                             // HSN/SAC; falls back to VendorSettings.hsnDefault
-  createdAt     DateTime    @default(now())
-  updatedAt     DateTime    @updatedAt
+  id           String   @id @default(cuid())
+  vendorId     String
+  vendor       Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name         String // Display name
+  slug         String? // URL/log-safe handle, e.g. "mohabbatein-sharbat" (unique per vendor)
+  aliases      String[] @default([]) // Voice recognition aliases (e.g. ["bhel", "lays bhel"])
+  tags         String[] @default([]) // Flexible labels for filtering & Claude context (e.g. ["drinks","cold"])
+  emoji        String   @default("🍽️")
+  category     String   @default("General")
+  priceInPaise Int // ALWAYS store in paise. ₹20 = 2000
+  isAvailable  Boolean  @default(true)
+  isPopular    Boolean  @default(false)
+  sortOrder    Int      @default(0)
+  imageUrl     String?
+  hsnCode      String? // HSN/SAC; falls back to VendorSettings.hsnDefault
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  orderItems    OrderItem[]
+  orderItems OrderItem[]
+  dropItems  DropItem[]
 
   @@unique([vendorId, slug])
   @@index([vendorId, isAvailable])
   @@map("menu_items")
 }
 
+// ─── DROPS (daily pre-order menus) ───────────────────────────────
+//
+// A Drop is one batch of cooking a home kitchen sells ahead of time:
+// "Saturday bakes, order by Fri 9pm, delivery Sat 5–8pm". MenuItem stays the
+// master catalogue; DropItem picks from it with today's price and quantity cap.
+// Sold counts are always computed from OrderItem rows (lib/drops.ts), never
+// stored as a counter, so a cancelled order frees stock without bookkeeping.
+
+model Drop {
+  id                 String         @id @default(cuid())
+  vendorId           String
+  vendor             Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  title              String // "Saturday Bakes"
+  note               String? // Shown on the storefront
+  date               DateTime       @db.Date // IST cooking day
+  fulfilmentMode     FulfilmentMode @default(DELIVERY)
+  fulfilmentStartsAt DateTime // Delivery / pickup window start (UTC)
+  fulfilmentEndsAt   DateTime
+  pickupNote         String? // "Collect from Gate 2, Block C"
+  deliveryFeePaise   Int            @default(0)
+  opensAt            DateTime? // Null = open as soon as published
+  closesAt           DateTime // Order cut-off (UTC)
+  status             DropStatus     @default(DRAFT)
+  frozenAt           DateTime?
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+
+  items        DropItem[]
+  transactions Transaction[]
+
+  @@index([vendorId, date])
+  @@index([vendorId, status])
+  @@map("drops")
+}
+
+model DropItem {
+  id            String   @id @default(cuid())
+  dropId        String
+  drop          Drop     @relation(fields: [dropId], references: [id], onDelete: Cascade)
+  menuItemId    String
+  menuItem      MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  priceInPaise  Int // Today's price (defaults to MenuItem price)
+  maxQty        Int? // Capacity; null = unlimited
+  perOrderLimit Int? // Max per single order; null = no limit
+  sortOrder     Int      @default(0)
+
+  orderItems OrderItem[]
+
+  @@unique([dropId, menuItemId])
+  @@index([dropId])
+  @@map("drop_items")
+}
+
+// ─── STOREFRONT CUSTOMERS (buyers, not staff) ──────────────────────
+//
+// Deliberately separate from User/NextAuth: a buyer must never come near staff
+// RBAC. Platform-wide identity (one email across kitchens); orders link via
+// Transaction.customerId. Passwordless — email magic link (lib/customer-auth.ts).
+// Tokens and session ids are stored only as SHA-256 hashes.
+
+model Customer {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  phone        String? // E.164; PII
+  savedAddress String? // PII
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  sessions     CustomerSession[]
+  loginTokens  CustomerLoginToken[]
+  transactions Transaction[]
+
+  @@map("customers")
+}
+
+model CustomerLoginToken {
+  id         String    @id @default(cuid())
+  customerId String
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tokenHash  String    @unique
+  returnTo   String? // Same-origin path only
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([customerId])
+  @@map("customer_login_tokens")
+}
+
+model CustomerSession {
+  id         String   @id @default(cuid())
+  customerId String
+  customer   Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+  tokenHash  String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+
+  @@index([customerId])
+  @@map("customer_sessions")
+}
+
 // ─── TRANSACTION ────────────────────────────────────────────────────
 
 model Transaction {
-  id                  String          @id @default(cuid())
-  vendorId            String
-  vendor              Vendor          @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  billNumber          String                          // AWZ-20260502-0001 (auto-generated)
-  subtotalPaise       Int
-  discountPaise       Int             @default(0)
-  taxPaise            Int             @default(0)
-  totalPaise          Int                             // subtotal - discount + tax
-  paymentMethod       PaymentMethod   @default(UPI)
-  paymentStatus       PaymentStatus   @default(PENDING)
-  upiRef              String?                         // Customer's UTR reference
-  razorpayOrderId     String?
-  razorpayPaymentId   String?
-  paymentLinkUrl      String?                         // Razorpay Payment Link URL
-  customerPhone       String?                         // +91 for WhatsApp receipt
-  customerName        String?
-  voiceTranscript     String?                         // Raw voice input
-  source              OrderSource     @default(VOICE)
-  notes               String?
-  paidAt              DateTime?
-  createdAt           DateTime        @default(now())
-  updatedAt           DateTime        @updatedAt
+  id                String        @id @default(cuid())
+  vendorId          String
+  vendor            Vendor        @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  billNumber        String // AWZ-20260502-0001 (auto-generated)
+  subtotalPaise     Int
+  discountPaise     Int           @default(0)
+  taxPaise          Int           @default(0)
+  totalPaise        Int // subtotal - discount + tax
+  paymentMethod     PaymentMethod @default(UPI)
+  paymentStatus     PaymentStatus @default(PENDING)
+  upiRef            String? // Customer's UTR reference
+  razorpayOrderId   String?
+  razorpayPaymentId String?
+  paymentLinkUrl    String? // Razorpay Payment Link URL
+  customerPhone     String? // +91 for WhatsApp receipt
+  customerName      String?
+  voiceTranscript   String? // Raw voice input
+  source            OrderSource   @default(VOICE)
+  notes             String?
+  paidAt            DateTime?
 
-  orderItems          OrderItem[]
-  receipt             Receipt?
+  // Storefront pre-orders (source = STOREFRONT). Null for counter sales.
+  dropId           String?
+  drop             Drop?             @relation(fields: [dropId], references: [id], onDelete: SetNull)
+  fulfilmentStatus FulfilmentStatus?
+  fulfilmentType   FulfilmentType?
+  deliveryAddress  String? // PII — never logged, never sent to an LLM
+  deliveryFeePaise Int               @default(0)
+  orderToken       String?           @unique // Unguessable handle for the buyer's order page
+  customerId       String?
+  customer         Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  cancelledAt      DateTime?
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+
+  orderItems OrderItem[]
+  receipt    Receipt?
 
   @@index([vendorId, createdAt])
   @@index([vendorId, paymentStatus])
   @@index([billNumber])
+  @@index([dropId])
+  @@index([customerId])
   @@map("transactions")
 }
 
 model OrderItem {
-  id            String       @id @default(cuid())
+  id            String      @id @default(cuid())
   transactionId String
-  transaction   Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   menuItemId    String?
-  menuItem      MenuItem?    @relation(fields: [menuItemId], references: [id])
-  name          String                               // Snapshot at time of sale
+  menuItem      MenuItem?   @relation(fields: [menuItemId], references: [id])
+  dropItemId    String? // Set on storefront orders; drives stock counts
+  dropItem      DropItem?   @relation(fields: [dropItemId], references: [id], onDelete: SetNull)
+  name          String // Snapshot at time of sale
   priceInPaise  Int
-  qty           Int          @default(1)
-  totalPaise    Int                                  // priceInPaise * qty
+  qty           Int         @default(1)
+  totalPaise    Int // priceInPaise * qty
 
   @@index([transactionId])
   @@map("order_items")
@@ -148,17 +276,17 @@ model OrderItem {
 // ─── RECEIPT ────────────────────────────────────────────────────────
 
 model Receipt {
-  id              String       @id @default(cuid())
-  transactionId   String       @unique
-  transaction     Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
-  vendorId        String
-  vendor          Vendor       @relation(fields: [vendorId], references: [id])
-  receiptNumber   String
-  whatsappSent    Boolean      @default(false)
-  whatsappSentAt  DateTime?
-  deliveredTo     String?                            // +91 phone number
-  pdfUrl          String?                            // Vercel Blob URL
-  createdAt       DateTime     @default(now())
+  id             String      @id @default(cuid())
+  transactionId  String      @unique
+  transaction    Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  vendorId       String
+  vendor         Vendor      @relation(fields: [vendorId], references: [id])
+  receiptNumber  String
+  whatsappSent   Boolean     @default(false)
+  whatsappSentAt DateTime?
+  deliveredTo    String? // +91 phone number
+  pdfUrl         String? // Vercel Blob URL
+  createdAt      DateTime    @default(now())
 
   @@index([vendorId, createdAt])
   @@map("receipts")
@@ -170,7 +298,7 @@ model DailySummary {
   id                String   @id @default(cuid())
   vendorId          String
   vendor            Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  date              DateTime @db.Date                // YYYY-MM-DD
+  date              DateTime @db.Date // YYYY-MM-DD
   totalRevenuePaise Int      @default(0)
   totalTransactions Int      @default(0)
   totalItemsSold    Int      @default(0)
@@ -187,16 +315,16 @@ model DailySummary {
 // ─── STAFF ──────────────────────────────────────────────────────────
 
 model StaffMember {
-  id            String    @id @default(cuid())
-  vendorId      String
-  vendor        Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  userId        String
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name          String
-  phone         String?
-  role          StaffRole @default(CASHIER)
-  isActive      Boolean   @default(true)
-  createdAt     DateTime  @default(now())
+  id        String    @id @default(cuid())
+  vendorId  String
+  vendor    Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name      String
+  phone     String?
+  role      StaffRole @default(CASHIER)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
 
   @@unique([vendorId, userId])
   @@index([userId])
@@ -208,20 +336,20 @@ model StaffMember {
 // Postgres truncation on long Google ID tokens.
 
 model User {
-  id            String        @id @default(cuid())
-  name          String?
-  email         String        @unique
-  emailVerified DateTime?
-  image         String?
-  passwordHash  String?                             // null for OAuth-only users
-  passwordChangedAt DateTime?                        // set on password reset; enforcement is a follow-up (see lib/rbac.ts)
-  role          UserRole      @default(USER)
-  createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
+  id                String    @id @default(cuid())
+  name              String?
+  email             String    @unique
+  emailVerified     DateTime?
+  image             String?
+  passwordHash      String? // null for OAuth-only users
+  passwordChangedAt DateTime? // set on password reset; enforcement is a follow-up (see lib/rbac.ts)
+  role              UserRole  @default(USER)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
 
-  accounts      Account[]
-  sessions      Session[]
-  staffMemberships StaffMember[]
+  accounts            Account[]
+  sessions            Session[]
+  staffMemberships    StaffMember[]
   passwordResetTokens PasswordResetToken[]
 
   @@index([email])
@@ -232,9 +360,9 @@ model PasswordResetToken {
   id        String    @id @default(cuid())
   userId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  tokenHash String    @unique                      // SHA-256 of the emailed token; raw token is never stored
+  tokenHash String    @unique // SHA-256 of the emailed token; raw token is never stored
   expiresAt DateTime
-  usedAt    DateTime?                              // single-use: set the moment the token is burned
+  usedAt    DateTime? // single-use: set the moment the token is burned
   requestIp String?
   createdAt DateTime  @default(now())
 
@@ -242,7 +370,6 @@ model PasswordResetToken {
   @@index([expiresAt])
   @@map("password_reset_tokens")
 }
-
 
 model Account {
   id                String  @id @default(cuid())
@@ -301,19 +428,19 @@ model BillSequence {
 // 90-day TTL via scheduled cleanup. NEVER store customer PII here.
 
 model VoiceParseLog {
-  id          String   @id @default(cuid())
-  vendorId    String
-  vendor      Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  transcript  String                                          // Voice transcript only
-  lang        String                                          // en-IN | hi-IN | te-IN | kn-IN | ta-IN
-  sttSource   String                                          // 'webspeech' | 'sarvam'
-  modelUsed   String                                          // 'claude-haiku-4-5' | 'claude-sonnet-4-5'
-  escalated   Boolean  @default(false)
-  itemCount   Int
-  confidence  String                                          // 'high' | 'medium' | 'low'
-  unmatched   String[] @default([])
-  latencyMs   Int
-  createdAt   DateTime @default(now())
+  id         String   @id @default(cuid())
+  vendorId   String
+  vendor     Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  transcript String // Voice transcript only
+  lang       String // en-IN | hi-IN | te-IN | kn-IN | ta-IN
+  sttSource  String // 'webspeech' | 'sarvam'
+  modelUsed  String // 'claude-haiku-4-5' | 'claude-sonnet-4-5'
+  escalated  Boolean  @default(false)
+  itemCount  Int
+  confidence String // 'high' | 'medium' | 'low'
+  unmatched  String[] @default([])
+  latencyMs  Int
+  createdAt  DateTime @default(now())
 
   @@index([vendorId, createdAt])
   @@index([modelUsed, escalated])
@@ -323,16 +450,16 @@ model VoiceParseLog {
 // ─── ENUMS ──────────────────────────────────────────────────────────
 
 enum UserRole {
-  USER            // Default — vendors and their staff
-  ADMIN           // IntelliForge support / ops
-  SUPER_ADMIN     // Platform owners
+  USER // Default — vendors and their staff
+  ADMIN // IntelliForge support / ops
+  SUPER_ADMIN // Platform owners
 }
 
 enum Plan {
-  FREE            // 50 transactions/month, 1 staff
-  STARTER         // ₹299/month — 500 txn, 3 staff, WhatsApp receipts
-  PRO             // ₹799/month — unlimited, Razorpay links, analytics export
-  ENTERPRISE      // Custom
+  FREE // 50 transactions/month, 1 staff
+  STARTER // ₹299/month — 500 txn, 3 staff, WhatsApp receipts
+  PRO // ₹799/month — unlimited, Razorpay links, analytics export
+  ENTERPRISE // Custom
 }
 
 enum StallType {
@@ -362,10 +489,37 @@ enum PaymentStatus {
 }
 
 enum OrderSource {
-  VOICE           // Via AI voice (AwaazOS core)
-  MANUAL          // Quick-add tap grid
-  WHATSAPP        // Future: WhatsApp ordering
-  API             // Future: 3rd party integrations
+  VOICE // Via AI voice (AwaazOS core)
+  MANUAL // Quick-add tap grid
+  WHATSAPP // Future: WhatsApp ordering
+  STOREFRONT // Pre-order placed by a buyer on /s/[slug]
+  API // Future: 3rd party integrations
+}
+
+enum DropStatus {
+  DRAFT // Being built; invisible to buyers
+  OPEN // Taking orders (until closesAt — evaluated lazily, no timer)
+  CLOSED // No new orders; vendor can still edit/cancel
+  FROZEN // Orders locked; prep sheet + delivery list
+  FULFILLED // Done
+}
+
+enum FulfilmentMode {
+  DELIVERY
+  PICKUP
+  BOTH
+}
+
+enum FulfilmentType {
+  DELIVERY
+  PICKUP
+}
+
+enum FulfilmentStatus {
+  PLACED // Buyer submitted
+  CONFIRMED // Vendor accepted
+  CANCELLED
+  DELIVERED // Handed over (delivery or pickup)
 }
 
 enum StaffRole {

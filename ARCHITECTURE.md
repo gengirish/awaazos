@@ -547,3 +547,150 @@ To stay focused, AwaazOS is explicitly **not**:
 - A general-purpose SaaS (we will not pivot to "POS for restaurants in the US")
 
 If a feature isn't on the path to "Indian micro-merchant takes their first 100 voice orders without thinking", it's a no.
+
+---
+
+## 11. Drops (home-kitchen pre-orders)
+
+A **Drop** is one batch of cooking a home kitchen sells ahead of time: "Saturday bakes — order by Fri 9 pm, delivery Sat 5–8 pm". The vendor builds it from her existing menu, shares `/s/<slug>`, buyers order against capped stock, and on the day she gets a cook list and a delivery list. Core rules: `lib/drops.ts` (read its header). Vendor UI: `/drops`, `/drops/[id]` (orders board), `/drops/[id]/edit`, `/drops/[id]/prep`. Buyer UI: `/s/[slug]`, `/s/[slug]/o/[token]`, `/s/[slug]/account`.
+
+### Data model
+
+```mermaid
+erDiagram
+    Vendor ||--o{ Drop : "sells"
+    Drop ||--o{ DropItem : "offers"
+    MenuItem ||--o{ DropItem : "picked into"
+    Drop ||--o{ Transaction : "storefront orders"
+    DropItem ||--o{ OrderItem : "sold as"
+    Customer ||--o{ Transaction : "placed (optional)"
+    Customer ||--o{ CustomerSession : "signed in"
+    Customer ||--o{ CustomerLoginToken : "magic links"
+
+    Drop {
+        date date "IST cooking day"
+        DropStatus status "DRAFT|OPEN|CLOSED|FROZEN|FULFILLED"
+        datetime opensAt "null = on open"
+        datetime closesAt "cut-off, evaluated lazily"
+        FulfilmentMode fulfilmentMode "DELIVERY|PICKUP|BOTH"
+        int deliveryFeePaise
+    }
+    DropItem {
+        int priceInPaise "today's price"
+        int maxQty "null = unlimited"
+        int perOrderLimit "null = none"
+    }
+    Transaction {
+        OrderSource source "STOREFRONT"
+        string orderToken UK "192-bit, buyer's handle"
+        FulfilmentStatus fulfilmentStatus "PLACED|CONFIRMED|DELIVERED|CANCELLED"
+        FulfilmentType fulfilmentType
+        string deliveryAddress "PII"
+        int deliveryFeePaise
+    }
+    Customer {
+        string email UK
+        string phone "PII"
+        string savedAddress "PII"
+    }
+```
+
+- `MenuItem` stays the master catalogue; `DropItem` is today's price + capacity. `OrderItem.dropItemId` links a sold line back to its drop item; `name`/`priceInPaise` are still snapshots.
+- Storefront orders are ordinary `Transaction` rows (`source = STOREFRONT`), so revenue, bill numbers (`AWZ-YYYYMMDD-NNNN`), receipts and exports work unchanged. The storefront-only columns are null for counter sales.
+- **There is no sold-count column.** Sold = sum of `OrderItem.qty` over orders that currently hold stock (`stockHoldingOrderWhere`): paid, pay-on-delivery, UTR submitted, confirmed/delivered, or placed less than `PENDING_HOLD_MINUTES` (15) ago. Cancelled never holds.
+- `Customer`, `CustomerSession`, `CustomerLoginToken` are buyers, deliberately separate from `User`/NextAuth. Tokens and session ids are stored as SHA-256 hashes only.
+- `VendorSettings` gains `fssaiNumber`, `acceptPayOnDelivery` (default `true`), and the vendor's own `razorpayKeyId` / `razorpayKeySecretEnc` / `razorpayWebhookSecretEnc`.
+
+### Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> DRAFT
+    DRAFT --> OPEN: Open orders (needs publishStorefront + a payment method)
+    OPEN --> DRAFT
+    OPEN --> CLOSED: Close now
+    OPEN --> FROZEN
+    CLOSED --> OPEN: Reopen (cut-off moved forward)
+    CLOSED --> FROZEN: Freeze (final cook list)
+    FROZEN --> CLOSED: Unfreeze
+    FROZEN --> FULFILLED
+    FULFILLED --> [*]
+
+    state OPEN {
+        SCHEDULED: SCHEDULED (computed, now before opensAt)
+        ACCEPTING: accepting orders
+        LAZY_CLOSED: CLOSED (computed, now after closesAt)
+        SCHEDULED --> ACCEPTING: opensAt passes
+        ACCEPTING --> LAZY_CLOSED: closesAt passes
+    }
+```
+
+Only the vendor moves the **stored** status (`ALLOWED_TRANSITIONS` in `lib/drops.ts`). Time-based states are computed on every read by `effectiveDropStatus()` and never written: a stored-OPEN drop shows as SCHEDULED before `opensAt` and as CLOSED after `closesAt`. Transitions are checked against the *effective* status, so an OPEN drop past its cut-off can be frozen directly. FROZEN locks confirm/cancel; payment and handover actions still work.
+
+### Order flow
+
+```mermaid
+sequenceDiagram
+    participant B as Buyer (browser)
+    participant S as /s/[slug] (RSC)
+    participant API as POST /api/s/[slug]/orders
+    participant DB as Postgres (Neon)
+    participant KV as Upstash
+    participant V as Vendor board /drops/[id]
+
+    B->>S: open storefront
+    S->>DB: vendor (publish-gated, allowlisted select) + OPEN drops + sold counts
+    S-->>B: drops with "Only N left"
+    B->>API: items, name, phone, fulfilment, payment method (Idempotency-Key)
+    API->>API: IP rate limit, Zod, publish gate (404)
+    API->>DB: BEGIN; SELECT drop FOR UPDATE
+    API->>DB: effective status, fulfilment, per-order limit, stock, plan cap
+    API->>DB: billSequence.upsert, transaction + orderItems + receipt
+    API->>DB: COMMIT
+    API--)KV: bump drop-orders:{vendorId}:{dropId} (fire-and-forget)
+    API-->>B: 201 { orderToken }, redirect to /s/[slug]/o/[token]
+    V->>KV: GET /api/drops/[id]/signal every 20 s (visible + accepting only)
+    V->>DB: refetch orders only when the counter moved
+```
+
+Rejections are typed (`PlaceOrderError`): `sold_out` carries `remaining` so the buyer's cart is trimmed in place; `drop_not_open` covers a cut-off that passed while the buyer was filling the form.
+
+### Payment paths
+
+| Path | How it gets paid | Who marks it paid |
+| --- | --- | --- |
+| **UPI intent + UTR** | Order page shows the vendor's UPI QR / `upi://` link for the exact amount; buyer pays in any app and submits the 12-digit UTR | Vendor matches the UTR in her UPI app and taps **Mark paid**. Nothing is auto-verified. |
+| **Pay on delivery** | Cash or UPI at the door / pickup (`acceptPayOnDelivery`) | Vendor's **Delivered · ₹X collected** tap marks it paid in the same DB transaction |
+| **Vendor's Razorpay** | Razorpay Checkout using the **vendor's own** keys; order created on her account | Signature verify on return (`/razorpay/verify`) or her webhook `/api/webhooks/razorpay-orders/[vendorId]`, whichever lands first |
+
+All three converge on `markOrderPaid()`: a conditional `updateMany` (`paymentStatus != PAID`, not cancelled) is the idempotency guard, and `DailySummary` is credited exactly once, **on payment, not placement**. `cancelOrder()` on a paid order sets `REFUNDED` and reverses the credit on the day it was made; the refund itself happens out of band. Storefront orders count toward `monthlyTxnCap` only once paid.
+
+### ADR: vendor-owned Razorpay keys vs platform collection
+
+**Status:** Accepted · **Date:** 2026-10-05
+
+**Context.** Buyers want to pay online at order time. The simplest build is to collect through AwaazOS's own Razorpay account (already used for subscriptions) and pay vendors out. That makes AwaazOS hold and settle third-party money, which under RBI's payment-aggregator guidelines requires PA authorisation, net-worth thresholds and escrow — out of reach and out of scope.
+
+**Decision.** Online storefront payments go through the **vendor's own Razorpay account**. She pastes her key id, key secret and webhook secret in Settings; secrets are AES-256-GCM encrypted with `PAYMENT_KEYS_ENCRYPTION_KEY` (`lib/secret-box.ts`) and never logged or returned. `lib/storefront-razorpay.ts` calls the Razorpay API with plain `fetch` per vendor (the SDK is a single-account singleton). Platform `RAZORPAY_*` keys and `lib/razorpay.ts` remain for AwaazOS's own billing only. Each vendor's webhook has its own URL, so the path selects which secret to verify against.
+
+**Consequences.**
+
+- Money settles straight to the vendor; AwaazOS never touches it, so no PA licence and no payout reconciliation.
+- Onboarding friction: a vendor needs a Razorpay account (KYC). UPI intent + UTR and pay on delivery stay first-class so the feature works without one.
+- The order webhook cannot verify HMAC before *any* DB read — it must load that vendor's encrypted secret first. It reads only that column, and unknown vendor / bad signature both return 400.
+- Losing `PAYMENT_KEYS_ENCRYPTION_KEY` means every vendor re-enters keys; rotating it needs a re-encrypt pass.
+
+### ADR: lazy cut-off vs scheduled job
+
+**Status:** Accepted · **Date:** 2026-10-05
+
+**Context.** Drops have an order cut-off, and unpaid UPI orders have a 15-minute stock hold. The conventional build is a cron/BullMQ job that flips OPEN → CLOSED and expires holds. Neon (like every metered backend here) scales to zero; any job running more often than the idle timeout pins it awake and bills as if saturated.
+
+**Decision.** No timers. The cut-off is a pure function of `(status, opensAt, closesAt, now)` — `effectiveDropStatus()` — evaluated on every read and inside the order transaction. Holds are a `createdAt` window in the sold-count query, not a row that expires. The stored status changes only when the vendor acts.
+
+**Consequences.**
+
+- Zero background Postgres traffic between orders; correctness doesn't depend on a worker being up.
+- Every reader must go through `effectiveDropStatus()` / `isAcceptingOrders()`; comparing `drop.status === "OPEN"` directly is a bug.
+- A drop's stored status can say OPEN long after it closed. Queries that need "really open" filter on stored OPEN and then evaluate in code (the storefront also hides closed drops after a 12 h grace).
+- The orders board, which does want freshness, polls an Upstash counter rather than Postgres (`lib/drops-signal.ts`).

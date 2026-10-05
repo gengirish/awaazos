@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatWhatsAppReceiptMessage } from "@/lib/whatsapp-message";
+import { formatWhatsAppReceiptMessage, receiptStorefrontUrl } from "@/lib/whatsapp-message";
 
 describe("formatWhatsAppReceiptMessage", () => {
   it("includes vendor header, bill line, items, total, and footer", () => {
@@ -50,5 +50,54 @@ describe("formatWhatsAppReceiptMessage", () => {
       receiptFooter: null,
     });
     expect(msg).toContain("HSN/SAC: 2106");
+  });
+
+  const base = {
+    vendorName: "Amma's Kitchen",
+    billNumber: "AWZ-20260423-0003",
+    createdAt: new Date("2026-04-23T10:00:00.000Z"),
+    items: [{ name: "Biryani", qty: 1, priceInPaise: 25000 }],
+    taxPaise: 0,
+    totalPaise: 25000,
+    receiptFooter: null,
+  };
+
+  it("prints the FSSAI number when set", () => {
+    const msg = formatWhatsAppReceiptMessage({ ...base, fssaiNumber: " 12345678901234 " });
+    expect(msg).toContain("FSSAI Lic. No: 12345678901234");
+  });
+
+  it("omits the FSSAI line when unset or blank", () => {
+    expect(formatWhatsAppReceiptMessage(base)).not.toContain("FSSAI");
+    expect(formatWhatsAppReceiptMessage({ ...base, fssaiNumber: "  " })).not.toContain("FSSAI");
+  });
+
+  it("adds an order-again line when a storefront URL is given", () => {
+    const msg = formatWhatsAppReceiptMessage({
+      ...base,
+      storefrontUrl: "https://awaazos.example/s/ammas-kitchen",
+    });
+    expect(msg).toContain("Order again: https://awaazos.example/s/ammas-kitchen");
+    expect(msg.trimEnd().endsWith("Powered by AwaazOS 🇮🇳")).toBe(true);
+  });
+
+  it("has no order-again line without a storefront URL", () => {
+    expect(formatWhatsAppReceiptMessage(base)).not.toContain("Order again");
+  });
+});
+
+describe("receiptStorefrontUrl", () => {
+  it("builds the link only when the storefront is published and a base URL exists", () => {
+    expect(
+      receiptStorefrontUrl({ slug: "ammas-kitchen", publishStorefront: true, baseUrl: "https://a.example/" }),
+    ).toBe("https://a.example/s/ammas-kitchen");
+    expect(
+      receiptStorefrontUrl({ slug: "ammas-kitchen", publishStorefront: false, baseUrl: "https://a.example" }),
+    ).toBeNull();
+    expect(
+      receiptStorefrontUrl({ slug: "ammas-kitchen", publishStorefront: undefined, baseUrl: "https://a.example" }),
+    ).toBeNull();
+    expect(receiptStorefrontUrl({ slug: "ammas-kitchen", publishStorefront: true, baseUrl: undefined })).toBeNull();
+    expect(receiptStorefrontUrl({ slug: "ammas-kitchen", publishStorefront: true, baseUrl: "  " })).toBeNull();
   });
 });

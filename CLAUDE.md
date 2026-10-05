@@ -145,11 +145,28 @@ Every Prisma `where` touching tenant data must include `vendorId` — **use a co
 mutations** (`where: { id, vendorId: vendor.id }`), never a post-fetch ownership check.
 Cross-tenant misses return **404, not 403** — don't leak existence.
 
-The single exception to "every protected handler starts with `requireVendorRole`" is the public
-storefront `app/s/[slug]` — the only unauthenticated route that reads tenant data. It is gated on
-`VendorSettings.publishStorefront` (default `false`), 404s rather than 403s when a vendor has not
-opted in, and its Prisma `select` is a hand-written allowlist: `Vendor.phone` / `Vendor.email` must
-never appear on it.
+The exception to "every protected handler starts with `requireVendorRole`" is the **public
+storefront surface** — unauthenticated, and no longer read-only (buyers place pre-orders):
+
+| Surface | What |
+| --- | --- |
+| `/s/[slug]` | Menu + open drops + checkout |
+| `/s/[slug]/o/[token]` | Buyer's order page (status, UPI pay, UTR form) |
+| `/s/[slug]/account` | Signed-in buyer's own orders/profile |
+| `/api/s/**` | Order placement, UTR submit, vendor-Razorpay start/verify, buyer magic-link auth |
+| `/api/webhooks/razorpay-orders/[vendorId]` | Per-vendor Razorpay webhook (vendor's own secret) |
+
+Rules every one of them follows:
+
+- Gated on `VendorSettings.publishStorefront` (default `false`); not opted in → **404, not 403**.
+- Prisma `select` is a hand-written allowlist. `Vendor.phone` / `Vendor.email` never appear.
+- Order pages are keyed on `Transaction.orderToken` alone (192-bit random, `generateOrderToken()`),
+  always looked up together with the slug's `vendorId`. Never expose or accept a transaction `id`.
+- Every write is IP rate-limited (`makeLimiter` in `lib/ratelimit.ts`; buyer login also per-email).
+- No buyer PII (phone, name, address, UTR, email) in logs, Sentry or error bodies.
+- The order webhook can't verify HMAC before *any* DB read — the secret is per vendor — so it
+  reads exactly one column (the encrypted webhook secret) first, and nothing else until verified.
+  Unknown vendor and bad signature are indistinguishable (both 400).
 
 Two role axes: platform `UserRole` (`USER < ADMIN < SUPER_ADMIN`) and per-tenant `StaffRole`
 (`CASHIER < MANAGER < OWNER`). Plan gates are separate again: `requirePlan(vendor, Plan.STARTER)`
@@ -166,6 +183,45 @@ are logged and swallowed — Redis being down must never block a sale.
 
 `OrderItem.name` and `priceInPaise` are snapshots, not joins. Renaming or deleting a menu item must
 not mutate historical bills.
+
+### Drops (pre-orders)
+
+A `Drop` is one batch a home kitchen sells ahead of time ("Saturday bakes, order by Fri 9 pm").
+Core rules live in `lib/drops.ts` (read its header before touching it); buyers order on
+`/s/[slug]`, the vendor works from `/drops`, `/drops/[id]` (orders board), `/drops/[id]/prep`.
+
+Three invariants, enforced in `lib/drops.ts` and nowhere else:
+
+1. **No timers.** Cut-off is evaluated lazily on every read and order attempt
+   (`effectiveDropStatus`). Nothing flips OPEN → CLOSED on a schedule — Neon must be able to
+   sleep between orders. `SCHEDULED` and "past cut-off = CLOSED" are computed, never stored.
+2. **No overselling.** `placeStorefrontOrder` takes `SELECT … FOR UPDATE` on the drop row, so
+   orders for one drop serialise and the stock check can't race.
+3. **Sold counts are derived, never stored.** Summed from `OrderItem` rows that still hold stock
+   (`stockHoldingOrderWhere` / `orderHoldsStock` — keep the twins in lockstep). An unpaid UPI order
+   holds stock for `PENDING_HOLD_MINUTES` (15) then silently stops counting; cancel frees stock.
+
+Money and plan rules:
+
+- `DailySummary` is credited when a storefront order is **paid** (`markOrderPaid`, idempotent via
+  conditional `updateMany`), not when placed. Cancel of a paid order reverses it (`cancelOrder`).
+  Pay-on-delivery is marked paid by the vendor's "Delivered · ₹X collected" tap.
+- Storefront orders count toward `monthlyTxnCap` only once paid (`countBillableTxnThisMonth`).
+- Online payment uses the **vendor's own Razorpay keys** (`lib/storefront-razorpay.ts`), secrets
+  AES-256-GCM-encrypted with `PAYMENT_KEYS_ENCRYPTION_KEY` (`lib/secret-box.ts`). Never the platform
+  `RAZORPAY_*` account — collecting on a vendor's behalf makes us an RBI payment aggregator.
+  The other paths are UPI intent + buyer-submitted UTR (vendor verifies) and pay on delivery.
+
+Buyer accounts are **not** NextAuth: `Customer` + passwordless email magic link
+(`lib/customer-auth.ts`), tokens and sessions stored as SHA-256 hashes only, session in the
+httpOnly `awz_cust` cookie. A buyer session never touches staff RBAC or widens a vendor `select`.
+
+Orders board freshness: order placement and board actions bump a vendor-scoped Upstash counter
+(`lib/drops-signal.ts`, fire-and-forget). The board polls `/api/drops/[id]/signal` every 20 s, only
+while visible and while the drop accepts orders, and refetches from Postgres only when it moves;
+no KV → 60 s direct refresh. See TODO.md — the signal route's auth check still hits Postgres.
+
+DB-backed drops tests are opt-in: `npm run test:drops:db` (needs a throwaway `DATABASE_URL`).
 
 ### Auth edge split
 

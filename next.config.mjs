@@ -61,6 +61,14 @@ const nextConfig = {
         source: "/:path*",
         headers: SECURITY_HEADERS,
       },
+      {
+        // Buyer order page opens Razorpay Checkout, whose netbanking / 3-D Secure
+        // steps run in a cross-origin popup that must post back to its opener.
+        // "same-origin" severs that link; "same-origin-allow-popups" keeps
+        // isolation for everything else. Later entries override earlier ones.
+        source: "/s/:slug/o/:token",
+        headers: [{ key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" }],
+      },
     ];
   },
 };

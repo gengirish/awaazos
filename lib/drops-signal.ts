@@ -1,0 +1,47 @@
+/**
+ * "Something changed on this drop" counter, kept in Upstash — not Postgres.
+ *
+ * The vendor's orders board wants to notice new orders quickly. Polling
+ * Postgres for that would pin Neon awake for as long as the board is open
+ * (see the global scale-to-zero rule). Instead, order placement bumps a KV
+ * counter; the board polls this cheap counter and refetches from Postgres only
+ * when the number moves.
+ *
+ * Fail-open both ways: no KV → bump is a no-op and reads return null, and the
+ * board falls back to a slow (≥60s) direct refresh.
+ */
+
+import { getKv } from "@/lib/kv";
+
+const TTL_SECONDS = 3 * 24 * 60 * 60;
+
+/** Vendor-scoped, so a vendor can only ever read counters for their own drops. */
+function key(vendorId: string, dropId: string): string {
+  return `drop-orders:${vendorId}:${dropId}`;
+}
+
+/** Never throws, never awaited by the order path. */
+export async function bumpDropOrderSignal(vendorId: string, dropId: string): Promise<void> {
+  const kv = getKv();
+  if (!kv) return;
+  try {
+    await kv.incr(key(vendorId, dropId));
+    await kv.expire(key(vendorId, dropId), TTL_SECONDS);
+  } catch {
+    // Signal is an optimisation; the board still refreshes on its slow path.
+  }
+}
+
+/** Current counter value, or null when KV is unavailable (caller falls back). */
+export async function getDropOrderSignal(vendorId: string, dropId: string): Promise<number | null> {
+  const kv = getKv();
+  if (!kv) return null;
+  try {
+    const v = await kv.get<number | string>(key(vendorId, dropId));
+    if (v === null || v === undefined) return 0;
+    const n = typeof v === "number" ? v : Number.parseInt(v, 10);
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return null;
+  }
+}

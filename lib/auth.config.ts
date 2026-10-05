@@ -13,6 +13,9 @@ function isPublicPath(pathname: string): boolean {
   // VendorSettings.publishStorefront is true, so this allowlist exposes nothing
   // on its own.
   if (pathname.startsWith("/s/")) return true;
+  // Storefront write paths (place order, submit UTR). Same opt-in gate: every
+  // handler under /api/s/ 404s unless the vendor has publishStorefront = true.
+  if (pathname.startsWith("/api/s/")) return true;
   if (pathname.startsWith("/api/auth")) return true;
   return false;
 }

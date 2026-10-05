@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getIstMonthStart, getIstTodayStart, formatBillDateYYYYMMDD } from "@/lib/billing-period";
+import { getIstTodayStart, formatBillDateYYYYMMDD } from "@/lib/billing-period";
 import { PLAN_LIMITS } from "@/lib/constants";
+import { countBillableTxnThisMonth } from "@/lib/drops";
 import { beginIdempotency, getIdempotencyKey } from "@/lib/idempotency";
 import { prisma } from "@/lib/prisma";
 import { getReceiptQueue } from "@/lib/queues";
@@ -118,10 +119,8 @@ export async function POST(req: NextRequest) {
 
     const cap = PLAN_LIMITS[vendor.plan].monthlyTxnCap;
     if (cap !== null) {
-      const monthStart = getIstMonthStart();
-      const count = await prisma.transaction.count({
-        where: { vendorId: vendor.id, createdAt: { gte: monthStart } },
-      });
+      // Unpaid storefront pre-orders don't burn the cap (lib/drops.ts).
+      const count = await countBillableTxnThisMonth(prisma, vendor.id);
       if (count >= cap) {
         throw new AuthError(402, "monthly_txn_cap_reached");
       }

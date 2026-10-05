@@ -1,14 +1,25 @@
 import type { Metadata } from "next";
-import { MapPin, QrCode, Sparkles, UtensilsCrossed } from "lucide-react";
+import { CalendarClock, MapPin, QrCode, ShoppingBag, Sparkles, Truck, UserRound, UtensilsCrossed } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { CopyUpiId } from "@/components/storefront/CopyUpiId";
+import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
+import { getIstTodayStart } from "@/lib/billing-period";
 import { STALL_TYPES } from "@/lib/constants";
 import { formatINRCompact } from "@/lib/currency";
+import { getCurrentCustomer } from "@/lib/customer-auth";
+import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
+import { formatDropDayLabel, formatFulfilmentWindow } from "@/lib/drops-time";
 import { prisma } from "@/lib/prisma";
+import {
+  formatIstDeadline,
+  formatTimeLeft,
+  storefrontDropVisibility,
+  type StorefrontDropVisibility,
+} from "@/lib/storefront-order";
 import { buildQrUrl, buildUpiCollectLink } from "@/lib/upi";
 
 export const dynamic = "force-dynamic";
@@ -27,8 +38,20 @@ export const runtime = "nodejs";
  *   3. The `select` is an allowlist, never a spread. `Vendor.phone` and
  *      `Vendor.email` are contact PII and must not reach a public page;
  *      `upiId` is here only because collecting payment is the point.
- *      `settings.theme` is the vendor's chosen brand colour — the only field
- *      read off VendorSettings besides the publish gate itself.
+ *      Off VendorSettings, besides the publish gate itself, only: `theme`
+ *      (brand colour), `fssaiNumber` (food-safety licence, legally meant to be
+ *      displayed), and `acceptPayOnDelivery` (whether to offer that option).
+ *
+ * Drops (daily pre-order menus) render above the regular menu. Only stored-OPEN
+ * drops from yesterday (IST) onward are read; the cut-off is evaluated here on
+ * every request (`effectiveDropStatus`), never by a timer — hence force-dynamic,
+ * and stock counts are recomputed per render. The order write path is
+ * app/api/s/[slug]/orders, held to the same gate.
+ *
+ * Optional buyer sign-in (lib/customer-auth.ts): the `awz_cust` session, when
+ * present, only adds a header link and checkout prefill from the buyer's OWN
+ * Customer row. It never widens the vendor `select` above. Guests see the
+ * page exactly as before, plus a "Sign in" link.
  */
 
 type StorefrontVendor = NonNullable<Awaited<ReturnType<typeof loadStorefront>>>;
@@ -41,6 +64,7 @@ const BRAND_THEMES = new Set(["green", "amber", "red", "blue", "purple"]);
  * this to a single query per request.
  */
 const loadStorefront = cache(async (slug: string) => {
+  const yesterday = new Date(getIstTodayStart().getTime() - 24 * 60 * 60 * 1000);
   return prisma.vendor.findFirst({
     where: {
       slug,
@@ -56,7 +80,38 @@ const loadStorefront = cache(async (slug: string) => {
       logoUrl: true,
       upiId: true,
       upiName: true,
-      settings: { select: { theme: true } },
+      settings: {
+        select: { theme: true, fssaiNumber: true, acceptPayOnDelivery: true },
+      },
+      drops: {
+        where: { status: "OPEN", date: { gte: yesterday } },
+        orderBy: [{ date: "asc" }, { closesAt: "asc" }],
+        take: 10,
+        select: {
+          id: true,
+          title: true,
+          note: true,
+          date: true,
+          status: true,
+          opensAt: true,
+          closesAt: true,
+          fulfilmentMode: true,
+          fulfilmentStartsAt: true,
+          fulfilmentEndsAt: true,
+          pickupNote: true,
+          deliveryFeePaise: true,
+          items: {
+            orderBy: [{ sortOrder: "asc" }],
+            select: {
+              id: true,
+              priceInPaise: true,
+              maxQty: true,
+              perOrderLimit: true,
+              menuItem: { select: { name: true, emoji: true, imageUrl: true } },
+            },
+          },
+        },
+      },
       menuItems: {
         where: { isAvailable: true },
         orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
@@ -158,6 +213,148 @@ function MenuRow({ item }: { item: StorefrontItems[number] }) {
   );
 }
 
+type StorefrontDrop = StorefrontVendor["drops"][number];
+
+type DropView = {
+  drop: StorefrontDrop;
+  visibility: Exclude<StorefrontDropVisibility, "hidden">;
+  items: DropOrderItem[];
+};
+
+/**
+ * Effective status + live stock per drop. Sold counts are queried only for
+ * orderable drops; `soldQtyByDropItem` filters by dropId, and every drop here
+ * already came through the vendor-scoped, publish-gated query above.
+ */
+async function buildDropViews(drops: StorefrontDrop[], now: Date): Promise<DropView[]> {
+  const visible = drops
+    .map((drop) => ({
+      drop,
+      visibility: storefrontDropVisibility(effectiveDropStatus(drop, now), drop.closesAt, now),
+    }))
+    .filter(
+      (d): d is { drop: StorefrontDrop; visibility: DropView["visibility"] } => d.visibility !== "hidden",
+    );
+
+  return Promise.all(
+    visible.map(async ({ drop, visibility }) => {
+      const sold =
+        visibility === "open" ? await soldQtyByDropItem(prisma, drop.id, now) : new Map<string, number>();
+      return {
+        drop,
+        visibility,
+        items: drop.items.map((i) => ({
+          id: i.id,
+          name: i.menuItem.name,
+          emoji: i.menuItem.emoji,
+          imageUrl: i.menuItem.imageUrl,
+          priceInPaise: i.priceInPaise,
+          remaining: remainingQty(i.maxQty, sold.get(i.id) ?? 0),
+          perOrderLimit: i.perOrderLimit,
+        })),
+      };
+    }),
+  );
+}
+
+function DropSection({
+  view,
+  slug,
+  payment,
+  now,
+  prefill,
+}: {
+  view: DropView;
+  slug: string;
+  payment: { upi: boolean; cod: boolean };
+  now: Date;
+  prefill: BuyerPrefill | null;
+}) {
+  const { drop, visibility } = view;
+  const headingId = `drop-${drop.id}`;
+  const types = allowedFulfilmentTypes(drop.fulfilmentMode);
+  const timeLeft = visibility === "open" ? formatTimeLeft(drop.closesAt, now) : null;
+
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="rounded-3xl border border-primary/25 bg-gradient-to-b from-primary/[0.08] to-background p-4 shadow-sm sm:p-5"
+    >
+      <p className="text-xs font-bold uppercase tracking-wide text-primary">
+        Pre-order · {formatDropDayLabel(drop.date)}
+      </p>
+      <h3 id={headingId} className="mt-1 font-display text-2xl font-bold leading-tight text-awaaz-charcoal">
+        {drop.title}
+      </h3>
+      {drop.note ? <p className="mt-1 text-sm text-muted-foreground">{drop.note}</p> : null}
+
+      <ul className="mt-3 space-y-1.5 text-sm">
+        <li className="flex items-start gap-2">
+          <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span>
+            {types.includes("DELIVERY") && types.includes("PICKUP")
+              ? "Delivery or pickup"
+              : types.includes("DELIVERY")
+                ? "Delivery"
+                : "Pickup"}{" "}
+            · {formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt)}
+          </span>
+        </li>
+        {types.includes("DELIVERY") ? (
+          <li className="flex items-start gap-2">
+            <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>
+              {drop.deliveryFeePaise > 0
+                ? `Delivery fee ${formatINRCompact(drop.deliveryFeePaise)}`
+                : "Free delivery"}
+            </span>
+          </li>
+        ) : null}
+        {types.includes("PICKUP") && drop.pickupNote ? (
+          <li className="flex items-start gap-2">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>Pickup: {drop.pickupNote}</span>
+          </li>
+        ) : null}
+      </ul>
+
+      <p
+        className={
+          visibility === "open"
+            ? "mt-3 inline-flex flex-wrap items-center gap-x-2 rounded-full bg-primary px-3 py-1 text-sm font-bold text-primary-foreground"
+            : "mt-3 inline-flex rounded-full bg-muted px-3 py-1 text-sm font-bold text-muted-foreground"
+        }
+      >
+        {visibility === "open" ? (
+          <>
+            <span>Order by {formatIstDeadline(drop.closesAt, now)}</span>
+            {timeLeft ? <span className="font-semibold opacity-90">· {timeLeft}</span> : null}
+          </>
+        ) : visibility === "scheduled" && drop.opensAt ? (
+          `Orders open ${formatIstDeadline(drop.opensAt, now)}`
+        ) : (
+          "Orders closed"
+        )}
+      </p>
+
+      <div className="mt-4">
+        <DropOrder
+          slug={slug}
+          dropId={drop.id}
+          dropTitle={drop.title}
+          items={view.items}
+          orderable={visibility === "open"}
+          fulfilmentTypes={types}
+          deliveryFeePaise={drop.deliveryFeePaise}
+          pickupNote={drop.pickupNote}
+          payment={payment}
+          prefill={prefill}
+        />
+      </div>
+    </section>
+  );
+}
+
 export default async function StorefrontPage({ params }: { params: { slug: string } }) {
   const vendor = await loadStorefront(params.slug);
   if (!vendor) notFound();
@@ -172,6 +369,17 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
   const rawTheme = vendor.settings?.theme ?? "orange";
   const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
   const itemCount = vendor.menuItems.length;
+
+  const now = new Date();
+  const [dropViews, customer] = await Promise.all([buildDropViews(vendor.drops, now), getCurrentCustomer()]);
+  const prefill: BuyerPrefill | null = customer
+    ? { name: customer.name, phone: customer.phone, address: customer.savedAddress }
+    : null;
+  const hasOpenDrop = dropViews.some((d) => d.visibility === "open");
+  const payment = {
+    upi: !!vendor.upiId,
+    cod: vendor.settings?.acceptPayOnDelivery ?? false,
+  };
 
   return (
     <div data-theme={theme} className="min-h-screen bg-awaaz-cream/40">
@@ -196,7 +404,19 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
           }}
         />
 
-        <div className="relative mx-auto max-w-2xl px-4 pb-7 pt-10 sm:px-6 sm:pb-9 sm:pt-14">
+        <div className="relative mx-auto flex max-w-2xl justify-end px-4 pt-3 sm:px-6">
+          <Link
+            href={`/s/${vendor.slug}/account`}
+            className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-sm transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          >
+            <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span className="truncate">
+              {customer ? `Hi${customer.name ? `, ${customer.name.split(/\s+/)[0]}` : ""} · My orders` : "Sign in"}
+            </span>
+          </Link>
+        </div>
+
+        <div className="relative mx-auto max-w-2xl px-4 pb-7 pt-4 sm:px-6 sm:pb-9 sm:pt-8">
           <div className="flex flex-col items-center text-center">
             {vendor.logoUrl ? (
               <Image
@@ -239,7 +459,15 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
               </p>
             ) : null}
 
-            {upiLink ? (
+            {hasOpenDrop ? (
+              <a
+                href="#drops"
+                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
+                <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+                Pre-order now
+              </a>
+            ) : upiLink ? (
               <a
                 href="#pay"
                 className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
@@ -274,12 +502,34 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
       ) : null}
 
       <main id="menu" className="mx-auto max-w-2xl px-4 py-7 sm:px-6 sm:py-9">
-        <h2 className="sr-only">Menu</h2>
+        {dropViews.length > 0 ? (
+          <div id="drops" className="mb-10 scroll-mt-16 space-y-6">
+            <h2 className="sr-only">Pre-order menus</h2>
+            {dropViews.map((view) => (
+              <DropSection
+                key={view.drop.id}
+                view={view}
+                slug={vendor.slug}
+                payment={payment}
+                now={now}
+                prefill={prefill}
+              />
+            ))}
+          </div>
+        ) : null}
+
+        {dropViews.length > 0 && categories.length > 0 ? (
+          <h2 className="mb-4 font-display text-lg font-bold text-awaaz-charcoal">Everyday menu</h2>
+        ) : dropViews.length === 0 ? (
+          <h2 className="sr-only">Menu</h2>
+        ) : null}
 
         {categories.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-border bg-background px-4 py-12 text-center text-sm text-muted-foreground">
-            This stall has not published any items yet. Please check back soon.
-          </p>
+          dropViews.length > 0 ? null : (
+            <p className="rounded-2xl border border-dashed border-border bg-background px-4 py-12 text-center text-sm text-muted-foreground">
+              This stall has not published any items yet. Please check back soon.
+            </p>
+          )
         ) : (
           <div className="space-y-8">
             {popular.length > 1 ? (
@@ -392,6 +642,9 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
       </main>
 
       <footer className="px-4 pb-10 pt-2 text-center">
+        {vendor.settings?.fssaiNumber ? (
+          <p className="mb-3 text-xs text-muted-foreground">FSSAI Lic. No. {vendor.settings.fssaiNumber}</p>
+        ) : null}
         <Link
           href="/"
           className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"

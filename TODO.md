@@ -80,9 +80,14 @@ spend on vendors who would never convert.
 Only start these if the two-week discovery test says the fire is real. See the positioning memo.
 
 ### 3.1 Storefront link inside the WhatsApp receipt
-One line in `formatWhatsAppReceiptMessage` (`lib/whatsapp-message.ts`) — the body currently ends
-at "Powered by AwaazOS" and carries no way back to the vendor. This is the market-sale → repeat
-loop in miniature. Blocked behind 1.1 being true.
+**Status:** implemented on `feat/home-kitchen-drops`; delivery still unverified (blocked by 1.1).
+
+`formatWhatsAppReceiptMessage` (`lib/whatsapp-message.ts`) now adds
+"Order again: https://<host>/s/<slug>" — only when `publishStorefront` is on **and** a public
+base URL is configured (`receiptStorefrontUrl()`). The worker runs on Fly, where Vercel's
+`VERCEL_*` vars don't exist, so it reads `NEXT_PUBLIC_APP_URL ?? AUTH_URL`; **set one of them on
+the Fly worker** or the line is silently omitted. Unit-tested; never seen in a real WhatsApp message
+because no receipt has been (see 1.1).
 
 ### 3.2 Tap-to-compose WhatsApp order on the storefront
 Buyer taps items on `/s/[slug]`, the page composes a pre-filled WhatsApp message to the vendor.
@@ -91,14 +96,56 @@ path — a customer-initiated message opens the 24-hour window legitimately, so 
 consent apparatus are needed.
 
 ### 3.3 `fssaiNumber` on storefront and receipts
-Home food businesses must show an FSSAI registration number on packaging, invoices and digital
-menus. Same shape as the existing `gstin` / `hsnCode` fields. Makes a seller compliant as a side
-effect of using us. Confirm the current rule for home-scale operators before putting it in a pitch.
+**Status:** implemented on `feat/home-kitchen-drops`. Receipt delivery still blocked by 1.1.
+
+`VendorSettings.fssaiNumber` (Settings → Pre-orders) is shown on the storefront and printed as
+"FSSAI Lic. No: …" on the WhatsApp receipt when set. Still open: confirm the current FSSAI rule for
+home-scale operators (registration vs licence wording) before putting it in a pitch.
 
 ### 3.4 The real project, if discovery passes
-Orders placed remotely with a paid/unpaid state, a customer entity (today a buyer is just a phone
-number stamped on a transaction), and order cut-off times for batch cooking. `razorpayLinks` is
-currently a flag in `PLAN_LIMITS` with no implementation behind it.
+**Status:** implemented on `feat/home-kitchen-drops` as **Drops** — see `ARCHITECTURE.md` §11.
+
+Remote pre-orders with paid/unpaid state, a `Customer` entity (magic-link buyer accounts), cut-off
+times evaluated lazily, capped stock, orders board, prep sheet, and three payment paths (UPI intent +
+UTR, pay on delivery, the vendor's own Razorpay keys). Covered by unit tests, `npm run test:drops:db`
+and `e2e/drops.spec.ts`. Not yet verified in production: vendor-Razorpay checkout and webhook
+against a real Razorpay account, buyer magic-link email delivery, and anything WhatsApp (1.1).
+`razorpayLinks` in `PLAN_LIMITS` is still a flag with nothing behind it — storefront Razorpay does
+not use it.
+
+### 3.5 Drops: open items found while building it
+
+- **Orders board keeps Neon awake during order windows.** `/api/drops/[id]/signal` reads its
+  counter from Upstash, but `requireVendorRole` inside it hits Postgres (session → membership) on
+  every poll — every 20 s while the board is visible and a drop is accepting orders. A vendor who
+  leaves the board open all evening pins Neon awake for the whole window, against the global
+  scale-to-zero rule. Options: a JWT-only session check plus a KV-cached `(userId, vendorId)`
+  membership for this one route, or a poll interval above Neon's idle timeout. **Needs an owner
+  decision.**
+- **Marking an EXPIRED order paid can oversell.** After the 15-minute hold lapses its stock is
+  released and may be resold; the board still lets the vendor tap Mark paid (e.g. a late UTR), which
+  re-counts that stock. Either re-check remaining stock under the drop lock in `mark_paid`, or warn
+  the vendor before allowing it.
+- **The monthly cap can be overshot.** The cap check at placement counts only *paid* storefront
+  orders, so several unpaid orders can each pass it and later all get paid. Bounded by order volume
+  per drop; decide whether to count in-flight holding orders too.
+- **Non-Latin names in the OG image fetch a font at runtime.** `app/s/[slug]/opengraph-image.tsx`
+  pulls a Google font when a vendor or item name isn't Latin (Telugu, Devanagari…). Adds latency and
+  an external dependency to link previews; bundle the subset fonts instead.
+- **`prisma db push` to Neon before deploying this branch.** Schema changes are additive only (new
+  tables, nullable columns, defaults), but the app will 500 on drops/storefront paths until the push
+  has run.
+- **Email link scanners can burn buyer sign-in links.** `GET /api/s/customer/verify` consumes the
+  token, so Outlook Safe Links–style prefetchers land the buyer on "expired". Fix: a confirm page
+  whose "Continue" button POSTs.
+- **Login CSRF on buyer accounts.** An attacker can send a victim their own sign-in link so the
+  victim's next orders attach to the attacker's account. Show "Signed in as <email>" in checkout.
+- **Online (Razorpay) payments are credited as UPI revenue.** `markOrderPaid` splits DailySummary by
+  `paymentMethod`, which stays `UPI` when a buyer pays by card through Checkout.
+- **Paid after cancel.** A buyer can pay through Checkout after the vendor cancelled; money moves but
+  the order is not marked paid (logged as `storefront_rzp_paid_unapplied`). Vendor refunds by hand.
+- **Fly receipt worker needs `NEXT_PUBLIC_APP_URL` or `AUTH_URL`** for the "Order again" link;
+  without it the line is silently omitted.
 
 ---
 

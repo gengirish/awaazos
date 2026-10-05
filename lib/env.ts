@@ -28,6 +28,9 @@ const envSchema = z.object({
   RAZORPAY_KEY_ID: z.string().optional(),
   RAZORPAY_KEY_SECRET: z.string().optional(),
   RAZORPAY_WEBHOOK_SECRET: z.string().optional(),
+  // AES-256-GCM key for vendors' own Razorpay credentials (lib/secret-box.ts).
+  // Length is validated lazily there, so a bad value can't block boot.
+  PAYMENT_KEYS_ENCRYPTION_KEY: z.string().optional(),
   AGENTMAIL_API_KEY: z.string().optional(),
   AGENTMAIL_INBOX_ID: z.string().optional(),
   GUPSHUP_API_KEY: z.string().optional(),

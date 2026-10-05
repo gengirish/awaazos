@@ -107,6 +107,7 @@ function buildHtml(greetingName: string, url: string): string {
 async function deliver(
   config: MailConfig,
   body: { to: string[]; subject: string; text: string; html: string; labels?: string[] },
+  event = "email.password_reset",
 ): Promise<string | null> {
   const endpoint = `${AGENTMAIL_API_BASE}/inboxes/${encodeURIComponent(config.inboxId)}/messages/send`;
   try {
@@ -124,7 +125,7 @@ async function deliver(
       const detail = await res.text().catch(() => "");
       logger.error(
         { status: res.status, detail: detail.slice(0, 300) },
-        "email.password_reset.rejected",
+        `${event}.rejected`,
       );
       return null;
     }
@@ -134,7 +135,7 @@ async function deliver(
   } catch (err) {
     logger.error(
       { err: err instanceof Error ? err.message : "unknown" },
-      "email.password_reset.request_failed",
+      `${event}.request_failed`,
     );
     return null;
   }
@@ -177,5 +178,108 @@ export async function sendPasswordResetEmail(
     "email.password_reset.sent",
   );
 
+  return { ok: true };
+}
+
+// ─── Storefront buyer sign-in (magic link) ──────────────────────────
+//
+// Same two invariants as the reset flow: never throws (the login route returns
+// an identical `{ success: true }` whether or not the email is known), and
+// never logs the URL or token.
+
+export type SendCustomerLoginEmailInput = {
+  to: string;
+  url: string;
+  kitchenName: string;
+  expiresAt: Date;
+};
+
+function buildCustomerLoginText(kitchenName: string, url: string): string {
+  return [
+    "Namaste,",
+    "",
+    `Here is your sign-in link for ${kitchenName}.`,
+    "It works once and expires in 15 minutes:",
+    "",
+    url,
+    "",
+    "If you didn't ask for this, you can ignore this email.",
+    "",
+    "AwaazOS — Bol. Bill. Becho.",
+  ].join("\n");
+}
+
+function buildCustomerLoginHtml(kitchenName: string, url: string): string {
+  const kitchen = escapeHtml(kitchenName);
+  const href = escapeHtml(url);
+  return `<!doctype html>
+<html>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:32px;">
+  <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e2e8f0;">
+    <div style="font-weight:700;font-size:18px;color:#FF6B00;">${kitchen}</div>
+    <h1 style="font-size:22px;margin:24px 0 8px 0;color:#1a1a1a;">Sign in to order</h1>
+    <p style="color:#334155;line-height:1.5;">
+      Namaste,<br><br>
+      Tap the button to sign in at ${kitchen}. This link works once and expires in 15 minutes.
+    </p>
+    <p style="margin:28px 0;">
+      <a href="${href}" style="background:#FF6B00;color:#ffffff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
+        Sign in
+      </a>
+    </p>
+    <p style="color:#64748b;font-size:12px;line-height:1.5;">
+      If the button doesn't work, paste this into your browser:<br>
+      <span style="word-break:break-all;">${href}</span>
+    </p>
+    <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
+    <p style="color:#94a3b8;font-size:11px;line-height:1.5;">
+      Someone — possibly you — asked to sign in with this email on an AwaazOS
+      storefront. If it wasn't you, ignore this email.
+    </p>
+  </div>
+</body>
+</html>`;
+}
+
+/**
+ * Best-effort send. Always resolves `{ ok: true }`. Kitchen name is
+ * vendor-authored, so it is HTML-escaped and stripped of newlines in the subject.
+ */
+export async function sendCustomerLoginEmail(
+  input: SendCustomerLoginEmailInput,
+): Promise<{ ok: true }> {
+  try {
+    const { to, url, expiresAt } = input;
+    const kitchenName = input.kitchenName.replace(/[\r\n]+/g, " ").trim().slice(0, 80) || "AwaazOS";
+    const config = getConfig();
+
+    if (!config) {
+      logger.warn(
+        {
+          toMasked: maskEmail(to),
+          expiresAt: expiresAt.toISOString(),
+          reason: "AGENTMAIL_API_KEY or AGENTMAIL_INBOX_ID not set",
+        },
+        "email.customer_login.unconfigured",
+      );
+      return { ok: true };
+    }
+
+    const messageId = await deliver(config, {
+      to: [to],
+      subject: `Your sign-in link for ${kitchenName}`,
+      text: buildCustomerLoginText(kitchenName, url),
+      html: buildCustomerLoginHtml(kitchenName, url),
+      labels: ["customer-login", "transactional"],
+    }, "email.customer_login");
+
+    logger.info(
+      { toMasked: maskEmail(to), messageId, delivered: messageId != null },
+      "email.customer_login.sent",
+    );
+  } catch {
+    // Invariant 1: never throw. No detail logged — it could carry the URL.
+    logger.error({}, "email.customer_login.failed");
+  }
   return { ok: true };
 }

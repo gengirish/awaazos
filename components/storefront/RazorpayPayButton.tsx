@@ -1,0 +1,245 @@
+"use client";
+
+import { CreditCard, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+
+/**
+ * "Pay online" for a storefront order, through the kitchen's OWN Razorpay
+ * account (Razorpay Standard Checkout). Flow:
+ *
+ *   1. POST …/razorpay        → server creates/reuses a Razorpay Order for the
+ *                                exact order total; returns the public key id.
+ *   2. Load checkout.js on click (not on page load — most buyers never need it).
+ *   3. Checkout success       → POST …/razorpay/verify (server checks the HMAC
+ *                                with the vendor's secret) → router.refresh().
+ *
+ * The per-vendor webhook marks the order paid independently, so if step 3 fails
+ * (flaky network) the buyer is told to refresh rather than pay again.
+ *
+ * `prefillName` / `prefillContact` are the buyer's own details on the buyer's
+ * own order page; they go only to Razorpay Checkout, never to a log.
+ */
+
+const CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
+
+type RazorpaySuccess = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
+
+type RazorpayOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill?: { name?: string; contact?: string };
+  notes?: Record<string, string>;
+  handler: (resp: RazorpaySuccess) => void;
+  modal?: { ondismiss?: () => void; confirm_close?: boolean };
+  retry?: { enabled: boolean };
+};
+
+type RazorpayInstance = {
+  open: () => void;
+  on: (event: "payment.failed", cb: (resp: unknown) => void) => void;
+};
+
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
+  }
+}
+
+let checkoutPromise: Promise<void> | null = null;
+
+function loadCheckout(): Promise<void> {
+  if (typeof window !== "undefined" && window.Razorpay) return Promise.resolve();
+  if (checkoutPromise) return checkoutPromise;
+  checkoutPromise = new Promise<void>((resolve, reject) => {
+    const s = document.createElement("script");
+    s.src = CHECKOUT_SRC;
+    s.async = true;
+    s.onload = () => (window.Razorpay ? resolve() : reject(new Error("checkout_missing")));
+    s.onerror = () => reject(new Error("checkout_load_failed"));
+    document.body.appendChild(s);
+  }).catch((e: unknown) => {
+    checkoutPromise = null; // allow a retry on the next tap
+    throw e;
+  });
+  return checkoutPromise;
+}
+
+type StartPaymentData = {
+  keyId: string;
+  razorpayOrderId: string;
+  amountPaise: number;
+  currency: string;
+  name: string;
+  billNumber: string;
+};
+
+const START_ERRORS: Record<string, string> = {
+  order_expired: "This order's hold has expired, so the items were released. Please place the order again.",
+  not_awaiting_payment: "This order isn't waiting for payment any more. Refresh to see its status.",
+  online_payment_unavailable: "Online payment isn't available for this kitchen right now. Please pay by UPI below.",
+  payment_processing: "Your payment went through — we're confirming it. Refresh in a minute.",
+  razorpay_unavailable: "Couldn't reach the payment service. Please try again, or pay by UPI below.",
+  rate_limited: "Too many attempts. Please wait a minute and try again.",
+};
+
+export function RazorpayPayButton({
+  slug,
+  token,
+  amountLabel,
+  prefillName,
+  prefillContact,
+}: {
+  slug: string;
+  token: string;
+  amountLabel: string;
+  prefillName?: string | null;
+  prefillContact?: string | null;
+}) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | null>(null);
+
+  const base = `/api/s/${encodeURIComponent(slug)}/orders/${encodeURIComponent(token)}/razorpay`;
+
+  async function confirm(resp: RazorpaySuccess) {
+    setBusy(true);
+    setMessage({ text: "Payment received — confirming with the kitchen…", tone: "info" });
+    try {
+      const res = await fetch(`${base}/verify`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(resp),
+      });
+      if (res.ok) {
+        setMessage({ text: "Paid! Updating your order…", tone: "info" });
+        router.refresh();
+        return;
+      }
+      if (res.status === 409) {
+        setMessage({
+          text: "Your payment went through, but this order was closed in the meantime. Please message the kitchen — they'll refund or confirm it.",
+          tone: "error",
+        });
+      } else {
+        setMessage({
+          text: "Your payment went through. We're still confirming it — refresh this page in a minute. Please don't pay again.",
+          tone: "info",
+        });
+      }
+    } catch {
+      setMessage({
+        text: "Your payment went through. We're still confirming it — refresh this page in a minute. Please don't pay again.",
+        tone: "info",
+      });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function start() {
+    if (busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const res = await fetch(base, { method: "POST" });
+      const json = (await res.json().catch(() => ({}))) as { data?: StartPaymentData; error?: string };
+      if (!res.ok || !json.data) {
+        setMessage({
+          text: START_ERRORS[json.error ?? ""] ?? "Couldn't start the payment. Please try again, or pay by UPI below.",
+          tone: json.error === "payment_processing" ? "info" : "error",
+        });
+        setBusy(false);
+        return;
+      }
+      const data = json.data;
+
+      try {
+        await loadCheckout();
+      } catch {
+        setMessage({
+          text: "Couldn't load the payment window. Check your connection, or pay by UPI below.",
+          tone: "error",
+        });
+        setBusy(false);
+        return;
+      }
+      const Razorpay = window.Razorpay;
+      if (!Razorpay) {
+        setBusy(false);
+        return;
+      }
+
+      const rzp = new Razorpay({
+        key: data.keyId,
+        amount: data.amountPaise,
+        currency: data.currency,
+        name: data.name,
+        description: `Order ${data.billNumber}`,
+        order_id: data.razorpayOrderId,
+        prefill: {
+          ...(prefillName ? { name: prefillName } : {}),
+          ...(prefillContact ? { contact: prefillContact } : {}),
+        },
+        handler: (resp) => {
+          void confirm(resp);
+        },
+        modal: {
+          confirm_close: true,
+          ondismiss: () => {
+            setBusy(false);
+            setMessage((m) =>
+              m?.tone === "error" ? m : { text: "Payment cancelled. You can try again, or pay by UPI below.", tone: "info" },
+            );
+          },
+        },
+      });
+      rzp.on("payment.failed", () => {
+        // Checkout lets the buyer retry inside the window; this just leaves a note.
+        setMessage({ text: "That payment didn't go through. No money was taken — try again or use another method.", tone: "error" });
+      });
+      rzp.open();
+    } catch {
+      setMessage({ text: "Couldn't reach the kitchen — check your connection and try again.", tone: "error" });
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={start}
+        disabled={busy}
+        aria-busy={busy}
+        className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
+      >
+        {busy ? (
+          <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+        ) : (
+          <CreditCard className="h-5 w-5" aria-hidden="true" />
+        )}
+        Pay {amountLabel} online
+      </button>
+      <p className="text-xs text-muted-foreground">UPI, cards or netbanking · secured by Razorpay</p>
+      <div aria-live="polite">
+        {message ? (
+          <p
+            role={message.tone === "error" ? "alert" : undefined}
+            className={message.tone === "error" ? "text-sm font-medium text-destructive" : "text-sm font-medium"}
+          >
+            {message.text}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
+}

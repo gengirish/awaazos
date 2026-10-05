@@ -6,6 +6,10 @@ import { SUPPORTED_VOICE_LANGS } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { requireVendorRole } from "@/lib/rbac";
 
+// Served to cashiers: the encrypted Razorpay secrets must never leave the server
+// (lib/storefront-razorpay.ts selects them explicitly where they are needed).
+const SETTINGS_SECRET_OMIT = { razorpayKeySecretEnc: true, razorpayWebhookSecretEnc: true } as const;
+
 const patchSchema = z.object({
   city: z.string().trim().min(1).max(80).optional(),
   state: z.string().trim().min(1).max(80).optional(),
@@ -16,6 +20,12 @@ const patchSchema = z.object({
   whatsappNumber: z.string().trim().max(20).optional().nullable(),
   voiceLang: z.enum(SUPPORTED_VOICE_LANGS).optional(),
   publishStorefront: z.boolean().optional(),
+  // FSSAI registration/licence numbers are exactly 14 digits. "" clears it.
+  fssaiNumber: z
+    .union([z.string().trim().regex(/^\d{14}$/, "FSSAI number must be exactly 14 digits"), z.literal("")])
+    .optional()
+    .nullable(),
+  acceptPayOnDelivery: z.boolean().optional(),
   menuItems: z
     .array(
       z.object({
@@ -46,7 +56,7 @@ export async function GET(req: NextRequest) {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
     const vendor = await prisma.vendor.findUnique({
       where: { id: ctx.vendor.id },
-      include: { settings: true },
+      include: { settings: { omit: SETTINGS_SECRET_OMIT } },
     });
     if (!vendor) {
       return NextResponse.json({ error: "Vendor not found." }, { status: 404 });
@@ -110,6 +120,12 @@ export async function PATCH(req: NextRequest) {
       if (vendorFields.publishStorefront !== undefined) {
         settingsUpdate.publishStorefront = vendorFields.publishStorefront;
       }
+      if (vendorFields.fssaiNumber !== undefined) {
+        settingsUpdate.fssaiNumber = vendorFields.fssaiNumber || null;
+      }
+      if (vendorFields.acceptPayOnDelivery !== undefined) {
+        settingsUpdate.acceptPayOnDelivery = vendorFields.acceptPayOnDelivery;
+      }
       if (vendorFields.onboardingDone === true && vendorFields.whatsappNumber) {
         settingsUpdate.sendWhatsappReceipt = true;
       }
@@ -141,7 +157,7 @@ export async function PATCH(req: NextRequest) {
 
     const vendor = await prisma.vendor.findUnique({
       where: { id: ctx.vendor.id },
-      include: { settings: true },
+      include: { settings: { omit: SETTINGS_SECRET_OMIT } },
     });
 
     const res = NextResponse.json({ vendor });
