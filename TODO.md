@@ -162,6 +162,13 @@ not use it.
   `paymentMethod`, which stays `UPI` when a buyer pays by card through Checkout.
 - **Paid after cancel.** A buyer can pay through Checkout after the vendor cancelled; money moves but
   the order is not marked paid (logged as `storefront_rzp_paid_unapplied`). Vendor refunds by hand.
+- **Menu orders board refreshes every 6 minutes.** "Order from menu" has no cut-off, so its board
+  can stay open all day; polling faster would keep Neon awake (each tick runs `requireVendorRole`).
+  Faster alerts need the same Postgres-free session check as the drops board item above.
+- **Menu ordering can be left without a way to pay.** `acceptMenuOrders` is guarded only when it is
+  switched on. If the vendor later clears the UPI ID or turns off pay-on-delivery, buyers reach a
+  checkout with no payment option (the sheet shows a "message the kitchen" note). Unpublishing is
+  safe (the buyer route 404s).
 - **"Order again" receipt link** — `NEXT_PUBLIC_APP_URL` is set in `fly.toml` `[env]`
   (`https://awaazos.intelliforge.tech`), but the Fly worker app doesn't exist; see 1.1 gate 3.
 

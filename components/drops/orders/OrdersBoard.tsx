@@ -1,14 +1,16 @@
 "use client";
 
-import { ChefHat, Loader2, Pencil, RefreshCw, Volume2, VolumeX } from "lucide-react";
+import type { FulfilmentMode } from "@prisma/client";
+import { ChefHat, ExternalLink, Loader2, Pencil, RefreshCw, Settings, Volume2, VolumeX } from "lucide-react";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
 import { OrderCard } from "@/components/drops/orders/OrderCard";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
 import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/currency";
+import type { EffectiveDropStatus } from "@/lib/drops";
 import {
   BOARD_FILTERS,
   DROP_STATUS_LABEL,
@@ -26,6 +28,12 @@ import {
 } from "@/lib/drops-board";
 import type { BoardDrop } from "@/lib/drops-board-server";
 import { formatIstDate, formatIstTime } from "@/lib/drops-time";
+import {
+  MENU_FALLBACK_POLL_MS,
+  MENU_SIGNAL_POLL_MS,
+  menuBoardPollKind,
+  toMakeFromOrders,
+} from "@/lib/menu-orders-board";
 import { cn } from "@/lib/utils";
 
 /** Signal poll — Upstash only (plus the session check), cheap. */
@@ -34,15 +42,42 @@ const SIGNAL_POLL_MS = 20_000;
 const FALLBACK_POLL_MS = 60_000;
 const MAX_TIMEOUT_MS = 2_147_483_647;
 
+/**
+ * Which orders the board shows: one Drop's pre-orders (cut-off, prep sheet,
+ * frozen rule), or the "order from menu" orders (storefront, no drop), which
+ * have no cut-off and poll only while the vendor has the setting switched on.
+ */
+export type OrdersBoardSource =
+  | { kind: "drop"; initialDrop: BoardDrop }
+  | { kind: "menu"; acceptMenuOrders: boolean; fulfilmentMode: FulfilmentMode };
+
 type Props = {
   vendorName: string;
   vendorSlug: string;
-  initialDrop: BoardDrop;
+  source: OrdersBoardSource;
   initialOrders: BoardOrder[];
   initialSignal: number | null;
 };
 
-type OrdersResponse = { data: BoardOrder[]; drop: BoardDrop; signal: number | null };
+type OrdersResponse = { data: BoardOrder[]; drop?: BoardDrop; signal: number | null };
+
+function boardUrls(source: OrdersBoardSource): { orders: string; signal: string; actionBase: string } {
+  if (source.kind === "menu") {
+    return {
+      orders: "/api/storefront-orders",
+      signal: "/api/storefront-orders/signal",
+      actionBase: "/api/storefront-orders",
+    };
+  }
+  const base = `/api/drops/${encodeURIComponent(source.initialDrop.id)}`;
+  return { orders: `${base}/orders`, signal: `${base}/signal`, actionBase: `${base}/orders` };
+}
+
+const MENU_MODE_LABEL: Record<FulfilmentMode, string> = {
+  PICKUP: "Pickup only",
+  DELIVERY: "Delivery only",
+  BOTH: "Delivery or pickup",
+};
 
 const ACTION_DONE: Record<OrderAction, string> = {
   confirm: "Order confirmed",
@@ -51,6 +86,9 @@ const ACTION_DONE: Record<OrderAction, string> = {
   deliver: "Marked delivered",
   undeliver: "Moved back to confirmed",
 };
+
+const LINK_BTN =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 function beep(ctx: AudioContext | null) {
   if (!ctx) return;
@@ -69,8 +107,9 @@ function beep(ctx: AudioContext | null) {
   }
 }
 
-export function OrdersBoard({ vendorName, vendorSlug, initialDrop, initialOrders, initialSignal }: Props) {
-  const [drop, setDrop] = useState(initialDrop);
+export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, initialSignal }: Props) {
+  const isMenu = source.kind === "menu";
+  const [drop, setDrop] = useState<BoardDrop | null>(source.kind === "drop" ? source.initialDrop : null);
   const [orders, setOrders] = useState(initialOrders);
   const [filter, setFilter] = useState<BoardFilter>("needs_action");
   const [refreshing, setRefreshing] = useState(false);
@@ -90,15 +129,18 @@ export function OrdersBoard({ vendorName, vendorSlug, initialDrop, initialOrders
   soundRef.current = soundOn;
   const inFlight = useRef(false);
 
-  const effective = liveEffectiveStatus(drop, now);
-  const frozen = drop.status === "FROZEN" || drop.status === "FULFILLED";
+  // A page never switches source, so these strings are stable for its lifetime.
+  const { orders: ordersUrl, signal: signalUrl, actionBase } = boardUrls(source);
+
+  const effective: EffectiveDropStatus | null = drop ? liveEffectiveStatus(drop, now) : null;
+  const frozen = drop ? drop.status === "FROZEN" || drop.status === "FULFILLED" : false;
 
   const refresh = useCallback(async (opts?: { manual?: boolean }) => {
     if (inFlight.current) return;
     inFlight.current = true;
     if (opts?.manual) setRefreshing(true);
     try {
-      const res = await fetch(`/api/drops/${encodeURIComponent(initialDrop.id)}/orders`, { cache: "no-store" });
+      const res = await fetch(ordersUrl, { cache: "no-store" });
       if (!res.ok) {
         if (opts?.manual) toast.error("Could not refresh orders");
         return;
@@ -118,7 +160,7 @@ export function OrdersBoard({ vendorName, vendorSlug, initialDrop, initialOrders
       signalRef.current = body.signal;
       setSignalMode(body.signal === null ? "fallback" : "kv");
       setOrders(body.data);
-      setDrop(body.drop);
+      if (body.drop) setDrop(body.drop);
       setNow(new Date());
     } catch {
       if (opts?.manual) toast.error("Could not refresh orders. Check your internet.");
@@ -126,32 +168,42 @@ export function OrdersBoard({ vendorName, vendorSlug, initialDrop, initialOrders
       inFlight.current = false;
       if (opts?.manual) setRefreshing(false);
     }
-  }, [initialDrop.id]);
+  }, [ordersUrl]);
 
   // Re-render exactly when the drop opens / closes, so polling starts / stops on
   // time without a network call. Pure client timer — touches nothing remote.
+  // (Menu board: no drop, no edges, no timer.)
+  const opensAt = drop?.opensAt ?? null;
+  const closesAtIso = drop?.closesAt ?? null;
   useEffect(() => {
     const t = Date.now();
-    const edges = [drop.opensAt, drop.closesAt]
+    const edges = [opensAt, closesAtIso]
       .filter((x): x is string => Boolean(x))
       .map((x) => new Date(x).getTime() - t)
       .filter((ms) => ms > 0);
     if (edges.length === 0) return;
     const id = window.setTimeout(() => setNow(new Date()), Math.min(Math.min(...edges) + 500, MAX_TIMEOUT_MS));
     return () => window.clearTimeout(id);
-  }, [drop.opensAt, drop.closesAt, now]);
+  }, [opensAt, closesAtIso, now]);
 
   // New-order detection without pinning Neon awake:
   //  - KV available: poll the Upstash counter every 20s, refetch only when it moves.
   //  - No KV: refetch every 60s, only while OPEN.
   //  - Only while the tab is visible; nothing at all once orders are closed.
-  const pollKind: "signal" | "fallback" | null = !shouldPollForOrders(effective)
-    ? null
-    : signalMode === "kv"
-      ? "signal"
-      : effective === "OPEN"
-        ? "fallback"
-        : null;
+  //  - Menu board: no cut-off, so it polls (every 6 min, above Neon's idle timeout) only
+  //    while "order from menu" is switched on — never when it is off.
+  const pollKind: "signal" | "fallback" | null =
+    source.kind === "menu"
+      ? menuBoardPollKind(source.acceptMenuOrders, signalMode)
+      : !effective || !shouldPollForOrders(effective)
+        ? null
+        : signalMode === "kv"
+          ? "signal"
+          : effective === "OPEN"
+            ? "fallback"
+            : null;
+  const signalPollMs = isMenu ? MENU_SIGNAL_POLL_MS : SIGNAL_POLL_MS;
+  const fallbackPollMs = isMenu ? MENU_FALLBACK_POLL_MS : FALLBACK_POLL_MS;
 
   useEffect(() => {
     if (!pollKind) return;
@@ -164,7 +216,7 @@ export function OrdersBoard({ vendorName, vendorSlug, initialDrop, initialOrders
         return;
       }
       try {
-        const res = await fetch(`/api/drops/${encodeURIComponent(initialDrop.id)}/signal`, { cache: "no-store" });
+        const res = await fetch(signalUrl, { cache: "no-store" });
         if (!res.ok || cancelled) return;
         const { signal } = (await res.json()) as { signal: number | null };
         if (signal === null) {
@@ -177,7 +229,7 @@ export function OrdersBoard({ vendorName, vendorSlug, initialDrop, initialOrders
       }
     };
 
-    const id = window.setInterval(tick, pollKind === "signal" ? SIGNAL_POLL_MS : FALLBACK_POLL_MS);
+    const id = window.setInterval(tick, pollKind === "signal" ? signalPollMs : fallbackPollMs);
     const onVisible = () => {
       if (document.visibilityState === "visible") void tick();
     };
@@ -187,7 +239,7 @@ export function OrdersBoard({ vendorName, vendorSlug, initialDrop, initialOrders
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [pollKind, initialDrop.id, refresh]);
+  }, [pollKind, signalUrl, signalPollMs, fallbackPollMs, refresh]);
 
   const toggleSound = () => {
     if (!soundOn) {
@@ -211,14 +263,11 @@ export function OrdersBoard({ vendorName, vendorSlug, initialDrop, initialOrders
   const runAction = async (orderId: string, action: OrderAction) => {
     setPending({ orderId, action });
     try {
-      const res = await fetch(
-        `/api/drops/${encodeURIComponent(initialDrop.id)}/orders/${encodeURIComponent(orderId)}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ action }),
-        },
-      );
+      const res = await fetch(`${actionBase}/${encodeURIComponent(orderId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
       const body = (await res.json().catch(() => ({}))) as { data?: BoardOrder; error?: string };
       if (res.ok && body.data) {
         const updated = body.data;
@@ -249,106 +298,82 @@ export function OrdersBoard({ vendorName, vendorSlug, initialDrop, initialOrders
   };
 
   const summary = useMemo(() => summarizeOrders(orders), [orders]);
-  const prep = useMemo(() => prepFromOrders(drop.items, orders), [drop.items, orders]);
+  const dropItems = drop?.items;
+  const prep = useMemo(() => (dropItems ? prepFromOrders(dropItems, orders) : []), [dropItems, orders]);
+  const toMake = useMemo(() => (isMenu ? toMakeFromOrders(orders) : []), [isMenu, orders]);
   const counts = useMemo(() => countByFilter(orders), [orders]);
   const visible = useMemo(() => filterOrders(orders, filter), [orders, filter]);
   const toCook = prep.filter((p) => p.qtyOrdered > 0);
 
-  const closesAt = new Date(drop.closesAt);
-  const fStart = new Date(drop.fulfilmentStartsAt);
-  const fEnd = new Date(drop.fulfilmentEndsAt);
-  const linkBtn =
-    "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  const controls = (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        className="min-h-11"
+        onClick={() => void refresh({ manual: true })}
+        disabled={refreshing}
+        aria-busy={refreshing}
+      >
+        {refreshing ? (
+          <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
+        ) : (
+          <RefreshCw aria-hidden />
+        )}
+        Refresh
+      </Button>
+      <Button
+        type="button"
+        variant="outline"
+        className="min-h-11"
+        onClick={toggleSound}
+        aria-pressed={soundOn}
+      >
+        {soundOn ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />}
+        {soundOn ? "Sound on" : "Sound off"}
+      </Button>
+    </>
+  );
+
+  const pollNote = (
+    <p className="mt-2 text-xs text-muted-foreground">
+      {pollKind
+        ? "New orders appear automatically while this screen is open."
+        : "Not checking for new orders automatically. Tap Refresh to update."}
+    </p>
+  );
+
+  const emptyText =
+    orders.length === 0
+      ? source.kind === "menu"
+        ? source.acceptMenuOrders
+          ? "No online orders yet. Share your store link on WhatsApp to get the first one."
+          : "No online orders. Turn on “Order from menu” in Settings to start taking them."
+        : effective === "OPEN"
+          ? "No orders yet. Share your drop on WhatsApp to get the first one."
+          : "No orders on this drop."
+      : "Nothing here right now.";
 
   return (
     <div className="mx-auto max-w-3xl">
-      <header className="mb-4">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="font-display text-2xl font-bold text-foreground">{drop.title}</h1>
-            <p className="mt-1 text-sm">
-              <span
-                className={cn(
-                  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-                  effective === "OPEN" ? "border-primary bg-primary/10" : "border-border bg-muted",
-                )}
-              >
-                {DROP_STATUS_LABEL[effective]}
-              </span>
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Link href={`/drops/${drop.id}/edit`} className={linkBtn}>
-              <Pencil className="h-4 w-4" aria-hidden />
-              Edit
-            </Link>
-            <Link href={`/drops/${drop.id}/prep`} className={linkBtn}>
-              <ChefHat className="h-4 w-4" aria-hidden />
-              Prep sheet
-            </Link>
-          </div>
-        </div>
-        <dl className="mt-3 grid grid-cols-1 gap-1 text-sm text-muted-foreground sm:grid-cols-2">
-          <div>
-            <dt className="inline font-medium text-foreground">Orders close: </dt>
-            <dd className="inline">
-              {formatIstDate(closesAt)}, {formatIstTime(closesAt)}
-            </dd>
-          </div>
-          <div>
-            <dt className="inline font-medium text-foreground">
-              {drop.fulfilmentMode === "PICKUP" ? "Pickup" : drop.fulfilmentMode === "DELIVERY" ? "Delivery" : "Delivery / pickup"}:{" "}
-            </dt>
-            <dd className="inline">
-              {formatIstDate(fStart)}, {formatIstTime(fStart)} – {formatIstTime(fEnd)}
-            </dd>
-          </div>
-        </dl>
-        <div className="mt-3 flex flex-wrap items-center gap-2">
-          {effective === "OPEN" && (
-            <ShareDropButton
-              vendorName={vendorName}
-              vendorSlug={vendorSlug}
-              dropTitle={drop.title}
-              closesAt={drop.closesAt}
-              fulfilmentStartsAt={drop.fulfilmentStartsAt}
-              fulfilmentEndsAt={drop.fulfilmentEndsAt}
-              fulfilmentMode={drop.fulfilmentMode}
-              itemNames={drop.items.map((i) => i.name)}
-            />
-          )}
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-11"
-            onClick={() => void refresh({ manual: true })}
-            disabled={refreshing}
-            aria-busy={refreshing}
-          >
-            {refreshing ? (
-              <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
-            ) : (
-              <RefreshCw aria-hidden />
-            )}
-            Refresh
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            className="min-h-11"
-            onClick={toggleSound}
-            aria-pressed={soundOn}
-          >
-            {soundOn ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />}
-            {soundOn ? "Sound on" : "Sound off"}
-          </Button>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {pollKind
-            ? "New orders appear automatically while this screen is open."
-            : "Not checking for new orders automatically. Tap Refresh to update."}
-        </p>
-      </header>
+      {drop && effective ? (
+        <DropHeader
+          drop={drop}
+          effective={effective}
+          vendorName={vendorName}
+          vendorSlug={vendorSlug}
+          controls={controls}
+          pollNote={pollNote}
+        />
+      ) : source.kind === "menu" ? (
+        <MenuHeader
+          acceptMenuOrders={source.acceptMenuOrders}
+          fulfilmentMode={source.fulfilmentMode}
+          vendorSlug={vendorSlug}
+          controls={controls}
+          pollNote={pollNote}
+        />
+      ) : null}
 
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
@@ -391,6 +416,26 @@ export function OrdersBoard({ vendorName, vendorSlug, initialDrop, initialOrders
               .join(" · ")}
           </p>
         )}
+        {isMenu && (
+          <div className="mt-3 rounded-lg border bg-card p-3" aria-live="polite">
+            <h3 className="text-sm font-semibold">To make</h3>
+            {toMake.length === 0 ? (
+              <p className="mt-1 text-sm text-muted-foreground">Nothing to make right now.</p>
+            ) : (
+              <ul className="mt-2 flex flex-wrap gap-2" aria-label="Items to make">
+                {toMake.map((r) => (
+                  <li
+                    key={r.name}
+                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full border bg-background px-3 text-sm"
+                  >
+                    <span className="font-mono font-bold tabular-nums">{r.qty} ×</span>
+                    <span>{r.name}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </section>
 
       <nav aria-label="Filter orders" className="-mx-4 mb-4 overflow-x-auto px-4">
@@ -418,13 +463,7 @@ export function OrdersBoard({ vendorName, vendorSlug, initialDrop, initialOrders
 
       <section id="orders-list" role="tabpanel" aria-label="Orders" aria-busy={refreshing}>
         {visible.length === 0 ? (
-          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-            {orders.length === 0
-              ? effective === "OPEN"
-                ? "No orders yet. Share your drop on WhatsApp to get the first one."
-                : "No orders on this drop."
-              : "Nothing here right now."}
-          </p>
+          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{emptyText}</p>
         ) : (
           <ul className="flex flex-col gap-3">
             {visible.map((o) => (
@@ -443,5 +482,139 @@ export function OrdersBoard({ vendorName, vendorSlug, initialDrop, initialOrders
         )}
       </section>
     </div>
+  );
+}
+
+function DropHeader({
+  drop,
+  effective,
+  vendorName,
+  vendorSlug,
+  controls,
+  pollNote,
+}: {
+  drop: BoardDrop;
+  effective: EffectiveDropStatus;
+  vendorName: string;
+  vendorSlug: string;
+  controls: ReactNode;
+  pollNote: ReactNode;
+}) {
+  const closesAt = new Date(drop.closesAt);
+  const fStart = new Date(drop.fulfilmentStartsAt);
+  const fEnd = new Date(drop.fulfilmentEndsAt);
+
+  return (
+    <header className="mb-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold text-foreground">{drop.title}</h1>
+          <p className="mt-1 text-sm">
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+                effective === "OPEN" ? "border-primary bg-primary/10" : "border-border bg-muted",
+              )}
+            >
+              {DROP_STATUS_LABEL[effective]}
+            </span>
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Link href={`/drops/${drop.id}/edit`} className={LINK_BTN}>
+            <Pencil className="h-4 w-4" aria-hidden />
+            Edit
+          </Link>
+          <Link href={`/drops/${drop.id}/prep`} className={LINK_BTN}>
+            <ChefHat className="h-4 w-4" aria-hidden />
+            Prep sheet
+          </Link>
+        </div>
+      </div>
+      <dl className="mt-3 grid grid-cols-1 gap-1 text-sm text-muted-foreground sm:grid-cols-2">
+        <div>
+          <dt className="inline font-medium text-foreground">Orders close: </dt>
+          <dd className="inline">
+            {formatIstDate(closesAt)}, {formatIstTime(closesAt)}
+          </dd>
+        </div>
+        <div>
+          <dt className="inline font-medium text-foreground">
+            {drop.fulfilmentMode === "PICKUP" ? "Pickup" : drop.fulfilmentMode === "DELIVERY" ? "Delivery" : "Delivery / pickup"}:{" "}
+          </dt>
+          <dd className="inline">
+            {formatIstDate(fStart)}, {formatIstTime(fStart)} – {formatIstTime(fEnd)}
+          </dd>
+        </div>
+      </dl>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {effective === "OPEN" && (
+          <ShareDropButton
+            vendorName={vendorName}
+            vendorSlug={vendorSlug}
+            dropTitle={drop.title}
+            closesAt={drop.closesAt}
+            fulfilmentStartsAt={drop.fulfilmentStartsAt}
+            fulfilmentEndsAt={drop.fulfilmentEndsAt}
+            fulfilmentMode={drop.fulfilmentMode}
+            itemNames={drop.items.map((i) => i.name)}
+          />
+        )}
+        {controls}
+      </div>
+      {pollNote}
+    </header>
+  );
+}
+
+function MenuHeader({
+  acceptMenuOrders,
+  fulfilmentMode,
+  vendorSlug,
+  controls,
+  pollNote,
+}: {
+  acceptMenuOrders: boolean;
+  fulfilmentMode: FulfilmentMode;
+  vendorSlug: string;
+  controls: ReactNode;
+  pollNote: ReactNode;
+}) {
+  return (
+    <header className="mb-4">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0">
+          <h1 className="font-display text-2xl font-bold text-foreground">Online orders</h1>
+          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+            <span
+              className={cn(
+                "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+                acceptMenuOrders ? "border-primary bg-primary/10" : "border-border bg-muted",
+              )}
+            >
+              {acceptMenuOrders ? "Taking orders" : "Not taking orders"}
+            </span>
+            {acceptMenuOrders && <span className="text-muted-foreground">{MENU_MODE_LABEL[fulfilmentMode]}</span>}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Orders customers placed from your menu in the last 3 days, plus older ones still open.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          {acceptMenuOrders && (
+            <a href={`/s/${vendorSlug}`} target="_blank" rel="noopener noreferrer" className={LINK_BTN}>
+              <ExternalLink className="h-4 w-4" aria-hidden />
+              My store
+            </a>
+          )}
+          <Link href="/settings#menu-orders" className={LINK_BTN}>
+            <Settings className="h-4 w-4" aria-hidden />
+            Settings
+          </Link>
+        </div>
+      </div>
+      <div className="mt-3 flex flex-wrap items-center gap-2">{controls}</div>
+      {pollNote}
+    </header>
   );
 }

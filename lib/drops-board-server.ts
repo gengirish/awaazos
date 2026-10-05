@@ -18,8 +18,10 @@ import {
   effectiveDropStatus,
   orderDisplayState,
   orderHoldsStock,
+  stockHoldingOrderWhere,
   type EffectiveDropStatus,
 } from "@/lib/drops";
+import { MENU_BOARD_MAX_ORDERS, menuBoardWindowStart } from "@/lib/menu-orders-board";
 import { prisma } from "@/lib/prisma";
 
 export const boardOrderSelect = {
@@ -146,4 +148,40 @@ export async function loadDropBoard(
     summary: summarizeOrders(orders),
     prep: prepFromOrders(items, orders),
   };
+}
+
+// ─── "Order from menu" board ────────────────────────────────────────
+
+export type MenuOrdersBoard = {
+  orders: BoardOrder[];
+  summary: BoardSummary;
+};
+
+/**
+ * Prisma filter for the menu-orders board: this vendor's storefront orders
+ * with no drop, placed in the last MENU_BOARD_WINDOW_DAYS IST days, plus any
+ * older one still open (PLACED / CONFIRMED) that holds stock — i.e. still
+ * needs the vendor. Old expired unpaid UPI orders fall off rather than pile up.
+ */
+export function menuOrdersBoardWhere(vendorId: string, now: Date = new Date()): Prisma.TransactionWhereInput {
+  return {
+    vendorId,
+    source: "STOREFRONT",
+    dropId: null,
+    OR: [
+      { createdAt: { gte: menuBoardWindowStart(now) } },
+      { AND: [{ fulfilmentStatus: { in: ["PLACED", "CONFIRMED"] } }, stockHoldingOrderWhere(now)] },
+    ],
+  };
+}
+
+export async function loadMenuOrdersBoard(vendorId: string, now: Date = new Date()): Promise<MenuOrdersBoard> {
+  const rows = await prisma.transaction.findMany({
+    where: menuOrdersBoardWhere(vendorId, now),
+    orderBy: { createdAt: "desc" },
+    take: MENU_BOARD_MAX_ORDERS,
+    select: boardOrderSelect,
+  });
+  const orders = rows.map((r) => toBoardOrder(r, now));
+  return { orders, summary: summarizeOrders(orders) };
 }

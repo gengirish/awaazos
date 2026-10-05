@@ -121,16 +121,46 @@ export function stockLabel(remaining: number | null, lowThreshold = 5): string |
   return null;
 }
 
+// ─── Everyday-menu ordering ─────────────────────────────────────────
+
+/**
+ * Cart (menuItemId → qty) → the `items` array storefrontMenuOrderSchema
+ * accepts: drops empty / non-integer lines, clamps to the schema ceiling.
+ * Never carries a price — the server re-reads every price from MenuItem.
+ */
+export function toMenuOrderLines(cart: Record<string, number>): { menuItemId: string; qty: number }[] {
+  const out: { menuItemId: string; qty: number }[] = [];
+  for (const [menuItemId, qty] of Object.entries(cart)) {
+    if (!menuItemId || !Number.isInteger(qty) || qty < 1) continue;
+    out.push({ menuItemId, qty: Math.min(qty, MAX_LINE_QTY) });
+  }
+  return out;
+}
+
+/** "Delivery or pickup" / "Delivery only" / "Pickup only" for a fulfilment option list. */
+export function fulfilmentOptionsLabel(types: readonly ("DELIVERY" | "PICKUP")[]): string {
+  const delivery = types.includes("DELIVERY");
+  const pickup = types.includes("PICKUP");
+  if (delivery && pickup) return "Delivery or pickup";
+  return delivery ? "Delivery only" : "Pickup only";
+}
+
 // ─── Order API error copy ───────────────────────────────────────────
 
 export type OrderApiError = {
   error: string;
   dropItemId?: string;
+  /** Set on menu-order (no drop) `item_not_found` rejections. */
+  menuItemId?: string;
   remaining?: number;
   limit?: number;
 };
 
-/** Buyer-facing copy for a failed checkout. `itemName` resolves `dropItemId`. */
+/**
+ * Buyer-facing copy for a failed checkout. `itemName` resolves `dropItemId` /
+ * `menuItemId`. A rejection carrying `menuItemId` came from the everyday-menu
+ * order path (app/api/s/[slug]/menu-orders), which has no drop to "close".
+ */
 export function orderErrorMessage(err: OrderApiError, itemName?: string): string {
   const name = itemName ?? "One item";
   switch (err.error) {
@@ -144,7 +174,11 @@ export function orderErrorMessage(err: OrderApiError, itemName?: string): string
     case "drop_not_found":
       return "Orders for this menu have closed. Refresh to see what's available.";
     case "item_not_found":
-      return `${name} is no longer on this menu. Please refresh and try again.`;
+      return err.menuItemId
+        ? `${name} isn't available right now. We've removed it from your cart — please check and try again.`
+        : `${name} is no longer on this menu. Please refresh and try again.`;
+    case "menu_orders_disabled":
+      return "This store has stopped taking online orders for now. Please order at the counter.";
     case "address_required":
       return "Please enter a delivery address.";
     case "fulfilment_unavailable":
@@ -177,10 +211,14 @@ export type OrderDisplayStateName =
 
 export type StatusTone = "success" | "warning" | "danger" | "neutral";
 
-/** Text label (never colour alone) for the buyer's order page. */
+/**
+ * Text label (never colour alone) for the buyer's order page. `menuOrder`
+ * (no drop) drops the stock wording — everyday-menu orders hold no stock.
+ */
 export function orderStatusLabel(
   state: OrderDisplayStateName,
   fulfilmentStatus: FulfilmentStatus | null,
+  opts: { menuOrder?: boolean } = {},
 ): { label: string; hint: string | null; tone: StatusTone } {
   const confirmed = fulfilmentStatus === "CONFIRMED";
   switch (state) {
@@ -190,7 +228,7 @@ export function orderStatusLabel(
       return { label: "Delivered", hint: null, tone: "success" };
     case "EXPIRED":
       return {
-        label: "Expired — items released, please order again",
+        label: opts.menuOrder ? "Expired — please order again" : "Expired — items released, please order again",
         hint: null,
         tone: "neutral",
       };

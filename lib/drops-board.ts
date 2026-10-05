@@ -249,10 +249,13 @@ export type ActionCheck = { ok: true } | { ok: false; error: "drop_frozen" | "in
  * Pre-flight for a vendor action. The route still uses conditional
  * `updateMany` writes so a race between two phones cannot double-apply; this
  * just gives a clean 409 for the obvious cases.
+ *
+ * `dropStatus` is the *stored* status of the order's drop, or null for an
+ * "order from menu" order (no drop, so no frozen rule).
  */
 export function checkOrderAction(
   action: OrderAction,
-  dropStatus: DropStatus,
+  dropStatus: DropStatus | null,
   o: { fulfilmentStatus: FulfilmentStatus | null; paymentStatus: PaymentStatus },
 ): ActionCheck {
   if ((dropStatus === "FROZEN" || dropStatus === "FULFILLED") && !FROZEN_ALLOWED.has(action)) {

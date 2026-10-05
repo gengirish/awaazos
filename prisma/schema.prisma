@@ -48,22 +48,28 @@ model Vendor {
 }
 
 model VendorSettings {
-  id                       String  @id @default(cuid())
-  vendorId                 String  @unique
-  vendor                   Vendor  @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  sendWhatsappReceipt      Boolean @default(false)
-  autoPrintReceipt         Boolean @default(false)
-  taxEnabled               Boolean @default(false)
-  taxPercent               Decimal @default(0) @db.Decimal(5, 2)
-  discountEnabled          Boolean @default(false)
+  id                       String         @id @default(cuid())
+  vendorId                 String         @unique
+  vendor                   Vendor         @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  sendWhatsappReceipt      Boolean        @default(false)
+  autoPrintReceipt         Boolean        @default(false)
+  taxEnabled               Boolean        @default(false)
+  taxPercent               Decimal        @default(0) @db.Decimal(5, 2)
+  discountEnabled          Boolean        @default(false)
   whatsappNumber           String? // +91XXXXXXXXXX
-  voiceLang                String  @default("en-IN") // hi-IN, te-IN, kn-IN, ta-IN
+  voiceLang                String         @default("en-IN") // hi-IN, te-IN, kn-IN, ta-IN
   receiptFooter            String? // "Thanks for visiting!"
-  theme                    String  @default("orange") // orange | green | blue | purple
+  theme                    String         @default("orange") // orange | green | blue | purple
   hsnDefault               String? // Default HSN/SAC code for menu items without one
-  publishStorefront        Boolean @default(false) // Opt-in: expose /s/<vendor slug> to the public
+  publishStorefront        Boolean        @default(false) // Opt-in: expose /s/<vendor slug> to the public
   fssaiNumber              String? // 14-digit FSSAI registration; shown on storefront + receipts
-  acceptPayOnDelivery      Boolean @default(true) // Storefront: allow cash/UPI on delivery instead of paying upfront
+  acceptPayOnDelivery      Boolean        @default(true) // Storefront: allow cash/UPI on delivery instead of paying upfront
+  // "Order from menu": buyers can order everyday MenuItems on /s/[slug] without a Drop
+  // (no cut-off, no stock caps). Orders are STOREFRONT transactions with dropId = null.
+  acceptMenuOrders         Boolean        @default(false)
+  menuFulfilmentMode       FulfilmentMode @default(PICKUP)
+  menuDeliveryFeePaise     Int            @default(0)
+  menuPickupNote           String?
   // Vendor-owned Razorpay account for storefront payments (money goes to the
   // vendor, never through the platform). Secrets are AES-256-GCM encrypted with
   // PAYMENT_KEYS_ENCRYPTION_KEY (lib/secret-box.ts) — never stored or logged raw.

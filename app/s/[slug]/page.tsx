@@ -1,5 +1,15 @@
 import type { Metadata } from "next";
-import { CalendarClock, MapPin, QrCode, ShoppingBag, Sparkles, Truck, UserRound, UtensilsCrossed } from "lucide-react";
+import {
+  CalendarClock,
+  ChevronDown,
+  MapPin,
+  QrCode,
+  ShoppingBag,
+  Sparkles,
+  Truck,
+  UserRound,
+  UtensilsCrossed,
+} from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,6 +17,7 @@ import { cache } from "react";
 
 import { CopyUpiId } from "@/components/storefront/CopyUpiId";
 import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
+import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
 import { getIstTodayStart } from "@/lib/billing-period";
 import { STALL_TYPES } from "@/lib/constants";
 import { formatINRCompact } from "@/lib/currency";
@@ -40,13 +51,19 @@ export const runtime = "nodejs";
  *      `upiId` is here only because collecting payment is the point.
  *      Off VendorSettings, besides the publish gate itself, only: `theme`
  *      (brand colour), `fssaiNumber` (food-safety licence, legally meant to be
- *      displayed), and `acceptPayOnDelivery` (whether to offer that option).
+ *      displayed), `acceptPayOnDelivery` (whether to offer that option), and
+ *      the "Order from menu" switches: `acceptMenuOrders`, `menuFulfilmentMode`,
+ *      `menuDeliveryFeePaise`, `menuPickupNote` (rendered at checkout).
  *
  * Drops (daily pre-order menus) render above the regular menu. Only stored-OPEN
  * drops from yesterday (IST) onward are read; the cut-off is evaluated here on
  * every request (`effectiveDropStatus`), never by a timer — hence force-dynamic,
  * and stock counts are recomputed per render. The order write path is
  * app/api/s/[slug]/orders, held to the same gate.
+ *
+ * "Order from menu" (`acceptMenuOrders`): the everyday menu becomes orderable
+ * (MenuOrder: steppers, cart, checkout) via app/api/s/[slug]/menu-orders, held
+ * to the same gate. Off, the menu stays read-only with the generic UPI QR.
  *
  * Optional buyer sign-in (lib/customer-auth.ts): the `awz_cust` session, when
  * present, only adds a header link and checkout prefill from the buyer's OWN
@@ -81,7 +98,15 @@ const loadStorefront = cache(async (slug: string) => {
       upiId: true,
       upiName: true,
       settings: {
-        select: { theme: true, fssaiNumber: true, acceptPayOnDelivery: true },
+        select: {
+          theme: true,
+          fssaiNumber: true,
+          acceptPayOnDelivery: true,
+          acceptMenuOrders: true,
+          menuFulfilmentMode: true,
+          menuDeliveryFeePaise: true,
+          menuPickupNote: true,
+        },
       },
       drops: {
         where: { status: "OPEN", date: { gte: yesterday } },
@@ -380,6 +405,19 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
     upi: !!vendor.upiId,
     cod: vendor.settings?.acceptPayOnDelivery ?? false,
   };
+  const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
+  const menuCategories: MenuOrderCategory[] = categories.map(([category, items], i) => ({
+    category,
+    anchor: categoryAnchor(category, i),
+    items: items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      emoji: item.emoji,
+      imageUrl: item.imageUrl,
+      priceInPaise: item.priceInPaise,
+      isPopular: item.isPopular,
+    })),
+  }));
 
   return (
     <div data-theme={theme} className="min-h-screen bg-awaaz-cream/40">
@@ -467,6 +505,14 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
                 <ShoppingBag className="h-4 w-4" aria-hidden="true" />
                 Pre-order now
               </a>
+            ) : menuOrdering ? (
+              <a
+                href="#menu-order"
+                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
+                <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+                Order now
+              </a>
             ) : upiLink ? (
               <a
                 href="#pay"
@@ -532,7 +578,9 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
           )
         ) : (
           <div className="space-y-8">
-            {popular.length > 1 ? (
+            {/* With menu ordering on, rows carry their own "Popular" badge and a
+                stepper; a second, non-orderable grid would only confuse. */}
+            {popular.length > 1 && !menuOrdering ? (
               <section aria-labelledby="popular-heading">
                 <h3
                   id="popular-heading"
@@ -572,7 +620,20 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
               </section>
             ) : null}
 
-            {categories.map(([category, items], i) => (
+            {menuOrdering ? (
+              <MenuOrder
+                slug={vendor.slug}
+                vendorName={vendor.name}
+                categories={menuCategories}
+                fulfilmentTypes={allowedFulfilmentTypes(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}
+                deliveryFeePaise={vendor.settings?.menuDeliveryFeePaise ?? 0}
+                pickupNote={vendor.settings?.menuPickupNote ?? null}
+                payment={payment}
+                prefill={prefill}
+              />
+            ) : null}
+
+            {menuOrdering ? null : categories.map(([category, items], i) => (
               <section key={category} aria-labelledby={categoryAnchor(category, i)}>
                 <div className="mb-3 flex scroll-mt-16 items-baseline gap-3">
                   <h3
@@ -596,7 +657,48 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
           </div>
         )}
 
-        {upiLink ? (
+        {upiLink && menuOrdering ? (
+          /* Menu ordering on: the cart gives the buyer an exact amount, so the
+             open-amount QR is demoted to a collapsed fallback for paying at the
+             counter instead of competing with checkout. */
+          <details
+            id="pay"
+            className="group mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm"
+          >
+            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
+              <QrCode className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span className="flex-1">Paying at the counter? Show the UPI QR</span>
+              <ChevronDown
+                className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                aria-hidden="true"
+              />
+            </summary>
+            <div className="border-t border-border/50 px-4 py-5 text-center sm:px-6">
+              <h3 id="pay-heading" className="sr-only">
+                Scan to pay at the counter
+              </h3>
+              <p className="text-sm text-muted-foreground">Any UPI app. Enter the amount the vendor tells you.</p>
+              <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
+                <Image
+                  src={buildQrUrl(upiLink, 180)}
+                  alt={`UPI QR code to pay ${payeeName}`}
+                  width={180}
+                  height={180}
+                  unoptimized
+                  className="rounded-lg"
+                />
+              </div>
+              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                Paying {payeeName}
+              </p>
+              {vendor.upiId ? (
+                <div className="mt-2 flex justify-center">
+                  <CopyUpiId upiId={vendor.upiId} className="max-w-full" />
+                </div>
+              ) : null}
+            </div>
+          </details>
+        ) : upiLink ? (
           <section
             id="pay"
             aria-labelledby="pay-heading"

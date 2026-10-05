@@ -221,6 +221,15 @@ Orders board freshness: order placement and board actions bump a vendor-scoped U
 while visible and while the drop accepts orders, and refetches from Postgres only when it moves;
 no KV → 60 s direct refresh. See TODO.md — the signal route's auth check still hits Postgres.
 
+**Order from menu** (`lib/menu-orders.ts`, opt-in `VendorSettings.acceptMenuOrders`): buyers order
+everyday `MenuItem`s with no drop — same STOREFRONT transaction with `dropId = null`, same payment
+paths and plan-cap rule, but no cut-off, no stock caps and no row lock (only `isAvailable` items).
+Fulfilment/fee/pickup note come from `menuFulfilmentMode` / `menuDeliveryFeePaise` /
+`menuPickupNote`. Buyer route `POST /api/s/[slug]/menu-orders`; vendor board `/orders` over
+`/api/storefront-orders/**`, sharing order actions with drops via `lib/storefront-order-actions.ts`.
+The menu board has no cut-off to stop it, so it polls every 6 min — keep it above Neon's idle
+timeout.
+
 DB-backed drops tests are opt-in: `npm run test:drops:db` (needs a throwaway `DATABASE_URL`).
 
 ### Auth edge split

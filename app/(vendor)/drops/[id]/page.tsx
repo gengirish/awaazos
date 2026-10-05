@@ -39,7 +39,7 @@ export default async function DropOrdersPage({ params }: Props) {
       <OrdersBoard
         vendorName={ctx.vendor.name}
         vendorSlug={ctx.vendor.slug}
-        initialDrop={board.drop}
+        source={{ kind: "drop", initialDrop: board.drop }}
         initialOrders={board.orders}
         initialSignal={signal}
       />

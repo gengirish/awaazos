@@ -96,6 +96,12 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise }:
         >
           Drops
         </Link>
+        <Link
+          href="/orders"
+          className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          Orders
+        </Link>
         <div className="ml-auto flex items-center gap-2">
           <Link
             href="/transactions"

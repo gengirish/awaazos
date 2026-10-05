@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { HomeKitchenClient } from "@/components/settings/HomeKitchenClient";
+import { MenuOrdersClient } from "@/components/settings/MenuOrdersClient";
 import { RazorpayKeysClient } from "@/components/settings/RazorpayKeysClient";
 import { StorefrontClient } from "@/components/settings/StorefrontClient";
 import { VoiceLanguageClient } from "@/components/settings/VoiceLanguageClient";
@@ -38,6 +39,10 @@ export default async function SettingsPage() {
         publishStorefront: true,
         fssaiNumber: true,
         acceptPayOnDelivery: true,
+        acceptMenuOrders: true,
+        menuFulfilmentMode: true,
+        menuDeliveryFeePaise: true,
+        menuPickupNote: true,
         // Presence only — the encrypted secrets never leave this server component.
         razorpayKeyId: true,
         razorpayKeySecretEnc: true,
@@ -93,6 +98,25 @@ export default async function SettingsPage() {
               initialPublished={settings?.publishStorefront ?? false}
               hasUpiId={Boolean(vendor?.upiId)}
               availableItemCount={availableItemCount}
+            />
+          </CardContent>
+        </Card>
+
+        <Card id="menu-orders" className="h-full sm:col-span-2">
+          <CardHeader>
+            <CardTitle className="font-display text-lg">Order from menu</CardTitle>
+            <CardDescription>
+              Let customers order your everyday menu from your storefront, any time. No Drop needed.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <MenuOrdersClient
+              slug={vendor?.slug ?? ""}
+              initialAcceptMenuOrders={settings?.acceptMenuOrders ?? false}
+              initialFulfilmentMode={settings?.menuFulfilmentMode ?? "PICKUP"}
+              initialDeliveryFeePaise={settings?.menuDeliveryFeePaise ?? 0}
+              initialPickupNote={settings?.menuPickupNote ?? null}
+              isOwner={isOwner}
             />
           </CardContent>
         </Card>

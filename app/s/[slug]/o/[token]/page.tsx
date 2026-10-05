@@ -34,6 +34,10 @@ export const runtime = "nodejs";
  * are handed to that button only to prefill Razorpay Checkout. Razorpay
  * credentials are selected for presence checks only — never rendered or passed
  * to a client component.
+ *
+ * Menu orders ("Order from menu", lib/menu-orders.ts) have `drop = null`: no
+ * drop title or fulfilment window; a pickup shows the vendor's
+ * `menuPickupNote` instead of the drop's.
  */
 
 const BRAND_THEMES = new Set(["green", "amber", "red", "blue", "purple"]);
@@ -87,6 +91,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
               theme: true,
               whatsappNumber: true,
               fssaiNumber: true,
+              menuPickupNote: true,
               razorpayKeyId: true,
               razorpayKeySecretEnc: true,
               razorpayWebhookSecretEnc: true,
@@ -140,8 +145,9 @@ export default async function StorefrontOrderPage({ params }: { params: { slug: 
     },
     now,
   );
-  const status = orderStatusLabel(state, order.fulfilmentStatus);
   const { vendor, drop } = order;
+  const status = orderStatusLabel(state, order.fulfilmentStatus, { menuOrder: !drop });
+  const pickupNote = drop ? drop.pickupNote : (vendor.settings?.menuPickupNote ?? null);
   const slug = vendor.slug;
   const rawTheme = vendor.settings?.theme ?? "orange";
   const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
@@ -200,7 +206,11 @@ export default async function StorefrontOrderPage({ params }: { params: { slug: 
             </h2>
             {status.hint ? <p className="text-sm">{status.hint}</p> : null}
             {awaitingUpi && minsLeft > 0 ? (
-              <p className="text-sm">Hold expires in {minsLeft} min — pay before then to keep your items.</p>
+              <p className="text-sm">
+                {drop
+                  ? `Hold expires in ${minsLeft} min — pay before then to keep your items.`
+                  : `Pay within ${minsLeft} min to confirm your order.`}
+              </p>
             ) : null}
             {state === "EXPIRED" && order.paymentMethod === "UPI" ? (
               <p className="text-sm">If you already paid, message the kitchen with your UPI reference.</p>
@@ -329,8 +339,8 @@ export default async function StorefrontOrderPage({ params }: { params: { slug: 
           {order.fulfilmentType === "DELIVERY" && order.deliveryAddress ? (
             <p className="whitespace-pre-line text-muted-foreground">{order.deliveryAddress}</p>
           ) : null}
-          {order.fulfilmentType === "PICKUP" && drop?.pickupNote ? (
-            <p className="text-muted-foreground">{drop.pickupNote}</p>
+          {order.fulfilmentType === "PICKUP" && pickupNote ? (
+            <p className="text-muted-foreground">{pickupNote}</p>
           ) : null}
           {order.notes ? (
             <p>

@@ -217,6 +217,21 @@ export async function countBillableTxnThisMonth(
   });
 }
 
+/** Atomic per-(vendor, IST day) bill number, same sequence as counter sales. */
+export async function nextBillNumber(
+  tx: Prisma.TransactionClient,
+  vendorId: string,
+  now: Date = new Date(),
+): Promise<string> {
+  const today = getIstTodayStart(now);
+  const seq = await tx.billSequence.upsert({
+    where: { vendorId_date: { vendorId, date: today } },
+    create: { vendorId, date: today, lastSeq: 1 },
+    update: { lastSeq: { increment: 1 } },
+  });
+  return `AWZ-${formatBillDateYYYYMMDD(today)}-${String(seq.lastSeq).padStart(4, "0")}`;
+}
+
 // ─── Place order ────────────────────────────────────────────────────
 
 export type PlaceOrderInput = {
@@ -333,13 +348,7 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
         deliveryFeePaise,
       );
 
-      const today = getIstTodayStart(now);
-      const seq = await tx.billSequence.upsert({
-        where: { vendorId_date: { vendorId, date: today } },
-        create: { vendorId, date: today, lastSeq: 1 },
-        update: { lastSeq: { increment: 1 } },
-      });
-      const billNumber = `AWZ-${formatBillDateYYYYMMDD(today)}-${String(seq.lastSeq).padStart(4, "0")}`;
+      const billNumber = await nextBillNumber(tx, vendorId, now);
       const orderToken = generateOrderToken();
 
       const created = await tx.transaction.create({

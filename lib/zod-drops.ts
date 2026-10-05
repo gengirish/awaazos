@@ -154,3 +154,19 @@ export const utrSubmitSchema = z.object({
     .trim()
     .regex(/^[A-Za-z0-9]{10,22}$/, "Enter the 12-digit UPI reference (UTR) from your payment app"),
 });
+
+/** Public "order from menu" body (no drop). Prices are never accepted from the client. */
+export const storefrontMenuOrderSchema = z.object({
+  items: z
+    .array(z.object({ menuItemId: z.string().min(1), qty: z.number().int().min(1).max(99) }))
+    .min(1)
+    .max(50),
+  customerName: z.string().trim().min(1).max(80),
+  customerPhone: indianPhoneE164,
+  fulfilmentType: z.enum(["DELIVERY", "PICKUP"]),
+  deliveryAddress: z.string().trim().max(500).nullish(),
+  notes: z.string().trim().max(280).nullish(),
+  paymentMethod: z.enum(["UPI", "CASH"]),
+});
+
+export type StorefrontMenuOrderInput = z.infer<typeof storefrontMenuOrderSchema>;

@@ -1,8 +1,9 @@
-import { Prisma, StallType } from "@prisma/client";
+import { FulfilmentMode, Prisma, StallType } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { SUPPORTED_VOICE_LANGS } from "@/lib/constants";
+import { menuOrdersEnableBlocker, type MenuOrdersBlocker } from "@/lib/menu-orders-board";
 import { prisma } from "@/lib/prisma";
 import { requireVendorRole } from "@/lib/rbac";
 
@@ -26,6 +27,12 @@ const patchSchema = z.object({
     .optional()
     .nullable(),
   acceptPayOnDelivery: z.boolean().optional(),
+  // "Order from menu" (storefront orders without a Drop).
+  acceptMenuOrders: z.boolean().optional(),
+  menuFulfilmentMode: z.nativeEnum(FulfilmentMode).optional(),
+  menuDeliveryFeePaise: z.number().int().min(0).max(100_000).optional(),
+  // "" or null clears it.
+  menuPickupNote: z.string().trim().max(200).optional().nullable(),
   menuItems: z
     .array(
       z.object({
@@ -38,6 +45,12 @@ const patchSchema = z.object({
     .max(50)
     .optional(),
 });
+
+class SettingsConflict extends Error {
+  constructor(public readonly code: MenuOrdersBlocker) {
+    super(code);
+  }
+}
 
 function withVendorCookie(res: NextResponse, slug: string | null) {
   if (slug) {
@@ -95,6 +108,26 @@ export async function PATCH(req: NextRequest) {
     const { menuItems, ...vendorFields } = parsed.data;
 
     await prisma.$transaction(async (tx) => {
+      // Turning "order from menu" on needs somewhere to order (a published
+      // storefront) and a way to pay (UPI ID or pay on delivery). Checked
+      // against the values this same request leaves behind.
+      if (vendorFields.acceptMenuOrders === true) {
+        const current = await tx.vendor.findUnique({
+          where: { id: ctx.vendor.id },
+          select: {
+            upiId: true,
+            settings: { select: { publishStorefront: true, acceptPayOnDelivery: true } },
+          },
+        });
+        const blocker = menuOrdersEnableBlocker({
+          publishStorefront: vendorFields.publishStorefront ?? current?.settings?.publishStorefront ?? false,
+          upiId: vendorFields.upiId !== undefined ? vendorFields.upiId : current?.upiId,
+          acceptPayOnDelivery:
+            vendorFields.acceptPayOnDelivery ?? current?.settings?.acceptPayOnDelivery ?? false,
+        });
+        if (blocker) throw new SettingsConflict(blocker);
+      }
+
       const data: Prisma.VendorUpdateInput = {};
       if (vendorFields.city !== undefined) data.city = vendorFields.city;
       if (vendorFields.state !== undefined) data.state = vendorFields.state;
@@ -125,6 +158,18 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.acceptPayOnDelivery !== undefined) {
         settingsUpdate.acceptPayOnDelivery = vendorFields.acceptPayOnDelivery;
+      }
+      if (vendorFields.acceptMenuOrders !== undefined) {
+        settingsUpdate.acceptMenuOrders = vendorFields.acceptMenuOrders;
+      }
+      if (vendorFields.menuFulfilmentMode !== undefined) {
+        settingsUpdate.menuFulfilmentMode = vendorFields.menuFulfilmentMode;
+      }
+      if (vendorFields.menuDeliveryFeePaise !== undefined) {
+        settingsUpdate.menuDeliveryFeePaise = vendorFields.menuDeliveryFeePaise;
+      }
+      if (vendorFields.menuPickupNote !== undefined) {
+        settingsUpdate.menuPickupNote = vendorFields.menuPickupNote || null;
       }
       if (vendorFields.onboardingDone === true && vendorFields.whatsappNumber) {
         settingsUpdate.sendWhatsappReceipt = true;
@@ -163,6 +208,9 @@ export async function PATCH(req: NextRequest) {
     const res = NextResponse.json({ vendor });
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (e) {
+    if (e instanceof SettingsConflict) {
+      return NextResponse.json({ error: e.code }, { status: 409 });
+    }
     const err = e as { status?: number; message?: string };
     if (err.message === "Unauthorized" || err.status === 401) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
