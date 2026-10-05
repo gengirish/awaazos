@@ -24,8 +24,26 @@ actually arriving, and any one of them is sufficient to mean it never does:
 2. **Enqueue.** Needs `REDIS_URL` set on Vercel. On the automatic post-sale path the enqueue
    failure is logged and swallowed on purpose — correct (a Redis outage must never block a sale),
    but it means a misconfiguration is invisible. `POST /api/receipts/send` at least returns 503.
-3. **Worker.** `workers/receipt.worker.ts` has to be running on Fly to drain the `send-receipt`
-   queue. Not confirmed.
+3. **Worker — confirmed missing (2026-10-05).** `workers/receipt.worker.ts` has to be running on
+   Fly to drain the `send-receipt` queue. `fly deploy -a awaazos-workers` returns **"app not
+   found"**: the app named in `fly.toml` (generated 2026-04-23) no longer exists on the logged-in
+   account. Nothing drains *any* BullMQ queue in production — receipts, `voice-parse-log`
+   telemetry and retention jobs all pile up in Redis unprocessed. Sales are unaffected (enqueue
+   failures are swallowed by design).
+
+   **To revive (future work, deliberately parked):**
+   1. `fly orgs list` / `fly apps list` — rule out the app living under another org or account.
+   2. Before recreating, check the plan behind `REDIS_URL`: a BullMQ worker holds a TCP
+      connection and issues blocking commands 24/7, which on Upstash pay-per-command bills even
+      at zero traffic (see the global scale-to-zero rule). Prefer a fixed-price plan or Redis on
+      Fly.
+   3. `fly apps create awaazos-workers`, then `fly secrets set` `DATABASE_URL`, `AUTH_SECRET`
+      (boot-required by `lib/env.ts`), `REDIS_URL`, `GUPSHUP_API_KEY`, `GUPSHUP_APP_NAME`,
+      `GUPSHUP_SOURCE_NUMBER`. `NEXT_PUBLIC_APP_URL` is already in `fly.toml` `[env]`.
+   4. `fly deploy -a awaazos-workers`; confirm with
+      `fly ssh console -a awaazos-workers -C "printenv NEXT_PUBLIC_APP_URL"`.
+
+   Reviving the worker alone does **not** make receipts arrive — gate 4 below still blocks them.
 4. **The session window — the likely blocker.** `lib/whatsapp.ts` posts
    `{ type: "text" }`, a free-form session message. WhatsApp delivers those only inside the
    24-hour window that opens when *the customer* messages the business. A walk-in has never
@@ -85,9 +103,9 @@ Only start these if the two-week discovery test says the fire is real. See the p
 `formatWhatsAppReceiptMessage` (`lib/whatsapp-message.ts`) now adds
 "Order again: https://<host>/s/<slug>" — only when `publishStorefront` is on **and** a public
 base URL is configured (`receiptStorefrontUrl()`). The worker runs on Fly, where Vercel's
-`VERCEL_*` vars don't exist, so it reads `NEXT_PUBLIC_APP_URL ?? AUTH_URL`; **set one of them on
-the Fly worker** or the line is silently omitted. Unit-tested; never seen in a real WhatsApp message
-because no receipt has been (see 1.1).
+`VERCEL_*` vars don't exist, so it reads `NEXT_PUBLIC_APP_URL ?? AUTH_URL`; `NEXT_PUBLIC_APP_URL`
+is now set in `fly.toml` `[env]`, effective once the worker app exists again (1.1 gate 3).
+Unit-tested; never seen in a real WhatsApp message because no receipt has been sent (see 1.1).
 
 ### 3.2 Tap-to-compose WhatsApp order on the storefront
 Buyer taps items on `/s/[slug]`, the page composes a pre-filled WhatsApp message to the vendor.
@@ -144,8 +162,8 @@ not use it.
   `paymentMethod`, which stays `UPI` when a buyer pays by card through Checkout.
 - **Paid after cancel.** A buyer can pay through Checkout after the vendor cancelled; money moves but
   the order is not marked paid (logged as `storefront_rzp_paid_unapplied`). Vendor refunds by hand.
-- **Fly receipt worker needs `NEXT_PUBLIC_APP_URL` or `AUTH_URL`** for the "Order again" link;
-  without it the line is silently omitted.
+- **"Order again" receipt link** — `NEXT_PUBLIC_APP_URL` is set in `fly.toml` `[env]`
+  (`https://awaazos.intelliforge.tech`), but the Fly worker app doesn't exist; see 1.1 gate 3.
 
 ---
 
