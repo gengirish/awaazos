@@ -172,6 +172,29 @@ not use it.
 - **"Order again" receipt link** — `NEXT_PUBLIC_APP_URL` is set in `fly.toml` `[env]`
   (`https://awaazos.intelliforge.tech`), but the Fly worker app doesn't exist; see 1.1 gate 3.
 
+### 3.6 Real new-order alerts for vendors
+
+Today the only alert is the orders board's **Sound** toggle (`components/drops/orders/OrdersBoard.tsx`,
+`beep()`): a Web Audio beep when the board's own poll finds new orders. Its limits:
+
+- **Delay.** It beeps only when the board checks: every 6 min on `/orders` (menu orders), every 20 s
+  on a drop board while it takes orders. Refresh checks immediately.
+- **Screen on only.** Polling stops when the tab is hidden or the phone is locked, so nothing beeps
+  in a pocket — the vendor has to keep the board open and visible.
+- **Not remembered.** Sound starts off on every page load (browsers need a tap before playing audio).
+
+Options, cheapest first:
+
+1. **Web Push** (service worker + VAPID keys; send from the order routes after commit,
+   fire-and-forget like the KV signal). Event-driven, so it also removes the need for fast polling —
+   no scale-to-zero cost. Works with the screen off on Android Chrome; iPhone needs iOS 16.4+ and the
+   site added to the Home Screen. Needs a `PushSubscription` table (vendor/staff-scoped) and an
+   opt-in prompt on the board.
+2. **WhatsApp to the vendor** on each new order — most reliable for this audience, but needs an
+   approved utility template and a running worker, so it is blocked by 1.1 (gates 3 and 4).
+3. **Small wins regardless:** remember the Sound choice per device (localStorage, try/catch), and
+   show "Last checked HH:MM · next check in N min" on the menu board so the delay is visible.
+
 ---
 
 ## 4. Correctness and quality
