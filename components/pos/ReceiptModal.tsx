@@ -3,7 +3,6 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PaymentMethod } from "@prisma/client";
-import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import {
@@ -15,9 +14,11 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useReceiptText, WhatsAppReceiptButton } from "@/components/receipts/WhatsAppReceipt";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
+import { receiptWhatsappUrl } from "@/lib/whatsapp-message";
 
 export type ReceiptModalProps = {
   open: boolean;
@@ -41,43 +42,13 @@ export function ReceiptModal({
   const router = useRouter();
   const clearCart = useCartStore((s) => s.clearCart);
   const [phone, setPhone] = useState("");
+  const receiptText = useReceiptText(open, { billNumber });
+  const waUrl = receiptText ? receiptWhatsappUrl(receiptText, phone) : null;
+  const phoneInvalid = Boolean(receiptText) && !waUrl;
 
   useEffect(() => {
     if (!open) setPhone("");
   }, [open]);
-
-  async function sendWhatsApp() {
-    const trimmed = phone.replace(/\s/g, "");
-    const e164 = trimmed.startsWith("+") ? trimmed : `+91${trimmed.replace(/^\+?91/, "")}`;
-    try {
-      const res = await fetch("/api/receipts/send", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ billNumber, customerPhone: e164 }),
-      });
-      const data = (await res.json().catch(() => ({}))) as {
-        queued?: boolean;
-        error?: string;
-        code?: string;
-      };
-      if (res.ok && data.queued) {
-        toast.success("Receipt sent on WhatsApp.");
-        return;
-      }
-      if (res.status === 402 && data.code === "plan_upgrade_required") {
-        toast.error("WhatsApp receipts require a paid plan.");
-        return;
-      }
-      if (res.status === 400 && data.code === "whatsapp_not_configured") {
-        toast.error("Add a WhatsApp number in Settings first.");
-        return;
-      }
-      toast.error(data.error ?? "Could not send WhatsApp receipt.");
-    } catch {
-      toast.error("Could not reach receipt service — try again.");
-    }
-  }
 
   function newOrder() {
     clearCart();
@@ -96,22 +67,29 @@ export function ReceiptModal({
         </p>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="cust-phone">Customer mobile (+91)</Label>
+        <Label htmlFor="cust-phone">Customer mobile (+91, optional)</Label>
         <Input
           id="cust-phone"
           name="customerPhone"
           type="tel"
           inputMode="tel"
-          autoComplete="tel"
+          autoComplete="off"
           placeholder="9876543210"
           value={phone}
           onChange={(e) => setPhone(e.target.value)}
+          aria-invalid={phoneInvalid}
+          aria-describedby="cust-phone-hint"
           className="font-mono"
         />
+        <p id="cust-phone-hint" className="text-xs text-muted-foreground" aria-live="polite">
+          {receiptText === null
+            ? "Couldn't load the receipt. Close and reopen to try again."
+            : phoneInvalid
+            ? "Enter a 10-digit mobile number, or leave blank to pick the chat in WhatsApp."
+            : "Opens your WhatsApp with the receipt ready — tap send."}
+        </p>
       </div>
-      <Button type="button" variant="secondary" className="h-12 w-full" onClick={() => void sendWhatsApp()}>
-        Send on WhatsApp
-      </Button>
+      <WhatsAppReceiptButton url={waUrl} loading={receiptText === undefined} />
       <Button type="button" className="h-12 w-full" onClick={newOrder}>
         New order 🆕
       </Button>

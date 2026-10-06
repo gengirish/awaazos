@@ -3,7 +3,6 @@
 import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { Plan } from "@prisma/client";
 
 import { TransactionDetailDrawer, type TransactionDetailModel } from "@/components/transactions/TransactionDetailDrawer";
 import { Badge } from "@/components/ui/badge";
@@ -83,9 +82,7 @@ type Props = {
   initialHasMore: boolean;
   initialQuery: Record<string, string>;
   vendorName: string;
-  vendorPlan: Plan;
   canExportCsv: boolean;
-  whatsappConfigured: boolean;
 };
 
 export function TransactionsTable({
@@ -96,9 +93,7 @@ export function TransactionsTable({
   initialHasMore,
   initialQuery,
   vendorName,
-  vendorPlan,
   canExportCsv,
-  whatsappConfigured,
 }: Props) {
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -306,8 +301,6 @@ export function TransactionsTable({
         onOpenChange={setDrawerOpen}
         transaction={selected}
         vendorName={vendorName}
-        vendorPlan={vendorPlan}
-        whatsappConfigured={whatsappConfigured}
       />
     </div>
   );

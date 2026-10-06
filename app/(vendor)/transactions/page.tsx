@@ -3,7 +3,6 @@ import { redirect } from "next/navigation";
 
 import { TransactionsTable } from "@/components/transactions/TransactionsTable";
 import { PLAN_LIMITS } from "@/lib/constants";
-import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import {
   parseTransactionListQuery,
@@ -31,10 +30,6 @@ export default async function TransactionsPage({ searchParams }: Props) {
   const parsedList = parseTransactionListQuery(sp);
   let listParams: ParsedTransactionListQuery =
     "error" in parsedList ? { page: 1, limit: 20 } : parsedList;
-
-  const settings = await prisma.vendorSettings.findUnique({
-    where: { vendorId: ctx.vendor.id },
-  });
 
   const { items, total } = await listVendorTransactions(ctx.vendor.id, listParams);
   const hasMore = listParams.page * listParams.limit < total;
@@ -68,9 +63,7 @@ export default async function TransactionsPage({ searchParams }: Props) {
           initialHasMore={hasMore}
           initialQuery={queryForClient}
           vendorName={ctx.vendor.name}
-          vendorPlan={ctx.vendor.plan}
           canExportCsv={PLAN_LIMITS[ctx.vendor.plan].csvExport}
-          whatsappConfigured={Boolean(settings?.whatsappNumber?.trim())}
         />
       </div>
     </div>
