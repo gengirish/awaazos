@@ -145,6 +145,216 @@ export function fulfilmentOptionsLabel(types: readonly ("DELIVERY" | "PICKUP")[]
   return delivery ? "Delivery only" : "Pickup only";
 }
 
+// ─── Cart persistence (device-local) ────────────────────────────────
+
+/** A saved cart older than this is discarded on restore. */
+export const CART_TTL_MS = 24 * 60 * 60 * 1000;
+
+export type CartScope = { kind: "menu" } | { kind: "drop"; dropId: string };
+
+/**
+ * localStorage key for one store's cart: `awz-cart:<slug>:menu` or
+ * `awz-cart:<slug>:drop:<dropId>`. Holds item ids + quantities only — never
+ * buyer details.
+ */
+export function cartStorageKey(slug: string, scope: CartScope): string {
+  return scope.kind === "menu" ? `awz-cart:${slug}:menu` : `awz-cart:${slug}:drop:${scope.dropId}`;
+}
+
+export type StoredCart = { savedAt: number; lines: Record<string, number> };
+
+/** Keeps positive integer quantities only. */
+function cleanLines(lines: Record<string, unknown>): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [id, qty] of Object.entries(lines)) {
+    if (!id || typeof qty !== "number" || !Number.isInteger(qty) || qty < 1) continue;
+    out[id] = qty;
+  }
+  return out;
+}
+
+/** Cart → JSON for storage, or null when there is nothing worth saving. */
+export function serializeCart(cart: Record<string, number>, savedAt: number): string | null {
+  const lines = cleanLines(cart);
+  if (Object.keys(lines).length === 0) return null;
+  return JSON.stringify({ v: 1, savedAt, lines });
+}
+
+/**
+ * Stored JSON → cart, or null when missing, malformed, from a future
+ * version, or older than `CART_TTL_MS`.
+ */
+export function parseStoredCart(raw: string | null, now: number): StoredCart | null {
+  if (!raw) return null;
+  let v: unknown;
+  try {
+    v = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!v || typeof v !== "object") return null;
+  const o = v as { v?: unknown; savedAt?: unknown; lines?: unknown };
+  if (o.v !== 1 || typeof o.savedAt !== "number" || !Number.isFinite(o.savedAt)) return null;
+  if (!o.lines || typeof o.lines !== "object" || Array.isArray(o.lines)) return null;
+  // A savedAt in the future (clock change) counts as fresh, not as forever.
+  const age = now - o.savedAt;
+  if (age > CART_TTL_MS || age < -CART_TTL_MS) return null;
+  return { savedAt: o.savedAt, lines: cleanLines(o.lines as Record<string, unknown>) };
+}
+
+/**
+ * Re-validates a restored cart against what the page offers now. `maxFor`
+ * returns the most the buyer may order of an item (stock / per-order limit),
+ * or null when the item is gone or unavailable. Lines are dropped at 0 and
+ * clamped to `maxFor` and the schema ceiling.
+ */
+export function restoreCartLines(
+  lines: Record<string, number>,
+  maxFor: (id: string) => number | null,
+): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const [id, qty] of Object.entries(cleanLines(lines))) {
+    const max = maxFor(id);
+    if (max === null) continue;
+    const q = Math.min(qty, max, MAX_LINE_QTY);
+    if (q >= 1) out[id] = q;
+  }
+  return out;
+}
+
+/** True when two carts hold the same lines (order-insensitive). */
+export function sameCartLines(a: Record<string, number>, b: Record<string, number>): boolean {
+  const ka = Object.keys(a);
+  if (ka.length !== Object.keys(b).length) return false;
+  return ka.every((k) => a[k] === b[k]);
+}
+
+// ─── Remembered buyer details (opt-in, device-local) ────────────────
+
+export type SavedBuyer = {
+  name: string;
+  phone: string;
+  address: string;
+  fulfilment: "DELIVERY" | "PICKUP" | null;
+  /** ms epoch of the last save; 0 for entries written before it existed. */
+  savedAt: number;
+};
+
+/** Tolerant parse of the "remember my details" entry; null when absent or unreadable. */
+export function parseSavedBuyer(raw: string | null): SavedBuyer | null {
+  if (!raw) return null;
+  let v: unknown;
+  try {
+    v = JSON.parse(raw);
+  } catch {
+    return null;
+  }
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  const str = (x: unknown) => (typeof x === "string" ? x : "");
+  return {
+    name: str(o.name),
+    phone: str(o.phone),
+    address: str(o.address),
+    fulfilment: o.fulfilment === "DELIVERY" || o.fulfilment === "PICKUP" ? o.fulfilment : null,
+    savedAt: typeof o.savedAt === "number" && Number.isFinite(o.savedAt) ? o.savedAt : 0,
+  };
+}
+
+// ─── Checkout validation ────────────────────────────────────────────
+
+export type CheckoutField = "name" | "phone" | "address" | "payment";
+export type CheckoutFieldErrors = Partial<Record<CheckoutField, string>>;
+
+/** Visual order of the fields in the checkout sheet — first invalid one gets focus. */
+export const CHECKOUT_FIELD_ORDER: readonly CheckoutField[] = ["name", "phone", "address", "payment"];
+
+export const CHECKOUT_FIELD_MESSAGES: Record<CheckoutField, string> = {
+  name: "Please enter your name.",
+  phone: "Enter a valid 10-digit +91 mobile number.",
+  address: "Please enter a delivery address.",
+  payment: "Please choose how you'll pay.",
+};
+
+/** "98765 43210", "+91 98765-43210", "919876543210" → true for a 6–9-leading 10-digit mobile. */
+export function looksLikeIndianMobile(raw: string): boolean {
+  const digits = raw.replace(/\D/g, "");
+  const local = digits.length === 12 && digits.startsWith("91") ? digits.slice(2) : digits;
+  return /^[6-9]\d{9}$/.test(local);
+}
+
+export type CheckoutInput = {
+  name: string;
+  phone: string;
+  address: string;
+  fulfilment: "DELIVERY" | "PICKUP";
+  method: "UPI" | "CASH" | null;
+};
+
+/** One field's client-side error, or null when it is valid (address only counts for delivery). */
+export function validateCheckoutField(field: CheckoutField, input: CheckoutInput): string | null {
+  switch (field) {
+    case "name":
+      return input.name.trim() ? null : CHECKOUT_FIELD_MESSAGES.name;
+    case "phone":
+      return looksLikeIndianMobile(input.phone) ? null : CHECKOUT_FIELD_MESSAGES.phone;
+    case "address":
+      return input.fulfilment !== "DELIVERY" || input.address.trim() ? null : CHECKOUT_FIELD_MESSAGES.address;
+    case "payment":
+      return input.method ? null : CHECKOUT_FIELD_MESSAGES.payment;
+  }
+}
+
+/** Every client-side error at once (empty object = valid). */
+export function validateCheckout(input: CheckoutInput): CheckoutFieldErrors {
+  const out: CheckoutFieldErrors = {};
+  for (const f of CHECKOUT_FIELD_ORDER) {
+    const msg = validateCheckoutField(f, input);
+    if (msg) out[f] = msg;
+  }
+  return out;
+}
+
+/** First field (in visual order) that carries an error, or null. */
+export function firstInvalidField(errors: CheckoutFieldErrors): CheckoutField | null {
+  return CHECKOUT_FIELD_ORDER.find((f) => !!errors[f]) ?? null;
+}
+
+/** 409-style rejection codes that belong to one field rather than the whole order. */
+export function checkoutFieldForErrorCode(code: string): CheckoutField | null {
+  switch (code) {
+    case "address_required":
+      return "address";
+    case "pay_on_delivery_disabled":
+      return "payment";
+    default:
+      return null;
+  }
+}
+
+const ISSUE_PATH_FIELD: Record<string, CheckoutField> = {
+  customerName: "name",
+  customerPhone: "phone",
+  deliveryAddress: "address",
+  paymentMethod: "payment",
+};
+
+/**
+ * A 400's zod `issues` → field errors with the sheet's own wording. Returns
+ * null when no issue maps to a field (the caller shows a banner instead).
+ */
+export function checkoutErrorsFromIssues(issues: unknown): CheckoutFieldErrors | null {
+  if (!Array.isArray(issues)) return null;
+  const out: CheckoutFieldErrors = {};
+  for (const issue of issues) {
+    const head = (issue as { path?: unknown } | null)?.path;
+    const key = Array.isArray(head) ? head[0] : undefined;
+    const field = typeof key === "string" ? ISSUE_PATH_FIELD[key] : undefined;
+    if (field && !out[field]) out[field] = CHECKOUT_FIELD_MESSAGES[field];
+  }
+  return Object.keys(out).length > 0 ? out : null;
+}
+
 // ─── Order API error copy ───────────────────────────────────────────
 
 export type OrderApiError = {

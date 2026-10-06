@@ -35,6 +35,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { paiseToRupees } from "@/lib/currency";
+import { suggestEmoji } from "@/lib/menu-suggestions";
 import { menuItemCreateInputSchema, menuItemUpdateSchema } from "@/lib/zod-menu";
 
 const FOOD_EMOJIS = [
@@ -60,6 +61,8 @@ const FOOD_EMOJIS = [
   "🥞",
 ] as const;
 
+const DEFAULT_EMOJI = "🍽️";
+
 const MENU_CATEGORIES = ["General", "Snacks", "Beverages", "Meals", "Desserts"] as const;
 
 /** Mirrors the server-side allowlist in app/api/menu/[id]/image/route.ts. */
@@ -71,7 +74,7 @@ export type MenuItemFormValues = z.input<typeof menuItemCreateInputSchema>;
 const defaultCreateValues: Partial<MenuItemFormValues> = {
   name: "",
   aliasesCsv: "",
-  emoji: "🍽️",
+  emoji: DEFAULT_EMOJI,
   category: "General",
   hsnCode: "",
   isPopular: false,
@@ -102,6 +105,11 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [imageBusy, setImageBusy] = useState(false);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  // New items only: the emoji follows the name (suggestEmoji) until the vendor
+  // taps one themselves. A manual pick is final, and editing never auto-picks —
+  // an existing item's emoji is the vendor's data.
+  const [emojiPicked, setEmojiPicked] = useState(false);
+  const [emojiSuggested, setEmojiSuggested] = useState(false);
 
   const form = useForm<MenuItemFormValues>({
     resolver: zodResolver(menuItemCreateInputSchema),
@@ -113,6 +121,8 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
     setImageUrl(item?.imageUrl ?? null);
     setPendingFile(null);
     setImageBusy(false);
+    setEmojiPicked(false);
+    setEmojiSuggested(false);
     if (item) {
       form.reset({
         name: item.name,
@@ -271,7 +281,18 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
                 <FormItem>
                   <FormLabel>Name</FormLabel>
                   <FormControl>
-                    <Input autoComplete="off" placeholder="e.g. Bhel puri" {...field} />
+                    <Input
+                      autoComplete="off"
+                      placeholder="e.g. Bhel puri"
+                      {...field}
+                      onChange={(e) => {
+                        field.onChange(e);
+                        if (isEdit || emojiPicked) return;
+                        const suggestion = suggestEmoji(e.target.value);
+                        form.setValue("emoji", suggestion ?? DEFAULT_EMOJI);
+                        setEmojiSuggested(suggestion !== null);
+                      }}
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
@@ -299,34 +320,49 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
             <FormField
               control={form.control}
               name="emoji"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Emoji</FormLabel>
-                  <FormControl>
-                    <div
-                      className="grid grid-cols-5 gap-2 sm:grid-cols-10"
-                      role="group"
-                      aria-label="Pick a food emoji"
-                    >
-                      {FOOD_EMOJIS.map((emo) => (
-                        <button
-                          key={emo}
-                          type="button"
-                          className={`flex min-h-11 min-w-11 items-center justify-center rounded-md border text-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                            field.value === emo ? "border-primary bg-primary/10" : "border-input bg-background hover:bg-accent"
-                          }`}
-                          aria-pressed={field.value === emo}
-                          aria-label={`Select emoji ${emo}`}
-                          onClick={() => field.onChange(emo)}
-                        >
-                          {emo}
-                        </button>
-                      ))}
-                    </div>
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
+              render={({ field }) => {
+                // A suggested (or previously saved) emoji outside the starter
+                // grid still needs a visible, selected button.
+                const options: string[] =
+                  field.value && !(FOOD_EMOJIS as readonly string[]).includes(field.value)
+                    ? [field.value, ...FOOD_EMOJIS]
+                    : [...FOOD_EMOJIS];
+                return (
+                  <FormItem>
+                    <FormLabel>Emoji</FormLabel>
+                    <FormControl>
+                      <div
+                        className="grid grid-cols-5 gap-2 sm:grid-cols-10"
+                        role="group"
+                        aria-label="Pick a food emoji"
+                      >
+                        {options.map((emo) => (
+                          <button
+                            key={emo}
+                            type="button"
+                            className={`flex min-h-11 min-w-11 items-center justify-center rounded-md border text-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                              field.value === emo ? "border-primary bg-primary/10" : "border-input bg-background hover:bg-accent"
+                            }`}
+                            aria-pressed={field.value === emo}
+                            aria-label={`Select emoji ${emo}`}
+                            onClick={() => {
+                              setEmojiPicked(true);
+                              setEmojiSuggested(false);
+                              field.onChange(emo);
+                            }}
+                          >
+                            {emo}
+                          </button>
+                        ))}
+                      </div>
+                    </FormControl>
+                    {!isEdit && emojiSuggested ? (
+                      <FormDescription>Picked from the name. Tap another to change it.</FormDescription>
+                    ) : null}
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
             <div className="space-y-2" role="group" aria-labelledby="menu-item-photo-label">
               <p className="text-sm font-medium leading-none" id="menu-item-photo-label">

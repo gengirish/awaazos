@@ -1,3 +1,4 @@
+import type { FulfilmentMode } from "@prisma/client";
 import type { Metadata } from "next";
 import {
   CalendarClock,
@@ -18,9 +19,10 @@ import { cache } from "react";
 import { CopyUpiId } from "@/components/storefront/CopyUpiId";
 import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
 import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
+import { UpiQrImage } from "@/components/storefront/UpiQrImage";
 import { getIstTodayStart } from "@/lib/billing-period";
 import { STALL_TYPES } from "@/lib/constants";
-import { formatINRCompact } from "@/lib/currency";
+import { formatINR } from "@/lib/currency";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
 import { formatDropDayLabel, formatFulfilmentWindow } from "@/lib/drops-time";
@@ -164,15 +166,22 @@ export async function generateMetadata({
 
   const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
   const title = `${vendor.name} — Menu`;
-  const description = place
-    ? `Menu and prices for ${vendor.name}, ${place}. Pay by UPI.`
-    : `Menu and prices for ${vendor.name}. Pay by UPI.`;
+  const where = place ? `${vendor.name}, ${place}` : vendor.name;
+  const ordering = (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0;
+  const description = ordering
+    ? `Order online from ${where}. ${menuFulfilmentPhrase(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}, pay by UPI.`
+    : `Menu and prices for ${where}. Pay by UPI.`;
 
   return {
     title,
     description,
     openGraph: { title, description, type: "website" },
   };
+}
+
+/** "Pickup" / "Delivery" / "Pickup or delivery" — mirrors the OG card's line. */
+function menuFulfilmentPhrase(mode: FulfilmentMode): string {
+  return mode === "BOTH" ? "Pickup or delivery" : mode === "DELIVERY" ? "Delivery" : "Pickup";
 }
 
 function stallTypeLabel(value: StorefrontVendor["stallType"]): string {
@@ -232,7 +241,7 @@ function MenuRow({ item }: { item: StorefrontItems[number] }) {
       </span>
 
       <span className="shrink-0 rounded-lg bg-muted/70 px-2.5 py-1 font-mono text-sm font-bold tabular-nums text-foreground">
-        {formatINRCompact(item.priceInPaise)}
+        {formatINR(item.priceInPaise)}
       </span>
     </li>
   );
@@ -330,7 +339,7 @@ function DropSection({
             <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
             <span>
               {drop.deliveryFeePaise > 0
-                ? `Delivery fee ${formatINRCompact(drop.deliveryFeePaise)}`
+                ? `Delivery fee ${formatINR(drop.deliveryFeePaise)}`
                 : "Free delivery"}
             </span>
           </li>
@@ -372,6 +381,7 @@ function DropSection({
           fulfilmentTypes={types}
           deliveryFeePaise={drop.deliveryFeePaise}
           pickupNote={drop.pickupNote}
+          pickupWindow={formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt)}
           payment={payment}
           prefill={prefill}
         />
@@ -532,12 +542,12 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
           aria-label="Menu categories"
           className="sticky top-0 z-20 border-b border-border/50 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70"
         >
-          <ul className="mx-auto flex max-w-2xl gap-2 overflow-x-auto px-4 py-2.5 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
+          <ul className="mx-auto flex max-w-2xl gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
             {categories.map(([category], i) => (
               <li key={category} className="shrink-0">
                 <a
                   href={`#${categoryAnchor(category, i)}`}
-                  className="inline-flex min-h-9 items-center whitespace-nowrap rounded-full border border-border/70 px-3.5 text-xs font-bold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-border/70 px-4 text-sm font-bold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
                   {category}
                 </a>
@@ -612,7 +622,7 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
                         {item.name}
                       </span>
                       <span className="mt-auto font-mono text-sm font-bold tabular-nums text-primary">
-                        {formatINRCompact(item.priceInPaise)}
+                        {formatINR(item.priceInPaise)}
                       </span>
                     </li>
                   ))}
@@ -679,14 +689,7 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
               </h3>
               <p className="text-sm text-muted-foreground">Any UPI app. Enter the amount the vendor tells you.</p>
               <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
-                <Image
-                  src={buildQrUrl(upiLink, 180)}
-                  alt={`UPI QR code to pay ${payeeName}`}
-                  width={180}
-                  height={180}
-                  unoptimized
-                  className="rounded-lg"
-                />
+                <UpiQrImage src={buildQrUrl(upiLink, 180)} alt={`UPI QR code to pay ${payeeName}`} size={180} />
               </div>
               <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                 Paying {payeeName}
@@ -713,14 +716,7 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
               </p>
 
               <div className="mx-auto mt-5 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
-                <Image
-                  src={buildQrUrl(upiLink, 220)}
-                  alt={`UPI QR code to pay ${payeeName}`}
-                  width={220}
-                  height={220}
-                  unoptimized
-                  className="rounded-lg"
-                />
+                <UpiQrImage src={buildQrUrl(upiLink, 220)} alt={`UPI QR code to pay ${payeeName}`} size={220} />
               </div>
 
               <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

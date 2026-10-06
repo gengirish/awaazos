@@ -3,18 +3,20 @@
 import { MapPin, ShoppingBag, Sparkles, Truck } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 
 import {
   CartBar,
   CheckoutSheet,
   NoPaymentNotice,
   QtyStepper,
+  usePersistedCart,
   type BuyerPrefill,
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
-import { formatINRCompact, sumPaise } from "@/lib/currency";
+import { formatINR, sumPaise } from "@/lib/currency";
 import {
+  cartStorageKey,
   fulfilmentOptionsLabel,
   maxOrderableQty,
   orderErrorMessage,
@@ -66,14 +68,22 @@ export function MenuOrder(props: MenuOrderProps) {
     props;
   const router = useRouter();
 
-  const [cart, setCart] = useState<Record<string, number>>({});
   const [open, setOpen] = useState(false);
+  const checkoutRef = useRef<HTMLButtonElement>(null);
 
   const byId = useMemo(() => {
     const m = new Map<string, MenuOrderItem>();
     for (const c of categories) for (const i of c.items) m.set(i.id, i);
     return m;
   }, [categories]);
+
+  // Saved per store; items no longer on the (available-only) menu are dropped on restore.
+  const max = maxOrderableQty(null, null);
+  const { cart, setCart, clearCart } = usePersistedCart({
+    storageKey: cartStorageKey(slug, { kind: "menu" }),
+    accepting: true,
+    maxFor: (id) => (byId.has(id) ? max : null),
+  });
 
   function setQty(itemId: string, qty: number) {
     setCart((c) => {
@@ -91,7 +101,6 @@ export function MenuOrder(props: MenuOrderProps) {
   const itemCount = lines.reduce((s, l) => s + l.qty, 0);
   const subtotalPaise = sumPaise(lines.map((l) => l.item.priceInPaise * l.qty));
   const canPay = payment.upi || payment.cod;
-  const max = maxOrderableQty(null, null);
 
   function onRejected(err: OrderApiError): string {
     const item = err.menuItemId ? byId.get(err.menuItemId) : undefined;
@@ -122,7 +131,7 @@ export function MenuOrder(props: MenuOrderProps) {
             <li className="flex items-start gap-2">
               <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
               <span>
-                {deliveryFeePaise > 0 ? `Delivery fee ${formatINRCompact(deliveryFeePaise)}` : "Free delivery"}
+                {deliveryFeePaise > 0 ? `Delivery fee ${formatINR(deliveryFeePaise)}` : "Free delivery"}
               </span>
             </li>
           ) : null}
@@ -170,7 +179,7 @@ export function MenuOrder(props: MenuOrderProps) {
                     <span className="truncate text-[15px] font-semibold text-foreground">{item.name}</span>
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
                       <span className="font-mono font-bold tabular-nums text-foreground">
-                        {formatINRCompact(item.priceInPaise)}
+                        {formatINR(item.priceInPaise)}
                       </span>
                       {item.isPopular ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
@@ -201,6 +210,7 @@ export function MenuOrder(props: MenuOrderProps) {
         subtotalPaise={subtotalPaise}
         canPay={canPay}
         onCheckout={() => setOpen(true)}
+        buttonRef={checkoutRef}
       />
 
       <CheckoutSheet
@@ -221,6 +231,8 @@ export function MenuOrder(props: MenuOrderProps) {
         pickupNote={pickupNote}
         payment={payment}
         prefill={prefill}
+        returnFocusRef={checkoutRef}
+        onOrdered={clearCart}
         buildBody={(d) => ({
           items: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty })),
           ...d,

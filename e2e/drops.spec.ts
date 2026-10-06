@@ -115,9 +115,12 @@ test.describe("drops: home-kitchen pre-order day", () => {
 
     // ── Buyer: guest, separate browser context ─────────────────────────
     const buyerCtx = await browser.newContext(CONTEXT_OPTIONS);
+    // The stale view lives in its own context: carts persist in localStorage per
+    // drop, so a same-context tab would hand its 2-laddu cart to the buyer tab.
+    const staleCtx = await browser.newContext(CONTEXT_OPTIONS);
     try {
-      // A second tab opened now keeps a stale view (3 left) for the oversell check later.
-      const stale = await buyerCtx.newPage();
+      // A second browser opened now keeps a stale view (3 left) for the oversell check later.
+      const stale = await staleCtx.newPage();
       await stubQrService(stale);
       await stale.goto(`/s/${slug}`);
       const staleDrop = stale.getByRole("region", { name: dropTitle });
@@ -165,6 +168,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
       expect(stale.url()).not.toMatch(/\/o\//);
     } finally {
       await buyerCtx.close();
+      await staleCtx.close();
     }
 
     // ── Vendor: freeze, then the prep sheet has the right totals ─────────

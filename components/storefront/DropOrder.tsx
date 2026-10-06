@@ -2,18 +2,25 @@
 
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import {
   CartBar,
   CheckoutSheet,
   NoPaymentNotice,
   QtyStepper,
+  usePersistedCart,
   type BuyerPrefill,
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
-import { formatINRCompact, sumPaise } from "@/lib/currency";
-import { maxOrderableQty, orderErrorMessage, stockLabel, type OrderApiError } from "@/lib/storefront-order";
+import { formatINR, sumPaise } from "@/lib/currency";
+import {
+  cartStorageKey,
+  maxOrderableQty,
+  orderErrorMessage,
+  stockLabel,
+  type OrderApiError,
+} from "@/lib/storefront-order";
 import { cn } from "@/lib/utils";
 
 export type { BuyerPrefill } from "@/components/storefront/StorefrontCheckout";
@@ -50,6 +57,8 @@ export type DropOrderProps = {
   fulfilmentTypes: FulfilmentType[];
   deliveryFeePaise: number;
   pickupNote: string | null;
+  /** Fulfilment window label ("Sat, 5 Oct · 5:00 pm – 8:00 pm"), shown with Pickup at checkout. */
+  pickupWindow?: string | null;
   payment: { upi: boolean; cod: boolean };
   /**
    * Signed-in buyer's own saved details (lib/customer-auth.ts). Non-empty
@@ -68,18 +77,30 @@ export function DropOrder(props: DropOrderProps) {
     fulfilmentTypes,
     deliveryFeePaise,
     pickupNote,
+    pickupWindow,
     payment,
     prefill,
   } = props;
   const router = useRouter();
 
-  const [cart, setCart] = useState<Record<string, number>>({});
   // Stock learned from a sold_out rejection, until the refreshed props land.
   const [remainingOverride, setRemainingOverride] = useState<Record<string, number>>({});
   useEffect(() => setRemainingOverride({}), [items]);
   const [open, setOpen] = useState(false);
+  const checkoutRef = useRef<HTMLButtonElement>(null);
 
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+
+  // Saved per drop; discarded once the drop stops taking orders, clamped to
+  // current stock and per-order limits on restore.
+  const { cart, setCart, clearCart } = usePersistedCart({
+    storageKey: cartStorageKey(slug, { kind: "drop", dropId }),
+    accepting: orderable,
+    maxFor: (id) => {
+      const item = byId.get(id);
+      return item ? maxOrderableQty(item.remaining, item.perOrderLimit) : null;
+    },
+  });
 
   function remainingFor(item: DropOrderItem): number | null {
     const o = remainingOverride[item.id];
@@ -171,7 +192,7 @@ export function DropOrder(props: DropOrderProps) {
                 <span className="truncate text-[15px] font-semibold text-foreground">{item.name}</span>
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
                   <span className="font-mono font-bold tabular-nums text-foreground">
-                    {formatINRCompact(item.priceInPaise)}
+                    {formatINR(item.priceInPaise)}
                   </span>
                   {badge ? (
                     <span
@@ -205,6 +226,7 @@ export function DropOrder(props: DropOrderProps) {
           subtotalPaise={subtotalPaise}
           canPay={canPay}
           onCheckout={() => setOpen(true)}
+          buttonRef={checkoutRef}
         />
       ) : null}
 
@@ -224,8 +246,11 @@ export function DropOrder(props: DropOrderProps) {
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
         pickupNote={pickupNote}
+        pickupWindow={pickupWindow}
         payment={payment}
         prefill={prefill}
+        returnFocusRef={checkoutRef}
+        onOrdered={clearCart}
         buildBody={(d) => ({
           dropId,
           items: lines.map((l) => ({ dropItemId: l.item.id, qty: l.qty })),

@@ -289,9 +289,20 @@ export function MenuOrdersClient({
             aria-describedby="menu-pickup-note-hint"
             className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           />
-          <p id="menu-pickup-note-hint" className="text-xs text-muted-foreground">
-            Where and when to collect, e.g. &ldquo;Gate 2, Shanti Nagar. 11 am – 8 pm.&rdquo;
-          </p>
+          {note.trim() === "" ? (
+            /* Without this, a pickup buyer has no idea where or when to come. */
+            <p
+              id="menu-pickup-note-hint"
+              className="rounded-md border border-amber-500/60 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+            >
+              <span className="font-semibold">Recommended:</span> Add where and when to collect, e.g.
+              &ldquo;Stall 12, Exhibition Grounds · 5–9 pm&rdquo; — customers see this at checkout.
+            </p>
+          ) : (
+            <p id="menu-pickup-note-hint" className="text-xs text-muted-foreground">
+              Customers see this at checkout.
+            </p>
+          )}
         </div>
       )}
 

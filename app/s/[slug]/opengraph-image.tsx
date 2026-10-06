@@ -15,6 +15,10 @@ import { prisma } from "@/lib/prisma";
  * URL shouldn't 404, but it must not confirm the stall exists either — the
  * generic card carries nothing derived from the slug).
  *
+ * Variants, in priority order: an open (or scheduled) drop with its items and
+ * cut-off; else, with "Order from menu" on, up to four available menu items
+ * (popular first) and "Order online · Pickup/Delivery"; else "See the menu".
+ *
  * The Prisma `select` is a hand-written allowlist: never `phone` / `email`.
  *
  * Satori only supports inline styles, so this file is the one place in the UI
@@ -48,6 +52,14 @@ async function loadCard(slug: string, now: Date) {
       id: true,
       name: true,
       city: true,
+      // "Order from menu" variant: only what the card draws.
+      settings: { select: { acceptMenuOrders: true, menuFulfilmentMode: true } },
+      menuItems: {
+        where: { isAvailable: true },
+        orderBy: [{ isPopular: "desc" }, { category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
+        take: MAX_ITEMS,
+        select: { name: true, priceInPaise: true },
+      },
       drops: {
         // Coarse DB filter; the precise rule is effectiveDropStatus below.
         where: { status: "OPEN", closesAt: { gt: now } },
@@ -75,7 +87,11 @@ async function loadCard(slug: string, now: Date) {
   const live = vendor.drops.filter((d) => effectiveDropStatus(d, now) === "OPEN");
   const upcoming = vendor.drops.filter((d) => effectiveDropStatus(d, now) === "SCHEDULED");
   const drop = live[0] ?? upcoming[0] ?? null; // already sorted by closesAt
-  return { name: vendor.name, city: vendor.city, drop };
+  const menuOrdering =
+    !drop && (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0
+      ? { mode: vendor.settings?.menuFulfilmentMode ?? "PICKUP", items: vendor.menuItems }
+      : null;
+  return { name: vendor.name, city: vendor.city, drop, menuOrdering };
 }
 
 function RupeeGlyph({ size: px }: { size: number }) {
@@ -143,6 +159,34 @@ function Frame({ children }: { children: ReactNode }) {
   );
 }
 
+function menuOrderLine(mode: string): string {
+  const how = mode === "BOTH" ? "Pickup or delivery" : mode === "DELIVERY" ? "Delivery" : "Pickup";
+  return `Order online · ${how}`;
+}
+
+function ItemRows({ items }: { items: { name: string; priceInPaise: number }[] }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      {items.map((it, i) => (
+        <div
+          key={i}
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            fontSize: 34,
+            padding: "8px 0",
+            borderBottom: "1px solid #E2E8F0",
+          }}
+        >
+          <span>{truncate(it.name, 40)}</span>
+          <Price paise={it.priceInPaise} fontSize={34} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function truncate(s: string, max: number): string {
   const t = s.trim();
   return t.length > max ? `${t.slice(0, max - 1)}…` : t;
@@ -174,7 +218,7 @@ export default async function Image({ params }: { params: { slug: string } }) {
 
   if (!card) return new ImageResponse(<GenericCard />, size);
 
-  const { drop } = card;
+  const { drop, menuOrdering } = card;
   return new ImageResponse(
     (
       <Frame>
@@ -188,29 +232,16 @@ export default async function Image({ params }: { params: { slug: string } }) {
               {truncate(drop.title, 36)}
             </div>
           ) : (
-            <div style={{ display: "flex", fontSize: 64, fontWeight: 700, marginTop: 8 }}>See the menu</div>
+            <div style={{ display: "flex", fontSize: 64, fontWeight: 700, marginTop: 8 }}>
+              {menuOrdering ? "Order from the menu" : "See the menu"}
+            </div>
           )}
         </div>
 
         {drop ? (
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            {drop.items.map((it, i) => (
-              <div
-                key={i}
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  fontSize: 34,
-                  padding: "8px 0",
-                  borderBottom: "1px solid #E2E8F0",
-                }}
-              >
-                <span>{truncate(it.menuItem.name, 40)}</span>
-                <Price paise={it.priceInPaise} fontSize={34} />
-              </div>
-            ))}
-          </div>
+          <ItemRows items={drop.items.map((it) => ({ name: it.menuItem.name, priceInPaise: it.priceInPaise }))} />
+        ) : menuOrdering ? (
+          <ItemRows items={menuOrdering.items} />
         ) : (
           <div style={{ display: "flex" }} />
         )}
@@ -234,6 +265,20 @@ export default async function Image({ params }: { params: { slug: string } }) {
               <div style={{ display: "flex", fontSize: 26, color: C.muted, marginTop: 10 }}>
                 {`${drop.fulfilmentMode === "PICKUP" ? "Pickup" : drop.fulfilmentMode === "BOTH" ? "Delivery or pickup" : "Delivery"} ${formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt)}`}
               </div>
+            </div>
+          ) : menuOrdering ? (
+            <div
+              style={{
+                display: "flex",
+                fontSize: 30,
+                fontWeight: 700,
+                color: C.ink,
+                background: C.tint,
+                borderRadius: 12,
+                padding: "8px 16px",
+              }}
+            >
+              {menuOrderLine(menuOrdering.mode)}
             </div>
           ) : (
             <div style={{ display: "flex" }} />
