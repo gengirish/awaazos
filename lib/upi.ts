@@ -45,3 +45,21 @@ export function buildUpiCollectLink({ upiId, name }: { upiId: string; name: stri
   });
   return `upi://pay?${params.toString()}`;
 }
+
+/**
+ * UPI virtual payment address, e.g. `name@okaxis`: a handle, `@`, and the
+ * bank/PSP suffix. Shared by the settings form, onboarding and PATCH /api/vendor
+ * so a typo is caught before it ends up inside every QR the stall shows.
+ */
+export const UPI_ID_PATTERN = /^[a-zA-Z0-9._-]{2,256}@[a-zA-Z][a-zA-Z0-9.-]{1,63}$/;
+
+/** Trims surrounding whitespace. Case is left alone: UPI apps resolve either. */
+export function normalizeUpiId(raw: string): string {
+  return raw.trim();
+}
+
+export function isValidUpiId(raw: string): boolean {
+  return UPI_ID_PATTERN.test(normalizeUpiId(raw));
+}
+
+export const UPI_ID_FORMAT_MESSAGE = "That doesn't look like a UPI ID. It should look like name@okaxis.";

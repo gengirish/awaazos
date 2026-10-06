@@ -6,6 +6,7 @@ import { SUPPORTED_VOICE_LANGS } from "@/lib/constants";
 import { menuOrdersEnableBlocker, type MenuOrdersBlocker } from "@/lib/menu-orders-board";
 import { prisma } from "@/lib/prisma";
 import { requireVendorRole } from "@/lib/rbac";
+import { UPI_ID_FORMAT_MESSAGE, UPI_ID_PATTERN } from "@/lib/upi";
 
 // Served to cashiers: the encrypted Razorpay secrets must never leave the server
 // (lib/storefront-razorpay.ts selects them explicitly where they are needed).
@@ -15,7 +16,14 @@ const patchSchema = z.object({
   city: z.string().trim().min(1).max(80).optional(),
   state: z.string().trim().min(1).max(80).optional(),
   stallType: z.nativeEnum(StallType).optional(),
-  upiId: z.string().trim().max(120).optional().nullable(),
+  // "" or null clears it; otherwise it must look like name@bank (lib/upi.ts).
+  upiId: z
+    .string()
+    .trim()
+    .max(120)
+    .refine((v) => v === "" || UPI_ID_PATTERN.test(v), UPI_ID_FORMAT_MESSAGE)
+    .optional()
+    .nullable(),
   upiName: z.string().trim().max(120).optional().nullable(),
   onboardingDone: z.boolean().optional(),
   whatsappNumber: z.string().trim().max(20).optional().nullable(),
@@ -132,8 +140,8 @@ export async function PATCH(req: NextRequest) {
       if (vendorFields.city !== undefined) data.city = vendorFields.city;
       if (vendorFields.state !== undefined) data.state = vendorFields.state;
       if (vendorFields.stallType !== undefined) data.stallType = vendorFields.stallType;
-      if (vendorFields.upiId !== undefined) data.upiId = vendorFields.upiId ?? null;
-      if (vendorFields.upiName !== undefined) data.upiName = vendorFields.upiName ?? null;
+      if (vendorFields.upiId !== undefined) data.upiId = vendorFields.upiId || null;
+      if (vendorFields.upiName !== undefined) data.upiName = vendorFields.upiName || null;
       if (vendorFields.onboardingDone !== undefined) data.onboardingDone = vendorFields.onboardingDone;
 
       if (Object.keys(data).length) {

@@ -148,7 +148,7 @@ export function UpiQRModal({
       {payMode === "UPI" ? (
         <>
           {!effectiveUpiId ? (
-            <p className="text-center text-sm text-destructive">Add a UPI ID in vendor settings to show a QR code.</p>
+            <p className="text-center text-sm text-destructive">Add a UPI ID in Settings → Payments to show a QR code.</p>
           ) : (
             <>
               <div className="flex flex-col items-center gap-2">

@@ -50,7 +50,7 @@ test.describe("menu orders: order straight from the everyday menu", () => {
     try {
       const p = await before.newPage();
       await stubQrService(p);
-      await page.goto("/settings");
+      await page.goto("/settings/store");
       const publish = page.getByRole("switch", { name: /publish/i });
       if ((await publish.getAttribute("aria-checked")) !== "true") await publish.click();
       await expect(publish).toHaveAttribute("aria-checked", "true");
@@ -62,10 +62,12 @@ test.describe("menu orders: order straight from the everyday menu", () => {
     }
 
     // ── Vendor: turn on menu ordering (needs a payment method) ─────────
-    const menuSwitch = page.getByRole("switch", { name: /order from your menu/i });
+    await page.goto("/settings/payments");
     const payOnDelivery = page.getByRole("switch", { name: /pay on delivery/i });
     if ((await payOnDelivery.getAttribute("aria-checked")) !== "true") await payOnDelivery.click();
     await expect(payOnDelivery).toHaveAttribute("aria-checked", "true");
+    await page.goto("/settings/orders");
+    const menuSwitch = page.getByRole("switch", { name: /order from your menu/i });
     await menuSwitch.click();
     await expect(menuSwitch).toHaveAttribute("aria-checked", "true");
 

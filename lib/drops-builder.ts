@@ -154,9 +154,9 @@ export const DROP_CONFLICT_MESSAGE: Record<string, string> = {
   move_cutoff_first: "The order cut-off has already passed. Move the cut-off later, save, then reopen orders.",
   no_items: "Add at least one item before opening orders.",
   no_payment_method:
-    "Customers have no way to pay yet. Add your UPI ID, or allow pay on delivery in Settings.",
+    "Customers have no way to pay yet. Add your UPI ID, or allow pay on delivery, in Settings → Payments.",
   storefront_not_published:
-    "Your storefront is private, so customers can't see this drop. Switch on \"Publish my menu\" in Settings.",
+    "Your storefront is private, so customers can't see this drop. Switch on \"Publish my menu\" in Settings → Online store.",
   drop_locked: "Orders are frozen, so this drop can no longer be edited.",
   item_has_orders: "Customers have already ordered this item, so it can't be removed. Lower its quantity instead.",
   has_orders: "This drop has orders, so it can't be deleted. Close orders instead.",

@@ -1,0 +1,46 @@
+import type { Metadata } from "next";
+
+import { FssaiNumberClient } from "@/components/settings/FssaiNumberClient";
+import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
+import { StorefrontClient } from "@/components/settings/StorefrontClient";
+import { prisma } from "@/lib/prisma";
+
+import { requireSettingsContext } from "../_context";
+
+export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Online store · Settings · AwaazOS" };
+
+export default async function StoreSettingsPage() {
+  const { vendor } = await requireSettingsContext();
+
+  const [settings, availableItemCount] = await Promise.all([
+    prisma.vendorSettings.findUnique({
+      where: { vendorId: vendor.id },
+      select: { publishStorefront: true, fssaiNumber: true },
+    }),
+    prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
+  ]);
+
+  return (
+    <>
+      <SettingsPageHeader
+        title="Online store"
+        description="A web page with your menu that customers open from a QR or a WhatsApp link."
+      />
+      <div className="space-y-4">
+        <SettingsCard title="Your store page">
+          <StorefrontClient
+            slug={vendor.slug}
+            initialPublished={settings?.publishStorefront ?? false}
+            hasUpiId={Boolean(vendor.upiId)}
+            availableItemCount={availableItemCount}
+          />
+        </SettingsCard>
+        <SettingsCard title="Food licence" description="Shown on your store page.">
+          <FssaiNumberClient initialFssaiNumber={settings?.fssaiNumber ?? null} />
+        </SettingsCard>
+      </div>
+    </>
+  );
+}

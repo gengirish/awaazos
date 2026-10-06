@@ -1,173 +1,170 @@
+import { CheckCircle2, ChevronRight, CircleDashed, ListChecks, MinusCircle } from "lucide-react";
+import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { HomeKitchenClient } from "@/components/settings/HomeKitchenClient";
-import { MenuOrdersClient } from "@/components/settings/MenuOrdersClient";
-import { RazorpayKeysClient } from "@/components/settings/RazorpayKeysClient";
-import { StorefrontClient } from "@/components/settings/StorefrontClient";
-import { VoiceLanguageClient } from "@/components/settings/VoiceLanguageClient";
-import { PLAN_LIMITS } from "@/lib/constants";
+import { LegacyAnchorRedirect } from "@/components/settings/LegacyAnchorRedirect";
+import { SETTINGS_SECTIONS, type SettingsSectionId } from "@/components/settings/sections";
 import { prisma } from "@/lib/prisma";
-import { AuthError, requireVendorRole } from "@/lib/rbac";
-import { isSecretBoxConfigured } from "@/lib/secret-box";
-import { hasStoredRazorpayCreds, vendorWebhookUrl } from "@/lib/storefront-razorpay";
+import {
+  ordersStatus,
+  paymentsStatus,
+  planStatus,
+  setupChecklist,
+  storeStatus,
+  voiceStatus,
+  type SectionStatus,
+  type SettingsSnapshot,
+} from "@/lib/settings-overview";
+import { hasStoredRazorpayCreds } from "@/lib/storefront-razorpay";
+
+import { requireSettingsContext } from "./_context";
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
-  let vendorId: string;
-  let vendorPlan: keyof typeof PLAN_LIMITS;
-  let isOwner: boolean;
-  try {
-    const ctx = await requireVendorRole("CASHIER");
-    vendorId = ctx.vendor.id;
-    vendorPlan = ctx.vendor.plan;
-    isOwner = ctx.staff.role === "OWNER";
-  } catch (e) {
-    if (e instanceof AuthError) {
-      redirect("/sign-in");
-    }
-    throw e;
-  }
+export const metadata: Metadata = { title: "Settings · AwaazOS" };
 
-  const [settings, vendor, availableItemCount] = await Promise.all([
+function StatusLine({ status }: { status: SectionStatus }) {
+  if (status.parts) {
+    return (
+      <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
+        {status.parts.map((p, i) => (
+          <span key={p.label} className="inline-flex items-center gap-1 whitespace-nowrap">
+            {p.label}
+            {p.on ? (
+              <CheckCircle2 className="h-3.5 w-3.5 text-green-700 dark:text-green-500" aria-hidden="true" />
+            ) : (
+              <MinusCircle className="h-3.5 w-3.5 text-muted-foreground" aria-hidden="true" />
+            )}
+            <span className="sr-only">{p.on ? "on" : "off"}</span>
+            {i < status.parts!.length - 1 ? (
+              <span aria-hidden="true" className="text-muted-foreground">
+                ·
+              </span>
+            ) : null}
+          </span>
+        ))}
+      </span>
+    );
+  }
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1">
+      {status.on ? (
+        <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-green-700 dark:text-green-500" aria-hidden="true" />
+      ) : (
+        <CircleDashed className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden="true" />
+      )}
+      <span className="truncate">{status.text}</span>
+    </span>
+  );
+}
+
+export default async function SettingsHubPage() {
+  const { vendor } = await requireSettingsContext();
+
+  const [settings, availableItemCount] = await Promise.all([
     prisma.vendorSettings.findUnique({
-      where: { vendorId },
+      where: { vendorId: vendor.id },
       select: {
         voiceLang: true,
         publishStorefront: true,
-        fssaiNumber: true,
         acceptPayOnDelivery: true,
         acceptMenuOrders: true,
         menuFulfilmentMode: true,
-        menuDeliveryFeePaise: true,
-        menuPickupNote: true,
         // Presence only — the encrypted secrets never leave this server component.
         razorpayKeyId: true,
         razorpayKeySecretEnc: true,
         razorpayWebhookSecretEnc: true,
       },
     }),
-    prisma.vendor.findUnique({
-      where: { id: vendorId },
-      select: { slug: true, upiId: true },
-    }),
-    prisma.menuItem.count({ where: { vendorId, isAvailable: true } }),
+    prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
   ]);
 
-  const razorpayConfigured = hasStoredRazorpayCreds(settings);
-  const razorpayKeyIdLast4 = razorpayConfigured && settings?.razorpayKeyId ? settings.razorpayKeyId.slice(-4) : null;
+  const snapshot: SettingsSnapshot = {
+    slug: vendor.slug,
+    publishStorefront: settings?.publishStorefront ?? false,
+    acceptMenuOrders: settings?.acceptMenuOrders ?? false,
+    menuFulfilmentMode: settings?.menuFulfilmentMode ?? "PICKUP",
+    upiId: vendor.upiId,
+    acceptPayOnDelivery: settings?.acceptPayOnDelivery ?? true,
+    razorpayConfigured: hasStoredRazorpayCreds(settings),
+    voiceLang: settings?.voiceLang ?? "en-IN",
+    plan: vendor.plan,
+    availableItemCount,
+  };
+
+  const statuses: Record<SettingsSectionId, SectionStatus> = {
+    store: storeStatus(snapshot),
+    orders: ordersStatus(snapshot),
+    payments: paymentsStatus(snapshot),
+    voice: voiceStatus(snapshot),
+    billing: planStatus(snapshot),
+  };
+  const checklist = setupChecklist(snapshot);
 
   return (
-    <div className="min-h-screen bg-background p-4 pb-10 md:p-6">
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground"
-      >
-        Skip to main content
-      </a>
-      <header className="mx-auto mb-6 max-w-3xl">
+    <>
+      <LegacyAnchorRedirect />
+      <header className="mb-4">
         <h1 className="font-display text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground">Manage your stall and subscription.</p>
+        <p className="text-sm text-muted-foreground">Manage your stall, online store and plan.</p>
       </header>
 
-      <main id="main" className="mx-auto grid max-w-3xl gap-4 sm:grid-cols-2">
-        <Link
-          href="/settings/billing"
-          className="block rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      {checklist.length > 0 ? (
+        <section
+          aria-labelledby="setup-checklist-heading"
+          className="mb-4 rounded-lg border border-amber-500/60 bg-amber-50 p-4 text-amber-950 dark:bg-amber-950/40 dark:text-amber-50"
         >
-          <Card className="h-full transition-colors hover:bg-muted/40">
-            <CardHeader>
-              <CardTitle className="font-display text-lg">Billing</CardTitle>
-              <CardDescription>Plan, usage, and invoices.</CardDescription>
-            </CardHeader>
-          </Card>
-        </Link>
+          <h2 id="setup-checklist-heading" className="flex items-center gap-2 font-display text-base font-semibold">
+            <ListChecks className="h-5 w-5" aria-hidden="true" />
+            Setup checklist: start taking online orders
+          </h2>
+          <ul className="mt-2 space-y-1">
+            {checklist.map((item) => (
+              <li key={item.id}>
+                <Link
+                  href={item.href}
+                  className="flex min-h-11 items-center justify-between gap-3 rounded-md px-2 text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span className="flex items-center gap-2">
+                    <CircleDashed className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    {item.text}
+                  </span>
+                  <span className="sr-only">{item.linkText}</span>
+                  <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
 
-        <Card id="storefront" className="h-full sm:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-display text-lg">Public storefront</CardTitle>
-            <CardDescription>
-              Share your menu as a web page customers can open from a QR or a WhatsApp link.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <StorefrontClient
-              slug={vendor?.slug ?? ""}
-              initialPublished={settings?.publishStorefront ?? false}
-              hasUpiId={Boolean(vendor?.upiId)}
-              availableItemCount={availableItemCount}
-            />
-          </CardContent>
-        </Card>
-
-        <Card id="menu-orders" className="h-full sm:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-display text-lg">Order from menu</CardTitle>
-            <CardDescription>
-              Let customers order your everyday menu from your storefront, any time. No Drop needed.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <MenuOrdersClient
-              slug={vendor?.slug ?? ""}
-              initialAcceptMenuOrders={settings?.acceptMenuOrders ?? false}
-              initialFulfilmentMode={settings?.menuFulfilmentMode ?? "PICKUP"}
-              initialDeliveryFeePaise={settings?.menuDeliveryFeePaise ?? 0}
-              initialPickupNote={settings?.menuPickupNote ?? null}
-              isOwner={isOwner}
-            />
-          </CardContent>
-        </Card>
-
-        <Card id="pre-orders" className="h-full sm:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-display text-lg">Pre-orders (Drops)</CardTitle>
-            <CardDescription>
-              How customers pay for pre-orders, and the food licence shown on your storefront.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <HomeKitchenClient
-              initialFssaiNumber={settings?.fssaiNumber ?? null}
-              initialAcceptPayOnDelivery={settings?.acceptPayOnDelivery ?? true}
-              hasUpiId={Boolean(vendor?.upiId)}
-            />
-          </CardContent>
-        </Card>
-
-        <Card id="online-payments" className="h-full sm:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-display text-lg">Online payments (Razorpay)</CardTitle>
-            <CardDescription>
-              Let customers pay online for pre-orders, into your own Razorpay account.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <RazorpayKeysClient
-              initialConfigured={razorpayConfigured}
-              initialKeyIdLast4={razorpayKeyIdLast4}
-              webhookUrl={isOwner ? vendorWebhookUrl(vendorId) : ""}
-              planEligible={PLAN_LIMITS[vendorPlan].razorpayLinks}
-              encryptionConfigured={isSecretBoxConfigured()}
-              isOwner={isOwner}
-            />
-          </CardContent>
-        </Card>
-
-        <Card className="h-full sm:col-span-2">
-          <CardHeader>
-            <CardTitle className="font-display text-lg">Voice & language</CardTitle>
-            <CardDescription>
-              Pick the language your counter staff will speak when using the POS mic.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <VoiceLanguageClient initialVoiceLang={settings?.voiceLang ?? "en-IN"} />
-          </CardContent>
-        </Card>
-      </main>
-    </div>
+      <nav aria-label="Settings sections">
+        <ul className="divide-y divide-border overflow-hidden rounded-lg border bg-card">
+          {SETTINGS_SECTIONS.map((section) => {
+            const Icon = section.icon;
+            return (
+              <li key={section.id}>
+                <Link
+                  href={section.href}
+                  className="flex min-h-14 items-center gap-3 px-4 py-3 ring-inset transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                    <Icon className="h-5 w-5" aria-hidden="true" />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold text-foreground">{section.title}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{section.description}</span>
+                    <span className="mt-0.5 block text-sm text-muted-foreground">
+                      <StatusLine status={statuses[section.id]} />
+                    </span>
+                  </span>
+                  <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
+    </>
   );
 }

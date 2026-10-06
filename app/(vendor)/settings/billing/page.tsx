@@ -1,11 +1,15 @@
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
 import { BillingManageClient } from "@/components/billing/BillingManageClient";
+import { SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { PLAN_LIMITS } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = { title: "Plan & billing · Settings · AwaazOS" };
 
 function startOfCalendarMonthKolkata(): Date {
   const now = new Date();
@@ -45,14 +49,10 @@ export default async function BillingSettingsPage() {
     const usageLabel = cap === null ? `${txnCount} / Unlimited` : `${txnCount} / ${cap}`;
 
     return (
-      <div className="min-h-screen bg-background p-4 pb-10 md:p-6">
-        <div className="mx-auto max-w-2xl space-y-8">
-          <header>
-            <h1 className="font-display text-2xl font-semibold">Billing</h1>
-            <p className="text-sm text-muted-foreground">Manage your AwaazOS subscription.</p>
-          </header>
-
-          <section className="rounded-lg border bg-card p-6 shadow-sm">
+      <>
+        <SettingsPageHeader title="Plan & billing" description="Manage your AwaazOS subscription." />
+        <div className="space-y-4">
+          <section className="rounded-lg border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="font-medium">Current plan</h2>
             <p className="mt-2 text-2xl font-semibold">{limits.label}</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -60,7 +60,7 @@ export default async function BillingSettingsPage() {
             </p>
           </section>
 
-          <section className="rounded-lg border bg-card p-6 shadow-sm">
+          <section className="rounded-lg border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="font-medium">Usage this month (IST)</h2>
             <p className="mt-2 text-lg font-semibold tabular-nums">{usageLabel} bills</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -68,14 +68,14 @@ export default async function BillingSettingsPage() {
             </p>
           </section>
 
-          <section className="rounded-lg border bg-card p-6 shadow-sm">
+          <section className="rounded-lg border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="font-medium">Invoices</h2>
             <p className="mt-2 text-sm text-muted-foreground">
               Invoice PDFs and history live in your Razorpay merchant dashboard for the linked account.
             </p>
           </section>
 
-          <section className="rounded-lg border bg-card p-6 shadow-sm">
+          <section className="rounded-lg border bg-card p-4 shadow-sm sm:p-6">
             <h2 className="mb-4 font-medium">Actions</h2>
             <BillingManageClient
               currentPlan={vendor.plan}
@@ -83,11 +83,12 @@ export default async function BillingSettingsPage() {
             />
           </section>
         </div>
-      </div>
+      </>
     );
   } catch (e) {
     if (e instanceof AuthError) {
-      redirect("/sign-in");
+      // Billing is owner-only; other staff go back to the Settings overview.
+      redirect(e.status === 403 ? "/settings" : "/sign-in");
     }
     throw e;
   }

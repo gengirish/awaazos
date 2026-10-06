@@ -35,13 +35,13 @@ const MAX_FEE_PAISE = 100_000;
 const BLOCKER_COPY: Record<MenuOrdersBlocker, { text: string; href: string; link: string }> = {
   storefront_not_published: {
     text: "Publish your storefront first, so customers have a page to order from.",
-    href: "#storefront",
-    link: "Go to Public storefront",
+    href: "/settings/store",
+    link: "Go to Online store",
   },
   no_payment_method: {
     text: "Customers need a way to pay. Add your UPI ID, or allow pay on delivery.",
-    href: "#pre-orders",
-    link: "Go to pay on delivery",
+    href: "/settings/payments",
+    link: "Go to Payments",
   },
 };
 
@@ -192,12 +192,12 @@ export function MenuOrdersClient({
           className="rounded-md border border-amber-500/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
         >
           <p>{blockerCopy.text}</p>
-          <a
+          <Link
             href={blockerCopy.href}
             className="mt-1 inline-flex min-h-11 items-center font-medium underline underline-offset-4"
           >
             {blockerCopy.link}
-          </a>
+          </Link>
         </div>
       )}
 

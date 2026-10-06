@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { ALLOWED_VOICE_LANGS, STALL_TYPES, VOICE_LANGUAGES } from "@/lib/constants";
 import { rupeesToPaise } from "@/lib/currency";
-import { buildQrUrl, buildUpiDeepLink } from "@/lib/upi";
+import { buildQrUrl, buildUpiDeepLink, isValidUpiId, UPI_ID_FORMAT_MESSAGE } from "@/lib/upi";
 import type { StallType, Vendor, VendorSettings } from "@prisma/client";
 
 type VendorPayload = Vendor & { settings: VendorSettings | null };
@@ -114,6 +114,7 @@ export default function OnboardingPage() {
     }
     if (step === 2) {
       if (!upiId.trim()) return "UPI ID is required.";
+      if (!isValidUpiId(upiId)) return UPI_ID_FORMAT_MESSAGE;
       if (!upiName.trim()) return "UPI display name is required.";
     }
     if (step === 3) {

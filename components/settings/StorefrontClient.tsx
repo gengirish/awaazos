@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState, useTransition } from "react";
 import { Check, Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
@@ -84,19 +85,24 @@ export function StorefrontClient({
           aria-checked={published}
           onClick={() => toggle(!published)}
           disabled={pending}
-          className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border-2 border-transparent transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 ${
-            published ? "bg-primary" : "bg-input"
-          }`}
+          className="inline-flex min-h-11 min-w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span className="sr-only">
             {published ? "Unpublish storefront" : "Publish storefront"}
           </span>
+          {/* 44px tap target around the 28px visual track. */}
           <span
             aria-hidden="true"
-            className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform ${
-              published ? "translate-x-6" : "translate-x-1"
+            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
+              published ? "bg-primary" : "bg-input"
             }`}
-          />
+          >
+            <span
+              className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform motion-reduce:transition-none ${
+                published ? "translate-x-6" : "translate-x-1"
+              }`}
+            />
+          </span>
         </button>
       </div>
 
@@ -138,8 +144,11 @@ export function StorefrontClient({
 
       {published && !hasUpiId ? (
         <p className="text-xs text-amber-600">
-          No UPI ID saved, so the page shows the menu without a payment QR. Add one during
-          onboarding or in your stall profile.
+          No UPI ID saved, so the page shows the menu without a payment QR.{" "}
+          <Link href="/settings/payments" className="font-medium underline underline-offset-4">
+            Add your UPI ID in Payments
+          </Link>
+          .
         </p>
       ) : null}
     </div>

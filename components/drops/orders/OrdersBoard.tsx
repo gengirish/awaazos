@@ -348,7 +348,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
       ? source.kind === "menu"
         ? source.acceptMenuOrders
           ? "No online orders yet. Share your store link on WhatsApp to get the first one."
-          : "No online orders. Turn on “Order from menu” in Settings to start taking them."
+          : "No online orders. Turn on “Order from menu” in Settings → Online orders to start taking them."
         : effective === "OPEN"
           ? "No orders yet. Share your drop on WhatsApp to get the first one."
           : "No orders on this drop."
@@ -607,7 +607,7 @@ function MenuHeader({
               My store
             </a>
           )}
-          <Link href="/settings#menu-orders" className={LINK_BTN}>
+          <Link href="/settings/orders" className={LINK_BTN}>
             <Settings className="h-4 w-4" aria-hidden />
             Settings
           </Link>

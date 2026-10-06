@@ -71,14 +71,14 @@ function conflictMessage(body: ApiError, fallback: string): string {
 function ConflictFix({ code }: { code: string | null }) {
   if (code === "storefront_not_published") {
     return (
-      <Link href="/settings#storefront" className="font-semibold underline underline-offset-2">
-        Open Settings to publish your storefront
+      <Link href="/settings/store" className="font-semibold underline underline-offset-2">
+        Open Online store settings to publish it
       </Link>
     );
   }
   if (code === "no_payment_method") {
     return (
-      <Link href="/settings#pre-orders" className="font-semibold underline underline-offset-2">
+      <Link href="/settings/payments" className="font-semibold underline underline-offset-2">
         Open payment settings
       </Link>
     );

@@ -166,7 +166,7 @@ test.describe("public storefront", () => {
     const slug = await vendorSlug(page);
     await createMenuItem(page, { name: "Misal Pav", priceInRupees: 60 });
 
-    await page.goto("/settings");
+    await page.goto("/settings/store");
     const toggle = page.getByRole("switch", { name: /publish/i });
     await expect(toggle).toBeVisible();
     await expect(toggle).toHaveAttribute("aria-checked", "false");
@@ -198,6 +198,8 @@ test.describe("public storefront", () => {
     await page.getByRole("link", { name: "Settings" }).click();
 
     await expect(page).toHaveURL(/\/settings$/);
+    await page.getByRole("link", { name: /Online store/ }).first().click();
+    await expect(page).toHaveURL(/\/settings\/store$/);
     await expect(page.getByRole("switch", { name: /publish/i })).toBeVisible();
   });
 });

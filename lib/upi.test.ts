@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { buildQrUrl, buildUpiCollectLink, buildUpiDeepLink } from "./upi";
+import { buildQrUrl, buildUpiCollectLink, buildUpiDeepLink, isValidUpiId, normalizeUpiId, UPI_ID_PATTERN } from "./upi";
 
 describe("upi", () => {
   it("buildUpiDeepLink encodes UPI params", () => {
@@ -52,5 +52,25 @@ describe("buildUpiCollectLink", () => {
     const qr = buildQrUrl(link, 220);
     expect(qr).toContain("size=220x220");
     expect(decodeURIComponent(qr.split("&data=")[1])).toBe(link);
+  });
+});
+
+describe("UPI ID validation", () => {
+  it("accepts common VPAs and trims whitespace", () => {
+    for (const id of ["shop@okaxis", "ravi.kumar-1@ybl", "9876543210@paytm", "  a_b@oksbi  ", "Shop@OkHdfcBank"]) {
+      expect(isValidUpiId(id), id).toBe(true);
+    }
+    expect(normalizeUpiId("  shop@okaxis ")).toBe("shop@okaxis");
+  });
+
+  it("keeps the case as typed", () => {
+    expect(normalizeUpiId("Shop@OkAxis")).toBe("Shop@OkAxis");
+  });
+
+  it("rejects things that are not a VPA", () => {
+    for (const id of ["", "shop", "@okaxis", "a@okaxis", "shop@", "shop@1bank", "shop@o", "sh op@okaxis", "shop@@okaxis", "shop@ok axis"]) {
+      expect(isValidUpiId(id), id).toBe(false);
+    }
+    expect(UPI_ID_PATTERN.test("shop@okaxis")).toBe(true);
   });
 });

@@ -67,12 +67,13 @@ test.describe("drops: home-kitchen pre-order day", () => {
     await createMenuItem(page, { name: laddu, priceInRupees: 120, category: "Sweets" });
     await createMenuItem(page, { name: chakli, priceInRupees: 80, category: "Snacks" });
 
-    await page.goto("/settings");
+    await page.goto("/settings/store");
     const publish = page.getByRole("switch", { name: /publish/i });
     await expect(publish).toHaveAttribute("aria-checked", "false");
     await publish.click();
     await expect(publish).toHaveAttribute("aria-checked", "true");
 
+    await page.goto("/settings/payments");
     const payOnDelivery = page.getByRole("switch", { name: /pay on delivery/i });
     await expect(payOnDelivery).toBeVisible();
     if ((await payOnDelivery.getAttribute("aria-checked")) !== "true") {
@@ -80,12 +81,19 @@ test.describe("drops: home-kitchen pre-order day", () => {
     }
     await expect(payOnDelivery).toHaveAttribute("aria-checked", "true");
 
-    // UPI ID lives on the vendor profile; settings has no input for it yet.
-    const upi = await page.request.patch("/api/vendor", {
-      data: { upiId: "e2e-kitchen@okaxis", upiName: "E2E Kitchen" },
-      headers: { "Content-Type": "application/json" },
-    });
-    expect(upi.ok(), "saving a UPI ID").toBe(true);
+    // UPI ID through the Payments form: a typo is caught inline, then it saves.
+    const upiId = page.getByLabel("UPI ID", { exact: true });
+    await upiId.fill("e2e-kitchen");
+    await page.getByLabel("Name shown on UPI apps").fill("E2E Kitchen");
+    await page.getByRole("button", { name: "Save UPI details" }).click();
+    await expect(upiId).toHaveAttribute("aria-invalid", "true");
+    await expect(page.getByText(/doesn't look like a UPI ID/)).toBeVisible();
+    await upiId.fill("e2e-kitchen@okaxis");
+    await expect(upiId).not.toHaveAttribute("aria-invalid", "true");
+    await page.getByRole("button", { name: "Save UPI details" }).click();
+    await expect(page.getByRole("status").filter({ hasText: /^Saved$/ })).toBeVisible();
+    await page.reload();
+    await expect(page.getByLabel("UPI ID", { exact: true })).toHaveValue("e2e-kitchen@okaxis");
 
     // ── Vendor: build the drop ─────────────────────────────────────────
     await page.goto("/drops/new");
