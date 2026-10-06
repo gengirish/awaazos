@@ -8,6 +8,7 @@ import { toast } from "sonner";
 
 import { OrderCard } from "@/components/drops/orders/OrderCard";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
+import { PushAlertsButton } from "@/components/push/PushAlertsButton";
 import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/currency";
 import type { EffectiveDropStatus } from "@/lib/drops";
@@ -41,6 +42,26 @@ const SIGNAL_POLL_MS = 20_000;
 /** No KV: refetch orders directly, but slowly and only while OPEN + visible. */
 const FALLBACK_POLL_MS = 60_000;
 const MAX_TIMEOUT_MS = 2_147_483_647;
+/** Coming back to the tab (e.g. tapping a push alert) refetches at most this often. */
+const VISIBLE_REFETCH_MIN_MS = 30_000;
+/** Per-device Sound choice. Audio still needs a tap to unlock after a reload. */
+const SOUND_PREF_KEY = "awz_board_sound_v1";
+
+function readSoundPref(): boolean {
+  try {
+    return window.localStorage.getItem(SOUND_PREF_KEY) === "on";
+  } catch {
+    return false;
+  }
+}
+
+function writeSoundPref(on: boolean): void {
+  try {
+    window.localStorage.setItem(SOUND_PREF_KEY, on ? "on" : "off");
+  } catch {
+    // Blocked storage: the choice just isn't remembered.
+  }
+}
 
 /**
  * Which orders the board shows: one Drop's pre-orders (cut-off, prep sheet,
@@ -117,6 +138,10 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
   const [newIds, setNewIds] = useState<Set<string>>(() => new Set());
   const [announcement, setAnnouncement] = useState("");
   const [soundOn, setSoundOn] = useState(false);
+  /** Saved choice was "on" but audio is still locked until the first tap. */
+  const [soundPending, setSoundPending] = useState(false);
+  /** Last successful check for new orders (orders fetch or signal check). Set after mount. */
+  const [lastChecked, setLastChecked] = useState<Date | null>(null);
   const [now, setNow] = useState(() => new Date());
   /** null = KV unavailable → fallback mode. */
   const [signalMode, setSignalMode] = useState<"kv" | "fallback">(initialSignal === null ? "fallback" : "kv");
@@ -128,6 +153,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
   const soundRef = useRef(soundOn);
   soundRef.current = soundOn;
   const inFlight = useRef(false);
+  const lastVisibleRefetch = useRef(0);
 
   // A page never switches source, so these strings are stable for its lifetime.
   const { orders: ordersUrl, signal: signalUrl, actionBase } = boardUrls(source);
@@ -162,6 +188,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
       setOrders(body.data);
       if (body.drop) setDrop(body.drop);
       setNow(new Date());
+      setLastChecked(new Date());
     } catch {
       if (opts?.manual) toast.error("Could not refresh orders. Check your internet.");
     } finally {
@@ -224,6 +251,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
           return;
         }
         if (signal !== signalRef.current) await refresh();
+        else setLastChecked(new Date());
       } catch {
         // Offline for a moment; next tick retries.
       }
@@ -241,23 +269,69 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
     };
   }, [pollKind, signalUrl, signalPollMs, fallbackPollMs, refresh]);
 
-  const toggleSound = () => {
-    if (!soundOn) {
-      // Created inside a tap, so mobile browsers allow it to play later.
-      try {
-        if (!audioRef.current) {
-          const Ctor =
-            window.AudioContext ??
-            (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
-          audioRef.current = Ctor ? new Ctor() : null;
-        }
-        void audioRef.current?.resume();
-        beep(audioRef.current);
-      } catch {
-        audioRef.current = null;
+  // The server-rendered orders were just fetched; start the clock on mount
+  // (not during render) so server and client markup match.
+  useEffect(() => {
+    setLastChecked(new Date());
+    lastVisibleRefetch.current = Date.now();
+  }, []);
+
+  // Returning to the tab (unlocking the phone, tapping a push alert) refetches
+  // once, at most every 30 s. Event-driven, not polling: nothing runs while the
+  // tab stays hidden, so it never keeps Neon awake.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== "visible") return;
+      const t = Date.now();
+      if (t - lastVisibleRefetch.current < VISIBLE_REFETCH_MIN_MS) return;
+      lastVisibleRefetch.current = t;
+      void refresh();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [refresh]);
+
+  // Created inside a tap, so mobile browsers allow it to play later.
+  const unlockAudio = useCallback((withBeep: boolean) => {
+    try {
+      if (!audioRef.current) {
+        const Ctor =
+          window.AudioContext ??
+          (window as unknown as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+        audioRef.current = Ctor ? new Ctor() : null;
       }
+      void audioRef.current?.resume();
+      if (withBeep) beep(audioRef.current);
+    } catch {
+      audioRef.current = null;
     }
-    setSoundOn((s) => !s);
+  }, []);
+
+  // Restore the per-device Sound choice. Browsers block audio until a tap, so a
+  // saved "on" waits for the first tap anywhere on the page.
+  useEffect(() => {
+    if (readSoundPref()) setSoundPending(true);
+  }, []);
+
+  useEffect(() => {
+    if (!soundPending) return;
+    const onTap = (e: Event) => {
+      // The Sound button handles its own tap.
+      if (e.target instanceof Element && e.target.closest("[data-sound-toggle]")) return;
+      unlockAudio(false);
+      setSoundOn(true);
+      setSoundPending(false);
+    };
+    document.addEventListener("click", onTap, true);
+    return () => document.removeEventListener("click", onTap, true);
+  }, [soundPending, unlockAudio]);
+
+  const toggleSound = () => {
+    const turnOn = soundPending || !soundOn;
+    if (turnOn) unlockAudio(true);
+    setSoundPending(false);
+    setSoundOn(turnOn);
+    writeSoundPref(turnOn);
   };
 
   const runAction = async (orderId: string, action: OrderAction) => {
@@ -322,16 +396,21 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
         )}
         Refresh
       </Button>
+      {lastChecked && (
+        <span className="text-xs text-muted-foreground">Last checked {formatIstTime(lastChecked)}</span>
+      )}
       <Button
         type="button"
         variant="outline"
         className="min-h-11"
         onClick={toggleSound}
         aria-pressed={soundOn}
+        data-sound-toggle
       >
-        {soundOn ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />}
-        {soundOn ? "Sound on" : "Sound off"}
+        {soundOn || soundPending ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />}
+        {soundOn ? "Sound on" : soundPending ? "Sound on — tap to enable" : "Sound off"}
       </Button>
+      <PushAlertsButton variant="board" />
     </>
   );
 

@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Baloo_2, Nunito } from "next/font/google";
 import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
 import { Toaster } from "@/components/ui/sonner";
@@ -20,6 +20,13 @@ const nunito = Nunito({
 export const metadata: Metadata = {
   title: "AwaazOS — Bol. Bill. Becho.",
   description: "Voice-first POS and UPI billing for Indian vendors.",
+  // iPhone: Home Screen install is what unlocks web push (iOS 16.4+).
+  appleWebApp: { capable: true, title: "AwaazOS", statusBarStyle: "default" },
+  icons: { apple: "/apple-touch-icon.png" },
+};
+
+export const viewport: Viewport = {
+  themeColor: "#FF6600",
 };
 
 export default function RootLayout({

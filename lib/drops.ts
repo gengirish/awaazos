@@ -42,6 +42,7 @@ import { PLAN_LIMITS } from "@/lib/constants";
 import { sumPaise } from "@/lib/currency";
 import { bumpDropOrderSignal } from "@/lib/drops-signal";
 import { prisma } from "@/lib/prisma";
+import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -398,8 +399,18 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
       } satisfies PlacedOrder;
     });
 
-    // Fire-and-forget: lets the vendor's board notice without polling Postgres.
+    // Fire-and-forget: lets the vendor's board notice without polling Postgres,
+    // and pushes an alert to opted-in staff phones (lib/push.ts).
     void bumpDropOrderSignal(vendorId, input.dropId);
+    notifyVendorInBackground(
+      vendorId,
+      newOrderPayload({
+        billNumber: order.billNumber,
+        totalPaise: order.totalPaise,
+        itemCount: lines.reduce((n, l) => n + l.qty, 0),
+        dropId: input.dropId,
+      }),
+    );
     return { ok: true, order };
   } catch (err) {
     if (err instanceof OrderRejected) return { ok: false, error: err.error };

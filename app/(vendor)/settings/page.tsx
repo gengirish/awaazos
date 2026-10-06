@@ -5,7 +5,10 @@ import Link from "next/link";
 import { LegacyAnchorRedirect } from "@/components/settings/LegacyAnchorRedirect";
 import { SETTINGS_SECTIONS, type SettingsSectionId } from "@/components/settings/sections";
 import { prisma } from "@/lib/prisma";
+import { isPushConfigured } from "@/lib/push";
+import { countVendorPushDevices } from "@/lib/push-devices";
 import {
+  notificationsStatus,
   ordersStatus,
   paymentsStatus,
   planStatus,
@@ -61,7 +64,8 @@ function StatusLine({ status }: { status: SectionStatus }) {
 export default async function SettingsHubPage() {
   const { vendor } = await requireSettingsContext();
 
-  const [settings, availableItemCount] = await Promise.all([
+  const pushConfigured = isPushConfigured();
+  const [settings, availableItemCount, pushDeviceCount] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: vendor.id },
       select: {
@@ -77,6 +81,7 @@ export default async function SettingsHubPage() {
       },
     }),
     prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
+    pushConfigured ? countVendorPushDevices(vendor.id) : Promise.resolve(0),
   ]);
 
   const snapshot: SettingsSnapshot = {
@@ -90,12 +95,15 @@ export default async function SettingsHubPage() {
     voiceLang: settings?.voiceLang ?? "en-IN",
     plan: vendor.plan,
     availableItemCount,
+    pushConfigured,
+    pushDeviceCount,
   };
 
   const statuses: Record<SettingsSectionId, SectionStatus> = {
     store: storeStatus(snapshot),
     orders: ordersStatus(snapshot),
     payments: paymentsStatus(snapshot),
+    notifications: notificationsStatus(snapshot),
     voice: voiceStatus(snapshot),
     billing: planStatus(snapshot),
   };
@@ -153,7 +161,7 @@ export default async function SettingsHubPage() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block font-semibold text-foreground">{section.title}</span>
-                    <span className="block truncate text-xs text-muted-foreground">{section.description}</span>
+                    <span className="hidden truncate text-xs text-muted-foreground sm:block">{section.description}</span>
                     <span className="mt-0.5 block text-sm text-muted-foreground">
                       <StatusLine status={statuses[section.id]} />
                     </span>

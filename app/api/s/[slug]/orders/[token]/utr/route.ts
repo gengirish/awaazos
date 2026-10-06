@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 
 import { PENDING_HOLD_MINUTES } from "@/lib/drops";
 import { prisma } from "@/lib/prisma";
+import { notifyVendorInBackground, paymentSubmittedPayload } from "@/lib/push";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
 import { utrSubmitSchema } from "@/lib/zod-drops";
 
@@ -51,7 +52,7 @@ export async function POST(req: Request, { params }: { params: { slug: string; t
           settings: { is: { publishStorefront: true } },
         },
       },
-      select: { id: true, vendorId: true },
+      select: { id: true, vendorId: true, billNumber: true, totalPaise: true, dropId: true },
     });
     if (!order) return NextResponse.json({ error: "Not found" }, { status: 404 });
 
@@ -78,6 +79,12 @@ export async function POST(req: Request, { params }: { params: { slug: string; t
     if (res.count === 0) {
       return NextResponse.json({ error: "not_awaiting_payment" }, { status: 409 });
     }
+
+    // Tell the vendor's phones there's a payment to match (no buyer PII, no UTR).
+    notifyVendorInBackground(
+      order.vendorId,
+      paymentSubmittedPayload({ billNumber: order.billNumber, totalPaise: order.totalPaise, dropId: order.dropId }),
+    );
 
     return NextResponse.json({ success: true });
   } catch (err) {

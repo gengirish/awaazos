@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   LEGACY_SETTINGS_ANCHORS,
+  notificationsStatus,
   ordersStatus,
   paymentsStatus,
   planStatus,
@@ -55,6 +56,13 @@ describe("settings hub status lines", () => {
     expect(voiceLanguageLabel("te-IN")).toBe("Telugu");
     expect(voiceLanguageLabel("xx")).toBe("English");
     expect(voiceStatus({ voiceLang: "hi-IN" }).text).toBe("हिन्दी (Hindi)");
+  });
+
+  it("notifications: not set up without VAPID, off with no devices, device count when on", () => {
+    expect(notificationsStatus({ pushConfigured: false, pushDeviceCount: 3 })).toEqual({ text: "Not set up", on: false });
+    expect(notificationsStatus({ pushConfigured: true, pushDeviceCount: 0 })).toEqual({ text: "Off", on: false });
+    expect(notificationsStatus({ pushConfigured: true, pushDeviceCount: 1 })).toEqual({ text: "On · 1 device", on: true });
+    expect(notificationsStatus({ pushConfigured: true, pushDeviceCount: 4 }).text).toBe("On · 4 devices");
   });
 
   it("plan: uses the plan label", () => {

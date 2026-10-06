@@ -28,6 +28,7 @@ import {
 } from "@/lib/drops";
 import { bumpDropOrderSignal } from "@/lib/drops-signal";
 import { prisma } from "@/lib/prisma";
+import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
 
 /** Signal-key stand-in for the vendor's menu-orders board (no drop id). */
 export const MENU_ORDERS_SIGNAL_ID = "menu";
@@ -182,6 +183,15 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
     });
 
     void bumpDropOrderSignal(vendorId, MENU_ORDERS_SIGNAL_ID);
+    notifyVendorInBackground(
+      vendorId,
+      newOrderPayload({
+        billNumber: order.billNumber,
+        totalPaise: order.totalPaise,
+        itemCount: lines.reduce((n, l) => n + l.qty, 0),
+        dropId: null,
+      }),
+    );
     return { ok: true, order };
   } catch (err) {
     if (err instanceof MenuOrderRejected) return { ok: false, error: err.error };

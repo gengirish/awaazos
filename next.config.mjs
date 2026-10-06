@@ -12,6 +12,9 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://api.qrserver.com https://*.razorpay.com https://*.public.blob.vercel-storage.com",
   "font-src 'self' data:",
+  // Push service worker (/sw.js) and the web app manifest — same origin only.
+  "worker-src 'self'",
+  "manifest-src 'self'",
   "connect-src 'self' https://api.anthropic.com https://api.sarvam.ai https://api.razorpay.com https://*.razorpay.com https://api.gupshup.io https://*.sentry.io",
   "frame-src https://api.razorpay.com https://*.razorpay.com",
   "frame-ancestors 'none'",
@@ -68,6 +71,16 @@ const nextConfig = {
         // isolation for everything else. Later entries override earlier ones.
         source: "/s/:slug/o/:token",
         headers: [{ key: "Cross-Origin-Opener-Policy", value: "same-origin-allow-popups" }],
+      },
+      {
+        // Push service worker: always revalidate so a fix ships on the next
+        // page load (browsers also cap SW caching at 24 h, but be explicit).
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+          { key: "Service-Worker-Allowed", value: "/" },
+          { key: "Content-Type", value: "application/javascript; charset=utf-8" },
+        ],
       },
     ];
   },

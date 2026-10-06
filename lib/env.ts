@@ -31,6 +31,10 @@ const envSchema = z.object({
   // AES-256-GCM key for vendors' own Razorpay credentials (lib/secret-box.ts).
   // Length is validated lazily there, so a bad value can't block boot.
   PAYMENT_KEYS_ENCRYPTION_KEY: z.string().optional(),
+  // Web Push (lib/push.ts). Generate once: `npx web-push generate-vapid-keys`.
+  NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_SUBJECT: z.string().optional(), // "mailto:ops@example.com"
   AGENTMAIL_API_KEY: z.string().optional(),
   AGENTMAIL_INBOX_ID: z.string().optional(),
   GUPSHUP_API_KEY: z.string().optional(),

@@ -1,8 +1,19 @@
 import type { NextAuthConfig } from "next-auth";
 import type { UserRole } from "@prisma/client";
 
+/** PWA files fetched by the browser without a session (also excluded in the middleware matcher). */
+const PUBLIC_PWA_FILES = new Set([
+  "/sw.js",
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png",
+  "/badge-72.png",
+]);
+
 function isPublicPath(pathname: string): boolean {
   if (pathname === "/") return true;
+  if (PUBLIC_PWA_FILES.has(pathname)) return true;
   if (pathname === "/sign-in" || pathname.startsWith("/sign-in/")) return true;
   if (pathname === "/sign-up" || pathname.startsWith("/sign-up/")) return true;
   if (pathname === "/forgot-password" || pathname.startsWith("/forgot-password/")) return true;

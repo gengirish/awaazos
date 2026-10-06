@@ -33,15 +33,16 @@ model Vendor {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  menuItems      MenuItem[]
-  transactions   Transaction[]
-  receipts       Receipt[]
-  staff          StaffMember[]
-  settings       VendorSettings?
-  dailySummaries DailySummary[]
-  billSequences  BillSequence[]
-  voiceParseLogs VoiceParseLog[]
-  drops          Drop[]
+  menuItems         MenuItem[]
+  transactions      Transaction[]
+  receipts          Receipt[]
+  staff             StaffMember[]
+  settings          VendorSettings?
+  dailySummaries    DailySummary[]
+  billSequences     BillSequence[]
+  voiceParseLogs    VoiceParseLog[]
+  drops             Drop[]
+  pushSubscriptions PushSubscription[]
 
   @@index([slug])
   @@map("vendors")
@@ -213,6 +214,31 @@ model CustomerSession {
   @@map("customer_sessions")
 }
 
+// ─── WEB PUSH (vendor new-order alerts) ───────────────────────────
+//
+// One row per browser/device a staff member opted in on, per vendor. Sent to
+// from lib/push.ts when a storefront order lands — event-driven, never polled.
+// A 404/410 from the push service deletes the row (no cleanup job).
+
+model PushSubscription {
+  id            String    @id @default(cuid())
+  vendorId      String
+  vendor        Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint      String    @unique // Push service URL — treat as a secret, never log
+  p256dh        String
+  auth          String
+  label         String? // "Chrome on Android" — shown in settings
+  createdAt     DateTime  @default(now())
+  lastSuccessAt DateTime?
+  failureCount  Int       @default(0)
+
+  @@index([vendorId])
+  @@index([userId])
+  @@map("push_subscriptions")
+}
+
 // ─── TRANSACTION ────────────────────────────────────────────────────
 
 model Transaction {
@@ -356,6 +382,7 @@ model User {
   accounts            Account[]
   sessions            Session[]
   staffMemberships    StaffMember[]
+  pushSubscriptions   PushSubscription[]
   passwordResetTokens PasswordResetToken[]
 
   @@index([email])

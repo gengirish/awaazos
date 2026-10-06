@@ -182,6 +182,13 @@ not use it.
 
 ### 3.6 Real new-order alerts for vendors
 
+**Web Push implemented on `feat/web-push`** (option 1 below, plus the small wins): `lib/push.ts`,
+`public/sw.js`, `app/manifest.ts`, `/api/push/**`, Settings → Notifications, "Get alerts on this
+phone" on both boards. Still unverified: **real delivery on devices** — Android Chrome with the screen
+locked, and an iPhone (iOS 16.4+) with AwaazOS added to the Home Screen. Headless CI can't reach a
+push service. Known gap: the button trusts this browser's subscription, so a row removed from another
+device leaves it saying "on" until toggled. The original analysis follows.
+
 Today the only alert is the orders board's **Sound** toggle (`components/drops/orders/OrdersBoard.tsx`,
 `beep()`): a Web Audio beep when the board's own poll finds new orders. Its limits:
 

@@ -19,6 +19,10 @@ export type SettingsSnapshot = {
   voiceLang: string;
   plan: Plan;
   availableItemCount: number;
+  /** VAPID keys present on this deployment (lib/push.ts isPushConfigured). */
+  pushConfigured: boolean;
+  /** Opted-in alert devices across the vendor's active staff. */
+  pushDeviceCount: number;
 };
 
 /** One on/off fact inside a status line, e.g. "UPI" on. */
@@ -86,6 +90,14 @@ export function voiceStatus(s: Pick<SettingsSnapshot, "voiceLang">): SectionStat
 
 export function planStatus(s: Pick<SettingsSnapshot, "plan">): SectionStatus {
   return { text: `${PLAN_LIMITS[s.plan].label} plan`, on: true };
+}
+
+export function notificationsStatus(
+  s: Pick<SettingsSnapshot, "pushConfigured" | "pushDeviceCount">,
+): SectionStatus {
+  if (!s.pushConfigured) return { text: "Not set up", on: false };
+  if (s.pushDeviceCount <= 0) return { text: "Off", on: false };
+  return { text: `On · ${s.pushDeviceCount} ${s.pushDeviceCount === 1 ? "device" : "devices"}`, on: true };
 }
 
 export type ChecklistItemId = "menu_items" | "publish_store" | "payment_method";

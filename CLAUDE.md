@@ -221,6 +221,14 @@ Orders board freshness: order placement and board actions bump a vendor-scoped U
 while visible and while the drop accepts orders, and refetches from Postgres only when it moves;
 no KV → 60 s direct refresh. See TODO.md — the signal route's auth check still hits Postgres.
 
+**Web Push alerts** (`lib/push.ts`): new storefront orders and submitted UPI references push to the
+vendor's opted-in staff devices (`PushSubscription`, one row per device). Event-driven only — never
+add a timer. `notifyVendorInBackground` wraps the send in `waitUntil` so it never blocks a buyer.
+Payloads carry bill number, amount and item count only — **no buyer name, phone or address** (lock
+screens are public). 404/410 from the push service deletes the row. Feature-gated on
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`. `public/sw.js`, the manifest
+and the icons are excluded from middleware; iPhones need the site added to the Home Screen.
+
 **Order from menu** (`lib/menu-orders.ts`, opt-in `VendorSettings.acceptMenuOrders`): buyers order
 everyday `MenuItem`s with no drop — same STOREFRONT transaction with `dropId = null`, same payment
 paths and plan-cap rule, but no cut-off, no stock caps and no row lock (only `isAvailable` items).
