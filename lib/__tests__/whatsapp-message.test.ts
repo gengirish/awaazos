@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { formatWhatsAppReceiptMessage, receiptStorefrontUrl } from "@/lib/whatsapp-message";
+import {
+  formatWhatsAppReceiptMessage,
+  receiptStorefrontUrl,
+  receiptWhatsappUrl,
+} from "@/lib/whatsapp-message";
 
 describe("formatWhatsAppReceiptMessage", () => {
   it("includes vendor header, bill line, items, total, and footer", () => {
@@ -99,5 +103,31 @@ describe("receiptStorefrontUrl", () => {
     ).toBeNull();
     expect(receiptStorefrontUrl({ slug: "ammas-kitchen", publishStorefront: true, baseUrl: undefined })).toBeNull();
     expect(receiptStorefrontUrl({ slug: "ammas-kitchen", publishStorefront: true, baseUrl: "  " })).toBeNull();
+  });
+});
+
+describe("receiptWhatsappUrl", () => {
+  it("opens a chat with the customer's number, treating 10 digits as Indian", () => {
+    expect(receiptWhatsappUrl("Bill & total", "98765 43210")).toBe(
+      "https://wa.me/919876543210?text=Bill%20%26%20total",
+    );
+    expect(receiptWhatsappUrl("x", "+91 98765-43210")).toBe("https://wa.me/919876543210?text=x");
+  });
+
+  it("falls back to WhatsApp's chat picker when no number is given", () => {
+    expect(receiptWhatsappUrl("x", "")).toBe("https://wa.me/?text=x");
+    expect(receiptWhatsappUrl("x", null)).toBe("https://wa.me/?text=x");
+    expect(receiptWhatsappUrl("x")).toBe("https://wa.me/?text=x");
+  });
+
+  it("rejects numbers that cannot be valid", () => {
+    expect(receiptWhatsappUrl("x", "12345")).toBeNull();
+    expect(receiptWhatsappUrl("x", "1234567890123456")).toBeNull();
+  });
+
+  it("round-trips a multi-line receipt through the text param", () => {
+    const text = "🧾 *Stall*\nBill: AWZ-1\n*Total: ₹50.00*";
+    const url = receiptWhatsappUrl(text, "9876543210")!;
+    expect(decodeURIComponent(url.split("?text=")[1])).toBe(text);
   });
 });

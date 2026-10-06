@@ -13,7 +13,15 @@ right.
 
 ### 1.1 WhatsApp receipts may never be delivered
 
-**Status:** unverified in production. Read from code, never observed working end to end.
+**Superseded for the POS (2026-10-06):** the POS "Send on WhatsApp" and the transactions
+"Resend" buttons no longer use Gupshup. `GET /api/receipts/message` returns the receipt text and
+the client opens a wa.me link (`receiptWhatsappUrl`) in the vendor's own WhatsApp — the vendor
+taps send. Free on every plan, no Redis, worker or template. The Gupshup path below is kept
+dormant (`/api/receipts/send`, `workers/receipt.worker.ts`, and the post-sale auto-enqueue in
+`POST /api/transactions` when a `customerPhone` is sent). Still to do: pricing/marketing copy and
+`PLAN_LIMITS.whatsappReceipts` still describe receipts as paid-only.
+
+**Status (Gupshup path):** unverified in production. Read from code, never observed working end to end.
 
 The receipt is the third pillar of "speak → UPI QR → WhatsApp receipt" and it appears in the
 pitch, the demo script and the marketing copy. Four independent gates sit in front of a message

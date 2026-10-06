@@ -1,11 +1,9 @@
 "use client";
 
-import { useState } from "react";
-import type { PaymentMethod, PaymentStatus, Plan } from "@prisma/client";
-import { toast } from "sonner";
+import type { PaymentMethod, PaymentStatus } from "@prisma/client";
 
+import { useReceiptText, WhatsAppReceiptButton } from "@/components/receipts/WhatsAppReceipt";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
   Table,
@@ -16,7 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatINR } from "@/lib/currency";
-import { PLAN_LIMITS } from "@/lib/constants";
+import { receiptWhatsappUrl } from "@/lib/whatsapp-message";
 
 export type TransactionDetailModel = {
   id: string;
@@ -63,45 +61,14 @@ type Props = {
   onOpenChange: (open: boolean) => void;
   transaction: TransactionDetailModel | null;
   vendorName: string;
-  vendorPlan: Plan;
-  whatsappConfigured: boolean;
 };
 
-export function TransactionDetailDrawer({
-  open,
-  onOpenChange,
-  transaction,
-  vendorName,
-  vendorPlan,
-  whatsappConfigured,
-}: Props) {
-  const [sending, setSending] = useState(false);
-
-  const canWhatsapp =
-    PLAN_LIMITS[vendorPlan].whatsapp && whatsappConfigured && Boolean(transaction?.customerPhone?.trim());
-
-  async function resendWhatsapp() {
-    if (!transaction) return;
-    setSending(true);
-    try {
-      const res = await fetch("/api/receipts/send", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ transactionId: transaction.id }),
-      });
-      const data = (await res.json()) as { queued?: boolean; error?: string; code?: string };
-      if (!res.ok) {
-        throw new Error(data.error ?? "Could not queue receipt");
-      }
-      toast.success("Receipt queued for WhatsApp");
-      onOpenChange(false);
-    } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Failed to queue");
-    } finally {
-      setSending(false);
-    }
-  }
+export function TransactionDetailDrawer({ open, onOpenChange, transaction, vendorName }: Props) {
+  const receiptText = useReceiptText(open, { transactionId: transaction?.id });
+  // A bad stored number shouldn't block the resend — fall back to WhatsApp's chat picker.
+  const waUrl = receiptText
+    ? (receiptWhatsappUrl(receiptText, transaction?.customerPhone) ?? receiptWhatsappUrl(receiptText))
+    : null;
 
   if (!transaction) return null;
 
@@ -197,23 +164,17 @@ export function TransactionDetailDrawer({
             </p>
           ) : null}
 
-          <Button
-            type="button"
-            className="w-full"
-            disabled={!canWhatsapp || sending}
-            title={
-              !PLAN_LIMITS[vendorPlan].whatsapp
-                ? "Upgrade to Starter for WhatsApp receipts"
-                : !whatsappConfigured
-                  ? "Configure WhatsApp number in settings"
-                  : !transaction.customerPhone?.trim()
-                    ? "No customer phone on this bill"
-                    : undefined
-            }
-            onClick={() => void resendWhatsapp()}
-          >
-            {sending ? "Queueing…" : "Resend WhatsApp receipt"}
-          </Button>
+          <WhatsAppReceiptButton
+            url={waUrl}
+            loading={receiptText === undefined}
+            label={transaction.customerPhone?.trim() ? "Resend on WhatsApp" : "Send on WhatsApp"}
+            className="h-11 w-full"
+          />
+          {receiptText === null ? (
+            <p className="text-xs text-muted-foreground" role="status">
+              Couldn&apos;t load the receipt. Close and reopen to try again.
+            </p>
+          ) : null}
         </div>
       </SheetContent>
     </Sheet>

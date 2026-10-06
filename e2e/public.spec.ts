@@ -70,6 +70,7 @@ test.describe("protected API routes refuse unauthenticated", () => {
     "/api/transactions",
     "/api/transactions/export",
     "/api/receipts/send",
+    "/api/receipts/message",
   ]) {
     test(`${path} returns redirect or 401/403`, async ({ request }) => {
       const r = await request.get(path, { maxRedirects: 0, failOnStatusCode: false });

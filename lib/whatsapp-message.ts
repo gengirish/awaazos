@@ -88,3 +88,20 @@ export function formatWhatsAppReceiptMessage(input: ReceiptMessageInput): string
 
   return lines.join("\n");
 }
+
+/**
+ * wa.me link that opens the vendor's own WhatsApp with the receipt pre-filled.
+ * The vendor taps send, so nothing goes through a WhatsApp Business API and no
+ * template or 24h session window applies.
+ *
+ * Blank phone → `wa.me/?text=` (WhatsApp asks which chat). A bare 10-digit
+ * number is treated as Indian. Returns null for a number that can't be valid.
+ */
+export function receiptWhatsappUrl(text: string, phone?: string | null): string | null {
+  const encoded = encodeURIComponent(text);
+  let digits = (phone ?? "").replace(/\D/g, "");
+  if (!digits) return `https://wa.me/?text=${encoded}`;
+  if (digits.length === 10) digits = `91${digits}`;
+  if (digits.length < 11 || digits.length > 15) return null;
+  return `https://wa.me/${digits}?text=${encoded}`;
+}
