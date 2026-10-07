@@ -256,6 +256,27 @@ export function parseStoredCart(raw: string | null, now: number): StoredCart | n
 }
 
 /**
+ * How many fresh, non-empty carts this device still holds for one store, from
+ * localStorage `[key, raw]` entries. The order page uses it to point a buyer
+ * back at a second cart (drop + menu) after placing the first; the placed
+ * order's own cart is cleared before navigation, so it never counts.
+ */
+export function countStoredCarts(
+  entries: readonly (readonly [string, string | null])[],
+  slug: string,
+  now: number,
+): number {
+  const prefix = `awz-cart:${slug}:`;
+  let n = 0;
+  for (const [key, raw] of entries) {
+    if (!key.startsWith(prefix)) continue;
+    const cart = parseStoredCart(raw, now);
+    if (cart && Object.keys(cart.lines).length > 0) n++;
+  }
+  return n;
+}
+
+/**
  * Re-validates a restored cart against what the page offers now. `maxFor`
  * returns the most the buyer may order of an item (stock / per-order limit),
  * or null when the item is gone or unavailable. Lines are dropped at 0 and

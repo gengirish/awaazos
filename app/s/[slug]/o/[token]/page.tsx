@@ -5,6 +5,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
+import { OtherCartsNotice } from "@/components/storefront/OtherCartsNotice";
 import { RazorpayPayButton } from "@/components/storefront/RazorpayPayButton";
 import { UtrForm } from "@/components/storefront/UtrForm";
 import { formatINR, paiseToRupees } from "@/lib/currency";
@@ -351,6 +352,8 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
             </p>
           ) : null}
         </section>
+
+        <OtherCartsNotice slug={slug} vendorName={vendor.name} />
 
         {waLink ? (
           <a

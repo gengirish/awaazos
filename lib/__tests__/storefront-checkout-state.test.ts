@@ -5,6 +5,7 @@ import {
   CHECKOUT_FIELD_MESSAGES,
   MAX_LINE_QTY,
   cartStorageKey,
+  countStoredCarts,
   checkoutErrorsFromIssues,
   checkoutFieldForErrorCode,
   firstInvalidField,
@@ -27,6 +28,37 @@ describe("cartStorageKey", () => {
     expect(cartStorageKey("ammas-kitchen", { kind: "drop", dropId: "d1" })).toBe(
       "awz-cart:ammas-kitchen:drop:d1",
     );
+  });
+});
+
+describe("countStoredCarts", () => {
+  const key = (scope: Parameters<typeof cartStorageKey>[1]) => cartStorageKey("ammas", scope);
+
+  it("counts this store's fresh, non-empty carts only", () => {
+    const entries: [string, string | null][] = [
+      [key({ kind: "menu" }), serializeCart({ a: 1 }, NOW)],
+      [key({ kind: "drop", dropId: "d1" }), serializeCart({ b: 2 }, NOW)],
+      [cartStorageKey("other-stall", { kind: "menu" }), serializeCart({ c: 1 }, NOW)],
+      ["awz:storefront:buyer:v1", '{"name":"x"}'],
+    ];
+    expect(countStoredCarts(entries, "ammas", NOW)).toBe(2);
+  });
+
+  it("ignores expired, empty and malformed carts", () => {
+    const entries: [string, string | null][] = [
+      [key({ kind: "menu" }), serializeCart({ a: 1 }, NOW - CART_TTL_MS - 1)],
+      [key({ kind: "drop", dropId: "d1" }), JSON.stringify({ v: 1, savedAt: NOW, lines: {} })],
+      [key({ kind: "drop", dropId: "d2" }), "{not json"],
+      [key({ kind: "drop", dropId: "d3" }), null],
+    ];
+    expect(countStoredCarts(entries, "ammas", NOW)).toBe(0);
+  });
+
+  it("does not match a store whose slug merely starts the same", () => {
+    const entries: [string, string | null][] = [
+      [cartStorageKey("ammas-kitchen", { kind: "menu" }), serializeCart({ a: 1 }, NOW)],
+    ];
+    expect(countStoredCarts(entries, "ammas", NOW)).toBe(0);
   });
 });
 

@@ -37,8 +37,9 @@ async function addToCart(dropSection: ReturnType<Page["getByRole"]>, itemName: s
 }
 
 /** Fill the checkout sheet as a guest: pickup + pay on delivery. */
-async function checkoutPickupPayOnDelivery(page: Page, dropSection: ReturnType<Page["getByRole"]>) {
-  await dropSection.getByRole("button", { name: "Checkout" }).click();
+async function checkoutPickupPayOnDelivery(page: Page) {
+  // One cart on the page, so the page-level cart bar has a single "Checkout".
+  await page.getByRole("button", { name: "Checkout", exact: true }).click();
   const sheet = page.getByRole("dialog", { name: "Checkout" });
   await expect(sheet).toBeVisible();
   await sheet.getByLabel("Your name").fill("Priya Buyer");
@@ -144,7 +145,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
       await expect(drop.getByText("Only 3 left")).toBeVisible();
 
       await addToCart(drop, laddu, 2);
-      const sheet = await checkoutPickupPayOnDelivery(buyer, drop);
+      const sheet = await checkoutPickupPayOnDelivery(buyer);
       await sheet.getByRole("button", { name: /place order/i }).click();
 
       await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
@@ -170,7 +171,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
       await buyer.goto(`/s/${slug}`);
       await expect(buyer.getByRole("region", { name: dropTitle }).getByText("Only 1 left")).toBeVisible();
 
-      const staleSheet = await checkoutPickupPayOnDelivery(stale, staleDrop);
+      const staleSheet = await checkoutPickupPayOnDelivery(stale);
       await staleSheet.getByRole("button", { name: /place order/i }).click();
       await expect(staleSheet.getByRole("alert")).toContainText(/only 1 left now/i);
       expect(stale.url()).not.toMatch(/\/o\//);
