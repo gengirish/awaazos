@@ -32,7 +32,7 @@ export type VoiceParseLogJobPayload = {
   vendorId: string;
   transcript: string;
   lang: string;
-  sttSource: "webspeech" | "sarvam" | "openai" | "groq" | "nvidia" | "whisper";
+  sttSource: "webspeech" | "sarvam" | "openai" | "groq" | "whisper";
   modelUsed: string;
   latencyMs: number;
   itemCount: number;
@@ -48,7 +48,7 @@ export type SendReceiptJobPayload = {
 };
 
 export type RetentionRunJobPayload = {
-  requestedBy: "cron" | "admin";
+  requestedBy: "admin";
   requestedByUserId?: string;
 };
 

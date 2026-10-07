@@ -24,7 +24,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
   transcript: z.string().min(1),
   lang: z.string().min(1),
-  sttSource: z.enum(["webspeech", "sarvam", "openai", "groq", "nvidia", "whisper"]),
+  sttSource: z.enum(["webspeech", "sarvam", "openai", "groq", "whisper"]),
 });
 
 function wordCount(transcript: string): number {

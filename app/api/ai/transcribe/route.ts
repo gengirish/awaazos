@@ -12,7 +12,6 @@ import {
 } from "@/lib/ai-usage-guard";
 import { getBreaker } from "@/lib/circuit-breaker";
 import { transcribeAudio as transcribeViaSarvam, type SarvamLang } from "@/lib/sarvam";
-import { transcribeAudio as transcribeViaNvidia, type NvidiaLang } from "@/lib/nvidia";
 import {
   transcribeAudio as transcribeViaOpenai,
   type OpenaiSttLang,
@@ -32,11 +31,10 @@ import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type SttSource = "sarvam" | "openai" | "nvidia" | "groq" | "whisper";
+type SttSource = "sarvam" | "openai" | "groq" | "whisper";
 
 const SARVAM_LANGS = ["te-IN", "kn-IN", "ta-IN"] as const satisfies readonly SarvamLang[];
 const FALLBACK_LANGS = ["en-IN", "hi-IN"] as const satisfies readonly (
-  | NvidiaLang
   | OpenaiSttLang
   | WhisperSttLang
 )[];
@@ -45,18 +43,13 @@ function isSarvamLang(s: string): s is SarvamLang {
   return (SARVAM_LANGS as readonly string[]).includes(s);
 }
 
-function isFallbackLang(s: string): s is NvidiaLang & OpenaiSttLang {
+function isFallbackLang(s: string): s is OpenaiSttLang {
   return (FALLBACK_LANGS as readonly string[]).includes(s);
 }
 
 function openaiConfigured(): boolean {
   const key = process.env.OPENAI_API_KEY;
   return typeof key === "string" && key.startsWith("sk-");
-}
-
-function nvidiaConfigured(): boolean {
-  const key = process.env.NVIDIA_API_KEY;
-  return typeof key === "string" && key.startsWith("nvapi-");
 }
 
 function groqConfigured(): boolean {
@@ -68,7 +61,7 @@ function groqConfigured(): boolean {
  * Build the per-language provider cascade.
  *
  * te/kn/ta:    Sarvam → Groq → Whisper (self-hosted)
- * en/hi:       OpenAI → Groq → NVIDIA → Whisper (self-hosted)
+ * en/hi:       OpenAI → Groq → Whisper (self-hosted)
  *
  * Each step is gated by its own circuit breaker. Tripped breakers are skipped
  * with no upstream call so cascades degrade instantly when a provider is hot.
@@ -81,7 +74,6 @@ function buildCascade(lang: string): SttSource[] {
   } else if (isFallbackLang(lang)) {
     if (openaiConfigured()) out.push("openai");
     if (groqConfigured()) out.push("groq");
-    if (nvidiaConfigured()) out.push("nvidia");
   }
   if (whisperSttConfigured()) out.push("whisper");
   return out;
@@ -103,8 +95,6 @@ async function callProvider(
       return transcribeViaOpenai(audio, lang as OpenaiSttLang);
     case "groq":
       return transcribeViaGroq(audio, lang as GroqSttLang);
-    case "nvidia":
-      return transcribeViaNvidia(audio, lang as NvidiaLang);
     case "whisper":
       return transcribeViaWhisper(audio, lang as WhisperSttLang);
   }
@@ -123,11 +113,6 @@ async function reserveQuota(
       return reserveOpenaiSttMinutes({ vendorId, plan, estimatedMinutes });
     case "groq":
       return reserveGroqSttMinutes({ vendorId, plan, estimatedMinutes });
-    case "nvidia":
-      // Legacy path; v0 deliberately does not enforce a per-vendor minute
-      // cap because traffic is gated to the rate limiter only. Add one if
-      // we ever reverse the OpenAI/NVIDIA priority again.
-      return { ok: true };
     case "whisper":
       // Self-hosted; cost is infra, not per-minute API billing.
       return { ok: true };
@@ -146,8 +131,6 @@ async function releaseQuota(
       return releaseOpenaiSttMinutes({ vendorId, estimatedMinutes });
     case "groq":
       return releaseGroqSttMinutes({ vendorId, estimatedMinutes });
-    case "nvidia":
-      return;
     case "whisper":
       return;
   }
@@ -180,7 +163,7 @@ export async function POST(req: NextRequest) {
 
     const cascade = buildCascade(lang);
     if (cascade.length === 0) {
-      const fallbackLangs = openaiConfigured() || nvidiaConfigured() || groqConfigured()
+      const fallbackLangs = openaiConfigured() || groqConfigured()
         ? FALLBACK_LANGS
         : [];
       return NextResponse.json(
@@ -282,24 +265,15 @@ export async function POST(req: NextRequest) {
     );
   } catch (err) {
     if (err instanceof PlanGateError) {
-      const featureBySource: Record<SttSource, string> = {
-        sarvam: "sarvam_stt",
-        openai: "openai_stt",
-        nvidia: "nvidia_stt",
-        groq: "groq_stt",
-        whisper: "whisper_stt",
-      };
+      // requirePlan runs before the cascade, so no provider has been tried
+      // yet; report the feature by language.
       return NextResponse.json(
         {
           error: err.message,
           code: "plan_upgrade_required",
           requiredPlan: err.required,
           currentPlan: err.current,
-          feature: lastSource
-            ? featureBySource[lastSource]
-            : isFallbackLang(lang)
-              ? "openai_stt"
-              : "sarvam_stt",
+          feature: isFallbackLang(lang) ? "openai_stt" : "sarvam_stt",
         },
         { status: err.status },
       );

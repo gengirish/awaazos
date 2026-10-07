@@ -22,7 +22,6 @@ const envSchema = z.object({
   // Feature-gated (validated lazily by their respective integrations)
   ANTHROPIC_API_KEY: z.string().optional(),
   SARVAM_API_KEY: z.string().optional(),
-  NVIDIA_API_KEY: z.string().startsWith("nvapi-").optional(),
   OPENAI_API_KEY: z.string().startsWith("sk-").optional(),
   GROQ_API_KEY: z.string().startsWith("gsk_").optional(),
   RAZORPAY_KEY_ID: z.string().optional(),

@@ -12,7 +12,7 @@ type VoiceOrderState =
   | "success"
   | "error";
 
-type SttSource = "webspeech" | "sarvam" | "openai" | "groq" | "nvidia" | "whisper";
+type SttSource = "webspeech" | "sarvam" | "openai" | "groq" | "whisper";
 
 type ParsedItem = {
   menuItemId: string;
@@ -51,19 +51,14 @@ declare global {
 }
 
 const SARVAM_LANGS = new Set(["te-IN", "kn-IN", "ta-IN"]);
+// en/hi: Web Speech in the browser by default, or the server cascade when
+// VOICE_FALLBACK_ENABLED is on.
 const WEBSPEECH_LANGS = new Set(["en-IN", "hi-IN"]);
-const FALLBACK_LANGS = new Set(["en-IN", "hi-IN"]);
 
 // Build-time public flag. When `true`, hi-IN/en-IN are routed through the
-// MediaRecorder + /api/ai/transcribe path (server picks OpenAI > NVIDIA based
-// on which key is configured) instead of the in-browser Web Speech API.
-// Set on Vercel for A/B testing.
-//
-// Backward compatible: NEXT_PUBLIC_VOICE_NVIDIA_FALLBACK still works for
-// rollouts that haven't been migrated yet.
-const VOICE_FALLBACK_ENABLED =
-  process.env.NEXT_PUBLIC_VOICE_FALLBACK_ENABLED === "true" ||
-  process.env.NEXT_PUBLIC_VOICE_NVIDIA_FALLBACK === "true";
+// MediaRecorder + /api/ai/transcribe path (server cascade: OpenAI → Groq →
+// Whisper) instead of the in-browser Web Speech API. Set on Vercel for A/B testing.
+const VOICE_FALLBACK_ENABLED = process.env.NEXT_PUBLIC_VOICE_FALLBACK_ENABLED === "true";
 
 function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
@@ -175,12 +170,12 @@ export function useVoiceOrder(options: { voiceLang: string }) {
     setConfidence(null);
     setModelUsed(null);
 
-    // Recorder path is used for: Sarvam langs always, NVIDIA langs only when
+    // Recorder path is used for: Sarvam langs always, en/hi only when
     // the public fallback flag is on. Web Speech path is the default for
     // hi-IN/en-IN unless the flag flips it.
     const useRecorder =
       SARVAM_LANGS.has(voiceLang) ||
-      (VOICE_FALLBACK_ENABLED && FALLBACK_LANGS.has(voiceLang));
+      (VOICE_FALLBACK_ENABLED && WEBSPEECH_LANGS.has(voiceLang));
 
     if (!useRecorder && WEBSPEECH_LANGS.has(voiceLang)) {
       const Ctor = window.SpeechRecognition ?? window.webkitSpeechRecognition;
@@ -307,7 +302,6 @@ export function useVoiceOrder(options: { voiceLang: string }) {
               // Server tells us which engine handled the audio; fall back to
               // a sensible default keyed on the lang group if the field is
               // absent (older deploy still in flight, browser cache, etc.).
-              // For fallback langs we now prefer OpenAI; NVIDIA is legacy.
               const reportedSource: SttSource =
                 data.sttSource ?? (SARVAM_LANGS.has(voiceLang) ? "sarvam" : "openai");
               await parseTranscript(transcript, reportedSource);

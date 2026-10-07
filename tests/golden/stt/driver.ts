@@ -6,7 +6,6 @@
  */
 
 import { transcribeAudio as transcribeViaGroq, type GroqSttLang } from "@/lib/groq-stt";
-import { transcribeAudio as transcribeViaNvidia, type NvidiaLang } from "@/lib/nvidia";
 import {
   transcribeAudio as transcribeViaOpenai,
   type OpenaiSttLang,
@@ -18,7 +17,7 @@ import {
   type WhisperSttLang,
 } from "@/lib/whisper-stt";
 
-export type SttProvider = "sarvam" | "openai" | "groq" | "nvidia" | "whisper";
+export type SttProvider = "sarvam" | "openai" | "groq" | "whisper";
 
 export interface SttProviderRunResult {
   provider: SttProvider;
@@ -34,7 +33,7 @@ export class SttProviderNotConfiguredError extends Error {
   }
 }
 
-type SupportedLang = GroqSttLang & OpenaiSttLang & SarvamLang & NvidiaLang & WhisperSttLang;
+type SupportedLang = GroqSttLang & OpenaiSttLang & SarvamLang & WhisperSttLang;
 
 function openaiConfigured(): boolean {
   const key = process.env.OPENAI_API_KEY;
@@ -44,11 +43,6 @@ function openaiConfigured(): boolean {
 function groqConfigured(): boolean {
   const key = process.env.GROQ_API_KEY;
   return typeof key === "string" && key.startsWith("gsk_");
-}
-
-function nvidiaConfigured(): boolean {
-  const key = process.env.NVIDIA_API_KEY;
-  return typeof key === "string" && key.startsWith("nvapi-");
 }
 
 function sarvamConfigured(): boolean {
@@ -64,8 +58,6 @@ export function isSttProviderConfigured(provider: SttProvider): boolean {
       return openaiConfigured();
     case "groq":
       return groqConfigured();
-    case "nvidia":
-      return nvidiaConfigured();
     case "whisper":
       return whisperSttConfigured();
   }
@@ -75,7 +67,6 @@ export const ALL_STT_PROVIDERS: SttProvider[] = [
   "sarvam",
   "openai",
   "groq",
-  "nvidia",
   "whisper",
 ];
 
@@ -100,9 +91,6 @@ export async function dispatchSttProvider(
       break;
     case "groq":
       out = await transcribeViaGroq(audio, lang as GroqSttLang);
-      break;
-    case "nvidia":
-      out = await transcribeViaNvidia(audio, lang as NvidiaLang);
       break;
     case "whisper":
       out = await transcribeViaWhisper(audio, lang as WhisperSttLang);
@@ -136,7 +124,7 @@ export function langSupportedByProvider(provider: SttProvider, lang: string): bo
   if (provider === "sarvam") {
     return (["te-IN", "kn-IN", "ta-IN"] as const).includes(lang as SarvamLang);
   }
-  if (provider === "openai" || provider === "nvidia") {
+  if (provider === "openai") {
     return (["en-IN", "hi-IN"] as const).includes(lang as OpenaiSttLang);
   }
   return (["en-IN", "hi-IN", "te-IN", "kn-IN", "ta-IN"] as const).includes(

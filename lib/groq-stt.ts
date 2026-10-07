@@ -14,7 +14,7 @@ import { requireEnv } from "@/lib/env";
  *
  * Slot in the cascade: layer-2 STT for ALL languages.
  *   te-IN/kn-IN/ta-IN  : Sarvam primary  → Groq fallback
- *   en-IN/hi-IN        : OpenAI primary → Groq fallback → NVIDIA legacy
+ *   en-IN/hi-IN        : OpenAI primary → Groq fallback
  *
  * Whisper does not return logprobs, so confidence is a fixed baseline (0.85),
  * matching the Sarvam adapter.
