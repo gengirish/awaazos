@@ -649,7 +649,7 @@ sequenceDiagram
     API->>DB: COMMIT
     API--)KV: bump drop-orders:{vendorId}:{dropId} (fire-and-forget)
     API-->>B: 201 { orderToken }, redirect to /s/[slug]/o/[token]
-    V->>KV: GET /api/drops/[id]/signal every 20 s (visible + accepting only)
+    V->>KV: GET /api/drops/[id]/signal every 6 min (visible + accepting only; Web Push is the instant path)
     V->>DB: refetch orders only when the counter moved
 ```
 

@@ -30,17 +30,12 @@ import {
 import type { BoardDrop } from "@/lib/drops-board-server";
 import { formatIstDate, formatIstTime } from "@/lib/drops-time";
 import {
-  MENU_FALLBACK_POLL_MS,
-  MENU_SIGNAL_POLL_MS,
+  BOARD_POLL_MS,
   menuBoardPollKind,
   toMakeFromOrders,
 } from "@/lib/menu-orders-board";
 import { cn } from "@/lib/utils";
 
-/** Signal poll — Upstash only (plus the session check), cheap. */
-const SIGNAL_POLL_MS = 20_000;
-/** No KV: refetch orders directly, but slowly and only while OPEN + visible. */
-const FALLBACK_POLL_MS = 60_000;
 const MAX_TIMEOUT_MS = 2_147_483_647;
 /** Coming back to the tab (e.g. tapping a push alert) refetches at most this often. */
 const VISIBLE_REFETCH_MIN_MS = 30_000;
@@ -213,12 +208,14 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
     return () => window.clearTimeout(id);
   }, [opensAt, closesAtIso, now]);
 
-  // New-order detection without pinning Neon awake:
-  //  - KV available: poll the Upstash counter every 20s, refetch only when it moves.
-  //  - No KV: refetch every 60s, only while OPEN.
-  //  - Only while the tab is visible; nothing at all once orders are closed.
-  //  - Menu board: no cut-off, so it polls (every 6 min, above Neon's idle timeout) only
-  //    while "order from menu" is switched on — never when it is off.
+  // New-order detection without pinning Neon awake. Instant alerts come from Web
+  // Push (lib/push.ts); polling is only a fallback, so BOTH boards tick every 6 min —
+  // above Neon's 5-min idle timeout, since each tick's session check reads Postgres.
+  //  - KV available: read the Upstash counter, refetch only when it moves.
+  //  - No KV: refetch directly, only while OPEN.
+  //  - Only while the tab is visible; returning to the tab refetches once.
+  //  - Drop board: nothing at all once orders are closed. Menu board: only while
+  //    "order from menu" is switched on.
   const pollKind: "signal" | "fallback" | null =
     source.kind === "menu"
       ? menuBoardPollKind(source.acceptMenuOrders, signalMode)
@@ -229,8 +226,6 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
           : effective === "OPEN"
             ? "fallback"
             : null;
-  const signalPollMs = isMenu ? MENU_SIGNAL_POLL_MS : SIGNAL_POLL_MS;
-  const fallbackPollMs = isMenu ? MENU_FALLBACK_POLL_MS : FALLBACK_POLL_MS;
 
   useEffect(() => {
     if (!pollKind) return;
@@ -257,7 +252,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
       }
     };
 
-    const id = window.setInterval(tick, pollKind === "signal" ? signalPollMs : fallbackPollMs);
+    const id = window.setInterval(tick, BOARD_POLL_MS);
     const onVisible = () => {
       if (document.visibilityState === "visible") void tick();
     };
@@ -267,7 +262,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [pollKind, signalUrl, signalPollMs, fallbackPollMs, refresh]);
+  }, [pollKind, signalUrl, refresh]);
 
   // The server-rendered orders were just fetched; start the clock on mount
   // (not during render) so server and client markup match.

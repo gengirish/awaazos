@@ -8,7 +8,7 @@
  * when the number moves.
  *
  * Fail-open both ways: no KV → bump is a no-op and reads return null, and the
- * board falls back to a slow (≥60s) direct refresh.
+ * board falls back to a slow (6 min) direct refresh.
  */
 
 import { getKv } from "@/lib/kv";

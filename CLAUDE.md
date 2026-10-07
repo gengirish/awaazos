@@ -217,9 +217,10 @@ Buyer accounts are **not** NextAuth: `Customer` + passwordless email magic link
 httpOnly `awz_cust` cookie. A buyer session never touches staff RBAC or widens a vendor `select`.
 
 Orders board freshness: order placement and board actions bump a vendor-scoped Upstash counter
-(`lib/drops-signal.ts`, fire-and-forget). The board polls `/api/drops/[id]/signal` every 20 s, only
-while visible and while the drop accepts orders, and refetches from Postgres only when it moves;
-no KV → 60 s direct refresh. See TODO.md — the signal route's auth check still hits Postgres.
+(`lib/drops-signal.ts`, fire-and-forget). Instant alerts come from Web Push; board polling is only
+a fallback, so both boards (`/drops/[id]` and `/orders`) poll every **6 min** (`BOARD_POLL_MS`), only
+while visible (and, for drops, while it accepts orders), refetching from Postgres only when the
+counter moves. Keep it above Neon's idle timeout — each tick's session check reads Postgres.
 
 **Web Push alerts** (`lib/push.ts`): new storefront orders and submitted UPI references push to the
 vendor's opted-in staff devices (`PushSubscription`, one row per device). Event-driven only — never

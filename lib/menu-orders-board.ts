@@ -70,9 +70,10 @@ export function toMakeFromOrders(orders: ToMakeOrderInput[]): ToMakeRow[] {
  * (global scale-to-zero rule). Faster alerts need a Postgres-free session
  * check on the signal route first; see TODO.md §3.5.
  */
-export const MENU_SIGNAL_POLL_MS = 6 * 60_000;
+export const BOARD_POLL_MS = 6 * 60_000;
+export const MENU_SIGNAL_POLL_MS = BOARD_POLL_MS;
 /** No KV: refetch the orders list directly, at the same cadence. */
-export const MENU_FALLBACK_POLL_MS = 6 * 60_000;
+export const MENU_FALLBACK_POLL_MS = BOARD_POLL_MS;
 
 export type MenuPollKind = "signal" | "fallback" | null;
 

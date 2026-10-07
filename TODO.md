@@ -141,13 +141,9 @@ not use it.
 
 ### 3.5 Drops: open items found while building it
 
-- **Orders board keeps Neon awake during order windows.** `/api/drops/[id]/signal` reads its
-  counter from Upstash, but `requireVendorRole` inside it hits Postgres (session → membership) on
-  every poll — every 20 s while the board is visible and a drop is accepting orders. A vendor who
-  leaves the board open all evening pins Neon awake for the whole window, against the global
-  scale-to-zero rule. Options: a JWT-only session check plus a KV-cached `(userId, vendorId)`
-  membership for this one route, or a poll interval above Neon's idle timeout. **Needs an owner
-  decision.**
+- ~~**Orders board keeps Neon awake during order windows.**~~ **Resolved:** with Web Push carrying
+  instant alerts, both boards now poll every 6 min (`BOARD_POLL_MS`), above Neon's idle timeout.
+  A JWT-only session check on the signal route would allow faster polling again if ever needed.
 - **Marking an EXPIRED order paid can oversell.** After the 15-minute hold lapses its stock is
   released and may be resold; the board still lets the vendor tap Mark paid (e.g. a late UTR), which
   re-counts that stock. Either re-check remaining stock under the drop lock in `mark_paid`, or warn
@@ -192,8 +188,8 @@ device leaves it saying "on" until toggled. The original analysis follows.
 Today the only alert is the orders board's **Sound** toggle (`components/drops/orders/OrdersBoard.tsx`,
 `beep()`): a Web Audio beep when the board's own poll finds new orders. Its limits:
 
-- **Delay.** It beeps only when the board checks: every 6 min on `/orders` (menu orders), every 20 s
-  on a drop board while it takes orders. Refresh checks immediately.
+- **Delay.** It beeps only when the board checks: every 6 min on both boards (Web Push is the
+  instant path). Refresh checks immediately.
 - **Screen on only.** Polling stops when the tab is hidden or the phone is locked, so nothing beeps
   in a pocket — the vendor has to keep the board open and visible.
 - **Not remembered.** Sound starts off on every page load (browsers need a tap before playing audio).
