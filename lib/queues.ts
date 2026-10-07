@@ -2,6 +2,7 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 
 import { requireEnv } from "@/lib/env";
+import type { SttSource } from "@/lib/stt-source";
 
 /**
  * BullMQ requires its own ioredis client with `maxRetriesPerRequest: null`
@@ -32,7 +33,7 @@ export type VoiceParseLogJobPayload = {
   vendorId: string;
   transcript: string;
   lang: string;
-  sttSource: "webspeech" | "sarvam" | "openai" | "groq" | "whisper";
+  sttSource: SttSource;
   modelUsed: string;
   latencyMs: number;
   itemCount: number;

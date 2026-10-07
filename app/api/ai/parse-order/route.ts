@@ -17,6 +17,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { STT_SOURCES } from "@/lib/stt-source";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,7 +25,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
   transcript: z.string().min(1),
   lang: z.string().min(1),
-  sttSource: z.enum(["webspeech", "sarvam", "openai", "groq", "whisper"]),
+  sttSource: z.enum(STT_SOURCES),
 });
 
 function wordCount(transcript: string): number {

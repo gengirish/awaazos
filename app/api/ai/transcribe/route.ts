@@ -13,13 +13,16 @@ import {
 import { getBreaker } from "@/lib/circuit-breaker";
 import { transcribeAudio as transcribeViaSarvam, type SarvamLang } from "@/lib/sarvam";
 import {
+  openaiSttConfigured,
   transcribeAudio as transcribeViaOpenai,
   type OpenaiSttLang,
 } from "@/lib/openai-stt";
 import {
+  groqSttConfigured,
   transcribeAudio as transcribeViaGroq,
   type GroqSttLang,
 } from "@/lib/groq-stt";
+import type { ServerSttSource as SttSource } from "@/lib/stt-source";
 import {
   transcribeAudio as transcribeViaWhisper,
   whisperSttConfigured,
@@ -30,8 +33,6 @@ import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
-
-type SttSource = "sarvam" | "openai" | "groq" | "whisper";
 
 const SARVAM_LANGS = ["te-IN", "kn-IN", "ta-IN"] as const satisfies readonly SarvamLang[];
 const FALLBACK_LANGS = ["en-IN", "hi-IN"] as const satisfies readonly (
@@ -47,16 +48,6 @@ function isFallbackLang(s: string): s is OpenaiSttLang {
   return (FALLBACK_LANGS as readonly string[]).includes(s);
 }
 
-function openaiConfigured(): boolean {
-  const key = process.env.OPENAI_API_KEY;
-  return typeof key === "string" && key.startsWith("sk-");
-}
-
-function groqConfigured(): boolean {
-  const key = process.env.GROQ_API_KEY;
-  return typeof key === "string" && key.startsWith("gsk_");
-}
-
 /**
  * Build the per-language provider cascade.
  *
@@ -70,10 +61,10 @@ function buildCascade(lang: string): SttSource[] {
   const out: SttSource[] = [];
   if (isSarvamLang(lang)) {
     out.push("sarvam");
-    if (groqConfigured()) out.push("groq");
+    if (groqSttConfigured()) out.push("groq");
   } else if (isFallbackLang(lang)) {
-    if (openaiConfigured()) out.push("openai");
-    if (groqConfigured()) out.push("groq");
+    if (openaiSttConfigured()) out.push("openai");
+    if (groqSttConfigured()) out.push("groq");
   }
   if (whisperSttConfigured()) out.push("whisper");
   return out;
@@ -163,7 +154,7 @@ export async function POST(req: NextRequest) {
 
     const cascade = buildCascade(lang);
     if (cascade.length === 0) {
-      const fallbackLangs = openaiConfigured() || groqConfigured()
+      const fallbackLangs = openaiSttConfigured() || groqSttConfigured()
         ? FALLBACK_LANGS
         : [];
       return NextResponse.json(

@@ -25,6 +25,11 @@ import { requireEnv } from "@/lib/env";
  * disclosure is updated to make the audio path explicit to vendors.
  */
 
+export function groqSttConfigured(): boolean {
+  const key = process.env.GROQ_API_KEY;
+  return typeof key === "string" && key.startsWith("gsk_");
+}
+
 const GROQ_STT_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const STT_TIMEOUT_MS = 5_000;
 

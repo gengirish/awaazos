@@ -2,6 +2,7 @@
 
 import { useCallback, useRef, useState } from "react";
 
+import type { SttSource } from "@/lib/stt-source";
 import { mapWebSpeechErrorCode, type VoiceErrorReason } from "@/lib/voice-error";
 
 type VoiceOrderState =
@@ -12,7 +13,6 @@ type VoiceOrderState =
   | "success"
   | "error";
 
-type SttSource = "webspeech" | "sarvam" | "openai" | "groq" | "whisper";
 
 type ParsedItem = {
   menuItemId: string;

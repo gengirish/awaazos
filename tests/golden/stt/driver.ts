@@ -5,19 +5,21 @@
  * or request shape is caught automatically.
  */
 
-import { transcribeAudio as transcribeViaGroq, type GroqSttLang } from "@/lib/groq-stt";
+import { groqSttConfigured, transcribeAudio as transcribeViaGroq, type GroqSttLang } from "@/lib/groq-stt";
 import {
+  openaiSttConfigured,
   transcribeAudio as transcribeViaOpenai,
   type OpenaiSttLang,
 } from "@/lib/openai-stt";
 import { transcribeAudio as transcribeViaSarvam, type SarvamLang } from "@/lib/sarvam";
+import type { ServerSttSource } from "@/lib/stt-source";
 import {
   transcribeAudio as transcribeViaWhisper,
   whisperSttConfigured,
   type WhisperSttLang,
 } from "@/lib/whisper-stt";
 
-export type SttProvider = "sarvam" | "openai" | "groq" | "whisper";
+export type SttProvider = ServerSttSource;
 
 export interface SttProviderRunResult {
   provider: SttProvider;
@@ -35,16 +37,6 @@ export class SttProviderNotConfiguredError extends Error {
 
 type SupportedLang = GroqSttLang & OpenaiSttLang & SarvamLang & WhisperSttLang;
 
-function openaiConfigured(): boolean {
-  const key = process.env.OPENAI_API_KEY;
-  return typeof key === "string" && key.startsWith("sk-");
-}
-
-function groqConfigured(): boolean {
-  const key = process.env.GROQ_API_KEY;
-  return typeof key === "string" && key.startsWith("gsk_");
-}
-
 function sarvamConfigured(): boolean {
   const key = process.env.SARVAM_API_KEY;
   return typeof key === "string" && key.length > 0;
@@ -55,9 +47,9 @@ export function isSttProviderConfigured(provider: SttProvider): boolean {
     case "sarvam":
       return sarvamConfigured();
     case "openai":
-      return openaiConfigured();
+      return openaiSttConfigured();
     case "groq":
-      return groqConfigured();
+      return groqSttConfigured();
     case "whisper":
       return whisperSttConfigured();
   }

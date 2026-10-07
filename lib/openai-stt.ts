@@ -31,6 +31,11 @@ const DEFAULT_STT_MODEL = "gpt-4o-mini-transcribe";
 
 export type OpenaiSttLang = "en-IN" | "hi-IN";
 
+export function openaiSttConfigured(): boolean {
+  const key = process.env.OPENAI_API_KEY;
+  return typeof key === "string" && key.startsWith("sk-");
+}
+
 const LANG_MAP: Record<OpenaiSttLang, string> = {
   // OpenAI accepts ISO-639-1 base codes ("en", "hi"); region tags are ignored
   // by the model. Pass the base code to avoid spurious "unknown language"
