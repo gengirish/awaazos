@@ -31,10 +31,17 @@ node_modules/
 .git/
 .gitignore
 .cursor/
+.claude/
+.kilo/
 agent-transcripts/
 terminals/
 
 # Tests + docs
+tests/
+e2e/
+docs/
+services/
+awaazos-course/
 **/__tests__/
 **/*.test.ts
 **/*.test.tsx
