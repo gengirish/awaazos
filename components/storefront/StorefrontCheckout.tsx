@@ -261,7 +261,8 @@ export function CartBar({
 }) {
   const summary = `${itemCount} ${itemCount === 1 ? "item" : "items"}`;
   return (
-    <div className={cn("sticky bottom-0 z-10", itemCount > 0 && "pb-3 pt-3")}>
+    // Sits above the cookie banner while it shows (CookieConsentBanner publishes its height).
+    <div className={cn("sticky bottom-[var(--cookie-banner-h,0px)] z-10", itemCount > 0 && "pb-3 pt-3")}>
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {itemCount > 0 ? `Cart: ${summary}, ${formatINR(subtotalPaise)}` : "Cart is empty"}
       </p>

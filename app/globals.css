@@ -83,7 +83,14 @@
   * {
     @apply border-border;
   }
+  /* While the cookie banner shows (CookieConsentBanner publishes
+     --cookie-banner-h), the page can scroll its last content clear of it, and
+     scrolled-into-view / focused elements land above it. */
+  html {
+    scroll-padding-bottom: var(--cookie-banner-h, 0px);
+  }
   body {
     @apply bg-background text-foreground;
+    padding-bottom: var(--cookie-banner-h, 0px);
   }
 }
