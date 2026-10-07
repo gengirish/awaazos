@@ -37,3 +37,16 @@ TTS call.
 ```bash
 node scripts/sarvam-smoke.mjs ./vendor-recording.webm hi-IN
 ```
+
+## `sync-agent-rules.mjs`
+
+```bash
+npm run sync:agent-rules                     # write .claude/
+node scripts/sync-agent-rules.mjs --check    # exit 1 if .claude/ is out of date
+```
+
+`.cursor/rules/*.mdc` and `.cursor/skills/` are the source of truth for agent conventions. This
+converts each rule to Claude Code's format (`.md`, `globs` → `paths`, `alwaysApply: true` → no
+`paths`), copies skills verbatim, and deletes anything in `.claude/rules` or `.claude/skills` that
+has no source. A rule with neither `alwaysApply` nor `globs` is an error, since Claude Code has no
+manual-only equivalent.

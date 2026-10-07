@@ -1,0 +1,66 @@
+---
+description: WCAG 2.2 AA + mobile-first accessibility (POS-specific)
+paths: ["**/*.tsx"]
+---
+
+<!-- Generated from .cursor/rules/accessibility.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
+
+# Accessibility — AwaazOS
+
+The POS screen is mobile-first (390px) and the **primary input is voice**.
+Every voice-only path MUST have a tap fallback (`QuickAddGrid`).
+
+## Required on every page
+
+- Skip-to-main-content link (`<a href="#main" class="sr-only focus:not-sr-only">`)
+- Heading hierarchy h1 → h2 → h3 (no skipping)
+- Landmark regions: `<main>`, `<nav>`, `<header>`, `<footer>`
+- `<html lang="en-IN">`
+
+## Touch targets — POS-critical
+
+- **Minimum 44×44 px** for any tap target.
+- Mic button: **80×80 px** (per spec) — must be reachable in single-handed thumb arc.
+- Cart qty +/- buttons: 44×44 px minimum, with 8 px spacing.
+- Disable tap-highlight only after replacing with a custom focus ring.
+
+## Forms
+
+- Visible `<label>` always (no placeholder-as-label).
+- Numeric inputs: `inputMode="decimal"` for ₹, `inputMode="tel"` for phone.
+- Currency input: format as the user types (₹X,XXX.XX) but submit paise integer.
+
+## Modals (UpiQRModal, ReceiptModal)
+
+- Focus trap + Escape to close
+- `aria-modal="true"`, `role="dialog"`, labeled by `aria-labelledby`
+- Mobile: bottom sheet (shadcn `Sheet`) — swipe-down to dismiss
+
+## Voice button states (must be distinguishable beyond color)
+
+| State | Color | Icon | aria-label | Haptic |
+|---|---|---|---|---|
+| idle | orange | mic | "Start voice order" | — |
+| listening | red, pulsing | mic-on | "Listening" + transcript live | short tap |
+| transcribing | purple | loader | "Transcribing audio" | — |
+| parsing | purple, spinning | sparkles | "Understanding order" | — |
+| error | gray | alert | error text | double tap |
+
+## Live regions
+
+- Cart updates: `aria-live="polite"` on `OrderCart`
+- Voice errors: `aria-live="assertive"` on the status row
+- Loading: `aria-busy="true"` on async containers
+
+## Visual
+
+- Text contrast 4.5:1 minimum (Slate-900 on white preferred)
+- Touch targets ≥ 44×44 px
+- Color is **never** the only indicator — pair with icon + text
+- `prefers-reduced-motion`: disable mic pulse, transitions ≤ 150 ms
+
+## Testing
+
+- Run axe-core in Vitest before any PR
+- Keyboard-only walkthrough of POS flow (mic button focus reachable via Tab)
+- Screen-reader smoke test (VoiceOver iOS, TalkBack Android) for the POS flow

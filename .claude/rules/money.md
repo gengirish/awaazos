@@ -1,0 +1,48 @@
+---
+description: Paise-integer money discipline — applies to all monetary code
+paths: ["lib/currency.ts","lib/upi.ts","app/api/**/*.ts","components/**/*.tsx","store/**/*.ts","workers/**/*.ts"]
+---
+
+<!-- Generated from .cursor/rules/money.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
+
+# Money Discipline (Paise Integer Only)
+
+## Banned in monetary code
+
+- `Decimal`, `BigDecimal`, `prisma.Decimal`
+- `Number.toFixed()`, `Number.toPrecision()`
+- `parseFloat()`, `Math.round()` on prices
+- Any arithmetic that goes through `number` for amounts > 1 paise
+
+## Required helpers (`lib/currency.ts`)
+
+```ts
+export function paiseToRupees(paise: number): number      // safe, integer-only
+export function rupeesToPaise(rupees: number): number     // throws on non-integer paise
+export function formatINR(paise: number): string          // Intl.NumberFormat en-IN INR
+export function sumPaise(items: number[]): number         // integer sum
+```
+
+## Tax computation
+
+```ts
+// taxPaise = floor(subtotalPaise * taxPercentBps / 10_000)
+// Use bps (basis points) to keep tax percent as integer too.
+const taxPaise = Math.floor((subtotalPaise * taxPercentBps) / 10_000);
+const totalPaise = subtotalPaise - discountPaise + taxPaise;
+```
+
+## UPI deep link is the only place rupees touch the wire
+
+```ts
+// upi://pay?pa=...&am=20.00 — rupees, not paise (per UPI spec)
+const am = (paiseToRupees(totalPaise)).toFixed(2);  // ONLY allowed toFixed in codebase
+```
+
+## Tests
+
+Vitest unit tests required for:
+- `rupeesToPaise(20.555)` → throws (must be ≤2 decimals)
+- `formatINR(2000)` → `"₹2,000.00"` (en-IN format with grouping)
+- `formatINR(123456789)` → `"₹12,34,567.89"` (lakh formatting)
+- `sumPaise([100, 200, 300])` → `600`
