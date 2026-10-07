@@ -59,6 +59,7 @@ const menuItemCreateFields = {
     .optional(),
   isPopular: z.boolean().optional(),
   isAvailable: z.boolean().optional(),
+  showOnline: z.boolean().optional(),
 };
 
 /** Client / RHF input validation (no paise transform). */
@@ -74,6 +75,7 @@ export const menuItemCreateSchema = menuItemCreateInputSchema.transform((data) =
   hsnCode: data.hsnCode?.trim() ? data.hsnCode.trim().toUpperCase() : null,
   isPopular: data.isPopular ?? false,
   isAvailable: data.isAvailable ?? true,
+  showOnline: data.showOnline ?? true,
 }));
 
 export const menuItemUpdateSchema = z
@@ -90,6 +92,7 @@ export const menuItemUpdateSchema = z
     hsnCode: z.string().trim().max(16).optional().nullable(),
     isPopular: z.boolean().optional(),
     isAvailable: z.boolean().optional(),
+    showOnline: z.boolean().optional(),
     sortOrder: z.coerce.number().int().optional(),
     // `null` clears the photo; the upload route sets it, the form can unset it.
     imageUrl: z
@@ -112,6 +115,7 @@ export const menuItemUpdateSchema = z
       d.hsnCode !== undefined ||
       d.isPopular !== undefined ||
       d.isAvailable !== undefined ||
+      d.showOnline !== undefined ||
       d.sortOrder !== undefined ||
       d.imageUrl !== undefined,
     { message: "At least one field is required", path: ["_root"] },

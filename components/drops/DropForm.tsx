@@ -112,6 +112,7 @@ type FormState = {
   useOpensAt: boolean;
   opensAtDate: string;
   opensAtTime: string;
+  showEverydayMenu: boolean;
 };
 
 export type DropFormProps = {
@@ -153,6 +154,7 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
     useOpensAt: Boolean(initial.opensAtDate && initial.opensAtTime),
     opensAtDate: initial.opensAtDate ?? initial.closesAtDate,
     opensAtTime: initial.opensAtTime ?? "09:00",
+    showEverydayMenu: initial.showEverydayMenu ?? false,
   }));
 
   // Drop items first (in their saved order), then the rest of the menu.
@@ -233,6 +235,7 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
       opensAtTime: form.useOpensAt ? form.opensAtTime : null,
       closesAtDate: form.closesAtDate,
       closesAtTime: form.closesAtTime,
+      showEverydayMenu: form.showEverydayMenu,
       items,
     };
   }
@@ -528,6 +531,22 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
               {err("opensAtTime")}
             </fieldset>
           ) : null}
+
+          <div className="space-y-1">
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium">
+              <input
+                type="checkbox"
+                className="h-5 w-5 shrink-0 accent-primary"
+                checked={form.showEverydayMenu}
+                onChange={(e) => set("showEverydayMenu", e.target.checked)}
+                aria-describedby="drop-everyday-help"
+              />
+              Also show my everyday menu while this drop is open
+            </label>
+            <p id="drop-everyday-help" className="pl-8 text-xs text-muted-foreground">
+              Off: customers see only this drop. On: your regular menu appears below it.
+            </p>
+          </div>
         </section>
 
         {/* ── Items ── */}
@@ -704,9 +723,17 @@ export type DropStatusControlsProps = {
   effectiveStatus: EffectiveDropStatus;
   allowedTransitions: DropStatus[];
   orderCount: number;
+  /** True when this open drop hides the vendor's "Order from menu" everyday menu. */
+  hidesEverydayMenu?: boolean;
 };
 
-export function DropStatusControls({ dropId, effectiveStatus, allowedTransitions, orderCount }: DropStatusControlsProps) {
+export function DropStatusControls({
+  dropId,
+  effectiveStatus,
+  allowedTransitions,
+  orderCount,
+  hidesEverydayMenu = false,
+}: DropStatusControlsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<{ code: string | null; message: string } | null>(null);
@@ -767,6 +794,9 @@ export function DropStatusControls({ dropId, effectiveStatus, allowedTransitions
         <DropStatusBadge status={effectiveStatus} />
       </div>
       <p className="text-sm text-muted-foreground">{STATUS_HELP[effectiveStatus]}</p>
+      {effectiveStatus === "OPEN" && hidesEverydayMenu ? (
+        <p className="text-sm">While this drop is open, your everyday menu is hidden from your store.</p>
+      ) : null}
 
       {actions.length ? (
         <div className="grid gap-2 sm:grid-cols-2">

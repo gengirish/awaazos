@@ -54,6 +54,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
     if (body.isPopular !== undefined) data.isPopular = body.isPopular;
     if (body.isAvailable !== undefined) data.isAvailable = body.isAvailable;
+    // Storefront visibility only — the counter POS ignores it.
+    if (body.showOnline !== undefined) data.showOnline = body.showOnline;
     if (body.sortOrder !== undefined) data.sortOrder = body.sortOrder;
     // `null` clears the photo. The blob itself is removed by
     // DELETE /api/menu/[id]/image, which is the path the UI uses.

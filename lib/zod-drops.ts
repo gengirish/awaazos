@@ -52,6 +52,8 @@ export const dropUpsertSchema = z
     opensAtTime: hm.nullish(),
     closesAtDate: ymd,
     closesAtTime: hm,
+    /** Also show the everyday menu on the storefront while this drop is open. */
+    showEverydayMenu: z.boolean().default(false),
     items: z.array(dropItemInputSchema).min(1, "Add at least one item").max(100),
   })
   .superRefine((v, ctx) => {
@@ -110,6 +112,7 @@ export function dropInputToData(v: DropUpsertInput) {
     deliveryFeePaise: v.fulfilmentMode === "PICKUP" ? 0 : v.deliveryFeePaise,
     opensAt: v.opensAtDate && v.opensAtTime ? istToUtc(v.opensAtDate, v.opensAtTime) : null,
     closesAt: istToUtc(v.closesAtDate, v.closesAtTime),
+    showEverydayMenu: v.showEverydayMenu,
   };
 }
 

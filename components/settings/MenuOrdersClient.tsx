@@ -155,6 +155,10 @@ export function MenuOrdersClient({
               ? "Customers can order available menu items from your storefront. New orders show under Orders."
               : "Off. Customers can only see your menu (and order from open Drops)."}
           </p>
+          <p className="text-xs text-muted-foreground">
+            Hide single items from your store with &ldquo;Show online&rdquo; on the Menu page. Drops hide the
+            everyday menu unless you tick &ldquo;Also show my everyday menu&rdquo;.
+          </p>
           {!isOwner && <p className="text-xs text-muted-foreground">Only the owner can change this.</p>}
         </div>
         <button

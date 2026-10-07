@@ -26,6 +26,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
+import { ShowOnlineSwitch } from "@/components/menu/ShowOnlineSwitch";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -79,6 +80,7 @@ const defaultCreateValues: Partial<MenuItemFormValues> = {
   hsnCode: "",
   isPopular: false,
   isAvailable: true,
+  showOnline: true,
 };
 
 type MenuItemFormProps = {
@@ -133,6 +135,7 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
         hsnCode: item.hsnCode ?? "",
         isPopular: item.isPopular,
         isAvailable: item.isAvailable,
+        showOnline: item.showOnline,
       });
     } else {
       form.reset(defaultCreateValues as MenuItemFormValues);
@@ -222,6 +225,7 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
           hsnCode: values.hsnCode?.trim() || null,
           isPopular: values.isPopular,
           isAvailable: values.isAvailable,
+          showOnline: values.showOnline,
         });
         const res = await fetch(`/api/menu/${item.id}`, {
           method: "PATCH",
@@ -548,6 +552,29 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
                       Available
                     </FormLabel>
                   </div>
+                </FormItem>
+              )}
+            />
+            <FormField
+              control={form.control}
+              name="showOnline"
+              render={({ field }) => (
+                <FormItem className="space-y-1">
+                  <div className="flex flex-row items-center gap-3">
+                    <ShowOnlineSwitch
+                      id="showOnline"
+                      checked={field.value ?? true}
+                      onCheckedChange={field.onChange}
+                      label="Show online"
+                      describedBy="showOnline-help"
+                    />
+                    <span className="text-sm" aria-hidden="true">
+                      Show online
+                    </span>
+                  </div>
+                  <p id="showOnline-help" className="text-xs text-muted-foreground">
+                    Off: stays on your counter POS, hidden from your online store.
+                  </p>
                 </FormItem>
               )}
             />

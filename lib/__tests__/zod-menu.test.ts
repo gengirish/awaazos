@@ -4,6 +4,7 @@ import { rupeesToPaise } from "@/lib/currency";
 import {
   menuItemCreateInputSchema,
   menuItemCreateSchema,
+  menuItemUpdateSchema,
   parseAliasesCsv,
 } from "@/lib/zod-menu";
 
@@ -72,5 +73,19 @@ describe("menuItemCreateInputSchema + rupeesToPaise", () => {
     expect(rupeesToPaise(parsed.priceInRupees)).toBe(1950);
     const p2 = menuItemCreateInputSchema.parse({ name: "x", priceInRupees: 0.99 });
     expect(rupeesToPaise(p2.priceInRupees)).toBe(99);
+  });
+});
+
+describe("menuItemUpdateSchema — showOnline", () => {
+  it("accepts a showOnline-only update (the Menu page switch sends just that)", () => {
+    expect(menuItemUpdateSchema.safeParse({ showOnline: false }).success).toBe(true);
+  });
+
+  it("still rejects an empty update", () => {
+    expect(menuItemUpdateSchema.safeParse({}).success).toBe(false);
+  });
+
+  it("defaults showOnline to true on create", () => {
+    expect(menuItemCreateSchema.parse({ name: "Chai", priceInRupees: 10 }).showOnline).toBe(true);
   });
 });

@@ -93,6 +93,7 @@ export function serializeDrop(
     deliveryFeePaise: drop.deliveryFeePaise,
     opensAt: drop.opensAt?.toISOString() ?? null,
     closesAt: drop.closesAt.toISOString(),
+    showEverydayMenu: drop.showEverydayMenu,
     status: drop.status,
     effectiveStatus: effectiveDropStatus(drop, opts.now),
     allowedTransitions: allowedTransitions(drop, opts.now),

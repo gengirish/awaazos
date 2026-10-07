@@ -56,6 +56,7 @@ export type PlaceMenuOrderInput = {
 
 export type PlaceMenuOrderError =
   | { code: "menu_orders_disabled" }
+  | { code: "menu_paused_for_drop" }
   | { code: "item_not_found"; menuItemId: string }
   | { code: "fulfilment_unavailable" }
   | { code: "address_required" }
@@ -80,6 +81,30 @@ class MenuOrderRejected extends Error {
   constructor(public readonly error: PlaceMenuOrderError) {
     super(error.code);
   }
+}
+
+/**
+ * True while one of the vendor's drops is taking orders right now and has
+ * `showEverydayMenu = false` — the storefront then shows only the drop, and
+ * menu orders are refused so a stale cart can't sneak one in. Mirrors
+ * effectiveDropStatus(): stored OPEN, past opensAt (if any), before closesAt.
+ */
+export async function everydayMenuHiddenByDrop(
+  db: Pick<typeof prisma, "drop">,
+  vendorId: string,
+  now: Date = new Date(),
+): Promise<boolean> {
+  const hiding = await db.drop.findFirst({
+    where: {
+      vendorId,
+      status: "OPEN",
+      showEverydayMenu: false,
+      closesAt: { gt: now },
+      OR: [{ opensAt: null }, { opensAt: { lte: now } }],
+    },
+    select: { id: true },
+  });
+  return hiding !== null;
 }
 
 /** Merge duplicate lines for the same menu item. */
@@ -108,11 +133,15 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
 
   const lines = mergeMenuLines(input.items);
 
+  if (await everydayMenuHiddenByDrop(prisma, vendorId, now)) {
+    return { ok: false, error: { code: "menu_paused_for_drop" } };
+  }
+
   try {
     const order = await prisma.$transaction(async (tx) => {
       // Compound filter = tenant isolation; unavailable items can't be ordered.
       const menuItems = await tx.menuItem.findMany({
-        where: { vendorId, isAvailable: true, id: { in: lines.map((l) => l.menuItemId) } },
+        where: { vendorId, isAvailable: true, showOnline: true, id: { in: lines.map((l) => l.menuItemId) } },
         select: { id: true, name: true, priceInPaise: true },
       });
       const byId = new Map(menuItems.map((m) => [m.id, m]));

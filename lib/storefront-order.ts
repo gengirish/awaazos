@@ -37,6 +37,45 @@ export function storefrontDropVisibility(
   return "hidden";
 }
 
+// ─── Everyday menu visibility ───────────────────────────────────────
+
+/**
+ * Which `MenuItem`s the public storefront offers: available today AND not
+ * kept counter-only by the vendor (`showOnline = false`). Shared by the page
+ * and its OG card; the order write path (lib/menu-orders.ts `placeMenuOrder`)
+ * applies the same two flags.
+ */
+export const STOREFRONT_MENU_ITEM_WHERE = { isAvailable: true, showOnline: true } as const;
+
+export type MenuHidingDrop = {
+  status: string;
+  opensAt: Date | null;
+  closesAt: Date;
+  showEverydayMenu: boolean;
+};
+
+/**
+ * True when a drop is taking orders right now with `showEverydayMenu = false`
+ * — the storefront then shows only the drop(s). SCHEDULED and past-cut-off
+ * drops never hide the menu.
+ *
+ * In-memory twin of lib/menu-orders.ts `everydayMenuHiddenByDrop` (which the
+ * menu-order write path uses to refuse with `menu_paused_for_drop`); "taking
+ * orders" is lib/drops.ts `effectiveDropStatus(...) === "OPEN"`, inlined
+ * because this module is client-safe and lib/drops.ts imports Prisma.
+ * Keep all three in lockstep.
+ */
+export function everydayMenuHiddenByDrops(drops: readonly MenuHidingDrop[], now: Date = new Date()): boolean {
+  const t = now.getTime();
+  return drops.some(
+    (d) =>
+      !d.showEverydayMenu &&
+      d.status === "OPEN" &&
+      t < d.closesAt.getTime() &&
+      (!d.opensAt || t >= d.opensAt.getTime()),
+  );
+}
+
 // ─── Time labels ────────────────────────────────────────────────────
 
 function istParts(d: Date): {
@@ -389,6 +428,8 @@ export function orderErrorMessage(err: OrderApiError, itemName?: string): string
         : `${name} is no longer on this menu. Please refresh and try again.`;
     case "menu_orders_disabled":
       return "This store has stopped taking online orders for now. Please order at the counter.";
+    case "menu_paused_for_drop":
+      return "The everyday menu is paused while today's special menu is open. Order from the drop above.";
     case "address_required":
       return "Please enter a delivery address.";
     case "fulfilment_unavailable":

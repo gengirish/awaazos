@@ -44,6 +44,8 @@ export default async function NewDropPage() {
     opensAtTime: null,
     closesAtDate: lateTonight ? tomorrow : istTodayYmd(now),
     closesAtTime: lateTonight ? "10:00" : "21:00",
+    // A drop appears on its own unless the vendor opts in.
+    showEverydayMenu: false,
     items: [],
   };
 

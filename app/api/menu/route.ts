@@ -79,6 +79,7 @@ export async function POST(req: NextRequest) {
         hsnCode: body.hsnCode,
         isPopular: body.isPopular,
         isAvailable: body.isAvailable,
+        showOnline: body.showOnline,
         sortOrder: nextOrder,
       },
     });

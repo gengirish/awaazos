@@ -3,8 +3,10 @@
 import type { MenuItem } from "@prisma/client";
 import Image from "next/image";
 import { Pencil, Trash2 } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
+import { ShowOnlineSwitch } from "@/components/menu/ShowOnlineSwitch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatINR } from "@/lib/currency";
@@ -16,21 +18,38 @@ export type MenuItemCardProps = {
 };
 
 export function MenuItemCard({ item, onEdit, onChanged }: MenuItemCardProps) {
-  async function toggleAvailable(next: boolean) {
+  const [saving, setSaving] = useState(false);
+
+  async function patch(body: { isAvailable: boolean } | { showOnline: boolean }): Promise<boolean> {
+    setSaving(true);
     try {
       const res = await fetch(`/api/menu/${item.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isAvailable: next }),
+        body: JSON.stringify(body),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         toast.error(typeof json.error === "string" ? json.error : "Update failed");
-        return;
+        return false;
       }
       onChanged();
+      return true;
     } catch {
       toast.error("Update failed");
+      return false;
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  function toggleAvailable(next: boolean) {
+    void patch({ isAvailable: next });
+  }
+
+  async function toggleShowOnline(next: boolean) {
+    if (await patch({ showOnline: next })) {
+      toast.success(next ? `${item.name} is back on your online store.` : `${item.name} is now counter only.`);
     }
   }
 
@@ -94,6 +113,20 @@ export function MenuItemCard({ item, onEdit, onChanged }: MenuItemCardProps) {
             />
             <span>{item.isAvailable ? "Available" : "Unavailable"}</span>
           </label>
+          <div className="flex items-center gap-1 text-sm">
+            <ShowOnlineSwitch
+              checked={item.showOnline}
+              onCheckedChange={toggleShowOnline}
+              label={`Show ${item.name} online`}
+              disabled={saving}
+            />
+            <span aria-hidden="true">Online</span>
+          </div>
+          {!item.showOnline ? (
+            <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+              Counter only
+            </span>
+          ) : null}
           {item.isPopular ? (
             <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">Popular</span>
           ) : null}

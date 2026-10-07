@@ -26,10 +26,12 @@ import { formatINR } from "@/lib/currency";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
 import { formatDropDayLabel, formatFulfilmentWindow } from "@/lib/drops-time";
+import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
 import { prisma } from "@/lib/prisma";
 import {
   formatIstDeadline,
   formatTimeLeft,
+  STOREFRONT_MENU_ITEM_WHERE,
   storefrontDropVisibility,
   type StorefrontDropVisibility,
 } from "@/lib/storefront-order";
@@ -67,6 +69,14 @@ export const runtime = "nodejs";
  * (MenuOrder: steppers, cart, checkout) via app/api/s/[slug]/menu-orders, held
  * to the same gate. Off, the menu stays read-only with the generic UPI QR.
  *
+ * Everyday menu visibility: only `isAvailable && showOnline` items are read
+ * (`showOnline = false` keeps an item on the counter POS only). While a drop is
+ * taking orders with `showEverydayMenu = false`, the whole everyday menu —
+ * rows, category pills, "Order now", the menu cart — is left out and only the
+ * drop(s) show (`everydayMenuHiddenByDrop` in lib/menu-orders.ts — the same check
+ * placeMenuOrder uses to refuse with `menu_paused_for_drop`). The counter UPI
+ * QR stays, collapsed, since the stall may still sell at the counter.
+ *
  * Optional buyer sign-in (lib/customer-auth.ts): the `awz_cust` session, when
  * present, only adds a header link and checkout prefill from the buyer's OWN
  * Customer row. It never widens the vendor `select` above. Guests see the
@@ -91,6 +101,7 @@ const loadStorefront = cache(async (slug: string) => {
       settings: { is: { publishStorefront: true } },
     },
     select: {
+      id: true, // tenant key for server-side checks only; never rendered
       slug: true,
       name: true,
       city: true,
@@ -127,6 +138,7 @@ const loadStorefront = cache(async (slug: string) => {
           fulfilmentEndsAt: true,
           pickupNote: true,
           deliveryFeePaise: true,
+          showEverydayMenu: true,
           items: {
             orderBy: [{ sortOrder: "asc" }],
             select: {
@@ -140,7 +152,7 @@ const loadStorefront = cache(async (slug: string) => {
         },
       },
       menuItems: {
-        where: { isAvailable: true },
+        where: STOREFRONT_MENU_ITEM_WHERE,
         orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
         select: {
           id: true,
@@ -167,10 +179,13 @@ export async function generateMetadata({
   const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
   const title = `${vendor.name} — Menu`;
   const where = place ? `${vendor.name}, ${place}` : vendor.name;
-  const ordering = (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0;
-  const description = ordering
-    ? `Order online from ${where}. ${menuFulfilmentPhrase(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}, pay by UPI.`
-    : `Menu and prices for ${where}. Pay by UPI.`;
+  const menuHidden = await everydayMenuHiddenByDrop(prisma, vendor.id);
+  const ordering = !menuHidden && (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0;
+  const description = menuHidden
+    ? `Pre-order today's special menu from ${where}. Pay by UPI.`
+    : ordering
+      ? `Order online from ${where}. ${menuFulfilmentPhrase(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}, pay by UPI.`
+      : `Menu and prices for ${where}. Pay by UPI.`;
 
   return {
     title,
@@ -394,8 +409,14 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
   const vendor = await loadStorefront(params.slug);
   if (!vendor) notFound();
 
-  const categories = groupByCategory(vendor.menuItems);
-  const popular = vendor.menuItems.filter((i) => i.isPopular).slice(0, 6);
+  const now = new Date();
+  // An open drop with showEverydayMenu=false takes over the page: no menu rows,
+  // pills, counts, "Order now" or menu cart — exactly as if the menu were empty.
+  // Same server check placeMenuOrder uses, so the page and checkout always agree.
+  const menuHidden = await everydayMenuHiddenByDrop(prisma, vendor.id, now);
+  const menuItems = menuHidden ? [] : vendor.menuItems;
+  const categories = groupByCategory(menuItems);
+  const popular = menuItems.filter((i) => i.isPopular).slice(0, 6);
   const payeeName = vendor.upiName ?? vendor.name;
   const upiLink = vendor.upiId
     ? buildUpiCollectLink({ upiId: vendor.upiId, name: payeeName })
@@ -403,9 +424,8 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
   const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
   const rawTheme = vendor.settings?.theme ?? "orange";
   const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
-  const itemCount = vendor.menuItems.length;
+  const itemCount = menuItems.length;
 
-  const now = new Date();
   const [dropViews, customer] = await Promise.all([buildDropViews(vendor.drops, now), getCurrentCustomer()]);
   const prefill: BuyerPrefill | null = customer
     ? { name: customer.name, phone: customer.phone, address: customer.savedAddress }
@@ -667,10 +687,11 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
           </div>
         )}
 
-        {upiLink && menuOrdering ? (
-          /* Menu ordering on: the cart gives the buyer an exact amount, so the
-             open-amount QR is demoted to a collapsed fallback for paying at the
-             counter instead of competing with checkout. */
+        {upiLink && (menuOrdering || menuHidden) ? (
+          /* Menu ordering on (or the menu handed over to an open drop): a cart
+             gives the buyer an exact amount, so the open-amount QR is demoted
+             to a collapsed fallback for paying at the counter instead of
+             competing with checkout. */
           <details
             id="pay"
             className="group mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm"

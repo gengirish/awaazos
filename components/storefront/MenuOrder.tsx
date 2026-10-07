@@ -31,9 +31,10 @@ import {
  * read-only menu rows.
  *
  * No stock, no cut-off: only items the server already filtered to
- * `isAvailable` reach this component, and app/api/s/[slug]/menu-orders
- * re-checks availability and re-reads every price. Only menuItemId + qty leave
- * the browser.
+ * `isAvailable && showOnline` reach this component (so a restored cart drops
+ * anything no longer offered online), and app/api/s/[slug]/menu-orders
+ * re-checks both and re-reads every price. Only menuItemId + qty leave the
+ * browser. Not rendered at all while an open drop hides the everyday menu.
  */
 
 export type MenuOrderItem = {
@@ -70,6 +71,7 @@ export function MenuOrder(props: MenuOrderProps) {
 
   const [open, setOpen] = useState(false);
   const checkoutRef = useRef<HTMLButtonElement>(null);
+  const refreshOnCloseRef = useRef(false);
 
   const byId = useMemo(() => {
     const m = new Map<string, MenuOrderItem>();
@@ -77,7 +79,7 @@ export function MenuOrder(props: MenuOrderProps) {
     return m;
   }, [categories]);
 
-  // Saved per store; items no longer on the (available-only) menu are dropped on restore.
+  // Saved per store; items no longer on the (available + online) menu are dropped on restore.
   const max = maxOrderableQty(null, null);
   const { cart, setCart, clearCart } = usePersistedCart({
     storageKey: cartStorageKey(slug, { kind: "menu" }),
@@ -113,10 +115,25 @@ export function MenuOrder(props: MenuOrderProps) {
         return next;
       });
       router.refresh();
+    } else if (err.error === "menu_paused_for_drop") {
+      // A drop opened while this cart was being built. The menu cart can't be
+      // placed until it closes, so drop it (memory + storage). The refreshed
+      // page has no everyday menu — this component and its sheet unmount — so
+      // refresh only once the buyer has read the message and closed the sheet.
+      clearCart();
+      refreshOnCloseRef.current = true;
     } else if (err.error === "menu_orders_disabled" || err.error === "fulfilment_unavailable") {
       router.refresh();
     }
     return message;
+  }
+
+  function onSheetOpenChange(next: boolean) {
+    setOpen(next);
+    if (!next && refreshOnCloseRef.current) {
+      refreshOnCloseRef.current = false;
+      router.refresh();
+    }
   }
 
   return (
@@ -215,7 +232,7 @@ export function MenuOrder(props: MenuOrderProps) {
 
       <CheckoutSheet
         open={open}
-        onOpenChange={setOpen}
+        onOpenChange={onSheetOpenChange}
         slug={slug}
         endpoint={`/api/s/${encodeURIComponent(slug)}/menu-orders`}
         idPrefix="menu"

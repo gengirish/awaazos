@@ -4,6 +4,7 @@ import {
   addDaysYmd,
   dayOffset,
   dropToFormInput,
+  duplicateDropFields,
   groupDropsByDay,
   istTodayYmd,
   istTomorrowYmd,
@@ -101,6 +102,60 @@ describe("dropToFormInput", () => {
     expect(back.closesAtTime).toBe("21:00");
     expect(back.items.map((i) => i.menuItemId)).toEqual(["a", "b"]); // sorted by sortOrder
     expect(dropUpsertSchema.safeParse(back).success).toBe(true);
+    expect(back.showEverydayMenu).toBe(false); // omitted on input → schema default
+  });
+
+  it.each([true, false])("round-trips showEverydayMenu = %s", (flag) => {
+    const input = dropUpsertSchema.parse({
+      title: "Biryani Sunday",
+      date: "2026-10-11",
+      fulfilmentMode: "PICKUP",
+      fulfilmentStart: "12:00",
+      fulfilmentEnd: "14:00",
+      closesAtDate: "2026-10-11",
+      closesAtTime: "10:00",
+      showEverydayMenu: flag,
+      items: [{ menuItemId: "a", priceInPaise: 25000 }],
+    });
+    const data = dropInputToData(input);
+    expect(data.showEverydayMenu).toBe(flag);
+    const back = dropToFormInput({ ...data, items: input.items });
+    expect(back.showEverydayMenu).toBe(flag);
+    expect(dropUpsertSchema.parse(back).showEverydayMenu).toBe(flag);
+  });
+});
+
+describe("duplicateDropFields (copy for tomorrow)", () => {
+  const src = {
+    title: "Saturday bakes",
+    note: "Eggless",
+    fulfilmentMode: "BOTH" as const,
+    pickupNote: "Gate 2",
+    deliveryFeePaise: 3000,
+    date: ymdToDbDate("2026-10-05"),
+    fulfilmentStartsAt: istToUtc("2026-10-05", "17:00"),
+    fulfilmentEndsAt: istToUtc("2026-10-05", "20:00"),
+    opensAt: null,
+    closesAt: istToUtc("2026-10-04", "21:00"),
+  };
+
+  it.each([true, false])("copies showEverydayMenu = %s", (flag) => {
+    expect(duplicateDropFields({ ...src, showEverydayMenu: flag }, "2026-10-06").showEverydayMenu).toBe(flag);
+  });
+
+  it("copies settings and moves the schedule", () => {
+    const out = duplicateDropFields({ ...src, showEverydayMenu: true }, "2026-10-06");
+    expect(out).toMatchObject({
+      title: "Saturday bakes",
+      note: "Eggless",
+      fulfilmentMode: "BOTH",
+      pickupNote: "Gate 2",
+      deliveryFeePaise: 3000,
+      opensAt: null,
+    });
+    expect(out.date.toISOString()).toBe("2026-10-06T00:00:00.000Z");
+    expect(out.closesAt).toEqual(istToUtc("2026-10-05", "21:00"));
+    expect(Object.keys(out)).not.toContain("status");
   });
 });
 

@@ -133,6 +133,9 @@ describe.skipIf(!ENABLED)("storefront (menu) orders — vendor side, DB integrat
         fulfilmentEndsAt: new Date(now.getTime() + 2 * 86_400_000 + 3_600_000),
         closesAt: new Date(now.getTime() + 86_400_000),
         status: "OPEN",
+        // Keep the everyday menu orderable alongside this drop — these tests
+        // place menu orders after seeding it (see menu-visibility.db.test.ts).
+        showEverydayMenu: true,
         items: { create: [{ menuItemId: v.menuItems[0]!.id, priceInPaise: 1500, sortOrder: 0 }] },
       },
       include: { items: true },

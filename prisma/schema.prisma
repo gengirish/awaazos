@@ -97,6 +97,7 @@ model MenuItem {
   category     String   @default("General")
   priceInPaise Int // ALWAYS store in paise. ₹20 = 2000
   isAvailable  Boolean  @default(true)
+  showOnline   Boolean  @default(true) // false = counter POS only, hidden from the storefront
   isPopular    Boolean  @default(false)
   sortOrder    Int      @default(0)
   imageUrl     String?
@@ -136,6 +137,7 @@ model Drop {
   closesAt           DateTime // Order cut-off (UTC)
   status             DropStatus     @default(DRAFT)
   frozenAt           DateTime?
+  showEverydayMenu   Boolean        @default(false) // false = while this drop is open, the storefront shows only the drop
   createdAt          DateTime       @default(now())
   updatedAt          DateTime       @updatedAt
 

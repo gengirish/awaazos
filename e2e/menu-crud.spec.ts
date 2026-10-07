@@ -71,4 +71,25 @@ test.describe("menu CRUD", () => {
     await page.goto("/menu");
     await expect(page.getByText("Masala Chai").first()).toBeVisible();
   });
+
+  test("Show online switch marks an item counter only, keeping it available", async ({ page, request }) => {
+    await createVendorSession(page, request, "menu-online");
+    const item = await createMenuItem(page, { name: "Kesar Lassi", priceInRupees: 40 });
+
+    await page.goto("/menu");
+    const sw = page.getByRole("switch", { name: "Show Kesar Lassi online" });
+    await expect(sw).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByText("Counter only", { exact: true })).toHaveCount(0);
+
+    await sw.click();
+    await expect(sw).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByText("Counter only", { exact: true })).toBeVisible();
+
+    const list = await page.request.get("/api/menu");
+    const row = ((await list.json()) as { data: (MenuItemRow & { showOnline: boolean })[] }).data.find(
+      (i) => i.id === item.id,
+    );
+    expect(row?.showOnline).toBe(false);
+    expect(row?.isAvailable).toBe(true);
+  });
 });

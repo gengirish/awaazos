@@ -71,6 +71,7 @@ type StoredDropForForm = DropSchedule & {
   fulfilmentMode: DropUpsertInput["fulfilmentMode"];
   pickupNote: string | null;
   deliveryFeePaise: number;
+  showEverydayMenu: boolean;
   items: {
     menuItemId: string;
     priceInPaise: number;
@@ -99,6 +100,7 @@ export function dropToFormInput(drop: StoredDropForForm): DropUpsertInput {
     opensAtTime: opens?.hm ?? null,
     closesAtDate: closes.ymd,
     closesAtTime: closes.hm,
+    showEverydayMenu: drop.showEverydayMenu,
     items: [...drop.items]
       .sort((a, b) => a.sortOrder - b.sortOrder)
       .map((i) => ({
@@ -108,6 +110,32 @@ export function dropToFormInput(drop: StoredDropForForm): DropUpsertInput {
         perOrderLimit: i.perOrderLimit,
         sortOrder: i.sortOrder,
       })),
+  };
+}
+
+type CopyableDrop = DropSchedule & {
+  title: string;
+  note: string | null;
+  fulfilmentMode: DropUpsertInput["fulfilmentMode"];
+  pickupNote: string | null;
+  deliveryFeePaise: number;
+  showEverydayMenu: boolean;
+};
+
+/**
+ * "Copy for tomorrow": the source drop's settings with its schedule moved to
+ * `toYmd`. Everything the vendor configured carries over (including whether the
+ * everyday menu shows alongside it); status, items and orders are the caller's.
+ */
+export function duplicateDropFields(src: CopyableDrop, toYmd: string) {
+  return {
+    title: src.title,
+    note: src.note,
+    fulfilmentMode: src.fulfilmentMode,
+    pickupNote: src.pickupNote,
+    deliveryFeePaise: src.deliveryFeePaise,
+    showEverydayMenu: src.showEverydayMenu,
+    ...shiftDropSchedule(src, toYmd),
   };
 }
 

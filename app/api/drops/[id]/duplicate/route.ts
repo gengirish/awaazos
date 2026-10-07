@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { DropApiError, dropErrorResponse, notFound, withVendorCookie } from "@/lib/drops-api";
-import { shiftDropSchedule } from "@/lib/drops-builder";
+import { duplicateDropFields } from "@/lib/drops-builder";
 import { prisma } from "@/lib/prisma";
 import { requireVendorRole } from "@/lib/rbac";
 
@@ -16,7 +16,8 @@ const bodySchema = z.object({
 /**
  * POST /api/drops/[id]/duplicate — "copy yesterday's menu". One read, one
  * nested create. The whole schedule moves by the same number of days; items
- * keep the source drop's prices and caps. The copy is always a DRAFT.
+ * keep the source drop's prices and caps, and settings (incl. showEverydayMenu)
+ * carry over. The copy is always a DRAFT.
  */
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -32,9 +33,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     });
     if (!src) throw notFound();
 
-    let schedule;
+    let fields;
     try {
-      schedule = shiftDropSchedule(src, date);
+      fields = duplicateDropFields(src, date);
     } catch {
       throw new DropApiError(400, {
         error: "Invalid input",
@@ -45,13 +46,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const created = await prisma.drop.create({
       data: {
         vendorId,
-        title: src.title,
-        note: src.note,
-        fulfilmentMode: src.fulfilmentMode,
-        pickupNote: src.pickupNote,
-        deliveryFeePaise: src.deliveryFeePaise,
         status: "DRAFT",
-        ...schedule,
+        ...fields,
         items: {
           create: src.items.map((i) => ({
             menuItemId: i.menuItemId,

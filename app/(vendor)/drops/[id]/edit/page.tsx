@@ -29,7 +29,7 @@ export default async function EditDropPage({ params }: { params: { id: string } 
   if (!drop) notFound();
 
   const now = new Date();
-  const [menuItems, sold, orderCount] = await Promise.all([
+  const [menuItems, sold, orderCount, settings] = await Promise.all([
     prisma.menuItem.findMany({
       where: { vendorId: vendor.id },
       orderBy: { sortOrder: "asc" },
@@ -37,6 +37,7 @@ export default async function EditDropPage({ params }: { params: { id: string } 
     }),
     soldQtyByDropItem(prisma, drop.id, now),
     prisma.transaction.count({ where: { vendorId: vendor.id, dropId: drop.id, ...liveDropOrderWhere } }),
+    prisma.vendorSettings.findUnique({ where: { vendorId: vendor.id }, select: { acceptMenuOrders: true } }),
   ]);
 
   const soldByMenuItem: Record<string, number> = {};
@@ -79,6 +80,7 @@ export default async function EditDropPage({ params }: { params: { id: string } 
           effectiveStatus={effectiveStatus}
           allowedTransitions={allowedTransitions(drop, now)}
           orderCount={orderCount}
+          hidesEverydayMenu={!drop.showEverydayMenu && Boolean(settings?.acceptMenuOrders)}
         />
 
         {effectiveStatus === "OPEN" || effectiveStatus === "SCHEDULED" ? (

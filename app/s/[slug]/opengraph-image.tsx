@@ -5,6 +5,7 @@ import { formatINR } from "@/lib/currency";
 import { effectiveDropStatus } from "@/lib/drops";
 import { formatFulfilmentWindow, formatIstDayLabel, formatIstTime } from "@/lib/drops-time";
 import { prisma } from "@/lib/prisma";
+import { everydayMenuHiddenByDrops, STOREFRONT_MENU_ITEM_WHERE } from "@/lib/storefront-order";
 
 /**
  * Link-preview card for /s/<slug> — what WhatsApp shows when a vendor shares
@@ -16,8 +17,11 @@ import { prisma } from "@/lib/prisma";
  * generic card carries nothing derived from the slug).
  *
  * Variants, in priority order: an open (or scheduled) drop with its items and
- * cut-off; else, with "Order from menu" on, up to four available menu items
- * (popular first) and "Order online · Pickup/Delivery"; else "See the menu".
+ * cut-off; else, with "Order from menu" on, up to four menu items offered
+ * online (`isAvailable && showOnline`, popular first) and "Order online ·
+ * Pickup/Delivery"; else "See the menu". The menu variant is never used while
+ * an open drop hides the everyday menu (`everydayMenuHiddenByDrops`, same rule
+ * as the page) — that drop is the card.
  *
  * The Prisma `select` is a hand-written allowlist: never `phone` / `email`.
  *
@@ -55,7 +59,7 @@ async function loadCard(slug: string, now: Date) {
       // "Order from menu" variant: only what the card draws.
       settings: { select: { acceptMenuOrders: true, menuFulfilmentMode: true } },
       menuItems: {
-        where: { isAvailable: true },
+        where: STOREFRONT_MENU_ITEM_WHERE,
         orderBy: [{ isPopular: "desc" }, { category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
         take: MAX_ITEMS,
         select: { name: true, priceInPaise: true },
@@ -73,6 +77,7 @@ async function loadCard(slug: string, now: Date) {
           fulfilmentMode: true,
           fulfilmentStartsAt: true,
           fulfilmentEndsAt: true,
+          showEverydayMenu: true,
           items: {
             orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
             take: MAX_ITEMS,
@@ -87,8 +92,9 @@ async function loadCard(slug: string, now: Date) {
   const live = vendor.drops.filter((d) => effectiveDropStatus(d, now) === "OPEN");
   const upcoming = vendor.drops.filter((d) => effectiveDropStatus(d, now) === "SCHEDULED");
   const drop = live[0] ?? upcoming[0] ?? null; // already sorted by closesAt
+  const menuHidden = everydayMenuHiddenByDrops(vendor.drops, now);
   const menuOrdering =
-    !drop && (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0
+    !drop && !menuHidden && (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0
       ? { mode: vendor.settings?.menuFulfilmentMode ?? "PICKUP", items: vendor.menuItems }
       : null;
   return { name: vendor.name, city: vendor.city, drop, menuOrdering };
