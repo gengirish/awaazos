@@ -1,23 +1,11 @@
 import { redirect } from "next/navigation";
 
 import { PosShell } from "@/components/pos/PosShell";
+import { getIstTodayStart } from "@/lib/billing-period";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
-
-function startOfTodayIST(): Date {
-  const parts = new Intl.DateTimeFormat("en-CA", {
-    timeZone: "Asia/Kolkata",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).formatToParts(new Date());
-  const y = parts.find((p) => p.type === "year")!.value;
-  const m = parts.find((p) => p.type === "month")!.value;
-  const d = parts.find((p) => p.type === "day")!.value;
-  return new Date(`${y}-${m}-${d}T00:00:00.000Z`);
-}
 
 export default async function PosPage() {
   let vendorId: string;
@@ -31,7 +19,7 @@ export default async function PosPage() {
     throw e;
   }
 
-  const today = startOfTodayIST();
+  const today = getIstTodayStart();
 
   const [daily, menuItems, vendorRecord] = await Promise.all([
     prisma.dailySummary.findUnique({

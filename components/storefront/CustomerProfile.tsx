@@ -6,22 +6,8 @@ import { useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { formatIndianMobile, normaliseIndianMobile } from "@/lib/phone";
 
-/** "+919876543210" → "98765 43210" for display; anything else as stored. */
-function displayPhone(e164: string | null): string {
-  if (!e164) return "";
-  const m = /^\+91(\d{5})(\d{5})$/.exec(e164);
-  return m ? `${m[1]} ${m[2]}` : e164;
-}
-
-/** Mirrors DropOrder: 10 digits → +91…; empty stays empty. */
-function normalisePhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 0) return "";
-  if (digits.length === 10) return `+91${digits}`;
-  if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`;
-  return raw.trim();
-}
 
 export type CustomerProfileProps = {
   email: string;
@@ -34,7 +20,7 @@ export type CustomerProfileProps = {
 export function CustomerProfile(props: CustomerProfileProps) {
   const router = useRouter();
   const [name, setName] = useState(props.name ?? "");
-  const [phone, setPhone] = useState(displayPhone(props.phone));
+  const [phone, setPhone] = useState(formatIndianMobile(props.phone));
   const [address, setAddress] = useState(props.savedAddress ?? "");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
@@ -48,7 +34,7 @@ export function CustomerProfile(props: CustomerProfileProps) {
       const res = await fetch("/api/s/customer/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone: normalisePhone(phone), savedAddress: address }),
+        body: JSON.stringify({ name, phone: normaliseIndianMobile(phone), savedAddress: address }),
       });
       if (res.ok) {
         setStatus({ kind: "ok", text: "Saved." });

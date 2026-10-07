@@ -19,7 +19,7 @@ function istYmdParts(d: Date): { y: string; m: string; day: string } {
 }
 
 /**
- * Calendar “today” in IST as a Date stored like POS `startOfTodayIST` — midnight UTC
+ * Calendar “today” in IST — midnight UTC
  * of the IST calendar Y-M-D for Postgres `@db.Date` keys.
  */
 export function getIstTodayStart(now: Date = new Date()): Date {

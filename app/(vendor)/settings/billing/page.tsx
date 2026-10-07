@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { BillingManageClient } from "@/components/billing/BillingManageClient";
 import { SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { PLAN_LIMITS } from "@/lib/constants";
+import { formatIstDate } from "@/lib/datetime";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
@@ -24,13 +25,7 @@ function startOfCalendarMonthKolkata(): Date {
 }
 
 function formatDateDdMmYyyyIst(d: Date | null): string {
-  if (!d) return "—";
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d);
+  return d ? formatIstDate(d) : "—";
 }
 
 export default async function BillingSettingsPage() {

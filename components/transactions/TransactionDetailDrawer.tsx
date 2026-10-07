@@ -14,6 +14,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatINR } from "@/lib/currency";
+import { formatIstDateTime } from "@/lib/datetime";
 import { receiptWhatsappUrl } from "@/lib/whatsapp-message";
 
 export type TransactionDetailModel = {
@@ -42,19 +43,6 @@ export type TransactionDetailModel = {
     whatsappSent: boolean;
   } | null;
 };
-
-function formatIstDateTime(iso: string): string {
-  const d = new Date(iso);
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(d);
-}
 
 type Props = {
   open: boolean;

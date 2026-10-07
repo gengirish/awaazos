@@ -14,6 +14,11 @@ const IST_DATE_TIME_FORMAT = new Intl.DateTimeFormat("en-IN", {
   timeZone: "Asia/Kolkata",
 });
 
+const ONE_DECIMAL = new Intl.NumberFormat("en-IN", {
+  minimumFractionDigits: 1,
+  maximumFractionDigits: 1,
+});
+
 function formatDelta(delta: number): { label: string; tone: "pos" | "neg" | "zero" } {
   const pct = delta * 100;
   if (Math.abs(pct) < 0.05) {
@@ -21,7 +26,7 @@ function formatDelta(delta: number): { label: string; tone: "pos" | "neg" | "zer
   }
   const sign = pct > 0 ? "+" : "";
   return {
-    label: `${sign}${pct.toFixed(1)}%`,
+    label: `${sign}${ONE_DECIMAL.format(pct)}%`,
     tone: pct > 0 ? "pos" : "neg",
   };
 }
@@ -45,7 +50,7 @@ export default async function AdminMetricsPage() {
 
   const metrics = await getAdminMetrics();
 
-  const voicePctLabel = `${(metrics.voiceSuccessRate7d * 100).toFixed(1)}%`;
+  const voicePctLabel = `${ONE_DECIMAL.format(metrics.voiceSuccessRate7d * 100)}%`;
   const activeWow = formatDelta(metrics.wowGrowth.activeVendorsWoW);
   const gmvWow = formatDelta(metrics.wowGrowth.gmvWoW);
   const generatedAt = IST_DATE_TIME_FORMAT.format(metrics.windows.now);
@@ -89,7 +94,7 @@ export default async function AdminMetricsPage() {
           </CardHeader>
           <CardContent>
             <p className="text-4xl font-bold tabular-nums text-foreground">
-              {metrics.billsPerVendorPerDayMedian.toFixed(1)}
+              {ONE_DECIMAL.format(metrics.billsPerVendorPerDayMedian)}
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               Median across active vendors (7d total ÷ 7)

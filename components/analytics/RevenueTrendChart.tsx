@@ -10,7 +10,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { formatINR } from "@/lib/currency";
+import { formatINR, paiseToRupees } from "@/lib/currency";
 
 export type RevenueTrendPoint = {
   dateKey: string;
@@ -26,7 +26,7 @@ export type RevenueTrendChartProps = {
 export function RevenueTrendChart({ data, title = "Revenue trend" }: RevenueTrendChartProps) {
   const chartData = data.map((d) => ({
     ...d,
-    revenueRupees: d.revenuePaise / 100,
+    revenueRupees: paiseToRupees(d.revenuePaise),
   }));
 
   return (
