@@ -3,7 +3,7 @@
  * tuned for Indian B2B context — common Indian + global passwords blocklisted,
  * minimum 8 chars, 2-of-4 character classes.
  *
- * Future hardening (tracked in HARDENING.md): swap in zxcvbn if false-positive
+ * Future hardening (tracked in TODO.md §4.6): swap in zxcvbn if false-positive
  * rate becomes a problem, or call HaveIBeenPwned k-anonymity API for breach
  * checking. Both deferred to avoid 600KB+ bundle bloat for an MVP.
  */

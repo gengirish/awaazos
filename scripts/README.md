@@ -2,13 +2,24 @@
 
 Operational utilities. Not deployed; run locally only.
 
+| Script | npm script | What it checks |
+|---|---|---|
+| `sarvam-roundtrip.mjs` | `npm run smoke:sarvam` | Sarvam TTS → STT round trip (no audio file needed) |
+| `openai-stt-smoke.mjs` | `npm run smoke:openai` | OpenAI transcription of a local clip |
+| `groq-stt-smoke.mjs` | `npm run smoke:groq` | Groq Whisper transcription of a local clip |
+| `whisper-stt-smoke.mjs` | `npm run smoke:whisper` | Self-hosted Whisper (`services/whisper-stt`) on a local clip |
+| `generate-pwa-icons.mjs` | none | Regenerates the PWA / push icons in `public/` |
+
+The smoke scripts are one-shot round trips against a live provider, for checking credentials and
+connectivity. They read keys from `.env.local` (an already-set environment variable wins) and never
+print a key in full. Use your own or synthetic clips only, never vendor or customer audio. Pass
+arguments to an npm script after `--`, e.g. `npm run smoke:openai -- clip.webm en-IN`.
+
 ## `sarvam-roundtrip.mjs`
 
-End-to-end smoke test for the Sarvam Saaras voice pipeline. Synthesises a
-Hindi phrase via Sarvam TTS (`bulbul:v2`, speaker `anushka`), then sends
-the resulting WAV back through Sarvam STT (`saaras:v3` or whatever
-`SARVAM_STT_MODEL` env says), and verifies the round-trip transcript
-materially overlaps the input via word-level Jaccard similarity.
+Synthesises a phrase with Sarvam TTS (`bulbul:v2`, speaker `anushka`), sends the WAV back through
+Sarvam STT (`SARVAM_STT_MODEL`, default `saaras:v3`), and checks that the transcript overlaps the
+input by word-level Jaccard similarity.
 
 ```bash
 # default: "दो समोसा और एक चाय दे दो" in hi-IN
@@ -19,11 +30,51 @@ node scripts/sarvam-roundtrip.mjs "ek aloo samosa de do" hi-IN
 node scripts/sarvam-roundtrip.mjs "ఒక చాయ్ ఇవ్వండి" te-IN
 ```
 
-Reads `SARVAM_API_KEY` and (optional) `SARVAM_STT_MODEL` from
-`.env.local`. The API key is never logged in full -- only first 6 chars +
-length. Exit codes:
+Env: `SARVAM_API_KEY`, optional `SARVAM_STT_MODEL`. Exit codes:
 
-- `0` -- TTS + STT both succeeded and Jaccard >= 0.4
-- `1` -- network / HTTP / parse / config error (see emitted JSON)
-- `2` -- both APIs returned 200 but transcript barely overlaps the input
-  (model degradation -- worth investigating before a vendor demo)
+- `0`: TTS and STT both succeeded and Jaccard >= 0.4
+- `1`: network / HTTP / parse / config error (see the emitted JSON)
+- `2`: both APIs returned 200 but the transcript barely overlaps the input (model degradation;
+  worth investigating before a vendor demo)
+
+## `openai-stt-smoke.mjs`
+
+```bash
+node scripts/openai-stt-smoke.mjs <path-to-audio> [lang]
+```
+
+`lang` is `en-IN` or `hi-IN` (default `hi-IN`). Model is `OPENAI_STT_MODEL`, default
+`gpt-4o-mini-transcribe`. Env: `OPENAI_API_KEY`. Files over 25 MB are rejected. Exit `0` on a
+transcript, `1` on any failure. Don't send real customer audio to an org without zero data
+retention.
+
+## `groq-stt-smoke.mjs`
+
+```bash
+node scripts/groq-stt-smoke.mjs <path-to-audio> [lang]
+```
+
+`lang` is one of `en-IN`, `hi-IN`, `te-IN`, `kn-IN`, `ta-IN` (default `hi-IN`). Model is
+`GROQ_STT_MODEL`, default `whisper-large-v3-turbo`. Env: `GROQ_API_KEY`. Exit `0` on a transcript,
+`1` on any failure. Don't run it on vendor audio until a DPDP-compliant agreement with Groq is in
+place.
+
+## `whisper-stt-smoke.mjs`
+
+```bash
+node scripts/whisper-stt-smoke.mjs <path-to-audio> [lang]
+```
+
+Posts the clip to `${WHISPER_STT_URL}/v1/transcribe` with `Authorization: Bearer
+${WHISPER_STT_SECRET}`. `lang` is one of `en-IN`, `hi-IN`, `te-IN`, `kn-IN`, `ta-IN` (default
+`hi-IN`). `WHISPER_STT_SECRET` must be at least 16 characters. Exit `0` on a transcript, `1` on any
+failure. The Fly app scales to zero, so the first call after idle is slow.
+
+## `generate-pwa-icons.mjs`
+
+```bash
+node scripts/generate-pwa-icons.mjs
+```
+
+Renders `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` and `badge-72.png` into `public/`
+from an inline SVG, using the Playwright Chromium already installed for e2e.

@@ -4,7 +4,7 @@ import { withSentryConfig } from "@sentry/nextjs";
 
 // Strict-but-pragmatic CSP. 'unsafe-inline' and 'unsafe-eval' on script-src
 // are tolerated for Next.js 14 inline JSON hydration; nonce-based CSP is a
-// future hardening (tracked in HARDENING.md → roadmap). Style 'unsafe-inline'
+// future hardening (tracked in TODO.md §4.6). Style 'unsafe-inline'
 // is required by Tailwind. Connect-src allowlists every upstream we call.
 const CSP = [
   "default-src 'self'",

@@ -1,25 +1,21 @@
 # AwaazOS — Bol. Bill. Becho.
 
 > **Voice-first POS + digital billing for India's 60 million small vendors.**
-> Speak the order in any Indian language → instant UPI QR → WhatsApp receipt → live sales dashboard. ₹0 to start.
+> Speak the order in Hindi or English → instant UPI QR → WhatsApp receipt → live sales dashboard. ₹0 to start.
 
 [![Live](https://img.shields.io/badge/live-awaazos.vercel.app-brightgreen)](https://awaazos.vercel.app)
 [![Stack](https://img.shields.io/badge/stack-Next.js%2014%20%C2%B7%20Auth.js%20%C2%B7%20Neon%20%C2%B7%20Claude%204.5-blueviolet)](#-tech-stack)
 [![License](https://img.shields.io/badge/license-proprietary-lightgrey)](#-license)
 
-> **Today (May 2026):** Production-deployed. Onboarding our first 10 design-partner chai vendors in Hyderabad in person. Real weekly traction numbers will appear here every Monday — see `/admin/metrics` for the live counts.
+> **Status:** Production-deployed, with design-partner vendors in Hyderabad. Live counts are on the admin-only `/admin/metrics` page.
 
 ---
 
 ## 🎬 60-Second Demo
 
-<!-- Once the video is published, replace <VIDEO_ID> in the two lines below. Storyboard: ./DEMO_VIDEO.md -->
-
-[![AwaazOS — 60-second demo](https://img.shields.io/badge/▶%20Watch-60s%20demo-red?style=for-the-badge)](https://youtu.be/<VIDEO_ID>)
-
 > Voice command in Hindi → cart fills in real time → UPI QR → WhatsApp receipt. Sixty seconds, end-to-end, on a real phone, in a real chai stall.
 >
-> _Production guide for shooting + editing + publishing this video lives in [`DEMO_VIDEO.md`](./DEMO_VIDEO.md)._
+> _The recorded video is not published yet. The original April 2026 script is archived (and partly stale) at [`docs/archive/DEMO_VIDEO.md`](./docs/archive/DEMO_VIDEO.md)._
 >
 > _**Live** walkthroughs (Zoom / investor rooms): [`docs/DEMO_GUIDE.md`](./docs/DEMO_GUIDE.md)._
 
@@ -33,7 +29,7 @@
 | **Pricing** | https://awaazos.vercel.app/pricing |
 | **Sign up** | https://awaazos.vercel.app/sign-up |
 | **GitHub** | https://github.com/gengirish/awaazos |
-| **60s video demo** | https://youtu.be/<VIDEO_ID> _(coming soon — see [DEMO_VIDEO.md](./DEMO_VIDEO.md))_ |
+| **60s video demo** | _not published yet_ |
 | **Live demo script** | [docs/DEMO_GUIDE.md](./docs/DEMO_GUIDE.md) _(Zoom / investors)_ |
 
 > 60-second test: sign up → onboard a stall → add 3 menu items → open `/pos` on your phone → tap the orange mic → say _"do samosa aur ek chai"_ → see the cart fill → scan the UPI QR → bill `AWZ-YYYYMMDD-0001` is generated atomically → check `/analytics`.
@@ -56,11 +52,11 @@ India has **63 million MSMEs** and **~25 million micro-merchants** — chai wala
 
 A POS where **the only interface is your voice and your eyes**.
 
-1. Vendor speaks the order in their language → AwaazOS transcribes (Sarvam Saaras v2 for Indic, Web Speech for en/hi)
+1. Vendor speaks the order in Hindi or English → the browser's Web Speech API transcribes it (a server-side STT cascade exists as an opt-in fallback; see Tech stack below)
 2. Claude Haiku 4.5 parses the transcript against this vendor's exact menu (with prompt caching) and emits structured items via tool-use
 3. Cart fills, total computes in paise (no float math, ever)
 4. Vendor taps **Collect Payment** → big UPI QR code → customer scans with GPay / PhonePe / Paytm
-5. Mark as paid → atomic bill number `AWZ-20260423-0001` → DB transaction commits → WhatsApp receipt enqueued
+5. Mark as paid → atomic bill number `AWZ-20260423-0001` → DB transaction commits → vendor taps **Send on WhatsApp** and the receipt opens pre-filled in their own WhatsApp (`wa.me` link)
 6. Owner sees real-time dashboards (revenue trend, top sellers, hourly heatmap, voice adoption %)
 
 All of this on a phone, in <8 seconds per transaction. **Hindi + English at MVP. More on roadmap once 50 vendors are active.**
@@ -72,15 +68,17 @@ All of this on a phone, in <8 seconds per transaction. **Hindi + English at MVP.
 ### Built and shipped
 
 - 🎙️ **Voice-first POS** — 80×80 mic button, 6 visual states (idle / listening / transcribing / parsing / success / error), distinguishable beyond color, full `aria-live` for screen readers
-- 🌍 **STT routing** — Web Speech for English & Hindi, Sarvam Saaras v2 wired in for Indic expansion as cohort demands
-- 🧠 **Two-tier AI parsing** — Claude Haiku 4.5 primary with ephemeral prompt caching on the menu, escalates to Sonnet 4.5 only on low confidence
+- 🌍 **STT routing** — Web Speech in the browser for English & Hindi. A server cascade (`/api/ai/transcribe`, STARTER+) is wired with per-provider circuit breakers: OpenAI → Groq → self-hosted Whisper for en/hi, Sarvam Saaras v3 → Groq → Whisper for Telugu / Kannada / Tamil. te/kn/ta are **dormant**: the code and golden fixtures are kept, but the language picker offers only English and Hindi
+- 🧠 **Two-tier AI parsing** — Claude Haiku 4.5 primary with ephemeral prompt caching on the menu, escalates to Sonnet 4.5 on empty or low-confidence results (`shouldEscalate()`) or a Haiku error
 - 💰 **Integer-paise math everywhere** — no `parseFloat`, no `toFixed` (single exception: UPI deep-link `am=` per spec)
 - 🔢 **Atomic bill numbering** — `AWZ-YYYYMMDD-NNNN` via `BillSequence.upsert` inside `prisma.$transaction`, race-safe across concurrent sales
-- 📲 **WhatsApp receipts** — Gupshup REST + BullMQ background queue + idempotent worker, customer phone PII-protected (never logged, only last-4 in CSV exports)
+- 📲 **WhatsApp receipts** — the vendor sends the bill from their own WhatsApp via a pre-filled `wa.me` link (`GET /api/receipts/message`); no Business API, no template, free on every plan. Customer phone is PII-protected (never logged, only last-4 in CSV exports). An older Gupshup + BullMQ path is still in the code but unused by the UI
 - 💳 **UPI deep links + QR** — vendor's own UPI ID, no MDR fees, scannable from any UPI app
 - 📊 **Analytics dashboard** — Recharts revenue trend, hourly heatmap, top sellers, voice adoption %, payment method breakdown — every chart has a `<details>` data table for accessibility
 - 🏢 **Multi-tenant** — `vendorId` scoping enforced on every query, two-layer RBAC (platform `UserRole` + per-tenant `StaffRole`)
-- 💸 **Razorpay subscriptions** — ₹299/mo per vendor, FREE for first 50 transactions, plan gates with `PlanGateError(402)` returning structured upgrade prompts
+- 💸 **Razorpay subscriptions** — ₹299/mo per vendor, FREE up to 50 transactions a month, plan gates with `PlanGateError(402)` returning structured upgrade prompts
+- 🛍️ **Public storefront + Drops** — opt-in `/s/[slug]` page where buyers order from the everyday menu or from a pre-order "drop" (cut-off, capped stock, orders board, prep sheet). Payment by UPI + UTR, pay on delivery, or the vendor's own Razorpay keys
+- 🔔 **Web Push alerts** — new storefront orders and submitted UPI references push to the vendor's opted-in devices (`lib/push.ts`, `public/sw.js`)
 - 🇮🇳 **India-first defaults** — IST timezone, DD/MM/YYYY dates, `+91` 10-digit phone validation, `Intl.NumberFormat('en-IN', { currency: 'INR' })`, `libphonenumber-js`
 - 🔐 **Auth.js v5 (NextAuth)** — Edge-split config, JWT sessions, Credentials provider with bcrypt, single `prisma.$transaction` for sign-up
 - 🎨 **Mobile-first UI** — Tailwind + shadcn/ui, saffron AwaazOS palette (`--awaaz-orange` AA-contrast), Baloo 2 + Nunito Indic-friendly fonts
@@ -104,13 +102,13 @@ _Also planned, not shipped:_ automated accessibility audits in CI (`@axe-core/pl
 | **Database** | Neon Serverless PostgreSQL | Branchable, scales to zero, Indian-region availability |
 | **ORM** | Prisma | Type-safe, `$transaction` for atomicity, `upsert` for idempotency |
 | **AI / Voice** | Anthropic Claude Haiku 4.5 (primary) + Sonnet 4.5 (fallback), tool-use, prompt caching | Best Indic instruction-following at lowest cost |
-| **STT** | Sarvam Saaras v2 (Indic) + Web Speech API (en/hi) | Sarvam best for Indian languages; Web Speech free for browser-native |
-| **Background jobs** | BullMQ + Redis (Fly.io workers) | Receipt sending, voice telemetry, retries with backoff |
+| **STT** | Web Speech API (en/hi, in-browser) + server cascade: OpenAI `gpt-4o-mini-transcribe`, Groq `whisper-large-v3-turbo`, Sarvam Saaras v3 (dormant te/kn/ta), self-hosted Whisper on Fly | Web Speech is free and needs no server call from us; the cascade covers the opt-in server path, each hop behind its own circuit breaker |
+| **Background jobs** | BullMQ + Redis (Fly.io workers) | Voice telemetry, retention runs, retries with backoff |
 | **Serverless KV** | [@upstash/redis](https://github.com/upstash/redis-js) HTTP on Vercel | Rate limits, idempotency keys, AI usage caps; no TCP from serverless |
-| **Payments** | Razorpay subscriptions + payment links | India-first, supports UPI / cards / wallets / EMI |
-| **Messaging** | Gupshup WhatsApp Business API | Cheapest verified WABA channel for India |
+| **Payments** | Razorpay subscriptions (platform) · UPI deep link + QR (POS) · vendor's own Razorpay keys (storefront) | India-first; storefront money goes to the vendor, never through the platform |
+| **Messaging** | `wa.me` links from the vendor's own WhatsApp · Web Push (`web-push`, VAPID) · AgentMail (password-reset and buyer magic-link email) | No WhatsApp Business API or templates needed |
 | **Hosting** | Vercel (Next.js) + Fly.io BOM region (workers) | Edge for users, BOM for low-latency to Indian compute |
-| **Storage** | Vercel Blob | Vendor logos, future menu item photos |
+| **Storage** | Vercel Blob | Menu item photos |
 | **Testing** | Vitest (unit) + Playwright (E2E — chromium + Pixel 7 mobile, `en-IN` locale, `Asia/Kolkata` timezone) | Fast unit feedback, real-browser E2E on the exact locale and timezone vendors run in |
 
 ---
@@ -125,20 +123,23 @@ npm install
 
 # 2. Copy env template, fill in your secrets
 cp .env.local.example .env.local
-# Required to boot: DATABASE_URL, AUTH_SECRET
-# Required for voice: ANTHROPIC_API_KEY (and SARVAM_API_KEY for non-en/hi)
-# Optional: RAZORPAY_*, GUPSHUP_*, BLOB_READ_WRITE_TOKEN
-# Vercel production: UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN (see .env.local.example)
-# Workers (local/Fly): REDIS_URL (TCP rediss:// — BullMQ only)
+# Required to boot: DATABASE_URL, AUTH_SECRET (set AUTH_URL too)
+# Required for voice parsing: ANTHROPIC_API_KEY
+# Optional server STT: OPENAI_API_KEY, GROQ_API_KEY, WHISPER_STT_URL + WHISPER_STT_SECRET
+#   (SARVAM_API_KEY only matters for the dormant te/kn/ta path)
+# Optional: RAZORPAY_* (incl. RAZORPAY_PLAN_STARTER / _PRO), BLOB_READ_WRITE_TOKEN,
+#   VAPID keys (Web Push), AGENTMAIL_*, SENTRY_*
+# Redis: UPSTASH_REDIS_REST_* (HTTP) and REDIS_URL (TCP, BullMQ) — see "Two Redis surfaces" in CLAUDE.md
+# Every variable is documented in .env.local.example
 
-# 3. Push Prisma schema to your Neon DB
+# 3. Push Prisma schema to your Neon DB (no migration files, no seed script)
 npx prisma db push
 
 # 4. Run dev server
 npm run dev
 # → http://localhost:3000
 
-# 5. (Optional) Run BullMQ workers locally for WhatsApp receipts
+# 5. (Optional) Run BullMQ workers locally (voice telemetry, retention)
 docker run -d --name awaazos-redis -p 6379:6379 redis:7-alpine
 npm run worker  # or: npx tsx workers/index.ts
 ```
@@ -166,73 +167,82 @@ npm run lint        # next lint
 npm test            # vitest run
 npm run build       # next build
 npm run e2e         # playwright (uses dev server) — chromium + mobile
-BASE_URL=https://awaazos.vercel.app npm run e2e   # E2E against prod
 ```
 
 Vitest unit + Playwright E2E (chromium + Pixel 7 mobile, en-IN locale, IST timezone). See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for the full testing stack and what each suite guards.
+
+> **The E2E suite writes real rows** (it registers vendors and rings up sales). Never run it against the production database or deployment; use a throwaway Postgres as shown in [`CLAUDE.md`](./CLAUDE.md#e2e-writes-real-rows--never-point-it-at-production).
 
 ---
 
 ## ☁️ Production deployment
 
-The app is deployed today across two providers:
+The app is deployed across these services:
 
 | Service | Host | What runs there |
 | --- | --- | --- |
 | **Web** | Vercel (`awaazos.vercel.app`) | Next.js App Router, all `/api/*` routes, marketing + vendor pages |
-| **Workers** | Fly.io `awaazos-workers` (BOM region) | BullMQ workers for `voiceLog` + `send-receipt` + retention |
-| **Redis (HTTP)** | Upstash REST (`UPSTASH_REDIS_*` on Vercel) | Rate limiting, idempotency, monthly AI caps, `/api/ready` Redis probe |
-| **Redis (TCP)** | Same or separate Upstash / Fly Redis (`REDIS_URL` on workers) | BullMQ only — persistent connection on Fly, **not** reachable from Vercel serverless |
+| **Workers** | Fly.io `awaazos-workers` (BOM region) | BullMQ workers for `voice-parse-log`, `send-receipt` (dormant Gupshup path) and retention. **The Fly app does not currently exist**; see TODO.md 1.1 |
+| **Whisper STT** | Fly.io (`services/whisper-stt`) | Optional self-hosted last-resort ASR |
+| **Redis (HTTP)** | Upstash REST (`UPSTASH_REDIS_*` on Vercel) | Rate limiting, idempotency, circuit breakers, monthly AI caps, `/api/ready` Redis probe |
+| **Redis (TCP)** | `REDIS_URL`, a public `rediss://` endpoint | BullMQ: Vercel routes enqueue, Fly workers consume |
 | **Database** | Neon Serverless Postgres (us-east-1) | All app data, `prisma.$transaction` boundaries |
+
+The two Redis surfaces are not interchangeable; the canonical explanation is in [`CLAUDE.md`](./CLAUDE.md#deploy-topology-three-hosts-not-one).
 
 ### Deploy from scratch
 
+Vercel deploys through its GitHub integration. [`vercel.json`](./vercel.json) skips every non-production build, so preview deployments are off and **a push to `main` is a production deploy**.
+
 ```bash
-# 1. Vercel (frontend + API)
+# 1. Vercel (frontend + API): connect the GitHub repo in the Vercel dashboard, then set env
 vercel link
 vercel env add DATABASE_URL production    # paste Neon pooled URL
 vercel env add AUTH_SECRET production     # openssl rand -base64 32
 vercel env add AUTH_TRUST_HOST production # value: true
+vercel env add AUTH_URL production        # the public production origin
 vercel env add ANTHROPIC_API_KEY production
 # Upstash REST (Vercel serverless — rate limits, idempotency, /api/ready)
 vercel env add UPSTASH_REDIS_REST_URL production   # https://....upstash.io
 vercel env add UPSTASH_REDIS_REST_TOKEN production
-# ... (add SARVAM_*, RAZORPAY_*, GUPSHUP_*, BLOB_READ_WRITE_TOKEN, SENTRY_* as needed)
-# Optional on Vercel: REDIS_URL only if you enqueue BullMQ from API routes using TCP (default uses ioredis + Fly secret)
-vercel --prod
+# REDIS_URL: public TCP endpoint. Without it, BullMQ enqueues fail (voice telemetry is dropped).
+vercel env add REDIS_URL production
+# ... (add OPENAI_* / GROQ_* / WHISPER_*, RAZORPAY_*, VAPID keys, AGENTMAIL_*, BLOB_READ_WRITE_TOKEN, SENTRY_* as needed)
+git push origin main   # builds and deploys production
 
 # 2. Fly.io workers
 flyctl launch --name awaazos-workers --region bom --no-deploy
 # Provision Redis with a TCP URL workers can hold open (Fly Redis, or Upstash rediss://)
 flyctl redis create --name awaazos-redis --org personal --region bom \
   --no-replicas --enable-eviction --enable-prodpack=false
-# copy the printed rediss:// or redis:// URL — private Fly URLs do NOT work from Vercel
+# copy the printed URL — private Fly *.internal URLs do NOT work from Vercel
+# A worker holds a TCP connection 24/7; on a pay-per-command Redis plan that bills even at zero traffic.
 
+# DATABASE_URL + AUTH_SECRET are boot-required by lib/env.ts. GUPSHUP_* only feed the dormant
+# receipt worker; the workers never call Anthropic.
 flyctl secrets set --app awaazos-workers \
   REDIS_URL="rediss://..." \
   DATABASE_URL="postgresql://..." \
-  ANTHROPIC_API_KEY="..." \
+  AUTH_SECRET="..." \
   GUPSHUP_API_KEY="..." \
-  GUPSHUP_SOURCE_NUMBER="..." \
-  AUTH_SECRET="..."
+  GUPSHUP_APP_NAME="..." \
+  GUPSHUP_SOURCE_NUMBER="..."
 
 flyctl deploy --app awaazos-workers --remote-only --ha=false
-
-# 3. If API routes enqueue BullMQ jobs, set REDIS_URL on Vercel to a **public** TCP Redis URL
-# (same Upstash database TCP endpoint as workers, or a dedicated instance). Do NOT use Fly *.internal URLs.
 ```
+
+The optional Whisper ASR service has its own Fly app and instructions in [`services/whisper-stt/README.md`](./services/whisper-stt/README.md).
 
 ### Per-deploy workflow we follow
 
 For every meaningful change:
 
 1. `npm test && npm run typecheck && npm run lint && npm run build` — must all pass
-2. `git add -A && git commit -m "feat(scope): ..."` — conventional commits
-3. `git push origin main` — GitHub integration auto-builds Vercel
-4. `vercel --prod --yes` — explicit CLI prod deploy for synchronous URL
-5. `BASE_URL=https://awaazos.vercel.app npx playwright test` — E2E against live
+2. Playwright against a throwaway Postgres (see [`CLAUDE.md`](./CLAUDE.md#e2e-writes-real-rows--never-point-it-at-production)), never against production
+3. `git commit -m "feat(scope): ..."` — conventional commits
+4. `git push origin main` — the GitHub integration builds and deploys production; CI runs lint, typecheck, unit, build, E2E (against a CI Postgres service), gitleaks and `npm audit`
 
-See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system diagrams, [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md) for production monitoring/alerting setup, [`HARDENING.md`](./HARDENING.md) for the production hardening checklist, [`docs/DEMO_GUIDE.md`](./docs/DEMO_GUIDE.md) for live demo walkthroughs, and [`PITCH.md`](./PITCH.md) for the YC pitch.
+See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system diagrams, [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md) for production monitoring/alerting setup, [`docs/README.md`](./docs/README.md) for the index of ops docs and production controls, [`docs/DEMO_GUIDE.md`](./docs/DEMO_GUIDE.md) for live demo walkthroughs, and [`PITCH.md`](./PITCH.md) for the YC pitch.
 
 ---
 
@@ -240,8 +250,8 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system diagrams, [`docs/OBSERVABI
 
 - **Secrets** — never committed; `.env.local` is gitignored. Real secrets live only in Vercel env + Fly secrets.
 - **PII boundaries** — customer phone numbers are stored in Neon for re-send capability but **never sent to LLMs or STT providers**, **never logged in plaintext** (only last-4 in CSV exports / log lines).
-- **Webhook auth** — Razorpay webhooks verified via HMAC-SHA256 with `crypto.timingSafeEqual`.
-- **HTTPS only** — middleware enforces; `AUTH_TRUST_HOST=true` lets Vercel's proxy work for Auth.js.
+- **Webhook auth** — Razorpay webhooks (platform and per-vendor storefront) verified via HMAC-SHA256 with `crypto.timingSafeEqual`.
+- **HTTPS only** — `Strict-Transport-Security` (2 years, `includeSubDomains`, `preload`) is set in `next.config.mjs` alongside the CSP; `AUTH_TRUST_HOST=true` lets Vercel's proxy work for Auth.js.
 - **Tenant isolation** — every Prisma `where` clause includes `vendorId`. Helper `requireVendorRole(role)` returns the resolved vendor and throws on cross-tenant access. CI guard recommended (not yet wired).
 - **Plan gates** — `PlanGateError(402)` returns `{ code, requiredPlan, currentPlan, feature }` so the UI can render contextual upgrade CTAs.
 
@@ -252,74 +262,48 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system diagrams, [`docs/OBSERVABI
 ```
 awaazos/
 ├── app/
-│   ├── (marketing)/         landing, pricing — public
-│   ├── (auth)/              sign-in, sign-up
+│   ├── (marketing)/         landing, pricing (public)
+│   ├── (auth)/              sign-in, sign-up, forgot / reset password
 │   ├── (onboarding)/        first-run vendor setup
-│   ├── (vendor)/            menu, pos, transactions, analytics, settings
-│   └── api/
-│       ├── auth/[...nextauth]/  Auth.js v5
-│       ├── menu/                CRUD
-│       ├── transactions/        atomic bill creation + list + CSV export
-│       ├── receipts/send/       enqueue WhatsApp receipt
-│       ├── ai/parse-order/      Claude two-tier NLU
-│       ├── ai/transcribe/       Sarvam STT (plan-gated)
-│       ├── razorpay/            subscription create / cancel
-│       └── webhooks/razorpay/   HMAC-verified webhook handler
-├── components/
-│   ├── ui/                  shadcn primitives
-│   ├── marketing/           Hero, HowItWorks, Features, PricingTeaser
-│   ├── menu/                MenuGrid, MenuItemForm
-│   ├── pos/                 PosShell, VoiceOrderButton (80×80), QuickAddGrid, OrderCart, UpiQRModal, ReceiptModal
-│   ├── transactions/        TransactionsTable, TransactionDetailDrawer
-│   ├── analytics/           AnalyticsDashboard, RevenueTrendChart, HourlyHeatmap, TopItemsList, VoiceAdoptionCard, PaymentMethodBreakdown
-│   └── billing/             SubscriptionGate, PricingPlanButtons
-├── lib/
-│   ├── auth.ts / auth.config.ts   Auth.js v5 split (edge + node)
-│   ├── prisma.ts                  PrismaClient singleton
-│   ├── env.ts                     Zod-validated env (boot-required vs feature-gated)
-│   ├── rbac.ts                    requireVendorRole, requirePlan, AuthError, PlanGateError
-│   ├── currency.ts                paise math (formatINR, paiseToRupees, sumPaise)
-│   ├── upi.ts                     UPI deep-link + QR builder (sole toFixed exception)
-│   ├── billing-period.ts          IST date helpers, AWZ-YYYYMMDD-NNNN formatter
-│   ├── anthropic.ts               Claude two-tier client + prompt caching + tool-use
-│   ├── sarvam.ts                  Saaras v2 STT client + AbortController timeout
-│   ├── razorpay.ts                Lazy singleton + HMAC verifier
-│   ├── whatsapp.ts + whatsapp-message.ts  Gupshup REST + receipt formatter
-│   ├── kv.ts                      Upstash REST Redis (Vercel — rate limit / idempotency / caps)
-│   ├── redis.ts                   ioredis singleton (TCP — optional enqueue path)
-│   ├── queues.ts                  BullMQ queue accessors (Fly worker connection)
-│   ├── cartStore.ts               Zustand POS cart
-│   ├── analytics-aggregations.ts  Pure helpers (KPI sums, plan clamp)
-│   ├── zod-auth.ts / zod-menu.ts / transaction-post-body.ts  Zod schemas
-│   └── __tests__/                 Vitest unit tests
-├── workers/
-│   ├── index.ts                   BullMQ entrypoint
-│   ├── voiceLog.worker.ts         persists voice telemetry
-│   └── receipt.worker.ts          sends WhatsApp via Gupshup, idempotent
-├── prisma/schema.prisma
-├── e2e/public.spec.ts             Playwright — public + auth gate smoke
-├── e2e/razorpay-subscription.spec.ts  Playwright — Razorpay subscription API + billing UI
-├── e2e/helpers/register-owner.ts  Shared E2E register + sign-in (cookie banner pre-dismissed)
-├── middleware.ts                  Auth.js edge middleware
-├── playwright.config.ts
-├── vitest.config.ts
-├── tailwind.config.ts             Saffron palette + Indic fonts
-├── Dockerfile.worker              Multi-stage Node 20 alpine for Fly
-├── fly.toml                       BOM region, 512MB
-├── .vercelignore                  excludes workers/ from Vercel
-├── .cursor/rules/*.mdc            9 project rules (india-locale, money, tenant-isolation, ...)
-├── .cursor/skills/                project-local agent skills
-├── AGENTS.md                      orientation for AI coding agents
-├── awaazos-cursor-prompt.md       authoritative product spec (1300+ lines)
-├── ARCHITECTURE.md                system diagrams + data model
-└── PITCH.md                       YC pitch + 10-slide deck
+│   ├── (vendor)/            pos, menu, transactions, analytics, orders, drops, settings (hub + sections)
+│   ├── admin/metrics/       platform KPIs (admin only; lib/admin-metrics.ts)
+│   ├── s/[slug]/            public storefront: menu, drops, checkout, buyer order + account pages
+│   ├── legal/               terms, privacy, refund, DPDP rights
+│   └── api/                 ai/ (transcribe, parse-order), transactions, menu, receipts, drops,
+│                            storefront-orders, s/ (buyer), push, razorpay, vendor, me, admin,
+│                            webhooks/ (razorpay, razorpay-orders), health, ready
+├── components/              ui/ (shadcn) plus pos, menu, transactions, analytics, storefront,
+│                            drops, settings, push, receipts, billing, marketing, legal
+├── hooks/useVoiceOrder.ts   mic → Web Speech or recorder → transcribe → parse-order
+├── lib/                     domain + integration modules (currency, upi, rbac, anthropic, STT
+│                            clients, drops, push, kv, queues, datetime, phone, …) and __tests__/
+├── workers/                 BullMQ workers (voice-parse-log, receipt, retention) for Fly
+├── prisma/schema.prisma     data model (applied with `prisma db push`; no migrations)
+├── public/                  push service worker (sw.js) and PWA icons
+├── services/whisper-stt/    optional self-hosted Whisper ASR (Python, own Fly app)
+├── scripts/                 STT provider smoke tests, PWA icon generator
+├── tests/golden/            LLM / ASR regression fixtures (parse-order, stt)
+├── e2e/                     Playwright specs + helpers
+├── src/types/               next-auth type augmentation
+├── docs/                    observability, demo guide, runbooks/, archive/ (frozen April 2026 material)
+├── .cursor/                 rules/*.mdc (enforced conventions) and skills/
+├── .github/workflows/ci.yml lint, typecheck, unit, build, E2E, gitleaks, npm audit
+├── middleware.ts            Auth.js edge middleware (imports lib/auth.config.ts only)
+├── next.config.mjs          CSP + security headers, Sentry
+├── vercel.json              production-only builds (no previews)
+├── Dockerfile.worker, fly.toml   worker image + Fly app config (BOM)
+├── CLAUDE.md                guide for contributors and coding agents
+├── AGENTS.md                pointer to CLAUDE.md
+├── ARCHITECTURE.md          system diagrams + data model
+├── TODO.md                  open items
+└── PITCH.md                 pitch + deck
 ```
 
 ---
 
 ## 💸 Pricing
 
-**₹299/mo per vendor. FREE for first 50 transactions.**
+**₹299/mo per vendor. FREE up to 50 transactions a month.**
 
 Higher tiers come back when ≥50 vendors are paying. Plan enforcement is server-side via `requirePlan(vendor, Plan.STARTER)` returning structured `402` responses.
 
@@ -329,7 +313,7 @@ Higher tiers come back when ≥50 vendors are paying. Plan enforcement is server
 
 This is a solo-built project today. If you're an Indian-language voice researcher, a kirana/dukaan owner who wants to be a design partner, or an engineer who wants to ship for Bharat — open an issue or DM.
 
-For internal contributors, the canonical agent guide is [`AGENTS.md`](./AGENTS.md). Read it before opening a PR.
+For internal contributors and coding agents, the canonical guide is [`CLAUDE.md`](./CLAUDE.md). Read it before opening a PR.
 
 ---
 

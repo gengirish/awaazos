@@ -4,7 +4,7 @@
 
 > **Today (May 2026):** Production-deployed. Onboarding our first 10 design-partner chai vendors in Hyderabad in person. Real weekly traction numbers update every Monday from `/admin/metrics`.
 
-> **▶ 60-second demo video:** https://youtu.be/<VIDEO_ID> _(storyboard: [DEMO_VIDEO.md](./DEMO_VIDEO.md); live walkthrough: [docs/DEMO_GUIDE.md](./docs/DEMO_GUIDE.md))_
+> **▶ 60-second demo video:** https://youtu.be/<VIDEO_ID> _(archived April storyboard, now stale: [docs/archive/DEMO_VIDEO.md](./docs/archive/DEMO_VIDEO.md); live walkthrough: [docs/DEMO_GUIDE.md](./docs/DEMO_GUIDE.md))_
 >
 > **Live app:** https://awaazos.vercel.app · **Repo:** https://github.com/gengirish/awaazos
 >
@@ -26,7 +26,7 @@ https://awaazos.vercel.app
 
 **▶ Watch:** https://youtu.be/<VIDEO_ID>
 
-**Canonical storyboard + production guide:** [DEMO_VIDEO.md](./DEMO_VIDEO.md) (8 scenes, full shot list, equipment + editing checklist)
+**Storyboard + production guide:** [docs/archive/DEMO_VIDEO.md](./docs/archive/DEMO_VIDEO.md) (8 scenes, shot list, equipment + editing checklist). It is archived and stale: it repeats claims that were cut (22 languages, Bharat AI Mission), shows automatic payment detection that does not exist, and predates `wa.me` receipts. Use it for shot structure only; the abridged script below is the current one.
 
 Abridged script for the YC form:
 
@@ -88,13 +88,13 @@ In 2012, my first production AI project at a leading semiconductor company was a
 
 Fast-forward through fourteen years of enterprise software (banking, pharma, telecom, fintech, IoT) at Fortune 500 companies, founding [IntelliForge AI](https://www.intelliforge.tech) (Hyderabad-based AI studio) in 2025, and starting an **M.Tech in Data Science & AI at IIIT Dharwad** in March 2026 — Speech & NLP is in my coursework right now.
 
-The AwaazOS prototype shipped end-to-end in **4 weekends in April 2026** because three forces aligned: Sarvam Saaras v2 hit 91% Hindi accuracy in conversational speech, UPI saturated to 14B txn/month at 0% MDR, and WhatsApp BAPI dropped to ₹0.30/msg via Gupshup. Two years ago this product literally could not exist.
+The AwaazOS prototype shipped end-to-end in **4 weekends in April 2026** because three forces aligned: Sarvam's Saaras models hit 91% Hindi accuracy in conversational speech, UPI saturated to 14B txn/month at 0% MDR, and WhatsApp BAPI dropped to ₹0.30/msg via Gupshup. Two years ago this product literally could not exist.
 
 The conviction is older than the product.
 
 ### 8. How long have you known one another?
 
-**Solo founder** today — 14 years of solo problem-solving across six industries gives me the breadth to ship the full stack alone (the production deploy at https://awaazos.vercel.app is the proof). Post-YC priority hire is a Bengaluru-based **Indic NLP engineer** (someone with formal NLP training, ideally an IIIT/IIT alum) to deepen the Sarvam → Claude pipeline beyond what I can architect alone. A **technical co-founder conversation is open** — actively talking to two senior engineers I've worked with at Fortune 500 banks who could join in batch.
+**Solo founder** today — 14 years of solo problem-solving across six industries gives me the breadth to ship the full stack alone (the production deploy at https://awaazos.vercel.app is the proof). Post-YC priority hire is a Bengaluru-based **Indic NLP engineer** (someone with formal NLP training, ideally an IIIT/IIT alum) to deepen the speech-to-text → Claude pipeline beyond what I can architect alone. A **technical co-founder conversation is open** — actively talking to two senior engineers I've worked with at Fortune 500 banks who could join in batch.
 
 ### 9. Are you (and any other founders) committed to this full-time?
 
@@ -104,9 +104,9 @@ The conviction is older than the product.
 
 Three forcing functions converged in 2026:
 
-1. **Indic voice models crossed the bar.** Sarvam Saaras v2 hit 91%+ word-accuracy on Hindi/Telugu/Kannada in conversational speech. Two years ago this was 73%. The product literally was not buildable.
+1. **Indic voice models crossed the bar.** Sarvam's Saaras models hit 91%+ word-accuracy on Hindi/Telugu/Kannada in conversational speech. Two years ago this was 73%. The product literally was not buildable.
 2. **UPI saturated.** 14B+ monthly transactions as of Q1 2026. Every Indian customer with a smartphone has GPay/PhonePe/Paytm. The MDR is zero. The settlement is real-time. We don't need to convince anyone to adopt anything — we just need to point a QR at them.
-3. **WhatsApp Business API got cheap.** Gupshup at ₹0.30/message means a vendor doing 200 sales/day can send digital receipts at ₹60/day = ₹1,800/mo. Affordable on a Starter plan ₹299 with margin to spare.
+3. **WhatsApp is the receipt channel.** Every customer already has it. AwaazOS opens the vendor's own WhatsApp with the receipt pre-filled (a `wa.me` link) and the vendor taps send, so a receipt costs ₹0 and works on the FREE plan. The Business API route (Gupshup, ~₹0.30/message) is wired in the code for later but not used today.
 
 And on the demand side: I've watched the chai-walas in my own neighborhood in Hyderabad lose ₹400-800/day to memory disputes ("I gave you ₹100, give me ₹70 back" / "you didn't, you gave me ₹50") and to forgotten orders during the evening rush. They won't use any current POS — typing English on a 4-inch screen in a monsoon while five customers wait is not a real product. They WILL speak into a microphone in Hindi or Telugu. That's the entire wedge.
 
@@ -220,7 +220,7 @@ The bet is simple: voice + UPI + WhatsApp is the *first* technology stack in Ind
        ▶ 60s demo: youtu.be/<VIDEO_ID>
 ```
 
-> **Speaker note:** Open with the 60-second demo video first (full screen, sound on), then advance to slide 2. Storyboard + production guide: [DEMO_VIDEO.md](./DEMO_VIDEO.md).
+> **Speaker note:** Open with the 60-second demo video first (full screen, sound on), then advance to slide 2. Archived (stale) storyboard: [docs/archive/DEMO_VIDEO.md](./docs/archive/DEMO_VIDEO.md).
 
 ---
 
@@ -244,11 +244,11 @@ The bet is simple: voice + UPI + WhatsApp is the *first* technology stack in Ind
 > A POS where the only interface is your **voice** and your **eyes**.
 >
 > 1. Vendor speaks the order in their language
-> 2. AwaazOS transcribes (Sarvam Saaras v2 + Web Speech) and parses against their menu (Claude Haiku 4.5 with prompt caching)
+> 2. AwaazOS transcribes (the browser's Web Speech API for Hindi and English, with a server fallback through OpenAI → Groq → self-hosted Whisper) and parses against their menu (Claude Haiku 4.5 with prompt caching, escalating to Sonnet 4.5 when unsure)
 > 3. Cart fills in real time, total computed in paise
 > 4. Vendor taps **Collect Payment** → instant UPI QR
 > 5. Customer scans → vendor marks paid → atomic bill number `AWZ-YYYYMMDD-NNNN`
-> 6. WhatsApp receipt → owner dashboard updates live
+> 6. WhatsApp receipt from the vendor's own number → owner dashboard updates live
 >
 > **End-to-end in 8 seconds.** [Show 60-second demo video]
 
@@ -260,7 +260,7 @@ Three things changed in 2025-2026:
 
 | Force | Then | Now |
 | --- | --- | --- |
-| **Indic voice AI** | Sarvam v1 — 73% word accuracy on Hindi | Sarvam Saaras v2 — 91%+ on Hindi (other Indic langs available, ship as cohort demands) |
+| **Indic voice AI** | Sarvam v1 — 73% word accuracy on Hindi | Sarvam Saaras — 91%+ on Hindi (other Indic langs available, ship as cohort demands) |
 | **UPI penetration** | ~3B txn/month (Q1 2024) | **14B+ txn/month** (Q1 2026), 0% MDR, real-time settlement |
 | **WhatsApp Business API** | ~₹2/message, restricted templates | **₹0.30/message**, full conversational support via Gupshup |
 
@@ -376,9 +376,9 @@ We will not project ARR or vendor count beyond two weeks out until we have W4 of
 
 ### Q: Sarvam is a vendor risk. What if they shut down or 10× pricing?
 
-**A:** Two mitigations:
-1. **Web Speech API covers en/hi for free** (Chrome / Edge / Samsung Browser native). That's ~60% of our addressable transcripts.
-2. **Sarvam is one of three commercial Indic STT options** (Sarvam, AI4Bharat IndicWav2Vec hosted, Reverie Saaras). We architect with a `transcribeAudio()` interface in `lib/sarvam.ts` so we can swap providers in <1 week. The pricing risk is real but the lock-in is low.
+**A:** Sarvam is no longer on the default path, and no single STT vendor is:
+1. **Web Speech API covers en/hi for free** (Chrome / Edge / Samsung Browser native). Hindi and English are the only languages vendors can pick today, so most transcripts never leave the phone as audio.
+2. **The server path is already multi-provider.** `POST /api/ai/transcribe` runs a cascade, each hop behind its own circuit breaker and quota: en/hi go OpenAI → Groq → self-hosted Whisper; Telugu/Kannada/Tamil (kept in code, not offered yet) go Sarvam → Groq → Whisper. Each provider is a small module (`lib/sarvam.ts`, `lib/openai-stt.ts`, `lib/groq-stt.ts`, `lib/whisper-stt.ts`) with the same `transcribeAudio()` shape, and we have already removed one provider (NVIDIA) with no change to the parsing logic beyond dropping its name from an input enum. A new provider has to pass the golden STT suite before it joins. The pricing risk is real but the lock-in is low.
 
 ### Q: What about offline mode? India has spotty internet.
 
@@ -386,7 +386,7 @@ We will not project ARR or vendor count beyond two weeks out until we have W4 of
 
 ### Q: GST? Most micro-merchants don't have GSTIN. What about the ones that do?
 
-**A:** Most micro-merchants are below the ₹40L turnover threshold and stay GST-exempt — that's our wedge cohort. GST-formatted invoicing is not on the MVP roadmap; we'll revisit only when paying vendors ask for it.
+**A:** Most micro-merchants are below the ₹40L turnover threshold and stay GST-exempt — that's our wedge cohort. For the ones that aren't, what has shipped is an optional HSN/SAC code per menu item, printed on the WhatsApp receipt, and one flat tax rate the vendor can switch on. Full GST invoicing (CGST/SGST/IGST split, GSTIN on the bill) is not built; we'll add it when paying vendors ask for it.
 
 ### Q: Why ₹299, not ₹99?
 
@@ -398,11 +398,11 @@ We will offer FREE for the first 50 monthly transactions to remove activation fr
 
 **A:** Three honest reasons:
 
-1. **Shipping velocity is already proven solo.** The production deploy at https://awaazos.vercel.app — full Next.js app + Auth.js + Prisma + Neon + Anthropic + Sarvam + Razorpay + Gupshup + Fly worker, with unit + E2E test coverage — was built solo in 4 weekends. Most "co-founded" YC applicants at this stage have a Figma. We have a deploy.
+1. **Shipping velocity is already proven solo.** The production deploy at https://awaazos.vercel.app — full Next.js app + Auth.js + Prisma + Neon + Anthropic + a multi-provider STT cascade + Razorpay + Fly worker, with unit + E2E test coverage — was built solo in 4 weekends. Most "co-founded" YC applicants at this stage have a Figma. We have a deploy.
 
 2. **14 years of solo problem-solving across six industries** (banking / pharma / telecom / fintech / IoT / compliance) gave me the breadth to cover full-stack + DevOps + payments + AI without bottlenecks. The architecture document ([ARCHITECTURE.md](./ARCHITECTURE.md)) reflects 14 years of "doing it the hard way" in enterprise contexts.
 
-3. **A technical co-founder conversation is open.** Two senior engineers from prior Fortune 500 work (one banking, one pharma) are in active conversation. If one of them joins in batch, great. If not, **first-month YC priority hire is a Bengaluru-based Indic NLP engineer** (IIIT/IIT alum) to deepen the Sarvam → Claude pipeline beyond what I can architect alone.
+3. **A technical co-founder conversation is open.** Two senior engineers from prior Fortune 500 work (one banking, one pharma) are in active conversation. If one of them joins in batch, great. If not, **first-month YC priority hire is a Bengaluru-based Indic NLP engineer** (IIIT/IIT alum) to deepen the speech-to-text → Claude pipeline beyond what I can architect alone.
 
 YC has funded plenty of single founders who shipped (Drew at Dropbox, Patrick at Stripe before John joined, etc.). I'd rather be a strong single founder with a working product than a weak two-founder with a deck.
 
@@ -430,7 +430,7 @@ YC has funded plenty of single founders who shipped (Drew at Dropbox, Patrick at
 │  English-speaking restaurant managers, not them.                 │
 │                                                                  │
 │  SOLUTION                                                        │
-│  Vendor speaks order in their language → Sarvam STT + Claude     │
+│  Vendor speaks order in their language → speech-to-text + Claude │
 │  parses against menu → cart fills → UPI QR → WhatsApp receipt    │
 │  → live dashboard. 8 seconds end-to-end. ₹299/mo.                │
 │                                                                  │
@@ -504,6 +504,26 @@ YC has funded plenty of single founders who shipped (Drew at Dropbox, Patrick at
 > "Standard YC deal. 12 months. From design partners → ≥1,000 daily-active vendors in 3 cities. Series A conversation starts when weekly active vendors > 1,000 with ≥40% W4 retention. No earlier.
 >
 > **Bol. Bill. Becho.** Thank you."
+
+---
+
+## Part F — Minimal product cut list
+
+On 24 April 2026 (commit `d5a808f`) the public surface was cut down to one wedge: speak the order, UPI, done. The cut is **UI only**. Plan enforcement, the Prisma schema and the APIs were left intact, and the hidden code is commented out rather than deleted, marked `HIDDEN — see PITCH.md "minimal product" cut list`. The commit set the re-enable trigger at **≥50 weekly active vendors**; the code comments say "when STARTER GA".
+
+**Still cut:**
+
+| What | Where | State today |
+| --- | --- | --- |
+| PRO and ENTERPRISE on the pricing page | `app/(marketing)/pricing/page.tsx` | `VISIBLE_TIERS = ["FREE", "STARTER"]`; the four-plan comparison table is commented out. `e2e/public.spec.ts` asserts PRO stays off this page (`433164c`). |
+| PRO tile on the landing page | `components/marketing/PricingTeaser.tsx` | Two tiles, FREE and STARTER. |
+| PRO upgrade in billing settings | `components/billing/BillingManageClient.tsx`, `components/billing/PricingPlanButtons.tsx` | Only "Upgrade to Starter" is shown; the button type allows FREE or STARTER. |
+| Voice languages beyond Hindi and English | `VOICE_LANGUAGES` in `lib/constants.ts` | Picker shows English and Hindi only. Telugu, Kannada and Tamil stay wired in the STT code, and an old stored choice still routes through them. |
+| Plan names in the CSV-export tooltip | `components/transactions/TransactionsTable.tsx` | Says "available on a higher plan" without naming PRO. |
+
+**Restored since:** the `/analytics` chart dashboard, which the cut had replaced with a single hero card, came back in `5718acd` (2 May 2026).
+
+**Kept underneath:** `PLAN_LIMITS` in `lib/constants.ts` still defines PRO at ₹799/mo (unlimited bills, unlimited staff, CSV export, 365-day analytics) and ENTERPRISE (custom). `POST /api/razorpay/create-subscription` still accepts `PRO`. Because no screen offers PRO, the PRO-gated features (CSV export and connecting a vendor's own Razorpay keys for storefront payments) can only be unlocked today by changing a vendor's plan directly.
 
 ---
 

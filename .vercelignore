@@ -21,11 +21,10 @@ terminals/
 
 # Not part of the Next.js app
 services/
-awaazos-course/
+docs/archive/
 tests/golden/
 
 # Spec doc
-awaazos-cursor-prompt.md
 AGENTS.md
 
 # Tests (not needed at runtime)

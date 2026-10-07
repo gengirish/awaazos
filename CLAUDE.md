@@ -15,7 +15,17 @@ npm run lint           # next lint
 npm test               # vitest run
 npm run build          # next build
 npm run e2e            # playwright (auto-starts dev server unless BASE_URL is set)
+
+npx prisma db push     # apply schema to Neon (no migration files and no seed script in this repo)
+npm run db:studio
+
+# Single test / single case
+npx vitest run lib/__tests__/currency.test.ts
+npx vitest run -t "formatINR"
+npx playwright test e2e/public.spec.ts --project=chromium
 ```
+
+Vitest only picks up `**/*.test.ts` (node environment, `@/` alias → repo root).
 
 ### E2E writes real rows — never point it at production
 
@@ -38,20 +48,11 @@ Exported vars win: Next does not overwrite an env var that is already set.
 `BASE_URL=https://…` runs the read-only specs against a deployment, but the
 vendor-creating specs will write to whatever database that deployment uses.
 
-npx prisma db push     # apply schema to Neon (no migration files in this repo)
-npm run db:studio
-
-# Single test / single case
-npx vitest run lib/__tests__/currency.test.ts
-npx vitest run -t "formatINR"
-npx playwright test e2e/public.spec.ts --project=chromium
-```
-
-Vitest only picks up `**/*.test.ts` (node environment, `@/` alias → repo root).
-
 ### Golden tests (LLM/ASR regression harness)
 
-Live runs cost real money and are **excluded** from `npm test`. Offline validators run in CI.
+Live runs cost real money. The `live.test.ts` files match the Vitest glob, so `npm test` collects
+them, but each live suite skips itself unless its `*_LIVE=1` flag is set. Offline validators run
+in CI as part of `npm test`.
 
 ```bash
 npm run test:golden:validate        # offline: fixture shape + menu refs
@@ -68,7 +69,7 @@ See `tests/golden/parse-order/README.md` for the rule on qualifying a new provid
 
 ### Provider smoke tests
 
-`npm run smoke:sarvam | smoke:openai | smoke:groq | smoke:nvidia | smoke:whisper` — one-shot
+`npm run smoke:sarvam | smoke:openai | smoke:groq | smoke:whisper` — one-shot
 round-trips against a live STT provider, for checking credentials/connectivity.
 
 ## Deploy topology (three hosts, not one)
@@ -77,16 +78,23 @@ round-trips against a live STT provider, for checking credentials/connectivity.
 | --- | --- |
 | **Vercel** | Next.js App Router, all `/api/*` (Node runtime), edge middleware |
 | **Fly.io (BOM)** | BullMQ workers — `workers/` — plus `services/whisper-stt` (optional Python ASR) |
-| **Neon** | Postgres. `DATABASE_URL` = pooled, `DIRECT_URL` = direct (migrations) |
+| **Neon** | Postgres. `DATABASE_URL` = pooled, `DIRECT_URL` = direct (`prisma db push`) |
+
+Vercel deploys through the Git integration: `vercel.json`'s `ignoreCommand` skips every non-production
+build, so preview deployments are off and a push to `main` is a production deploy. The Fly worker app
+named in `fly.toml` (`awaazos-workers`) does not currently exist (TODO.md 1.1), so nothing drains the
+BullMQ queues in production.
 
 **Two Redis surfaces, not interchangeable — the single easiest thing to get wrong:**
 
 - `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` → `lib/kv.ts` (@upstash/redis over HTTP).
   Used on Vercel for rate limiting, idempotency, circuit breakers, AI usage caps, `/api/ready`.
   Serverless can't hold TCP, so anything running in an API route uses this.
-- `REDIS_URL` (TCP `rediss://`) → `lib/queues.ts` / `lib/redis.ts` (ioredis + BullMQ) on Fly.
-  If set on Vercel it must be a **public** endpoint — Fly `*.internal` hostnames are unreachable
-  from Vercel.
+- `REDIS_URL` (TCP `rediss://`) → `lib/queues.ts` (ioredis + BullMQ), the only TCP Redis client.
+  Workers on Fly consume; API routes on Vercel enqueue (`voice-parse-log`, admin retention runs,
+  the dormant Gupshup receipt path). Without it on Vercel those enqueues fail; voice telemetry is
+  dropped silently.
+  On Vercel it must be a **public** endpoint — Fly `*.internal` hostnames are unreachable from Vercel.
 
 `.vercelignore` excludes `workers/` from the Vercel build.
 
@@ -103,12 +111,20 @@ mic → STT (ASR only, no LLM) → transcript → /api/ai/parse-order (Claude) �
 - `POST /api/ai/transcribe` runs a per-language provider cascade, each hop guarded by its own
   circuit breaker (`lib/circuit-breaker.ts`, Upstash-backed) and minute quota (`lib/ai-usage-guard.ts`):
   - `te/kn/ta` → Sarvam → Groq → Whisper
-  - `en/hi` → OpenAI → Groq → NVIDIA (legacy) → Whisper
-  - Providers absent from env are skipped when building the cascade; Whisper only joins when
-    `WHISPER_STT_URL` is set.
+  - `en/hi` → OpenAI → Groq → Whisper
+  - OpenAI, Groq and Whisper are skipped when not configured (Sarvam is always tried for
+    `te/kn/ta`). Whisper only joins when `WHISPER_STT_URL` is set **and** `WHISPER_STT_SECRET` is
+    at least 16 characters — a shorter secret silently drops it. Sarvam defaults to `saaras:v3`.
+  - The route is plan-gated (`requirePlan(..., Plan.STARTER)`) for every language.
+  - **`te/kn/ta` are dormant.** The picker (`VOICE_LANGUAGES` in `lib/constants.ts`) offers only
+    `en-IN` and `hi-IN`; the Sarvam code path and golden fixtures are kept, reachable only through
+    legacy `VendorSettings.voiceLang` rows or a direct `PATCH /api/vendor` (which still accepts
+    `SUPPORTED_VOICE_LANGS`).
   - Cascade exhaustion returns **200** with `{ error: "all_providers_failed", fallback: "quickadd" }`
     — the client falls back to tap input, it is not an error state for the vendor.
-  - `en/hi` normally never reach this route at all: the browser does Web Speech locally.
+  - `en/hi` normally never reach this route at all: the browser does Web Speech locally, unless
+    `NEXT_PUBLIC_VOICE_FALLBACK_ENABLED=true` routes them through the server cascade.
+  - Provider ids are one list, `STT_SOURCES` in `lib/stt-source.ts`.
 - `POST /api/ai/parse-order` runs two-tier Claude with forced `add_items` tool-use
   (`lib/anthropic.ts`). Haiku 4.5 primary → escalates to Sonnet 4.5 per `shouldEscalate()`
   (empty cart on a >3-word transcript, empty cart with no unmatched, or low confidence + unmatched)
@@ -180,6 +196,13 @@ does everything in one `prisma.$transaction`: `billSequence.upsert` (atomic per-
 increment producing `AWZ-YYYYMMDD-NNNN`) → `transaction.create` with nested `orderItems` →
 `dailySummary.upsert` → `receipt.create`. WhatsApp enqueue happens **after** commit and its failures
 are logged and swallowed — Redis being down must never block a sale.
+
+**Receipts go out via wa.me, not Gupshup.** The POS "Send on WhatsApp" and the transactions
+"Resend" fetch text from `GET /api/receipts/message` and open a `wa.me` link
+(`receiptWhatsappUrl()` in `lib/whatsapp-message.ts`) in the vendor's own WhatsApp. The Gupshup
+path — `lib/whatsapp.ts`, `workers/receipt.worker.ts`, `POST /api/receipts/send`, and the
+post-sale enqueue above (only when a `customerPhone` is posted on a plan with `whatsapp: true`) —
+is kept but unused by the UI. See TODO.md 1.1 before reviving it.
 
 `OrderItem.name` and `priceInPaise` are snapshots, not joins. Renaming or deleting a menu item must
 not mutate historical bills.
@@ -265,8 +288,10 @@ Full template and status-code table in `.cursor/rules/api-routes.mdc`. Essential
 - Shapes: list `{ data: T[] }` · create `{ data: T }` 201 · delete `{ success: true }` ·
   Zod fail `{ error, issues }` 400 · `AuthError` → `err.status` · plan gate 402 · 500 is
   `{ error: "Internal server error" }` with the real error only in the server log.
-- Webhooks skip `requireVendorRole`, verify HMAC **before** any DB access, and must be allowlisted
-  in `auth.config.ts` so middleware doesn't redirect them.
+- Webhooks skip `requireVendorRole` and verify HMAC **before** any DB access. Middleware never runs
+  on them: the `middleware.ts` matcher excludes `api/webhooks` (and `api/health`, `api/ready`).
+  Other `/api/*` routes do pass through middleware, but `authorized()` in `lib/auth.config.ts`
+  always lets them through so handlers return JSON 401/403 instead of a sign-in redirect.
 
 ## PII boundary (hard rule)
 
@@ -282,7 +307,9 @@ matching area — `money.mdc`, `tenant-isolation.mdc`, `security-first.mdc` (alw
 `accessibility.mdc` (scoped by glob).
 
 India-locale specifics that bite: store UTC / display IST (`Asia/Kolkata`), `DD/MM/YYYY` in UI,
-phones validated as +91 10-digit and stored E.164 via `libphonenumber-js`.
+phones validated as +91 10-digit and stored E.164 via `libphonenumber-js`. Use the shared helpers
+rather than local copies: `lib/datetime.ts` (`formatIstDate`, `formatIstDateTime`), `lib/phone.ts`
+(`normaliseIndianMobile`, `formatIndianMobile`, `lastFourDigits`).
 
 Accessibility is POS-critical, not decorative: 44×44 px minimum tap targets (mic button 80×80),
 voice states distinguishable beyond color, `aria-live` on cart and voice status, and **every
@@ -295,11 +322,21 @@ Postgres service, plus gitleaks (full history) and `npm audit --audit-level=high
 pre-commit hook runs `lint-staged` (eslint `--max-warnings=0`) and gitleaks if installed locally.
 
 Repo workflow for a meaningful change: `npm test && npm run typecheck && npm run lint && npm run build`
-→ conventional commit → push → `vercel --prod --yes` → `BASE_URL=https://awaazos.vercel.app npm run e2e`.
+→ Playwright against a throwaway Postgres (see "E2E writes real rows" above) → conventional commit
+→ push. Merging to `main` is the production deploy (see "Deploy topology"); never run the e2e
+suite against the production deployment, because its vendor-creating specs write to the live
+database.
+
+## Stack is locked
+
+Auth.js v5 (`next-auth` beta) with `@auth/prisma-adapter` + bcryptjs, Neon Postgres, Prisma 6,
+Vercel Blob (menu item photos, `app/api/menu/[id]/image`). Don't install `@clerk/nextjs`,
+`@supabase/supabase-js` or `svix`.
 
 ## Further reading
 
 - `ARCHITECTURE.md` — system diagrams, full data model, latency budget, ADRs, trade-offs
-- `AGENTS.md` — agent orientation; stack is locked (no Clerk, no Supabase, no svix)
-- `awaazos-cursor-prompt.md` — authoritative product spec
-- `HARDENING.md`, `docs/OBSERVABILITY.md`, `docs/runbooks/` — production ops
+- `TODO.md` — open items, ordered by what breaks if ignored
+- `docs/README.md` (index), `docs/OBSERVABILITY.md`, `docs/runbooks/` — production ops
+- `docs/archive/` — frozen April 2026 material (kickoff spec, course, demo-video script); not a
+  description of the current product

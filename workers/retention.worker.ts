@@ -24,7 +24,7 @@ function yearsAgo(years: number): Date {
  * - VoiceParseLog: delete older than 90 days
  * - Receipt: delete older than 7 years (GST/accounting horizon)
  *
- * This worker is enqueue-triggered (admin route/cron).
+ * This worker is enqueue-triggered (POST /api/admin/retention/run; no cron yet).
  */
 export const retentionWorker = new Worker<RetentionRunJobPayload>(
   "retention-maintenance",
