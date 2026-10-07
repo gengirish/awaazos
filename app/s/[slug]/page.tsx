@@ -22,15 +22,17 @@ import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuO
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
 import { getIstTodayStart } from "@/lib/billing-period";
 import { STALL_TYPES } from "@/lib/constants";
-import { formatINR } from "@/lib/currency";
+import { formatINRCompact } from "@/lib/currency";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
 import { formatDropDayLabel, formatFulfilmentWindow } from "@/lib/drops-time";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
 import { prisma } from "@/lib/prisma";
 import {
+  dropHasStock,
   formatIstDeadline,
   formatTimeLeft,
+  menuItemAnchor,
   STOREFRONT_MENU_ITEM_WHERE,
   storefrontDropVisibility,
   type StorefrontDropVisibility,
@@ -146,6 +148,7 @@ const loadStorefront = cache(async (slug: string) => {
               priceInPaise: true,
               maxQty: true,
               perOrderLimit: true,
+              menuItemId: true,
               menuItem: { select: { name: true, emoji: true, imageUrl: true } },
             },
           },
@@ -256,7 +259,7 @@ function MenuRow({ item }: { item: StorefrontItems[number] }) {
       </span>
 
       <span className="shrink-0 rounded-lg bg-muted/70 px-2.5 py-1 font-mono text-sm font-bold tabular-nums text-foreground">
-        {formatINR(item.priceInPaise)}
+        {formatINRCompact(item.priceInPaise)}
       </span>
     </li>
   );
@@ -268,14 +271,24 @@ type DropView = {
   drop: StorefrontDrop;
   visibility: Exclude<StorefrontDropVisibility, "hidden">;
   items: DropOrderItem[];
+  /** Open, but every item is sold out — nothing left to pre-order. */
+  soldOut: boolean;
 };
 
 /**
  * Effective status + live stock per drop. Sold counts are queried only for
  * orderable drops; `soldQtyByDropItem` filters by dropId, and every drop here
  * already came through the vendor-scoped, publish-gated query above.
+ *
+ * `menuAnchorFor` returns the everyday-menu row id for items the buyer can
+ * order there too (null when menu ordering is off), so a sold-out pre-order
+ * item can point at it.
  */
-async function buildDropViews(drops: StorefrontDrop[], now: Date): Promise<DropView[]> {
+async function buildDropViews(
+  drops: StorefrontDrop[],
+  now: Date,
+  menuAnchorFor: (menuItemId: string) => string | null,
+): Promise<DropView[]> {
   const visible = drops
     .map((drop) => ({
       drop,
@@ -289,19 +302,17 @@ async function buildDropViews(drops: StorefrontDrop[], now: Date): Promise<DropV
     visible.map(async ({ drop, visibility }) => {
       const sold =
         visibility === "open" ? await soldQtyByDropItem(prisma, drop.id, now) : new Map<string, number>();
-      return {
-        drop,
-        visibility,
-        items: drop.items.map((i) => ({
-          id: i.id,
-          name: i.menuItem.name,
-          emoji: i.menuItem.emoji,
-          imageUrl: i.menuItem.imageUrl,
-          priceInPaise: i.priceInPaise,
-          remaining: remainingQty(i.maxQty, sold.get(i.id) ?? 0),
-          perOrderLimit: i.perOrderLimit,
-        })),
-      };
+      const items: DropOrderItem[] = drop.items.map((i) => ({
+        id: i.id,
+        name: i.menuItem.name,
+        emoji: i.menuItem.emoji,
+        imageUrl: i.menuItem.imageUrl,
+        priceInPaise: i.priceInPaise,
+        remaining: remainingQty(i.maxQty, sold.get(i.id) ?? 0),
+        perOrderLimit: i.perOrderLimit,
+        menuAnchor: menuAnchorFor(i.menuItemId),
+      }));
+      return { drop, visibility, items, soldOut: visibility === "open" && !dropHasStock(items) };
     }),
   );
 }
@@ -312,17 +323,21 @@ function DropSection({
   payment,
   now,
   prefill,
+  menuOrdering,
 }: {
   view: DropView;
   slug: string;
   payment: { upi: boolean; cod: boolean };
   now: Date;
   prefill: BuyerPrefill | null;
+  /** Everyday menu is orderable — a sold-out drop points buyers at it. */
+  menuOrdering: boolean;
 }) {
-  const { drop, visibility } = view;
+  const { drop, visibility, soldOut } = view;
   const headingId = `drop-${drop.id}`;
   const types = allowedFulfilmentTypes(drop.fulfilmentMode);
-  const timeLeft = visibility === "open" ? formatTimeLeft(drop.closesAt, now) : null;
+  const orderable = visibility === "open" && !soldOut;
+  const timeLeft = orderable ? formatTimeLeft(drop.closesAt, now) : null;
 
   return (
     <section
@@ -354,7 +369,7 @@ function DropSection({
             <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
             <span>
               {drop.deliveryFeePaise > 0
-                ? `Delivery fee ${formatINR(drop.deliveryFeePaise)}`
+                ? `Delivery fee ${formatINRCompact(drop.deliveryFeePaise)}`
                 : "Free delivery"}
             </span>
           </li>
@@ -369,12 +384,14 @@ function DropSection({
 
       <p
         className={
-          visibility === "open"
+          orderable
             ? "mt-3 inline-flex flex-wrap items-center gap-x-2 rounded-full bg-primary px-3 py-1 text-sm font-bold text-primary-foreground"
             : "mt-3 inline-flex rounded-full bg-muted px-3 py-1 text-sm font-bold text-muted-foreground"
         }
       >
-        {visibility === "open" ? (
+        {soldOut ? (
+          "Sold out"
+        ) : orderable ? (
           <>
             <span>Order by {formatIstDeadline(drop.closesAt, now)}</span>
             {timeLeft ? <span className="font-semibold opacity-90">· {timeLeft}</span> : null}
@@ -386,13 +403,30 @@ function DropSection({
         )}
       </p>
 
+      {soldOut ? (
+        <p className="mt-2 text-sm text-muted-foreground">
+          Everything in this batch has been ordered.
+          {menuOrdering ? (
+            <>
+              {" "}
+              <a
+                href="#menu-order"
+                className="font-semibold text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
+                Order from the everyday menu
+              </a>
+            </>
+          ) : null}
+        </p>
+      ) : null}
+
       <div className="mt-4">
         <DropOrder
           slug={slug}
           dropId={drop.id}
           dropTitle={drop.title}
           items={view.items}
-          orderable={visibility === "open"}
+          orderable={orderable}
           fulfilmentTypes={types}
           deliveryFeePaise={drop.deliveryFeePaise}
           pickupNote={drop.pickupNote}
@@ -426,16 +460,21 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
   const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
   const itemCount = menuItems.length;
 
-  const [dropViews, customer] = await Promise.all([buildDropViews(vendor.drops, now), getCurrentCustomer()]);
+  const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
+  // Everyday-menu rows only take orders (and carry row ids) with menu ordering on.
+  const orderableMenuIds = new Set(menuOrdering ? menuItems.map((i) => i.id) : []);
+  const [dropViews, customer] = await Promise.all([
+    buildDropViews(vendor.drops, now, (id) => (orderableMenuIds.has(id) ? menuItemAnchor(id) : null)),
+    getCurrentCustomer(),
+  ]);
   const prefill: BuyerPrefill | null = customer
     ? { name: customer.name, phone: customer.phone, address: customer.savedAddress }
     : null;
-  const hasOpenDrop = dropViews.some((d) => d.visibility === "open");
+  const hasOpenDrop = dropViews.some((d) => d.visibility === "open" && !d.soldOut);
   const payment = {
     upi: !!vendor.upiId,
     cod: vendor.settings?.acceptPayOnDelivery ?? false,
   };
-  const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
   const menuCategories: MenuOrderCategory[] = categories.map(([category, items], i) => ({
     category,
     anchor: categoryAnchor(category, i),
@@ -557,12 +596,23 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
       </header>
 
       {/* Category jump bar — a long mela menu on a phone is unusable without it. */}
-      {categories.length > 1 ? (
+      {categories.length + (dropViews.length > 0 ? 1 : 0) > 1 ? (
         <nav
           aria-label="Menu categories"
           className="sticky top-0 z-20 border-b border-border/50 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70"
         >
           <ul className="mx-auto flex max-w-2xl gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
+            {dropViews.length > 0 ? (
+              <li className="shrink-0">
+                <a
+                  href="#drops"
+                  className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/40 bg-primary/10 px-4 text-sm font-bold text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  <CalendarClock className="h-4 w-4" aria-hidden="true" />
+                  Pre-order
+                </a>
+              </li>
+            ) : null}
             {categories.map(([category], i) => (
               <li key={category} className="shrink-0">
                 <a
@@ -579,7 +629,7 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
 
       <main id="menu" className="mx-auto max-w-2xl px-4 py-7 sm:px-6 sm:py-9">
         {dropViews.length > 0 ? (
-          <div id="drops" className="mb-10 scroll-mt-16 space-y-6">
+          <div id="drops" className="mb-10 scroll-mt-20 space-y-6">
             <h2 className="sr-only">Pre-order menus</h2>
             {dropViews.map((view) => (
               <DropSection
@@ -589,6 +639,7 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
                 payment={payment}
                 now={now}
                 prefill={prefill}
+                menuOrdering={menuOrdering}
               />
             ))}
           </div>
@@ -642,7 +693,7 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
                         {item.name}
                       </span>
                       <span className="mt-auto font-mono text-sm font-bold tabular-nums text-primary">
-                        {formatINR(item.priceInPaise)}
+                        {formatINRCompact(item.priceInPaise)}
                       </span>
                     </li>
                   ))}
@@ -665,10 +716,10 @@ export default async function StorefrontPage({ params }: { params: { slug: strin
 
             {menuOrdering ? null : categories.map(([category, items], i) => (
               <section key={category} aria-labelledby={categoryAnchor(category, i)}>
-                <div className="mb-3 flex scroll-mt-16 items-baseline gap-3">
+                <div className="mb-3 flex items-baseline gap-3">
                   <h3
                     id={categoryAnchor(category, i)}
-                    className="font-display text-base font-bold text-awaaz-charcoal"
+                    className="scroll-mt-20 font-display text-base font-bold text-awaaz-charcoal"
                   >
                     {category}
                   </h3>

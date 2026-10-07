@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowDown } from "lucide-react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -13,7 +14,7 @@ import {
   type BuyerPrefill,
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
-import { formatINR, sumPaise } from "@/lib/currency";
+import { formatINRCompact, sumPaise } from "@/lib/currency";
 import {
   cartStorageKey,
   maxOrderableQty,
@@ -45,6 +46,11 @@ export type DropOrderItem = {
   /** null = unlimited */
   remaining: number | null;
   perOrderLimit: number | null;
+  /**
+   * DOM id of the same item's row on the orderable everyday menu, when it is
+   * there. A sold-out pre-order item then points at it instead of dead-ending.
+   */
+  menuAnchor: string | null;
 };
 
 export type DropOrderProps = {
@@ -192,7 +198,7 @@ export function DropOrder(props: DropOrderProps) {
                 <span className="truncate text-[15px] font-semibold text-foreground">{item.name}</span>
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
                   <span className="font-mono font-bold tabular-nums text-foreground">
-                    {formatINR(item.priceInPaise)}
+                    {formatINRCompact(item.priceInPaise)}
                   </span>
                   {badge ? (
                     <span
@@ -212,6 +218,15 @@ export function DropOrder(props: DropOrderProps) {
 
               {orderable && !soldOut ? (
                 <QtyStepper itemName={item.name} qty={qty} max={max} onChange={(q) => setQty(item.id, q)} />
+              ) : soldOut && item.menuAnchor ? (
+                <a
+                  href={`#${item.menuAnchor}`}
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-2 text-xs font-bold text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  aria-label={`${item.name} is on the everyday menu`}
+                >
+                  On menu
+                  <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+                </a>
               ) : null}
             </li>
           );
