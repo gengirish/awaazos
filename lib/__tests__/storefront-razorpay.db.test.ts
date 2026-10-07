@@ -20,7 +20,7 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 const ENABLED = process.env.RAZORPAY_DB_TEST === "1";
 
 type PrismaModule = typeof import("@/lib/prisma");
-type Handler = (req: Request, ctx: { params: Record<string, string> }) => Promise<Response>;
+type Handler = (req: Request, ctx: { params: Promise<Record<string, string>> }) => Promise<Response>;
 
 const KEY_ID = "rzp_test_UnitTest1234";
 const KEY_SECRET = "unit_test_key_secret_abc";
@@ -148,7 +148,7 @@ describe.skipIf(!ENABLED)("storefront razorpay — DB integration", () => {
 
   it("start: creates a Razorpay order for exactly totalPaise, then reuses it", async () => {
     const s = await seed();
-    const ctx = { params: { slug: s.slug, token: s.token } };
+    const ctx = { params: Promise.resolve({ slug: s.slug, token: s.token }) };
     const r1 = await startPayment(post("http://t/x"), ctx);
     expect(r1.status).toBe(200);
     const d1 = ((await r1.json()) as { data: Record<string, unknown> }).data;
@@ -166,7 +166,7 @@ describe.skipIf(!ENABLED)("storefront razorpay — DB integration", () => {
 
   it("start: concurrent taps converge on one stored order id", async () => {
     const s = await seed();
-    const ctx = { params: { slug: s.slug, token: s.token } };
+    const ctx = { params: Promise.resolve({ slug: s.slug, token: s.token }) };
     const res = await Promise.all([1, 2, 3].map(() => startPayment(post("http://t/x"), ctx)));
     const ids = await Promise.all(res.map(async (r) => ((await r.json()) as { data: { razorpayOrderId: string } }).data.razorpayOrderId));
     const row = await prisma.transaction.findUniqueOrThrow({ where: { id: s.txn.id } });
@@ -175,24 +175,24 @@ describe.skipIf(!ENABLED)("storefront razorpay — DB integration", () => {
 
   it("start: refuses expired holds, FREE plan, unknown token", async () => {
     const expired = await seed({ minsAgo: 20 });
-    const r1 = await startPayment(post("http://t/x"), { params: { slug: expired.slug, token: expired.token } });
+    const r1 = await startPayment(post("http://t/x"), { params: Promise.resolve({ slug: expired.slug, token: expired.token }) });
     expect(r1.status).toBe(409);
     expect(await r1.json()).toEqual({ error: "order_expired" });
 
     const free = await seed({ plan: "FREE" });
-    const r2 = await startPayment(post("http://t/x"), { params: { slug: free.slug, token: free.token } });
+    const r2 = await startPayment(post("http://t/x"), { params: Promise.resolve({ slug: free.slug, token: free.token }) });
     expect(r2.status).toBe(409);
     expect(await r2.json()).toEqual({ error: "online_payment_unavailable" });
 
     const r3 = await startPayment(post("http://t/x"), {
-      params: { slug: free.slug, token: crypto.randomBytes(24).toString("base64url") },
+      params: Promise.resolve({ slug: free.slug, token: crypto.randomBytes(24).toString("base64url") }),
     });
     expect(r3.status).toBe(404);
   });
 
   it("verify: rejects bad signature and foreign order id, then marks paid exactly once", async () => {
     const s = await seed();
-    const ctx = { params: { slug: s.slug, token: s.token } };
+    const ctx = { params: Promise.resolve({ slug: s.slug, token: s.token }) };
     const started = ((await (await startPayment(post("http://t/x"), ctx)).json()) as { data: { razorpayOrderId: string } }).data;
     const orderId = started.razorpayOrderId;
     const paymentId = "pay_TestPayment001";
@@ -233,7 +233,7 @@ describe.skipIf(!ENABLED)("storefront razorpay — DB integration", () => {
     const s = await seed();
     const orderId = `order_${crypto.randomBytes(7).toString("hex")}`;
     await prisma.transaction.update({ where: { id: s.txn.id }, data: { razorpayOrderId: orderId } });
-    const ctx = { params: { vendorId: s.vendor.id } };
+    const ctx = { params: Promise.resolve({ vendorId: s.vendor.id }) };
     const event = (amount: number, ev = "payment.captured", txnId = s.txn.id) =>
       JSON.stringify({
         entity: "event",
@@ -251,7 +251,7 @@ describe.skipIf(!ENABLED)("storefront razorpay — DB integration", () => {
     expect(noSig.status).toBe(400);
     const unknownVendor = await webhook(
       post("http://t/x", body, { "x-razorpay-signature": hmac(WEBHOOK_SECRET, body) }),
-      { params: { vendorId: "cnonexistentvendor000000" } },
+      { params: Promise.resolve({ vendorId: "cnonexistentvendor000000" }) },
     );
     expect(unknownVendor.status).toBe(400);
 
@@ -276,7 +276,7 @@ describe.skipIf(!ENABLED)("storefront razorpay — DB integration", () => {
     const paymentId = "pay_WebhookPay01";
     const late = await verify(
       post("http://t/x", { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: hmac(KEY_SECRET, `${orderId}|${paymentId}`) }),
-      { params: { slug: s.slug, token: s.token } },
+      { params: Promise.resolve({ slug: s.slug, token: s.token }) },
     );
     expect(late.status).toBe(200);
 
@@ -300,7 +300,7 @@ describe.skipIf(!ENABLED)("storefront razorpay — DB integration", () => {
     // Signed with the (shared test) secret but posted to the attacker's own vendor path:
     // the lookup is scoped by vendorId, so the victim's order is never matched.
     const r = await webhook(post("http://t/x", body, { "x-razorpay-signature": hmac(WEBHOOK_SECRET, body) }), {
-      params: { vendorId: attacker.vendor.id },
+      params: Promise.resolve({ vendorId: attacker.vendor.id }),
     });
     expect(r.status).toBe(200);
     expect((await prisma.transaction.findUniqueOrThrow({ where: { id: victim.txn.id } })).paymentStatus).toBe("PENDING");

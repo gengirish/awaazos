@@ -164,7 +164,7 @@ describe.skipIf(!ENABLED)("storefront (menu) orders — vendor side, DB integrat
         method: "PATCH",
         body: JSON.stringify({ action }),
       }),
-      { params: { orderId } },
+      { params: Promise.resolve({ orderId }) },
     );
   const patchDrop = (dropId: string, orderId: string, action: string) =>
     dropItemRoute.PATCH(
@@ -172,7 +172,7 @@ describe.skipIf(!ENABLED)("storefront (menu) orders — vendor side, DB integrat
         method: "PATCH",
         body: JSON.stringify({ action }),
       }),
-      { params: { id: dropId, orderId } },
+      { params: Promise.resolve({ id: dropId, orderId }) },
     );
   const patchVendor = (body: unknown) =>
     vendorRoute.PATCH(

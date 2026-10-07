@@ -212,7 +212,8 @@ function GenericCard() {
   );
 }
 
-export default async function Image({ params }: { params: { slug: string } }) {
+export default async function Image(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const now = new Date();
   let card: Awaited<ReturnType<typeof loadCard>> = null;
   try {

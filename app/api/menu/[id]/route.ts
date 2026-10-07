@@ -23,7 +23,8 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
   return res;
 }
 
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
     const body = menuItemUpdateSchema.parse(await req.json());
@@ -89,7 +90,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
 

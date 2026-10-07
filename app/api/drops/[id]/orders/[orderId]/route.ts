@@ -43,8 +43,9 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
  */
 export async function PATCH(
   req: NextRequest,
-  { params }: { params: { id: string; orderId: string } },
+  props: { params: Promise<{ id: string; orderId: string }> }
 ) {
+  const params = await props.params;
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
     const { action } = bodySchema.parse(await req.json());

@@ -53,7 +53,7 @@ function vendor(drops: unknown[]) {
 }
 
 async function card(): Promise<string> {
-  const res = (await Image({ params: { slug: "asha" } })) as unknown as { el: ReactElement };
+  const res = (await Image({ params: Promise.resolve({ slug: "asha" }) })) as unknown as { el: ReactElement };
   return renderToStaticMarkup(res.el);
 }
 

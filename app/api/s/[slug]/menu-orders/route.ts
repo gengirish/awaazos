@@ -75,7 +75,8 @@ async function backfillCustomerProfile(
   }
 }
 
-export async function POST(req: Request, { params }: { params: { slug: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   try {
     const rl = await menuOrderRateLimit.check(getClientIp(req));
     if (!rl.ok) return tooManyRequests(rl, "storefront-menu-order");

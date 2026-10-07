@@ -18,7 +18,8 @@ export const runtime = "nodejs";
  * their own drops without an extra Postgres read per poll; the orders GET,
  * which returns real data, does the compound vendorId check.
  */
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
     const signal = await getDropOrderSignal(ctx.vendor.id, params.id);

@@ -126,17 +126,17 @@ describe.skipIf(!ENABLED)("everyday menu controls — vendor side, DB integratio
     expect((await prisma.drop.findUniqueOrThrow({ where: { id: on.id } })).showEverydayMenu).toBe(true);
 
     // GET returns it.
-    res = await dropRoute.GET(req("GET", `/api/drops/${on.id}`), { params: { id: on.id } });
+    res = await dropRoute.GET(req("GET", `/api/drops/${on.id}`), { params: Promise.resolve({ id: on.id }) });
     expect(((await res.json()) as { data: { showEverydayMenu: boolean } }).data.showEverydayMenu).toBe(true);
 
     // Full replace turns it off (and on again).
     res = await dropRoute.PUT(req("PUT", `/api/drops/${on.id}`, dropBody(itemId, { showEverydayMenu: false })), {
-      params: { id: on.id },
+      params: Promise.resolve({ id: on.id }),
     });
     expect(res.status).toBe(200);
     expect(((await res.json()) as { data: { showEverydayMenu: boolean } }).data.showEverydayMenu).toBe(false);
     res = await dropRoute.PUT(req("PUT", `/api/drops/${on.id}`, dropBody(itemId, { showEverydayMenu: true })), {
-      params: { id: on.id },
+      params: Promise.resolve({ id: on.id }),
     });
     expect(((await res.json()) as { data: { showEverydayMenu: boolean } }).data.showEverydayMenu).toBe(true);
 
@@ -146,7 +146,7 @@ describe.skipIf(!ENABLED)("everyday menu controls — vendor side, DB integratio
       [plain.id, false],
     ] as const) {
       res = await duplicateRoute.POST(req("POST", `/api/drops/${id}/duplicate`, { date: "2030-10-13" }), {
-        params: { id },
+        params: Promise.resolve({ id }),
       });
       expect(res.status).toBe(201);
       const { data: copy } = (await res.json()) as { data: { id: string } };
@@ -172,7 +172,7 @@ describe.skipIf(!ENABLED)("everyday menu controls — vendor side, DB integratio
 
     // The card's switch sends showOnline on its own.
     res = await menuItemRoute.PATCH(req("PATCH", `/api/menu/${chai.id}`, { showOnline: false }), {
-      params: { id: chai.id },
+      params: Promise.resolve({ id: chai.id }),
     });
     expect(res.status).toBe(200);
     const patched = await prisma.menuItem.findUniqueOrThrow({ where: { id: chai.id } });
@@ -187,7 +187,7 @@ describe.skipIf(!ENABLED)("everyday menu controls — vendor side, DB integratio
     // Another tenant can't flip it: 404, row unchanged.
     auth.vendor = other;
     res = await menuItemRoute.PATCH(req("PATCH", `/api/menu/${chai.id}`, { showOnline: true }), {
-      params: { id: chai.id },
+      params: Promise.resolve({ id: chai.id }),
     });
     expect(res.status).toBe(404);
     expect((await prisma.menuItem.findUniqueOrThrow({ where: { id: chai.id } })).showOnline).toBe(false);

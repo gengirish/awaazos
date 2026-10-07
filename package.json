@@ -39,7 +39,7 @@
     "@sentry/nextjs": "^10.50.0",
     "@sentry/node": "^10.50.0",
     "@upstash/redis": "^1.37.0",
-    "@vercel/blob": "^0.27.1",
+    "@vercel/blob": "^2.8.1",
     "@vercel/functions": "^3.9.11",
     "bcryptjs": "^2.4.3",
     "bullmq": "^5.34.10",
@@ -48,12 +48,12 @@
     "ioredis": "^5.4.2",
     "libphonenumber-js": "^1.11.18",
     "lucide-react": "^0.469.0",
-    "next": "^14.2.21",
+    "next": "^15.5.27",
     "next-auth": "5.0.0-beta.32",
     "pino": "^10.3.1",
     "razorpay": "^2.9.5",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
     "react-hook-form": "^7.54.2",
     "recharts": "^2.15.0",
     "sonner": "^1.7.1",
@@ -67,12 +67,12 @@
     "@playwright/test": "^1.59.1",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.10.5",
-    "@types/react": "^18.3.18",
-    "@types/react-dom": "^18.3.5",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
     "@types/web-push": "^3.6.4",
     "autoprefixer": "^10.4.20",
     "eslint": "^8.57.1",
-    "eslint-config-next": "^14.2.21",
+    "eslint-config-next": "^15.5.27",
     "husky": "^9.1.7",
     "lint-staged": "^16.4.0",
     "postcss": "^8.4.49",
@@ -80,11 +80,17 @@
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "^5.0.3"
   },
   "lint-staged": {
     "*.{js,jsx,ts,tsx,mjs,cjs}": [
       "eslint --max-warnings=0"
     ]
+  },
+  "overrides": {
+    "next": {
+      "postcss": "$postcss"
+    },
+    "deepmerge-ts": "^8.0.2"
   }
 }

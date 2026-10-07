@@ -23,7 +23,8 @@ export const runtime = "nodejs";
  * The cut-off itself is never stored (lib/drops.ts), so `from` is the
  * *effective* status.
  */
-export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const ctx = await requireVendorRole("MANAGER", undefined, req);
     const vendorId = ctx.vendor.id;

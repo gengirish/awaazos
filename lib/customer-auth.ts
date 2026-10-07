@@ -236,7 +236,7 @@ export async function customerFromSessionToken(
  * from storefront pages / storefront API routes.
  */
 export async function getCurrentCustomer(): Promise<CurrentCustomer | null> {
-  const raw = cookies().get(CUSTOMER_SESSION_COOKIE)?.value;
+  const raw = (await cookies()).get(CUSTOMER_SESSION_COOKIE)?.value;
   if (!raw) return null;
   try {
     return await customerFromSessionToken(raw);
@@ -254,7 +254,7 @@ export async function getCurrentCustomer(): Promise<CurrentCustomer | null> {
 
 /** Delete the current session row (if any). The caller clears the cookie. */
 export async function destroySession(): Promise<void> {
-  const raw = cookies().get(CUSTOMER_SESSION_COOKIE)?.value;
+  const raw = (await cookies()).get(CUSTOMER_SESSION_COOKIE)?.value;
   if (!raw || raw.length > 128) return;
   await prisma.customerSession.deleteMany({ where: { tokenHash: hashToken(raw) } });
 }

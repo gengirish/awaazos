@@ -25,7 +25,8 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
  *
  * Contains customer name / phone / address: vendor-only, never logged.
  */
-export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+export async function GET(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
     // Read the signal first: if an order lands between the two reads, the next

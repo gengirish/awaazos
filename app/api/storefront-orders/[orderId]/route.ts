@@ -37,7 +37,8 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
  * STOREFRONT, dropId: null }`: a drop order, a counter sale or another
  * vendor's order is a 404. No frozen rule — there is no drop.
  */
-export async function PATCH(req: NextRequest, { params }: { params: { orderId: string } }) {
+export async function PATCH(req: NextRequest, props: { params: Promise<{ orderId: string }> }) {
+  const params = await props.params;
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
     const { action } = bodySchema.parse(await req.json());

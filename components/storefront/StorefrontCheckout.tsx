@@ -311,7 +311,7 @@ export type CheckoutSheetProps = {
   payment: { upi: boolean; cod: boolean };
   prefill?: BuyerPrefill | null;
   /** Focus goes back here when the sheet closes (the Checkout button). */
-  returnFocusRef?: React.RefObject<HTMLElement>;
+  returnFocusRef?: React.RefObject<HTMLElement | null>;
   /** Request body from the buyer's details — ids and quantities only, never prices. */
   buildBody: (details: CheckoutDetails) => Record<string, unknown>;
   /**

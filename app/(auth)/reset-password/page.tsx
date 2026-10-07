@@ -17,11 +17,12 @@ export const metadata = { title: "Reset password · AwaazOS" };
  * avoids `useSearchParams()`, which needs a <Suspense> boundary or
  * `next build` fails with the CSR-bailout error (see .cursor/rules/auth-rbac.mdc).
  */
-export default function ResetPasswordPage({
-  searchParams,
-}: {
-  searchParams: { token?: string };
-}) {
+export default async function ResetPasswordPage(
+  props: {
+    searchParams: Promise<{ token?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
   const token = typeof searchParams.token === "string" ? searchParams.token.trim() : "";
 
   if (!token) {

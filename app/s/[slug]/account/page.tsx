@@ -39,7 +39,8 @@ const loadVendor = cache(async (slug: string) =>
   }),
 );
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const params = await props.params;
   const vendor = await loadVendor(params.slug);
   return {
     title: vendor ? `Your account — ${vendor.name}` : "Not found — AwaazOS",
@@ -55,13 +56,14 @@ const TONE_CLASS: Record<StatusTone, string> = {
   neutral: "border-border bg-muted text-foreground",
 };
 
-export default async function StorefrontAccountPage({
-  params,
-  searchParams,
-}: {
-  params: { slug: string };
-  searchParams: { login?: string };
-}) {
+export default async function StorefrontAccountPage(
+  props: {
+    params: Promise<{ slug: string }>;
+    searchParams: Promise<{ login?: string }>;
+  }
+) {
+  const searchParams = await props.searchParams;
+  const params = await props.params;
   const vendor = await loadVendor(params.slug);
   if (!vendor) notFound();
 

@@ -103,11 +103,12 @@ const loadOrder = cache(async (slug: string, token: string) => {
   });
 });
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { slug: string; token: string };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ slug: string; token: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
   const order = await loadOrder(params.slug, params.token);
   return {
     title: order ? `Your order — ${order.vendor.name}` : "Not found — AwaazOS",
@@ -130,7 +131,8 @@ function ToneIcon({ tone }: { tone: StatusTone }) {
   return <Clock className={cls} aria-hidden="true" />;
 }
 
-export default async function StorefrontOrderPage({ params }: { params: { slug: string; token: string } }) {
+export default async function StorefrontOrderPage(props: { params: Promise<{ slug: string; token: string }> }) {
+  const params = await props.params;
   const order = await loadOrder(params.slug, params.token);
   if (!order) notFound();
 

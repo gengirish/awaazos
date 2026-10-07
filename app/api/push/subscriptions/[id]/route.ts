@@ -13,7 +13,8 @@ export const runtime = "nodejs";
  * devices for the active vendor. Anyone else's row (other staff, other
  * vendor) is a 404, never a 403.
  */
-export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
 

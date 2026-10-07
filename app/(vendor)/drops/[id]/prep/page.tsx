@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 
 export const metadata = { title: "Prep sheet · AwaazOS" };
 
-type Props = { params: { id: string } };
+type Props = { params: Promise<{ id: string }> };
 
 function DueCell({ order }: { order: BoardOrder }) {
   const due = handoverDue(order);
@@ -70,7 +70,8 @@ function HandoverTable({ title, orders, showAddress }: { title: string; orders: 
   );
 }
 
-export default async function DropPrepPage({ params }: Props) {
+export default async function DropPrepPage(props: Props) {
+  const params = await props.params;
   let ctx: Awaited<ReturnType<typeof requireVendorRole>>;
   try {
     ctx = await requireVendorRole("CASHIER");

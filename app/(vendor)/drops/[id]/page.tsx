@@ -8,11 +8,12 @@ import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
-type Props = { params: { id: string } };
+type Props = { params: Promise<{ id: string }> };
 
 export const metadata = { title: "Drop orders · AwaazOS" };
 
-export default async function DropOrdersPage({ params }: Props) {
+export default async function DropOrdersPage(props: Props) {
+  const params = await props.params;
   let ctx: Awaited<ReturnType<typeof requireVendorRole>>;
   try {
     ctx = await requireVendorRole("CASHIER");

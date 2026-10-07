@@ -115,7 +115,7 @@ describe.skipIf(!ENABLED)("/api/push routes — DB integration", () => {
     );
   const get = () => subsRoute.GET(new NextRequest(`${base}/subscriptions`));
   const delById = (id: string) =>
-    subRoute.DELETE(new NextRequest(`${base}/subscriptions/${id}`, { method: "DELETE" }), { params: { id } });
+    subRoute.DELETE(new NextRequest(`${base}/subscriptions/${id}`, { method: "DELETE" }), { params: Promise.resolve({ id }) });
   const delByEndpoint = (endpoint: string) =>
     subsRoute.DELETE(
       new NextRequest(`${base}/subscriptions?endpoint=${encodeURIComponent(endpoint)}`, { method: "DELETE" }),

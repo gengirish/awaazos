@@ -168,11 +168,12 @@ const loadStorefront = cache(async (slug: string) => {
   });
 });
 
-export async function generateMetadata({
-  params,
-}: {
-  params: { slug: string };
-}): Promise<Metadata> {
+export async function generateMetadata(
+  props: {
+    params: Promise<{ slug: string }>;
+  }
+): Promise<Metadata> {
+  const params = await props.params;
   const vendor = await loadStorefront(params.slug);
   if (!vendor) return { title: "Not found — AwaazOS" };
 
@@ -405,7 +406,8 @@ function DropSection({
   );
 }
 
-export default async function StorefrontPage({ params }: { params: { slug: string } }) {
+export default async function StorefrontPage(props: { params: Promise<{ slug: string }> }) {
+  const params = await props.params;
   const vendor = await loadStorefront(params.slug);
   if (!vendor) notFound();
 

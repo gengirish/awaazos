@@ -12,7 +12,8 @@ import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditDropPage({ params }: { params: { id: string } }) {
+export default async function EditDropPage(props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   let vendor: { id: string; name: string; slug: string };
   try {
     const ctx = await requireVendorRole("MANAGER");

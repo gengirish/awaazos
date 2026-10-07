@@ -19,7 +19,8 @@ const bodySchema = z.object({
  * keep the source drop's prices and caps, and settings (incl. showEverydayMenu)
  * carry over. The copy is always a DRAFT.
  */
-export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
+export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
+  const params = await props.params;
   try {
     const ctx = await requireVendorRole("MANAGER", undefined, req);
     const vendorId = ctx.vendor.id;

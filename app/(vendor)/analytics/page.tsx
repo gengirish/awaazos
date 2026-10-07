@@ -23,7 +23,7 @@ import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
-type Props = { searchParams: Record<string, string | string[] | undefined> };
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
 function firstParam(v: string | string[] | undefined): string | undefined {
   if (v === undefined) return undefined;
@@ -45,7 +45,8 @@ function planAnalyticsCap(plan: Plan): number | null {
   return PLAN_LIMITS[plan].analyticsDays;
 }
 
-export default async function AnalyticsPage({ searchParams }: Props) {
+export default async function AnalyticsPage(props: Props) {
+  const searchParams = await props.searchParams;
   let ctx: Awaited<ReturnType<typeof requireVendorRole>>;
   try {
     ctx = await requireVendorRole("MANAGER");

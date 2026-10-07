@@ -19,7 +19,7 @@ import { dropInputToData, dropUpsertSchema } from "@/lib/zod-drops";
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-type Params = { params: { id: string } };
+type Params = { params: Promise<{ id: string }> };
 
 async function loadSerialized(vendorId: string, id: string, now: Date) {
   const drop = await prisma.drop.findFirst({ where: { id, vendorId }, include: dropWithItemsInclude });
@@ -32,7 +32,8 @@ async function loadSerialized(vendorId: string, id: string, now: Date) {
 }
 
 /** GET /api/drops/[id] — one drop with items, sold and remaining counts. */
-export async function GET(req: NextRequest, { params }: Params) {
+export async function GET(req: NextRequest, props: Params) {
+  const params = await props.params;
   try {
     const ctx = await requireVendorRole("MANAGER", undefined, req);
     const data = await loadSerialized(ctx.vendor.id, params.id, new Date());
@@ -48,7 +49,8 @@ export async function GET(req: NextRequest, { params }: Params) {
  * upserted if present, deleted if absent — unless a buyer already ordered one,
  * in which case the whole save is rejected (409 item_has_orders).
  */
-export async function PUT(req: NextRequest, { params }: Params) {
+export async function PUT(req: NextRequest, props: Params) {
+  const params = await props.params;
   try {
     const ctx = await requireVendorRole("MANAGER", undefined, req);
     const vendorId = ctx.vendor.id;
@@ -115,7 +117,8 @@ export async function PUT(req: NextRequest, { params }: Params) {
 }
 
 /** DELETE /api/drops/[id] — only when no live storefront orders exist. */
-export async function DELETE(req: NextRequest, { params }: Params) {
+export async function DELETE(req: NextRequest, props: Params) {
+  const params = await props.params;
   try {
     const ctx = await requireVendorRole("MANAGER", undefined, req);
     const vendorId = ctx.vendor.id;

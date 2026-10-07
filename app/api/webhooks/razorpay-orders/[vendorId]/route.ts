@@ -51,7 +51,8 @@ function ack() {
   return NextResponse.json({ ok: true });
 }
 
-export async function POST(req: Request, { params }: { params: { vendorId: string } }) {
+export async function POST(req: Request, props: { params: Promise<{ vendorId: string }> }) {
+  const params = await props.params;
   const rl = await webhookRateLimit.check(`razorpay-orders:${getClientIp(req)}`);
   if (!rl.ok) return tooManyRequests(rl, "webhook-razorpay-orders");
 

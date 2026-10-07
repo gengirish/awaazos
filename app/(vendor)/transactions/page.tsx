@@ -13,9 +13,10 @@ import { listVendorTransactions } from "@/lib/transactions-list";
 
 export const dynamic = "force-dynamic";
 
-type Props = { searchParams: Record<string, string | string[] | undefined> };
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 
-export default async function TransactionsPage({ searchParams }: Props) {
+export default async function TransactionsPage(props: Props) {
+  const searchParams = await props.searchParams;
   let ctx: Awaited<ReturnType<typeof requireVendorRole>>;
   try {
     ctx = await requireVendorRole("CASHIER");
