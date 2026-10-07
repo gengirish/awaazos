@@ -18,11 +18,6 @@ function istYmdParts(d: Date): { y: string; m: string; day: string } {
   return { y, m, day };
 }
 
-/** Current instant (wall-clock comparisons use this; no “IST Date” wrapper). */
-export function getIstNow(): Date {
-  return new Date();
-}
-
 /**
  * Calendar “today” in IST as a Date stored like POS `startOfTodayIST` — midnight UTC
  * of the IST calendar Y-M-D for Postgres `@db.Date` keys.

@@ -6,9 +6,8 @@ import { requireEnv } from "@/lib/env";
 /**
  * BullMQ requires its own ioredis client with `maxRetriesPerRequest: null`
  * (BullMQ uses blocking commands like BRPOPLPUSH that must not auto-retry).
- * The general-purpose ratelimit/idempotency client (lib/redis.ts) uses
- * snappy retry-2 settings instead, so the two clients have different
- * config requirements and live separately by design.
+ * Ratelimit/idempotency run on Vercel over Upstash REST (lib/kv.ts), so this
+ * is the only TCP Redis client in the codebase.
  */
 let _bullmqRedis: IORedis | null = null;
 function getBullMqRedis(): IORedis {

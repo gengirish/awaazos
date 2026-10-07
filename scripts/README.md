@@ -27,13 +27,3 @@ length. Exit codes:
 - `1` -- network / HTTP / parse / config error (see emitted JSON)
 - `2` -- both APIs returned 200 but transcript barely overlaps the input
   (model degradation -- worth investigating before a vendor demo)
-
-## `sarvam-smoke.mjs`
-
-Single-shot STT only. Use this when you have a real WebM/WAV recording
-from a phone and want to verify the recognition path without burning a
-TTS call.
-
-```bash
-node scripts/sarvam-smoke.mjs ./vendor-recording.webm hi-IN
-```
