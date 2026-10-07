@@ -28,17 +28,23 @@ export class AuthError extends Error {
   constructor(public status: number, message: string) { super(message); }
 }
 
+// 402 with { required, current } — extends AuthError, so catch it first
+export class PlanGateError extends AuthError {
+  constructor(public readonly required: Plan, public readonly current: Plan);
+}
+
 // Platform-wide (USER, ADMIN, SUPER_ADMIN)
 export async function requirePlatformRole(role: UserRole): Promise<{ user }>;
 
 // Per-tenant (OWNER > MANAGER > CASHIER)
 export async function requireVendorRole(
-  role: StaffRole,
-  vendorIdOrSlug?: string
-): Promise<{ user, vendor, staff }>;
+  minRole: StaffRole,
+  vendorIdOrSlug?: string | null,
+  req?: NextRequest,               // pass it so `?vendor=` is honoured
+): Promise<{ user, vendor, staff, setVendorCookie: string | null }>;
 
-// Plan gate (FREE < STARTER < PRO < ENTERPRISE)
-export function requirePlan(vendor: Vendor, minPlan: Plan): void;
+// Plan gate (FREE < STARTER < PRO < ENTERPRISE, via PLAN_RANK) — throws PlanGateError
+export function requirePlan(vendor: { plan: Plan }, minPlan: Plan): void;
 ```
 
 ## Use everywhere
@@ -50,9 +56,10 @@ const { vendor } = await requireVendorRole("CASHIER");
 // Settings change — Owner only
 const { vendor } = await requireVendorRole("OWNER");
 
-// Razorpay link — PRO only
-const { vendor } = await requireVendorRole("OWNER");
-requirePlan(vendor, "PRO");
+// Saving the vendor's own Razorpay keys for storefront payments — OWNER + PRO
+// (PUT /api/vendor/payments; PRO = PLAN_LIMITS[plan].razorpayLinks)
+const ctx = await requireVendorRole("OWNER", undefined, req);
+requirePlan(ctx.vendor, "PRO");
 ```
 
 ## Sign-up = one transaction

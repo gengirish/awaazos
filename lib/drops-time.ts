@@ -57,14 +57,7 @@ export function formatIstTime(d: Date): string {
 }
 
 /** "05/10/2026" (DD/MM/YYYY, per india-locale rule) in IST. */
-export function formatIstDate(d: Date): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: IST,
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d);
-}
+export { formatIstDate } from "@/lib/datetime";
 
 /** "Sat, 5 Oct" in IST — friendly label for storefront headings and share text. */
 export function formatIstDayLabel(d: Date): string {

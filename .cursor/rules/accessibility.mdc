@@ -60,6 +60,12 @@ Every voice-only path MUST have a tap fallback (`QuickAddGrid`).
 
 ## Testing
 
-- Run axe-core in Vitest before any PR
+- No automated axe audit exists: `@axe-core/playwright` is not installed and
+  Vitest runs in a `node` environment (no DOM). Don't write axe calls until
+  someone adds the package and wires it into `npm run e2e`.
+- `e2e/accessibility.spec.ts` (Playwright) asserts the measurable rules: 44×44 /
+  80×80 tap targets, the mic's state-driven `aria-label`, the cart live region,
+  the QuickAddGrid tap fallback, skip links and labelled sign-in fields.
+  Extend it when you add a POS control.
 - Keyboard-only walkthrough of POS flow (mic button focus reachable via Tab)
 - Screen-reader smoke test (VoiceOver iOS, TalkBack Android) for the POS flow

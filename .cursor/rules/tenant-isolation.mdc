@@ -11,11 +11,14 @@ A `User` (Auth.js) belongs to one or more vendors via `StaffMember`.
 ## Mandatory pattern in every protected handler
 
 ```ts
+import type { NextRequest } from "next/server";
 import { requireVendorRole } from "@/lib/rbac";
 
-export async function GET(req: Request) {
-  const { user, vendor, staff } = await requireVendorRole("CASHIER");
+export async function GET(req: NextRequest) {
+  const { user, vendor, staff, setVendorCookie } =
+    await requireVendorRole("CASHIER", undefined, req);
   // …all queries below MUST include vendorId: vendor.id
+  // …and set the `awz_vendor` cookie on the response when setVendorCookie is non-null
 }
 ```
 
@@ -45,10 +48,13 @@ tables (e.g. Transaction + OrderItem + DailySummary + BillSequence + Receipt).
 
 ## Active vendor selection (multi-vendor users)
 
-Resolved by `requireVendorRole()` in this order:
-1. `?vendor=<slug>` query param
-2. `awz_vendor` cookie
-3. First `StaffMember` by `createdAt` (and the cookie is set)
+Resolved by `requireVendorRole(minRole, vendorIdOrSlug?, req?)` among the
+user's active memberships, in this order:
+1. the explicit `vendorIdOrSlug` argument
+2. `?vendor=<slug or id>` query param (read only when `req` is passed)
+3. `awz_vendor` cookie
+4. Oldest active `StaffMember` by `createdAt`. When this default is used and no
+   cookie existed, it returns `setVendorCookie` and the route sets the cookie.
 
 ## Cross-tenant reference rejection
 
@@ -58,8 +64,12 @@ post-fetch checks.
 
 ## Tests
 
-For every list/detail/mutation route, add a Vitest case that:
-1. Creates two vendors V1, V2 with one menu item each.
-2. Authenticates as V1's owner.
-3. Attempts to read/update/delete V2's item.
+Cross-tenant tests live in `e2e/tenant-isolation.spec.ts` (Playwright, real
+Postgres), not Vitest — Vitest has no session harness. For every new
+list/detail/mutation route, add a case there that:
+1. Registers two vendors via `createVendorSession()` (`e2e/helpers/vendor.ts`),
+   each in its own browser context.
+2. Creates a row as vendor A.
+3. As vendor B, attempts to read/update/delete A's row (or lists and checks A's
+   row is absent).
 4. Asserts 404 (not 403 — don't leak existence).

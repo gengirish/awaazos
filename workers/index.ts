@@ -87,7 +87,7 @@ process.on("unhandledRejection", (reason) => {
 
 // Capture every BullMQ "failed" event into Sentry too — already logged via pino,
 // but Sentry gives us the dashboard + alerting + replay-by-attempt view.
-[receiptWorker, voiceLogWorker].forEach((w) => {
+ALL_WORKERS.forEach((w) => {
   w.on("failed", (job, err) => {
     Sentry.captureException(err, {
       tags: {

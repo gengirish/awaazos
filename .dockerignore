@@ -31,10 +31,16 @@ node_modules/
 .git/
 .gitignore
 .cursor/
+.claude/
+.kilo/
 agent-transcripts/
 terminals/
 
 # Tests + docs
+tests/
+e2e/
+docs/
+services/
 **/__tests__/
 **/*.test.ts
 **/*.test.tsx
@@ -42,7 +48,6 @@ playwright-report/
 test-results/
 README.md
 AGENTS.md
-awaazos-cursor-prompt.md
 
 # Editor / OS
 .DS_Store

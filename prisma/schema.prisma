@@ -376,7 +376,7 @@ model User {
   emailVerified     DateTime?
   image             String?
   passwordHash      String? // null for OAuth-only users
-  passwordChangedAt DateTime? // set on password reset; enforcement is a follow-up (see lib/rbac.ts)
+  passwordChangedAt DateTime? // set on password reset; sessions issued before it are rejected in lib/rbac.ts
   role              UserRole  @default(USER)
   createdAt         DateTime  @default(now())
   updatedAt         DateTime  @updatedAt

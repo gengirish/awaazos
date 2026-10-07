@@ -25,8 +25,11 @@ via CSS variables — never hardcode hex in components.
 
 - **Headings:** Baloo 2 (Google Fonts) — has Devanagari for आवाज़ logo
 - **Body:** Nunito (Google Fonts)
-- **Data / bills:** JetBrains Mono (numeric tabular figures)
-- Load via `next/font/google`, set CSS variables in `app/layout.tsx`
+- **Data / bills:** Tailwind's default `font-mono` stack (system monospace).
+  JetBrains Mono is **not** loaded.
+- Baloo 2 and Nunito load via `next/font/google` in `app/layout.tsx`
+  (`--font-baloo`, `--font-nunito`), mapped to `font-display` / `font-body` /
+  `font-sans` in `tailwind.config.ts`
 
 ## Icons
 
@@ -55,7 +58,8 @@ Use Tailwind defaults. POS-specific:
 
 - Respect `prefers-reduced-motion` — disable mic pulse, slide-up sheets become fade
 - Transition durations: 150–300 ms
-- Mic listening: 1.5 s pulse `@keyframes mic-pulse`
+- Mic listening: Tailwind `motion-safe:animate-pulse` on `VoiceOrderButton`
+  (there is no custom `mic-pulse` keyframe)
 
 ## Don't
 

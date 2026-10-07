@@ -3,7 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { istDayRangeFromQuery } from "@/lib/billing-period";
 import { paiseToRupees } from "@/lib/currency";
+import { formatIstDate } from "@/lib/datetime";
 import { withStatementTimeout } from "@/lib/db-timeout";
+import { lastFourDigits } from "@/lib/phone";
 import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
@@ -18,9 +20,7 @@ function csvPlainInr(paise: number): string {
 
 function maskCustomerPhone(phone: string | null | undefined): string {
   if (!phone) return "";
-  const digits = phone.replace(/\D/g, "");
-  const last4 = digits.slice(-4);
-  return `XXXXXX${last4}`;
+  return `XXXXXX${lastFourDigits(phone)}`;
 }
 
 function csvEscape(field: string): string {
@@ -28,15 +28,6 @@ function csvEscape(field: string): string {
     return `"${field.replace(/"/g, '""')}"`;
   }
   return field;
-}
-
-function formatIstDate(d: Date): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-  }).format(d);
 }
 
 function formatIstTime(d: Date): string {

@@ -23,20 +23,23 @@ flowchart LR
     end
 
     subgraph Fly[Fly.io · BOM region]
-        Workers[BullMQ Workers<br/>voiceLog · send-receipt · retention<br/>Node 20 alpine · 512MB]
+        Workers[BullMQ Workers<br/>voice-parse-log · send-receipt · retention-maintenance<br/>Node 20 alpine · 512MB]
+        Whisper[awaazos-whisper-stt<br/>optional self-hosted ASR<br/>services/whisper-stt]
         Redis[(Redis TCP<br/>REDIS_URL<br/>BullMQ queues)]
     end
 
     subgraph Neon[Neon Serverless Postgres]
         Pool[(Pgbouncer pooled<br/>DATABASE_URL)]
-        Direct[(Direct conn<br/>DIRECT_URL · migrations)]
+        Direct[(Direct conn<br/>DIRECT_URL · schema push)]
     end
 
     subgraph External[External APIs]
         Anthropic[Anthropic<br/>Claude Haiku 4.5 + Sonnet 4.5]
-        Sarvam[Sarvam Saaras v2<br/>Indic STT]
-        Razorpay[Razorpay<br/>Subscriptions + Webhooks]
-        Gupshup[Gupshup<br/>WhatsApp Business API]
+        STT[Cloud STT<br/>Sarvam saaras:v3 · OpenAI gpt-4o-mini-transcribe<br/>Groq whisper-large-v3-turbo]
+        Razorpay[Razorpay<br/>platform subscriptions +<br/>vendor-owned storefront keys]
+        Gupshup[Gupshup<br/>WhatsApp Business API<br/>wired, not used by the UI]
+        AgentMail[AgentMail<br/>password reset + buyer magic links]
+        Push[Browser push services<br/>Web Push · VAPID]
     end
 
     Vendor -->|HTTPS| Edge
@@ -46,17 +49,21 @@ flowchart LR
     APIs --> Pool
     APIs -->|HTTP| KvHttp
     APIs -->|enqueue TCP| Redis
-    APIs -->|tool-use| Anthropic
-    APIs -->|audio blob| Sarvam
-    APIs -->|create sub| Razorpay
+    APIs -->|tool-use · transcript only| Anthropic
+    APIs -->|audio blob| STT
+    APIs -->|audio blob · last resort| Whisper
+    APIs -->|subs · storefront orders| Razorpay
     Razorpay -->|webhook · HMAC| APIs
+    APIs -->|email| AgentMail
+    APIs -->|new-order alert| Push
     Workers --> Redis
     Workers --> Pool
-    Workers -->|HTTPS| Anthropic
-    Workers -->|HTTPS| Gupshup
-    Gupshup -->|WhatsApp message| Customer
+    Workers -.->|send-receipt jobs only| Gupshup
+    Vendor -->|wa.me link · vendor taps send| Customer
     Customer -->|UPI scan| Vendor
 ```
+
+POS receipts go out through a `wa.me` link: the vendor's own WhatsApp opens with the receipt text pre-filled (`GET /api/receipts/message`) and the vendor taps send. No Business API, Redis or worker is involved, and it works on every plan. The Gupshup path (`POST /api/receipts/send`, the post-sale enqueue in `POST /api/transactions` when a `customerPhone` is sent, and `workers/receipt.worker.ts`) is still in the code, but the POS UI no longer calls it. Workers never call Anthropic; the only Claude caller is `/api/ai/parse-order`.
 
 ### Why this split
 
@@ -70,103 +77,133 @@ flowchart LR
 | Step | Median | P95 |
 | --- | ---: | ---: |
 | Browser → Vercel `/api/ai/transcribe` | 80ms | 200ms |
-| Sarvam STT (5s audio) | 1.2s | 2.5s |
+| Server STT cascade (5s audio; only when the recorder path is used) | 1.2s | 2.5s |
 | Vercel → Anthropic Claude Haiku 4.5 | 350ms | 800ms |
 | Cart UI update | 16ms | 32ms |
 | `POST /api/transactions` `prisma.$transaction` | 90ms | 250ms |
 | Post-commit BullMQ enqueue | 8ms | 25ms |
 | Vendor sees UPI QR | **~1.8s end-to-end** | ~3.7s |
 
-For en/hi (Web Speech API path), the STT happens locally — total drops to ~600ms median.
+For en/hi (Web Speech API path, the default), the STT happens locally — total drops to ~600ms median. Treat these figures as rough targets: they were not re-measured when the STT cascade changed.
 
 ---
 
 ## 2. Data model
+
+Source of truth is `prisma/schema.prisma` (applied with `prisma db push`; there are no migration files). The diagram shows the core POS models with their main fields. Storefront, Drops and buyer models are summarised in the table below it and drawn in [§11](#11-drops-home-kitchen-pre-orders).
 
 ```mermaid
 erDiagram
     User ||--o{ StaffMember : "is staff at"
     User ||--o{ Account : "has oauth"
     User ||--o{ Session : "has sessions"
+    User ||--o{ PasswordResetToken : "reset links"
+    User ||--o{ PushSubscription : "opted-in devices"
     Vendor ||--o{ StaffMember : "has staff"
     Vendor ||--o{ MenuItem : "owns"
     Vendor ||--o{ Transaction : "records"
+    Vendor ||--o{ Receipt : "issues"
     Vendor ||--o{ DailySummary : "rolls-up"
     Vendor ||--o{ BillSequence : "atomic counter"
     Vendor ||--o{ VoiceParseLog : "telemetry"
-    Vendor ||--|| VendorSettings : "has"
+    Vendor ||--o{ Drop : "sells"
+    Vendor ||--o{ PushSubscription : "alerts to"
+    Vendor ||--o| VendorSettings : "has"
     Transaction ||--o{ OrderItem : "contains"
-    Transaction ||--|| Receipt : "produces"
+    Transaction ||--o| Receipt : "produces"
     MenuItem ||--o{ OrderItem : "snapshotted in"
 
     User {
         string id PK
         string email UK
-        string passwordHash
-        UserRole role "PLATFORM_ADMIN | USER"
+        string passwordHash "null for OAuth-only"
+        datetime passwordChangedAt "older sessions rejected"
+        UserRole role "USER | ADMIN | SUPER_ADMIN"
+    }
+    PasswordResetToken {
+        string id PK
+        string userId FK
+        string tokenHash UK "SHA-256, raw never stored"
+        datetime expiresAt
+        datetime usedAt "single-use"
     }
     Vendor {
         string id PK
         string slug UK
         string name
+        string ownerName
+        string upiId
+        string upiName
         StallType stallType
         Plan plan "FREE | STARTER | PRO | ENTERPRISE"
-        string razorpaySubscriptionId
+        string gstin "optional, not yet printed"
     }
     StaffMember {
         string id PK
         string userId FK
-        string vendorId FK
+        string vendorId FK "unique with userId"
         StaffRole role "OWNER | MANAGER | CASHIER"
     }
     VendorSettings {
-        string vendorId PK_FK
-        string voiceLang "en | hi | te | kn | ta | mr | bn"
+        string id PK
+        string vendorId FK, UK
+        string voiceLang "en-IN | hi-IN | te-IN | kn-IN | ta-IN"
+        boolean sendWhatsappReceipt
         boolean taxEnabled
         decimal taxPercent "@db.Decimal(5,2)"
-        string upiId
-        string upiName
+        string hsnDefault "schema only, unused"
         string whatsappNumber
         string receiptFooter
+        boolean publishStorefront "default false"
+        boolean acceptMenuOrders "default false"
+        string razorpaySubId "platform subscription"
     }
     MenuItem {
         string id PK
         string vendorId FK
         string name
+        string slug "unique per vendor"
+        string_array aliases "voice aliases"
+        string_array tags
         string emoji
+        string category "free text, default General"
         int priceInPaise "INTEGER · paise only"
-        StallType category
         int sortOrder
         boolean isPopular
         boolean isAvailable
+        string imageUrl "Vercel Blob"
         string hsnCode "optional HSN/SAC"
     }
     BillSequence {
-        string vendorId PK_FK
+        string vendorId PK, FK
         date date PK
         int lastSeq "atomic increment"
     }
     Transaction {
         string id PK
         string vendorId FK
-        string billNumber UK "AWZ-YYYYMMDD-NNNN"
+        string billNumber "AWZ-YYYYMMDD-NNNN, indexed not unique"
         int subtotalPaise
         int discountPaise
         int taxPaise
         int totalPaise
-        PaymentMethod paymentMethod
+        PaymentMethod paymentMethod "UPI | CASH | CARD | RAZORPAY_LINK"
         PaymentStatus paymentStatus "PENDING | PAID | FAILED | REFUNDED"
-        OrderSource source "VOICE | MANUAL | WHATSAPP | API"
-        string customerPhone
-        string upiRef
+        OrderSource source "VOICE | MANUAL | WHATSAPP | STOREFRONT | API"
+        string customerPhone "PII"
+        string customerName "PII"
+        string upiRef "UTR, PII"
         string voiceTranscript
+        string dropId FK "storefront only"
+        string orderToken UK "storefront only"
         datetime createdAt
         datetime paidAt
     }
     OrderItem {
         string id PK
         string transactionId FK
-        string menuItemId FK_nullable "nullable for off-menu"
+        string menuItemId FK "nullable for off-menu"
+        string dropItemId FK "storefront drop orders"
         string name "snapshotted at sale time"
         int priceInPaise
         int qty
@@ -174,15 +211,15 @@ erDiagram
     }
     Receipt {
         string id PK
-        string transactionId FK_UK
+        string transactionId FK, UK
         string vendorId FK
-        string receiptNumber UK
+        string receiptNumber "same as billNumber, not unique"
         boolean whatsappSent
         datetime whatsappSentAt
         string deliveredTo "stored for resend"
     }
     DailySummary {
-        string vendorId FK
+        string vendorId FK "unique with date"
         date date
         int totalRevenuePaise
         int totalTransactions
@@ -193,22 +230,37 @@ erDiagram
     VoiceParseLog {
         string id PK
         string vendorId FK
-        string transcript
-        json parsedItems
-        decimal confidence
-        string modelUsed "haiku-4-5 | sonnet-4-5"
+        string transcript "no PII"
+        string lang
+        string sttSource "webspeech | sarvam | openai | groq | whisper"
+        string modelUsed "claude-haiku-4-5 | claude-sonnet-4-5"
+        boolean escalated
+        int itemCount
+        string confidence "high | medium | low"
+        string_array unmatched
         int latencyMs
-        boolean wasCorrected
+        datetime createdAt
     }
 ```
+
+Models not drawn above:
+
+| Model | What it is |
+| --- | --- |
+| `Drop`, `DropItem` | A home-kitchen pre-order batch and its per-item price / capacity. See §11. |
+| `Customer`, `CustomerSession`, `CustomerLoginToken` | Storefront buyers, kept apart from `User` / Auth.js. Passwordless email magic link; tokens and session ids stored as SHA-256 hashes. See §11. |
+| `PushSubscription` | One row per staff device opted in to Web Push new-order alerts (`lib/push.ts`). A 404/410 from the push service deletes the row; there is no cleanup job. |
+| `Account`, `Session`, `VerificationToken` | Standard Auth.js adapter tables. The session strategy is JWT (`lib/auth.ts`). |
+
+`VendorSettings` also carries the storefront fields (`fssaiNumber`, `acceptPayOnDelivery`, `menuFulfilmentMode`, `menuDeliveryFeePaise`, `menuPickupNote`) and the vendor's own encrypted Razorpay keys (`razorpayKeyId`, `razorpayKeySecretEnc`, `razorpayWebhookSecretEnc`), plus `razorpayCustomerId` for the platform subscription.
 
 ### Critical invariants
 
 1. **Money is paise.** Every monetary column is `Int` (paise). The codebase has a `lib/currency.ts` rule banning `parseFloat`, `Number()` on price strings, and `toFixed`. The single allowed `toFixed` lives in `lib/upi.ts` for UPI deep-link `am=` parameter (UPI spec requires decimal rupees).
 2. **Bill numbers are unique per `(vendorId, date)`.** Generated atomically inside `prisma.$transaction` via `tx.billSequence.upsert({ ..., update: { lastSeq: { increment: 1 } } })`. Two concurrent sales never collide.
 3. **`OrderItem.name` and `priceInPaise` are snapshots**, not joins to `MenuItem`. A menu item deletion or price change must NOT mutate historical bills.
-4. **`vendorId` scoping is enforced at the application layer**, not the database. Every Prisma `where` clause that touches multi-tenant data must include `vendorId`. Helper `requireVendorRole(role)` returns the resolved vendor and throws `AuthError(403)` on cross-tenant access.
-5. **PII is firewalled.** `Transaction.customerPhone` and `Receipt.deliveredTo` exist for re-send capability but are NEVER sent to LLM/STT providers and NEVER logged in plaintext. Only last-4 appears in CSV exports + audit logs.
+4. **`vendorId` scoping is enforced at the application layer**, not the database. Every Prisma `where` clause that touches multi-tenant data must include `vendorId`. Helper `requireVendorRole(minRole, vendorIdOrSlug?, req?)` resolves the active vendor and throws `AuthError(403)` when the user has no membership there or too low a role. A row that belongs to another tenant is looked up with a compound `where` and returns **404**, so existence never leaks.
+5. **PII is firewalled.** `Transaction.customerPhone`, `customerName`, `upiRef` (UTR), `deliveryAddress`, `Receipt.deliveredTo` and the `Customer` contact fields exist for re-send, delivery and reconciliation but are NEVER sent to LLM/STT providers, `VoiceParseLog`, Sentry or push payloads, and NEVER logged in plaintext. Only last-4 appears in CSV exports + audit logs.
 
 ---
 
@@ -221,57 +273,64 @@ sequenceDiagram
     autonumber
     participant U as 👤 Vendor
     participant Hook as useVoiceOrder hook<br/>(client)
+    participant TR as POST /api/ai/transcribe<br/>(Vercel)
+    participant STT as STT cascade<br/>(see ADR below)
     participant API as POST /api/ai/parse-order<br/>(Vercel)
-    participant Sarvam as Sarvam Saaras v2
-    participant Cache as Anthropic prompt cache
     participant Haiku as Claude Haiku 4.5
     participant Sonnet as Claude Sonnet 4.5
-    participant Q as BullMQ voiceLog
+    participant Q as BullMQ voice-parse-log
 
     U->>Hook: tap mic, speak<br/>"do samosa aur ek chai"
-    alt en or hi
-        Hook->>Hook: Web Speech API STT (free)
-    else te / kn / ta / mr / bn
-        Hook->>API: POST /api/ai/transcribe<br/>(audio blob)
-        API->>Sarvam: POST /speech-to-text<br/>5s AbortController timeout
-        Sarvam-->>API: { transcript, lang }
-        API-->>Hook: transcript
+    alt en-IN / hi-IN (default)
+        Hook->>Hook: Web Speech API STT in the browser (free)
+    else te/kn/ta (dormant), or en/hi with NEXT_PUBLIC_VOICE_FALLBACK_ENABLED
+        Hook->>TR: MediaRecorder audio blob + lang
+        TR->>TR: requirePlan(STARTER) · rate limit
+        TR->>STT: provider hops, each behind a circuit breaker + minute quota
+        STT-->>TR: transcript
+        TR-->>Hook: { transcript, sttSource }<br/>or 200 { error:"all_providers_failed", fallback:"quickadd" }
     end
 
-    Hook->>API: POST /api/ai/parse-order<br/>{ transcript, vendorId }
-    API->>API: load vendor's MenuItem[]<br/>Zod validate body
-    API->>Cache: cache_control: ephemeral<br/>system block = menu JSON
+    Hook->>API: { transcript, lang, sttSource }
+    API->>API: requireVendorRole(CASHIER) · AI rate limit + token cap<br/>load available MenuItem[] · Zod validate
 
-    Note over API,Haiku: Tier 1 — Haiku 4.5
+    Note over API,Haiku: Tier 1 — Haiku 4.5 (menu JSON block carries cache_control: ephemeral)
 
-    API->>Haiku: messages.create<br/>tools: [add_items]<br/>cached menu block
-    Haiku-->>API: tool_use add_items + confidence 0.92
+    API->>Haiku: messages.create · forced tool add_items
+    Haiku-->>API: { items, unmatched, confidence: high|medium|low }
 
-    alt confidence ≥ 0.75
-        API-->>Hook: { items, confidence:0.92, model:"haiku-4-5" }
-    else confidence < 0.75 OR off-menu items present
-        Note over API,Sonnet: Escalate — Tier 2 — Sonnet 4.5
-        API->>Sonnet: messages.create<br/>tools: [add_items]<br/>same cached menu block
-        Sonnet-->>API: tool_use add_items + confidence 0.88
-        API-->>Hook: { items, confidence:0.88, model:"sonnet-4-5", needsConfirmation:true }
+    alt shouldEscalate() is true, or Haiku threw
+        Note over API,Sonnet: Tier 2 — Sonnet 4.5, same prompt
+        API->>Sonnet: messages.create · forced tool add_items
+        Sonnet-->>API: { items, unmatched, confidence }
     end
 
+    API->>API: alignParsedItemsToMenu()<br/>empty cart on ≥2 words → rescueMatchFromTranscript() (confidence low)
+    API-)Q: enqueue voice-parse-log (no await, attempts: 1)
+    API-->>Hook: { items, unmatched, confidence, modelUsed, ... }
     Hook->>Hook: cartStore.setItemsFromVoice(items)
-    API-)Q: enqueue VoiceParseLog (no await)
-    Q->>Q: workers/voiceLog.worker.ts<br/>persists telemetry
+    Q->>Q: workers/voiceLog.worker.ts<br/>persists VoiceParseLog
 ```
+
+**Escalation rule** (`shouldEscalate()` in `app/api/ai/parse-order/route.ts`). Haiku's answer goes to Sonnet when any of these holds:
+
+- the cart is empty and the transcript has more than 3 words;
+- the cart is empty, the transcript has at least 2 words, and nothing was reported unmatched (Haiku gave up silently, e.g. a misheard "less bill" for Lassi);
+- confidence is `low` and something was unmatched.
+
+Any Haiku exception also falls through to Sonnet. There is no numeric confidence score and the API returns no `needsConfirmation` field: confidence is the model's own `high | medium | low`. On the client, `useVoiceOrder` derives `needsConfirmation = confidence === "low"`, and the POS shows an amber double-check banner above the cart.
 
 ### Why this design
 
 - **Prompt caching on the menu block** — for a vendor with 30 items, the menu JSON is ~2KB. Cached, the per-call cost on Haiku 4.5 drops by ~75%. Cache lifetime is 5 minutes; the cashier's busiest hour stays warm.
-- **Tier-1 Haiku covers ~85% of orders** — short, in-menu, common. Cheap and fast.
-- **Tier-2 Sonnet covers the rest** — long compound orders ("sat samosa, do chai, ek vada pav, pyaaz wala"), code-mixing ("aap ke pas vada pav hai? to teen do na"), off-menu detection. Sonnet is ~4x the cost but only invoked ~15% of the time.
-- **Tool-use forces structured output** — no JSON parsing fragility. Claude returns an `add_items` tool call with a typed schema; we get `{ items: [{ menuItemId, qty, confidence }], unmatched: [] }` directly.
+- **Tier-1 Haiku handles the common case** — short, in-menu orders. Cheap and fast.
+- **Tier-2 Sonnet covers the rest** — long compound orders ("sat samosa, do chai, ek vada pav, pyaaz wala"), code-mixing ("aap ke pas vada pav hai? to teen do na"), off-menu detection. Sonnet costs several times more, so it runs only when `shouldEscalate()` fires or Haiku throws. The real escalation rate is in `VoiceParseLog.escalated`.
+- **Tool-use forces structured output** — no JSON parsing fragility. Claude returns an `add_items` tool call with a typed schema; we get `{ items: [{ menuItemId, name, priceInPaise, qty }], unmatched: [], confidence }` directly. Ids and prices are then re-anchored to real menu rows, so the model's numbers are never trusted.
 - **Telemetry is async** — `VoiceParseLog` writes via BullMQ on Fly. The cashier never waits.
 
 ### Indic numeral normalization
 
-Vendors say _"ek"_, _"do"_, _"teen"_, _"sat"_ in Hindi; _"oka"_, _"rendu"_, _"moodu"_ in Telugu; _"ondu"_, _"eradu"_ in Kannada. The Claude prompt includes a 1-page normalization guide as a system message, plus a trained-into-the-tool-schema constraint that `qty` must be a positive integer. Edge cases (fractional like _"adha samosa"_ → 0.5) are rejected by the tool schema and fall back to operator confirmation.
+Vendors say _"ek"_, _"do"_, _"teen"_, _"sat"_ in Hindi; _"okati"_, _"rendu"_, _"moodu"_ in Telugu; _"ondu"_, _"eradu"_ in Kannada. The system prompt (`ORDER_PARSE_SYSTEM` in `lib/anthropic.ts`) carries a numeral table for hi/te/kn/ta, and the tool schema requires `qty` to be an integer ≥ 1. Fractions like _"adha samosa"_ cannot be expressed, so the vendor fixes those lines by tapping.
 
 ### ADR: STT and NLU are separate concerns
 
@@ -283,7 +342,7 @@ Vendors say _"ek"_, _"do"_, _"teen"_, _"sat"_ in Hindi; _"oka"_, _"rendu"_, _"mo
 
 | Layer | Job | Technology | Needs LLM? |
 | --- | --- | --- | --- |
-| **STT** | audio → transcript | Web Speech · Sarvam · OpenAI transcribe · Groq Whisper · self-hosted Whisper (`services/whisper-stt`) | **No** — ASR only |
+| **STT** | audio → transcript | Web Speech · Sarvam `saaras:v3` · OpenAI `gpt-4o-mini-transcribe` · Groq `whisper-large-v3-turbo` · self-hosted Whisper (`services/whisper-stt`) | **No** — ASR only |
 | **NLU** | transcript + menu → `{ items, unmatched, confidence }` | Claude Haiku 4.5 → Sonnet 4.5 (`add_items` tool-use) | **Yes** — menu matching, qty extraction, alias resolution |
 
 ```
@@ -295,14 +354,16 @@ mic → STT (ASR) → transcript string → parse-order (LLM) → cart
 - OpenAI `gpt-4o-mini-transcribe` is an **ASR API**, not the order parser — same slot as Groq Whisper or Sarvam.
 - Self-hosted Whisper (`lib/whisper-stt.ts` → `services/whisper-stt`) is an **optional last-resort STT tier** on Fly, gated by `WHISPER_STT_URL`. It does not replace Sarvam for te/kn/ta until golden STT pass rates match (see `tests/golden/stt/README.md`).
 
-**STT cascade (server path, when Web Speech is skipped or unavailable):**
+**STT cascade (`POST /api/ai/transcribe`, used only on the recorder path):**
 
 | Lang | Order |
 | --- | --- |
-| `te-IN`, `kn-IN`, `ta-IN` | Sarvam → Groq → Whisper (self-hosted) |
-| `en-IN`, `hi-IN` | OpenAI → Groq → NVIDIA (legacy) → Whisper (self-hosted) |
+| `en-IN`, `hi-IN` | OpenAI → Groq → Whisper (self-hosted) |
+| `te-IN`, `kn-IN`, `ta-IN` (dormant) | Sarvam → Groq → Whisper (self-hosted) |
 
-Each hop has its own circuit breaker and (where applicable) minute quota. Whisper is omitted from the cascade when `WHISPER_STT_URL` is unset.
+Each hop has its own circuit breaker (`lib/circuit-breaker.ts`) and, for the paid APIs, a minute quota (`lib/ai-usage-guard.ts`). A provider whose env is missing is left out of the cascade: OpenAI needs an `sk-` key, Groq a `gsk_` key, and Whisper needs both `WHISPER_STT_URL` and a `WHISPER_STT_SECRET` of at least 16 characters. The route is plan-gated to STARTER. If every hop fails it returns **200** with `{ error: "all_providers_failed", fallback: "quickadd" }` and the POS falls back to the tap grid.
+
+**Which path runs.** The language picker (`VOICE_LANGUAGES` in `lib/constants.ts`) offers only `en-IN` and `hi-IN`, and those use the browser's Web Speech API by default, so in normal use this route is not called at all. It runs for en/hi only when the build-time flag `NEXT_PUBLIC_VOICE_FALLBACK_ENABLED=true` switches the hook to MediaRecorder. If Web Speech is missing in the browser, the hook shows an `stt_unsupported` error rather than falling back to the server. Telugu, Kannada and Tamil are **dormant**: the Sarvam code path and the `te/kn/ta` values in `SUPPORTED_VOICE_LANGS` remain so older `VendorSettings.voiceLang` rows keep working, but no vendor can pick them. There is no Marathi or Bengali support anywhere.
 
 **Consequences.**
 
@@ -321,20 +382,19 @@ sequenceDiagram
     participant POS as /pos client
     participant API as POST /api/transactions
     participant Tx as prisma.$transaction
-    participant Q as BullMQ send-receipt
-    participant W as Fly worker
-    participant G as Gupshup
+    participant Msg as GET /api/receipts/message
+    participant WA as Vendor's WhatsApp (wa.me)
 
     U->>POS: tap "Collect Payment"
     POS->>POS: build UPI deep link<br/>upi://pay?pa=&pn=&am=...
-    POS->>U: render 256×256 QR<br/>(via api.qrserver.com)
+    POS->>U: render QR image<br/>(via api.qrserver.com)
 
     U->>POS: customer scans · pays<br/>vendor taps "Mark as Paid"
-    POS->>API: { items, totals, paymentMethod, upiRef, customerPhone }
-    API->>API: requireVendorRole('CASHIER')
+    POS->>API: { items, subtotalPaise, taxPaise, totalPaise, paymentMethod, upiRef }
+    API->>API: requireVendorRole('CASHIER') · idempotency key
     API->>API: server-side recompute<br/>subtotal + total
     Note right of API: reject 400 on mismatch
-    API->>API: count monthly txns<br/>vs PLAN_LIMITS[plan].monthlyTxnCap
+    API->>API: countBillableTxnThisMonth()<br/>vs PLAN_LIMITS[plan].monthlyTxnCap
 
     API->>Tx: prisma.$transaction
     Tx->>Tx: 1. billSequence.upsert<br/>(atomic increment)
@@ -343,31 +403,25 @@ sequenceDiagram
     Tx->>Tx: 4. receipt.create<br/>whatsappSent: false
     Tx-->>API: { transaction, receipt }
 
-    alt customerPhone provided AND plan allows whatsapp
-        API-)Q: enqueue send-receipt<br/>{ transactionId, vendorId, customerPhone }
-        Note right of API: enqueue failures<br/>logged + swallowed
-    end
-
     API-->>POS: 201 { transaction, receiptNumber, whatsappQueued }
-    POS->>U: show ReceiptModal<br/>"Bill AWZ-20260423-0001"
-    U->>POS: tap "New Order 🆕"
+    POS->>Msg: prefetch receipt text for the bill
+    Msg-->>POS: formatted text (lines, HSN/SAC where set, footer)
+    POS->>U: ReceiptModal "Paid"<br/>optional customer mobile
+    U->>WA: tap "Send on WhatsApp" (plain link)
+    WA->>WA: receipt pre-filled · vendor taps send
+    U->>POS: tap "New order"
     POS->>POS: cartStore.clearCart()
-
-    Q->>W: receipt worker picks up
-    W->>W: load Transaction + Vendor<br/>scoped by vendorId
-    Note right of W: idempotent — return if<br/>receipt.whatsappSent === true
-    W->>W: format multiline message<br/>via lib/whatsapp-message
-    W->>G: POST /sm/api/v1/msg<br/>8s AbortController timeout
-    G-->>W: { messageId, status }
-    W->>Tx: receipt.update<br/>{ whatsappSent: true,<br/>  whatsappSentAt, deliveredTo }
-    G->>G: deliver to customer's WhatsApp
 ```
+
+The receipt link is built by `receiptWhatsappUrl()` (`lib/whatsapp-message.ts`): a blank number opens WhatsApp's chat picker and a 10-digit number gets `+91`. The text is fetched when the modal opens so the button is a plain link (an `await` before `window.open` is popup-blocked on mobile). The transactions drawer has the same **Send / Resend on WhatsApp** button. This path costs nothing, needs no Redis or worker, and is available on every plan.
+
+**Legacy Gupshup path (wired, unused by the UI).** If a caller sends `customerPhone` to `POST /api/transactions` and the plan has `whatsapp: true`, the route enqueues `send-receipt` after commit; `POST /api/receipts/send` does the same on demand. `workers/receipt.worker.ts` then loads the transaction scoped by `vendorId`, returns early if `receipt.whatsappSent` is already true, posts to Gupshup with an 8 s timeout, and marks the receipt sent. The POS no longer sends `customerPhone`, so in practice `whatsappQueued` is `false`.
 
 ### Atomicity proof
 
 The `prisma.$transaction` block bundles **bill number generation + transaction insert + order items + daily summary + receipt** into a single Postgres `BEGIN ... COMMIT`. If any step throws, the entire transaction rolls back — no orphaned bill numbers, no half-recorded sales, no DailySummary drift.
 
-WhatsApp enqueue happens **outside the transaction**, after commit. If the queue is unreachable (Redis down), the cashier still completes the sale; only the WhatsApp send fails (and it surfaces as a manual "Resend" button on the transaction detail drawer).
+Anything after the sale happens **outside the transaction**, after commit. The wa.me receipt is a client-side link, and the legacy Gupshup enqueue logs and swallows its own failures, so Redis being down never blocks a sale.
 
 ---
 
@@ -396,35 +450,41 @@ flowchart TD
 
 | Layer | Enum | Values | Stored on | Purpose |
 | --- | --- | --- | --- | --- |
-| Platform | `UserRole` | `PLATFORM_ADMIN`, `USER` | `User.role` | AwaazOS internal admin (us) |
+| Platform | `UserRole` | `USER`, `ADMIN`, `SUPER_ADMIN` | `User.role` | AwaazOS internal admin (us); `/admin/metrics` needs `ADMIN`+ |
 | Tenant | `StaffRole` | `OWNER`, `MANAGER`, `CASHIER` | `StaffMember.role` | Per-vendor permissions |
 
-A `User` can be staff at multiple `Vendor`s (multi-org). Active vendor resolution priority: `?vendor=` query param → `vendor` cookie → oldest membership.
+A `User` can be staff at multiple `Vendor`s (multi-org). Active vendor resolution priority: `?vendor=` query param → `awz_vendor` cookie → oldest membership. When `requireVendorRole` returns a non-null `setVendorCookie`, the route sets that cookie on its response.
+
+Storefront buyers (`Customer`) never pass through this flow; they have their own magic-link session (`lib/customer-auth.ts`).
 
 ### Plan gating
 
 ```typescript
-// Throws PlanGateError(402) with structured body if vendor.plan < required
+// Throws PlanGateError(402) carrying { required, current } if vendor.plan < required
 requirePlan(vendor, Plan.STARTER);
 
-// Frontend catches → renders <SubscriptionGate feature="whatsapp_receipts" />
-// → CTA to /settings/billing
+// Route maps it to 402 { error, code: "plan_upgrade_required", requiredPlan, currentPlan, feature }
+// so the UI can show an upgrade CTA to /settings/billing
 ```
+
+Current `requirePlan` call sites: STARTER for `/api/ai/transcribe` and `/api/receipts/send`; PRO for `/api/transactions/export` (CSV) and saving the vendor's own Razorpay keys (`PUT /api/vendor/payments`).
 
 `PLAN_LIMITS` table lives in `lib/constants.ts`:
 
-| Plan | monthlyTxnCap | whatsapp | analyticsDays | csvExport |
-| --- | ---: | --- | ---: | --- |
-| FREE | 50 | ❌ | 7 | ❌ |
-| STARTER | 500 | ✅ | 90 | ❌ |
-| PRO | null (∞) | ✅ | 365 | ✅ |
-| ENTERPRISE | null | ✅ | null | ✅ |
+| Plan | Price/mo | monthlyTxnCap | maxStaff | whatsapp | razorpayLinks | sarvamStt | analyticsDays | csvExport |
+| --- | ---: | ---: | ---: | --- | --- | --- | ---: | --- |
+| FREE | ₹0 | 50 | 1 | ❌ | ❌ | ❌ | 7 | ❌ |
+| STARTER | ₹299 | 500 | 3 | ✅ | ❌ | ✅ | 90 | ❌ |
+| PRO | ₹799 | null (∞) | null | ✅ | ✅ | ✅ | 365 | ✅ |
+| ENTERPRISE | custom | null | null | ✅ | ✅ | ✅ | 365 | ✅ |
+
+`txnPerMonth` and `whatsappReceipts` duplicate `monthlyTxnCap` and `whatsapp`. The marketing pricing page shows only FREE and STARTER (see the cut list in `PITCH.md`); PRO and ENTERPRISE stay in the code for the gates.
 
 ---
 
 ## 6. Background jobs
 
-BullMQ queues run on **Redis TCP** (`REDIS_URL`) consumed by **Fly.io** workers. Vercel uses **Upstash REST** (`lib/kv.ts`) for rate limiting and idempotency — not the same transport as BullMQ.
+BullMQ queues run on **Redis TCP** (`REDIS_URL`) consumed by **Fly.io** workers (`workers/index.ts`). Vercel uses **Upstash REST** (`lib/kv.ts`) for rate limiting, idempotency, circuit breakers, AI usage caps and the drops-board signal counter — not the same transport as BullMQ.
 
 ```mermaid
 flowchart LR
@@ -436,12 +496,12 @@ flowchart LR
         KvV[lib/kv.ts<br/>Upstash HTTP]
     end
     subgraph RedisTCP[Redis TCP · REDIS_URL]
-        QSendReceipt[(send-receipt queue)]
-        QVoiceLog[(voiceLog queue)]
-        QRetention[(retention queue)]
+        QSendReceipt[(send-receipt)]
+        QVoiceLog[(voice-parse-log)]
+        QRetention[(retention-maintenance)]
     end
     subgraph Fly[Fly worker · BOM]
-        WorkerSend[receipt.worker.ts<br/>attempts:3 backoff:exp]
+        WorkerSend[receipt.worker.ts]
         WorkerLog[voiceLog.worker.ts]
         WorkerRet[retention.worker.ts]
     end
@@ -453,8 +513,8 @@ flowchart LR
     TxAPI --> KvV
     ParseAPI --> KvV
     AdminRet -->|enqueue| QRetention
-    TxAPI -->|post-commit enqueue| QSendReceipt
-    ReceiptAPI -->|enqueue| QSendReceipt
+    TxAPI -.->|post-commit enqueue,<br/>only if customerPhone sent| QSendReceipt
+    ReceiptAPI -.->|enqueue · not called by UI| QSendReceipt
     ParseAPI -->|enqueue telemetry| QVoiceLog
     QSendReceipt --> WorkerSend
     QVoiceLog --> WorkerLog
@@ -465,13 +525,23 @@ flowchart LR
     WorkerRet --> DB
 ```
 
+Dotted edges are the legacy Gupshup receipt path, which stays wired but which the POS UI no longer triggers (receipts go out via `wa.me`, see §4). Nothing in this diagram runs on a timer: retention runs only when an admin calls `POST /api/admin/retention/run`.
+
 ### Worker contracts
 
-| Queue | Job | Idempotency | Retry policy |
+Payload types live in `lib/queues.ts`. `DEFAULT_JOB_OPTS` there is 5 attempts with exponential backoff from 5 s, failed jobs kept 7 days; enqueue sites override it where noted.
+
+| Queue | Job payload | Idempotency | Retry policy |
 | --- | --- | --- | --- |
-| `send-receipt` | `{ transactionId, vendorId, customerPhone }` | early-return if `Receipt.whatsappSent === true` | 3 attempts, exponential backoff 5s |
-| `voiceLog` | `{ vendorId, transcript, parsedItems, confidence, modelUsed, latencyMs }` | n/a (write-only telemetry) | 1 attempt, no retry |
-| `retention-maintenance` | `{ requestedBy }` | jobId dedupes daily admin enqueue | per `DEFAULT_JOB_OPTS` in `lib/queues.ts` |
+| `send-receipt` | `{ transactionId, vendorId, customerPhone }` | early-return if `Receipt.whatsappSent === true` | 3 attempts, exponential from 5 s (both enqueue sites) |
+| `voice-parse-log` | `{ vendorId, transcript, lang, sttSource, modelUsed, latencyMs, itemCount, confidence, unmatched, escalated }` | n/a (write-only telemetry) | 1 attempt, no retry |
+| `retention-maintenance` | `{ requestedBy: "admin", requestedByUserId? }` | jobId `retention:<UTC day>` dedupes a day's runs | `DEFAULT_JOB_OPTS` |
+
+The retention worker deletes `VoiceParseLog` rows older than 90 days and receipts older than 7 years.
+
+### Web Push (not a queue)
+
+New-order alerts for storefront and menu orders go straight from the API route to the browser push services via `web-push` (`lib/push.ts`). `notifyVendorInBackground()` hands the send to Vercel's `waitUntil`, so it never blocks the response and needs no worker. It is feature-gated on the VAPID env, sends to the vendor's active staff who opted in on a device, and carries no buyer PII (bill number, amount and item count only).
 
 ---
 
@@ -506,20 +576,20 @@ rg -l "toFixed" --glob '!lib/upi.ts' --glob '!*.md' app/ components/ lib/ worker
 
 ## 8. Quality gates
 
-Every commit on `main` must pass:
+Locally, the husky pre-commit hook runs `npm run precommit:checks` (lint-staged) and `gitleaks protect --staged` when gitleaks is installed. CI (`.github/workflows/ci.yml`) runs on every push and pull request to `main`:
 
 ```mermaid
 flowchart LR
-    Code[git commit] --> TC[npm run typecheck<br/>tsc --noEmit]
-    TC --> Lint[npm run lint<br/>next lint]
-    Lint --> Unit[npm test<br/>vitest 51 cases]
-    Unit --> Build[npm run build<br/>next build · 25 routes]
-    Build --> Push[git push origin main]
-    Push --> Vercel[Vercel auto-deploy]
-    Vercel --> CLIDeploy[vercel --prod --yes<br/>synchronous URL]
-    CLIDeploy --> E2E[BASE_URL=prod npm run e2e<br/>playwright 38 cases]
-    E2E --> Done[✓ Phase complete]
+    Push[push / PR to main] --> Lint[npm run lint]
+    Lint --> TC[npm run typecheck<br/>tsc --noEmit]
+    TC --> Unit[npm test<br/>vitest]
+    Unit --> Build[npm run build]
+    Build --> E2E[E2E job<br/>Postgres 15 service · prisma db push<br/>playwright chromium]
+    Push --> Sec[Security job<br/>gitleaks full history · npm audit --audit-level=high]
+    Main[merge to main] --> Vercel[Vercel Git deploy to production<br/>vercel.json skips preview builds]
 ```
+
+Test counts drift with every change, so they are not recorded here; `npx vitest run` and `npx playwright test --list` print the current numbers. Live golden runs (`GOLDEN_*_LIVE=1`) cost money and are not part of CI. Never run the E2E suite against the production database: it creates vendors and sales.
 
 ---
 
@@ -528,10 +598,10 @@ flowchart LR
 - **Neon over Supabase** — chose Neon for branchable databases + serverless-first pricing. We lose Supabase's bundled storage / auth / realtime, but we gain simpler bill-of-materials (one provider per concern) and full Auth.js v5 freedom. Storage moved to Vercel Blob.
 - **Auth.js v5 over Clerk** — Clerk is faster to integrate but expensive at scale (~$25/mo per 1000 MAU after 10K) and has India-specific friction (no native +91 OTP without Twilio Verify integration cost). Auth.js + Prisma adapter is free and gives us full control of the User schema for multi-tenant `StaffMember` joins.
 - **Two-tier Claude over single Sonnet** — saves ~70% on inference cost for what is essentially the per-transaction unit cost of the product. Justifies the added escalation logic complexity.
-- **Self-hosted BullMQ over Vercel Cron** — Cron is fine for scheduled work; for retry-with-backoff on a per-job basis (what WhatsApp delivery needs), BullMQ wins. Cost: one Fly machine ($0/mo on shared-cpu-1x free tier as of 2026) + Upstash Redis ($0 baseline + $0.20 per 100K commands).
+- **Self-hosted BullMQ over Vercel Cron** — Cron is fine for scheduled work; for retry-with-backoff on a per-job basis (what Business-API WhatsApp delivery needed), BullMQ wins. POS receipts have since moved to `wa.me` links, so today the queues carry voice telemetry, admin-triggered retention, and the unused Gupshup path. Cost: one Fly machine ($0/mo on shared-cpu-1x free tier as of 2026) + Upstash Redis ($0 baseline + $0.20 per 100K commands).
 - **Server-side recompute of totals** — we throw 400 if `subtotalPaise + taxPaise - discountPaise !== totalPaise` from the client. Costs nothing, prevents an entire class of "client tampered with cart" bugs.
 - **Snapshotted `OrderItem.name` and `priceInPaise`** — denormalized, but historical bills don't break when a vendor renames or deletes a menu item.
-- **No GST module yet** — most micro-merchants don't have GSTIN. Adding GST early would gold-plate for the wrong segment. Roadmapped for the kirana / restaurant tier.
+- **Minimal GST support** — most micro-merchants don't have a GSTIN. What has shipped: an optional HSN/SAC code per menu item (`MenuItem.hsnCode`) printed on the WhatsApp receipt text. `VendorSettings.hsnDefault` exists in the schema but nothing reads it yet, and one flat tax rate (`taxEnabled` + `taxPercent`, applied in basis points). Not built: a CGST/SGST/IGST split, GST-formatted invoices, or printing `Vendor.gstin`. Roadmapped for the kirana / restaurant tier.
 - **No offline support yet** — every Indian city has data; the bigger problem for our segment is voice quality, not connectivity. Offline PWA is a Phase 6 item.
 
 ---
@@ -664,6 +734,16 @@ Rejections are typed (`PlaceOrderError`): `sold_out` carries `remaining` so the 
 | **Vendor's Razorpay** | Razorpay Checkout using the **vendor's own** keys; order created on her account | Signature verify on return (`/razorpay/verify`) or her webhook `/api/webhooks/razorpay-orders/[vendorId]`, whichever lands first |
 
 All three converge on `markOrderPaid()`: a conditional `updateMany` (`paymentStatus != PAID`, not cancelled) is the idempotency guard, and `DailySummary` is credited exactly once, **on payment, not placement**. `cancelOrder()` on a paid order sets `REFUNDED` and reverses the credit on the day it was made; the refund itself happens out of band. Storefront orders count toward `monthlyTxnCap` only once paid.
+
+### Order from menu (no Drop)
+
+A vendor who turns on `VendorSettings.acceptMenuOrders` lets buyers order everyday `MenuItem`s on `/s/[slug]` at any time (`lib/menu-orders.ts`, `POST /api/s/[slug]/menu-orders`). These are the same `STOREFRONT` transactions with `dropId = null`, the same three payment paths and the same plan-cap rule. Differences from a Drop: no cut-off and no stock caps (so no row lock), only `isAvailable` items can be ordered, prices are always re-read from `MenuItem`, and fulfilment mode, delivery fee and pickup note come from `menuFulfilmentMode` / `menuDeliveryFeePaise` / `menuPickupNote`. The vendor works them from `/orders`, which polls `/api/storefront-orders/signal` every 6 minutes. That interval is deliberately longer than Neon's idle timeout, because each tick still reads Postgres through `requireVendorRole`.
+
+Both kinds of storefront order fire a Web Push alert to opted-in staff devices when placed, and again when a buyer submits a UTR (§6).
+
+### Settings hub
+
+`/settings` is a hub with one-line status per area and a setup checklist for taking online orders (pure helpers in `lib/settings-overview.ts`). Sub-pages: `store` (storefront publish, FSSAI), `orders` (menu ordering), `payments` (UPI, pay on delivery, vendor Razorpay keys), `voice`, `notifications` (Web Push devices) and `billing`.
 
 ### ADR: vendor-owned Razorpay keys vs platform collection
 

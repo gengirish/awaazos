@@ -1,6 +1,6 @@
 # Live demo guide (investors, partners, design reviews)
 
-Use this for **in-person or Zoom** walkthroughs. For **recording a 60s YC video**, follow [`../DEMO_VIDEO.md`](../DEMO_VIDEO.md) instead.
+Use this for **in-person or Zoom** walkthroughs. For **recording a 60s YC video**, the old storyboard is archived at [`archive/DEMO_VIDEO.md`](archive/DEMO_VIDEO.md). It is stale (cut claims such as 22 languages, automatic payment detection that doesn't exist, Gupshup receipts), so use it for shot structure only and take the script from `PITCH.md` §3.
 
 ---
 
@@ -10,10 +10,10 @@ Use this for **in-person or Zoom** walkthroughs. For **recording a 60s YC video*
 2. **Sanity-check backends** (optional but professional):
    - [https://awaazos.vercel.app/api/health](https://awaazos.vercel.app/api/health) → `200`, `"status":"ok"`
    - [https://awaazos.vercel.app/api/ready](https://awaazos.vercel.app/api/ready) → `200`, both `database` and `redis` probes `ok: true`
-3. **Account**: use a demo vendor with **STARTER or above** if you will speak **Telugu / Kannada / Tamil / Marathi / Bengali** (Sarvam STT is plan-gated). **FREE** is fine for **English / Hindi** (Web Speech).
+3. **Account**: demo in **Hindi or English** — those are the only languages in the voice picker (Settings → Voice). Telugu, Kannada and Tamil are dormant in the code and can't be selected; Marathi and Bengali are not supported. **FREE** is fine: by default Hindi and English are transcribed in the browser (Web Speech), which isn't plan-gated. Only the server STT route (`/api/ai/transcribe`) needs STARTER, and the POS calls it only when the deployment is built with `NEXT_PUBLIC_VOICE_FALLBACK_ENABLED=true`.
 4. **Menu**: pre-create 3 items with obvious Hindi names and round prices (e.g. Special Chai ₹20, Aloo Samosa ₹15, Mirchi Bajji ₹15) so mental math is easy.
-5. **Phone**: charge the device; enable **mic permission** for the site; use **Chrome** on Android or desktop for the most predictable Web Speech path.
-6. **WhatsApp** (optional beat): have a **second number** in settings as the receipt destination, and confirm **Gupshup** + worker env are live if you promise “receipt lands in WhatsApp.”
+5. **Phone**: charge the device; enable **mic permission** for the site; use **Chrome** on Android or desktop. A browser without Web Speech shows a "not supported" error rather than falling back to the server, so check this before the meeting.
+6. **WhatsApp** (optional beat): the demo phone needs WhatsApp installed. Receipts go out as a `wa.me` link: **Send on WhatsApp** opens the vendor's own WhatsApp with the receipt pre-filled, and you tap send. Have a **second number** ready to type in as the customer's mobile. No Gupshup, Redis or worker is involved, and it works on FREE.
 
 ---
 
@@ -26,20 +26,20 @@ Use this for **in-person or Zoom** walkthroughs. For **recording a 60s YC video*
 
 1. **Sign in** → **POS** (`/pos`). Empty cart.
 2. Tap the **mic** (“Bolo”). Say clearly in your chosen language, e.g. Hindi: *“Do special chai, ek aloo samosa, ek mirchi bajji.”*  
-   - *Talk track:* “Transcription routes to Web Speech or Sarvam; parsing is Claude with the vendor’s real menu.”
+   - *Talk track:* “Speech-to-text runs in the browser for Hindi and English, with a server fallback that cascades OpenAI → Groq → our own Whisper. The order itself is parsed by Claude against the vendor’s real menu — Haiku first, Sonnet if it’s unsure.”
 3. **Cart** fills with lines + **₹ total**.  
    - *Talk track:* “Integer paise in the DB—no float money bugs.”
 4. **Collect payment** → **UPI QR**.  
    - *Talk track:* “Vendor’s own UPI ID; customer scans with any UPI app.”
 5. **Mark as paid** (simulate or real payment). Show **bill number** `AWZ-YYYYMMDD-NNNN`.  
    - *Talk track:* “Atomic bill sequence inside one Postgres transaction.”
-6. If WhatsApp is configured: show **receipt** on the phone.  
-   - *Talk track:* “Queued on Redis, sent by a Fly.io worker—retries, idempotent.”
+6. Optional: type the second number and tap **Send on WhatsApp**; WhatsApp opens with the receipt ready, tap send, show it arrive.  
+   - *Talk track:* “Receipt comes from the vendor’s own WhatsApp — free, no Business API, no app for the customer.”
 7. **Analytics** (`/analytics`): revenue trend, voice adoption.  
    - *Talk track:* “Owner sees what sold and whether voice is being adopted.”
 
 **Close (15s)**  
-“Live stack: Next.js on Vercel, Neon Postgres, Claude + Sarvam, BullMQ workers on Fly. **Bol. Bill. Becho.**”
+“Live stack: Next.js on Vercel, Neon Postgres, Claude for parsing, browser speech plus a multi-provider STT fallback, BullMQ workers on Fly. **Bol. Bill. Becho.**”
 
 ---
 
@@ -48,10 +48,11 @@ Use this for **in-person or Zoom** walkthroughs. For **recording a 60s YC video*
 | Symptom | Likely cause | What to say / do |
 | --- | --- | --- |
 | Mic does nothing | Browser blocked mic | “Allow microphone for this site”; refresh. |
-| Hindi works, Indic language fails | Plan is FREE | “That language uses Sarvam—I'll show on STARTER”; switch account or use Hindi. |
+| Mic shows “not supported” | Browser has no Web Speech (e.g. Firefox, some in-app browsers) | Switch to Chrome; meanwhile bill from the **quick-add grid**. |
+| Voice drops to the tap grid with a degraded notice | Server STT cascade exhausted (only when the fallback flag is on) | Expected behaviour, not a crash: “every voice path has a tap fallback.” Carry on from the quick-add grid. |
 | Cart empty after voice | Network / API error | Open DevTools → Network on `parse-order`; fall back to **manual add** from quick grid—still shows billing + UPI. |
 | `/api/ready` Redis fails | Missing or wrong `UPSTASH_*` on Vercel | Don’t show the JSON to the room; fix env and redeploy before the next meeting. |
-| WhatsApp never arrives | Worker down / Gupshup env | “Receipt is in the app and DB; WhatsApp is async”—show transaction detail + resend if UI allows. |
+| WhatsApp doesn't open | Popup blocked, WhatsApp not installed, or the number isn't 10 digits | Leave the number blank to pick the chat inside WhatsApp, or show the bill in `/transactions` and use **Send on WhatsApp** from the detail drawer. |
 
 ---
 
@@ -59,13 +60,13 @@ Use this for **in-person or Zoom** walkthroughs. For **recording a 60s YC video*
 
 - [ ] Note questions asked → feed into roadmap / `PITCH.md`
 - [ ] If you showed prod URLs, remind viewers **not to abuse** the public signup
-- [ ] For YC / press, prioritize publishing the **60s video** and linking it from `README.md` + `PITCH.md` (placeholders: `DEMO_VIDEO.md`)
+- [ ] For YC / press, prioritize publishing the **60s video** and replacing the `<VIDEO_ID>` placeholders in `README.md` + `PITCH.md`
 
 ---
 
 ## Related docs
 
 - [`../README.md`](../README.md) — quickstart, live URLs, deploy
-- [`../DEMO_VIDEO.md`](../DEMO_VIDEO.md) — shot list + export settings for the 60s film
+- [`archive/DEMO_VIDEO.md`](archive/DEMO_VIDEO.md) — archived, stale shot list + export settings for the 60s film
 - [`../PITCH.md`](../PITCH.md) — YC narrative and deck
 - [`../ARCHITECTURE.md`](../ARCHITECTURE.md) — system topology (Vercel vs Fly vs Redis)

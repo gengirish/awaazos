@@ -5,20 +5,21 @@
  * or request shape is caught automatically.
  */
 
-import { transcribeAudio as transcribeViaGroq, type GroqSttLang } from "@/lib/groq-stt";
-import { transcribeAudio as transcribeViaNvidia, type NvidiaLang } from "@/lib/nvidia";
+import { groqSttConfigured, transcribeAudio as transcribeViaGroq, type GroqSttLang } from "@/lib/groq-stt";
 import {
+  openaiSttConfigured,
   transcribeAudio as transcribeViaOpenai,
   type OpenaiSttLang,
 } from "@/lib/openai-stt";
 import { transcribeAudio as transcribeViaSarvam, type SarvamLang } from "@/lib/sarvam";
+import type { ServerSttSource } from "@/lib/stt-source";
 import {
   transcribeAudio as transcribeViaWhisper,
   whisperSttConfigured,
   type WhisperSttLang,
 } from "@/lib/whisper-stt";
 
-export type SttProvider = "sarvam" | "openai" | "groq" | "nvidia" | "whisper";
+export type SttProvider = ServerSttSource;
 
 export interface SttProviderRunResult {
   provider: SttProvider;
@@ -34,22 +35,7 @@ export class SttProviderNotConfiguredError extends Error {
   }
 }
 
-type SupportedLang = GroqSttLang & OpenaiSttLang & SarvamLang & NvidiaLang & WhisperSttLang;
-
-function openaiConfigured(): boolean {
-  const key = process.env.OPENAI_API_KEY;
-  return typeof key === "string" && key.startsWith("sk-");
-}
-
-function groqConfigured(): boolean {
-  const key = process.env.GROQ_API_KEY;
-  return typeof key === "string" && key.startsWith("gsk_");
-}
-
-function nvidiaConfigured(): boolean {
-  const key = process.env.NVIDIA_API_KEY;
-  return typeof key === "string" && key.startsWith("nvapi-");
-}
+type SupportedLang = GroqSttLang & OpenaiSttLang & SarvamLang & WhisperSttLang;
 
 function sarvamConfigured(): boolean {
   const key = process.env.SARVAM_API_KEY;
@@ -61,11 +47,9 @@ export function isSttProviderConfigured(provider: SttProvider): boolean {
     case "sarvam":
       return sarvamConfigured();
     case "openai":
-      return openaiConfigured();
+      return openaiSttConfigured();
     case "groq":
-      return groqConfigured();
-    case "nvidia":
-      return nvidiaConfigured();
+      return groqSttConfigured();
     case "whisper":
       return whisperSttConfigured();
   }
@@ -75,7 +59,6 @@ export const ALL_STT_PROVIDERS: SttProvider[] = [
   "sarvam",
   "openai",
   "groq",
-  "nvidia",
   "whisper",
 ];
 
@@ -100,9 +83,6 @@ export async function dispatchSttProvider(
       break;
     case "groq":
       out = await transcribeViaGroq(audio, lang as GroqSttLang);
-      break;
-    case "nvidia":
-      out = await transcribeViaNvidia(audio, lang as NvidiaLang);
       break;
     case "whisper":
       out = await transcribeViaWhisper(audio, lang as WhisperSttLang);
@@ -136,7 +116,7 @@ export function langSupportedByProvider(provider: SttProvider, lang: string): bo
   if (provider === "sarvam") {
     return (["te-IN", "kn-IN", "ta-IN"] as const).includes(lang as SarvamLang);
   }
-  if (provider === "openai" || provider === "nvidia") {
+  if (provider === "openai") {
     return (["en-IN", "hi-IN"] as const).includes(lang as OpenaiSttLang);
   }
   return (["en-IN", "hi-IN", "te-IN", "kn-IN", "ta-IN"] as const).includes(

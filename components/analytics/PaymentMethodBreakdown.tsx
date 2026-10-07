@@ -3,7 +3,7 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
 import { BRAND } from "@/lib/constants";
-import { formatINR } from "@/lib/currency";
+import { formatINR, paiseToRupees } from "@/lib/currency";
 
 export type PaymentSlice = {
   key: string;
@@ -20,7 +20,7 @@ export type PaymentMethodBreakdownProps = {
 export function PaymentMethodBreakdown({ slices }: PaymentMethodBreakdownProps) {
   const data = slices.filter((s) => s.paise > 0).map((s) => ({
     ...s,
-    rupees: s.paise / 100,
+    rupees: paiseToRupees(s.paise),
   }));
 
   return (

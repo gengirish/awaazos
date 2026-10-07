@@ -14,7 +14,7 @@ import { requireEnv } from "@/lib/env";
  *
  * Slot in the cascade: layer-2 STT for ALL languages.
  *   te-IN/kn-IN/ta-IN  : Sarvam primary  → Groq fallback
- *   en-IN/hi-IN        : OpenAI primary → Groq fallback → NVIDIA legacy
+ *   en-IN/hi-IN        : OpenAI primary → Groq fallback
  *
  * Whisper does not return logprobs, so confidence is a fixed baseline (0.85),
  * matching the Sarvam adapter.
@@ -24,6 +24,11 @@ import { requireEnv } from "@/lib/env";
  * a DPDP-compliant agreement is in place with Groq, or until the privacy
  * disclosure is updated to make the audio path explicit to vendors.
  */
+
+export function groqSttConfigured(): boolean {
+  const key = process.env.GROQ_API_KEY;
+  return typeof key === "string" && key.startsWith("gsk_");
+}
 
 const GROQ_STT_URL = "https://api.groq.com/openai/v1/audio/transcriptions";
 const STT_TIMEOUT_MS = 5_000;

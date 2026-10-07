@@ -20,15 +20,17 @@
    - latest receipt records
 3. Swap app `DATABASE_URL`/`DIRECT_URL` to restored branch:
    - Vercel env update + redeploy
-   - Fly secrets update + redeploy workers
+   - Fly secrets update + redeploy on the worker app (`awaazos-workers`), if it is deployed
+     (TODO.md §1.1). The Whisper app (`awaazos-whisper-stt`) has no database access.
 4. Run post-restore smoke tests.
 
 ## Verification
 
 - `GET /api/ready` passes (DB + Upstash REST Redis; workers still need TCP `REDIS_URL`)
-- POS create transaction works
-- Receipt queue and worker processing resume
-- `/api/_metrics` counters update as expected
+- POS create transaction works, and "Send on WhatsApp" opens WhatsApp with the receipt text
+  (`GET /api/receipts/message`)
+- If the worker app is deployed: BullMQ queues drain (`flyctl logs -a awaazos-workers`)
+- `/admin/metrics` (platform ADMIN) shows the paid bills and GMV you expect for the last 7 days
 
 ## Post-restore actions
 

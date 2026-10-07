@@ -14,9 +14,9 @@ function utcDayKey(date = new Date()): string {
 /**
  * Enqueue one retention maintenance run.
  *
- * Intended to be called by:
- * - Vercel Cron (once daily)
- * - Admin dashboard "Run now" action
+ * Platform ADMIN only, and nothing calls it on a schedule yet: there is no
+ * cron and no "Run now" button, so retention runs only when an admin POSTs
+ * here by hand. The per-day jobId makes repeat calls on the same UTC day a no-op.
  */
 export async function POST() {
   try {

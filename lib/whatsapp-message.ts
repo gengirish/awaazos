@@ -1,4 +1,5 @@
 import { formatINR } from "@/lib/currency";
+import { formatIstDateTime } from "@/lib/datetime";
 
 export type ReceiptMessageInput = {
   vendorName: string;
@@ -35,23 +36,11 @@ export function receiptStorefrontUrl(args: {
   return `${base}/s/${encodeURIComponent(args.slug)}`;
 }
 
-function formatReceiptDateTimeIst(createdAt: Date): string {
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(createdAt);
-}
-
 /**
  * Plain-text WhatsApp body (Markdown-style asterisks for bold on WhatsApp).
  */
 export function formatWhatsAppReceiptMessage(input: ReceiptMessageInput): string {
-  const dateLine = formatReceiptDateTimeIst(input.createdAt);
+  const dateLine = formatIstDateTime(input.createdAt);
   const lines: string[] = [
     `🧾 *${input.vendorName}*`,
     `Bill: ${input.billNumber}`,

@@ -3,7 +3,7 @@
 import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 
 import { BRAND } from "@/lib/constants";
-import { formatINR } from "@/lib/currency";
+import { formatINR, paiseToRupees } from "@/lib/currency";
 
 export type HourlyRow = {
   hour: number;
@@ -31,7 +31,7 @@ export function HourlyHeatmap({ rows }: HourlyHeatmapProps) {
   const chartData = full24.map((r) => ({
     ...r,
     label: String(r.hour).padStart(2, "0"),
-    revenueRupees: r.revenuePaise / 100,
+    revenueRupees: paiseToRupees(r.revenuePaise),
     fillOpacity: 0.35 + (0.65 * r.revenuePaise) / maxRev,
   }));
 

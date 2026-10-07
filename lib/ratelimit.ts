@@ -99,20 +99,6 @@ export const authRateLimit = makeLimiter({
   max: 5,
 });
 
-/** 30 AI calls per vendor per minute — guards Anthropic/Sarvam token spend. */
-export const aiRateLimit = makeLimiter({
-  name: "ai",
-  windowMs: 60_000,
-  max: 30,
-});
-
-/** 4 AI calls per vendor per second — anti-burst (POS double-tap protection). */
-export const aiBurstRateLimit = makeLimiter({
-  name: "ai-burst",
-  windowMs: 1_000,
-  max: 4,
-});
-
 const PLAN_AI_LIMITS: Record<Plan, { perMinute: number; burstPerSecond: number }> = {
   FREE: { perMinute: 10, burstPerSecond: 2 },
   STARTER: { perMinute: 30, burstPerSecond: 4 },

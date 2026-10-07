@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { formatINR, sumPaise } from "@/lib/currency";
+import { formatIndianMobile, normaliseIndianMobile } from "@/lib/phone";
 import {
   CHECKOUT_FIELD_MESSAGES,
   checkoutErrorsFromIssues,
@@ -64,13 +65,6 @@ export type CheckoutDetails = {
   paymentMethod: PaymentMethod;
 };
 
-/** "+919876543210" → "98765 43210" to match what the field expects. */
-function phoneForField(e164: string | null): string {
-  if (!e164) return "";
-  const m = /^\+91(\d{5})(\d{5})$/.exec(e164);
-  return m ? `${m[1]} ${m[2]}` : e164;
-}
-
 const STORAGE_KEY = "awz:storefront:buyer:v1";
 
 function readSavedBuyerRaw(): string | null {
@@ -103,14 +97,6 @@ function newIdempotencyKey(): string {
   } catch {
     return `k${Date.now()}${String(Math.random()).slice(2)}`;
   }
-}
-
-/** "98765 43210" / "+91 98765-43210" → "+919876543210"; anything else is sent as typed. */
-function normalisePhone(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
-  if (digits.length === 10) return `+91${digits}`;
-  if (digits.length === 12 && digits.startsWith("91")) return `+${digits}`;
-  return raw.trim();
 }
 
 // ─── Persisted cart ─────────────────────────────────────────────────
@@ -435,7 +421,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     if (saved) setRemember(true);
     applySaved({
       name: p?.name || saved?.name || "",
-      phone: phoneForField(p?.phone ?? null) || saved?.phone || "",
+      phone: formatIndianMobile(p?.phone ?? null) || saved?.phone || "",
       address: p?.address || saved?.address || "",
       fulfilment: saved?.fulfilment ?? null,
     });
@@ -563,7 +549,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
         body: JSON.stringify(
           buildBody({
             customerName: name.trim(),
-            customerPhone: normalisePhone(phone),
+            customerPhone: normaliseIndianMobile(phone),
             fulfilmentType: fulfilment,
             deliveryAddress: fulfilment === "DELIVERY" ? address.trim() : null,
             notes: notes.trim() || null,

@@ -13,12 +13,18 @@ node_modules/
 
 # Repo metadata that bloats deploys
 .cursor/
+.claude/
+.kilo/
 .git/
 agent-transcripts/
 terminals/
 
+# Not part of the Next.js app
+services/
+docs/archive/
+tests/golden/
+
 # Spec doc
-awaazos-cursor-prompt.md
 AGENTS.md
 
 # Tests (not needed at runtime)

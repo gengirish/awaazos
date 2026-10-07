@@ -115,7 +115,7 @@ export async function getAdminMetrics(now: Date = new Date()): Promise<AdminMetr
   const weeklyActiveVendors = thisWeekVendorGroups.length;
 
   const ratesPerVendor = thisWeekVendorGroups.map((g) => g._count._all / 7);
-  const billsPerVendorPerDayMedian = Number(median(ratesPerVendor).toFixed(1));
+  const billsPerVendorPerDayMedian = Math.round(median(ratesPerVendor) * 10) / 10;
 
   const voiceSuccessRate7d =
     thisWeekPaidCount === 0 ? 0 : thisWeekVoiceCount / thisWeekPaidCount;

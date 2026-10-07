@@ -17,6 +17,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { STT_SOURCES } from "@/lib/stt-source";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -24,7 +25,7 @@ export const runtime = "nodejs";
 const bodySchema = z.object({
   transcript: z.string().min(1),
   lang: z.string().min(1),
-  sttSource: z.enum(["webspeech", "sarvam", "openai", "groq", "nvidia", "whisper"]),
+  sttSource: z.enum(STT_SOURCES),
 });
 
 function wordCount(transcript: string): number {
@@ -128,6 +129,13 @@ export async function POST(req: NextRequest) {
 
     const latencyMs = Date.now() - t0;
 
+    const logEnqueueFailure = (queueErr: unknown) =>
+      console.error(
+        "[api/ai/parse-order] voice-parse-log enqueue failed",
+        queueErr instanceof Error ? queueErr.message : "unknown",
+      );
+    // Fire-and-forget: getVoiceLogQueue() can throw synchronously (missing
+    // REDIS_URL) and add() can reject (Redis down); both are swallowed.
     try {
       void getVoiceLogQueue().add(
         "voice-parse-log",
@@ -144,12 +152,9 @@ export async function POST(req: NextRequest) {
           escalated,
         },
         { attempts: 1, removeOnComplete: true },
-      );
+      ).catch(logEnqueueFailure);
     } catch (queueErr) {
-      console.error(
-        "[api/ai/parse-order] voice-parse-log enqueue failed",
-        queueErr instanceof Error ? queueErr.message : "unknown",
-      );
+      logEnqueueFailure(queueErr);
     }
 
     const res = NextResponse.json({

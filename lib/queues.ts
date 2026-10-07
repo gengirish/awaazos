@@ -2,13 +2,13 @@ import { Queue } from "bullmq";
 import IORedis from "ioredis";
 
 import { requireEnv } from "@/lib/env";
+import type { SttSource } from "@/lib/stt-source";
 
 /**
  * BullMQ requires its own ioredis client with `maxRetriesPerRequest: null`
  * (BullMQ uses blocking commands like BRPOPLPUSH that must not auto-retry).
- * The general-purpose ratelimit/idempotency client (lib/redis.ts) uses
- * snappy retry-2 settings instead, so the two clients have different
- * config requirements and live separately by design.
+ * Ratelimit/idempotency run on Vercel over Upstash REST (lib/kv.ts), so this
+ * is the only TCP Redis client in the codebase.
  */
 let _bullmqRedis: IORedis | null = null;
 function getBullMqRedis(): IORedis {
@@ -33,7 +33,7 @@ export type VoiceParseLogJobPayload = {
   vendorId: string;
   transcript: string;
   lang: string;
-  sttSource: "webspeech" | "sarvam" | "openai" | "groq" | "nvidia" | "whisper";
+  sttSource: SttSource;
   modelUsed: string;
   latencyMs: number;
   itemCount: number;
@@ -49,7 +49,7 @@ export type SendReceiptJobPayload = {
 };
 
 export type RetentionRunJobPayload = {
-  requestedBy: "cron" | "admin";
+  requestedBy: "admin";
   requestedByUserId?: string;
 };
 

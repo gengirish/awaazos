@@ -25,6 +25,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { formatINR } from "@/lib/currency";
+import { formatIstDateTime } from "@/lib/datetime";
 import type { TransactionListRow } from "@/lib/transactions-list";
 
 function toDetailModel(row: TransactionListRow): TransactionDetailModel {
@@ -55,19 +56,6 @@ function toDetailModel(row: TransactionListRow): TransactionDetailModel {
       ? { receiptNumber: row.receipt.receiptNumber, whatsappSent: row.receipt.whatsappSent }
       : null,
   };
-}
-
-function formatIstShort(value: Date | string): string {
-  const d = value instanceof Date ? value : new Date(value);
-  return new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kolkata",
-    day: "2-digit",
-    month: "2-digit",
-    year: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(d);
 }
 
 function itemQtySum(row: TransactionListRow): number {
@@ -241,7 +229,7 @@ export function TransactionsTable({
                 role="button"
               >
                 <TableCell className="font-mono text-xs">{row.billNumber}</TableCell>
-                <TableCell className="whitespace-nowrap text-sm">{formatIstShort(row.createdAt)}</TableCell>
+                <TableCell className="whitespace-nowrap text-sm">{formatIstDateTime(row.createdAt)}</TableCell>
                 <TableCell className="text-right tabular-nums">{itemQtySum(row)}</TableCell>
                 <TableCell className="text-right font-medium tabular-nums">{formatINR(row.totalPaise)}</TableCell>
                 <TableCell>

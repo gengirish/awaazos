@@ -89,7 +89,9 @@ Stated ICP does ~200 sales/day (~5,200/month). Limits live in `PLAN_LIMITS` (`li
   arrives. Competing free trials in this market run 14 days, unlimited.
 - **FREE has `sarvamStt: false`** — Telugu, Kannada and Tamil voice are paid-only; Hindi and
   English work free only because the browser handles them. The Hyderabad cohort speaks Telugu, so
-  the free tier cannot demonstrate the core feature to the actual design partners.
+  the free tier cannot demonstrate the core feature to the actual design partners. (Since then the
+  voice-language picker, `VOICE_LANGUAGES` in `lib/constants.ts`, offers only en-IN and hi-IN on
+  every plan; te/kn/ta are dormant, reachable only through legacy `voiceLang` rows.)
 - **FREE has `whatsappReceipts: false`** — the third pillar is paid-only too.
 - **STARTER is 500 txn/month** at ₹299, roughly 10× below the ICP. The customer we pitch cannot
   stay on the plan we sell him; he is forced to PRO at ₹799, which is hidden from the pricing page
@@ -103,7 +105,7 @@ spend on vendors who would never convert.
 
 ## 3. Conditional on the repositioning decision
 
-Only start these if the two-week discovery test says the fire is real. See the positioning memo.
+Only start these if the two-week discovery test says the fire is real.
 
 ### 3.1 Storefront link inside the WhatsApp receipt
 **Status:** implemented on `feat/home-kitchen-drops`; delivery still unverified (blocked by 1.1).
@@ -174,7 +176,8 @@ not use it.
   checkout with no payment option (the sheet shows a "message the kitchen" note). Unpublishing is
   safe (the buyer route 404s).
 - **"Order again" receipt link** — `NEXT_PUBLIC_APP_URL` is set in `fly.toml` `[env]`
-  (`https://awaazos.intelliforge.tech`), but the Fly worker app doesn't exist; see 1.1 gate 3.
+  (`https://awaazos.intelliforge.tech`; whether that is the production domain is open, see §5), but
+  the Fly worker app doesn't exist; see 1.1 gate 3.
 
 ### 3.6 Real new-order alerts for vendors
 
@@ -231,13 +234,58 @@ the app) or `min-h-11` on each call site.
 Fixed in `433164c`. If CI was green through that period, the Playwright job is not gating `main` —
 worth checking `.github/workflows/ci.yml` actually runs and blocks on it.
 
+### 4.4 Customer phone numbers are stored as typed
+`POST /api/transactions` (`transactionPostBodySchema` in `lib/transaction-post-body.ts`) and
+`POST /api/receipts/send` accept `customerPhone` as any string. They only `trim()` it: no +91
+10-digit check and no E.164 normalisation via `libphonenumber-js`, which the India-locale rule
+requires. The raw value goes into `Transaction.customerPhone` and into the `send-receipt` job.
+Left out of the Phase 3 cleanup because adding validation changes behaviour (a request that
+succeeds today would start returning 400). Decide whether to reject or normalise, then add it to
+both routes.
+
+### 4.5 Unused Prisma fields — don't drop yet
+Never referenced in `app/`, `lib/`, `components/`, `workers/` or `hooks/` (re-checked 2026-10-07):
+
+- `Vendor.gstin`
+- `VendorSettings.autoPrintReceipt`, `discountEnabled`, `hsnDefault`, `razorpayCustomerId`
+- `Transaction.paymentLinkUrl`
+- `Receipt.pdfUrl`
+- `OrderSource.WHATSAPP` and `OrderSource.API`
+
+Read but never written: `Vendor.logoUrl` (storefront), `VendorSettings.theme` (storefront) and
+`VendorSettings.taxEnabled` / `taxPercent` (POS cart). Nothing in the app sets them.
+
+`Transaction.razorpayOrderId` and `razorpayPaymentId` were on the original audit list but are now
+used by storefront Razorpay checkout (Drops).
+
+Dropping a column is destructive under `prisma db push` and there are no migration files, so
+decide per field (drop, or build the feature) rather than in bulk. Re-run the grep first:
+`rg -w "<field>" app lib components workers hooks`.
+
+### 4.6 Security hardening deferred from the MVP
+- **Nonce-based CSP.** `script-src` in `next.config.mjs` still allows `'unsafe-inline'` and
+  `'unsafe-eval'` for Next.js inline hydration. Moving to nonces removes both.
+- **Password strength.** `lib/password-strength.ts` is a custom heuristic (length, character
+  classes, a common-password blocklist). Swap in zxcvbn if false positives become a problem, or add
+  a HaveIBeenPwned k-anonymity breach check. Both were deferred to avoid 600 KB+ of bundle.
+
 ---
 
 ## 5. Ops
 
+- **Production domain is undecided.** This file and `fly.toml` (`NEXT_PUBLIC_APP_URL`) use
+  `https://awaazos.intelliforge.tech`; README.md, PITCH.md and `docs/DEMO_GUIDE.md` use
+  `https://awaazos.vercel.app`. Pick one (cleanup plan decision D5), then update `AUTH_URL`,
+  `fly.toml` and the docs to match.
+- **Retention never runs on a schedule.** `workers/retention.worker.ts` deletes `VoiceParseLog` rows
+  older than 90 days and `Receipt` rows older than 7 years, but the only trigger is
+  `POST /api/admin/retention/run` (platform ADMIN session). There is no cron and no UI button, so
+  it runs only when someone POSTs by hand, and it also needs the Fly worker running (1.1 gate 3).
+  If a cron is added, run it at most once a day: the job touches Neon, which scales to zero, and the
+  route's per-UTC-day `jobId` already makes repeat calls the same day a no-op.
 - **`AUTH_URL` is unset on Vercel.** Reset links are correct anyway via the
   `VERCEL_PROJECT_PRODUCTION_URL` fallback, but Auth.js also uses `AUTH_URL` for callback URLs.
-  Set it to `https://awaazos.intelliforge.tech`.
+  Set it to the production domain once that is decided (see above).
 - **Vercel CLI is not authorized locally.** `vercel --prod` fails with "Not authorized"; deploys
   currently happen via the GitHub integration on push to `main`. Run `vercel login` if CLI deploys
   or `vercel env pull` are wanted.

@@ -1,14 +1,10 @@
 import { requireEnv } from "@/lib/env";
+import { lastFourDigits } from "@/lib/phone";
 
 export type SendWhatsappReceiptArgs = {
   to: string;
   message: string;
 };
-
-function lastFourDigits(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  return digits.slice(-4);
-}
 
 /**
  * Gupshup WhatsApp text message. Does not log full phone — only last 4 digits.
