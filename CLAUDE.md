@@ -278,9 +278,13 @@ exports and log lines carry last-4 only. Audio bytes are streamed and discarded,
 ## Project rules
 
 `.cursor/rules/*.mdc` are the enforced conventions and are worth reading before touching the
-matching area — `money.mdc`, `tenant-isolation.mdc`, `security-first.mdc` (always apply);
-`india-locale.mdc`, `voice-ai.mdc`, `api-routes.mdc`, `auth-rbac.mdc`, `design-system.mdc`,
+matching area — `security-first.mdc`, `tenant-isolation.mdc`, `india-locale.mdc` (always apply);
+`money.mdc`, `voice-ai.mdc`, `api-routes.mdc`, `auth-rbac.mdc`, `design-system.mdc`,
 `accessibility.mdc` (scoped by glob).
+
+`.cursor/` is the source of truth. `.claude/rules/*.md` and `.claude/skills/` are generated from it
+by `npm run sync:agent-rules` (`.mdc` `globs` → `.md` `paths`); edit the `.cursor/` file and re-run,
+never the `.claude/` copy. `node scripts/sync-agent-rules.mjs --check` exits 1 on drift.
 
 India-locale specifics that bite: store UTC / display IST (`Asia/Kolkata`), `DD/MM/YYYY` in UI,
 phones validated as +91 10-digit and stored E.164 via `libphonenumber-js`.

@@ -1,0 +1,61 @@
+---
+description: Secure defaults, secret hygiene, PII boundaries
+---
+
+<!-- Generated from .cursor/rules/security-first.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
+
+# Security First — AwaazOS
+
+## Secrets
+
+- NEVER hardcode API keys, DB URLs, or tokens.
+- All secrets via `process.env.*`, validated with zod at boot in `lib/env.ts`.
+- `.env.local` is gitignored. `.env.local.example` has placeholders only.
+- If a secret leaks (in chat, in commit, in screenshot): rotate immediately at provider.
+
+## PII boundaries
+
+- Customer `phone`, `name`, UPI `utr` ref: stay in DB. NEVER sent to:
+  - Anthropic (Claude prompts) — only `menu` + `transcript` go
+  - Sarvam (STT) — only audio bytes
+  - LLM logs (`VoiceParseLog`) — only `transcript`, `lang`, model metadata
+  - Console / Sentry / OTel — scrub before logging
+- Audio bytes from Sarvam: never stored. Streamed and discarded.
+
+## Auth
+
+- Validate authn + authz on every route. No exceptions.
+- Reject cross-tenant requests with 404 (not 403) — don't leak existence.
+- Webhooks: HMAC signature verification BEFORE any DB read or write.
+
+## Razorpay webhook
+
+```ts
+const sig = req.headers.get("x-razorpay-signature");
+const expected = crypto
+  .createHmac("sha256", process.env.RAZORPAY_WEBHOOK_SECRET!)
+  .update(rawBody)
+  .digest("hex");
+if (sig !== expected) return NextResponse.json({}, { status: 401 });
+```
+
+## Logging
+
+- `console.log` allowed in dev only. Production uses structured logger.
+- NEVER log:
+  - Request bodies for `/api/auth/*`
+  - Anything containing `Authorization`, `Cookie`, `passwordHash`
+  - Customer phone/name/UTR
+  - Audio bytes / file uploads
+
+## Dependencies
+
+- No `eval`, `Function()`, `dangerouslySetInnerHTML` without explicit review
+- Pin major versions in `package.json` (no `^` for `next-auth@beta`, `@anthropic-ai/sdk`)
+- Run `npm audit` weekly; fix HIGH/CRITICAL before deploy
+
+## DPDP Act readiness
+
+- User can request data export (their User + all their Vendors' Transactions)
+- User can request deletion: cascades from User → StaffMember; Vendor data
+  retained for ₹20L turnover compliance, but contact details scrubbed.
