@@ -152,6 +152,20 @@ export function maxOrderableQty(remaining: number | null, perOrderLimit: number 
   return Math.max(0, max);
 }
 
+/** DOM id of an everyday-menu row, so a sold-out drop item can link to it. */
+export function menuItemAnchor(menuItemId: string): string {
+  return `menu-item-${menuItemId}`;
+}
+
+/**
+ * True while at least one item in a drop can still be ordered (`null` =
+ * unlimited). An open drop whose every item is sold out must not drive the
+ * "Pre-order now" CTA or a countdown: there is nothing left to pre-order.
+ */
+export function dropHasStock(items: readonly { remaining: number | null }[]): boolean {
+  return items.some((i) => i.remaining === null || i.remaining > 0);
+}
+
 /** "Only 3 left" when stock is low, "Sold out" at zero, else null. */
 export function stockLabel(remaining: number | null, lowThreshold = 5): string | null {
   if (remaining === null) return null;

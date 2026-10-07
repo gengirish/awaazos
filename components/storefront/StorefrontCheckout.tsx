@@ -228,7 +228,8 @@ export function QtyStepper({
 
 /**
  * Sticky within its parent only, so a drop's bar and the menu's bar never
- * stack. Invisible (but keeps its space) while the cart is empty.
+ * stack. Takes no space while the cart is empty; the live region stays
+ * mounted so the first add is still announced.
  */
 export function CartBar({
   itemCount,
@@ -244,39 +245,32 @@ export function CartBar({
   /** The Checkout button — the sheet returns focus here when it closes. */
   buttonRef?: React.Ref<HTMLButtonElement>;
 }) {
+  const summary = `${itemCount} ${itemCount === 1 ? "item" : "items"}`;
   return (
-    <div className={cn("sticky bottom-0 z-10 pb-3 pt-3", itemCount === 0 && "pointer-events-none")}>
-      <div
-        className={cn(
-          "flex items-center gap-3 rounded-2xl bg-awaaz-charcoal px-4 py-3 text-white shadow-lg transition-opacity",
-          itemCount === 0 && "opacity-0",
-        )}
-      >
-        <ShoppingBag className="h-5 w-5 shrink-0" aria-hidden="true" />
-        <p className="min-w-0 flex-1 text-sm" aria-live="polite" aria-atomic="true">
-          {itemCount > 0 ? (
-            <>
-              <span className="font-semibold">
-                {itemCount} {itemCount === 1 ? "item" : "items"}
-              </span>
-              <span className="mx-1.5 opacity-60">·</span>
-              <span className="font-mono font-bold tabular-nums">{formatINR(subtotalPaise)}</span>
-            </>
-          ) : (
-            <span className="sr-only">Cart is empty</span>
-          )}
-        </p>
-        <button
-          ref={buttonRef}
-          type="button"
-          onClick={onCheckout}
-          disabled={itemCount === 0 || !canPay}
-          tabIndex={itemCount === 0 ? -1 : 0}
-          className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-awaaz-charcoal disabled:opacity-50"
-        >
-          Checkout
-        </button>
-      </div>
+    // Sits above the cookie banner while it shows (CookieConsentBanner publishes its height).
+    <div className={cn("sticky bottom-[var(--cookie-banner-h,0px)] z-10", itemCount > 0 && "pb-3 pt-3")}>
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {itemCount > 0 ? `Cart: ${summary}, ${formatINR(subtotalPaise)}` : "Cart is empty"}
+      </p>
+      {itemCount > 0 ? (
+        <div className="flex items-center gap-3 rounded-2xl bg-awaaz-charcoal px-4 py-3 text-white shadow-lg animate-in fade-in slide-in-from-bottom-2 motion-reduce:animate-none">
+          <ShoppingBag className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <p className="min-w-0 flex-1 text-sm" aria-hidden="true">
+            <span className="font-semibold">{summary}</span>
+            <span className="mx-1.5 opacity-60">·</span>
+            <span className="font-mono font-bold tabular-nums">{formatINR(subtotalPaise)}</span>
+          </p>
+          <button
+            ref={buttonRef}
+            type="button"
+            onClick={onCheckout}
+            disabled={!canPay}
+            className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-awaaz-charcoal disabled:opacity-50"
+          >
+            Checkout
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

@@ -14,11 +14,12 @@ import {
   type BuyerPrefill,
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
-import { formatINR, sumPaise } from "@/lib/currency";
+import { formatINRCompact, sumPaise } from "@/lib/currency";
 import {
   cartStorageKey,
   fulfilmentOptionsLabel,
   maxOrderableQty,
+  menuItemAnchor,
   orderErrorMessage,
   toMenuOrderLines,
   type OrderApiError,
@@ -148,7 +149,7 @@ export function MenuOrder(props: MenuOrderProps) {
             <li className="flex items-start gap-2">
               <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
               <span>
-                {deliveryFeePaise > 0 ? `Delivery fee ${formatINR(deliveryFeePaise)}` : "Free delivery"}
+                {deliveryFeePaise > 0 ? `Delivery fee ${formatINRCompact(deliveryFeePaise)}` : "Free delivery"}
               </span>
             </li>
           ) : null}
@@ -165,8 +166,8 @@ export function MenuOrder(props: MenuOrderProps) {
       <div className="space-y-8">
         {categories.map(({ category, anchor, items }) => (
           <section key={anchor} aria-labelledby={anchor}>
-            <div className="mb-3 flex scroll-mt-16 items-baseline gap-3">
-              <h3 id={anchor} className="font-display text-base font-bold text-awaaz-charcoal">
+            <div className="mb-3 flex items-baseline gap-3">
+              <h3 id={anchor} className="scroll-mt-20 font-display text-base font-bold text-awaaz-charcoal">
                 {category}
               </h3>
               <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
@@ -174,7 +175,11 @@ export function MenuOrder(props: MenuOrderProps) {
             </div>
             <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
               {items.map((item) => (
-                <li key={item.id} className="flex items-center gap-3 px-3 py-3 sm:gap-4 sm:px-4">
+                <li
+                  key={item.id}
+                  id={menuItemAnchor(item.id)}
+                  className="flex scroll-mt-20 items-center gap-3 px-3 py-3 target:bg-primary/[0.08] sm:gap-4 sm:px-4"
+                >
                   {item.imageUrl ? (
                     <Image
                       src={item.imageUrl}
@@ -196,7 +201,7 @@ export function MenuOrder(props: MenuOrderProps) {
                     <span className="truncate text-[15px] font-semibold text-foreground">{item.name}</span>
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
                       <span className="font-mono font-bold tabular-nums text-foreground">
-                        {formatINR(item.priceInPaise)}
+                        {formatINRCompact(item.priceInPaise)}
                       </span>
                       {item.isPopular ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">

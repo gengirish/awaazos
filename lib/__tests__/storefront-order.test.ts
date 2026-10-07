@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   CLOSED_DROP_GRACE_MS,
+  dropHasStock,
   formatIstDeadline,
   formatTimeLeft,
   holdMinutesLeft,
@@ -86,6 +87,19 @@ describe("maxOrderableQty / stockLabel", () => {
     expect(stockLabel(20)).toBeNull();
     expect(stockLabel(3)).toBe("Only 3 left");
     expect(stockLabel(0)).toBe("Sold out");
+  });
+});
+
+describe("dropHasStock", () => {
+  it("is true while any item is unlimited or has stock left", () => {
+    expect(dropHasStock([{ remaining: 0 }, { remaining: null }])).toBe(true);
+    expect(dropHasStock([{ remaining: 0 }, { remaining: 1 }])).toBe(true);
+  });
+
+  it("is false when every item is sold out, or there are none", () => {
+    expect(dropHasStock([{ remaining: 0 }, { remaining: 0 }])).toBe(false);
+    expect(dropHasStock([{ remaining: -1 }])).toBe(false);
+    expect(dropHasStock([])).toBe(false);
   });
 });
 
