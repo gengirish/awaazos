@@ -4,6 +4,8 @@ import { AlertTriangle, Check } from "lucide-react";
 import { useId, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { LastPaymentMethodNotice, lastPaymentMethodBlockersFrom } from "@/components/settings/LastPaymentMethodNotice";
+import type { PaymentGuardBlocker } from "@/lib/payment-guard";
 import { isValidUpiId, normalizeUpiId, UPI_ID_FORMAT_MESSAGE } from "@/lib/upi";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +45,8 @@ export function UpiDetailsClient({
   const [errors, setErrors] = useState<FieldErrors>({});
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  // Server refused to remove the last payment method (409 last_payment_method).
+  const [serverBlock, setServerBlock] = useState<PaymentGuardBlocker[] | null>(null);
   const [pending, startTransition] = useTransition();
 
   const nextUpiId = normalizeUpiId(upiId);
@@ -62,6 +66,7 @@ export function UpiDetailsClient({
       return;
     }
     setErrors({});
+    setServerBlock(null);
     startTransition(async () => {
       try {
         const res = await fetch("/api/vendor", {
@@ -75,6 +80,16 @@ export function UpiDetailsClient({
             error?: string;
             details?: Record<string, string[] | undefined>;
           };
+          const blockers = lastPaymentMethodBlockersFrom(res.status, data);
+          if (blockers) {
+            // Put the saved details back: that ID is still what customers pay to.
+            setUpiId(saved.upiId);
+            setUpiName(saved.upiName);
+            setConfirmRemove(false);
+            setServerBlock(blockers);
+            toast.error("Keep at least one way to pay while customers can order online.");
+            return;
+          }
           const fieldErrors: FieldErrors = {
             upiId: data.details?.upiId?.[0],
             upiName: data.details?.upiName?.[0],
@@ -100,6 +115,7 @@ export function UpiDetailsClient({
   function onEdit() {
     setJustSaved(false);
     setConfirmRemove(false);
+    setServerBlock(null);
   }
 
   return (
@@ -180,6 +196,8 @@ export function UpiDetailsClient({
           </p>
         </div>
       ) : null}
+
+      {serverBlock ? <LastPaymentMethodNotice blockers={serverBlock} /> : null}
 
       {isOwner && (
         <div className="flex flex-wrap items-center gap-3">

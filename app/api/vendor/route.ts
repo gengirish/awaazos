@@ -4,6 +4,13 @@ import { z } from "zod";
 
 import { SUPPORTED_VOICE_LANGS } from "@/lib/constants";
 import { menuOrdersEnableBlocker, type MenuOrdersBlocker } from "@/lib/menu-orders-board";
+import {
+  dropWillTakeOrdersWhere,
+  hasPaymentMethod,
+  LAST_PAYMENT_METHOD_ERROR,
+  lastPaymentMethodBlockers,
+  type PaymentGuardBlocker,
+} from "@/lib/payment-guard";
 import { prisma } from "@/lib/prisma";
 import { requireVendorRole } from "@/lib/rbac";
 import { UPI_ID_FORMAT_MESSAGE, UPI_ID_PATTERN } from "@/lib/upi";
@@ -57,6 +64,12 @@ const patchSchema = z.object({
 class SettingsConflict extends Error {
   constructor(public readonly code: MenuOrdersBlocker) {
     super(code);
+  }
+}
+
+class LastPaymentMethodConflict extends Error {
+  constructor(public readonly blockers: PaymentGuardBlocker[]) {
+    super(LAST_PAYMENT_METHOD_ERROR);
   }
 }
 
@@ -116,24 +129,43 @@ export async function PATCH(req: NextRequest) {
     const { menuItems, ...vendorFields } = parsed.data;
 
     await prisma.$transaction(async (tx) => {
-      // Turning "order from menu" on needs somewhere to order (a published
-      // storefront) and a way to pay (UPI ID or pay on delivery). Checked
-      // against the values this same request leaves behind.
-      if (vendorFields.acceptMenuOrders === true) {
+      const touchesPayment = vendorFields.upiId !== undefined || vendorFields.acceptPayOnDelivery !== undefined;
+      if (vendorFields.acceptMenuOrders === true || touchesPayment) {
         const current = await tx.vendor.findUnique({
           where: { id: ctx.vendor.id },
           select: {
             upiId: true,
-            settings: { select: { publishStorefront: true, acceptPayOnDelivery: true } },
+            settings: { select: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true } },
           },
         });
-        const blocker = menuOrdersEnableBlocker({
+        // The values this same request leaves behind.
+        const after = {
           publishStorefront: vendorFields.publishStorefront ?? current?.settings?.publishStorefront ?? false,
           upiId: vendorFields.upiId !== undefined ? vendorFields.upiId : current?.upiId,
-          acceptPayOnDelivery:
-            vendorFields.acceptPayOnDelivery ?? current?.settings?.acceptPayOnDelivery ?? false,
-        });
-        if (blocker) throw new SettingsConflict(blocker);
+          acceptPayOnDelivery: vendorFields.acceptPayOnDelivery ?? current?.settings?.acceptPayOnDelivery ?? false,
+          acceptMenuOrders: vendorFields.acceptMenuOrders ?? current?.settings?.acceptMenuOrders ?? false,
+        };
+
+        // Turning "order from menu" on needs somewhere to order (a published
+        // storefront) and a way to pay (UPI ID or pay on delivery).
+        if (vendorFields.acceptMenuOrders === true) {
+          const blocker = menuOrdersEnableBlocker(after);
+          if (blocker) throw new SettingsConflict(blocker);
+        }
+
+        // The reverse (lib/payment-guard.ts): the last payment method can't go
+        // while customers can still order online — menu orders on, or a drop
+        // open or scheduled to open.
+        if (touchesPayment && !hasPaymentMethod(after)) {
+          const now = new Date();
+          const drops = await tx.drop.findMany({
+            where: { vendorId: ctx.vendor.id, ...dropWillTakeOrdersWhere(now) },
+            select: { status: true, closesAt: true },
+            take: 1,
+          });
+          const blockers = lastPaymentMethodBlockers({ ...after, drops }, now);
+          if (blockers.length) throw new LastPaymentMethodConflict(blockers);
+        }
       }
 
       const data: Prisma.VendorUpdateInput = {};
@@ -218,6 +250,9 @@ export async function PATCH(req: NextRequest) {
   } catch (e) {
     if (e instanceof SettingsConflict) {
       return NextResponse.json({ error: e.code }, { status: 409 });
+    }
+    if (e instanceof LastPaymentMethodConflict) {
+      return NextResponse.json({ error: LAST_PAYMENT_METHOD_ERROR, blockers: e.blockers }, { status: 409 });
     }
     const err = e as { status?: number; message?: string };
     if (err.message === "Unauthorized" || err.status === 401) {

@@ -115,4 +115,30 @@ test.describe("settings hub", () => {
     await page.getByRole("link", { name: "Back to POS" }).click();
     await expect(page).toHaveURL(/\/pos$/);
   });
+
+  test("payments: the last way to pay can't be switched off while Order from menu is on", async ({
+    page,
+    request,
+  }) => {
+    // New vendor: no UPI ID, pay on delivery on by default.
+    await createVendorSession(page, request, "settings-lastpay", "/settings");
+    const on = await page.request.patch("/api/vendor", {
+      data: { publishStorefront: true, acceptMenuOrders: true },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(on.status()).toBe(200);
+
+    await page.goto("/settings/payments");
+    const payOnDelivery = page.getByRole("switch", { name: /pay on delivery/i });
+    await expect(payOnDelivery).toHaveAttribute("aria-checked", "true");
+    await payOnDelivery.click();
+
+    const notice = page.getByRole("alert").filter({ hasText: /keep at least one way to pay/i });
+    await expect(notice).toBeVisible();
+    await expect(notice.getByRole("link", { name: "Go to Online orders" })).toHaveAttribute("href", "/settings/orders");
+    await expect(payOnDelivery).toHaveAttribute("aria-checked", "true");
+
+    await page.reload();
+    await expect(page.getByRole("switch", { name: /pay on delivery/i })).toHaveAttribute("aria-checked", "true");
+  });
 });
