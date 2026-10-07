@@ -129,6 +129,13 @@ export async function POST(req: NextRequest) {
 
     const latencyMs = Date.now() - t0;
 
+    const logEnqueueFailure = (queueErr: unknown) =>
+      console.error(
+        "[api/ai/parse-order] voice-parse-log enqueue failed",
+        queueErr instanceof Error ? queueErr.message : "unknown",
+      );
+    // Fire-and-forget: getVoiceLogQueue() can throw synchronously (missing
+    // REDIS_URL) and add() can reject (Redis down); both are swallowed.
     try {
       void getVoiceLogQueue().add(
         "voice-parse-log",
@@ -145,12 +152,9 @@ export async function POST(req: NextRequest) {
           escalated,
         },
         { attempts: 1, removeOnComplete: true },
-      );
+      ).catch(logEnqueueFailure);
     } catch (queueErr) {
-      console.error(
-        "[api/ai/parse-order] voice-parse-log enqueue failed",
-        queueErr instanceof Error ? queueErr.message : "unknown",
-      );
+      logEnqueueFailure(queueErr);
     }
 
     const res = NextResponse.json({
