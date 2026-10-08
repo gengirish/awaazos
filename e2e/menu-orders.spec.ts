@@ -10,16 +10,6 @@ import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/
  * Writes real rows — run against a throwaway Postgres only (see CLAUDE.md).
  */
 
-async function stubQrService(page: Page): Promise<void> {
-  const onePixelPng = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-    "base64",
-  );
-  await page.route("**://api.qrserver.com/**", (route) =>
-    route.fulfill({ status: 200, contentType: "image/png", body: onePixelPng }),
-  );
-}
-
 async function vendorSlug(page: Page): Promise<string> {
   const res = await page.request.get("/api/vendor");
   expect(res.status(), "GET /api/vendor should succeed for a signed-in owner").toBe(200);
@@ -49,7 +39,6 @@ test.describe("menu orders: order straight from the everyday menu", () => {
     const before = await browser.newContext(CONTEXT_OPTIONS);
     try {
       const p = await before.newPage();
-      await stubQrService(p);
       await page.goto("/settings/store");
       const publish = page.getByRole("switch", { name: /publish/i });
       if ((await publish.getAttribute("aria-checked")) !== "true") await publish.click();
@@ -75,7 +64,6 @@ test.describe("menu orders: order straight from the everyday menu", () => {
     const buyerCtx = await browser.newContext(CONTEXT_OPTIONS);
     try {
       const buyer = await buyerCtx.newPage();
-      await stubQrService(buyer);
       const res = await buyer.goto(`/s/${slug}`);
       expect(res?.status()).toBe(200);
 

@@ -16,10 +16,18 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { formatINR, paiseToRupees } from "@/lib/currency";
-import { buildQrUrl, buildUpiDeepLink } from "@/lib/upi";
+import { useQrDataUrl } from "@/hooks/useQrDataUrl";
+import { checkoutSale } from "@/lib/pos-outbox";
+import { buildUpiDeepLink } from "@/lib/upi";
 import type { CartLine } from "@/lib/cartStore";
 
+/** A sale that committed now, or one saved on the device to sync later. */
+export type PaidResult =
+  | { kind: "synced"; billNumber: string; totalPaise: number; paymentMethod: PaymentMethod }
+  | { kind: "queued"; localNo: number; totalPaise: number; paymentMethod: PaymentMethod; needsSignIn: boolean };
+
 export type UpiQRModalProps = {
+  vendorId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   isDesktop: boolean;
@@ -30,14 +38,11 @@ export type UpiQRModalProps = {
   subtotalPaise: number;
   taxPaise: number;
   items: CartLine[];
-  onPaid: (result: {
-    billNumber: string;
-    totalPaise: number;
-    paymentMethod: PaymentMethod;
-  }) => void;
+  onPaid: (result: PaidResult) => void;
 };
 
 export function UpiQRModal({
+  vendorId,
   open,
   onOpenChange,
   isDesktop,
@@ -75,44 +80,51 @@ export function UpiQRModal({
           billRef,
         })
       : "";
-  const qrSrc = upiLink ? buildQrUrl(upiLink, 256) : "";
+  // Rendered on the device, so the QR works offline and the VPA/amount never
+  // go to a third-party image service.
+  const qrSrc = useQrDataUrl(upiLink, 256);
 
   async function markPaid() {
     setSubmitting(true);
     try {
-      const res = await fetch("/api/transactions", {
-        method: "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          items: items.map((i) => ({
-            menuItemId: i.menuItemId,
-            name: i.name,
-            priceInPaise: i.priceInPaise,
-            qty: i.qty,
-          })),
-          subtotalPaise,
-          taxPaise,
-          totalPaise,
-          paymentMethod: payMode === "CASH" ? PaymentMethod.CASH : PaymentMethod.UPI,
-          upiRef: payMode === "UPI" ? (upiRef.trim() || null) : null,
-        }),
+      const paymentMethod = payMode === "CASH" ? PaymentMethod.CASH : PaymentMethod.UPI;
+      // Saved on the device first, then committed; offline it stays queued and
+      // syncs later (lib/pos-outbox.ts). Either way the sale is not lost.
+      const result = await checkoutSale(vendorId, {
+        items: items.map((i) => ({
+          menuItemId: i.menuItemId,
+          name: i.name,
+          priceInPaise: i.priceInPaise,
+          qty: i.qty,
+        })),
+        subtotalPaise,
+        taxPaise,
+        totalPaise,
+        paymentMethod,
+        upiRef: payMode === "UPI" ? (upiRef.trim() || null) : null,
       });
-      const data = (await res.json()) as {
-        transaction?: { billNumber: string; totalPaise: number; paymentMethod: PaymentMethod };
-        error?: string;
-      };
-      if (!res.ok || !data.transaction) {
-        throw new Error(data.error ?? "Payment failed");
+      if (result.kind === "rejected") {
+        throw new Error(result.code === "monthly_txn_cap_reached" ? "Monthly bill limit reached for your plan" : result.code);
       }
-      onPaid({
-        billNumber: data.transaction.billNumber,
-        totalPaise: data.transaction.totalPaise,
-        paymentMethod: data.transaction.paymentMethod,
-      });
+      onPaid(
+        result.kind === "synced"
+          ? {
+              kind: "synced",
+              billNumber: result.bill.billNumber,
+              totalPaise: result.bill.totalPaise,
+              paymentMethod: result.bill.paymentMethod,
+            }
+          : {
+              kind: "queued",
+              localNo: result.localNo,
+              totalPaise,
+              paymentMethod,
+              needsSignIn: result.needsSignIn,
+            },
+      );
       onOpenChange(false);
     } catch (e) {
-      console.error(e);
+      console.error(e instanceof Error ? e.message : "checkout_failed");
       toast.error(e instanceof Error ? e.message : "Could not record payment");
     } finally {
       setSubmitting(false);
@@ -152,14 +164,18 @@ export function UpiQRModal({
           ) : (
             <>
               <div className="flex flex-col items-center gap-2">
-                {/* eslint-disable-next-line @next/next/no-img-element -- external QR API URL */}
-                <img
-                  src={qrSrc}
-                  alt="UPI payment QR code"
-                  width={256}
-                  height={256}
-                  className="rounded-md border bg-white p-2"
-                />
+                {qrSrc ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- local SVG data URL
+                  <img
+                    src={qrSrc}
+                    alt="UPI payment QR code"
+                    width={256}
+                    height={256}
+                    className="rounded-md border bg-white p-2"
+                  />
+                ) : (
+                  <div className="h-[256px] w-[256px] rounded-md border bg-muted" aria-hidden />
+                )}
                 <p className="text-center text-xs text-muted-foreground">Scan with GPay / PhonePe / Paytm</p>
                 <p className="break-all text-center font-mono text-sm text-foreground">{effectiveUpiId}</p>
               </div>

@@ -79,6 +79,7 @@ export default async function PosPage() {
       initialItems={initialItems}
       settings={settings}
       todaysRevenuePaise={todaysRevenuePaise}
+      renderedAt={new Date().toISOString()}
     />
   );
 }

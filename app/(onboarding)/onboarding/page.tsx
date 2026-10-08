@@ -16,9 +16,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useQrDataUrl } from "@/hooks/useQrDataUrl";
 import { ALLOWED_VOICE_LANGS, STALL_TYPES, VOICE_LANGUAGES } from "@/lib/constants";
 import { rupeesToPaise } from "@/lib/currency";
-import { buildQrUrl, buildUpiDeepLink, isValidUpiId, UPI_ID_FORMAT_MESSAGE } from "@/lib/upi";
+import { buildUpiDeepLink, isValidUpiId, UPI_ID_FORMAT_MESSAGE } from "@/lib/upi";
 import type { StallType, Vendor, VendorSettings } from "@prisma/client";
 
 type VendorPayload = Vendor & { settings: VendorSettings | null };
@@ -105,7 +106,7 @@ export default function OnboardingPage() {
     }
   }, [upiId, upiName]);
 
-  const qrSrc = previewLink ? buildQrUrl(previewLink, 220) : "";
+  const qrSrc = useQrDataUrl(previewLink, 220);
 
   function validateStep(): string | null {
     if (step === 1) {

@@ -38,7 +38,8 @@ import {
   storefrontDropVisibility,
   type StorefrontDropVisibility,
 } from "@/lib/storefront-order";
-import { buildQrUrl, buildUpiCollectLink } from "@/lib/upi";
+import { qrSvgDataUrl } from "@/lib/qr";
+import { buildUpiCollectLink } from "@/lib/upi";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -458,6 +459,11 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   const upiLink = vendor.upiId
     ? buildUpiCollectLink({ upiId: vendor.upiId, name: payeeName })
     : null;
+  // Rendered here, not by a third-party image URL: no network hop for the buyer,
+  // and the payee VPA never leaves our server.
+  const [qrSmall, qrLarge] = upiLink
+    ? await Promise.all([qrSvgDataUrl(upiLink, 180), qrSvgDataUrl(upiLink, 220)])
+    : ["", ""];
   const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
   const rawTheme = vendor.settings?.theme ?? "orange";
   const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
@@ -765,7 +771,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                 </h3>
                 <p className="text-sm text-muted-foreground">Any UPI app. Enter the amount the vendor tells you.</p>
                 <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
-                  <UpiQrImage src={buildQrUrl(upiLink, 180)} alt={`UPI QR code to pay ${payeeName}`} size={180} />
+                  <UpiQrImage src={qrSmall} alt={`UPI QR code to pay ${payeeName}`} size={180} />
                 </div>
                 <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Paying {payeeName}
@@ -792,7 +798,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                 </p>
 
                 <div className="mx-auto mt-5 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
-                  <UpiQrImage src={buildQrUrl(upiLink, 220)} alt={`UPI QR code to pay ${payeeName}`} size={220} />
+                  <UpiQrImage src={qrLarge} alt={`UPI QR code to pay ${payeeName}`} size={220} />
                 </div>
 
                 <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

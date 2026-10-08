@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test } from "@playwright/test";
 
 import { createMenuItem, createVendorSession } from "./helpers/vendor";
 
@@ -10,24 +10,12 @@ import { createMenuItem, createVendorSession } from "./helpers/vendor";
  * a UPI sale would need onboarding completed first.
  */
 
-/** The QR image is fetched from api.qrserver.com; stub it so CI never needs egress. */
-async function stubQrService(page: Page): Promise<void> {
-  const onePixelPng = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-    "base64",
-  );
-  await page.route("**://api.qrserver.com/**", (route) =>
-    route.fulfill({ status: 200, contentType: "image/png", body: onePixelPng }),
-  );
-}
-
 test.describe("POS sale — driven through the UI", () => {
   test("tap item → collect payment → cash → paid, mints a bill and clears the cart", async ({
     page,
     request,
   }) => {
     await createVendorSession(page, request, "posui");
-    await stubQrService(page);
 
     // Seeded before navigation: /pos is a server component that reads menu
     // items from Prisma at render time, not via a client fetch.

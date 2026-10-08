@@ -27,6 +27,8 @@ export type ReceiptModalProps = {
   billNumber: string;
   totalPaise: number;
   paymentMethod: PaymentMethod;
+  /** Set when the sale is saved on this device and hasn't synced yet. */
+  queued: { localNo: number; needsSignIn: boolean } | null;
   onCloseAll: () => void;
 };
 
@@ -37,12 +39,14 @@ export function ReceiptModal({
   billNumber,
   totalPaise,
   paymentMethod,
+  queued,
   onCloseAll,
 }: ReceiptModalProps) {
   const router = useRouter();
   const clearCart = useCartStore((s) => s.clearCart);
   const [phone, setPhone] = useState("");
-  const receiptText = useReceiptText(open, { billNumber });
+  // A queued sale has no bill on the server yet, so there is no receipt to send.
+  const receiptText = useReceiptText(open && !queued, { billNumber });
   const waUrl = receiptText ? receiptWhatsappUrl(receiptText, phone) : null;
   const phoneInvalid = Boolean(receiptText) && !waUrl;
 
@@ -54,10 +58,29 @@ export function ReceiptModal({
     clearCart();
     onCloseAll();
     onOpenChange(false);
-    router.refresh();
+    // Refetches today's revenue; offline that request can only fail.
+    if (navigator.onLine) router.refresh();
   }
 
-  const body = (
+  const body = queued ? (
+    <div className="space-y-4">
+      <div className="rounded-lg bg-muted/50 px-4 py-3">
+        <p className="text-xs text-muted-foreground">Saved on this phone</p>
+        <p className="font-mono text-lg font-semibold tabular-nums text-foreground">Offline #{queued.localNo}</p>
+        <p className="mt-2 text-sm text-muted-foreground">
+          Paid {formatINR(totalPaise)} via {paymentMethod}
+        </p>
+      </div>
+      <p className="text-sm text-muted-foreground" role="status">
+        {queued.needsSignIn
+          ? "Sign in again to sync it. It gets a bill number and receipt once it syncs."
+          : "No connection right now. It syncs by itself and gets a bill number when you're back online."}
+      </p>
+      <Button type="button" className="h-12 w-full" onClick={newOrder}>
+        New order 🆕
+      </Button>
+    </div>
+  ) : (
     <div className="space-y-4">
       <div className="rounded-lg bg-muted/50 px-4 py-3">
         <p className="text-xs text-muted-foreground">Bill number</p>
@@ -101,8 +124,10 @@ export function ReceiptModal({
       <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Paid</DialogTitle>
-            <DialogDescription>Share the receipt or start a new order.</DialogDescription>
+            <DialogTitle>{queued ? "Paid · saved offline" : "Paid"}</DialogTitle>
+            <DialogDescription>
+              {queued ? "This sale syncs when you're back online." : "Share the receipt or start a new order."}
+            </DialogDescription>
           </DialogHeader>
           {body}
         </DialogContent>
@@ -114,8 +139,10 @@ export function ReceiptModal({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto rounded-t-xl">
         <SheetHeader>
-          <SheetTitle>Paid</SheetTitle>
-          <SheetDescription>Share the receipt or start a new order.</SheetDescription>
+          <SheetTitle>{queued ? "Paid · saved offline" : "Paid"}</SheetTitle>
+          <SheetDescription>
+            {queued ? "This sale syncs when you're back online." : "Share the receipt or start a new order."}
+          </SheetDescription>
         </SheetHeader>
         <div className="mt-4">{body}</div>
       </SheetContent>

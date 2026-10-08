@@ -5,12 +5,16 @@ import Link from "next/link";
 import { PaymentMethod } from "@prisma/client";
 
 import { PosHeader } from "@/components/pos/PosHeader";
+import { PosSyncStatus } from "@/components/pos/PosSyncStatus";
 import { QuickAddGrid, type MenuTile } from "@/components/pos/QuickAddGrid";
 import { OrderCart, type PosSettings } from "@/components/pos/OrderCart";
 import { ReceiptModal } from "@/components/pos/ReceiptModal";
-import { UpiQRModal } from "@/components/pos/UpiQRModal";
+import { UpiQRModal, type PaidResult } from "@/components/pos/UpiQRModal";
 import { VoiceOrderButton } from "@/components/pos/VoiceOrderButton";
+import { useOnline } from "@/hooks/useOnline";
+import { usePosOutbox } from "@/hooks/usePosOutbox";
 import { useCartStore } from "@/lib/cartStore";
+import { registerAppServiceWorker } from "@/lib/sw-client";
 
 export type PosShellProps = {
   vendor: {
@@ -23,10 +27,14 @@ export type PosShellProps = {
   initialItems: MenuTile[];
   settings: PosSettings & { voiceLang: string };
   todaysRevenuePaise: number;
+  /** ISO time the server rendered this page; shown as "menu as of" when offline. */
+  renderedAt: string;
 };
 
-export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise }: PosShellProps) {
+export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise, renderedAt }: PosShellProps) {
   const items = useCartStore((s) => s.items);
+  const online = useOnline();
+  const outbox = usePosOutbox(vendor.id);
 
   const [isDesktop, setIsDesktop] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
@@ -41,7 +49,13 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise }:
     billNumber: "",
     totalPaise: 0,
     paymentMethod: PaymentMethod.UPI as PaymentMethod,
+    queued: null as { localNo: number; needsSignIn: boolean } | null,
   });
+
+  // Lets /pos open from the Home Screen with no network (public/sw.js).
+  useEffect(() => {
+    registerAppServiceWorker();
+  }, []);
 
   useEffect(() => {
     const mq = window.matchMedia("(min-width: 768px)");
@@ -59,13 +73,24 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise }:
     [],
   );
 
-  const onPaid = useCallback(
-    (result: { billNumber: string; totalPaise: number; paymentMethod: PaymentMethod }) => {
-      setReceiptMeta(result);
-      setReceiptOpen(true);
-    },
-    [],
-  );
+  const onPaid = useCallback((result: PaidResult) => {
+    setReceiptMeta(
+      result.kind === "synced"
+        ? {
+            billNumber: result.billNumber,
+            totalPaise: result.totalPaise,
+            paymentMethod: result.paymentMethod,
+            queued: null,
+          }
+        : {
+            billNumber: "",
+            totalPaise: result.totalPaise,
+            paymentMethod: result.paymentMethod,
+            queued: { localNo: result.localNo, needsSignIn: result.needsSignIn },
+          },
+    );
+    setReceiptOpen(true);
+  }, []);
 
   const cartSettings: PosSettings = {
     taxEnabled: settings.taxEnabled,
@@ -117,7 +142,20 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise }:
           </Link>
         </div>
       </nav>
-      <PosHeader stallName={vendor.name} todaysRevenuePaise={todaysRevenuePaise} />
+      <PosHeader
+        stallName={vendor.name}
+        todaysRevenuePaise={todaysRevenuePaise}
+        pendingPaise={outbox.pendingTodayPaise}
+      />
+      <PosSyncStatus
+        online={online}
+        renderedAt={renderedAt}
+        pending={outbox.pending}
+        failed={outbox.failed}
+        needsSignIn={outbox.needsSignIn}
+        onSync={outbox.sync}
+        onDiscard={(ref) => void outbox.discard(ref)}
+      />
       <main id="main-pos" className="mt-6 flex flex-col gap-8">
         <VoiceOrderButton voiceLang={settings.voiceLang} onNeedsConfirmationChange={setVoiceDoubleCheck} />
         <QuickAddGrid items={initialItems} />
@@ -133,6 +171,7 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise }:
       </main>
 
       <UpiQRModal
+        vendorId={vendor.id}
         open={payOpen}
         onOpenChange={setPayOpen}
         isDesktop={isDesktop}
@@ -153,6 +192,7 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise }:
         billNumber={receiptMeta.billNumber}
         totalPaise={receiptMeta.totalPaise}
         paymentMethod={receiptMeta.paymentMethod}
+        queued={receiptMeta.queued}
         onCloseAll={() => {
           setPayOpen(false);
           setReceiptOpen(false);

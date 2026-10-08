@@ -10,17 +10,6 @@ import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/
  * Writes real rows — run against a throwaway Postgres only (see CLAUDE.md).
  */
 
-/** The storefront UPI QR comes from api.qrserver.com; stub it so CI never needs egress. */
-async function stubQrService(page: Page): Promise<void> {
-  const onePixelPng = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-    "base64",
-  );
-  await page.route("**://api.qrserver.com/**", (route) =>
-    route.fulfill({ status: 200, contentType: "image/png", body: onePixelPng }),
-  );
-}
-
 async function vendorSlug(page: Page): Promise<string> {
   const res = await page.request.get("/api/vendor");
   expect(res.status(), "GET /api/vendor should succeed for a signed-in owner").toBe(200);
@@ -130,14 +119,12 @@ test.describe("drops: home-kitchen pre-order day", () => {
     try {
       // A second browser opened now keeps a stale view (3 left) for the oversell check later.
       const stale = await staleCtx.newPage();
-      await stubQrService(stale);
       await stale.goto(`/s/${slug}`);
       const staleDrop = stale.getByRole("region", { name: dropTitle });
       await expect(staleDrop.getByText("Only 3 left")).toBeVisible();
       await addToCart(staleDrop, laddu, 2);
 
       const buyer = await buyerCtx.newPage();
-      await stubQrService(buyer);
       const res = await buyer.goto(`/s/${slug}`);
       expect(res?.status()).toBe(200);
       const drop = buyer.getByRole("region", { name: dropTitle });

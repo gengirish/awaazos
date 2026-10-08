@@ -13,16 +13,6 @@ import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/
  * Writes real rows — run against a throwaway Postgres only (see CLAUDE.md).
  */
 
-async function stubQrService(page: Page): Promise<void> {
-  const onePixelPng = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-    "base64",
-  );
-  await page.route("**://api.qrserver.com/**", (route) =>
-    route.fulfill({ status: 200, contentType: "image/png", body: onePixelPng }),
-  );
-}
-
 async function vendorSlug(page: Page): Promise<string> {
   const res = await page.request.get("/api/vendor");
   expect(res.status(), "GET /api/vendor should succeed for a signed-in owner").toBe(200);
@@ -76,7 +66,6 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
   const buyerCtx = await browser.newContext(CONTEXT_OPTIONS);
   try {
     const buyer = await buyerCtx.newPage();
-    await stubQrService(buyer);
     await buyer.goto(`/s/${slug}`);
 
     // Before selling out: the drop drives the CTA, and prices drop the ".00".

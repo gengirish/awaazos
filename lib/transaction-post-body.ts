@@ -21,6 +21,14 @@ export const transactionPostBodySchema = z.object({
   voiceTranscript: z.string().optional().nullable(),
   source: z.nativeEnum(OrderSource).default(OrderSource.MANUAL),
   notes: z.string().optional().nullable(),
+  // POS offline outbox (docs/PWA_OFFLINE_PLAN.md). `clientRef` dedupes durably;
+  // `vendorId` pins the sale to the tenant it was rung up for; `deferred` marks a
+  // background sync of a sale taken earlier, whose `clientCreatedAt` then sets
+  // the bill date.
+  clientRef: z.string().uuid().optional(),
+  clientCreatedAt: z.string().datetime({ offset: true }).optional(),
+  vendorId: z.string().min(1).optional(),
+  deferred: z.boolean().optional(),
 });
 
 export type TransactionPostBody = z.infer<typeof transactionPostBodySchema>;
@@ -53,4 +61,36 @@ export function checkTransactionTotals(body: {
     return { ok: false, code: "total_mismatch" };
   }
   return { ok: true };
+}
+
+/** A deferred sale may be this far ahead of the server clock (device skew). */
+export const MAX_CLIENT_CLOCK_SKEW_MS = 5 * 60 * 1000;
+/** Oldest deferred sale the server accepts (plan decision D4). */
+export const MAX_DEFERRED_SALE_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+export type SaleTimeResult =
+  | { ok: true; saleAt: Date; fromClient: boolean }
+  | { ok: false; code: "client_time_missing" | "client_time_in_future" | "client_time_too_old" };
+
+/**
+ * When the sale happened. Live checkouts use the server clock, as before. A
+ * deferred (offline-queued) sale uses the device's `clientCreatedAt`, so it
+ * lands in the IST day, bill number and DailySummary of the day it was rung up
+ * rather than the day it synced. Bounded both ways against bad device clocks.
+ */
+export function resolveSaleTime(
+  body: { deferred?: boolean; clientCreatedAt?: string },
+  now: Date = new Date(),
+): SaleTimeResult {
+  if (!body.deferred) return { ok: true, saleAt: now, fromClient: false };
+  if (!body.clientCreatedAt) return { ok: false, code: "client_time_missing" };
+  const saleAt = new Date(body.clientCreatedAt);
+  if (saleAt.getTime() > now.getTime() + MAX_CLIENT_CLOCK_SKEW_MS) {
+    return { ok: false, code: "client_time_in_future" };
+  }
+  if (saleAt.getTime() < now.getTime() - MAX_DEFERRED_SALE_AGE_MS) {
+    return { ok: false, code: "client_time_too_old" };
+  }
+  // A sale can't be later than the moment we receive it.
+  return { ok: true, saleAt: saleAt > now ? now : saleAt, fromClient: true };
 }

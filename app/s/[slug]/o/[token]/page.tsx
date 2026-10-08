@@ -14,7 +14,8 @@ import { formatFulfilmentWindow, formatIstDate, formatIstTime } from "@/lib/drop
 import { holdMinutesLeft, orderStatusLabel, whatsappChatLink, type StatusTone } from "@/lib/storefront-order";
 import { prisma } from "@/lib/prisma";
 import { isOnlinePaymentEnabled } from "@/lib/storefront-razorpay";
-import { buildQrUrl, buildUpiDeepLink } from "@/lib/upi";
+import { qrSvgDataUrl } from "@/lib/qr";
+import { buildUpiDeepLink } from "@/lib/upi";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -166,6 +167,7 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
           billRef: order.billNumber,
         })
       : null;
+  const qrSrc = upiLink ? await qrSvgDataUrl(upiLink, 220) : "";
   const minsLeft = awaitingUpi ? holdMinutesLeft(order.createdAt, PENDING_HOLD_MINUTES, now) : 0;
   const payOnline = awaitingUpi && minsLeft > 0 && isOnlinePaymentEnabled(vendor.plan, vendor.settings);
 
@@ -260,7 +262,7 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
                 </a>
                 <div className="mx-auto w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
                   <Image
-                    src={buildQrUrl(upiLink, 220)}
+                    src={qrSrc}
                     alt={`UPI QR code to pay ${formatINR(order.totalPaise)} to ${payeeName}`}
                     width={220}
                     height={220}

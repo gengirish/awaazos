@@ -4,6 +4,7 @@ import type { UserRole } from "@prisma/client";
 /** PWA files fetched by the browser without a session (also excluded in the middleware matcher). */
 const PUBLIC_PWA_FILES = new Set([
   "/sw.js",
+  "/offline.html",
   "/manifest.webmanifest",
   "/icon-192.png",
   "/icon-512.png",

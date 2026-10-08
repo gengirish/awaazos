@@ -7,17 +7,6 @@ import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/
  * these tests are as much about what does NOT render as what does.
  */
 
-/** The QR image comes from api.qrserver.com; stub it so CI never needs egress. */
-async function stubQrService(page: Page): Promise<void> {
-  const onePixelPng = Buffer.from(
-    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
-    "base64",
-  );
-  await page.route("**://api.qrserver.com/**", (route) =>
-    route.fulfill({ status: 200, contentType: "image/png", body: onePixelPng }),
-  );
-}
-
 async function vendorSlug(page: Page): Promise<string> {
   const res = await page.request.get("/api/vendor");
   expect(res.status(), "GET /api/vendor should succeed for a signed-in owner").toBe(200);
@@ -135,7 +124,6 @@ test.describe("public storefront", () => {
 
     const anon = await browser.newContext(CONTEXT_OPTIONS);
     const anonPage = await anon.newPage();
-    await stubQrService(anonPage);
 
     try {
       // register() does not set a UPI ID, so the pay block must be absent

@@ -250,8 +250,17 @@ vendor's opted-in staff devices (`PushSubscription`, one row per device). Event-
 add a timer. `notifyVendorInBackground` wraps the send in `waitUntil` so it never blocks a buyer.
 Payloads carry bill number, amount and item count only — **no buyer name, phone or address** (lock
 screens are public). 404/410 from the push service deletes the row. Feature-gated on
-`NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`. `public/sw.js`, the manifest
-and the icons are excluded from middleware; iPhones need the site added to the Home Screen.
+`NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`. `public/sw.js`, the manifest,
+`offline.html` and the icons are excluded from middleware; iPhones need the site added to the Home Screen.
+
+**Offline counter sales** (`docs/PWA_OFFLINE_PLAN.md`): `/sw.js` (registered on `/pos` load) caches
+`/pos` and its chunks; it never intercepts `/api/**`, `/s/**` or non-GET. Every POS checkout goes
+through the IndexedDB outbox (`lib/pos-outbox.ts`): saved first, then POSTed with a `clientRef` uuid
+(`@@unique([vendorId, clientRef])` — replays return the original bill with 200). Queued sales show
+"Offline #N" and sync on page load / `online` / tab visible — **never on a timer**. A `deferred` sale
+is billed to the IST day in its `clientCreatedAt` (≤ 7 days old, `resolveSaleTime`), and its body
+`vendorId` must match the resolved vendor or the route 404s (`requireVendorRole` falls back to the
+first membership otherwise). UPI QRs are rendered locally by `lib/qr.ts` — no third-party QR host.
 
 **Order from menu** (`lib/menu-orders.ts`, opt-in `VendorSettings.acceptMenuOrders`): buyers order
 everyday `MenuItem`s with no drop — same STOREFRONT transaction with `dropId = null`, same payment
