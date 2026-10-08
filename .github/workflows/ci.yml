@@ -50,7 +50,7 @@ jobs:
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     needs: quality
     services:
       postgres:
@@ -88,6 +88,11 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install --with-deps chromium
 
+      # Test the production build: `next dev` (on-demand compiles, HMR) has crashed
+      # mid-run in CI since Next 15, and prod is what users get anyway.
+      - name: Build
+        run: npm run build
+
       - name: Run E2E
         run: npm run e2e
 
@@ -95,6 +100,12 @@ jobs:
     name: Secret scan + npm audit
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # gitleaks-action lists the PR's commits; without pull-requests: read the
+    # token gets "Resource not accessible by integration" and the job fails
+    # before npm audit ever runs.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
       - name: Checkout
         uses: actions/checkout@v4
