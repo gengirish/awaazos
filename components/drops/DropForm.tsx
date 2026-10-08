@@ -33,7 +33,7 @@ import type { DropUpsertInput } from "@/lib/zod-drops";
 // ─── Shared bits ────────────────────────────────────────────────────
 
 const inputCls =
-  "flex min-h-11 w-full rounded-md border border-input bg-background px-3 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 aria-[invalid=true]:border-destructive";
+  "flex min-h-11 w-full rounded-md border border-input bg-background px-3 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-destructive";
 
 type Issue = { path: (string | number)[]; message: string };
 type ApiError = { error?: string; issues?: Issue[]; menuItemId?: string };
@@ -457,7 +457,7 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
                   role="radio"
                   aria-checked={active}
                   onClick={() => set("fulfilmentMode", m.value)}
-                  className={`min-h-11 rounded-md border px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                  className={`min-h-11 rounded-md border px-2 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                     active
                       ? "border-primary bg-primary text-primary-foreground"
                       : "border-input bg-background hover:bg-accent"
@@ -750,7 +750,7 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
       ) : null}
 
       {!locked ? (
-        <div className="sticky bottom-0 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur">
+        <div className="sticky bottom-0 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm">
           <Button type="submit" size="lg" className="min-h-12 w-full text-base" disabled={pending}>
             {pending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
             {pending ? "Saving…" : dropId ? "Save changes" : "Create drop"}

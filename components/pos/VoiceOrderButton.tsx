@@ -134,7 +134,7 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
         aria-label={offlineIdle ? "Voice needs internet — tap items below" : label}
         aria-pressed={state === "listening"}
         className={cn(
-          "relative flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-full shadow-md ring-4 ring-offset-2 ring-offset-background transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-safe:transition-colors",
+          "relative flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-full shadow-md ring-4 ring-offset-2 ring-offset-background transition-transform focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-safe:transition-colors",
           state === "idle" && !offlineIdle && "bg-primary text-primary-foreground ring-transparent",
           offlineIdle && "cursor-not-allowed bg-muted text-muted-foreground ring-border",
           state === "listening" &&
@@ -155,7 +155,7 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
         {state === "success" ? <Check className="h-9 w-9" aria-hidden /> : null}
         {state === "error" ? <AlertCircle className="h-9 w-9" aria-hidden /> : null}
       </button>
-      <div className="min-h-[3rem] w-full max-w-sm text-center">
+      <div className="min-h-12 w-full max-w-sm text-center">
         {offlineIdle ? (
           <p aria-live="polite" className="text-sm font-medium text-muted-foreground">
             Voice needs internet — tap items below

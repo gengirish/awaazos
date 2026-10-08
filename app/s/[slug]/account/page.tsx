@@ -108,11 +108,11 @@ export default async function StorefrontAccountPage(
         Skip to main content
       </a>
 
-      <header className="border-b border-border/50 bg-gradient-to-b from-primary/15 to-background">
+      <header className="border-b border-border/50 bg-linear-to-b from-primary/15 to-background">
         <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-4 sm:px-6">
           <Link
             href={`/s/${vendor.slug}`}
-            className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Back to {vendor.name}
@@ -126,7 +126,7 @@ export default async function StorefrontAccountPage(
         </h1>
 
         {!customer ? (
-          <section aria-labelledby="signin-heading" className="rounded-2xl border border-border/60 bg-background p-5 shadow-sm">
+          <section aria-labelledby="signin-heading" className="rounded-2xl border border-border/60 bg-background p-5 shadow-xs">
             <h2 id="signin-heading" className="sr-only">
               Sign in
             </h2>
@@ -152,7 +152,7 @@ export default async function StorefrontAccountPage(
                   No orders yet. Orders you place while signed in show up here.
                 </p>
               ) : (
-                <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
+                <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs">
                   {orders.map((o) => {
                     const state = orderDisplayState(
                       {
@@ -169,7 +169,7 @@ export default async function StorefrontAccountPage(
                       <li key={o.id}>
                         <Link
                           href={`/s/${vendor.slug}/o/${encodeURIComponent(o.orderToken ?? "")}`}
-                          className="flex min-h-11 items-center gap-3 px-4 py-3 hover:bg-primary/[0.04] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
+                          className="flex min-h-11 items-center gap-3 px-4 py-3 hover:bg-primary/4 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
                         >
                           <ShoppingBag className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                           <span className="min-w-0 flex-1">
@@ -201,7 +201,7 @@ export default async function StorefrontAccountPage(
               )}
             </section>
 
-            <section aria-labelledby="details-heading" className="rounded-2xl border border-border/60 bg-background p-5 shadow-sm">
+            <section aria-labelledby="details-heading" className="rounded-2xl border border-border/60 bg-background p-5 shadow-xs">
               <h2 id="details-heading" className="mb-3 font-display text-lg font-bold text-awaaz-charcoal">
                 Your details
               </h2>

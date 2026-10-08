@@ -26,7 +26,7 @@ export function SettingsNav() {
                 href={item.href}
                 aria-current={active ? "page" : undefined}
                 className={cn(
-                  "relative flex min-h-11 items-center gap-3 rounded-md px-3 text-sm ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
+                  "relative flex min-h-11 items-center gap-3 rounded-md px-3 text-sm ring-offset-background transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                   active
                     ? "bg-muted font-semibold text-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-1 before:rounded-full before:bg-primary"
                     : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",

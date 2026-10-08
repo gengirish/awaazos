@@ -131,7 +131,7 @@ export default async function SettingsHubPage() {
               <li key={item.id}>
                 <Link
                   href={item.href}
-                  className="flex min-h-11 items-center justify-between gap-3 rounded-md px-2 text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex min-h-11 items-center justify-between gap-3 rounded-md px-2 text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span className="flex items-center gap-2">
                     <CircleDashed className="h-4 w-4 shrink-0" aria-hidden="true" />
@@ -154,7 +154,7 @@ export default async function SettingsHubPage() {
               <li key={section.id}>
                 <Link
                   href={section.href}
-                  className="flex min-h-14 items-center gap-3 px-4 py-3 ring-inset transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="flex min-h-14 items-center gap-3 px-4 py-3 ring-inset transition-colors hover:bg-muted/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
                     <Icon className="h-5 w-5" aria-hidden="true" />

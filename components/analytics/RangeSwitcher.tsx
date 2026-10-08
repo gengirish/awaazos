@@ -65,7 +65,7 @@ export function RangeSwitcher({
               role="tab"
               aria-selected={isActive}
               scroll={false}
-              className={`min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              className={`min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
                 isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
               }`}
             >
@@ -78,7 +78,7 @@ export function RangeSwitcher({
           role="tab"
           aria-selected={active === "custom"}
           scroll={false}
-          className={`min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+          className={`min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
             active === "custom" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
           }`}
         >
@@ -113,7 +113,7 @@ export function RangeSwitcher({
         <button
           type="button"
           onClick={applyCustom}
-          className="min-h-11 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="min-h-11 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
         >
           Apply
         </button>

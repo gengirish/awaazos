@@ -38,7 +38,7 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
       aria-labelledby="cart-heading"
       aria-live="polite"
       aria-atomic="false"
-      className="rounded-lg border bg-card text-card-foreground shadow-sm"
+      className="rounded-lg border bg-card text-card-foreground shadow-xs"
     >
       <div className="border-b px-4 py-3">
         <h2 id="cart-heading" className="font-display text-lg font-semibold">

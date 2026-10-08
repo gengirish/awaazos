@@ -25,7 +25,7 @@ export function PaymentMethodBreakdown({ slices }: PaymentMethodBreakdownProps) 
 
   return (
     <section
-      className="rounded-xl border border-border bg-card p-4 shadow-sm"
+      className="rounded-xl border border-border bg-card p-4 shadow-xs"
       aria-labelledby="payment-mix-heading"
     >
       <h2 id="payment-mix-heading" className="font-display text-lg font-semibold text-foreground">

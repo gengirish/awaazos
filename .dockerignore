@@ -13,9 +13,8 @@ middleware.ts
 next.config.mjs
 next-env.d.ts
 postcss.config.js
-tailwind.config.ts
+eslint.config.mjs
 components.json
-.eslintrc.json
 vitest.config.ts
 
 # node_modules — installed inside container

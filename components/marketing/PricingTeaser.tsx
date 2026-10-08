@@ -23,7 +23,7 @@ export function PricingTeaser() {
               className={
                 tier.emphasis
                   ? "border-2 border-awaaz-orange bg-awaaz-cream/30 shadow-md"
-                  : "border-border/80 bg-card shadow-sm"
+                  : "border-border/80 bg-card shadow-xs"
               }
             >
               <CardHeader>
@@ -57,7 +57,7 @@ export function PricingTeaser() {
         <div className="mt-10 text-center">
           <Link
             href="/pricing"
-            className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-base font-semibold text-awaaz-orange underline-offset-4 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+            className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-base font-semibold text-awaaz-orange underline-offset-4 outline-hidden hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
           >
             See pricing →
           </Link>

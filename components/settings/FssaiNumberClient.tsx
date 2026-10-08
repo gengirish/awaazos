@@ -75,7 +75,7 @@ export function FssaiNumberClient({ initialFssaiNumber }: FssaiNumberClientProps
         }}
         aria-invalid={fssaiError ? true : undefined}
         aria-describedby="fssai-hint"
-        className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 font-mono text-base tabular-nums ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 font-mono text-base tabular-nums ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       />
       <p id="fssai-hint" className={`text-xs ${fssaiError ? "text-destructive" : "text-muted-foreground"}`}>
         {fssaiError ?? "14 digits. Shown on your storefront so customers know your kitchen is registered."}
@@ -84,7 +84,7 @@ export function FssaiNumberClient({ initialFssaiNumber }: FssaiNumberClientProps
         type="button"
         onClick={saveFssai}
         disabled={!fssaiDirty || pending}
-        className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {pending && fssaiDirty ? "Saving…" : fssaiDirty ? "Save" : "Saved"}
       </button>

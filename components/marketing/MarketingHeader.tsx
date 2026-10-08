@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 const navLinkClass =
-  "inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-awaaz-charcoal/90 outline-none transition-colors hover:text-awaaz-orange focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2";
+  "inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-awaaz-charcoal/90 outline-hidden transition-colors hover:text-awaaz-orange focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2";
 
 export function MarketingHeader() {
   const [scrolled, setScrolled] = useState(false);
@@ -21,14 +21,14 @@ export function MarketingHeader() {
   return (
     <header
       className={cn(
-        "sticky top-0 z-50 w-full border-b border-border/60 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 motion-reduce:transition-none",
-        scrolled && "shadow-sm",
+        "sticky top-0 z-50 w-full border-b border-border/60 bg-background/95 backdrop-blur-sm supports-backdrop-filter:bg-background/80 motion-reduce:transition-none",
+        scrolled && "shadow-xs",
       )}
     >
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link
           href="/"
-          className="font-display text-xl font-bold tracking-tight text-awaaz-charcoal outline-none focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+          className="font-display text-xl font-bold tracking-tight text-awaaz-charcoal outline-hidden focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
         >
           AwaazOS
         </Link>
@@ -55,7 +55,7 @@ export function MarketingHeader() {
         <div className="flex items-center gap-2 md:hidden">
           <Link
             href="/sign-in"
-            className="inline-flex min-h-11 min-w-[44px] items-center justify-center rounded-md border border-awaaz-charcoal/20 px-3 text-sm font-medium text-awaaz-charcoal outline-none hover:bg-muted focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+            className="inline-flex min-h-11 min-w-[44px] items-center justify-center rounded-md border border-awaaz-charcoal/20 px-3 text-sm font-medium text-awaaz-charcoal outline-hidden hover:bg-muted focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
           >
             Sign in
           </Link>
@@ -73,13 +73,13 @@ export function MarketingHeader() {
       >
         <Link
           href="/#how-it-works"
-          className="shrink-0 rounded-full bg-muted px-3 py-2 text-xs font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+          className="shrink-0 rounded-full bg-muted px-3 py-2 text-xs font-medium text-foreground outline-hidden focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
         >
           How it works
         </Link>
         <Link
           href="/pricing"
-          className="shrink-0 rounded-full bg-muted px-3 py-2 text-xs font-medium text-foreground outline-none focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+          className="shrink-0 rounded-full bg-muted px-3 py-2 text-xs font-medium text-foreground outline-hidden focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
         >
           Pricing
         </Link>

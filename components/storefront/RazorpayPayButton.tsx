@@ -220,7 +220,7 @@ export function RazorpayPayButton({
         onClick={start}
         disabled={busy}
         aria-busy={busy}
-        className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
+        className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
       >
         {busy ? (
           <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />

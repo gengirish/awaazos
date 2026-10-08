@@ -344,7 +344,7 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
                           <button
                             key={emo}
                             type="button"
-                            className={`flex min-h-11 min-w-11 items-center justify-center rounded-md border text-lg transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                            className={`flex min-h-11 min-w-11 items-center justify-center rounded-md border text-lg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
                               field.value === emo ? "border-primary bg-primary/10" : "border-input bg-background hover:bg-accent"
                             }`}
                             aria-pressed={field.value === emo}

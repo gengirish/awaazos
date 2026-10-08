@@ -30,7 +30,7 @@ export function RevenueTrendChart({ data, title = "Revenue trend" }: RevenueTren
   }));
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4 shadow-sm" aria-labelledby="revenue-trend-heading">
+    <section className="rounded-xl border border-border bg-card p-4 shadow-xs" aria-labelledby="revenue-trend-heading">
       <h2 id="revenue-trend-heading" className="font-display text-lg font-semibold text-foreground">
         {title}
       </h2>

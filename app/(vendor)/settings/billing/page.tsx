@@ -42,7 +42,7 @@ export default async function BillingSettingsPage() {
       <>
         <SettingsPageHeader title="Plan & billing" description="Manage your AwaazOS subscription." />
         <div className="space-y-4">
-          <section className="rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+          <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
             <h2 className="font-medium">Current plan</h2>
             <p className="mt-2 text-2xl font-semibold">{limits.label}</p>
             {planExpired && vendor.planExpiresAt ? (
@@ -62,7 +62,7 @@ export default async function BillingSettingsPage() {
             )}
           </section>
 
-          <section className="rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+          <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
             <h2 className="font-medium">Usage this month (IST)</h2>
             <p className="mt-2 text-lg font-semibold tabular-nums">{usageLabel} bills</p>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -70,14 +70,14 @@ export default async function BillingSettingsPage() {
             </p>
           </section>
 
-          <section className="rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+          <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
             <h2 className="font-medium">Invoices</h2>
             <p className="mt-2 text-sm text-muted-foreground">
               Invoice PDFs and history live in your Razorpay merchant dashboard for the linked account.
             </p>
           </section>
 
-          <section className="rounded-lg border bg-card p-4 shadow-sm sm:p-6">
+          <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
             <h2 className="mb-4 font-medium">Actions</h2>
             <BillingManageClient
               currentPlan={vendor.plan}

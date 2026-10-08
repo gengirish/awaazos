@@ -80,7 +80,7 @@ export function PosSyncStatus({
           {needsSignIn ? (
             <Link
               href="/sign-in?callbackUrl=%2Fpos"
-              className="inline-flex min-h-11 shrink-0 items-center rounded-md border border-input px-3 font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="inline-flex min-h-11 shrink-0 items-center rounded-md border border-input px-3 font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
               Sign in
             </Link>

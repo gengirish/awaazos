@@ -38,7 +38,7 @@ export function CopyUpiId({ upiId, className }: { upiId: string; className?: str
         onClick={copy}
         aria-label={copied ? `UPI ID ${upiId} copied` : `Copy UPI ID ${upiId}`}
         className={cn(
-          "inline-flex min-h-11 max-w-full items-center gap-2 rounded-full border px-4 py-2 font-mono text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 motion-reduce:transition-none",
+          "inline-flex min-h-11 max-w-full items-center gap-2 rounded-full border px-4 py-2 font-mono text-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 motion-reduce:transition-none",
           copied
             ? "border-primary bg-primary/10 text-foreground"
             : "border-border/70 bg-background text-foreground hover:border-primary/50 hover:bg-primary/5",

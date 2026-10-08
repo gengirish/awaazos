@@ -33,7 +33,7 @@ export function OtherCartsNotice({ slug, vendorName }: { slug: string; vendorNam
   return (
     <Link
       href={`/s/${encodeURIComponent(slug)}`}
-      className="flex min-h-12 items-center gap-3 rounded-2xl border border-primary/30 bg-primary/[0.06] px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+      className="flex min-h-12 items-center gap-3 rounded-2xl border border-primary/30 bg-primary/6 px-4 py-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     >
       <ShoppingBag className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
       <span className="flex-1">

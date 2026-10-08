@@ -36,7 +36,7 @@ export function HourlyHeatmap({ rows }: HourlyHeatmapProps) {
   }));
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4 shadow-sm" aria-labelledby="hourly-heading">
+    <section className="rounded-xl border border-border bg-card p-4 shadow-xs" aria-labelledby="hourly-heading">
       <h2 id="hourly-heading" className="font-display text-lg font-semibold text-foreground">
         Sales by hour (IST)
       </h2>

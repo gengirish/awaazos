@@ -17,7 +17,7 @@ export function TopItemsList({ items, maxQty }: TopItemsListProps) {
   const denom = Math.max(1, maxQty);
 
   return (
-    <section className="rounded-xl border border-border bg-card p-4 shadow-sm" aria-labelledby="top-items-heading">
+    <section className="rounded-xl border border-border bg-card p-4 shadow-xs" aria-labelledby="top-items-heading">
       <h2 id="top-items-heading" className="font-display text-lg font-semibold text-foreground">
         Best-selling items
       </h2>

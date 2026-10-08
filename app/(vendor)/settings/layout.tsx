@@ -23,7 +23,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
           <p className="font-display text-base font-semibold text-foreground">AwaazOS settings</p>
           <Link
             href="/pos"
-            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <Calculator className="h-4 w-4" aria-hidden="true" />
             Back to POS
@@ -34,7 +34,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
         <aside className="hidden w-56 shrink-0 md:block">
           <SettingsNav />
         </aside>
-        <main id="main" tabIndex={-1} className="min-w-0 max-w-3xl flex-1 focus:outline-none">
+        <main id="main" tabIndex={-1} className="min-w-0 max-w-3xl flex-1 focus:outline-hidden">
           {children}
         </main>
       </div>

@@ -185,7 +185,7 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
         Skip to order
       </a>
 
-      <header className="border-b border-border/50 bg-gradient-to-b from-primary/15 to-background">
+      <header className="border-b border-border/50 bg-linear-to-b from-primary/15 to-background">
         <div className="mx-auto max-w-xl px-4 pb-6 pt-8 sm:px-6">
           <Link
             href={`/s/${slug}`}
@@ -227,7 +227,7 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
         {awaitingUpi ? (
           <section
             aria-labelledby="pay-heading"
-            className="space-y-4 rounded-2xl border border-primary/25 bg-background p-4 text-center shadow-sm sm:p-6"
+            className="space-y-4 rounded-2xl border border-primary/25 bg-background p-4 text-center shadow-xs sm:p-6"
           >
             <h2 id="pay-heading" className="font-display text-xl font-bold text-awaaz-charcoal">
               Pay {formatINR(order.totalPaise)}
@@ -253,7 +253,7 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
                 <a
                   href={upiLink}
                   className={cn(
-                    "inline-flex min-h-12 w-full items-center justify-center rounded-xl px-6 text-base font-bold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
+                    "inline-flex min-h-12 w-full items-center justify-center rounded-xl px-6 text-base font-bold focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
                     payOnline
                       ? "border border-primary/40 bg-background text-primary"
                       : "bg-primary text-primary-foreground shadow-md",
@@ -286,7 +286,7 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
 
         <section
           aria-labelledby="items-heading"
-          className="rounded-2xl border border-border/60 bg-background shadow-sm"
+          className="rounded-2xl border border-border/60 bg-background shadow-xs"
         >
           <h2
             id="items-heading"
@@ -331,7 +331,7 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
 
         <section
           aria-labelledby="fulfil-heading"
-          className="space-y-2 rounded-2xl border border-border/60 bg-background p-4 text-sm shadow-sm"
+          className="space-y-2 rounded-2xl border border-border/60 bg-background p-4 text-sm shadow-xs"
         >
           <h2 id="fulfil-heading" className="flex items-center gap-2 font-display text-base font-bold">
             <MapPin className="h-4 w-4 text-primary" aria-hidden="true" />
@@ -363,7 +363,7 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
             href={waLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-green-600/40 bg-background px-6 text-sm font-bold text-green-800 shadow-sm hover:bg-green-600/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-green-600/40 bg-background px-6 text-sm font-bold text-green-800 shadow-xs hover:bg-green-600/5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             <MessageCircle className="h-5 w-5" aria-hidden="true" />
             Message the kitchen on WhatsApp

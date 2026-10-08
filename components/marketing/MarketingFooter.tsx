@@ -16,13 +16,13 @@ export function MarketingFooter() {
         <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
           <Link
             href="/legal/privacy"
-            className="min-h-11 min-w-[44px] content-center font-medium text-awaaz-charcoal/80 underline-offset-4 outline-none hover:text-awaaz-orange hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+            className="min-h-11 min-w-[44px] content-center font-medium text-awaaz-charcoal/80 underline-offset-4 outline-hidden hover:text-awaaz-orange hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
           >
             Privacy
           </Link>
           <Link
             href="/legal/terms"
-            className="min-h-11 min-w-[44px] content-center font-medium text-awaaz-charcoal/80 underline-offset-4 outline-none hover:text-awaaz-orange hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+            className="min-h-11 min-w-[44px] content-center font-medium text-awaaz-charcoal/80 underline-offset-4 outline-hidden hover:text-awaaz-orange hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
           >
             Terms
           </Link>

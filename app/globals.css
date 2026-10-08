@@ -1,6 +1,154 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss' source(none);
+/* Radix enter/exit classes (animate-in, fade-in-0, slide-in-from-*, zoom-in-95…);
+   Tailwind-4 replacement for the tailwindcss-animate plugin. */
+@import 'tw-animate-css';
+
+/* Explicit class-scanning roots (v3 `content` was app/ + components/). Docs,
+   e2e and scripts are deliberately not scanned. */
+@source '../app';
+@source '../components';
+@source '../lib';
+@source '../hooks';
+
+@custom-variant dark (&:is(.dark *));
+
+/* v3 parity: v4's `hover:` only matches on hover-capable pointers. Keep the v3
+   behaviour (apply on :hover everywhere) so touch POS screens look the same. */
+@custom-variant hover (&:hover);
+
+@theme inline {
+  --color-border: hsl(var(--border));
+  --color-input: hsl(var(--input));
+  --color-ring: hsl(var(--ring));
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+
+  --color-secondary: hsl(var(--secondary));
+  --color-secondary-foreground: hsl(var(--secondary-foreground));
+
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+
+  --color-popover: hsl(var(--popover));
+  --color-popover-foreground: hsl(var(--popover-foreground));
+
+  --color-card: hsl(var(--card));
+  --color-card-foreground: hsl(var(--card-foreground));
+
+  --color-brand-saffron: #ff6b00;
+  --color-brand-green: #16a34a;
+  --color-brand-amber: #d97706;
+  --color-brand-red: #dc2626;
+  --color-brand-blue: #2563eb;
+  --color-brand-purple: #7c3aed;
+
+  --color-awaaz-orange: hsl(var(--awaaz-orange));
+  --color-awaaz-charcoal: hsl(var(--awaaz-charcoal));
+  --color-awaaz-cream: hsl(var(--awaaz-cream));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+
+  --font-sans: var(--font-nunito), system-ui, sans-serif;
+  /* KNOWN, PRE-EXISTING: `Baloo 2` is unquoted, which makes the whole
+     font-family declaration invalid, so `font-display` falls back to the
+     inherited Nunito. That is exactly what v3 shipped (tailwind.config.ts had
+     the same unquoted name), so it is kept for visual parity. Quoting it turns
+     Baloo 2 on for ~70 headings — a deliberate design change, not part of the
+     Tailwind 4 migration. */
+  --font-display: var(--font-baloo), Baloo 2, system-ui, sans-serif;
+  --font-body: var(--font-nunito), Nunito, system-ui, sans-serif;
+
+  --animate-accordion-down: accordion-down 0.2s ease-out;
+  --animate-accordion-up: accordion-up 0.2s ease-out;
+
+  @keyframes accordion-down {
+    from {
+      height: 0;
+    }
+    to {
+      height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes accordion-up {
+    from {
+      height: var(--radix-accordion-content-height);
+    }
+    to {
+      height: 0;
+    }
+  }
+}
+
+/*
+  The default border color has changed to `currentcolor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentcolor);
+  }
+
+  /* v3 parity (official v4 upgrade guide): placeholders were gray-400, and
+     buttons showed a pointer cursor. */
+  input::placeholder,
+  textarea::placeholder {
+    color: #9ca3af; /* v3 gray-400 */
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+}
+
+/*
+  v3 parity for space-y-* / space-x-*. v4 puts margin-BOTTOM on every child but
+  the last; v3 put margin-TOP on every child but the first. The v4 form is
+  invisible after an inline first child (e.g. <label> above an <input> inside
+  space-y-2) and after an absolutely-positioned / sr-only first child, which
+  this codebase relies on in dozens of forms. These utilities re-emit the v3
+  selector (same 0-3-0 specificity) and cancel v4's zero-specificity
+  margin-bottom with a 0-0-1 rule so a child's own mb-* class still wins, as
+  it did in v3. Remove only after every space-* container is moved to gap-*.
+*/
+@utility space-y-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    margin-top: calc(var(--spacing) * --value(number));
+    margin-bottom: 0;
+  }
+  :where(&) > :is(html *) {
+    margin-bottom: 0;
+  }
+}
+
+@utility space-x-* {
+  & > :not([hidden]) ~ :not([hidden]) {
+    margin-left: calc(var(--spacing) * --value(number));
+    margin-right: 0;
+  }
+  :where(&) > :is(html *) {
+    margin-right: 0;
+  }
+}
 
 @layer base {
   :root {

@@ -233,7 +233,7 @@ function categoryAnchor(category: string, index: number): string {
 
 function MenuRow({ item }: { item: StorefrontItems[number] }) {
   return (
-    <li className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-primary/[0.04] sm:gap-4 sm:px-4">
+    <li className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-primary/4 sm:gap-4 sm:px-4">
       {item.imageUrl ? (
         <Image
           src={item.imageUrl}
@@ -345,7 +345,7 @@ function DropSection({
   return (
     <section
       aria-labelledby={headingId}
-      className="rounded-3xl border border-primary/25 bg-gradient-to-b from-primary/[0.08] to-background p-4 shadow-sm sm:p-5"
+      className="rounded-3xl border border-primary/25 bg-linear-to-b from-primary/8 to-background p-4 shadow-xs sm:p-5"
     >
       <p className="text-xs font-bold uppercase tracking-wide text-primary">
         Pre-order · {formatDropDayLabel(drop.date)}
@@ -414,7 +414,7 @@ function DropSection({
               {" "}
               <a
                 href="#menu-order"
-                className="font-semibold text-primary underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="font-semibold text-primary underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 Order from the everyday menu
               </a>
@@ -508,7 +508,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
 
       {/* Brand band. The vendor's theme colour is the only thing that differs
           between one storefront and the next, so it carries the whole identity. */}
-      <header className="relative overflow-hidden border-b border-border/50 bg-gradient-to-b from-primary/20 via-primary/[0.07] to-background">
+      <header className="relative overflow-hidden border-b border-border/50 bg-linear-to-b from-primary/20 via-primary/[0.07] to-background">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-0 opacity-40"
@@ -523,7 +523,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
         <div className="relative mx-auto flex max-w-2xl justify-end px-4 pt-3 sm:px-6">
           <Link
             href={`/s/${vendor.slug}/account`}
-            className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-sm transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="truncate">
@@ -551,7 +551,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
               </div>
             )}
 
-            <h1 className="mt-4 font-display text-3xl font-bold leading-tight tracking-tight text-awaaz-charcoal sm:text-4xl">
+            <h1 className="mt-4 font-display text-3xl font-bold leading-tight tracking-tight text-awaaz-charcoal sm:text-4xl sm:leading-10">
               {vendor.name}
             </h1>
 
@@ -578,7 +578,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             {hasOpenDrop ? (
               <a
                 href="#drops"
-                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 <ShoppingBag className="h-4 w-4" aria-hidden="true" />
                 Pre-order now
@@ -586,7 +586,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             ) : menuOrdering ? (
               <a
                 href="#menu-order"
-                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 <ShoppingBag className="h-4 w-4" aria-hidden="true" />
                 Order now
@@ -594,7 +594,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             ) : upiLink ? (
               <a
                 href="#pay"
-                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 <QrCode className="h-4 w-4" aria-hidden="true" />
                 Scan &amp; pay
@@ -608,14 +608,14 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
       {categories.length + (dropViews.length > 0 ? 1 : 0) > 1 ? (
         <nav
           aria-label="Menu categories"
-          className="sticky top-0 z-20 border-b border-border/50 bg-background/85 backdrop-blur supports-[backdrop-filter]:bg-background/70"
+          className="sticky top-0 z-20 border-b border-border/50 bg-background/85 backdrop-blur-sm supports-backdrop-filter:bg-background/70"
         >
-          <ul className="mx-auto flex max-w-2xl gap-2 overflow-x-auto px-4 py-2 [scrollbar-width:none] sm:px-6 [&::-webkit-scrollbar]:hidden">
+          <ul className="mx-auto flex max-w-2xl gap-2 overflow-x-auto px-4 py-2 scrollbar-none sm:px-6 [&::-webkit-scrollbar]:hidden">
             {dropViews.length > 0 ? (
               <li className="shrink-0">
                 <a
                   href="#drops"
-                  className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/40 bg-primary/10 px-4 text-sm font-bold text-primary transition-colors hover:bg-primary/15 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/40 bg-primary/10 px-4 text-sm font-bold text-primary transition-colors hover:bg-primary/15 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
                   <CalendarClock className="h-4 w-4" aria-hidden="true" />
                   Pre-order
@@ -626,7 +626,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
               <li key={category} className="shrink-0">
                 <a
                   href={`#${categoryAnchor(category, i)}`}
-                  className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-border/70 px-4 text-sm font-bold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-border/70 px-4 text-sm font-bold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
                   {category}
                 </a>
@@ -684,7 +684,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                     {popular.map((item) => (
                       <li
                         key={item.id}
-                        className="flex flex-col gap-2 rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/10 to-background p-3 shadow-sm"
+                        className="flex flex-col gap-2 rounded-2xl border border-primary/20 bg-linear-to-b from-primary/10 to-background p-3 shadow-xs"
                       >
                         {item.imageUrl ? (
                           <Image
@@ -738,7 +738,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                       {items.length}
                     </span>
                   </div>
-                  <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
+                  <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs">
                     {items.map((item) => (
                       <MenuRow key={item.id} item={item} />
                     ))}
@@ -755,9 +755,9 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                competing with checkout. */
             <details
               id="pay"
-              className="group mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm"
+              className="group mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs"
             >
-              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
                 <QrCode className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                 <span className="flex-1">Paying at the counter? Show the UPI QR</span>
                 <ChevronDown
@@ -787,9 +787,9 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             <section
               id="pay"
               aria-labelledby="pay-heading"
-              className="mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-primary/25 bg-background shadow-sm"
+              className="mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-primary/25 bg-background shadow-xs"
             >
-              <div className="bg-gradient-to-b from-primary/10 to-transparent px-4 py-6 text-center sm:px-6">
+              <div className="bg-linear-to-b from-primary/10 to-transparent px-4 py-6 text-center sm:px-6">
                 <h3 id="pay-heading" className="font-display text-xl font-bold text-awaaz-charcoal">
                   Scan to pay
                 </h3>
