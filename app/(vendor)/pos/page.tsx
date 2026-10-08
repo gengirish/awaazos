@@ -75,6 +75,7 @@ export default async function PosPage() {
         slug: vendorRecord.slug,
         upiId: vendorRecord.upiId,
         upiName: vendorRecord.upiName,
+        storefrontPublished: s?.publishStorefront ?? false,
       }}
       initialItems={initialItems}
       settings={settings}

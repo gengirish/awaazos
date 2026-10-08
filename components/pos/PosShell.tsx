@@ -23,6 +23,8 @@ export type PosShellProps = {
     slug: string;
     upiId: string | null;
     upiName: string | null;
+    /** `VendorSettings.publishStorefront` — the store link is shown only when true. */
+    storefrontPublished: boolean;
   };
   initialItems: MenuTile[];
   settings: PosSettings & { voiceLang: string };
@@ -146,6 +148,7 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise, r
         stallName={vendor.name}
         todaysRevenuePaise={todaysRevenuePaise}
         pendingPaise={outbox.pendingTodayPaise}
+        storePath={vendor.storefrontPublished ? `/s/${encodeURIComponent(vendor.slug)}` : null}
       />
       <PosSyncStatus
         online={online}
