@@ -169,7 +169,7 @@ export function MenuOrdersClient({
           aria-describedby={blockerCopy ? "menu-orders-blocker" : undefined}
           onClick={() => toggle(!enabled)}
           disabled={pending || !isOwner}
-          className="group inline-flex min-h-11 min-w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="group inline-flex min-h-11 min-w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           <span className="sr-only">{enabled ? "Turn off ordering from menu" : "Turn on ordering from menu"}</span>
           <span
@@ -181,7 +181,7 @@ export function MenuOrdersClient({
           >
             <span
               className={cn(
-                "inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform motion-reduce:transition-none",
+                "inline-block h-5 w-5 transform rounded-full bg-background shadow-sm transition-transform motion-reduce:transition-none",
                 enabled ? "translate-x-6" : "translate-x-1",
               )}
             />
@@ -212,14 +212,14 @@ export function MenuOrdersClient({
             href={path}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           >
             <ExternalLink className="h-4 w-4" aria-hidden="true" />
             Open my store
           </a>
           <Link
             href="/orders"
-            className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex min-h-11 items-center rounded-md border border-border bg-background px-3 text-sm font-medium hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           >
             See online orders
           </Link>
@@ -237,7 +237,7 @@ export function MenuOrdersClient({
               aria-checked={mode === m.id}
               onClick={() => setMode(m.id)}
               className={cn(
-                "min-h-11 rounded-full border px-4 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
+                "min-h-11 rounded-full border px-4 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
                 mode === m.id
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-input bg-background hover:bg-accent",
@@ -267,7 +267,7 @@ export function MenuOrdersClient({
             placeholder="0"
             aria-invalid={feeError ? true : undefined}
             aria-describedby="menu-delivery-fee-hint"
-            className="flex min-h-11 w-full max-w-xs rounded-md border border-input bg-background px-3 font-mono text-base tabular-nums ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="flex min-h-11 w-full max-w-xs rounded-md border border-input bg-background px-3 font-mono text-base tabular-nums ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           />
           <p
             id="menu-delivery-fee-hint"
@@ -291,7 +291,7 @@ export function MenuOrdersClient({
             disabled={!isOwner}
             onChange={(e) => setNote(e.target.value)}
             aria-describedby="menu-pickup-note-hint"
-            className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           />
           {note.trim() === "" ? (
             /* Without this, a pickup buyer has no idea where or when to come. */
@@ -315,7 +315,7 @@ export function MenuOrdersClient({
           type="button"
           onClick={saveDetails}
           disabled={!dirty || pending}
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs ring-offset-background transition-opacity hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {pending && dirty ? "Saving…" : dirty ? "Save details" : "Saved"}
         </button>

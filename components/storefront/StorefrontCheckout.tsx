@@ -190,7 +190,7 @@ export function QtyStepper({
         type="button"
         onClick={() => onChange(1)}
         disabled={max < 1}
-        className="inline-flex min-h-11 min-w-[72px] items-center justify-center gap-1 rounded-xl border border-primary/40 bg-primary/5 px-4 text-sm font-bold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50"
+        className="inline-flex min-h-11 min-w-[72px] items-center justify-center gap-1 rounded-xl border border-primary/40 bg-primary/5 px-4 text-sm font-bold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50"
         aria-label={`Add ${itemName}`}
       >
         <Plus className="h-4 w-4" aria-hidden="true" />
@@ -203,7 +203,7 @@ export function QtyStepper({
       <button
         type="button"
         onClick={() => onChange(qty - 1)}
-        className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-background text-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-background text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         aria-label={`Remove one ${itemName}`}
       >
         <Minus className="h-4 w-4" aria-hidden="true" />
@@ -215,7 +215,7 @@ export function QtyStepper({
         type="button"
         onClick={() => onChange(Math.min(max, qty + 1))}
         disabled={qty >= max}
-        className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-40"
+        className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-40"
         aria-label={qty >= max ? `${itemName}: maximum reached` : `Add one more ${itemName}`}
       >
         <Plus className="h-4 w-4" aria-hidden="true" />
@@ -248,7 +248,7 @@ export function CartBar({
   const summary = `${itemCount} ${itemCount === 1 ? "item" : "items"}`;
   return (
     // Sits above the cookie banner while it shows (CookieConsentBanner publishes its height).
-    <div className={cn("sticky bottom-[var(--cookie-banner-h,0px)] z-10", itemCount > 0 && "pb-3 pt-3")}>
+    <div className={cn("sticky bottom-(--cookie-banner-h,0px) z-10", itemCount > 0 && "pb-3 pt-3")}>
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {itemCount > 0 ? `Cart: ${summary}, ${formatINR(subtotalPaise)}` : "Cart is empty"}
       </p>
@@ -265,7 +265,7 @@ export function CartBar({
             type="button"
             onClick={onCheckout}
             disabled={!canPay}
-            className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-awaaz-charcoal disabled:opacity-50"
+            className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-awaaz-charcoal disabled:opacity-50"
           >
             Checkout
           </button>
@@ -639,7 +639,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
               required
               aria-invalid={fieldErrors.name ? true : undefined}
               aria-describedby={describedBy("name")}
-              className="h-11 scroll-my-24 aria-[invalid=true]:border-destructive"
+              className="h-11 scroll-my-24 aria-invalid:border-destructive"
             />
             <FieldError id={ids.error("name")} message={fieldErrors.name} />
           </div>
@@ -668,7 +668,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                 required
                 aria-invalid={fieldErrors.phone ? true : undefined}
                 aria-describedby={describedBy("phone", ids.phoneHint)}
-                className="h-11 scroll-my-24 aria-[invalid=true]:border-destructive"
+                className="h-11 scroll-my-24 aria-invalid:border-destructive"
               />
             </div>
             <FieldError id={ids.error("phone")} message={fieldErrors.phone} />
@@ -685,7 +685,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                   <label
                     key={t}
                     className={cn(
-                      "flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary",
+                      "flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold has-focus-visible:ring-2 has-focus-visible:ring-primary",
                       fulfilment === t ? "border-primary bg-primary/10 text-primary" : "border-border",
                     )}
                   >
@@ -732,7 +732,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                 placeholder="Flat, building, street, landmark"
                 aria-invalid={fieldErrors.address ? true : undefined}
                 aria-describedby={describedBy("address")}
-                className="flex w-full scroll-my-24 rounded-md border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-[invalid=true]:border-destructive md:text-sm"
+                className="flex w-full scroll-my-24 rounded-md border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
               />
               <FieldError id={ids.error("address")} message={fieldErrors.address} />
             </div>
@@ -862,7 +862,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
             type="submit"
             disabled={submitting || lines.length === 0}
             aria-busy={submitting}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
+            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
           >
             {submitting ? (
               <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
@@ -898,7 +898,7 @@ function PaymentOption(props: {
   return (
     <label
       className={cn(
-        "flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-primary",
+        "flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 has-focus-visible:ring-2 has-focus-visible:ring-primary",
         props.checked ? "border-primary bg-primary/10" : props.invalid ? "border-destructive" : "border-border",
       )}
     >

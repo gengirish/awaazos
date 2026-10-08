@@ -49,7 +49,7 @@ export function Features() {
           {features.map((f) => {
             const Icon = f.icon;
             return (
-              <Card key={f.title} className="border-border/80 bg-background shadow-sm">
+              <Card key={f.title} className="border-border/80 bg-background shadow-xs">
                 <CardHeader className="pb-2">
                   <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-lg bg-awaaz-orange/10 text-awaaz-orange">
                     <Icon className="h-6 w-6" aria-hidden="true" />

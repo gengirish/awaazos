@@ -182,7 +182,7 @@ export function PushAlertsButton({ variant }: { variant: Variant }) {
         {tooMany && isBoard && (
           <Link
             href="/settings/notifications"
-            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex min-h-11 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Settings className="h-4 w-4" aria-hidden />
             Manage devices
@@ -206,7 +206,7 @@ export function PushAlertsButton({ variant }: { variant: Variant }) {
         <button
           type="button"
           onClick={dismiss}
-          className="-m-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="-m-2 inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
           aria-label="Dismiss phone alerts tip"
         >
           <X className="h-4 w-4" aria-hidden />

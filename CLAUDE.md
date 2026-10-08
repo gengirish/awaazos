@@ -11,7 +11,7 @@ AwaazOS is a multi-tenant, voice-first POS for Indian micro-merchants: vendor sp
 npm run dev            # Next.js on :3000
 npm run worker         # BullMQ workers (separate terminal; needs REDIS_URL)
 npm run typecheck      # tsc --noEmit
-npm run lint           # next lint
+npm run lint           # eslint . (ESLint 9 flat config, eslint.config.mjs)
 npm test               # vitest run
 npm run build          # next build
 npm run e2e            # playwright (auto-starts dev server unless BASE_URL is set)

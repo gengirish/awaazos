@@ -13,7 +13,7 @@ export function SettingsPageHeader({ title, description }: { title: string; desc
     <header className="mb-4 md:mb-6">
       <Link
         href="/settings"
-        className="-ml-2 mb-1 inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:hidden"
+        className="-ml-2 mb-1 inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring md:hidden"
       >
         <ChevronLeft className="h-4 w-4" aria-hidden="true" />
         Settings
@@ -40,7 +40,7 @@ export function SettingsCard({
   return (
     <section
       aria-labelledby={headingId}
-      className={cn("rounded-lg border bg-card p-4 text-card-foreground shadow-sm sm:p-6", className)}
+      className={cn("rounded-lg border bg-card p-4 text-card-foreground shadow-xs sm:p-6", className)}
     >
       <h2 id={headingId} className="font-display text-lg font-semibold leading-tight">
         {title}

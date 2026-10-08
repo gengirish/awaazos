@@ -25,7 +25,7 @@ type Row = {
 };
 
 const linkBtn =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 export default async function DropsPage() {
   let vendorId: string;
@@ -62,7 +62,7 @@ export default async function DropsPage() {
     <div className="min-h-screen bg-background p-4 pb-10 md:p-6">
       <a
         href="#main-drops"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-[100] focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground"
+        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-100 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground"
       >
         Skip to drops
       </a>
@@ -77,7 +77,7 @@ export default async function DropsPage() {
           </Link>
           <Link
             href="/drops/new"
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:flex-none"
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:flex-none"
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
             New drop
@@ -111,10 +111,10 @@ function DropSection({ title, rows }: { title: string; rows: Row[] }) {
       </h2>
       <ul className="space-y-3">
         {rows.map((d) => (
-          <li key={d.id} className="rounded-xl border border-border bg-card p-4 shadow-sm">
+          <li key={d.id} className="rounded-xl border border-border bg-card p-4 shadow-xs">
             <Link
               href={`/drops/${d.id}`}
-              className="-m-1 flex items-start justify-between gap-3 rounded-md p-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="-m-1 flex items-start justify-between gap-3 rounded-md p-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div className="min-w-0 space-y-1">
                 <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">

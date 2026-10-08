@@ -174,7 +174,7 @@ export function DropOrder(props: DropOrderProps) {
 
   return (
     <div>
-      <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
+      <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs">
         {items.map((item) => {
           const remaining = remainingFor(item);
           const max = maxOrderableQty(remaining, item.perOrderLimit);
@@ -235,7 +235,7 @@ export function DropOrder(props: DropOrderProps) {
               ) : soldOut && item.menuAnchor ? (
                 <a
                   href={`#${item.menuAnchor}`}
-                  className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-2 text-xs font-bold text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-2 text-xs font-bold text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   aria-label={`${item.name} is on the everyday menu`}
                 >
                   On menu

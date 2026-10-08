@@ -125,7 +125,7 @@ export function CartHubProvider({ children }: { children: React.ReactNode }) {
         <div
           ref={barRef}
           // Above the cookie banner while it shows (CookieConsentBanner publishes its height).
-          className="fixed inset-x-0 bottom-[var(--cookie-banner-h,0px)] z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-2 sm:px-6"
+          className="fixed inset-x-0 bottom-(--cookie-banner-h,0px) z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-2 sm:px-6"
         >
           <div className="mx-auto max-w-2xl rounded-2xl bg-awaaz-charcoal px-4 py-3 text-white shadow-lg animate-in fade-in slide-in-from-bottom-2 motion-reduce:animate-none">
             {active.length > 1 ? (
@@ -148,7 +148,7 @@ export function CartHubProvider({ children }: { children: React.ReactNode }) {
                     onClick={e.onCheckout}
                     disabled={!e.canPay}
                     aria-label={active.length > 1 ? `Checkout ${e.label}` : "Checkout"}
-                    className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-awaaz-charcoal disabled:opacity-50"
+                    className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-awaaz-charcoal disabled:opacity-50"
                   >
                     Checkout
                   </button>

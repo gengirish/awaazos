@@ -116,7 +116,7 @@ export function OrderCard({ order, vendorName, frozen, isNew, pendingAction, onA
     <article
       aria-labelledby={titleId}
       className={cn(
-        "rounded-lg border bg-card p-4 text-card-foreground shadow-sm",
+        "rounded-lg border bg-card p-4 text-card-foreground shadow-xs",
         isNew && "ring-2 ring-primary",
         (order.displayState === "CANCELLED" || order.displayState === "EXPIRED") && "opacity-80",
       )}
@@ -205,7 +205,7 @@ export function OrderCard({ order, vendorName, frozen, isNew, pendingAction, onA
         <div className="mt-3 flex gap-2">
           <a
             href={`tel:${order.customerPhone}`}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={`Call ${order.customerName ?? "customer"}`}
           >
             <Phone className="h-4 w-4" aria-hidden />
@@ -218,7 +218,7 @@ export function OrderCard({ order, vendorName, frozen, isNew, pendingAction, onA
             )}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={`WhatsApp ${order.customerName ?? "customer"}`}
           >
             <MessageCircle className="h-4 w-4" aria-hidden />

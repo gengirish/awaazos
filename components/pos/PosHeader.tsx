@@ -25,7 +25,7 @@ export function PosHeader({ stallName, todaysRevenuePaise, pendingPaise = 0 }: P
       </div>
       <Link
         href="/settings"
-        className="flex h-11 min-w-[44px] items-center justify-center rounded-md border border-input bg-background text-foreground ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        className="flex h-11 min-w-[44px] items-center justify-center rounded-md border border-input bg-background text-foreground ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         aria-label="Settings"
       >
         <Settings className="h-5 w-5" aria-hidden />

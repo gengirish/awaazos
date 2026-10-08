@@ -19,7 +19,7 @@ export function VoiceAdoptionCard({ voiceCount, totalCount, percent }: VoiceAdop
 
   return (
     <section
-      className="rounded-xl border border-border bg-card p-4 shadow-sm"
+      className="rounded-xl border border-border bg-card p-4 shadow-xs"
       aria-labelledby="voice-adoption-heading"
     >
       <h2 id="voice-adoption-heading" className="font-display text-lg font-semibold text-foreground">

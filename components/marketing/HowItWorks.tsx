@@ -30,7 +30,7 @@ export function HowItWorks() {
         </p>
         <div className="mt-10 grid gap-6 md:grid-cols-3">
           {steps.map((step) => (
-            <Card key={step.title} className="border-border/80 bg-card shadow-sm">
+            <Card key={step.title} className="border-border/80 bg-card shadow-xs">
               <CardHeader className="pb-2">
                 <div className="mb-2 text-3xl" aria-hidden="true">
                   {step.emoji}

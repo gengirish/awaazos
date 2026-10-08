@@ -104,7 +104,7 @@ const ACTION_DONE: Record<OrderAction, string> = {
 };
 
 const LINK_BTN =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
 
 function beep(ctx: AudioContext | null) {
   if (!ctx) return;
@@ -523,7 +523,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
               aria-controls="orders-list"
               onClick={() => setFilter(f.id)}
               className={cn(
-                "min-h-11 shrink-0 whitespace-nowrap rounded-full border px-4 text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                "min-h-11 shrink-0 whitespace-nowrap rounded-full border px-4 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
                 filter === f.id
                   ? "border-primary bg-primary text-primary-foreground"
                   : "border-input bg-background hover:bg-accent",

@@ -57,7 +57,7 @@ export default async function OrdersSettingsPage() {
             </p>
             <Link
               href="/drops"
-              className="mt-1 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="mt-1 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
               Go to Drops
               <ChevronRight className="h-4 w-4" aria-hidden="true" />

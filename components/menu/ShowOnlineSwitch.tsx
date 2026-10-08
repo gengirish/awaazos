@@ -28,7 +28,7 @@ export function ShowOnlineSwitch({ checked, onCheckedChange, label, id, disabled
       aria-describedby={describedBy}
       disabled={disabled}
       onClick={() => onCheckedChange(!checked)}
-      className="group inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+      className="group inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
     >
       <span
         aria-hidden="true"
@@ -39,7 +39,7 @@ export function ShowOnlineSwitch({ checked, onCheckedChange, label, id, disabled
       >
         <span
           className={cn(
-            "inline-block h-4 w-4 transform rounded-full bg-background shadow transition-transform motion-reduce:transition-none",
+            "inline-block h-4 w-4 transform rounded-full bg-background shadow-sm transition-transform motion-reduce:transition-none",
             checked ? "translate-x-5" : "translate-x-1",
           )}
         />

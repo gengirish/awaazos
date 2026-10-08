@@ -151,7 +151,7 @@ export function MenuOrder(props: MenuOrderProps) {
 
   return (
     <div id="menu-order" className="scroll-mt-16">
-      <div className="mb-6 rounded-2xl border border-primary/25 bg-gradient-to-b from-primary/[0.08] to-background px-4 py-3 text-sm">
+      <div className="mb-6 rounded-2xl border border-primary/25 bg-linear-to-b from-primary/8 to-background px-4 py-3 text-sm">
         <p className="flex items-center gap-2 font-bold text-awaaz-charcoal">
           <ShoppingBag className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           Order online · {fulfilmentOptionsLabel(fulfilmentTypes)}
@@ -185,12 +185,12 @@ export function MenuOrder(props: MenuOrderProps) {
               <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
               <span className="text-xs font-semibold text-muted-foreground">{items.length}</span>
             </div>
-            <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
+            <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs">
               {items.map((item) => (
                 <li
                   key={item.id}
                   id={menuItemAnchor(item.id)}
-                  className="flex scroll-mt-20 items-center gap-3 px-3 py-3 target:bg-primary/[0.08] sm:gap-4 sm:px-4"
+                  className="flex scroll-mt-20 items-center gap-3 px-3 py-3 target:bg-primary/8 sm:gap-4 sm:px-4"
                 >
                   {item.imageUrl ? (
                     <Image

@@ -163,7 +163,7 @@ npm run worker  # or: npx tsx workers/index.ts
 
 ```bash
 npm run typecheck   # tsc --noEmit
-npm run lint        # next lint
+npm run lint        # eslint . (ESLint 9 flat config)
 npm test            # vitest run
 npm run build       # next build
 npm run e2e         # playwright (uses dev server) — chromium + mobile
