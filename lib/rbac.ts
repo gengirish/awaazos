@@ -4,6 +4,7 @@ import { cookies } from "next/headers";
 
 import { auth } from "@/lib/auth";
 import { PLAN_RANK } from "@/lib/constants";
+import { effectivePlan } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 
 const USER_ROLE_RANK: Record<UserRole, number> = {
@@ -96,7 +97,14 @@ export async function requirePlatformRole(role: UserRole): Promise<{ user: NonNu
 
 export type VendorRoleContext = {
   user: NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>>;
+  /**
+   * `vendor.plan` is the EFFECTIVE plan (FREE once `planExpiresAt` + grace has
+   * passed — see lib/plan.ts), so `PLAN_LIMITS[vendor.plan]` and `requirePlan`
+   * honour expiry. `vendor.planExpiresAt` is the raw stored value.
+   */
   vendor: Vendor;
+  /** `Vendor.plan` as stored in the DB, before expiry is applied (billing UI only). */
+  storedPlan: Plan;
   staff: NonNullable<Awaited<ReturnType<typeof prisma.staffMember.findFirst>>>;
   /** When non-null, API route should `Set-Cookie: awz_vendor=...` */
   setVendorCookie: string | null;
@@ -148,7 +156,8 @@ export async function requireVendorRole(
     throw new AuthError(403, "Vendor not found for this account.");
   }
 
-  const { vendor } = staff;
+  const storedPlan = staff.vendor.plan;
+  const vendor: Vendor = { ...staff.vendor, plan: effectivePlan(staff.vendor) };
   if (!staffRoleAtLeast(staff.role, minRole)) {
     throw new AuthError(403, `Requires staff role ${minRole} or higher.`);
   }
@@ -156,5 +165,8 @@ export async function requireVendorRole(
   const hadCookie = Boolean(cookieSlug);
   const setVendorCookie = usedDefaultFirst && !hadCookie ? vendor.slug : null;
 
-  return { user, vendor, staff, setVendorCookie };
+  // The row was loaded with `include: { vendor }`; swap in the effective-plan
+  // vendor so nothing reading `staff.vendor` at runtime sees the raw plan.
+  const staffRow = { ...staff, vendor };
+  return { user, vendor, storedPlan, staff: staffRow, setVendorCookie };
 }

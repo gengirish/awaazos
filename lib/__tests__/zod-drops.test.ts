@@ -80,6 +80,26 @@ describe("dropUpsertSchema", () => {
     expect(issuesFor({ ...valid, items: [{ menuItemId: "m1", priceInPaise: 0 }] }).length).toBeGreaterThan(0);
   });
 
+  it("rejects a per-order limit above the item's total quantity", () => {
+    const issues = issuesFor({
+      ...valid,
+      items: [{ menuItemId: "m1", priceInPaise: 12000, maxQty: 5, perOrderLimit: 6 }],
+    });
+    const issue = issues.find((i) => i.path.join(".") === "items.0.perOrderLimit");
+    expect(issue?.message).toMatch(/can't be more than how many you can make/);
+  });
+
+  it("accepts a per-order limit equal to the total, or with either side unlimited", () => {
+    for (const item of [
+      { maxQty: 6, perOrderLimit: 6 },
+      { maxQty: null, perOrderLimit: 6 },
+      { maxQty: 5, perOrderLimit: null },
+    ]) {
+      const r = dropUpsertSchema.safeParse({ ...valid, items: [{ menuItemId: "m1", priceInPaise: 12000, ...item }] });
+      expect(r.success).toBe(true);
+    }
+  });
+
   it("returns issues (does not throw) for malformed or impossible times", () => {
     expect(() => dropUpsertSchema.safeParse({ ...valid, fulfilmentStart: "25:00" })).not.toThrow();
     expect(issuesFor({ ...valid, fulfilmentStart: "25:00" }).some((i) => i.path[0] === "fulfilmentStart")).toBe(true);

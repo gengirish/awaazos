@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 
-import { PLAN_LIMITS } from "@/lib/constants";
 import { orderHoldsStock } from "@/lib/drops";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
@@ -9,7 +8,7 @@ import {
   fetchRazorpayOrder,
   findStorefrontOrderForPayment,
   getVendorRazorpayCreds,
-  hasStoredRazorpayCreds,
+  isOnlinePaymentEnabled,
   type RazorpayCreds,
 } from "@/lib/storefront-razorpay";
 
@@ -78,7 +77,8 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     }
     if (!orderHoldsStock(order, now)) return err("order_expired", 409);
 
-    if (!PLAN_LIMITS[order.vendor.plan].razorpayLinks || !hasStoredRazorpayCreds(order.vendor.settings)) {
+    // Same gate as the order page: effective plan (expiry, lib/plan.ts) + saved creds.
+    if (!isOnlinePaymentEnabled(order.vendor, order.vendor.settings, now)) {
       return err("online_payment_unavailable", 409);
     }
     const creds = await getVendorRazorpayCreds(order.vendorId);

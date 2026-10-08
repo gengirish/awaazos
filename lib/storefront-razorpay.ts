@@ -16,9 +16,8 @@
 
 import crypto from "node:crypto";
 
-import type { Plan } from "@prisma/client";
-
 import { PLAN_LIMITS } from "@/lib/constants";
+import { effectivePlan, type PlanFields } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { decryptSecret, isSecretBoxConfigured } from "@/lib/secret-box";
 import { withTimeout } from "@/lib/with-timeout";
@@ -72,9 +71,20 @@ export function hasStoredRazorpayCreds(s: CredFields | null | undefined): boolea
   return Boolean(s?.razorpayKeyId && s.razorpayKeySecretEnc && s.razorpayWebhookSecretEnc);
 }
 
-/** Plan flag (PRO/ENTERPRISE) + saved creds + the encryption key present on this deploy. */
-export function isOnlinePaymentEnabled(plan: Plan, s: CredFields | null | undefined): boolean {
-  return PLAN_LIMITS[plan].razorpayLinks && hasStoredRazorpayCreds(s) && isSecretBoxConfigured();
+/**
+ * Plan flag (PRO/ENTERPRISE, after expiry — lib/plan.ts) + saved creds + the
+ * encryption key present on this deploy.
+ */
+export function isOnlinePaymentEnabled(
+  vendor: PlanFields,
+  s: CredFields | null | undefined,
+  now: Date = new Date(),
+): boolean {
+  return (
+    PLAN_LIMITS[effectivePlan(vendor, now)].razorpayLinks &&
+    hasStoredRazorpayCreds(s) &&
+    isSecretBoxConfigured()
+  );
 }
 
 /**
@@ -285,6 +295,7 @@ export async function findStorefrontOrderForPayment(slug: string, token: string)
         select: {
           name: true,
           plan: true,
+          planExpiresAt: true,
           settings: {
             select: { razorpayKeyId: true, razorpayKeySecretEnc: true, razorpayWebhookSecretEnc: true },
           },

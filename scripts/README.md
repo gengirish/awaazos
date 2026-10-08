@@ -9,6 +9,7 @@ Operational utilities. Not deployed; run locally only.
 | `groq-stt-smoke.mjs` | `npm run smoke:groq` | Groq Whisper transcription of a local clip |
 | `whisper-stt-smoke.mjs` | `npm run smoke:whisper` | Self-hosted Whisper (`services/whisper-stt`) on a local clip |
 | `generate-pwa-icons.mjs` | none | Regenerates the PWA / push icons in `public/` |
+| `sync-agent-rules.mjs` | `npm run sync:agent-rules` | Regenerates `.claude/rules` + `.claude/skills` from `.cursor/` |
 
 The smoke scripts are one-shot round trips against a live provider, for checking credentials and
 connectivity. They read keys from `.env.local` (an already-set environment variable wins) and never
@@ -78,3 +79,16 @@ node scripts/generate-pwa-icons.mjs
 
 Renders `icon-192.png`, `icon-512.png`, `apple-touch-icon.png` and `badge-72.png` into `public/`
 from an inline SVG, using the Playwright Chromium already installed for e2e.
+
+## `sync-agent-rules.mjs`
+
+```bash
+npm run sync:agent-rules                     # write .claude/
+node scripts/sync-agent-rules.mjs --check    # exit 1 if .claude/ is out of date
+```
+
+`.cursor/rules/*.mdc` and `.cursor/skills/` are the source of truth for agent conventions. This
+converts each rule to Claude Code's format (`.md`, `globs` → `paths`, `alwaysApply: true` → no
+`paths`), copies skills verbatim, and deletes anything in `.claude/rules` or `.claude/skills` that
+has no source. A rule with neither `alwaysApply` nor `globs` is an error, since Claude Code has no
+manual-only equivalent.

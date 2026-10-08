@@ -55,7 +55,7 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
 export async function GET(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
-    requirePlan(ctx.vendor, Plan.PRO);
+    requirePlan(ctx.vendor, Plan.STARTER);
 
     const sp = req.nextUrl.searchParams;
     const fromStr = sp.get("from");

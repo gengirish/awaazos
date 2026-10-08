@@ -70,7 +70,7 @@ In the route: `if (!verifyRazorpaySignature(rawBody, sig)) return NextResponse.j
 ## DPDP Act readiness
 
 - Data export (User + all their Vendors' Transactions): **not implemented.**
-  `/api/me` has no `GET`; the only bulk export is the PRO-gated CSV at
+  `/api/me` has no `GET`; the only bulk export is the STARTER-gated CSV at
   `/api/transactions/export`.
 - Deletion: `DELETE /api/me` deletes the User (cascading their `StaffMember`
   rows). Any vendor where they were the only active OWNER is deleted too, with

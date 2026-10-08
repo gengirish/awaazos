@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -71,7 +71,15 @@ type Props = {
   initialQuery: Record<string, string>;
   vendorName: string;
   canExportCsv: boolean;
+  /** Current IST month (1st → today) as YYYY-MM-DD, used when From/To are both empty. */
+  defaultExportRange: { from: string; to: string };
 };
+
+/** "2026-10-08" → "08/10/2026" (the value is already an IST calendar date). */
+function ymdToDisplay(ymd: string): string {
+  const [y, m, d] = ymd.split("-");
+  return `${d}/${m}/${y}`;
+}
 
 export function TransactionsTable({
   initialItems,
@@ -82,6 +90,7 @@ export function TransactionsTable({
   initialQuery,
   vendorName,
   canExportCsv,
+  defaultExportRange,
 }: Props) {
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -93,11 +102,6 @@ export function TransactionsTable({
   const [method, setMethod] = useState(initialQuery.paymentMethod ?? "all");
 
   const totalPages = Math.max(1, Math.ceil(initialTotal / initialLimit));
-
-  const exportTitle = useMemo(() => {
-    if (canExportCsv) return undefined;
-    return "CSV export is available on a higher plan";
-  }, [canExportCsv]);
 
   function buildListUrl(page: number) {
     const sp = new URLSearchParams();
@@ -129,10 +133,13 @@ export function TransactionsTable({
     setDrawerOpen(true);
   }
 
-  const exportHref =
-    from && to
-      ? `/api/transactions/export?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`
-      : undefined;
+  // Both dates empty → export the current IST month so the button works on first load.
+  // Exactly one date set → ask for the other rather than guessing.
+  const usingDefaultRange = !from && !to;
+  const exportRange = usingDefaultRange ? defaultExportRange : from && to ? { from, to } : null;
+  const exportHref = exportRange
+    ? `/api/transactions/export?from=${encodeURIComponent(exportRange.from)}&to=${encodeURIComponent(exportRange.to)}`
+    : undefined;
 
   return (
     <div className="space-y-4">
@@ -177,21 +184,35 @@ export function TransactionsTable({
             </Select>
           </div>
         </div>
-        <div className="flex gap-2">
-          <Button type="button" variant="secondary" onClick={() => applyFilters()}>
-            Apply filters
-          </Button>
-          {canExportCsv && exportHref ? (
-            <Button type="button" variant="outline" asChild>
-              <a href={exportHref} className="no-underline">
-                Export CSV
-              </a>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button type="button" variant="secondary" className="min-h-11" onClick={() => applyFilters()}>
+              Apply filters
             </Button>
-          ) : (
-            <Button type="button" variant="outline" disabled title={exportTitle}>
-              Export CSV
-            </Button>
-          )}
+            {!canExportCsv ? (
+              <Link
+                href="/settings/billing"
+                className="inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-primary underline underline-offset-4 hover:no-underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                Export CSV · Upgrade to Starter
+              </Link>
+            ) : exportHref ? (
+              <Button type="button" variant="outline" className="min-h-11" asChild>
+                <a href={exportHref} className="no-underline">
+                  Export CSV
+                </a>
+              </Button>
+            ) : null}
+          </div>
+          {canExportCsv ? (
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              {exportRange
+                ? usingDefaultRange
+                  ? `Exports this month: ${ymdToDisplay(exportRange.from)} – ${ymdToDisplay(exportRange.to)}`
+                  : `Exports ${ymdToDisplay(exportRange.from)} – ${ymdToDisplay(exportRange.to)}`
+                : "Pick a date range to export"}
+            </p>
+          ) : null}
         </div>
       </div>
 

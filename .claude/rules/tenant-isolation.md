@@ -1,0 +1,76 @@
+---
+description: Strict per-vendor data isolation — every read/write must scope to vendor.id
+---
+
+<!-- Generated from .cursor/rules/tenant-isolation.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
+
+# Tenant Isolation — AwaazOS
+
+`Vendor` (Prisma model) is the tenant. `Vendor.id` IS the tenant id.
+A `User` (Auth.js) belongs to one or more vendors via `StaffMember`.
+
+## Mandatory pattern in every protected handler
+
+```ts
+import type { NextRequest } from "next/server";
+import { requireVendorRole } from "@/lib/rbac";
+
+export async function GET(req: NextRequest) {
+  const { user, vendor, staff, setVendorCookie } =
+    await requireVendorRole("CASHIER", undefined, req);
+  // …all queries below MUST include vendorId: vendor.id
+  // …and set the `awz_vendor` cookie on the response when setVendorCookie is non-null
+}
+```
+
+## Reads
+
+```ts
+prisma.menuItem.findMany({ where: { vendorId: vendor.id, isAvailable: true } })
+```
+
+## Writes — ALWAYS use compound `where` to defeat ID forgery
+
+```ts
+// GOOD — even if attacker knows the id, the row is rejected unless it belongs to vendor
+prisma.menuItem.update({
+  where: { id: menuItemId, vendorId: vendor.id },
+  data:  { ... },
+});
+
+// BAD — vulnerable to IDOR
+prisma.menuItem.update({ where: { id: menuItemId }, data: { ... } });
+```
+
+## Multi-table writes
+
+Use `prisma.$transaction(async tx => { ... })` for any operation touching ≥2
+tables (e.g. Transaction + OrderItem + DailySummary + BillSequence + Receipt).
+
+## Active vendor selection (multi-vendor users)
+
+Resolved by `requireVendorRole(minRole, vendorIdOrSlug?, req?)` among the
+user's active memberships, in this order:
+1. the explicit `vendorIdOrSlug` argument
+2. `?vendor=<slug or id>` query param (read only when `req` is passed)
+3. `awz_vendor` cookie
+4. Oldest active `StaffMember` by `createdAt`. When this default is used and no
+   cookie existed, it returns `setVendorCookie` and the route sets the cookie.
+
+## Cross-tenant reference rejection
+
+A staff member of Vendor A must never be able to read or write Vendor B's data
+even if they construct a request with B's IDs. Prefer compound `where` over
+post-fetch checks.
+
+## Tests
+
+Cross-tenant tests live in `e2e/tenant-isolation.spec.ts` (Playwright, real
+Postgres), not Vitest — Vitest has no session harness. For every new
+list/detail/mutation route, add a case there that:
+1. Registers two vendors via `createVendorSession()` (`e2e/helpers/vendor.ts`),
+   each in its own browser context.
+2. Creates a row as vendor A.
+3. As vendor B, attempts to read/update/delete A's row (or lists and checks A's
+   row is absent).
+4. Asserts 404 (not 403 — don't leak existence).

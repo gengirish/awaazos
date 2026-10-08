@@ -2,7 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   addDaysYmd,
+  cutoffLeadDays,
+  daysBetweenYmd,
   dayOffset,
+  defaultCutoffFor,
   dropToFormInput,
   duplicateDropFields,
   groupDropsByDay,
@@ -10,6 +13,7 @@ import {
   istTomorrowYmd,
   planDropItemRemoval,
   shiftDropSchedule,
+  shiftOrderWindowDates,
 } from "@/lib/drops-builder";
 import { istToUtc, ymdToDbDate } from "@/lib/drops-time";
 import { dropInputToData, dropUpsertSchema } from "@/lib/zod-drops";
@@ -185,5 +189,103 @@ describe("groupDropsByDay", () => {
     const { upcoming, past } = groupDropsByDay(drops, "2026-10-05");
     expect(upcoming.map((d) => d.date)).toEqual(["2026-10-05", "2026-10-07"]);
     expect(past.map((d) => d.date)).toEqual(["2026-10-03", "2026-10-01"]);
+  });
+});
+
+describe("defaultCutoffFor", () => {
+  it("closes the evening before the cooking day at 21:00 IST", () => {
+    // Wed 7 Oct 2026, 12:00 IST; cooking Thu 8 Oct.
+    expect(defaultCutoffFor("2026-10-08", new Date("2026-10-07T06:30:00.000Z"))).toEqual({
+      closesAtDate: "2026-10-07",
+      closesAtTime: "21:00",
+    });
+    // Same moment, cooking Sat 10 Oct → Fri 9 Oct, not today.
+    expect(defaultCutoffFor("2026-10-10", new Date("2026-10-07T06:30:00.000Z"))).toEqual({
+      closesAtDate: "2026-10-09",
+      closesAtTime: "21:00",
+    });
+  });
+
+  it("falls back to the cooking-day morning when the evening before is nearly over", () => {
+    // Wed 7 Oct 20:00 IST = 14:30Z; cooking tomorrow.
+    expect(defaultCutoffFor("2026-10-08", new Date("2026-10-07T14:30:00.000Z"))).toEqual({
+      closesAtDate: "2026-10-08",
+      closesAtTime: "10:00",
+    });
+    // 19:59 IST still gets the evening cut-off.
+    expect(defaultCutoffFor("2026-10-08", new Date("2026-10-07T14:29:00.000Z")).closesAtTime).toBe("21:00");
+  });
+
+  it("falls back when the day before is already past (cooking today)", () => {
+    expect(defaultCutoffFor("2026-10-07", new Date("2026-10-07T03:30:00.000Z"))).toEqual({
+      closesAtDate: "2026-10-07",
+      closesAtTime: "10:00",
+    });
+  });
+
+  it("is accepted by dropUpsertSchema with the default 17:00 start", () => {
+    const cutoff = defaultCutoffFor("2026-10-10", new Date("2026-10-07T06:30:00.000Z"));
+    const r = dropUpsertSchema.safeParse({
+      title: "Saturday bakes",
+      date: "2026-10-10",
+      fulfilmentMode: "DELIVERY",
+      fulfilmentStart: "17:00",
+      fulfilmentEnd: "20:00",
+      ...cutoff,
+      items: [{ menuItemId: "m1", priceInPaise: 12000 }],
+    });
+    expect(r.success).toBe(true);
+  });
+});
+
+describe("shiftOrderWindowDates", () => {
+  const untouched = { closesAtDate: false, opensAtDate: false };
+
+  it("Thursday → Saturday moves a Wednesday 21:00 cut-off to Friday", () => {
+    const window = { closesAtDate: "2026-10-07", closesAtTime: "21:00", opensAtDate: "2026-10-06" };
+    const out = shiftOrderWindowDates(window, "2026-10-08", "2026-10-10", untouched);
+    expect(out).toEqual({ closesAtDate: "2026-10-09", closesAtTime: "21:00", opensAtDate: "2026-10-08" });
+    expect(cutoffLeadDays("2026-10-10", out.closesAtDate)).toBe(1);
+  });
+
+  it("shifts backwards too, across a month end", () => {
+    const out = shiftOrderWindowDates(
+      { closesAtDate: "2026-11-01", opensAtDate: "2026-10-31" },
+      "2026-11-02",
+      "2026-10-30",
+      untouched,
+    );
+    expect(out).toEqual({ closesAtDate: "2026-10-29", opensAtDate: "2026-10-28" });
+  });
+
+  it("leaves a date the vendor edited by hand alone", () => {
+    const out = shiftOrderWindowDates(
+      { closesAtDate: "2026-10-07", opensAtDate: "2026-10-06" },
+      "2026-10-08",
+      "2026-10-10",
+      { closesAtDate: true, opensAtDate: false },
+    );
+    expect(out).toEqual({ closesAtDate: "2026-10-07", opensAtDate: "2026-10-08" });
+  });
+
+  it("does nothing when either cooking day is blank or invalid", () => {
+    const window = { closesAtDate: "2026-10-07", opensAtDate: "2026-10-06" };
+    expect(shiftOrderWindowDates(window, "2026-10-08", "", untouched)).toBe(window);
+    expect(shiftOrderWindowDates(window, "", "2026-10-10", untouched)).toBe(window);
+  });
+
+  it("keeps a blank order-window date blank", () => {
+    const out = shiftOrderWindowDates({ closesAtDate: "", opensAtDate: "2026-10-06" }, "2026-10-08", "2026-10-09", untouched);
+    expect(out).toEqual({ closesAtDate: "", opensAtDate: "2026-10-07" });
+  });
+});
+
+describe("cutoffLeadDays / daysBetweenYmd", () => {
+  it("counts whole days between cut-off and cooking day", () => {
+    expect(cutoffLeadDays("2026-10-10", "2026-10-09")).toBe(1);
+    expect(cutoffLeadDays("2026-10-10", "2026-10-07")).toBe(3);
+    expect(cutoffLeadDays("2026-10-10", "2026-10-10")).toBe(0);
+    expect(cutoffLeadDays("2026-10-10", "")).toBeNull();
+    expect(daysBetweenYmd("2026-10-10", "2026-10-08")).toBe(-2);
   });
 });

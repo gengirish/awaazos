@@ -309,6 +309,52 @@ describe.skipIf(!ENABLED)("drops — DB integration", () => {
     expect(await drops.countBillableTxnThisMonth(prisma, s.vendor.id)).toBe(2);
   });
 
+  it("(d2) billableTxnWhere and billableTxnSql select the same rows", async () => {
+    const s = await seed({ maxQty: null });
+    const mk = (label: string, data: Partial<Prisma.TransactionUncheckedCreateInput>) =>
+      prisma.transaction.create({
+        data: {
+          vendorId: s.vendor.id,
+          billNumber: `TEST-${label}-${randomBytes(3).toString("hex")}`,
+          subtotalPaise: 100,
+          totalPaise: 100,
+          ...data,
+        },
+      });
+    const sf = { source: "STOREFRONT", dropId: s.drop.id, fulfilmentType: "PICKUP" } as const;
+    await Promise.all([
+      mk("voice-paid", { source: "VOICE", paymentStatus: "PAID" }),
+      mk("manual-pending", { source: "MANUAL", paymentStatus: "PENDING" }),
+      mk("api-failed", { source: "API", paymentStatus: "FAILED" }),
+      mk("sf-paid", { ...sf, paymentStatus: "PAID", paidAt: new Date(), fulfilmentStatus: "CONFIRMED" }),
+      mk("sf-pending", { ...sf, paymentStatus: "PENDING", fulfilmentStatus: "PLACED" }),
+      mk("sf-cod", { ...sf, paymentMethod: "CASH", paymentStatus: "PENDING", fulfilmentStatus: "PLACED" }),
+      mk("sf-refunded", { ...sf, paymentStatus: "REFUNDED", fulfilmentStatus: "CANCELLED" }),
+    ]);
+
+    const viaWhere = (
+      await prisma.transaction.findMany({
+        where: { vendorId: s.vendor.id, ...drops.billableTxnWhere() },
+        select: { billNumber: true },
+      })
+    )
+      .map((t) => t.billNumber.split("-")[1] + "-" + t.billNumber.split("-")[2])
+      .sort();
+    const { Prisma: P } = await import("@prisma/client");
+    const viaSql = (
+      await prisma.$queryRaw<{ billNumber: string }[]>(P.sql`
+        SELECT t."billNumber" FROM transactions t
+        WHERE t."vendorId" = ${s.vendor.id} AND ${drops.billableTxnSql}
+      `)
+    )
+      .map((t) => t.billNumber.split("-")[1] + "-" + t.billNumber.split("-")[2])
+      .sort();
+
+    expect(viaWhere).toEqual(["api-failed", "manual-pending", "sf-paid", "voice-paid"]);
+    expect(viaSql).toEqual(viaWhere);
+    expect(await drops.countBillableTxnThisMonth(prisma, s.vendor.id)).toBe(4);
+  });
+
   it("(e) an OPEN drop past closesAt rejects with drop_not_open", async () => {
     const s = await seed();
     const after = new Date(s.drop.closesAt.getTime() + MIN);

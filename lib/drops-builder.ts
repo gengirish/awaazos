@@ -40,6 +40,76 @@ export function dayOffset(fromDbDate: Date, toYmd: string): number {
   return diff / DAY_MS;
 }
 
+/** Whole calendar days from `fromYmd` to `toYmd` (negative when `toYmd` is earlier). */
+export function daysBetweenYmd(fromYmd: string, toYmd: string): number {
+  return (ymdToUtcMidnightMs(toYmd) - ymdToUtcMidnightMs(fromYmd)) / DAY_MS;
+}
+
+/** True for a real calendar day in "YYYY-MM-DD" form. */
+export function isValidYmd(ymd: string): boolean {
+  try {
+    ymdToUtcMidnightMs(ymd);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** Usual cut-off: the evening before the cooking day. */
+export const DEFAULT_CUTOFF_TIME = "21:00";
+/** Fallback when the evening before is (nearly) gone: the cooking-day morning. */
+export const LATE_CUTOFF_TIME = "10:00";
+/** From this IST time on the evening before, a 21:00 cut-off leaves buyers too little time. */
+const LATE_EVENING_HM = "20:00";
+
+/**
+ * Default order cut-off for a drop cooked on `cookingYmd`: the day before at
+ * 21:00 IST. If that evening has already passed — or it is today and already
+ * past 20:00 IST — fall back to the cooking day itself at 10:00.
+ */
+export function defaultCutoffFor(
+  cookingYmd: string,
+  now: Date = new Date(),
+): { closesAtDate: string; closesAtTime: string } {
+  const dayBefore = addDaysYmd(cookingYmd, -1);
+  const { ymd: today, hm: nowHm } = utcToIstParts(now);
+  const tooLate = today > dayBefore || (today === dayBefore && nowHm >= LATE_EVENING_HM);
+  return tooLate
+    ? { closesAtDate: cookingYmd, closesAtTime: LATE_CUTOFF_TIME }
+    : { closesAtDate: dayBefore, closesAtTime: DEFAULT_CUTOFF_TIME };
+}
+
+/**
+ * The cooking day moved from `prevDate` to `nextDate`: move the order window's
+ * dates by the same number of days, so a drop rescheduled from Thursday to
+ * Saturday doesn't keep a Wednesday cut-off. A date the vendor edited by hand
+ * (`touched`) is left alone, as is everything when either cooking day isn't a
+ * valid "YYYY-MM-DD" (e.g. the date input was cleared mid-edit).
+ */
+export function shiftOrderWindowDates<T extends { closesAtDate: string; opensAtDate: string }>(
+  window: T,
+  prevDate: string,
+  nextDate: string,
+  touched: { closesAtDate: boolean; opensAtDate: boolean },
+): T {
+  if (!isValidYmd(prevDate) || !isValidYmd(nextDate)) return window;
+  const delta = daysBetweenYmd(prevDate, nextDate);
+  if (delta === 0) return window;
+  const move = (ymd: string, isTouched: boolean) =>
+    isTouched || !isValidYmd(ymd) ? ymd : addDaysYmd(ymd, delta);
+  return {
+    ...window,
+    closesAtDate: move(window.closesAtDate, touched.closesAtDate),
+    opensAtDate: move(window.opensAtDate, touched.opensAtDate),
+  };
+}
+
+/** Days between the order cut-off and the cooking day (1 = the day before), or null if either is invalid. */
+export function cutoffLeadDays(cookingYmd: string, closesAtYmd: string): number | null {
+  if (!isValidYmd(cookingYmd) || !isValidYmd(closesAtYmd)) return null;
+  return daysBetweenYmd(closesAtYmd, cookingYmd);
+}
+
 export type DropSchedule = {
   date: Date;
   fulfilmentStartsAt: Date;
@@ -175,6 +245,9 @@ export const DROP_STATUS_LABEL: Record<EffectiveDropStatus, string> = {
   FROZEN: "Orders frozen",
   FULFILLED: "Fulfilled",
 };
+
+/** Shared by `dropUpsertSchema` and the form's client-side check. */
+export const PER_ORDER_OVER_MAX = "Max per order can't be more than how many you can make";
 
 /** Plain-language messages for the 409 codes the drops API returns. */
 export const DROP_CONFLICT_MESSAGE: Record<string, string> = {

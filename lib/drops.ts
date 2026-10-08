@@ -33,14 +33,15 @@ import type {
   PaymentMethod,
   PaymentStatus,
   Plan,
-  Prisma,
   PrismaClient,
 } from "@prisma/client";
+import { Prisma } from "@prisma/client";
 
 import { formatBillDateYYYYMMDD, getIstMonthStart, getIstTodayStart } from "@/lib/billing-period";
 import { PLAN_LIMITS } from "@/lib/constants";
 import { sumPaise } from "@/lib/currency";
 import { bumpDropOrderSignal } from "@/lib/drops-signal";
+import { effectivePlan } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
 
@@ -200,9 +201,39 @@ export function generateOrderToken(): string {
 // ─── Plan usage ─────────────────────────────────────────────────────
 
 /**
- * Transactions that count toward the monthly plan cap: every counter sale, plus
- * storefront orders only once they are paid. An abandoned pre-order must not
- * burn a FREE vendor's 50.
+ * Transactions that are real sales: every counter sale (any status — it was
+ * rung up), plus storefront orders only once they are paid. Unpaid, expired
+ * and cancelled pre-orders (cancel of a paid order sets REFUNDED) are excluded.
+ *
+ * This is the one definition of "a bill" for the plan cap, the billing usage
+ * line and analytics counts. Spread it into a `where` alongside `vendorId`;
+ * it carries an `OR`, so don't combine it with another top-level `OR`.
+ * `billableTxnSql` is its raw-SQL twin — keep the two in lockstep (tested).
+ */
+export function billableTxnWhere(): Prisma.TransactionWhereInput {
+  return { OR: [{ source: { not: "STOREFRONT" } }, { paymentStatus: "PAID" }] };
+}
+
+/**
+ * Raw-SQL twin of `billableTxnWhere`, for `$queryRaw`. Expects the
+ * `transactions` table aliased as `t`.
+ */
+export const billableTxnSql = Prisma.sql`(t."source" <> 'STOREFRONT' OR t."paymentStatus" = 'PAID')`;
+
+const IST_OFFSET_MS = 330 * 60_000;
+
+/**
+ * The instant the current IST month began (00:00 IST on the 1st). Unlike
+ * `getIstMonthStart` — a `@db.Date` key at 00:00 UTC, i.e. 05:30 IST — this is
+ * the right lower bound for a `createdAt` timestamp.
+ */
+export function istMonthStartInstant(now: Date = new Date()): Date {
+  return new Date(getIstMonthStart(now).getTime() - IST_OFFSET_MS);
+}
+
+/**
+ * Transactions that count toward the monthly plan cap (`billableTxnWhere`).
+ * An abandoned pre-order must not burn a FREE vendor's 50.
  */
 export async function countBillableTxnThisMonth(
   db: Db,
@@ -212,8 +243,8 @@ export async function countBillableTxnThisMonth(
   return db.transaction.count({
     where: {
       vendorId,
-      createdAt: { gte: getIstMonthStart(now) },
-      OR: [{ source: { not: "STOREFRONT" } }, { paymentStatus: "PAID" }],
+      createdAt: { gte: istMonthStartInstant(now) },
+      ...billableTxnWhere(),
     },
   });
 }
@@ -236,7 +267,11 @@ export async function nextBillNumber(
 // ─── Place order ────────────────────────────────────────────────────
 
 export type PlaceOrderInput = {
-  vendor: { id: string; plan: Plan };
+  /**
+   * Stored plan + raw expiry; the cap uses `effectivePlan()` (lib/plan.ts).
+   * Omitting `planExpiresAt` means "no expiry" — always pass it from a DB row.
+   */
+  vendor: { id: string; plan: Plan; planExpiresAt?: Date | null };
   acceptPayOnDelivery: boolean;
   dropId: string;
   items: { dropItemId: string; qty: number }[];
@@ -338,7 +373,11 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
         return { item, qty: l.qty };
       });
 
-      const cap = PLAN_LIMITS[input.vendor.plan].monthlyTxnCap;
+      const plan = effectivePlan(
+        { plan: input.vendor.plan, planExpiresAt: input.vendor.planExpiresAt ?? null },
+        now,
+      );
+      const cap = PLAN_LIMITS[plan].monthlyTxnCap;
       if (cap !== null && (await countBillableTxnThisMonth(tx, vendorId, now)) >= cap) {
         throw new OrderRejected({ code: "monthly_txn_cap_reached" });
       }

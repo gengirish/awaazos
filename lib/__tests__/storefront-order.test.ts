@@ -82,6 +82,11 @@ describe("maxOrderableQty / stockLabel", () => {
     expect(maxOrderableQty(500, null)).toBe(99);
   });
 
+  it("caps at remaining stock when it is below the per-order limit", () => {
+    // "Only 5 left" must never sit next to an effective cap of 6.
+    expect(maxOrderableQty(5, 6)).toBe(5);
+  });
+
   it("labels low stock and sold out", () => {
     expect(stockLabel(null)).toBeNull();
     expect(stockLabel(20)).toBeNull();

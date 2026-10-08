@@ -92,10 +92,22 @@ Stated ICP does ~200 sales/day (~5,200/month). Limits live in `PLAN_LIMITS` (`li
   the free tier cannot demonstrate the core feature to the actual design partners. (Since then the
   voice-language picker, `VOICE_LANGUAGES` in `lib/constants.ts`, offers only en-IN and hi-IN on
   every plan; te/kn/ta are dormant, reachable only through legacy `voiceLang` rows.)
-- **FREE has `whatsappReceipts: false`** — the third pillar is paid-only too.
+- **FREE has `whatsappReceipts: false`** — the third pillar is paid-only too. (Since then receipts
+  go out via wa.me from the vendor's own WhatsApp on every plan; the flag gates only the dormant
+  Gupshup send.)
 - **STARTER is 500 txn/month** at ₹299, roughly 10× below the ICP. The customer we pitch cannot
   stay on the plan we sell him; he is forced to PRO at ₹799, which is hidden from the pricing page
   (`VISIBLE_TIERS` in `app/(marketing)/pricing/page.tsx`).
+
+- **Staff invites don't exist.** `PLAN_LIMITS.*.maxStaff` is never read and only
+  `/api/auth/register` creates a `StaffMember`, so the "3 staff logins" Starter claim was removed
+  from the copy (`lib/plan-copy.ts`; `lib/__tests__/plan-copy.test.ts` fails if "staff" reappears).
+  To ship: StaffMember invite/accept, enforce `PLAN_LIMITS.maxStaff`, add a tenant-isolation e2e
+  case — then re-add "staff logins" to the Starter copy and relax that test.
+- **Pro is not sold** — hidden from pricing (`MARKETED_PLANS` in `lib/plan-copy.ts`) and billing,
+  but `POST /api/razorpay/create-subscription` still accepts it. Any vendor on PRO was set manually;
+  check `planExpiresAt` on those rows so they don't keep PRO-gated features (own Razorpay keys)
+  indefinitely or lose them silently.
 
 **Proposed fix:** time-box the trial instead of transaction-boxing it — 30 days, unlimited, every
 language, WhatsApp on — then one paid tier whose cap is above real usage. Cost is some Sarvam
@@ -227,7 +239,7 @@ the app) or `min-h-11` on each call site.
 - **StaffRole enforcement** (a CASHIER refused an OWNER-only write) — untestable because there is
   no staff-management API to create a non-owner member.
 - **CSV export contents** — the PII rule says last-4 phone only and DD/MM/YYYY IST, both untested,
-  because the route is PRO-gated and nothing can upgrade a plan from a test.
+  because the route is STARTER-gated and nothing can upgrade a plan from a test.
 
 ### 4.3 Confirm CI actually runs e2e on `main`
 `e2e/public.spec.ts` asserted a pricing tier that had been deliberately cut, so it had been failing.

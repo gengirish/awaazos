@@ -6,7 +6,10 @@ vi.mock("@/lib/auth", () => ({
 }));
 
 vi.mock("@/lib/prisma", () => ({
-  prisma: {},
+  prisma: {
+    user: { findUnique: vi.fn() },
+    staffMember: { findMany: vi.fn() },
+  },
 }));
 
 vi.mock("next/headers", () => ({
@@ -15,8 +18,10 @@ vi.mock("next/headers", () => ({
   })),
 }));
 
+import { auth } from "@/lib/auth";
 import { PLAN_RANK } from "@/lib/constants";
-import { PlanGateError, requirePlan } from "@/lib/rbac";
+import { prisma } from "@/lib/prisma";
+import { PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
 
 describe("requirePlan", () => {
   it("throws PlanGateError with status 402 when plan is too low", () => {
@@ -42,5 +47,36 @@ describe("PLAN_RANK", () => {
     for (let i = 0; i < ordered.length - 1; i++) {
       expect(PLAN_RANK[ordered[i]!]).toBeLessThan(PLAN_RANK[ordered[i + 1]!]!);
     }
+  });
+});
+
+describe("requireVendorRole applies plan expiry", () => {
+  function mockMembership(plan: Plan, planExpiresAt: Date | null) {
+    vi.mocked(auth).mockResolvedValue({ user: { id: "u1" } } as never);
+    vi.mocked(prisma.user.findUnique).mockResolvedValue({ id: "u1", passwordChangedAt: null } as never);
+    vi.mocked(prisma.staffMember.findMany).mockResolvedValue([
+      {
+        vendorId: "v1",
+        role: "OWNER",
+        vendor: { id: "v1", slug: "v1-shop", plan, planExpiresAt },
+      },
+    ] as never);
+  }
+
+  it("downgrades an expired paid plan to FREE but keeps the stored plan and raw expiry", async () => {
+    const expiredAt = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    mockMembership("PRO", expiredAt);
+    const ctx = await requireVendorRole("CASHIER");
+    expect(ctx.vendor.plan).toBe("FREE");
+    expect(ctx.storedPlan).toBe("PRO");
+    expect(ctx.vendor.planExpiresAt).toEqual(expiredAt);
+    expect(() => requirePlan(ctx.vendor, "STARTER")).toThrow(PlanGateError);
+  });
+
+  it("leaves an unexpired plan alone", async () => {
+    mockMembership("PRO", new Date(Date.now() + 24 * 60 * 60 * 1000));
+    const ctx = await requireVendorRole("CASHIER");
+    expect(ctx.vendor.plan).toBe("PRO");
+    expect(ctx.storedPlan).toBe("PRO");
   });
 });

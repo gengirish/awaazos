@@ -88,6 +88,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
           upiId: true,
           upiName: true,
           plan: true,
+          planExpiresAt: true,
           settings: {
             select: {
               theme: true,
@@ -169,7 +170,7 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
       : null;
   const qrSrc = upiLink ? await qrSvgDataUrl(upiLink, 220) : "";
   const minsLeft = awaitingUpi ? holdMinutesLeft(order.createdAt, PENDING_HOLD_MINUTES, now) : 0;
-  const payOnline = awaitingUpi && minsLeft > 0 && isOnlinePaymentEnabled(vendor.plan, vendor.settings);
+  const payOnline = awaitingUpi && minsLeft > 0 && isOnlinePaymentEnabled(vendor, vendor.settings, now);
 
   const waLink = vendor.settings?.whatsappNumber
     ? whatsappChatLink(vendor.settings.whatsappNumber, `Hi, I placed order ${order.billNumber} on your store`)

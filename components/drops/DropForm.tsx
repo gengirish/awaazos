@@ -1,10 +1,10 @@
 "use client";
 
 import type { DropStatus } from "@prisma/client";
-import { Copy, Loader2, Trash2 } from "lucide-react";
+import { AlertTriangle, Copy, Loader2, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
+import { useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,15 @@ import {
 } from "@/components/ui/dialog";
 import { formatINR, paiseToRupees, rupeesToPaise } from "@/lib/currency";
 import type { EffectiveDropStatus } from "@/lib/drops";
-import { DROP_CONFLICT_MESSAGE, DROP_STATUS_LABEL, istTomorrowYmd } from "@/lib/drops-builder";
+import {
+  DROP_CONFLICT_MESSAGE,
+  DROP_STATUS_LABEL,
+  PER_ORDER_OVER_MAX,
+  cutoffLeadDays,
+  isValidYmd,
+  istTomorrowYmd,
+  shiftOrderWindowDates,
+} from "@/lib/drops-builder";
 import { formatDropDayLabel, formatIstDate, ymdToDbDate } from "@/lib/drops-time";
 import type { DropUpsertInput } from "@/lib/zod-drops";
 
@@ -84,6 +92,41 @@ function ConflictFix({ code }: { code: string | null }) {
     );
   }
   return null;
+}
+
+/**
+ * "Orders close N days before cooking day". More than a day ahead is allowed
+ * but unusual (often a cooking day moved without its cut-off), so it gets a
+ * soft warning — icon + text, not colour alone. Never blocks saving.
+ */
+function CutoffLeadHint({ id, days }: { id: string; days: number | null }) {
+  if (days === null || days < 0) return null;
+  if (days === 0) {
+    return (
+      <p id={id} className="text-xs text-muted-foreground">
+        Orders close on the cooking day.
+      </p>
+    );
+  }
+  const text = `Orders close ${days} ${days === 1 ? "day" : "days"} before cooking day.`;
+  if (days === 1) {
+    return (
+      <p id={id} className="text-xs text-muted-foreground">
+        {text}
+      </p>
+    );
+  }
+  return (
+    <p
+      id={id}
+      className="flex items-start gap-1.5 rounded-md border border-amber-500/50 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
+    >
+      <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+      <span>
+        {text} Customers can&apos;t order after that — check this is what you meant.
+      </span>
+    </p>
+  );
 }
 
 // ─── Form ───────────────────────────────────────────────────────────
@@ -186,6 +229,28 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
     setForm((f) => ({ ...f, [key]: value }));
     setFieldErrors((e) => (e[key] ? { ...e, [key]: "" } : e));
   };
+
+  // Order-window dates follow the cooking day unless the vendor set them by
+  // hand in this session. `lastCookingDate` survives the date input being
+  // cleared mid-edit, so re-picking a day still shifts from the last real one.
+  const touchedDates = useRef({ closesAtDate: false, opensAtDate: false });
+  const lastCookingDate = useRef(initial.date);
+  const setOrderWindowDate = (key: "closesAtDate" | "opensAtDate", value: string) => {
+    touchedDates.current[key] = true;
+    set(key, value);
+  };
+  const setCookingDate = (next: string) => {
+    const prev = lastCookingDate.current;
+    if (isValidYmd(next)) lastCookingDate.current = next;
+    const touched = { ...touchedDates.current };
+    setForm((f) => ({ ...shiftOrderWindowDates(f, prev, next, touched), date: next }));
+    setFieldErrors((e) =>
+      e.date || e.closesAtDate || e.closesAtTime || e.opensAtDate
+        ? { ...e, date: "", closesAtDate: "", closesAtTime: "", opensAtDate: "" }
+        : e,
+    );
+  };
+  const leadDays = cutoffLeadDays(form.date, form.closesAtDate);
   const setRow = (id: string, patch: Partial<Row>) => {
     setRows((r) => ({ ...r, [id]: { ...r[id], ...patch } }));
     setItemErrors((e) => (e[id] ? { ...e, [id]: "" } : e));
@@ -214,6 +279,7 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
       if (price === null || price <= 0) ie[id] = "Enter a price in rupees, e.g. 120";
       else if (maxQty === undefined) ie[id] = "Quantity must be a whole number, or blank for no limit";
       else if (perOrderLimit === undefined) ie[id] = "Per-order limit must be a whole number, or blank";
+      else if (maxQty !== null && perOrderLimit !== null && perOrderLimit > maxQty) ie[id] = PER_ORDER_OVER_MAX;
       else items.push({ menuItemId: id, priceInPaise: price, maxQty, perOrderLimit, sortOrder: idx });
     });
     if (selectedIds.length === 0) fe.items = "Pick at least one item for this drop";
@@ -311,6 +377,9 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
     ) : null;
   const errProps = (key: string) =>
     fieldErrors[key] ? { "aria-invalid": true, "aria-describedby": `${key}-error` } : {};
+  /** Error id (when shown) plus an always-present hint id. */
+  const describedBy = (key: string, hintId: string | null) =>
+    [fieldErrors[key] ? `${key}-error` : null, hintId].filter(Boolean).join(" ") || undefined;
 
   return (
     <form onSubmit={submit} noValidate className="space-y-6" aria-busy={pending}>
@@ -365,7 +434,7 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
               type="date"
               className={inputCls}
               value={form.date}
-              onChange={(e) => set("date", e.target.value)}
+              onChange={(e) => setCookingDate(e.target.value)}
               {...errProps("date")}
             />
             <p className="text-xs text-muted-foreground">{ymdHint(form.date)}</p>
@@ -479,8 +548,9 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
                 aria-label="Order cut-off date"
                 className={inputCls}
                 value={form.closesAtDate}
-                onChange={(e) => set("closesAtDate", e.target.value)}
+                onChange={(e) => setOrderWindowDate("closesAtDate", e.target.value)}
                 {...errProps("closesAtDate")}
+                aria-describedby={describedBy("closesAtDate", leadDays !== null && leadDays >= 0 ? "cutoff-lead" : null)}
               />
               <input
                 type="time"
@@ -492,6 +562,7 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
               />
             </div>
             <p className="text-xs text-muted-foreground">{ymdHint(form.closesAtDate)} (IST)</p>
+            <CutoffLeadHint id="cutoff-lead" days={leadDays} />
             {err("closesAtDate")}
             {err("closesAtTime")}
           </fieldset>
@@ -514,7 +585,7 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
                   aria-label="Orders open date"
                   className={inputCls}
                   value={form.opensAtDate}
-                  onChange={(e) => set("opensAtDate", e.target.value)}
+                  onChange={(e) => setOrderWindowDate("opensAtDate", e.target.value)}
                   {...errProps("opensAtDate")}
                 />
                 <input

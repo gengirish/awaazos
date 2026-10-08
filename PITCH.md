@@ -523,7 +523,7 @@ On 24 April 2026 (commit `d5a808f`) the public surface was cut down to one wedge
 
 **Restored since:** the `/analytics` chart dashboard, which the cut had replaced with a single hero card, came back in `5718acd` (2 May 2026).
 
-**Kept underneath:** `PLAN_LIMITS` in `lib/constants.ts` still defines PRO at ₹799/mo (unlimited bills, unlimited staff, CSV export, 365-day analytics) and ENTERPRISE (custom). `POST /api/razorpay/create-subscription` still accepts `PRO`. Because no screen offers PRO, the PRO-gated features (CSV export and connecting a vendor's own Razorpay keys for storefront payments) can only be unlocked today by changing a vendor's plan directly.
+**Kept underneath:** `PLAN_LIMITS` in `lib/constants.ts` still defines PRO at ₹799/mo (unlimited bills, 365-day analytics; its "unlimited staff" is moot — there is no staff invite flow yet) and ENTERPRISE (custom). `POST /api/razorpay/create-subscription` still accepts `PRO`. Because no screen offers PRO, the PRO-gated feature (connecting a vendor's own Razorpay keys for storefront payments) can only be unlocked today by changing a vendor's plan directly.
 
 ---
 

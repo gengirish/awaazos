@@ -1,23 +1,10 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { MARKETED_PLANS, PLAN_MARKETING } from "@/lib/plan-copy";
 
-// HIDDEN — see PITCH.md "minimal product" cut list. Re-enable PRO when STARTER GA.
-const tiers = [
-  {
-    name: "FREE",
-    price: "₹0",
-    blurb: "First 50 transactions free. Voice + UPI QR + WhatsApp receipts.",
-    emphasis: false,
-  },
-  {
-    name: "STARTER",
-    price: "₹299",
-    suffix: "/mo",
-    blurb: "Unlimited bills. The full single-stall product. Most vendors live here.",
-    emphasis: true,
-  },
-] as const;
+// Tier copy lives in lib/plan-copy.ts (one source with the pricing page). PRO is not sold.
+const tiers = MARKETED_PLANS.map((plan) => ({ name: plan, ...PLAN_MARKETING[plan] }));
 
 export function PricingTeaser() {
   return (
@@ -27,7 +14,7 @@ export function PricingTeaser() {
           Simple plans for every vendor
         </h2>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          Start free. ₹299/mo when you outgrow it. No upsells.
+          Start free. {PLAN_MARKETING.STARTER.price} when you outgrow it. No upsells.
         </p>
         <div className="mt-10 grid gap-6 md:grid-cols-2">
           {tiers.map((tier) => (
@@ -42,14 +29,14 @@ export function PricingTeaser() {
               <CardHeader>
                 <CardTitle className="font-display text-lg text-awaaz-charcoal">{tier.name}</CardTitle>
                 <p className="mt-2 font-display text-3xl font-bold text-awaaz-charcoal">
-                  {tier.price}
-                  {"suffix" in tier ? (
-                    <span className="text-base font-normal text-muted-foreground">{tier.suffix}</span>
+                  {tier.amount}
+                  {tier.period ? (
+                    <span className="text-base font-normal text-muted-foreground">{tier.period}</span>
                   ) : null}
                 </p>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground">{tier.blurb}</p>
+                <p className="text-sm text-muted-foreground">{tier.teaser}</p>
               </CardContent>
               <CardFooter className="pt-2">
                 <Button

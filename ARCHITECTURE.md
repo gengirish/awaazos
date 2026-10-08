@@ -467,18 +467,18 @@ requirePlan(vendor, Plan.STARTER);
 // so the UI can show an upgrade CTA to /settings/billing
 ```
 
-Current `requirePlan` call sites: STARTER for `/api/ai/transcribe` and `/api/receipts/send`; PRO for `/api/transactions/export` (CSV) and saving the vendor's own Razorpay keys (`PUT /api/vendor/payments`).
+Current `requirePlan` call sites: STARTER for `/api/ai/transcribe`, `/api/receipts/send` and `/api/transactions/export` (CSV); PRO for saving the vendor's own Razorpay keys (`PUT /api/vendor/payments`).
 
 `PLAN_LIMITS` table lives in `lib/constants.ts`:
 
 | Plan | Price/mo | monthlyTxnCap | maxStaff | whatsapp | razorpayLinks | sarvamStt | analyticsDays | csvExport |
 | --- | ---: | ---: | ---: | --- | --- | --- | ---: | --- |
 | FREE | ₹0 | 50 | 1 | ❌ | ❌ | ❌ | 7 | ❌ |
-| STARTER | ₹299 | 500 | 3 | ✅ | ❌ | ✅ | 90 | ❌ |
+| STARTER | ₹299 | 500 | 3 | ✅ | ❌ | ✅ | 90 | ✅ |
 | PRO | ₹799 | null (∞) | null | ✅ | ✅ | ✅ | 365 | ✅ |
 | ENTERPRISE | custom | null | null | ✅ | ✅ | ✅ | 365 | ✅ |
 
-`txnPerMonth` and `whatsappReceipts` duplicate `monthlyTxnCap` and `whatsapp`. The marketing pricing page shows only FREE and STARTER (see the cut list in `PITCH.md`); PRO and ENTERPRISE stay in the code for the gates.
+`txnPerMonth` and `whatsappReceipts` duplicate `monthlyTxnCap` and `whatsapp`. `whatsapp` gates only the dormant automated Gupshup send — wa.me receipts from the vendor's own WhatsApp work on every plan. `maxStaff` is not read anywhere (there is no staff invite flow). Marketing copy for the sold tiers is derived from this table in `lib/plan-copy.ts`. The marketing pricing page shows only FREE and STARTER (see the cut list in `PITCH.md`); PRO and ENTERPRISE stay in the code for the gates.
 
 ---
 

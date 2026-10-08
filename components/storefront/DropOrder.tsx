@@ -222,8 +222,10 @@ export function DropOrder(props: DropOrderProps) {
                       {badge}
                     </span>
                   ) : null}
-                  {item.perOrderLimit !== null && !soldOut ? (
-                    <span className="text-xs text-muted-foreground">Max {item.perOrderLimit} per order</span>
+                  {/* Only when the per-order cap actually binds — once stock is at or
+                      below it, "Only N left" already says how many you can get. */}
+                  {item.perOrderLimit !== null && !soldOut && (remaining === null || remaining > item.perOrderLimit) ? (
+                    <span className="text-xs text-muted-foreground">Max {max} per order</span>
                   ) : null}
                 </span>
               </span>
