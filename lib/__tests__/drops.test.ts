@@ -49,6 +49,14 @@ describe("effectiveDropStatus", () => {
     expect(effectiveDropStatus(drop("OPEN", null), new Date(0))).toBe("OPEN");
   });
 
+  it("regression: a Saturday drop with a Friday 21:00 IST cut-off is OPEN on Thursday night", () => {
+    // Sat 10 Oct 2026 drop; cut-off Fri 9 Oct 21:00 IST = 15:30Z.
+    const saturdayDrop = { status: "OPEN" as DropStatus, opensAt: null, closesAt: new Date("2026-10-09T15:30:00.000Z") };
+    const thursday10pmIst = new Date("2026-10-08T16:30:00.000Z");
+    expect(effectiveDropStatus(saturdayDrop, thursday10pmIst)).toBe("OPEN");
+    expect(isAcceptingOrders(saturdayDrop, thursday10pmIst)).toBe(true);
+  });
+
   it.each<DropStatus>(["DRAFT", "CLOSED", "FROZEN", "FULFILLED"])("%s passes through regardless of time", (s) => {
     expect(effectiveDropStatus(drop(s), new Date(opensAt.getTime() - MIN))).toBe(s);
     expect(effectiveDropStatus(drop(s), new Date(closesAt.getTime() + MIN))).toBe(s);

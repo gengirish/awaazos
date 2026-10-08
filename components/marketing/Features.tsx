@@ -25,7 +25,7 @@ const features = [
   {
     icon: Globe2,
     title: "Multi-Language",
-    description: "English, Hindi, Telugu, Kannada, Tamil — voice and UI tuned for Indian vendors.",
+    description: "Speak orders in English or Hindi — tuned for how Indian vendors actually talk.",
   },
   {
     icon: WifiOff,

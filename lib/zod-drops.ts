@@ -1,6 +1,7 @@
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { z } from "zod";
 
+import { PER_ORDER_OVER_MAX } from "@/lib/drops-builder";
 import { istToUtc, ymdToDbDate } from "@/lib/drops-time";
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
@@ -94,6 +95,11 @@ export const dropUpsertSchema = z
         ctx.addIssue({ code: "custom", path: ["items", i, "menuItemId"], message: "Item added twice" });
       }
       ids.add(it.menuItemId);
+      // A per-order cap above total stock is meaningless and reads oddly on the
+      // storefront ("Only 5 left" next to "Max 6 per order").
+      if (it.maxQty != null && it.perOrderLimit != null && it.perOrderLimit > it.maxQty) {
+        ctx.addIssue({ code: "custom", path: ["items", i, "perOrderLimit"], message: PER_ORDER_OVER_MAX });
+      }
     });
   });
 

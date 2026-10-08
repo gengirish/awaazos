@@ -16,6 +16,10 @@ test.describe("public surfaces", () => {
     await expect(page.getByText(/STARTER/i).first()).toBeVisible();
     await expect(page.getByText(/₹\s*0/).first()).toBeVisible();
     await expect(page.getByText(/₹\s*299/).first()).toBeVisible();
+    // Copy comes from lib/plan-copy.ts: Starter sells CSV export, and no tier
+    // promises staff logins (there is no invite flow — see TODO.md §2).
+    await expect(page.getByText(/CSV export/i).first()).toBeVisible();
+    await expect(page.getByText(/staff/i)).toHaveCount(0);
   });
 
   test("PRO stays off the marketing surface until STARTER is GA", async ({ page }) => {
@@ -26,6 +30,12 @@ test.describe("public surfaces", () => {
     // surface should be free of it.
     await expect(page.getByText(/₹\s*799/)).toHaveCount(0);
     await expect(page.getByRole("heading", { name: /^pro$/i })).toHaveCount(0);
+  });
+
+  test("pricing shows whole-rupee prices, matching the landing teaser", async ({ page }) => {
+    await page.goto("/pricing");
+    await expect(page.getByText("₹299/mo", { exact: true })).toBeVisible();
+    await expect(page.getByText(/₹\s*299\.00/)).toHaveCount(0);
   });
 
   for (const path of ["/legal/privacy", "/legal/terms"]) {

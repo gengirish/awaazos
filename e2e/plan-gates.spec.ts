@@ -16,7 +16,7 @@ type PlanGateBody = {
  * (components/pos/ReceiptModal.tsx keys off `code === "plan_upgrade_required"`).
  */
 test.describe("plan gates return structured 402s", () => {
-  test("CSV export is PRO-only and refuses a FREE vendor", async ({ page, request }) => {
+  test("CSV export is STARTER-only and refuses a FREE vendor", async ({ page, request }) => {
     await createVendorSession(page, request, "gate-csv");
 
     const res = await page.request.get(
@@ -26,7 +26,7 @@ test.describe("plan gates return structured 402s", () => {
 
     const body = (await res.json()) as PlanGateBody;
     expect(body.code).toBe("plan_upgrade_required");
-    expect(body.requiredPlan).toBe("PRO");
+    expect(body.requiredPlan).toBe("STARTER");
     expect(body.currentPlan).toBe("FREE");
     expect(body.feature).toBe("csv_export");
   });
@@ -35,7 +35,7 @@ test.describe("plan gates return structured 402s", () => {
     await createVendorSession(page, request, "gate-csv-noparams");
 
     // No from/to at all — a FREE vendor must still see 402, not the 400 that a
-    // PRO vendor would get for missing params. Order matters: leaking 400 here
+    // STARTER vendor would get for missing params. Order matters: leaking 400 here
     // would tell an un-entitled caller which params the endpoint wants.
     const res = await page.request.get("/api/transactions/export");
     expect(res.status()).toBe(402);

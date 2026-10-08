@@ -2,8 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { DropForm } from "@/components/drops/DropForm";
-import { istTodayYmd, istTomorrowYmd } from "@/lib/drops-builder";
-import { utcToIstParts } from "@/lib/drops-time";
+import { defaultCutoffFor, istTomorrowYmd } from "@/lib/drops-builder";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import type { DropUpsertInput } from "@/lib/zod-drops";
@@ -26,11 +25,12 @@ export default async function NewDropPage() {
     select: { id: true, name: true, emoji: true, priceInPaise: true, isAvailable: true },
   });
 
-  // Sensible default: cook tomorrow 5–8 pm, orders close tonight at 9 pm —
-  // or tomorrow 10 am if it's already late tonight.
+  // Sensible default: cook tomorrow 5–8 pm, orders close the evening before at
+  // 9 pm — or the cooking-day morning if that evening is already (nearly) gone.
+  // DropForm moves the cut-off along when the vendor changes the cooking day.
   const now = new Date();
   const tomorrow = istTomorrowYmd(now);
-  const lateTonight = utcToIstParts(now).hm >= "20:00";
+  const cutoff = defaultCutoffFor(tomorrow, now);
   const initial: DropUpsertInput = {
     title: "",
     note: null,
@@ -42,8 +42,8 @@ export default async function NewDropPage() {
     deliveryFeePaise: 0,
     opensAtDate: null,
     opensAtTime: null,
-    closesAtDate: lateTonight ? tomorrow : istTodayYmd(now),
-    closesAtTime: lateTonight ? "10:00" : "21:00",
+    closesAtDate: cutoff.closesAtDate,
+    closesAtTime: cutoff.closesAtTime,
     // A drop appears on its own unless the vendor opts in.
     showEverydayMenu: false,
     items: [],

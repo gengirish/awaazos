@@ -1,0 +1,127 @@
+---
+description: Voice STT + Claude NLU pipeline rules (the AwaazOS differentiator)
+paths: ["lib/anthropic.ts","lib/sarvam.ts","hooks/useVoice*.ts","app/api/ai/**/*.ts","components/pos/VoiceOrderButton.tsx","workers/voiceLog.worker.ts"]
+---
+
+<!-- Generated from .cursor/rules/voice-ai.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
+
+# Voice Pipeline Rules — AwaazOS
+
+## STT routing (by `VendorSettings.voiceLang`)
+
+| Lang | STT |
+|---|---|
+| `en-IN`, `hi-IN` | Web Speech API (browser, free, all plans). Only when the build flag `NEXT_PUBLIC_VOICE_FALLBACK_ENABLED=true` is set does the client record audio and call `/api/ai/transcribe` instead (STARTER+). |
+| `te-IN`, `kn-IN`, `ta-IN` | **Dormant.** Sarvam Saaras v3 (`saaras:v3`, override with `SARVAM_STT_MODEL`) via `/api/ai/transcribe` (STARTER+). The code path is kept, but the picker (`VOICE_LANGUAGES` in `lib/constants.ts`) offers only en-IN / hi-IN, so only legacy `voiceLang` rows reach it. |
+
+**STT vs NLU:** STT turns audio → text (ASR only — no Claude). NLU
+(`/api/ai/parse-order`) turns text + menu → cart (Claude Haiku/Sonnet).
+Self-hosted Whisper (`lib/whisper-stt.ts`) is an optional last-resort STT tier
+when `WHISPER_STT_URL` is set — never used for menu matching.
+
+Server STT cascade (`buildCascade()` in `app/api/ai/transcribe/route.ts`):
+te/kn/ta → Sarvam → Groq → Whisper; en/hi → OpenAI → Groq → Whisper.
+Providers without credentials are skipped; Whisper joins only when
+`WHISPER_STT_URL` is set. Each hop has its own circuit breaker
+(`stt:<provider>`) and minute quota. Cascade exhaustion returns **200**
+`{ error: "all_providers_failed", fallback: "quickadd" }`. The list of STT
+source ids (`webspeech` + the server providers) lives in `lib/stt-source.ts`.
+
+`/api/ai/transcribe` calls `requirePlan(vendor, STARTER)` for every language, so
+a FREE vendor gets 402 and the client shows its generic voice error pointing at
+QuickAddGrid. (An upgrade nudge for this case is not implemented.) Never route
+FREE vendors to a paid provider.
+
+## Claude two-tier NLU
+
+```
+Haiku 4.5 (primary, fast, cheap, schema-strict tool-use)
+   ↓ escalate ONLY if:
+   (a) the Haiku call throws for any reason — API error/timeout, no add_items
+       tool_use block, or zod validation of the tool input fails
+   (b) items.length === 0 AND words > 3
+   (c) items.length === 0 AND words >= 2 AND unmatched.length === 0
+   (d) confidence === 'low' AND unmatched.length > 0
+Sonnet 4.5 (fallback)
+```
+
+(b)–(d) are `shouldEscalate()` in `app/api/ai/parse-order/route.ts`; (a) is its
+surrounding `catch`. `words` = `transcript.trim().split(/\s+/).filter(Boolean).length`.
+After the model, `alignParsedItemsToMenu()` re-anchors ids/prices to real menu
+rows, and if the cart is still empty on a ≥2-word transcript,
+`rescueMatchFromTranscript()` (`lib/parse-order-align.ts`) tries a string match
+and forces `confidence: "low"`.
+
+## Tool-use, not free-form JSON
+
+Define ONE tool `add_items` with `input_schema` matching the contract:
+
+```ts
+{
+  items: { menuItemId, name, priceInPaise, qty }[],
+  unmatched: string[],
+  confidence: "high" | "medium" | "low"
+}
+```
+
+Tool use guarantees well-formed output and lets the cart UI stream item-by-item.
+
+## Prompt caching
+
+- Wrap the menu block (the expensive, repeated input) with
+  `cache_control: { type: 'ephemeral' }`. It is the first content block; the
+  transcript follows in a separate, uncached block.
+- The menu JSON comes from `stableMenuJson()` — its key order and sort order
+  are load-bearing for cache hits.
+- 5-min TTL, refreshed only by real parses. There is no cache warmer (none is
+  implemented).
+
+## Performance budget
+
+- Web Speech latency: ≤ 200 ms perceived
+- Sarvam STT round-trip: 5 s hard timeout (then next provider in the cascade)
+- Haiku tool-use: target ≤ 1 s p50
+- Total mic-press → first cart item visible: target ≤ 2 s p50
+
+## Logging — privacy-critical
+
+- ENQUEUE (do NOT await) BullMQ `voice-parse-log` job from `/api/ai/parse-order`:
+  `void getVoiceLogQueue().add("voice-parse-log", {...}, { attempts: 1, removeOnComplete: true })`
+  inside a `try/catch` that logs and swallows. The cashier never waits on logging.
+- Log to `VoiceParseLog`: `{vendorId, transcript, lang, sttSource, modelUsed,
+  itemCount, confidence, unmatched, latencyMs, escalated}`
+- 90-day retention via `workers/retention.worker.ts`
+- **NEVER log:** `customerPhone`, `customerName`, payment data, audio bytes,
+  vendor menu prices, UTR refs
+
+## PII guardrail
+
+Customer phone/name MUST NOT appear in any prompt, log, or telemetry sent to
+Anthropic or any STT provider. Only `transcript` + `menu` go to the LLM.
+
+## Indic numeral normalization (in system prompt)
+
+Hard-code in the prompt — don't rely on the model to know:
+```
+hi: ek=1, do=2, teen=3, char=4, paanch=5
+te: okati=1, rendu=2, moodu=3, naalugu=4, aidu=5
+kn: ondu=1, eradu=2, mooru=3, naalku=4, aidu=5
+ta: onnu=1, rendu=2, moonu=3, naangu=4, anju=5
+```
+
+## Parse fixtures (must all pass)
+
+These baseline transcripts are covered twice: `lib/__tests__/anthropic.test.ts`
+(Vitest, mocked Anthropic client — checks the request/response plumbing in
+`npm test`, not model accuracy) and `tests/golden/parse-order/fixtures/*.json`
+(live Claude, `GOLDEN_PARSE_ORDER_LIVE=1 npm run test:golden`; the golden set
+also has more en/hi cases and te/kn/ta ones).
+
+| Transcript | Lang | Expected |
+|---|---|---|
+| `"do bhel aur ek nimbu pani"` | hi-IN | bhel×2, nimbu pani×1 |
+| `"one small bhel and two lemonades"` | en-IN | small bhel×1, lemonade×2 |
+| `"rendu large bhel"` | te-IN | bhel puri×2 ("large" absorbed — no separate SKU) |
+| `"moodu samosa, okati chai"` | te-IN | samosa×3, chai×1 |
+| `"ek vada pav"` | hi-IN | vada pav×1 |
+| `"scooty chahiye"` | hi-IN | items:[], unmatched:["scooty chahiye"], confidence:'low' |

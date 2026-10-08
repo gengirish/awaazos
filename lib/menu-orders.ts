@@ -27,6 +27,7 @@ import {
   nextBillNumber,
 } from "@/lib/drops";
 import { bumpDropOrderSignal } from "@/lib/drops-signal";
+import { effectivePlan } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
 
@@ -41,7 +42,11 @@ export type MenuOrderSettings = {
 };
 
 export type PlaceMenuOrderInput = {
-  vendor: { id: string; plan: Plan };
+  /**
+   * Stored plan + raw expiry; the cap uses `effectivePlan()` (lib/plan.ts).
+   * Omitting `planExpiresAt` means "no expiry" — always pass it from a DB row.
+   */
+  vendor: { id: string; plan: Plan; planExpiresAt?: Date | null };
   settings: MenuOrderSettings;
   items: { menuItemId: string; qty: number }[];
   customerName: string;
@@ -151,7 +156,11 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
         return { item, qty: l.qty };
       });
 
-      const cap = PLAN_LIMITS[input.vendor.plan].monthlyTxnCap;
+      const plan = effectivePlan(
+        { plan: input.vendor.plan, planExpiresAt: input.vendor.planExpiresAt ?? null },
+        now,
+      );
+      const cap = PLAN_LIMITS[plan].monthlyTxnCap;
       if (cap !== null && (await countBillableTxnThisMonth(tx, vendorId, now)) >= cap) {
         throw new MenuOrderRejected({ code: "monthly_txn_cap_reached" });
       }

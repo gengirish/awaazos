@@ -18,6 +18,7 @@ import {
 } from "@/lib/analytics-aggregations";
 import { getIstTodayStart, istDayRangeFromQuery } from "@/lib/billing-period";
 import { PLAN_LIMITS } from "@/lib/constants";
+import { billableTxnSql, billableTxnWhere } from "@/lib/drops";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
@@ -124,6 +125,16 @@ export default async function AnalyticsPage(props: Props) {
   const customToResolved =
     range === "custom" && toQ && /^\d{4}-\d{2}-\d{2}$/.test(toQ) ? toQ : undefined;
 
+  // Transaction-level tiles (transaction count, voice share, hourly heatmap,
+  // top items, payment mix) all count the same rows: billable transactions
+  // (`billableTxnWhere` — counter sales plus *paid* storefront orders) created
+  // in range. Unpaid/expired/cancelled pre-orders never show up as sales.
+  const billableInRange: Prisma.TransactionWhereInput = {
+    vendorId,
+    createdAt: { gte: txnRangeStart, lte: txnRangeEnd },
+    ...billableTxnWhere(),
+  };
+
   const [
     dailyRows,
     hourlyRaw,
@@ -138,13 +149,14 @@ export default async function AnalyticsPage(props: Props) {
     }),
     prisma.$queryRaw<{ hour: number; revenue: bigint; txns: number }[]>(Prisma.sql`
       SELECT
-        EXTRACT(HOUR FROM ("createdAt" AT TIME ZONE 'Asia/Kolkata'))::int AS hour,
-        SUM("totalPaise")::bigint AS revenue,
+        EXTRACT(HOUR FROM (t."createdAt" AT TIME ZONE 'Asia/Kolkata'))::int AS hour,
+        SUM(t."totalPaise")::bigint AS revenue,
         COUNT(*)::int AS txns
-      FROM transactions
-      WHERE "vendorId" = ${vendorId}
-        AND "createdAt" >= ${txnRangeStart}
-        AND "createdAt" <= ${txnRangeEnd}
+      FROM transactions t
+      WHERE t."vendorId" = ${vendorId}
+        AND t."createdAt" >= ${txnRangeStart}
+        AND t."createdAt" <= ${txnRangeEnd}
+        AND ${billableTxnSql}
       GROUP BY 1
       ORDER BY 1
     `),
@@ -159,27 +171,27 @@ export default async function AnalyticsPage(props: Props) {
       WHERE t."vendorId" = ${vendorId}
         AND t."createdAt" >= ${txnRangeStart}
         AND t."createdAt" <= ${txnRangeEnd}
+        AND ${billableTxnSql}
       GROUP BY oi."menuItemId", oi.name
       ORDER BY qty DESC
       LIMIT 10
     `),
+    // VOICE is never STOREFRONT, so this is a strict subset of totalTxnCount.
     prisma.transaction.count({
-      where: {
-        vendorId,
-        createdAt: { gte: txnRangeStart, lte: txnRangeEnd },
-        source: "VOICE",
-      },
+      where: { ...billableInRange, source: "VOICE" },
     }),
-    prisma.transaction.count({
-      where: { vendorId, createdAt: { gte: txnRangeStart, lte: txnRangeEnd } },
-    }),
+    prisma.transaction.count({ where: billableInRange }),
     prisma.transaction.groupBy({
       by: ["paymentMethod"],
-      where: { vendorId, createdAt: { gte: txnRangeStart, lte: txnRangeEnd } },
+      where: billableInRange,
       _sum: { totalPaise: true },
     }),
   ]);
 
+  // Revenue, items sold, trend and avg ticket come from DailySummary (storefront
+  // orders dated by paidAt there). Avg ticket keeps numerator and denominator
+  // from that same rollup so the ratio is never mixed-source; the "Total
+  // transactions" tile uses totalTxnCount so it always matches the voice tile.
   const kpis = sumDailySummariesKpis(dailyRows);
   const hasSales = kpis.totalTransactions > 0 || totalTxnCount > 0;
   const avgTicketPaise =
@@ -279,7 +291,7 @@ export default async function AnalyticsPage(props: Props) {
           trendTitle={trendTitle}
           kpis={{
             totalRevenuePaise: kpis.totalRevenuePaise,
-            totalTransactions: kpis.totalTransactions,
+            totalTransactions: totalTxnCount,
             avgTicketPaise,
             totalItemsSold: kpis.totalItemsSold,
           }}

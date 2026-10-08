@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { TransactionsTable } from "@/components/transactions/TransactionsTable";
+import { getIstMonthStart, getIstTodayStart } from "@/lib/billing-period";
 import { PLAN_LIMITS } from "@/lib/constants";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import {
@@ -35,6 +36,14 @@ export default async function TransactionsPage(props: Props) {
   const { items, total } = await listVendorTransactions(ctx.vendor.id, listParams);
   const hasMore = listParams.page * listParams.limit < total;
 
+  // Default CSV range: 1st of the current IST month → today. Both helpers return
+  // UTC midnight of the IST calendar date, so the ISO date part is the IST day.
+  const now = new Date();
+  const defaultExportRange = {
+    from: getIstMonthStart(now).toISOString().slice(0, 10),
+    to: getIstTodayStart(now).toISOString().slice(0, 10),
+  };
+
   const queryForClient: Record<string, string> = {};
   for (const [k, v] of Array.from(sp.entries())) {
     queryForClient[k] = v;
@@ -65,6 +74,7 @@ export default async function TransactionsPage(props: Props) {
           initialQuery={queryForClient}
           vendorName={ctx.vendor.name}
           canExportCsv={PLAN_LIMITS[ctx.vendor.plan].csvExport}
+          defaultExportRange={defaultExportRange}
         />
       </div>
     </div>

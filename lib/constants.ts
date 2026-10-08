@@ -7,7 +7,17 @@ export const PLAN_LIMITS: Record<
     label: string;
     pricePaise: number;
     txnPerMonth: number | null;
+    /**
+     * NOT ENFORCED — nothing reads it, and there is no staff invite flow (only
+     * /api/auth/register creates a StaffMember). Don't advertise staff logins
+     * until invites ship (TODO.md §2); `lib/__tests__/plan-copy.test.ts` guards it.
+     */
     maxStaff: number | null;
+    /**
+     * `whatsappReceipts` / `whatsapp` gate the DORMANT automated Gupshup send
+     * (`POST /api/receipts/send`, post-sale enqueue). They do NOT gate wa.me
+     * receipts — the vendor sending from their own WhatsApp is free on every plan.
+     */
     whatsappReceipts: boolean;
     razorpayLinks: boolean;
     monthlyTxnCap: number | null;
@@ -39,7 +49,7 @@ export const PLAN_LIMITS: Record<
     razorpayLinks: false,
     monthlyTxnCap: 500,
     whatsapp: true,
-    csvExport: false,
+    csvExport: true,
     sarvamStt: true,
     analyticsDays: 90,
   },

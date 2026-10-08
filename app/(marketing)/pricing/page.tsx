@@ -2,25 +2,17 @@ import type { Metadata } from "next";
 
 import { PricingPlanButtons } from "@/components/billing/PricingPlanButtons";
 import { auth } from "@/lib/auth";
-import { PLAN_LIMITS, PLAN_PRICES_PAISE } from "@/lib/constants";
-import { formatINR } from "@/lib/currency";
+import { MARKETED_PLANS, PLAN_MARKETING } from "@/lib/plan-copy";
 
 export const metadata: Metadata = {
   title: "Pricing — AwaazOS",
   description: "₹299/mo. Speak the order. Print the bill. Take UPI. Done.",
 };
 
-// HIDDEN — see PITCH.md "minimal product" cut list. Re-enable when STARTER GA.
-// PRO and ENTERPRISE remain in `lib/constants` (PLAN_PRICES_PAISE, PLAN_LIMITS, PLAN_RANK)
-// and in the Razorpay routes. We're only hiding them from the marketing surface for now.
-const VISIBLE_TIERS = ["FREE", "STARTER"] as const;
-type VisibleTier = (typeof VISIBLE_TIERS)[number];
-
-function priceLabel(plan: VisibleTier) {
-  const paise = PLAN_PRICES_PAISE[plan];
-  if (plan === "FREE") return formatINR(paise);
-  return `${formatINR(paise)}/mo`;
-}
+// PRO and ENTERPRISE are not sold: they stay in `lib/constants` (PLAN_PRICES_PAISE,
+// PLAN_LIMITS, PLAN_RANK) and in the Razorpay routes for the gates, but never on the
+// marketing surface. Tier copy is shared with the landing teaser via lib/plan-copy.ts.
+const VISIBLE_TIERS = MARKETED_PLANS;
 
 export default async function PricingPage() {
   const session = await auth();
@@ -43,15 +35,17 @@ export default async function PricingPage() {
             <section
               key={tier}
               className={`flex flex-col rounded-xl border bg-card p-6 shadow-sm ${
-                tier === "STARTER" ? "ring-2 ring-[#FF6B00] ring-offset-2 ring-offset-background" : ""
+                PLAN_MARKETING[tier].emphasis ? "ring-2 ring-[#FF6B00] ring-offset-2 ring-offset-background" : ""
               }`}
             >
-              <h2 className="font-display text-xl font-semibold">{PLAN_LIMITS[tier].label}</h2>
-              <p className="mt-2 text-3xl font-bold tracking-tight">{priceLabel(tier)}</p>
-              <p className="mt-4 text-sm text-muted-foreground">
-                {tier === "FREE" && "Try AwaazOS on your stall — voice billing and UPI QR."}
-                {tier === "STARTER" && "WhatsApp receipts, Sarvam STT in te/kn/ta, higher limits."}
-              </p>
+              <h2 className="font-display text-xl font-semibold">{PLAN_MARKETING[tier].label}</h2>
+              <p className="mt-2 text-3xl font-bold tracking-tight">{PLAN_MARKETING[tier].price}</p>
+              <p className="mt-4 text-sm text-muted-foreground">{PLAN_MARKETING[tier].summary}</p>
+              <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-foreground">
+                {PLAN_MARKETING[tier].bullets.map((b) => (
+                  <li key={b}>{b}</li>
+                ))}
+              </ul>
               <div className="mt-6 flex flex-1 flex-col justify-end gap-4">
                 <PricingPlanButtons tier={tier} signedIn={signedIn} />
               </div>
