@@ -28,6 +28,14 @@ test.describe("public surfaces", () => {
     await expect(page.getByRole("heading", { name: /^pro$/i })).toHaveCount(0);
   });
 
+  for (const path of ["/legal/privacy", "/legal/terms"]) {
+    test(`${path} is public (no sign-in redirect)`, async ({ page }) => {
+      await page.goto(path);
+      await expect(page).toHaveURL(new RegExp(`${path}$`));
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    });
+  }
+
   test("sign-in form renders email + password + submit", async ({ page }) => {
     await page.goto("/sign-in");
     await expect(page.getByLabel(/email/i)).toBeVisible();
