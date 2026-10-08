@@ -14,6 +14,11 @@ tailwindcss-animate 1.0.7 → tw-animate-css 1.4.0, autoprefixer removed,
 eslint 8.57.1 → 9.39.5 (+ `@eslint/eslintrc` 3.3.7), eslint-config-next stays
 15.5.x, tsx 4.21 → 4.23 (lockfile only, pulls esbuild 0.28.2).
 
+> **Already migrated and rebasing onto new main?** Skip to
+> [Rebasing this branch onto a main that gained Tailwind 3 code](#rebasing-this-branch-onto-a-main-that-gained-tailwind-3-code).
+> Do not re-run `@tailwindcss/upgrade` on the migrated tree, because it does
+> nothing useful there.
+
 ---
 
 ## Tailwind 4
@@ -321,3 +326,98 @@ Quick runtime checks in the browser console on `/s/<slug>`:
 - adding `.dark` to `<html>` makes the body background `rgb(2,8,23)`
 - `rounded-sm` is 4px
 - Radix sheets animate (`animation-name: enter`)
+
+---
+
+## Rebasing this branch onto a main that gained Tailwind 3 code
+
+Done once already: rebasing onto 0cf740a, which brought in PR #20 (POS offline)
+and PR #21 (public legal pages). Took about 10 minutes plus verification.
+
+### R1. Rebase, and take main's side of every conflict
+
+```bash
+git fetch origin && git rebase origin/main
+# On conflicts (last time: components/pos/VoiceOrderButton.tsx and package-lock.json):
+git checkout --ours <conflicted .tsx files> package-lock.json   # in a rebase, --ours = origin/main
+```
+
+- **Components:** take main's behaviour unchanged. Its Tailwind 3 classes get
+  converted in R3, so never hand-merge class strings.
+- **package-lock.json:** never hand-merge it. With main's lockfile in place,
+  `package.json` has already auto-merged (main's new deps plus this branch's
+  Tailwind/ESLint deps and overrides). Regenerate:
+
+```bash
+node -e '
+const fs=require("fs");const l=JSON.parse(fs.readFileSync("package-lock.json","utf8"));
+for (const k of Object.keys(l.packages)) if (k.startsWith("node_modules/@next/eslint-plugin-next/node_modules/")) delete l.packages[k];
+fs.writeFileSync("package-lock.json",JSON.stringify(l,null,2)+"\n");'
+rm -rf node_modules/@next/eslint-plugin-next/node_modules
+npm install && npm update tsx        # tsx: main's lock pins esbuild 0.27.x (low advisory)
+npm audit                            # found 0 vulnerabilities
+git add <files> package-lock.json && GIT_EDITOR=true git rebase --continue
+```
+
+### R2. Do NOT run the upgrade tool on the migrated tree
+
+On a v4 project, `@tailwindcss/upgrade` sees `tailwindcss@4` and only does v4
+canonicalisations, such as `min-h-[3rem]` → `min-h-12`. It **cannot** tell
+that main's `outline-none` / `shadow-sm` / `rounded-sm` were written for v3,
+because those names are also valid in v4 with a different meaning. It
+silently leaves them, and you lose v3 parity.
+
+### R3. Run the tool in v3 mode on a throwaway checkout of main, then copy over main's changed files
+
+```bash
+T=<scratch dir outside the repo>
+git worktree add --detach "$T" origin/main
+(cd "$T" && npm ci --ignore-scripts && npx -y @tailwindcss/upgrade@4.3.3)
+for f in $(git diff --name-only <old-base>..origin/main | grep -E '\.(tsx|ts|jsx|js|css)$'); do
+  [ -f "$T/$f" ] && ! git -C "$T" diff --quiet -- "$f" && cp "$T/$f" "$f" && echo "copied $f"
+done
+git diff        # the new renames
+```
+
+`<old-base>` is the main commit this branch was last based on (c5d288f for
+the first rebase, 0cf740a for the next). Skip `app/globals.css` and
+`package*.json` in that list. Then:
+
+- re-apply this branch's manual edits that the copy overwrote. Check with
+  `git diff`: anything that **removes** `sm:leading-*` from the storefront
+  or Hero `<h1>`, or turns a variant back into `"outline-solid"`, must be
+  restored (`git checkout <file>` when the copy added nothing new)
+- run the step 3 grep (`'"outline-solid"'`) and the step 6 leading/responsive-text grep
+- `grep -noE "[a-z:-]*space-[xy]-[^ \"'\`}]+"` over the changed files.
+  Numeric `space-y-N` / `space-x-N` is covered by the step 5d parity block;
+  anything else (`space-y-[…]`, `-space-*`, `space-*-reverse`) needs handling
+- remove the scratch worktree. On Windows a deep `node_modules` makes
+  `git worktree remove` fail with "Filename too long". Use
+  `cmd /c rmdir /s /q "\?\<path>"`, then `git worktree prune`
+
+Sanity check: for every file the tool touched, the tool's output should now
+match the branch byte for byte (ignoring CRLF), apart from the documented
+manual edits.
+
+Last time this gave: PosSyncStatus `focus-visible:outline-none` →
+`outline-hidden`, VoiceOrderButton `focus-visible:outline-none` →
+`outline-hidden` and `min-h-[3rem]` → `min-h-12`. The other #20/#21 files had
+already come through the rebase with their renames, and #21 had no class
+changes. The new space-y usages were all numeric.
+
+### R4. Schema drift on the throwaway DB
+
+If main changed `prisma/schema.prisma` (#20 added a nullable
+`Transaction.clientRef` plus `@@unique([vendorId, clientRef])`), run
+`npx prisma db push --skip-generate --accept-data-loss` against the
+**throwaway** DB only. The "data loss" warning is just the unique constraint,
+and NULLs never collide.
+
+### R5. Visual parity for new screens
+
+Add main's new UI states to the screenshot set. For POS offline: visit `/pos`,
+wait for `navigator.serviceWorker.controller`, reload, wait for
+`caches.match("/pos")`, then `context.setOffline(true)` and reload. Capture
+the offline banner, a cash sale's receipt ("Offline #N"), and "N sales
+waiting to sync". Close the context **while still offline** so the queued
+sales never sync into the DB.
