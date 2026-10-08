@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
+import { useCartHubEntry } from "@/components/storefront/CartHub";
 import {
   CartBar,
   CheckoutSheet,
@@ -104,6 +105,17 @@ export function MenuOrder(props: MenuOrderProps) {
   const itemCount = lines.reduce((s, l) => s + l.qty, 0);
   const subtotalPaise = sumPaise(lines.map((l) => l.item.priceInPaise * l.qty));
   const canPay = payment.upi || payment.cod;
+
+  // The page-level cart bar (CartHub) shows this cart next to any drop's.
+  const inHub = useCartHubEntry({
+    key: "menu",
+    label: "Everyday menu",
+    itemCount,
+    subtotalPaise,
+    canPay,
+    onCheckout: () => setOpen(true),
+    enabled: true,
+  });
 
   function onRejected(err: OrderApiError): string {
     const item = err.menuItemId ? byId.get(err.menuItemId) : undefined;
@@ -227,13 +239,15 @@ export function MenuOrder(props: MenuOrderProps) {
 
       {!canPay ? <NoPaymentNotice /> : null}
 
-      <CartBar
-        itemCount={itemCount}
-        subtotalPaise={subtotalPaise}
-        canPay={canPay}
-        onCheckout={() => setOpen(true)}
-        buttonRef={checkoutRef}
-      />
+      {inHub ? null : (
+        <CartBar
+          itemCount={itemCount}
+          subtotalPaise={subtotalPaise}
+          canPay={canPay}
+          onCheckout={() => setOpen(true)}
+          buttonRef={checkoutRef}
+        />
+      )}
 
       <CheckoutSheet
         open={open}
@@ -253,7 +267,7 @@ export function MenuOrder(props: MenuOrderProps) {
         pickupNote={pickupNote}
         payment={payment}
         prefill={prefill}
-        returnFocusRef={checkoutRef}
+        returnFocusRef={inHub ? undefined : checkoutRef}
         onOrdered={clearCart}
         buildBody={(d) => ({
           items: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty })),

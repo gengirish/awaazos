@@ -5,6 +5,7 @@ import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useCartHubEntry } from "@/components/storefront/CartHub";
 import {
   CartBar,
   CheckoutSheet,
@@ -130,6 +131,17 @@ export function DropOrder(props: DropOrderProps) {
   const subtotalPaise = sumPaise(lines.map((l) => l.item.priceInPaise * l.qty));
   const canPay = payment.upi || payment.cod;
 
+  // The page-level cart bar (CartHub) shows this cart next to any others.
+  const inHub = useCartHubEntry({
+    key: `drop:${dropId}`,
+    label: `Pre-order · ${dropTitle}`,
+    itemCount,
+    subtotalPaise,
+    canPay,
+    onCheckout: () => setOpen(true),
+    enabled: orderable,
+  });
+
   /** Business rejection → cart correction + buyer copy. */
   function onRejected(err: OrderApiError): string {
     const item = err.dropItemId ? byId.get(err.dropItemId) : undefined;
@@ -235,7 +247,7 @@ export function DropOrder(props: DropOrderProps) {
 
       {orderable && !canPay ? <NoPaymentNotice /> : null}
 
-      {orderable ? (
+      {orderable && !inHub ? (
         <CartBar
           itemCount={itemCount}
           subtotalPaise={subtotalPaise}
@@ -264,7 +276,7 @@ export function DropOrder(props: DropOrderProps) {
         pickupWindow={pickupWindow}
         payment={payment}
         prefill={prefill}
-        returnFocusRef={checkoutRef}
+        returnFocusRef={inHub ? undefined : checkoutRef}
         onOrdered={clearCart}
         buildBody={(d) => ({
           dropId,

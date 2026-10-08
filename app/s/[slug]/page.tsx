@@ -16,6 +16,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
+import { CartHubProvider } from "@/components/storefront/CartHub";
 import { CopyUpiId } from "@/components/storefront/CopyUpiId";
 import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
 import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
@@ -629,202 +630,204 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
         </nav>
       ) : null}
 
-      <main id="menu" className="mx-auto max-w-2xl px-4 py-7 sm:px-6 sm:py-9">
-        {dropViews.length > 0 ? (
-          <div id="drops" className="mb-10 scroll-mt-20 space-y-6">
-            <h2 className="sr-only">Pre-order menus</h2>
-            {dropViews.map((view) => (
-              <DropSection
-                key={view.drop.id}
-                view={view}
-                slug={vendor.slug}
-                payment={payment}
-                now={now}
-                prefill={prefill}
-                menuOrdering={menuOrdering}
-              />
-            ))}
-          </div>
-        ) : null}
+      <CartHubProvider>
+        <main id="menu" className="mx-auto max-w-2xl px-4 py-7 sm:px-6 sm:py-9">
+          {dropViews.length > 0 ? (
+            <div id="drops" className="mb-10 scroll-mt-20 space-y-6">
+              <h2 className="sr-only">Pre-order menus</h2>
+              {dropViews.map((view) => (
+                <DropSection
+                  key={view.drop.id}
+                  view={view}
+                  slug={vendor.slug}
+                  payment={payment}
+                  now={now}
+                  prefill={prefill}
+                  menuOrdering={menuOrdering}
+                />
+              ))}
+            </div>
+          ) : null}
 
-        {dropViews.length > 0 && categories.length > 0 ? (
-          <h2 className="mb-4 font-display text-lg font-bold text-awaaz-charcoal">Everyday menu</h2>
-        ) : dropViews.length === 0 ? (
-          <h2 className="sr-only">Menu</h2>
-        ) : null}
+          {dropViews.length > 0 && categories.length > 0 ? (
+            <h2 className="mb-4 font-display text-lg font-bold text-awaaz-charcoal">Everyday menu</h2>
+          ) : dropViews.length === 0 ? (
+            <h2 className="sr-only">Menu</h2>
+          ) : null}
 
-        {categories.length === 0 ? (
-          dropViews.length > 0 ? null : (
-            <p className="rounded-2xl border border-dashed border-border bg-background px-4 py-12 text-center text-sm text-muted-foreground">
-              This stall has not published any items yet. Please check back soon.
-            </p>
-          )
-        ) : (
-          <div className="space-y-8">
-            {/* With menu ordering on, rows carry their own "Popular" badge and a
-                stepper; a second, non-orderable grid would only confuse. */}
-            {popular.length > 1 && !menuOrdering ? (
-              <section aria-labelledby="popular-heading">
-                <h3
-                  id="popular-heading"
-                  className="mb-3 flex items-center gap-2 font-display text-base font-bold text-awaaz-charcoal"
-                >
-                  <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
-                  Most loved
-                </h3>
-                <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                  {popular.map((item) => (
-                    <li
-                      key={item.id}
-                      className="flex flex-col gap-2 rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/10 to-background p-3 shadow-sm"
-                    >
-                      {item.imageUrl ? (
-                        <Image
-                          src={item.imageUrl}
-                          alt=""
-                          width={44}
-                          height={44}
-                          className="h-11 w-11 rounded-xl object-cover ring-1 ring-border/60"
-                        />
-                      ) : (
-                        <span aria-hidden="true" className="text-2xl leading-none">
-                          {item.emoji}
-                        </span>
-                      )}
-                      <span className="text-sm font-semibold leading-snug text-foreground">
-                        {item.name}
-                      </span>
-                      <span className="mt-auto font-mono text-sm font-bold tabular-nums text-primary">
-                        {formatINRCompact(item.priceInPaise)}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </section>
-            ) : null}
-
-            {menuOrdering ? (
-              <MenuOrder
-                slug={vendor.slug}
-                vendorName={vendor.name}
-                categories={menuCategories}
-                fulfilmentTypes={allowedFulfilmentTypes(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}
-                deliveryFeePaise={vendor.settings?.menuDeliveryFeePaise ?? 0}
-                pickupNote={vendor.settings?.menuPickupNote ?? null}
-                payment={payment}
-                prefill={prefill}
-              />
-            ) : null}
-
-            {menuOrdering ? null : categories.map(([category, items], i) => (
-              <section key={category} aria-labelledby={categoryAnchor(category, i)}>
-                <div className="mb-3 flex items-baseline gap-3">
+          {categories.length === 0 ? (
+            dropViews.length > 0 ? null : (
+              <p className="rounded-2xl border border-dashed border-border bg-background px-4 py-12 text-center text-sm text-muted-foreground">
+                This stall has not published any items yet. Please check back soon.
+              </p>
+            )
+          ) : (
+            <div className="space-y-8">
+              {/* With menu ordering on, rows carry their own "Popular" badge and a
+                  stepper; a second, non-orderable grid would only confuse. */}
+              {popular.length > 1 && !menuOrdering ? (
+                <section aria-labelledby="popular-heading">
                   <h3
-                    id={categoryAnchor(category, i)}
-                    className="scroll-mt-20 font-display text-base font-bold text-awaaz-charcoal"
+                    id="popular-heading"
+                    className="mb-3 flex items-center gap-2 font-display text-base font-bold text-awaaz-charcoal"
                   >
-                    {category}
+                    <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
+                    Most loved
                   </h3>
-                  <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
-                  <span className="text-xs font-semibold text-muted-foreground">
-                    {items.length}
-                  </span>
-                </div>
-                <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
-                  {items.map((item) => (
-                    <MenuRow key={item.id} item={item} />
-                  ))}
-                </ul>
-              </section>
-            ))}
-          </div>
-        )}
-
-        {upiLink && (menuOrdering || menuHidden) ? (
-          /* Menu ordering on (or the menu handed over to an open drop): a cart
-             gives the buyer an exact amount, so the open-amount QR is demoted
-             to a collapsed fallback for paying at the counter instead of
-             competing with checkout. */
-          <details
-            id="pay"
-            className="group mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm"
-          >
-            <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
-              <QrCode className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              <span className="flex-1">Paying at the counter? Show the UPI QR</span>
-              <ChevronDown
-                className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
-                aria-hidden="true"
-              />
-            </summary>
-            <div className="border-t border-border/50 px-4 py-5 text-center sm:px-6">
-              <h3 id="pay-heading" className="sr-only">
-                Scan to pay at the counter
-              </h3>
-              <p className="text-sm text-muted-foreground">Any UPI app. Enter the amount the vendor tells you.</p>
-              <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
-                <UpiQrImage src={buildQrUrl(upiLink, 180)} alt={`UPI QR code to pay ${payeeName}`} size={180} />
-              </div>
-              <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Paying {payeeName}
-              </p>
-              {vendor.upiId ? (
-                <div className="mt-2 flex justify-center">
-                  <CopyUpiId upiId={vendor.upiId} className="max-w-full" />
-                </div>
-              ) : null}
-            </div>
-          </details>
-        ) : upiLink ? (
-          <section
-            id="pay"
-            aria-labelledby="pay-heading"
-            className="mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-primary/25 bg-background shadow-sm"
-          >
-            <div className="bg-gradient-to-b from-primary/10 to-transparent px-4 py-6 text-center sm:px-6">
-              <h3 id="pay-heading" className="font-display text-xl font-bold text-awaaz-charcoal">
-                Scan to pay
-              </h3>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Any UPI app. Enter the amount the vendor tells you.
-              </p>
-
-              <div className="mx-auto mt-5 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
-                <UpiQrImage src={buildQrUrl(upiLink, 220)} alt={`UPI QR code to pay ${payeeName}`} size={220} />
-              </div>
-
-              <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Paying {payeeName}
-              </p>
-              {vendor.upiId ? (
-                <div className="mt-2 flex justify-center">
-                  <CopyUpiId upiId={vendor.upiId} className="max-w-full" />
-                </div>
+                  <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {popular.map((item) => (
+                      <li
+                        key={item.id}
+                        className="flex flex-col gap-2 rounded-2xl border border-primary/20 bg-gradient-to-b from-primary/10 to-background p-3 shadow-sm"
+                      >
+                        {item.imageUrl ? (
+                          <Image
+                            src={item.imageUrl}
+                            alt=""
+                            width={44}
+                            height={44}
+                            className="h-11 w-11 rounded-xl object-cover ring-1 ring-border/60"
+                          />
+                        ) : (
+                          <span aria-hidden="true" className="text-2xl leading-none">
+                            {item.emoji}
+                          </span>
+                        )}
+                        <span className="text-sm font-semibold leading-snug text-foreground">
+                          {item.name}
+                        </span>
+                        <span className="mt-auto font-mono text-sm font-bold tabular-nums text-primary">
+                          {formatINRCompact(item.priceInPaise)}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ) : null}
 
-              <a
-                href={upiLink}
-                className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md sm:hidden"
-              >
-                Open UPI app
-              </a>
-            </div>
-          </section>
-        ) : null}
-      </main>
+              {menuOrdering ? (
+                <MenuOrder
+                  slug={vendor.slug}
+                  vendorName={vendor.name}
+                  categories={menuCategories}
+                  fulfilmentTypes={allowedFulfilmentTypes(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}
+                  deliveryFeePaise={vendor.settings?.menuDeliveryFeePaise ?? 0}
+                  pickupNote={vendor.settings?.menuPickupNote ?? null}
+                  payment={payment}
+                  prefill={prefill}
+                />
+              ) : null}
 
-      <footer className="px-4 pb-10 pt-2 text-center">
-        {vendor.settings?.fssaiNumber ? (
-          <p className="mb-3 text-xs text-muted-foreground">FSSAI Lic. No. {vendor.settings.fssaiNumber}</p>
-        ) : null}
-        <Link
-          href="/"
-          className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
-        >
-          <span aria-hidden="true">🎙️</span>
-          Billing by AwaazOS — Bol. Bill. Becho.
-        </Link>
-      </footer>
+              {menuOrdering ? null : categories.map(([category, items], i) => (
+                <section key={category} aria-labelledby={categoryAnchor(category, i)}>
+                  <div className="mb-3 flex items-baseline gap-3">
+                    <h3
+                      id={categoryAnchor(category, i)}
+                      className="scroll-mt-20 font-display text-base font-bold text-awaaz-charcoal"
+                    >
+                      {category}
+                    </h3>
+                    <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
+                    <span className="text-xs font-semibold text-muted-foreground">
+                      {items.length}
+                    </span>
+                  </div>
+                  <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm">
+                    {items.map((item) => (
+                      <MenuRow key={item.id} item={item} />
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
+          )}
+
+          {upiLink && (menuOrdering || menuHidden) ? (
+            /* Menu ordering on (or the menu handed over to an open drop): a cart
+               gives the buyer an exact amount, so the open-amount QR is demoted
+               to a collapsed fallback for paying at the counter instead of
+               competing with checkout. */
+            <details
+              id="pay"
+              className="group mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-sm"
+            >
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
+                <QrCode className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <span className="flex-1">Paying at the counter? Show the UPI QR</span>
+                <ChevronDown
+                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
+                  aria-hidden="true"
+                />
+              </summary>
+              <div className="border-t border-border/50 px-4 py-5 text-center sm:px-6">
+                <h3 id="pay-heading" className="sr-only">
+                  Scan to pay at the counter
+                </h3>
+                <p className="text-sm text-muted-foreground">Any UPI app. Enter the amount the vendor tells you.</p>
+                <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
+                  <UpiQrImage src={buildQrUrl(upiLink, 180)} alt={`UPI QR code to pay ${payeeName}`} size={180} />
+                </div>
+                <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Paying {payeeName}
+                </p>
+                {vendor.upiId ? (
+                  <div className="mt-2 flex justify-center">
+                    <CopyUpiId upiId={vendor.upiId} className="max-w-full" />
+                  </div>
+                ) : null}
+              </div>
+            </details>
+          ) : upiLink ? (
+            <section
+              id="pay"
+              aria-labelledby="pay-heading"
+              className="mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-primary/25 bg-background shadow-sm"
+            >
+              <div className="bg-gradient-to-b from-primary/10 to-transparent px-4 py-6 text-center sm:px-6">
+                <h3 id="pay-heading" className="font-display text-xl font-bold text-awaaz-charcoal">
+                  Scan to pay
+                </h3>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Any UPI app. Enter the amount the vendor tells you.
+                </p>
+
+                <div className="mx-auto mt-5 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
+                  <UpiQrImage src={buildQrUrl(upiLink, 220)} alt={`UPI QR code to pay ${payeeName}`} size={220} />
+                </div>
+
+                <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                  Paying {payeeName}
+                </p>
+                {vendor.upiId ? (
+                  <div className="mt-2 flex justify-center">
+                    <CopyUpiId upiId={vendor.upiId} className="max-w-full" />
+                  </div>
+                ) : null}
+
+                <a
+                  href={upiLink}
+                  className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md sm:hidden"
+                >
+                  Open UPI app
+                </a>
+              </div>
+            </section>
+          ) : null}
+        </main>
+
+        <footer className="px-4 pb-10 pt-2 text-center">
+          {vendor.settings?.fssaiNumber ? (
+            <p className="mb-3 text-xs text-muted-foreground">FSSAI Lic. No. {vendor.settings.fssaiNumber}</p>
+          ) : null}
+          <Link
+            href="/"
+            className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+          >
+            <span aria-hidden="true">🎙️</span>
+            Billing by AwaazOS — Bol. Bill. Becho.
+          </Link>
+        </footer>
+      </CartHubProvider>
     </div>
   );
 }
