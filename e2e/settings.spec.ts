@@ -62,10 +62,13 @@ test.describe("settings hub", () => {
       await hubRow(page, row.title).click();
       await expect(page).toHaveURL(new RegExp(`${row.path}$`));
       await expect(page.getByRole("heading", { level: 1, name: row.heading })).toBeVisible();
-      // Desktop: the sidebar marks the current page.
-      await expect(
-        page.getByRole("navigation", { name: "Settings", exact: true }).getByRole("link", { name: row.title }),
-      ).toHaveAttribute("aria-current", "page");
+      // Desktop (md+): the sidebar marks the current page. Phones have no sidebar —
+      // they get the "← Settings" back link instead (covered in the phone test).
+      if ((page.viewportSize()?.width ?? 0) >= 768) {
+        await expect(
+          page.getByRole("navigation", { name: "Settings", exact: true }).getByRole("link", { name: row.title }),
+        ).toHaveAttribute("aria-current", "page");
+      }
     }
 
     // Fix both checklist items through the checklist's own links.
