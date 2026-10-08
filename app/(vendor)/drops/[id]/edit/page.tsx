@@ -38,7 +38,7 @@ export default async function EditDropPage(props: { params: Promise<{ id: string
     }),
     soldQtyByDropItem(prisma, drop.id, now),
     prisma.transaction.count({ where: { vendorId: vendor.id, dropId: drop.id, ...liveDropOrderWhere } }),
-    prisma.vendorSettings.findUnique({ where: { vendorId: vendor.id }, select: { acceptMenuOrders: true } }),
+    prisma.vendorSettings.findUnique({ where: { vendorId: vendor.id }, select: { acceptMenuOrders: true, voiceLang: true } }),
   ]);
 
   const soldByMenuItem: Record<string, number> = {};
@@ -104,6 +104,7 @@ export default async function EditDropPage(props: { params: Promise<{ id: string
           initial={dropToFormInput(drop)}
           locked={locked}
           soldByMenuItem={soldByMenuItem}
+          voiceLang={settings?.voiceLang ?? "en-IN"}
         />
       </main>
     </div>

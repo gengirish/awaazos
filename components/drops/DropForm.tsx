@@ -1,12 +1,13 @@
 "use client";
 
 import type { DropStatus } from "@prisma/client";
-import { AlertTriangle, Copy, Loader2, Trash2 } from "lucide-react";
+import { AlertTriangle, Copy, Loader2, Mic, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { VoiceDropPanel, type VoiceApplyResult } from "@/components/drops/VoiceDropPanel";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -16,7 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { formatINR, paiseToRupees, rupeesToPaise } from "@/lib/currency";
+import { formatINR, rupeesToPaise } from "@/lib/currency";
 import type { EffectiveDropStatus } from "@/lib/drops";
 import {
   DROP_CONFLICT_MESSAGE,
@@ -28,6 +29,18 @@ import {
   shiftOrderWindowDates,
 } from "@/lib/drops-builder";
 import { formatDropDayLabel, formatIstDate, ymdToDbDate } from "@/lib/drops-time";
+import {
+  NO_VOICE_MARKS,
+  mergeDropDraft,
+  paiseToRupeeInput,
+  unmarkField,
+  unmarkItem,
+  type DropFormFields,
+  type DropFormRow,
+  type DropFormSnapshot,
+  type VoiceMarks,
+} from "@/lib/drop-voice";
+import type { DropDraft } from "@/lib/parse-drop-types";
 import type { DropUpsertInput } from "@/lib/zod-drops";
 
 // ─── Shared bits ────────────────────────────────────────────────────
@@ -47,9 +60,7 @@ function ymdHint(ymd: string): string {
   }
 }
 
-function paiseToInput(paise: number): string {
-  return String(paiseToRupees(paise));
-}
+const paiseToInput = paiseToRupeeInput;
 
 /** "120" / "12.50" → paise, or null if it isn't a valid rupee amount. */
 function rupeeInputToPaise(raw: string): number | null {
@@ -92,6 +103,17 @@ function ConflictFix({ code }: { code: string | null }) {
     );
   }
   return null;
+}
+
+/** "From voice" marker — text + icon, not colour alone. */
+function FromVoiceBadge({ show }: { show: boolean }) {
+  if (!show) return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full border border-primary/50 bg-primary/10 px-2 py-0.5 text-xs font-medium text-foreground">
+      <Mic className="h-3 w-3" aria-hidden="true" />
+      From voice
+    </span>
+  );
 }
 
 /**
@@ -139,24 +161,8 @@ export type DropFormMenuItem = {
   isAvailable: boolean;
 };
 
-type Row = { selected: boolean; price: string; maxQty: string; perOrderLimit: string };
-
-type FormState = {
-  title: string;
-  note: string;
-  date: string;
-  fulfilmentMode: DropUpsertInput["fulfilmentMode"];
-  fulfilmentStart: string;
-  fulfilmentEnd: string;
-  deliveryFee: string;
-  pickupNote: string;
-  closesAtDate: string;
-  closesAtTime: string;
-  useOpensAt: boolean;
-  opensAtDate: string;
-  opensAtTime: string;
-  showEverydayMenu: boolean;
-};
+type Row = DropFormRow;
+type FormState = DropFormFields;
 
 export type DropFormProps = {
   menuItems: DropFormMenuItem[];
@@ -167,6 +173,8 @@ export type DropFormProps = {
   locked?: boolean;
   /** menuItemId → qty already reserved by buyers (edit only). */
   soldByMenuItem?: Record<string, number>;
+  /** VendorSettings.voiceLang. Present = show the voice panel (hidden when locked). */
+  voiceLang?: string;
 };
 
 const MODES: { value: FormState["fulfilmentMode"]; label: string }[] = [
@@ -175,7 +183,14 @@ const MODES: { value: FormState["fulfilmentMode"]; label: string }[] = [
   { value: "BOTH", label: "Both" },
 ];
 
-export function DropForm({ menuItems, initial, dropId, locked = false, soldByMenuItem = {} }: DropFormProps) {
+export function DropForm({
+  menuItems,
+  initial,
+  dropId,
+  locked = false,
+  soldByMenuItem = {},
+  voiceLang,
+}: DropFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [filter, setFilter] = useState("");
@@ -200,12 +215,13 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
     showEverydayMenu: initial.showEverydayMenu ?? false,
   }));
 
-  // Drop items first (in their saved order), then the rest of the menu.
-  const order = useMemo(() => {
+  // Drop items first (in their saved order), then the rest of the menu. Voice
+  // can reorder it (dishes in the order they were spoken).
+  const [order, setOrder] = useState<string[]>(() => {
     const inDrop = initial.items.map((i) => i.menuItemId);
     const seen = new Set(inDrop);
     return [...inDrop, ...menuItems.map((m) => m.id).filter((id) => !seen.has(id))];
-  }, [initial.items, menuItems]);
+  });
 
   const menuById = useMemo(() => new Map(menuItems.map((m) => [m.id, m])), [menuItems]);
 
@@ -225,9 +241,19 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
     return out;
   });
 
+  // Voice: which fields came from the last take, and the form before it (undo).
+  const [voiceMarks, setVoiceMarks] = useState<VoiceMarks>(NO_VOICE_MARKS);
+  const [beforeVoice, setBeforeVoice] = useState<{
+    snapshot: DropFormSnapshot;
+    marks: VoiceMarks;
+    lastCookingDate: string;
+  } | null>(null);
+  const fromVoice = (...keys: (keyof FormState)[]) => keys.some((k) => voiceMarks.fields.includes(k));
+
   const set = <K extends keyof FormState>(key: K, value: FormState[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
     setFieldErrors((e) => (e[key] ? { ...e, [key]: "" } : e));
+    setVoiceMarks((m) => unmarkField(m, key));
   };
 
   // Order-window dates follow the cooking day unless the vendor set them by
@@ -249,12 +275,47 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
         ? { ...e, date: "", closesAtDate: "", closesAtTime: "", opensAtDate: "" }
         : e,
     );
+    setVoiceMarks((m) => unmarkField(m, "date"));
   };
   const leadDays = cutoffLeadDays(form.date, form.closesAtDate);
   const setRow = (id: string, patch: Partial<Row>) => {
     setRows((r) => ({ ...r, [id]: { ...r[id], ...patch } }));
     setItemErrors((e) => (e[id] ? { ...e, [id]: "" } : e));
+    setVoiceMarks((m) => unmarkItem(m, id));
   };
+
+  /** Merge a parsed voice draft into the form. Never saves. */
+  const applyVoiceDraft = useCallback(
+    (draft: DropDraft): VoiceApplyResult => {
+      const prev: DropFormSnapshot = { form, rows, order };
+      const result = mergeDropDraft(prev, draft, menuItems, touchedDates.current);
+      setBeforeVoice({ snapshot: prev, marks: voiceMarks, lastCookingDate: lastCookingDate.current });
+      if (isValidYmd(result.next.form.date)) lastCookingDate.current = result.next.form.date;
+      setForm(result.next.form);
+      setRows(result.next.rows);
+      setOrder(result.next.order);
+      setVoiceMarks(result.marks);
+      setFieldErrors({});
+      setItemErrors({});
+      setFormError(null);
+      setFilter("");
+      return result;
+    },
+    [form, rows, order, menuItems, voiceMarks],
+  );
+
+  const undoVoice = useCallback(() => {
+    if (!beforeVoice) return;
+    setForm(beforeVoice.snapshot.form);
+    setRows(beforeVoice.snapshot.rows);
+    setOrder(beforeVoice.snapshot.order);
+    setVoiceMarks(beforeVoice.marks);
+    lastCookingDate.current = beforeVoice.lastCookingDate;
+    setFieldErrors({});
+    setItemErrors({});
+    setFormError(null);
+    setBeforeVoice(null);
+  }, [beforeVoice]);
 
   const selectedIds = order.filter((id) => rows[id]?.selected && menuById.has(id));
   const visibleIds = order.filter((id) => {
@@ -389,6 +450,16 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
         </p>
       ) : null}
 
+      {voiceLang && !locked ? (
+        <VoiceDropPanel
+          voiceLang={voiceLang}
+          isEdit={Boolean(dropId)}
+          onDraft={applyVoiceDraft}
+          onUndo={undoVoice}
+          canUndo={beforeVoice !== null}
+        />
+      ) : null}
+
       <fieldset disabled={locked || pending} className="space-y-6">
         {/* ── Basics ── */}
         <section aria-labelledby="drop-basics" className="space-y-4 rounded-xl border border-border bg-card p-4">
@@ -396,9 +467,12 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
             What are you cooking?
           </h2>
           <div className="space-y-1.5">
-            <label htmlFor="drop-title" className="text-sm font-medium">
-              Title
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="drop-title" className="text-sm font-medium">
+                Title
+              </label>
+              <FromVoiceBadge show={fromVoice("title")} />
+            </div>
             <input
               id="drop-title"
               className={inputCls}
@@ -411,9 +485,12 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
             {err("title")}
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="drop-note" className="text-sm font-medium">
-              Note for customers <span className="font-normal text-muted-foreground">(optional)</span>
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="drop-note" className="text-sm font-medium">
+                Note for customers <span className="font-normal text-muted-foreground">(optional)</span>
+              </label>
+              <FromVoiceBadge show={fromVoice("note")} />
+            </div>
             <textarea
               id="drop-note"
               className={`${inputCls} min-h-20 py-2`}
@@ -426,9 +503,12 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
             {err("note")}
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="drop-date" className="text-sm font-medium">
-              Cooking day
-            </label>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="drop-date" className="text-sm font-medium">
+                Cooking day
+              </label>
+              <FromVoiceBadge show={fromVoice("date")} />
+            </div>
             <input
               id="drop-date"
               type="date"
@@ -444,9 +524,12 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
 
         {/* ── Fulfilment ── */}
         <section aria-labelledby="drop-fulfilment" className="space-y-4 rounded-xl border border-border bg-card p-4">
-          <h2 id="drop-fulfilment" className="font-display text-lg font-semibold">
-            Delivery or pickup
-          </h2>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 id="drop-fulfilment" className="font-display text-lg font-semibold">
+              Delivery or pickup
+            </h2>
+            <FromVoiceBadge show={fromVoice("fulfilmentMode")} />
+          </div>
           <div role="radiogroup" aria-label="How customers get their food" className="grid grid-cols-3 gap-2">
             {MODES.map((m) => {
               const active = form.fulfilmentMode === m.value;
@@ -470,9 +553,12 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label htmlFor="drop-start" className="text-sm font-medium">
-                From
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="drop-start" className="text-sm font-medium">
+                  From
+                </label>
+                <FromVoiceBadge show={fromVoice("fulfilmentStart")} />
+              </div>
               <input
                 id="drop-start"
                 type="time"
@@ -484,9 +570,12 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
               {err("fulfilmentStart")}
             </div>
             <div className="space-y-1.5">
-              <label htmlFor="drop-end" className="text-sm font-medium">
-                Until
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="drop-end" className="text-sm font-medium">
+                  Until
+                </label>
+                <FromVoiceBadge show={fromVoice("fulfilmentEnd")} />
+              </div>
               <input
                 id="drop-end"
                 type="time"
@@ -500,9 +589,12 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
           </div>
           {form.fulfilmentMode !== "PICKUP" ? (
             <div className="space-y-1.5">
-              <label htmlFor="drop-fee" className="text-sm font-medium">
-                Delivery fee (₹)
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="drop-fee" className="text-sm font-medium">
+                  Delivery fee (₹)
+                </label>
+                <FromVoiceBadge show={fromVoice("deliveryFee")} />
+              </div>
               <input
                 id="drop-fee"
                 inputMode="decimal"
@@ -518,9 +610,12 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
           ) : null}
           {form.fulfilmentMode !== "DELIVERY" ? (
             <div className="space-y-1.5">
-              <label htmlFor="drop-pickup" className="text-sm font-medium">
-                Pickup instructions <span className="font-normal text-muted-foreground">(optional)</span>
-              </label>
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="drop-pickup" className="text-sm font-medium">
+                  Pickup instructions <span className="font-normal text-muted-foreground">(optional)</span>
+                </label>
+                <FromVoiceBadge show={fromVoice("pickupNote")} />
+              </div>
               <input
                 id="drop-pickup"
                 className={inputCls}
@@ -542,6 +637,7 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
           </h2>
           <fieldset className="space-y-1.5">
             <legend className="text-sm font-medium">Last time to order</legend>
+            <FromVoiceBadge show={fromVoice("closesAtDate", "closesAtTime")} />
             <div className="grid grid-cols-2 gap-3">
               <input
                 type="date"
@@ -579,6 +675,7 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
           {form.useOpensAt ? (
             <fieldset className="space-y-1.5">
               <legend className="text-sm font-medium">Orders open at</legend>
+              <FromVoiceBadge show={fromVoice("opensAtDate", "opensAtTime")} />
               <div className="grid grid-cols-2 gap-3">
                 <input
                   type="date"
@@ -617,6 +714,11 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
             <p id="drop-everyday-help" className="pl-8 text-xs text-muted-foreground">
               Off: customers see only this drop. On: your regular menu appears below it.
             </p>
+            {fromVoice("showEverydayMenu") ? (
+              <div className="pl-8">
+                <FromVoiceBadge show />
+              </div>
+            ) : null}
           </div>
         </section>
 
@@ -681,6 +783,11 @@ export function DropForm({ menuItems, initial, dropId, locked = false, soldByMen
                           </span>
                         </span>
                       </label>
+                      {r.selected && voiceMarks.items.includes(id) ? (
+                        <div className="mt-2">
+                          <FromVoiceBadge show />
+                        </div>
+                      ) : null}
                       {r.selected ? (
                         <div className="mt-3 grid grid-cols-3 gap-2">
                           <div className="space-y-1">

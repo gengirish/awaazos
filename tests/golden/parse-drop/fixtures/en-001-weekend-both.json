@@ -1,0 +1,33 @@
+{
+  "id": "en-001-weekend-both",
+  "lang": "en-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "Sunday brunch drop, pickup or delivery 10 am to 1 pm, 12 banana bread at 300 each, 20 ragi laddu, max 4 laddu per order, orders close Saturday 9 pm",
+  "expected": {
+    "date": "2026-10-11",
+    "fulfilmentMode": "BOTH",
+    "fulfilmentStart": "10:00",
+    "fulfilmentEnd": "13:00",
+    "closesAtDate": "2026-10-10",
+    "closesAtTime": "21:00",
+    "items": [
+      {
+        "menuItemId": "banana-bread",
+        "maxQty": 12,
+        "priceInPaise": 30000
+      },
+      {
+        "menuItemId": "ragi-laddu",
+        "maxQty": 20,
+        "priceInPaise": 12000,
+        "perOrderLimit": 4
+      }
+    ]
+  },
+  "tags": [
+    "english",
+    "both",
+    "per-order-limit",
+    "weekday"
+  ]
+}

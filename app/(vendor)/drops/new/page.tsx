@@ -19,11 +19,14 @@ export default async function NewDropPage() {
     throw e;
   }
 
-  const menuItems = await prisma.menuItem.findMany({
-    where: { vendorId },
-    orderBy: { sortOrder: "asc" },
-    select: { id: true, name: true, emoji: true, priceInPaise: true, isAvailable: true },
-  });
+  const [menuItems, settings] = await Promise.all([
+    prisma.menuItem.findMany({
+      where: { vendorId },
+      orderBy: { sortOrder: "asc" },
+      select: { id: true, name: true, emoji: true, priceInPaise: true, isAvailable: true },
+    }),
+    prisma.vendorSettings.findUnique({ where: { vendorId }, select: { voiceLang: true } }),
+  ]);
 
   // Sensible default: cook tomorrow 5–8 pm, orders close the evening before at
   // 9 pm — or the cooking-day morning if that evening is already (nearly) gone.
@@ -64,7 +67,7 @@ export default async function NewDropPage() {
         </Link>
       </header>
       <main className="mx-auto max-w-2xl">
-        <DropForm menuItems={menuItems} initial={initial} />
+        <DropForm menuItems={menuItems} initial={initial} voiceLang={settings?.voiceLang ?? "en-IN"} />
       </main>
     </div>
   );

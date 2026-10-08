@@ -1,0 +1,33 @@
+{
+  "id": "hi-002-kal-delivery",
+  "lang": "hi-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "kal delivery karungi shaam 5 se 7, delivery charge 30 rupaye, bees modak aur pachees puran poli, order aaj raat 9 baje tak",
+  "expected": {
+    "date": "2026-10-09",
+    "fulfilmentMode": "DELIVERY",
+    "fulfilmentStart": "17:00",
+    "fulfilmentEnd": "19:00",
+    "deliveryFeePaise": 3000,
+    "closesAtDate": "2026-10-08",
+    "closesAtTime": "21:00",
+    "items": [
+      {
+        "menuItemId": "modak",
+        "maxQty": 20,
+        "priceInPaise": 3000
+      },
+      {
+        "menuItemId": "puran-poli",
+        "maxQty": 25,
+        "priceInPaise": 5000
+      }
+    ]
+  },
+  "tags": [
+    "hinglish",
+    "indic-numerals",
+    "delivery-fee",
+    "part-of-day"
+  ]
+}

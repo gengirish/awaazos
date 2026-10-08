@@ -152,7 +152,7 @@ export const anthropicSonnet = new Proxy({} as Anthropic, {
   },
 });
 
-function stableMenuJson(menuItems: MenuItemForParse[]): string {
+export function stableMenuJson(menuItems: MenuItemForParse[]): string {
   const normalized = [...menuItems]
     .sort((a, b) => a.id.localeCompare(b.id))
     .map((m) => ({

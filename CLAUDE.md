@@ -137,6 +137,20 @@ mic → STT (ASR only, no LLM) → transcript → /api/ai/parse-order (Claude) �
 - Telemetry is fire-and-forget: enqueue `voice-parse-log` on BullMQ, never await, swallow enqueue
   failures. The cashier never waits on logging.
 
+**Voice drop builder** — `POST /api/ai/parse-drop` (`lib/parse-drop.ts`, MANAGER) turns a cook's
+spoken plan ("aaj ke liye 20 ragi laddu 150 rupaye, pickup shaam 6 se 8, order 4 baje tak") into a
+**draft** `DropDraft` (`lib/parse-drop-types.ts`, client-safe) for the drop form; it saves nothing.
+Same shape as parse-order: forced `build_drop` tool, Haiku → Sonnet (`shouldEscalateDrop()`: Haiku
+throws, empty items on a >3-word transcript, or ≥ half the items without a valid menu id), menu block
+from `stableMenuJson()` with `cache_control`, and today's IST date/time only in the uncached
+transcript block. `postProcessDropDraft()` never trusts the model: relative days resolve from server
+time in IST, times are re-validated, items re-anchor to this vendor's menu (unknown ids → name match
+via `rescueMatchFromTranscript()`, else `unmatched`), rupees go through `rupeesToPaise`, counts clamp,
+and anything `dropUpsertSchema` would reject becomes a `warnings` entry, not an error. Missing
+`ANTHROPIC_API_KEY` → 503 `{ error: "voice_unavailable", fallback: "form" }`. No `voice-parse-log`
+(the log has no kind column). Golden set `tests/golden/parse-drop/`:
+`npm run test:golden:drop:validate` offline, `GOLDEN_PARSE_DROP_LIVE=1 npm run test:golden:drop` live.
+
 ### Money is integer paise, everywhere
 
 `Int` in Prisma, `number` in TS. `parseFloat`, `toFixed`, `Decimal`, and `Math.round` on prices are

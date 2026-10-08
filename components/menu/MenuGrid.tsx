@@ -11,12 +11,15 @@ import { Button } from "@/components/ui/button";
 
 type MenuGridProps = {
   initialItems: MenuItem[];
+  /** Open the add form with this name on first render (`/menu?add=…`). */
+  prefillName?: string;
 };
 
-export function MenuGrid({ initialItems }: MenuGridProps) {
+export function MenuGrid({ initialItems, prefillName }: MenuGridProps) {
   const router = useRouter();
   const [items, setItems] = useState<MenuItem[]>(initialItems);
-  const [formOpen, setFormOpen] = useState(false);
+  const [formOpen, setFormOpen] = useState(Boolean(prefillName));
+  const [defaultName, setDefaultName] = useState(prefillName ?? "");
   const [editing, setEditing] = useState<MenuItem | null>(null);
 
   useEffect(() => {
@@ -28,6 +31,7 @@ export function MenuGrid({ initialItems }: MenuGridProps) {
   }, [router]);
 
   function openCreate() {
+    setDefaultName("");
     setEditing(null);
     setFormOpen(true);
   }
@@ -107,7 +111,13 @@ export function MenuGrid({ initialItems }: MenuGridProps) {
           </div>
         ))}
       </div>
-      <MenuItemForm open={formOpen} onOpenChange={setFormOpen} item={editing} onSaved={refresh} />
+      <MenuItemForm
+        open={formOpen}
+        onOpenChange={setFormOpen}
+        item={editing}
+        onSaved={refresh}
+        defaultName={defaultName}
+      />
     </div>
   );
 }

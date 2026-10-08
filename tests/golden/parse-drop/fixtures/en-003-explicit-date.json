@@ -1,0 +1,26 @@
+{
+  "id": "en-003-explicit-date",
+  "lang": "en-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "Diwali sweets on 17th October, pickup from half past five to eight in the evening, 40 boxes kaju katli at 450 rupees, orders by 15th October 9 pm",
+  "expected": {
+    "date": "2026-10-17",
+    "fulfilmentMode": "PICKUP",
+    "fulfilmentStart": "17:30",
+    "fulfilmentEnd": "20:00",
+    "closesAtDate": "2026-10-15",
+    "closesAtTime": "21:00",
+    "items": [
+      {
+        "menuItemId": "kaju-katli",
+        "maxQty": 40,
+        "priceInPaise": 45000
+      }
+    ]
+  },
+  "tags": [
+    "english",
+    "explicit-date",
+    "price-override"
+  ]
+}

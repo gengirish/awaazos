@@ -1,0 +1,38 @@
+{
+  "id": "hi-001-headline",
+  "lang": "hi-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "aaj ke liye 20 ragi laddu 150 rupaye, 15 thepla, banana bread 10, pickup shaam 6 se 8 baje, order 4 baje tak",
+  "expected": {
+    "date": "2026-10-08",
+    "fulfilmentMode": "PICKUP",
+    "fulfilmentStart": "18:00",
+    "fulfilmentEnd": "20:00",
+    "closesAtDate": "2026-10-08",
+    "closesAtTime": "16:00",
+    "items": [
+      {
+        "menuItemId": "ragi-laddu",
+        "maxQty": 20,
+        "priceInPaise": 15000
+      },
+      {
+        "menuItemId": "methi-thepla",
+        "maxQty": 15,
+        "priceInPaise": 8000
+      },
+      {
+        "menuItemId": "banana-bread",
+        "maxQty": 10,
+        "priceInPaise": 25000
+      }
+    ]
+  },
+  "tags": [
+    "hinglish",
+    "price-override",
+    "same-day-cutoff",
+    "part-of-day"
+  ],
+  "notes": "The spec's headline utterance. 'banana bread 10' is a quantity, not a price."
+}

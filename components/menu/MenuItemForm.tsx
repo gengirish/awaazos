@@ -88,9 +88,11 @@ type MenuItemFormProps = {
   onOpenChange: (open: boolean) => void;
   item: MenuItem | null;
   onSaved: () => void;
+  /** Create only: pre-fill the name (e.g. a dish heard by the voice drop builder). */
+  defaultName?: string;
 };
 
-export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemFormProps) {
+export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = "" }: MenuItemFormProps) {
   const isEdit = Boolean(item);
   const categoryOptions = useMemo(() => {
     const base: string[] = [...MENU_CATEGORIES];
@@ -138,9 +140,15 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved }: MenuItemForm
         showOnline: item.showOnline,
       });
     } else {
-      form.reset(defaultCreateValues as MenuItemFormValues);
+      const suggestion = defaultName ? suggestEmoji(defaultName) : null;
+      form.reset({
+        ...defaultCreateValues,
+        name: defaultName,
+        emoji: suggestion ?? DEFAULT_EMOJI,
+      } as MenuItemFormValues);
+      setEmojiSuggested(suggestion !== null);
     }
-  }, [open, item, form]);
+  }, [open, item, form, defaultName]);
 
   function validateImage(file: File): string | null {
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return "Use a JPEG, PNG or WebP photo";

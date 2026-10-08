@@ -1,0 +1,28 @@
+{
+  "id": "hi-003-dedh-sau",
+  "lang": "hi-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "shanivaar ko pickup dopahar 12 se 2, chakli dedh sau rupaye packet, tees packet, shukravaar raat 8 baje tak order",
+  "expected": {
+    "date": "2026-10-10",
+    "fulfilmentMode": "PICKUP",
+    "fulfilmentStart": "12:00",
+    "fulfilmentEnd": "14:00",
+    "closesAtDate": "2026-10-09",
+    "closesAtTime": "20:00",
+    "items": [
+      {
+        "menuItemId": "chakli",
+        "maxQty": 30,
+        "priceInPaise": 15000
+      }
+    ]
+  },
+  "tags": [
+    "weekday",
+    "indic-numerals",
+    "price-override",
+    "part-of-day"
+  ],
+  "notes": "Thursday -> shanivaar = Sat 10 Oct, shukravaar = Fri 9 Oct. 'packet' is a serving word."
+}

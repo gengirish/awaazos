@@ -1,0 +1,25 @@
+{
+  "id": "hi-006-saade-teen-sau",
+  "lang": "hi-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "kal subah 9 se 11 pickup, das dabba dry fruit laddu, saade teen sau ka ek dabba",
+  "expected": {
+    "date": "2026-10-09",
+    "fulfilmentMode": "PICKUP",
+    "fulfilmentStart": "09:00",
+    "fulfilmentEnd": "11:00",
+    "items": [
+      {
+        "menuItemId": "dry-fruit-laddu",
+        "maxQty": 10,
+        "priceInPaise": 35000
+      }
+    ]
+  },
+  "tags": [
+    "hinglish",
+    "indic-numerals",
+    "part-of-day",
+    "price-override"
+  ]
+}

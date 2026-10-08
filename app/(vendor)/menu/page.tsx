@@ -6,7 +6,11 @@ import { MenuGrid } from "@/components/menu/MenuGrid";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
-export default async function MenuPage() {
+export default async function MenuPage(props: { searchParams: Promise<{ add?: string | string[] }> }) {
+  // `?add=<name>` (from the voice drop builder's "Add to menu") opens the add form pre-filled.
+  const { add } = await props.searchParams;
+  const prefillName = typeof add === "string" ? add.trim().slice(0, 80) : "";
+
   let vendorId: string;
   try {
     const ctx = await requireVendorRole("CASHIER");
@@ -45,7 +49,7 @@ export default async function MenuPage() {
           </Link>
         </header>
         <main id="main-menu" className="mx-auto max-w-5xl">
-          <MenuGrid initialItems={items} />
+          <MenuGrid initialItems={items} prefillName={prefillName || undefined} />
         </main>
       </div>
     </>

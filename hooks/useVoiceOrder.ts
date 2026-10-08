@@ -21,7 +21,7 @@ type ParsedItem = {
   qty: number;
 };
 
-interface WebSpeechRecognition extends EventTarget {
+export interface WebSpeechRecognition extends EventTarget {
   lang: string;
   continuous: boolean;
   interimResults: boolean;
@@ -34,11 +34,11 @@ interface WebSpeechRecognition extends EventTarget {
   onend: ((this: WebSpeechRecognition, ev: Event) => void) | null;
 }
 
-interface VoiceSpeechRecognitionEvent extends Event {
+export interface VoiceSpeechRecognitionEvent extends Event {
   results: SpeechRecognitionResultList;
 }
 
-interface VoiceSpeechErrorEvent extends Event {
+export interface VoiceSpeechErrorEvent extends Event {
   error: string;
   message?: string;
 }
@@ -50,17 +50,17 @@ declare global {
   }
 }
 
-const SARVAM_LANGS = new Set(["te-IN", "kn-IN", "ta-IN"]);
+export const SARVAM_LANGS = new Set(["te-IN", "kn-IN", "ta-IN"]);
 // en/hi: Web Speech in the browser by default, or the server cascade when
 // VOICE_FALLBACK_ENABLED is on.
-const WEBSPEECH_LANGS = new Set(["en-IN", "hi-IN"]);
+export const WEBSPEECH_LANGS = new Set(["en-IN", "hi-IN"]);
 
 // Build-time public flag. When `true`, hi-IN/en-IN are routed through the
 // MediaRecorder + /api/ai/transcribe path (server cascade: OpenAI → Groq →
 // Whisper) instead of the in-browser Web Speech API. Set on Vercel for A/B testing.
-const VOICE_FALLBACK_ENABLED = process.env.NEXT_PUBLIC_VOICE_FALLBACK_ENABLED === "true";
+export const VOICE_FALLBACK_ENABLED = process.env.NEXT_PUBLIC_VOICE_FALLBACK_ENABLED === "true";
 
-function pickMimeType(): string | undefined {
+export function pickMimeType(): string | undefined {
   if (typeof MediaRecorder === "undefined") return undefined;
   const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4"];
   for (const t of candidates) {

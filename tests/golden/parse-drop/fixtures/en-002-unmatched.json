@@ -1,0 +1,25 @@
+{
+  "id": "en-002-unmatched",
+  "lang": "en-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "tomorrow evening 6 to 8 pickup, 15 thepla and 10 gulab jamun",
+  "expected": {
+    "date": "2026-10-09",
+    "fulfilmentMode": "PICKUP",
+    "fulfilmentStart": "18:00",
+    "fulfilmentEnd": "20:00",
+    "items": [
+      {
+        "menuItemId": "methi-thepla",
+        "maxQty": 15
+      }
+    ],
+    "unmatched": [
+      "gulab jamun"
+    ]
+  },
+  "tags": [
+    "english",
+    "unmatched"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "id": "hi-004-opens-at",
+  "lang": "hi-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "parson ke liye, orders kal subah 8 baje se khulenge aur kal raat 10 baje band, 25 dhokla, delivery shaam 7 se 9",
+  "expected": {
+    "date": "2026-10-10",
+    "fulfilmentMode": "DELIVERY",
+    "fulfilmentStart": "19:00",
+    "fulfilmentEnd": "21:00",
+    "opensAtDate": "2026-10-09",
+    "opensAtTime": "08:00",
+    "closesAtDate": "2026-10-09",
+    "closesAtTime": "22:00",
+    "items": [
+      {
+        "menuItemId": "dhokla",
+        "maxQty": 25
+      }
+    ]
+  },
+  "tags": [
+    "hinglish",
+    "opens-at",
+    "part-of-day"
+  ]
+}

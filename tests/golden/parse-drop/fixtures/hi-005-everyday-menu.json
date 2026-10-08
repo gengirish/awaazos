@@ -1,0 +1,24 @@
+{
+  "id": "hi-005-everyday-menu",
+  "lang": "hi-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "kal pickup shaam 4 se 6, 30 samosa, regular menu bhi dikhana",
+  "expected": {
+    "date": "2026-10-09",
+    "fulfilmentMode": "PICKUP",
+    "fulfilmentStart": "16:00",
+    "fulfilmentEnd": "18:00",
+    "showEverydayMenu": true,
+    "items": [
+      {
+        "menuItemId": "samosa",
+        "maxQty": 30,
+        "priceInPaise": 2000
+      }
+    ]
+  },
+  "tags": [
+    "hinglish",
+    "everyday-menu"
+  ]
+}

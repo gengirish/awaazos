@@ -1,0 +1,28 @@
+{
+  "id": "te-001-repu",
+  "lang": "te-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "repu saayantram 6 nundi 8 varaku pickup, iravai ragi laddu, padi obbattu",
+  "expected": {
+    "date": "2026-10-09",
+    "fulfilmentMode": "PICKUP",
+    "fulfilmentStart": "18:00",
+    "fulfilmentEnd": "20:00",
+    "items": [
+      {
+        "menuItemId": "ragi-laddu",
+        "maxQty": 20
+      },
+      {
+        "menuItemId": "puran-poli",
+        "maxQty": 10
+      }
+    ]
+  },
+  "tags": [
+    "telugu",
+    "indic-numerals",
+    "alias-resolution"
+  ],
+  "notes": "Telugu transliteration as it arrives from the STT route. obbattu is a Puran Poli alias."
+}

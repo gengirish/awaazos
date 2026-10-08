@@ -1,0 +1,25 @@
+{
+  "id": "en-004-items-only",
+  "lang": "en-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "20 ragi laddu and 15 murukku",
+  "expected": {
+    "fulfilmentMode": "PICKUP",
+    "items": [
+      {
+        "menuItemId": "ragi-laddu",
+        "maxQty": 20
+      },
+      {
+        "menuItemId": "chakli",
+        "maxQty": 15
+      }
+    ]
+  },
+  "tags": [
+    "english",
+    "defaults",
+    "alias-resolution"
+  ],
+  "notes": "Nothing but items: the schedule comes from server defaults (only the PICKUP default is asserted)."
+}

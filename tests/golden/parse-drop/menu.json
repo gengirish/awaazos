@@ -1,0 +1,138 @@
+[
+  {
+    "id": "ragi-laddu",
+    "slug": "ragi-laddu",
+    "name": "Ragi Laddu",
+    "aliases": [
+      "nachni laddu",
+      "ragi ladoo"
+    ],
+    "tags": [
+      "millet",
+      "sweets"
+    ],
+    "priceInPaise": 12000
+  },
+  {
+    "id": "dry-fruit-laddu",
+    "slug": "dry-fruit-laddu",
+    "name": "Dry Fruit Laddu",
+    "aliases": [
+      "dry fruit ladoo",
+      "dryfruit ladoo"
+    ],
+    "tags": [
+      "sweets"
+    ],
+    "priceInPaise": 30000
+  },
+  {
+    "id": "methi-thepla",
+    "slug": "methi-thepla",
+    "name": "Methi Thepla",
+    "aliases": [
+      "thepla",
+      "theple"
+    ],
+    "tags": [
+      "breakfast",
+      "gujarati"
+    ],
+    "priceInPaise": 8000
+  },
+  {
+    "id": "banana-bread",
+    "slug": "banana-bread",
+    "name": "Banana Bread",
+    "aliases": [
+      "banana cake"
+    ],
+    "tags": [
+      "bakes"
+    ],
+    "priceInPaise": 25000
+  },
+  {
+    "id": "chakli",
+    "slug": "chakli",
+    "name": "Chakli",
+    "aliases": [
+      "chakri",
+      "murukku"
+    ],
+    "tags": [
+      "fried",
+      "snacks"
+    ],
+    "priceInPaise": 6000
+  },
+  {
+    "id": "modak",
+    "slug": "modak",
+    "name": "Ukadiche Modak",
+    "aliases": [
+      "modak",
+      "steamed modak"
+    ],
+    "tags": [
+      "festive",
+      "sweets"
+    ],
+    "priceInPaise": 3000
+  },
+  {
+    "id": "puran-poli",
+    "slug": "puran-poli",
+    "name": "Puran Poli",
+    "aliases": [
+      "holige",
+      "obbattu"
+    ],
+    "tags": [
+      "festive",
+      "sweets"
+    ],
+    "priceInPaise": 5000
+  },
+  {
+    "id": "dhokla",
+    "slug": "dhokla",
+    "name": "Khaman Dhokla",
+    "aliases": [
+      "dhokla",
+      "khaman"
+    ],
+    "tags": [
+      "gujarati",
+      "snacks"
+    ],
+    "priceInPaise": 4000
+  },
+  {
+    "id": "samosa",
+    "slug": "samosa",
+    "name": "Samosa",
+    "aliases": [
+      "singara"
+    ],
+    "tags": [
+      "fried",
+      "snacks"
+    ],
+    "priceInPaise": 2000
+  },
+  {
+    "id": "kaju-katli",
+    "slug": "kaju-katli",
+    "name": "Kaju Katli",
+    "aliases": [
+      "kaju barfi",
+      "kaju katri"
+    ],
+    "tags": [
+      "festive",
+      "sweets"
+    ],
+    "priceInPaise": 40000
+  }
+]
