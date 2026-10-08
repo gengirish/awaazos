@@ -32,7 +32,9 @@ export default defineConfig({
   webServer: process.env.BASE_URL
     ? undefined
     : {
-        command: "npm run dev",
+        // CI runs against the production build (the workflow builds first);
+        // locally keep the dev server for fast iteration.
+        command: process.env.CI ? "npm run start" : "npm run dev",
         url: "http://localhost:3000",
         reuseExistingServer: true,
         timeout: 180_000,
