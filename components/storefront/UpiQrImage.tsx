@@ -15,9 +15,9 @@ const BOX: Record<180 | 220, string> = {
 /**
  * Counter UPI QR with a fixed-size box and a visible loading state.
  *
- * The image comes from an external QR renderer and can take a second or more
- * on a mela-ground connection; without a placeholder the box just looks empty.
- * The box is sized up front (no layout shift), shows "Loading QR…" until the
+ * The image is an inline SVG data URL rendered on the server (lib/qr.ts), so it
+ * normally paints at once; the placeholder covers a slow decode. The box is
+ * sized up front (no layout shift), shows "Loading QR…" until the
  * image fires `load`, and says so plainly if it fails — the UPI ID and "Open
  * UPI app" next to it still work.
  */

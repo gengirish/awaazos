@@ -10,7 +10,7 @@ const CSP = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://checkout.razorpay.com",
   "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob: https://api.qrserver.com https://*.razorpay.com https://*.public.blob.vercel-storage.com",
+  "img-src 'self' data: blob: https://*.razorpay.com https://*.public.blob.vercel-storage.com",
   "font-src 'self' data:",
   // Push service worker (/sw.js) and the web app manifest — same origin only.
   "worker-src 'self'",
@@ -45,11 +45,6 @@ const nextConfig = {
   poweredByHeader: false,
   images: {
     remotePatterns: [
-      {
-        protocol: "https",
-        hostname: "api.qrserver.com",
-        pathname: "/v1/create-qr-code/**",
-      },
       {
         // Vercel Blob store for menu item photos (POST /api/menu/[id]/image).
         protocol: "https",

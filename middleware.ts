@@ -12,8 +12,8 @@ export const config = {
     //  - webhook callbacks (signature-verified, must accept anonymous POST)
     //  - liveness / readiness probes (must be open for uptime monitors)
     //  - health-check sub-paths (/api/health and /api/ready)
-    //  - PWA files: the push service worker, web app manifest and its icons
+    //  - PWA files: the service worker, its offline page, web app manifest and icons
     //    (browsers fetch these without a session; a redirect breaks install/push)
-    "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/health|api/ready|sw.js|manifest.webmanifest|icon-192.png|icon-512.png|apple-touch-icon.png|badge-72.png).*)",
+    "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/health|api/ready|sw.js|offline.html|manifest.webmanifest|icon-192.png|icon-512.png|apple-touch-icon.png|badge-72.png).*)",
   ],
 };

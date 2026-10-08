@@ -1,5 +1,6 @@
 /**
- * UPI deep link (rupees on the wire) + QR image URL. See spec UPI rules.
+ * UPI deep link (rupees on the wire). See spec UPI rules. QR images are
+ * rendered locally from these links by `lib/qr.ts`.
  */
 
 export type BuildUpiDeepLinkParams = {
@@ -19,11 +20,6 @@ export function buildUpiDeepLink({ upiId, name, amountRupees, billRef }: BuildUp
     tn: billRef,
   });
   return `upi://pay?${params.toString()}`;
-}
-
-export function buildQrUrl(upiLink: string, size = 256): string {
-  const encoded = encodeURIComponent(upiLink);
-  return `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encoded}`;
 }
 
 /**

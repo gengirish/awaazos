@@ -276,12 +276,19 @@ model Transaction {
   customerId       String?
   customer         Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   cancelledAt      DateTime?
-  createdAt        DateTime          @default(now())
-  updatedAt        DateTime          @updatedAt
+
+  // POS offline outbox (docs/PWA_OFFLINE_PLAN.md): device-generated uuid for a
+  // counter sale. Dedupes replays for as long as the row exists, unlike the
+  // 24 h Upstash idempotency record. Null for storefront orders and old rows.
+  clientRef String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
   orderItems OrderItem[]
   receipt    Receipt?
 
+  @@unique([vendorId, clientRef])
   @@index([vendorId, createdAt])
   @@index([vendorId, paymentStatus])
   @@index([billNumber])

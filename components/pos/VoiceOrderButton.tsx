@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertCircle, Check, Loader2, Mic } from "lucide-react";
 
+import { useOnline } from "@/hooks/useOnline";
 import { useVoiceOrder } from "@/hooks/useVoiceOrder";
 import { useCartStore } from "@/lib/cartStore";
 import { VOICE_LANGUAGES } from "@/lib/constants";
@@ -101,6 +102,11 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
 
   const langLabel = voiceLangBadgeLabel(voiceLang);
 
+  // Web Speech and the parser both need the network; offline, say so up front
+  // instead of letting the mic fail slowly. Tap input keeps working.
+  const online = useOnline();
+  const offlineIdle = !online && (state === "idle" || state === "error" || state === "success");
+
   return (
     <section className="flex flex-col items-center gap-2" aria-labelledby="voice-order-heading">
       <h2 id="voice-order-heading" className="sr-only">
@@ -120,16 +126,17 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
       ) : null}
       <button
         type="button"
-        disabled={state === "parsing" || state === "transcribing"}
+        disabled={offlineIdle || state === "parsing" || state === "transcribing"}
         onClick={() => {
           if (state === "listening") stopListening();
           else if (state === "idle" || state === "success" || state === "error") startListening();
         }}
-        aria-label={label}
+        aria-label={offlineIdle ? "Voice needs internet — tap items below" : label}
         aria-pressed={state === "listening"}
         className={cn(
           "relative flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-full shadow-md ring-4 ring-offset-2 ring-offset-background transition-transform focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-safe:transition-colors",
-          state === "idle" && "bg-primary text-primary-foreground ring-transparent",
+          state === "idle" && !offlineIdle && "bg-primary text-primary-foreground ring-transparent",
+          offlineIdle && "cursor-not-allowed bg-muted text-muted-foreground ring-border",
           state === "listening" &&
             "bg-destructive text-destructive-foreground ring-2 ring-white/90 motion-safe:animate-pulse",
           state === "listening" && reducedMotion && "motion-safe:animate-none",
@@ -149,7 +156,11 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
         {state === "error" ? <AlertCircle className="h-9 w-9" aria-hidden /> : null}
       </button>
       <div className="min-h-[3rem] w-full max-w-sm text-center">
-        {state === "error" ? (
+        {offlineIdle ? (
+          <p aria-live="polite" className="text-sm font-medium text-muted-foreground">
+            Voice needs internet — tap items below
+          </p>
+        ) : state === "error" ? (
           <p role="alert" aria-live="assertive" className="text-sm font-medium text-muted-foreground">
             {mapError(errorReason)}
           </p>

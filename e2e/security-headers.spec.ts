@@ -42,13 +42,14 @@ test("the CSP keeps the clickjacking and injection directives", async ({ request
   expect(csp).toContain("default-src 'self'");
 });
 
-test("the CSP allowlists the QR service used by the UPI modal and storefront", async ({
-  request,
-}) => {
+test("UPI QR codes render as data: images, with no third-party QR host", async ({ request }) => {
   const csp = (await request.get("/")).headers()["content-security-policy"] ?? "";
-  // Both the POS UpiQRModal and /s/[slug] render an <img> from this host; if the
-  // directive is dropped the QR silently fails to paint and a vendor cannot be paid.
-  expect(csp).toContain("https://api.qrserver.com");
+  const imgSrc = csp.split(";").find((d) => d.trim().startsWith("img-src")) ?? "";
+  // lib/qr.ts renders every QR locally as an SVG data URL; if data: is dropped
+  // the QR silently fails to paint and a vendor cannot be paid.
+  expect(imgSrc).toContain("data:");
+  // The old renderer received the payee VPA and amount in its URL.
+  expect(csp).not.toContain("qrserver");
 });
 
 test("audio never has an egress path to a provider the CSP does not name", async ({ request }) => {
