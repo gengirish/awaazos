@@ -34,7 +34,7 @@ export default async function PricingPage() {
           {VISIBLE_TIERS.map((tier) => (
             <section
               key={tier}
-              className={`flex flex-col rounded-xl border bg-card p-6 shadow-sm ${
+              className={`flex flex-col rounded-xl border bg-card p-6 shadow-xs ${
                 PLAN_MARKETING[tier].emphasis ? "ring-2 ring-[#FF6B00] ring-offset-2 ring-offset-background" : ""
               }`}
             >

@@ -405,6 +405,18 @@ Last time this gave: PosSyncStatus `focus-visible:outline-none` →
 already come through the rebase with their renames, and #21 had no class
 changes. The new space-y usages were all numeric.
 
+Second rebase onto 5b5c095 (PR #23, plan copy) followed the same steps.
+- One conflict: `app/(marketing)/pricing/page.tsx`. Taking main's side
+  dropped this branch's `shadow-sm→shadow-xs` there, and R3 put it back.
+- New renames from R3: pricing `shadow-sm→shadow-xs`, TransactionsTable
+  `focus-visible:outline-none→outline-hidden`.
+- False positives reverted again in DropForm and PricingTeaser (`"outline-solid"`).
+- `package.json` gained only a script, so the lockfile merged cleanly and
+  needed no regeneration. `npm ci` confirms that.
+
+**Taking main's side in a conflict throws away this branch's renames in that
+file, so always run R3 over the conflicted files too.**
+
 ### R4. Schema drift on the throwaway DB
 
 If main changed `prisma/schema.prisma` (#20 added a nullable
