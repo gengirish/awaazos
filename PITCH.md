@@ -1,5 +1,10 @@
 # AwaazOS — YC Pitch
 
+> **⚠ Positioning changed (2026-10-09).** The customer is now **Instagram-based cloud kitchens**
+> — see [docs/ICP.md](./docs/ICP.md). Parts A–F below still tell the original street-stall /
+> counter-POS story and need rewriting before this pitch is used again. Treat their market
+> sizing, demo script and traction lines as out of date.
+
 > **One-liner:** Voice-first POS for India's 60 million micro-merchants. Speak the order, instant UPI QR, WhatsApp receipt. ₹0 to start.
 
 > **Today (May 2026):** Production-deployed. Onboarding our first 10 design-partner chai vendors in Hyderabad in person. Real weekly traction numbers update every Monday from `/admin/metrics`.

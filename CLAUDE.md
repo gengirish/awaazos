@@ -2,8 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-AwaazOS is a multi-tenant, voice-first POS for Indian micro-merchants: vendor speaks an order
-("do samosa aur ek chai") → Claude parses it against that vendor's menu → UPI QR → WhatsApp receipt.
+AwaazOS is multi-tenant pre-ordering and billing for Instagram-based cloud kitchens (ICP in
+`docs/ICP.md`): storefront link in bio → Drops with a cut-off → UPI → orders board and prep sheet.
+It began as a voice-first counter POS (vendor speaks "do samosa aur ek chai" → Claude parses it
+against the menu → UPI QR → WhatsApp receipt); that path still ships.
 
 ## Commands
 
@@ -267,7 +269,12 @@ Three invariants, enforced in `lib/drops.ts` and nowhere else:
 
 Money and plan rules:
 
-- `DailySummary` is credited when a storefront order is **paid** (`markOrderPaid`, idempotent via
+- **Instagram story image:** `GET /api/drops/[id]/story-image` (CASHIER, compound `{ id, vendorId }`)
+renders `lib/drop-story-image.tsx` at 1080×1920, inside Instagram's top/bottom overlay zones, with
+`Cache-Control: private, no-store`. `InstagramStoryButton` fetches it on the first tap and shares the
+file on the second (iOS drops the gesture across a fetch). Shared Satori parts: `lib/og-parts.tsx`.
+
+`DailySummary` is credited when a storefront order is **paid** (`markOrderPaid`, idempotent via
   conditional `updateMany`), not when placed. Cancel of a paid order reverses it (`cancelOrder`).
   Pay-on-delivery is marked paid by the vendor's "Delivered · ₹X collected" tap.
 - Storefront orders count toward `monthlyTxnCap` only once paid (`countBillableTxnThisMonth`).
