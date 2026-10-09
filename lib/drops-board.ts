@@ -279,6 +279,34 @@ export function checkOrderAction(
   return ok ? { ok: true } : { ok: false, error: "invalid_state" };
 }
 
+/**
+ * The action buttons an order card offers. Stricter than `checkOrderAction`
+ * in one place: an unpaid pay-on-delivery order is "marked paid" by the
+ * "Delivered · ₹X collected" tap, so plain "Mark paid" only shows for it once
+ * delivered. Bulk selection (lib/order-bulk.ts) builds on the same list, so the
+ * card and the bulk bar never disagree about what an order can do.
+ */
+export function availableOrderActions(
+  o: {
+    fulfilmentStatus: FulfilmentStatus | null;
+    paymentStatus: PaymentStatus;
+    paymentMethod: PaymentMethod;
+  },
+  frozen: boolean,
+): Set<OrderAction> {
+  const fs = o.fulfilmentStatus;
+  const live = fs === "PLACED" || fs === "CONFIRMED";
+  const out = new Set<OrderAction>();
+  if (fs === "PLACED" && !frozen) out.add("confirm");
+  if (fs !== "CANCELLED" && o.paymentStatus !== "PAID" && (o.paymentMethod !== "CASH" || fs === "DELIVERED")) {
+    out.add("mark_paid");
+  }
+  if (live) out.add("deliver");
+  if (fs === "DELIVERED") out.add("undeliver");
+  if (live && !frozen) out.add("cancel");
+  return out;
+}
+
 // ─── Small display helpers ──────────────────────────────────────────
 
 export function firstName(name: string | null | undefined): string {

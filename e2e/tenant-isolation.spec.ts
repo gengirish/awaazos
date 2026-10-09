@@ -123,6 +123,68 @@ test.describe("tenant isolation", () => {
     expect(print?.status(), "cross-tenant print page must 404").toBe(404);
   });
 
+  test("vendor B cannot bulk-act on vendor A's storefront order (reported not_found)", async ({ request }) => {
+    // A opts in to "order from menu" (published storefront + pay on delivery).
+    const settings = await pageA.request.patch("/api/vendor", {
+      data: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(settings.status()).toBe(200);
+    const vendorRes = await pageA.request.get("/api/vendor");
+    const { vendor } = (await vendorRes.json()) as { vendor: { slug: string } };
+    const itemA = await createMenuItem(pageA, { name: "A Bulk Poha", priceInRupees: 40 });
+
+    // A guest buyer (no session) places a menu order with A.
+    const placed = await request.post(`/api/s/${vendor.slug}/menu-orders`, {
+      data: {
+        items: [{ menuItemId: itemA.id, qty: 1 }],
+        customerName: "Iso Buyer",
+        customerPhone: "+919848054321",
+        fulfilmentType: "PICKUP",
+        paymentMethod: "CASH",
+      },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(placed.status()).toBe(201);
+
+    type Board = { data: { id: string; fulfilmentStatus: string }[] };
+    const boardA = (await (await pageA.request.get("/api/storefront-orders")).json()) as Board;
+    expect(boardA.data).toHaveLength(1);
+    const orderId = boardA.data[0].id;
+
+    // B forges a bulk confirm with A's order id: no existence leak, nothing changes.
+    const bulkB = await pageB.request.post("/api/storefront-orders/bulk", {
+      data: { orderIds: [orderId], action: "confirm" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(bulkB.status()).toBe(200);
+    const bodyB = (await bulkB.json()) as {
+      data: { succeeded: string[]; failed: { id: string; error: string }[]; orders: unknown[] };
+    };
+    expect(bodyB.data.succeeded).toEqual([]);
+    expect(bodyB.data.failed).toEqual([{ id: orderId, error: "not_found" }]);
+    expect(bodyB.data.orders).toEqual([]);
+
+    // B's drop bulk route with a drop that isn't B's is a plain 404.
+    const dropBulkB = await pageB.request.post("/api/drops/not-my-drop/orders/bulk", {
+      data: { orderIds: [orderId], action: "confirm" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(dropBulkB.status()).toBe(404);
+
+    const afterB = (await (await pageA.request.get("/api/storefront-orders")).json()) as Board;
+    expect(afterB.data.find((o) => o.id === orderId)?.fulfilmentStatus).toBe("PLACED");
+
+    // The same request from A succeeds — the miss above was tenancy, not a bad id.
+    const bulkA = await pageA.request.post("/api/storefront-orders/bulk", {
+      data: { orderIds: [orderId], action: "confirm" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(bulkA.status()).toBe(200);
+    const bodyA = (await bulkA.json()) as { data: { succeeded: string[] } };
+    expect(bodyA.data.succeeded).toEqual([orderId]);
+  });
+
   test("each vendor's bill sequence is independent", async () => {
     const itemA = await createMenuItem(pageA, { name: "A Item", priceInRupees: 10 });
     const itemB = await createMenuItem(pageB, { name: "B Item", priceInRupees: 10 });

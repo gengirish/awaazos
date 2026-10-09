@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import { BulkActionBar } from "@/components/drops/orders/BulkActionBar";
 import { OrderCard } from "@/components/drops/orders/OrderCard";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
 import { PushAlertsButton } from "@/components/push/PushAlertsButton";
@@ -34,6 +35,16 @@ import {
   menuBoardPollKind,
   toMakeFromOrders,
 } from "@/lib/menu-orders-board";
+import {
+  BULK_ORDER_MAX,
+  bulkActionCounts,
+  bulkResultMessage,
+  bulkTargets,
+  isBulkSelectable,
+  pruneSelection,
+  type BulkOrderAction,
+  type BulkOrderResult,
+} from "@/lib/order-bulk";
 import { cn } from "@/lib/utils";
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
@@ -76,6 +87,9 @@ type Props = {
 };
 
 type OrdersResponse = { data: BoardOrder[]; drop?: BoardDrop; signal: number | null };
+type BulkResponse = { data?: BulkOrderResult & { orders: BoardOrder[] }; error?: string };
+
+const EMPTY_SELECTION: ReadonlySet<string> = new Set();
 
 function boardUrls(source: OrdersBoardSource): { orders: string; signal: string; actionBase: string } {
   if (source.kind === "menu") {
@@ -130,6 +144,8 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
   const [filter, setFilter] = useState<BoardFilter>("needs_action");
   const [refreshing, setRefreshing] = useState(false);
   const [pending, setPending] = useState<{ orderId: string; action: OrderAction } | null>(null);
+  const [selected, setSelected] = useState<ReadonlySet<string>>(EMPTY_SELECTION);
+  const [bulkPending, setBulkPending] = useState<BulkOrderAction | null>(null);
   const [newIds, setNewIds] = useState<Set<string>>(() => new Set());
   const [announcement, setAnnouncement] = useState("");
   const [soundOn, setSoundOn] = useState(false);
@@ -374,6 +390,95 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
   const visible = useMemo(() => filterOrders(orders, filter), [orders, filter]);
   const toCook = prep.filter((p) => p.qtyOrdered > 0);
 
+  // Selection is limited to what is on screen and still actionable: derived, so
+  // a refetch that moves an order to another tab silently drops it.
+  const activeSelected = useMemo(() => pruneSelection(selected, visible, frozen), [selected, visible, frozen]);
+  const selectableVisible = useMemo(() => visible.filter((o) => isBulkSelectable(o, frozen)), [visible, frozen]);
+  const bulkCounts = useMemo(() => bulkActionCounts(visible, activeSelected, frozen), [visible, activeSelected, frozen]);
+  const allSelected = selectableVisible.length > 0 && selectableVisible.every((o) => activeSelected.has(o.id));
+  const someSelected = activeSelected.size > 0 && !allSelected;
+
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someSelected;
+  }, [someSelected]);
+
+  const toggleSelect = useCallback((orderId: string) => {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(orderId)) next.delete(orderId);
+      else next.add(orderId);
+      return next;
+    });
+  }, []);
+
+  const toggleSelectAll = () => {
+    setSelected(allSelected ? EMPTY_SELECTION : new Set(selectableVisible.map((o) => o.id)));
+  };
+
+  const changeFilter = (f: BoardFilter) => {
+    setFilter(f);
+    setSelected(EMPTY_SELECTION);
+  };
+
+  const targetsFor = (action: BulkOrderAction) => bulkTargets(visible, activeSelected, action, frozen);
+
+  const runBulk = async (action: BulkOrderAction) => {
+    const ids = targetsFor(action).map((o) => o.id);
+    if (ids.length === 0) return;
+    setBulkPending(action);
+    const result: BulkOrderResult = { succeeded: [], failed: [] };
+    const changed: BoardOrder[] = [];
+    let requestFailed = false;
+    try {
+      // The route takes at most 50 ids; a big drop goes in a few calls, one after another.
+      for (let i = 0; i < ids.length; i += BULK_ORDER_MAX) {
+        const chunk = ids.slice(i, i + BULK_ORDER_MAX);
+        const res = await fetch(`${actionBase}/bulk`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ orderIds: chunk, action }),
+        });
+        const body = (await res.json().catch(() => ({}))) as BulkResponse;
+        if (!res.ok || !body.data) {
+          requestFailed = true;
+          break;
+        }
+        result.succeeded.push(...body.data.succeeded);
+        result.failed.push(...body.data.failed);
+        changed.push(...body.data.orders);
+      }
+    } catch {
+      requestFailed = true;
+    }
+
+    if (changed.length > 0) {
+      const byId = new Map(changed.map((o) => [o.id, o]));
+      setOrders((prev) => prev.map((o) => byId.get(o.id) ?? o));
+      setNewIds((prev) => {
+        const next = new Set(prev);
+        changed.forEach((o) => next.delete(o.id));
+        return next;
+      });
+    }
+    setSelected(EMPTY_SELECTION);
+    setBulkPending(null);
+
+    if (requestFailed) {
+      toast.error(
+        result.succeeded.length > 0
+          ? `${result.succeeded.length} changed, then the connection dropped. Refreshed.`
+          : "Could not update the orders. Check your internet and try again.",
+      );
+      await refresh();
+      return;
+    }
+    const msg = bulkResultMessage(action, result);
+    if (msg.kind === "success") toast.success(msg.text);
+    else toast.error(msg.text);
+    if (result.failed.length > 0) await refresh();
+  };
+
   const controls = (
     <>
       <Button
@@ -521,7 +626,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
               role="tab"
               aria-selected={filter === f.id}
               aria-controls="orders-list"
-              onClick={() => setFilter(f.id)}
+              onClick={() => changeFilter(f.id)}
               className={cn(
                 "min-h-11 shrink-0 whitespace-nowrap rounded-full border px-4 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
                 filter === f.id
@@ -539,20 +644,53 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
         {visible.length === 0 ? (
           <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{emptyText}</p>
         ) : (
-          <ul className="flex flex-col gap-3">
-            {visible.map((o) => (
-              <li key={o.id}>
-                <OrderCard
-                  order={o}
-                  vendorName={vendorName}
-                  frozen={frozen}
-                  isNew={newIds.has(o.id)}
-                  pendingAction={pending?.orderId === o.id ? pending.action : null}
-                  onAction={runAction}
-                />
-              </li>
-            ))}
-          </ul>
+          <>
+            {selectableVisible.length > 1 && (
+              <div className="mb-2 flex items-center">
+                <label className="inline-flex min-h-11 cursor-pointer items-center gap-3 rounded-md pr-3 text-sm font-medium focus-within:ring-2 focus-within:ring-ring">
+                  <span className="inline-flex min-h-11 min-w-11 items-center justify-center">
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      className="h-5 w-5 cursor-pointer accent-primary"
+                      checked={allSelected}
+                      onChange={toggleSelectAll}
+                      disabled={bulkPending !== null}
+                    />
+                  </span>
+                  {allSelected ? "Unselect all" : "Select all"} ({selectableVisible.length})
+                </label>
+              </div>
+            )}
+            <ul className="flex flex-col gap-3">
+              {visible.map((o) => (
+                <li key={o.id}>
+                  <OrderCard
+                    order={o}
+                    vendorName={vendorName}
+                    frozen={frozen}
+                    isNew={newIds.has(o.id)}
+                    pendingAction={pending?.orderId === o.id ? pending.action : null}
+                    onAction={runAction}
+                    selectable={isBulkSelectable(o, frozen)}
+                    selected={activeSelected.has(o.id)}
+                    onToggleSelect={toggleSelect}
+                    locked={bulkPending !== null}
+                  />
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+        {activeSelected.size > 0 && (
+          <BulkActionBar
+            selectedCount={activeSelected.size}
+            counts={bulkCounts}
+            pending={bulkPending}
+            targetsFor={targetsFor}
+            onRun={(a) => void runBulk(a)}
+            onClear={() => setSelected(EMPTY_SELECTION)}
+          />
         )}
       </section>
     </div>
