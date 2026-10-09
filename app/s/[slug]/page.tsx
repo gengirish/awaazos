@@ -17,10 +17,10 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { CartHubProvider } from "@/components/storefront/CartHub";
-import { CopyUpiId } from "@/components/storefront/CopyUpiId";
 import { CustomerSignOut } from "@/components/storefront/CustomerProfile";
 import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
 import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
+import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
 import { getIstTodayStart } from "@/lib/billing-period";
 import { STALL_TYPES } from "@/lib/constants";
@@ -787,10 +787,16 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                 <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Paying {payeeName}
                 </p>
+                <p className="mt-1 text-xs text-muted-foreground">Scan from another phone, or open your UPI app below.</p>
                 {vendor.upiId ? (
-                  <div className="mt-2 flex justify-center">
-                    <CopyUpiId upiId={vendor.upiId} className="max-w-full" />
-                  </div>
+                  <UpiPayOptions
+                    upiLink={upiLink}
+                    upiId={vendor.upiId}
+                    genericLabel="Open UPI app"
+                    emphasis="secondary"
+                    linksMobileOnly
+                    className="mt-4"
+                  />
                 ) : null}
               </div>
             </details>
@@ -815,18 +821,16 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                 <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Paying {payeeName}
                 </p>
+                <p className="mt-1 text-xs text-muted-foreground">Scan from another phone, or open your UPI app below.</p>
                 {vendor.upiId ? (
-                  <div className="mt-2 flex justify-center">
-                    <CopyUpiId upiId={vendor.upiId} className="max-w-full" />
-                  </div>
+                  <UpiPayOptions
+                    upiLink={upiLink}
+                    upiId={vendor.upiId}
+                    genericLabel="Open UPI app"
+                    linksMobileOnly
+                    className="mt-4"
+                  />
                 ) : null}
-
-                <a
-                  href={upiLink}
-                  className="mt-4 inline-flex min-h-12 w-full items-center justify-center rounded-xl bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md sm:hidden"
-                >
-                  Open UPI app
-                </a>
               </div>
             </section>
           ) : null}
