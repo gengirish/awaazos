@@ -1,0 +1,25 @@
+{
+  "id": "en-002-dedupe",
+  "lang": "en-IN",
+  "transcript": "Samosa 20, kachori 25, oh wait samosa 22",
+  "expected": {
+    "items": [
+      {
+        "name": "Samosa",
+        "action": "update_price",
+        "existingMenuItemId": "mi-samosa",
+        "priceInPaise": 2200
+      },
+      {
+        "name": "Kachori",
+        "action": "update_price",
+        "existingMenuItemId": "mi-kachori",
+        "priceInPaise": 2500
+      }
+    ]
+  },
+  "tags": [
+    "dedupe",
+    "existing-match"
+  ]
+}

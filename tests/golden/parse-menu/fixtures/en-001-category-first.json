@@ -1,0 +1,37 @@
+{
+  "id": "en-001-category-first",
+  "lang": "en-IN",
+  "transcript": "Desserts: brownie 70, gulab jamun 40. Cold drinks: cold coffee 80 and lemon soda 30.",
+  "expected": {
+    "items": [
+      {
+        "name": "Brownie",
+        "action": "create",
+        "priceInPaise": 7000,
+        "category": "Desserts"
+      },
+      {
+        "name": "Gulab Jamun",
+        "action": "create",
+        "priceInPaise": 4000,
+        "category": "Desserts"
+      },
+      {
+        "name": "Cold Coffee",
+        "action": "create",
+        "priceInPaise": 8000,
+        "category": "Cold Drinks"
+      },
+      {
+        "name": "Lemon Soda",
+        "action": "create",
+        "priceInPaise": 3000,
+        "category": "Cold Drinks"
+      }
+    ]
+  },
+  "tags": [
+    "english",
+    "category-before-list"
+  ]
+}

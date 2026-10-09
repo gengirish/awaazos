@@ -1,10 +1,11 @@
 /**
- * Wire-level request shape for the two forced-tool Claude calls.
+ * Wire-level request shape for the forced-tool Claude calls.
  *
- * Builds a real SDK client with a capturing `fetch`, runs parseOrderWithClaude
- * and buildDropWithClaude, and compares the exact JSON body the SDK puts on the
+ * Builds a real SDK client with a capturing `fetch`, runs parseOrderWithClaude,
+ * buildDropWithClaude and buildMenuWithClaude, and compares the exact JSON body the SDK puts on the
  * wire against `fixtures/anthropic-request-bodies.json`. That fixture was
- * captured on SDK 0.39.0 (before the upgrade to 0.132), so an SDK upgrade that
+ * captured on SDK 0.39.0 (before the upgrade to 0.132; the parse-menu entries
+ * were added later on 0.132), so an SDK upgrade that
  * changes the request (model ids, forced tool_choice, cache_control on the menu block,
  * system prompt, max_tokens/temperature, key order) fails here. The menu block
  * must stay byte-identical or the prompt cache misses on every call.
@@ -36,6 +37,7 @@ import {
   type MenuItemForParse,
 } from "@/lib/anthropic";
 import { buildDropWithClaude } from "@/lib/parse-drop";
+import { buildMenuWithClaude, menuBuilderCachedText, type ExistingMenuItem } from "@/lib/parse-menu";
 
 const FIXTURE_PATH = path.join(__dirname, "fixtures", "anthropic-request-bodies.json");
 const UPDATE = process.env.UPDATE_ANTHROPIC_REQUEST_FIXTURE === "1";
@@ -47,6 +49,14 @@ const MENU: MenuItemForParse[] = [
   { id: "mi_chai", slug: null, name: "Masala Chai", aliases: ["chai", "चाय"], tags: [], priceInPaise: 1_000 },
   { id: "mi_bhel", name: "Bhel Puri", aliases: ["bhel", "lays bhel"], priceInPaise: 4_000 },
   { id: "mi_nimbu", slug: "nimbu-panna", name: "Nimbu Panna", aliases: ["nimbu pani", "lemonade"], tags: ["drinks", "cold", "seasonal"], priceInPaise: 2_500 },
+];
+
+/** Same rows with categories (one missing) for the menu builder's category list. */
+const MENU_WITH_CATEGORIES: ExistingMenuItem[] = [
+  { ...MENU[0]!, category: "Snacks", emoji: "🥟" },
+  { ...MENU[1]!, category: "Chai", emoji: "☕" },
+  { ...MENU[2]!, category: "Snacks" },
+  { ...MENU[3]! },
 ];
 
 /** Thu 8 Oct 2026, 15:30 IST — fixed so the drop user-turn text is deterministic. */
@@ -134,6 +144,22 @@ async function captureAll(): Promise<Record<string, Captured>> {
     );
     expect(drop.calls).toHaveLength(1);
     out[`parse-drop:${tier}`] = drop.calls[0]!;
+
+    const menu = capturingClient(
+      toolMessage(model, "add_menu_items", {
+        items: [{ name: "Cutting Chai", priceRupees: 10, category: "Chai" }],
+        unparsed: [],
+      }),
+    );
+    await buildMenuWithClaude(
+      menu.client,
+      model,
+      MENU_WITH_CATEGORIES,
+      "cutting chai das rupaye, samosa bees, snacks mein",
+      "hi-IN",
+    );
+    expect(menu.calls).toHaveLength(1);
+    out[`parse-menu:${tier}`] = menu.calls[0]!;
   }
   return out;
 }
@@ -181,13 +207,21 @@ describe("Anthropic request shape (wire body)", () => {
         tool_choice: unknown;
         messages: { role: string; content: { type: string; text: string; cache_control?: unknown }[] }[];
       };
-      const isOrder = key.startsWith("parse-order");
-      const toolName = isOrder ? "add_items" : "build_drop";
+      const kind = key.split(":")[0] as "parse-order" | "parse-drop" | "parse-menu";
+      const { toolName, maxTokens, cachedText } = {
+        "parse-order": { toolName: "add_items", maxTokens: 512, cachedText: menuText },
+        "parse-drop": { toolName: "build_drop", maxTokens: 1024, cachedText: menuText },
+        "parse-menu": {
+          toolName: "add_menu_items",
+          maxTokens: 4096,
+          cachedText: menuBuilderCachedText(MENU_WITH_CATEGORIES),
+        },
+      }[kind];
 
       expect(call.path).toBe("/v1/messages");
       expect(call.anthropicBeta).toBeNull();
       expect(body.model).toBe(key.endsWith("haiku") ? "claude-haiku-4-5" : "claude-sonnet-4-5");
-      expect(body.max_tokens).toBe(isOrder ? 512 : 1024);
+      expect(body.max_tokens).toBe(maxTokens);
       expect(body.temperature).toBe(0.1);
       expect(typeof body.system).toBe("string");
       expect(body.tools.map((t) => t.name)).toEqual([toolName]);
@@ -195,7 +229,9 @@ describe("Anthropic request shape (wire body)", () => {
       expect(body.messages).toHaveLength(1);
       const [menuBlock, tail, ...rest] = body.messages[0]!.content;
       expect(rest).toEqual([]);
-      expect(menuBlock).toEqual({ type: "text", text: menuText, cache_control: { type: "ephemeral" } });
+      expect(menuBlock).toEqual({ type: "text", text: cachedText, cache_control: { type: "ephemeral" } });
+      // The menu JSON itself is the shared stableMenuJson() prefix on every path.
+      expect(menuBlock!.text.startsWith(menuText)).toBe(true);
       expect(tail!.cache_control).toBeUndefined();
     }
   });

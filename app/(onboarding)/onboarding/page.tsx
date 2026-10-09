@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
+import { Mic } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -47,6 +48,10 @@ export default function OnboardingPage() {
     { name: "", priceRupees: "", emoji: "🍽️", alias: "" },
     { name: "", priceRupees: "", emoji: "🍽️", alias: "" },
   ]);
+
+  // "Speak your whole menu": skip typing the three items here and land on
+  // /menu?voice=1 (voice menu builder open) once setup is saved.
+  const [speakMenu, setSpeakMenu] = useState(false);
 
   const [whatsapp, setWhatsapp] = useState("");
   const [voiceLang, setVoiceLang] = useState("en-IN");
@@ -118,7 +123,7 @@ export default function OnboardingPage() {
       if (!isValidUpiId(upiId)) return UPI_ID_FORMAT_MESSAGE;
       if (!upiName.trim()) return "UPI display name is required.";
     }
-    if (step === 3) {
+    if (step === 3 && !speakMenu) {
       for (let i = 0; i < items.length; i++) {
         const it = items[i]!;
         if (!it.name.trim()) return `Menu item ${i + 1}: name is required.`;
@@ -167,19 +172,21 @@ export default function OnboardingPage() {
     const parsedPhone = parsePhoneNumberFromString(whatsapp.trim(), "IN");
     const wa = parsedPhone?.format("E.164") ?? whatsapp.trim();
 
-    const menuItems = items.map((it) => {
-      const priceInPaise = rupeesToPaise(Number(it.priceRupees));
-      const aliases = it.alias
-        .split(",")
-        .map((a) => a.trim())
-        .filter(Boolean);
-      return {
-        name: it.name.trim(),
-        priceInPaise,
-        emoji: it.emoji.trim() || "🍽️",
-        aliases: aliases.length ? aliases : undefined,
-      };
-    });
+    const menuItems = speakMenu
+      ? undefined
+      : items.map((it) => {
+          const priceInPaise = rupeesToPaise(Number(it.priceRupees));
+          const aliases = it.alias
+            .split(",")
+            .map((a) => a.trim())
+            .filter(Boolean);
+          return {
+            name: it.name.trim(),
+            priceInPaise,
+            emoji: it.emoji.trim() || "🍽️",
+            aliases: aliases.length ? aliases : undefined,
+          };
+        });
 
     const res = await fetch("/api/vendor", {
       method: "PATCH",
@@ -204,7 +211,7 @@ export default function OnboardingPage() {
       return;
     }
 
-    router.push("/pos");
+    router.push(speakMenu ? "/menu?voice=1" : "/pos");
     router.refresh();
   }
 
@@ -294,8 +301,38 @@ export default function OnboardingPage() {
             </>
           )}
 
-          {step === 3 && (
+          {step === 3 && speakMenu && (
+            <div className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-3">
+              <p className="flex items-start gap-2 text-sm font-medium">
+                <Mic className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <span>
+                  After the last step you&apos;ll land on your Menu with the mic ready. Say each dish and its price,
+                  check the list, then save.
+                </span>
+              </p>
+              <Button type="button" variant="outline" className="min-h-11" onClick={() => setSpeakMenu(false)}>
+                Type three items instead
+              </Button>
+            </div>
+          )}
+
+          {step === 3 && !speakMenu && (
             <div className="space-y-6">
+              <div className="flex flex-col gap-2 rounded-lg border border-dashed p-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm text-muted-foreground">Got more dishes? Say them all at once instead of typing.</p>
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11 shrink-0"
+                  onClick={() => {
+                    setError(null);
+                    setSpeakMenu(true);
+                  }}
+                >
+                  <Mic aria-hidden="true" />
+                  Speak your whole menu
+                </Button>
+              </div>
               {items.map((it, idx) => (
                 <div key={idx} className="space-y-3 rounded-lg border p-3">
                   <p className="text-sm font-medium">Item {idx + 1}</p>
@@ -373,7 +410,7 @@ export default function OnboardingPage() {
             </Button>
           ) : (
             <Button type="button" onClick={finish} disabled={saving}>
-              {saving ? "Saving…" : "Finish & go to POS"}
+              {saving ? "Saving…" : speakMenu ? "Finish & speak your menu" : "Finish & go to POS"}
             </Button>
           )}
         </CardFooter>

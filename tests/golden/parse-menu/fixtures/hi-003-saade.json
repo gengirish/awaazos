@@ -1,0 +1,25 @@
+{
+  "id": "hi-003-saade",
+  "lang": "hi-IN",
+  "transcript": "mini thali dhai sau, special thali saade teen sau, thali mein daal do",
+  "expected": {
+    "items": [
+      {
+        "name": "Mini Thali",
+        "action": "create",
+        "priceInPaise": 25000,
+        "category": "Thali"
+      },
+      {
+        "name": "Special Thali",
+        "action": "create",
+        "priceInPaise": 35000,
+        "category": "Thali"
+      }
+    ]
+  },
+  "tags": [
+    "indic-numerals",
+    "category-scope"
+  ]
+}

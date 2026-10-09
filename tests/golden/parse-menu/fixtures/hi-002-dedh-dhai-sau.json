@@ -1,0 +1,31 @@
+{
+  "id": "hi-002-dedh-dhai-sau",
+  "lang": "hi-IN",
+  "transcript": "paneer tikka dedh sau, chicken biryani dhai sau, veg biryani do sau, ye sab main course mein",
+  "expected": {
+    "items": [
+      {
+        "name": "Paneer Tikka",
+        "action": "create",
+        "priceInPaise": 15000,
+        "category": "Main Course"
+      },
+      {
+        "name": "Chicken Biryani",
+        "action": "create",
+        "priceInPaise": 25000,
+        "category": "Main Course"
+      },
+      {
+        "name": "Veg Biryani",
+        "action": "create",
+        "priceInPaise": 20000,
+        "category": "Main Course"
+      }
+    ]
+  },
+  "tags": [
+    "indic-numerals",
+    "category-scope"
+  ]
+}

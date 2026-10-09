@@ -1,0 +1,23 @@
+{
+  "id": "hi-006-plate-not-price",
+  "lang": "hi-IN",
+  "transcript": "pav bhaji ek plate assi rupaye, chole bhature plate sau rupaye",
+  "expected": {
+    "items": [
+      {
+        "name": "Pav Bhaji",
+        "action": "create",
+        "priceInPaise": 8000
+      },
+      {
+        "name": "Chole Bhature",
+        "action": "create",
+        "priceInPaise": 10000
+      }
+    ]
+  },
+  "tags": [
+    "plate-words",
+    "indic-numerals"
+  ]
+}

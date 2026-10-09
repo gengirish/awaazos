@@ -1,0 +1,38 @@
+{
+  "id": "hi-007-category-runs",
+  "lang": "hi-IN",
+  "transcript": "nimbu pani bees, jaljeera pachees, drinks mein. bread pakoda tees, aloo tikki pachees, snacks wale",
+  "expected": {
+    "items": [
+      {
+        "name": "Nimbu Pani",
+        "action": "create",
+        "priceInPaise": 2000,
+        "category": "Drinks"
+      },
+      {
+        "name": "Jaljeera",
+        "action": "create",
+        "priceInPaise": 2500,
+        "category": "Drinks"
+      },
+      {
+        "name": "Bread Pakoda",
+        "action": "create",
+        "priceInPaise": 3000,
+        "category": "Snacks"
+      },
+      {
+        "name": "Aloo Tikki",
+        "action": "create",
+        "priceInPaise": 2500,
+        "category": "Snacks"
+      }
+    ]
+  },
+  "tags": [
+    "category-scope",
+    "existing-category",
+    "indic-numerals"
+  ]
+}

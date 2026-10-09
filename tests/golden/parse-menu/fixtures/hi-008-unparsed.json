@@ -1,0 +1,28 @@
+{
+  "id": "hi-008-unparsed",
+  "lang": "hi-IN",
+  "transcript": "onion uttapam assi, wada pao baais, aur haan kal se dukaan aath baje khulegi",
+  "expected": {
+    "items": [
+      {
+        "name": "Onion Uttapam",
+        "action": "create",
+        "priceInPaise": 8000
+      },
+      {
+        "name": "Vada Pav",
+        "action": "update_price",
+        "existingMenuItemId": "mi-vada-pav",
+        "priceInPaise": 2200
+      }
+    ],
+    "unparsed": [
+      "khulegi"
+    ]
+  },
+  "tags": [
+    "unparsed",
+    "existing-match",
+    "mishearing"
+  ]
+}

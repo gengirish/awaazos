@@ -3,13 +3,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { MenuGrid } from "@/components/menu/MenuGrid";
+import { VoiceMenuPanel } from "@/components/menu/VoiceMenuPanel";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
-export default async function MenuPage(props: { searchParams: Promise<{ add?: string | string[] }> }) {
+export default async function MenuPage(props: {
+  searchParams: Promise<{ add?: string | string[]; voice?: string | string[] }>;
+}) {
   // `?add=<name>` (from the voice drop builder's "Add to menu") opens the add form pre-filled.
-  const { add } = await props.searchParams;
+  // `?voice=1` (from onboarding's "Speak your whole menu") opens the voice panel.
+  const { add, voice } = await props.searchParams;
   const prefillName = typeof add === "string" ? add.trim().slice(0, 80) : "";
+  const voiceOpen = voice === "1";
 
   let vendorId: string;
   try {
@@ -22,10 +27,14 @@ export default async function MenuPage(props: { searchParams: Promise<{ add?: st
     throw e;
   }
 
-  const items: MenuItem[] = await prisma.menuItem.findMany({
-    where: { vendorId },
-    orderBy: { sortOrder: "asc" },
-  });
+  const [items, settings]: [MenuItem[], { voiceLang: string } | null] = await Promise.all([
+    prisma.menuItem.findMany({
+      where: { vendorId },
+      orderBy: { sortOrder: "asc" },
+    }),
+    prisma.vendorSettings.findUnique({ where: { vendorId }, select: { voiceLang: true } }),
+  ]);
+  const categories = [...new Set(items.map((i) => i.category).filter(Boolean))];
 
   return (
     <>
@@ -48,7 +57,13 @@ export default async function MenuPage(props: { searchParams: Promise<{ add?: st
             Back to POS
           </Link>
         </header>
-        <main id="main-menu" className="mx-auto max-w-5xl">
+        <main id="main-menu" className="mx-auto max-w-5xl space-y-6">
+          <VoiceMenuPanel
+            voiceLang={settings?.voiceLang ?? "en-IN"}
+            categories={categories}
+            itemCount={items.length}
+            defaultOpen={voiceOpen}
+          />
           <MenuGrid initialItems={items} prefillName={prefillName || undefined} />
         </main>
       </div>

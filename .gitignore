@@ -67,6 +67,7 @@ tmp/
 # golden parse-order test artifacts
 tests/golden/parse-order/.last-run/
 tests/golden/parse-drop/.last-run/
+tests/golden/parse-menu/.last-run/
 
 # golden STT test artifacts + synthetic audio clips (record in-house)
 tests/golden/stt/.last-run/
