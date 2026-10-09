@@ -258,8 +258,7 @@ both routes.
 ### 4.5 Unused Prisma fields — don't drop yet
 Never referenced in `app/`, `lib/`, `components/`, `workers/` or `hooks/` (re-checked 2026-10-07):
 
-- `Vendor.gstin`
-- `VendorSettings.autoPrintReceipt`, `discountEnabled`, `hsnDefault`, `razorpayCustomerId`
+- `VendorSettings.discountEnabled`, `hsnDefault`, `razorpayCustomerId`
 - `Transaction.paymentLinkUrl`
 - `Receipt.pdfUrl`
 - `OrderSource.WHATSAPP` and `OrderSource.API`

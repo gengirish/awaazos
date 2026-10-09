@@ -45,9 +45,12 @@ alwaysApply: true
 
 ## GST / HSN (optional day-1, mandatory at ₹20L turnover)
 
-- `Vendor.gstin` — optional 15-char GST identifier. Format validation
-  (`^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$`) is **not
-  implemented** yet; add it wherever `gstin` becomes writable.
+- `Vendor.gstin` — optional 15-char GST identifier, written only by
+  `PATCH /api/vendor` (Settings → Receipts), which uppercases it and checks
+  `GSTIN_PATTERN` in `lib/receipt.ts`
+  (`^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$`). Format only:
+  the state code and check digit are **not** verified. Printed on every receipt
+  when set.
 - `MenuItem.hsnCode` is printed on the WhatsApp receipt when set. The intended
   fallback to `VendorSettings.hsnDefault` is **not implemented** (the column
   exists, nothing reads it).

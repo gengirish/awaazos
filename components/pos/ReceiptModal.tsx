@@ -14,7 +14,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useReceiptText, WhatsAppReceiptButton } from "@/components/receipts/WhatsAppReceipt";
+import {
+  PrintReceiptLink,
+  useAutoPrintReceipt,
+  useReceiptText,
+  WhatsAppReceiptButton,
+} from "@/components/receipts/WhatsAppReceipt";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { paymentMethodLabel } from "@/lib/cash-tender";
 import { formatINR } from "@/lib/currency";
@@ -30,6 +35,8 @@ export type ReceiptModalProps = {
   paymentMethod: PaymentMethod;
   /** Set when the sale is saved on this device and hasn't synced yet. */
   queued: { localNo: number; needsSignIn: boolean } | null;
+  /** VendorSettings.autoPrintReceipt — counter computers only (see useAutoPrintReceipt). */
+  autoPrint: boolean;
   onCloseAll: () => void;
 };
 
@@ -41,6 +48,7 @@ export function ReceiptModal({
   totalPaise,
   paymentMethod,
   queued,
+  autoPrint,
   onCloseAll,
 }: ReceiptModalProps) {
   const router = useRouter();
@@ -50,6 +58,9 @@ export function ReceiptModal({
   const receiptText = useReceiptText(open && !queued, { billNumber });
   const waUrl = receiptText ? receiptWhatsappUrl(receiptText, phone) : null;
   const phoneInvalid = Boolean(receiptText) && !waUrl;
+  // Phones print through the share sheet / a printer app, so only a desktop
+  // counter gets the dialog without a tap.
+  useAutoPrintReceipt(open && !queued && autoPrint && isDesktop && billNumber ? billNumber : null);
 
   const newOrderRef = useRef<HTMLButtonElement>(null);
   const waWrapRef = useRef<HTMLDivElement>(null);
@@ -140,6 +151,7 @@ export function ReceiptModal({
       <div ref={waWrapRef}>
         <WhatsAppReceiptButton url={waUrl} loading={receiptText === undefined} />
       </div>
+      <PrintReceiptLink billNumber={billNumber} />
       <Button ref={newOrderRef} type="button" className="h-12 w-full" onClick={newOrder}>
         New order
       </Button>

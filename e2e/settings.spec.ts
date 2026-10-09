@@ -13,6 +13,7 @@ const ROWS = [
   { title: "Online store", path: "/settings/store", heading: "Online store" },
   { title: "Online orders", path: "/settings/orders", heading: "Online orders" },
   { title: "Payments", path: "/settings/payments", heading: "Payments" },
+  { title: "Receipts", path: "/settings/receipts", heading: "Receipts" },
   { title: "Counter & voice", path: "/settings/voice", heading: "Counter & voice" },
   { title: "Plan & billing", path: "/settings/billing", heading: "Plan & billing" },
 ] as const;
@@ -47,6 +48,7 @@ test.describe("settings hub", () => {
     await expect(hubRow(page, "Online orders")).toContainText("Order from menu: Off");
     await expect(hubRow(page, "Payments")).toContainText("UPI");
     await expect(hubRow(page, "Payments")).toContainText("Pay on delivery");
+    await expect(hubRow(page, "Receipts")).toContainText("80 mm paper");
     await expect(hubRow(page, "Counter & voice")).toContainText("English");
     await expect(hubRow(page, "Plan & billing")).toContainText("Free plan");
 

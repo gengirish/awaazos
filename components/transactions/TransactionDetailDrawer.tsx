@@ -2,7 +2,7 @@
 
 import type { PaymentMethod, PaymentStatus } from "@prisma/client";
 
-import { useReceiptText, WhatsAppReceiptButton } from "@/components/receipts/WhatsAppReceipt";
+import { PrintReceiptLink, useReceiptText, WhatsAppReceiptButton } from "@/components/receipts/WhatsAppReceipt";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import {
@@ -158,6 +158,7 @@ export function TransactionDetailDrawer({ open, onOpenChange, transaction, vendo
             label={transaction.customerPhone?.trim() ? "Resend on WhatsApp" : "Send on WhatsApp"}
             className="h-11 w-full"
           />
+          <PrintReceiptLink billNumber={transaction.billNumber} className="h-11 w-full" />
           {receiptText === null ? (
             <p className="text-xs text-muted-foreground" role="status">
               Couldn&apos;t load the receipt. Close and reopen to try again.

@@ -1,4 +1,4 @@
-import { FulfilmentMode, Prisma, StallType } from "@prisma/client";
+import { FulfilmentMode, Prisma, ReceiptPaper, StallType } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -13,6 +13,7 @@ import {
 } from "@/lib/payment-guard";
 import { prisma } from "@/lib/prisma";
 import { requireVendorRole } from "@/lib/rbac";
+import { GSTIN_FORMAT_MESSAGE, GSTIN_PATTERN, RECEIPT_FOOTER_MAX } from "@/lib/receipt";
 import { UPI_ID_FORMAT_MESSAGE, UPI_ID_PATTERN } from "@/lib/upi";
 
 // Served to cashiers: the encrypted Razorpay secrets must never leave the server
@@ -42,6 +43,17 @@ const patchSchema = z.object({
     .optional()
     .nullable(),
   acceptPayOnDelivery: z.boolean().optional(),
+  // Receipts (Settings → Receipts). "" or null clears footer / GSTIN.
+  receiptFooter: z.string().trim().max(RECEIPT_FOOTER_MAX).optional().nullable(),
+  gstin: z
+    .string()
+    .trim()
+    .transform((v) => v.toUpperCase())
+    .refine((v) => v === "" || GSTIN_PATTERN.test(v), GSTIN_FORMAT_MESSAGE)
+    .optional()
+    .nullable(),
+  autoPrintReceipt: z.boolean().optional(),
+  receiptPaper: z.nativeEnum(ReceiptPaper).optional(),
   // "Order from menu" (storefront orders without a Drop).
   acceptMenuOrders: z.boolean().optional(),
   menuFulfilmentMode: z.nativeEnum(FulfilmentMode).optional(),
@@ -175,6 +187,7 @@ export async function PATCH(req: NextRequest) {
       if (vendorFields.upiId !== undefined) data.upiId = vendorFields.upiId || null;
       if (vendorFields.upiName !== undefined) data.upiName = vendorFields.upiName || null;
       if (vendorFields.onboardingDone !== undefined) data.onboardingDone = vendorFields.onboardingDone;
+      if (vendorFields.gstin !== undefined) data.gstin = vendorFields.gstin || null;
 
       if (Object.keys(data).length) {
         await tx.vendor.update({
@@ -198,6 +211,15 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.acceptPayOnDelivery !== undefined) {
         settingsUpdate.acceptPayOnDelivery = vendorFields.acceptPayOnDelivery;
+      }
+      if (vendorFields.receiptFooter !== undefined) {
+        settingsUpdate.receiptFooter = vendorFields.receiptFooter || null;
+      }
+      if (vendorFields.autoPrintReceipt !== undefined) {
+        settingsUpdate.autoPrintReceipt = vendorFields.autoPrintReceipt;
+      }
+      if (vendorFields.receiptPaper !== undefined) {
+        settingsUpdate.receiptPaper = vendorFields.receiptPaper;
       }
       if (vendorFields.acceptMenuOrders !== undefined) {
         settingsUpdate.acceptMenuOrders = vendorFields.acceptMenuOrders;

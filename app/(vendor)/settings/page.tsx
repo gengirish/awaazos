@@ -13,6 +13,7 @@ import {
   ordersStatus,
   paymentsStatus,
   planStatus,
+  receiptsStatus,
   setupChecklist,
   storeStatus,
   voiceStatus,
@@ -75,6 +76,8 @@ export default async function SettingsHubPage() {
         acceptPayOnDelivery: true,
         acceptMenuOrders: true,
         menuFulfilmentMode: true,
+        receiptPaper: true,
+        autoPrintReceipt: true,
         // Presence only — the encrypted secrets never leave this server component.
         razorpayKeyId: true,
         razorpayKeySecretEnc: true,
@@ -104,6 +107,11 @@ export default async function SettingsHubPage() {
     store: storeStatus(snapshot),
     orders: ordersStatus(snapshot),
     payments: paymentsStatus(snapshot),
+    receipts: receiptsStatus({
+      receiptPaper: settings?.receiptPaper ?? "MM80",
+      autoPrintReceipt: settings?.autoPrintReceipt ?? false,
+      gstin: vendor.gstin,
+    }),
     notifications: notificationsStatus(snapshot),
     voice: voiceStatus(snapshot),
     billing: planStatus(snapshot),

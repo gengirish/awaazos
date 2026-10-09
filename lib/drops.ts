@@ -44,6 +44,7 @@ import { bumpDropOrderSignal } from "@/lib/drops-signal";
 import { effectivePlan } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
+import { generateReceiptToken } from "@/lib/receipt-data";
 
 type Db = PrismaClient | Prisma.TransactionClient;
 
@@ -424,7 +425,13 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
       });
 
       await tx.receipt.create({
-        data: { transactionId: created.id, vendorId, receiptNumber: billNumber, whatsappSent: false },
+        data: {
+          transactionId: created.id,
+          vendorId,
+          receiptNumber: billNumber,
+          whatsappSent: false,
+          publicToken: generateReceiptToken(),
+        },
       });
 
       return {

@@ -30,6 +30,7 @@ import { bumpDropOrderSignal } from "@/lib/drops-signal";
 import { effectivePlan } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
+import { generateReceiptToken } from "@/lib/receipt-data";
 
 /** Signal-key stand-in for the vendor's menu-orders board (no drop id). */
 export const MENU_ORDERS_SIGNAL_ID = "menu";
@@ -206,7 +207,13 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
       });
 
       await tx.receipt.create({
-        data: { transactionId: created.id, vendorId, receiptNumber: billNumber, whatsappSent: false },
+        data: {
+          transactionId: created.id,
+          vendorId,
+          receiptNumber: billNumber,
+          whatsappSent: false,
+          publicToken: generateReceiptToken(),
+        },
       });
 
       return {

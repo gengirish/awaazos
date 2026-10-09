@@ -6,6 +6,7 @@ import { PLAN_LIMITS } from "@/lib/constants";
 import { countBillableTxnThisMonth } from "@/lib/drops";
 import { beginIdempotency, getIdempotencyKey } from "@/lib/idempotency";
 import { prisma } from "@/lib/prisma";
+import { generateReceiptToken } from "@/lib/receipt-data";
 import { getReceiptQueue } from "@/lib/queues";
 import { tooManyRequests, writeRateLimit } from "@/lib/ratelimit";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
@@ -368,6 +369,7 @@ async function createSale(args: {
         vendorId,
         receiptNumber: billNumber,
         whatsappSent: false,
+        publicToken: generateReceiptToken(),
       },
     });
 

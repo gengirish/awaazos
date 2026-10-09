@@ -183,6 +183,7 @@ storefront surface** — unauthenticated, and no longer read-only (buyers place 
 | `/s/[slug]` | Menu + open drops + checkout |
 | `/s/[slug]/o/[token]` | Buyer's order page (status, UPI pay, UTR form) |
 | `/s/[slug]/account` | Signed-in buyer's own orders/profile |
+| `/r/[token]` | Customer receipt page (see "Receipt module"; not gated on `publishStorefront`) |
 | `/api/s/**` | Order placement, UTR submit, vendor-Razorpay start/verify, buyer magic-link auth |
 | `/api/webhooks/razorpay-orders/[vendorId]` | Per-vendor Razorpay webhook (vendor's own secret) |
 
@@ -217,6 +218,17 @@ are logged and swallowed — Redis being down must never block a sale.
 path — `lib/whatsapp.ts`, `workers/receipt.worker.ts`, `POST /api/receipts/send`, and the
 post-sale enqueue above (only when a `customerPhone` is posted on a plan with `whatsapp: true`) —
 is kept but unused by the UI. See TODO.md 1.1 before reviving it.
+
+**Receipt module.** One `ReceiptView` (`lib/receipt.ts`, pure and client-safe) per bill, built by
+`lib/receipt-data.ts` from the `RECEIPT_TX_SELECT` allowlist (no customer phone/name/address/UTR,
+no vendor phone/email). It is rendered three ways: as WhatsApp text (`formatWhatsAppReceiptMessage`),
+as the staff print page `/receipts/[bill]` (58/80 mm thermal or A4: named `@page` rules in
+`app/globals.css`, `?autoprint=1`, `?embed=1`), and as the public customer page `/r/[token]`.
+`<ReceiptDocument>` is the single layout. `/r/[token]` is keyed on `Receipt.publicToken` (192-bit,
+minted at `receipt.create`; older bills get one the first time `GET /api/receipts/message` loads
+them) and 404s for an unknown token or an inactive vendor. `VendorSettings.autoPrintReceipt` loads
+the print page in a hidden iframe after a POS sale, on desktop only. Settings → Receipts edits the
+footer, GSTIN, paper width and auto-print.
 
 `OrderItem.name` and `priceInPaise` are snapshots, not joins. Renaming or deleting a menu item must
 not mutate historical bills.

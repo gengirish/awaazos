@@ -56,6 +56,7 @@ export default async function PosPage() {
     voiceLang: s?.voiceLang ?? "en-IN",
     taxEnabled: s?.taxEnabled ?? false,
     taxPercent: s?.taxPercent != null ? String(s.taxPercent) : "0",
+    autoPrintReceipt: s?.autoPrintReceipt ?? false,
   };
 
   const todaysRevenuePaise = daily?.totalRevenuePaise ?? 0;

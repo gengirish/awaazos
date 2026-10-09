@@ -1,6 +1,6 @@
 ---
 description: AwaazOS visual design system — saffron-orange POS, mobile-first
-paths: ["**/*.tsx","**/*.css","tailwind.config.ts"]
+paths: ["**/*.tsx","**/*.css"]
 ---
 
 <!-- Generated from .cursor/rules/design-system.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
@@ -30,7 +30,7 @@ via CSS variables — never hardcode hex in components.
   JetBrains Mono is **not** loaded.
 - Baloo 2 and Nunito load via `next/font/google` in `app/layout.tsx`
   (`--font-baloo`, `--font-nunito`), mapped to `font-display` / `font-body` /
-  `font-sans` in `tailwind.config.ts`
+  `font-sans` in the `@theme` block of `app/globals.css` (Tailwind 4, CSS-first config)
 
 ## Icons
 
