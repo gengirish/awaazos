@@ -30,7 +30,7 @@ export default async function ReceiptSettingsPage() {
         title="Receipt details"
         description={
           <>
-            Shop name and city come from your profile. The FSSAI number is set under{" "}
+            City comes from your profile. Shop name and FSSAI number are set under{" "}
             <Link href="/settings/store" className="font-medium text-primary underline-offset-4 hover:underline">
               Online store
             </Link>

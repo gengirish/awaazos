@@ -146,4 +146,57 @@ test.describe("settings hub", () => {
     await page.reload();
     await expect(page.getByRole("switch", { name: /pay on delivery/i })).toHaveAttribute("aria-checked", "true");
   });
+
+  test("store name: the owner renames the store, the link stays the same", async ({ page, request }) => {
+    test.setTimeout(120_000);
+    await createVendorSession(page, request, "rename-store", "/settings/store");
+
+    const before = (await (await page.request.get("/api/vendor")).json()) as {
+      vendor: { name: string; slug: string };
+    };
+
+    await page.goto("/settings/store");
+    const input = page.getByLabel("Store name");
+    await expect(input).toHaveValue(before.vendor.name);
+    const save = page.getByRole("button", { name: /^(save|saved)$/i });
+    const box = await save.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+
+    // Blank is rejected client-side with a visible message, nothing saved.
+    await input.fill("   ");
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByText("Enter a store name.")).toBeVisible();
+    await expect(input).toHaveAttribute("aria-invalid", "true");
+
+    const newName = `Renamed Chaat ${Date.now()}`;
+    await input.fill(`  ${newName}  `);
+    await page.getByRole("button", { name: "Save" }).click();
+    await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
+
+    await page.reload();
+    await expect(page.getByLabel("Store name")).toHaveValue(newName);
+
+    const after = (await (await page.request.get("/api/vendor")).json()) as {
+      vendor: { name: string; slug: string };
+    };
+    expect(after.vendor.name).toBe(newName);
+    expect(after.vendor.slug).toBe(before.vendor.slug);
+
+    // The public store page (same /s/<slug> link) shows the new name.
+    const publish = await page.request.patch("/api/vendor", {
+      data: { publishStorefront: true },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(publish.status()).toBe(200);
+    await page.goto(`/s/${before.vendor.slug}`);
+    await expect(page.getByRole("heading", { level: 1, name: newName })).toBeVisible();
+
+    // The API rejects an empty name too.
+    const blank = await page.request.patch("/api/vendor", {
+      data: { name: "  " },
+      headers: { "Content-Type": "application/json" },
+      failOnStatusCode: false,
+    });
+    expect(blank.status()).toBe(400);
+  });
 });

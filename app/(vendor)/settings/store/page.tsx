@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { FssaiNumberClient } from "@/components/settings/FssaiNumberClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
+import { StoreNameClient } from "@/components/settings/StoreNameClient";
 import { StorefrontClient } from "@/components/settings/StorefrontClient";
 import { prisma } from "@/lib/prisma";
 
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Online store · Settings · AwaazOS" };
 
 export default async function StoreSettingsPage() {
-  const { vendor } = await requireSettingsContext();
+  const { vendor, isOwner } = await requireSettingsContext();
 
   const [settings, availableItemCount] = await Promise.all([
     prisma.vendorSettings.findUnique({
@@ -29,6 +30,9 @@ export default async function StoreSettingsPage() {
         description="A web page with your menu that customers open from a QR or a WhatsApp link."
       />
       <div className="space-y-4">
+        <SettingsCard title="Store name">
+          <StoreNameClient initialName={vendor.name} isOwner={isOwner} />
+        </SettingsCard>
         <SettingsCard title="Your store page">
           <StorefrontClient
             slug={vendor.slug}
