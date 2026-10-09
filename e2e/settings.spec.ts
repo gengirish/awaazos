@@ -156,22 +156,23 @@ test.describe("settings hub", () => {
     };
 
     await page.goto("/settings/store");
-    const input = page.getByRole("textbox", { name: "Store name" });
+    const card = page.getByRole("region", { name: "Store name" });
+    const input = card.getByRole("textbox", { name: "Store name" });
     await expect(input).toHaveValue(before.vendor.name);
-    const save = page.getByRole("button", { name: /^(save|saved)$/i });
+    const save = card.getByRole("button", { name: /^(save|saved)$/i });
     const box = await save.boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
 
     // Blank is rejected client-side with a visible message, nothing saved.
     await input.fill("   ");
-    await page.getByRole("button", { name: "Save" }).click();
+    await card.getByRole("button", { name: "Save" }).click();
     await expect(page.getByText("Enter a store name.")).toBeVisible();
     await expect(input).toHaveAttribute("aria-invalid", "true");
 
     const newName = `Renamed Chaat ${Date.now()}`;
     await input.fill(`  ${newName}  `);
-    await page.getByRole("button", { name: "Save" }).click();
-    await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
+    await card.getByRole("button", { name: "Save" }).click();
+    await expect(card.getByRole("button", { name: "Saved" })).toBeVisible();
 
     await page.reload();
     await expect(page.getByRole("textbox", { name: "Store name" })).toHaveValue(newName);
