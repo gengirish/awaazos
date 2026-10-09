@@ -28,7 +28,7 @@ export type PosShellProps = {
     storefrontPublished: boolean;
   };
   initialItems: MenuTile[];
-  settings: PosSettings & { voiceLang: string };
+  settings: PosSettings & { voiceLang: string; autoPrintReceipt: boolean };
   todaysRevenuePaise: number;
   /** ISO time the server rendered this page; shown as "menu as of" when offline. */
   renderedAt: string;
@@ -179,6 +179,7 @@ export function PosShell({
         totalPaise={receiptMeta.totalPaise}
         paymentMethod={receiptMeta.paymentMethod}
         queued={receiptMeta.queued}
+        autoPrint={settings.autoPrintReceipt}
         onCloseAll={() => {
           setPayOpen(false);
           setReceiptOpen(false);

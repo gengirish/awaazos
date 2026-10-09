@@ -82,7 +82,7 @@ describe("formatWhatsAppReceiptMessage", () => {
       storefrontUrl: "https://awaazos.example/s/ammas-kitchen",
     });
     expect(msg).toContain("Order again: https://awaazos.example/s/ammas-kitchen");
-    expect(msg.trimEnd().endsWith("Powered by AwaazOS 🇮🇳")).toBe(true);
+    expect(msg.trimEnd().endsWith("Powered by AwaazOS")).toBe(true);
   });
 
   it("has no order-again line without a storefront URL", () => {
@@ -126,7 +126,7 @@ describe("receiptWhatsappUrl", () => {
   });
 
   it("round-trips a multi-line receipt through the text param", () => {
-    const text = "🧾 *Stall*\nBill: AWZ-1\n*Total: ₹50.00*";
+    const text = "*Stall*\nBill: AWZ-1\n*Total: ₹50.00*";
     const url = receiptWhatsappUrl(text, "9876543210")!;
     expect(decodeURIComponent(url.split("?text=")[1])).toBe(text);
   });

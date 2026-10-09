@@ -1,7 +1,24 @@
-import { Bell, CreditCard, LayoutList, Mic, ShoppingBag, Store, Wallet, type LucideIcon } from "lucide-react";
+import {
+  Bell,
+  CreditCard,
+  LayoutList,
+  Mic,
+  ReceiptText,
+  ShoppingBag,
+  Store,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 
 /** The Settings areas, in the order the hub and the sidebar show them. */
-export type SettingsSectionId = "store" | "orders" | "payments" | "notifications" | "voice" | "billing";
+export type SettingsSectionId =
+  | "store"
+  | "orders"
+  | "payments"
+  | "receipts"
+  | "notifications"
+  | "voice"
+  | "billing";
 
 export type SettingsSection = {
   id: SettingsSectionId;
@@ -32,6 +49,13 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     title: "Payments",
     description: "UPI ID, pay on delivery and Razorpay.",
     icon: Wallet,
+  },
+  {
+    id: "receipts",
+    href: "/settings/receipts",
+    title: "Receipts",
+    description: "What your bills show, GSTIN, and printing.",
+    icon: ReceiptText,
   },
   {
     id: "notifications",

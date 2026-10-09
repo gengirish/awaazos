@@ -57,7 +57,7 @@ export function CookieConsentBanner() {
   return (
     <div
       ref={ref}
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/98 p-4 shadow-lg backdrop-blur-sm"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/98 p-4 shadow-lg backdrop-blur-sm print:hidden"
       role="dialog"
       aria-live="polite"
       aria-label="Cookie consent"

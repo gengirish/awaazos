@@ -1,8 +1,10 @@
 "use client";
 
+import { Printer } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { receiptPrintPath } from "@/lib/receipt";
 
 type ReceiptRef = { billNumber?: string; transactionId?: string };
 
@@ -68,4 +70,35 @@ export function WhatsAppReceiptButton({
       </a>
     </Button>
   );
+}
+
+/** Opens the bill's print page in a new tab with the print dialog up. A plain link, so it never gets popup-blocked. */
+export function PrintReceiptLink({ billNumber, className = "h-12 w-full" }: { billNumber: string; className?: string }) {
+  return (
+    <Button asChild variant="outline" className={className}>
+      <a href={receiptPrintPath(billNumber, { autoprint: true })} target="_blank" rel="noopener">
+        <Printer className="h-4 w-4" aria-hidden="true" />
+        Print receipt
+      </a>
+    </Button>
+  );
+}
+
+/**
+ * VendorSettings.autoPrintReceipt: while `billNumber` is set, loads the print
+ * page in a hidden iframe, which opens the print dialog for itself. An iframe
+ * needs no user gesture, unlike a new tab after the sale's `await`.
+ */
+export function useAutoPrintReceipt(billNumber: string | null) {
+  useEffect(() => {
+    if (!billNumber) return;
+    const frame = document.createElement("iframe");
+    frame.src = receiptPrintPath(billNumber, { embed: true });
+    frame.title = "Receipt for printing";
+    frame.setAttribute("aria-hidden", "true");
+    frame.tabIndex = -1;
+    frame.className = "pointer-events-none fixed -left-[9999px] top-0 h-px w-px opacity-0";
+    document.body.appendChild(frame);
+    return () => frame.remove();
+  }, [billNumber]);
 }

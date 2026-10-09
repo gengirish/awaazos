@@ -60,6 +60,7 @@ model VendorSettings {
   whatsappNumber           String? // +91XXXXXXXXXX
   voiceLang                String         @default("en-IN") // hi-IN, te-IN, kn-IN, ta-IN
   receiptFooter            String? // "Thanks for visiting!"
+  receiptPaper             ReceiptPaper   @default(MM80) // Width of the printed receipt (/receipts/[bill])
   theme                    String         @default("orange") // orange | green | blue | purple
   hsnDefault               String? // Default HSN/SAC code for menu items without one
   publishStorefront        Boolean        @default(false) // Opt-in: expose /s/<vendor slug> to the public
@@ -327,6 +328,10 @@ model Receipt {
   whatsappSentAt DateTime?
   deliveredTo    String? // +91 phone number
   pdfUrl         String? // Vercel Blob URL
+  // Unguessable handle for the customer's receipt page /r/<token> (lib/receipt.ts).
+  // Null on rows older than the receipt page; filled the first time a vendor
+  // shares that bill.
+  publicToken    String?     @unique
   createdAt      DateTime    @default(now())
 
   @@index([vendorId, createdAt])
@@ -521,6 +526,12 @@ enum PaymentMethod {
   CASH
   CARD
   RAZORPAY_LINK
+}
+
+enum ReceiptPaper {
+  MM58 // 58 mm thermal roll
+  MM80 // 80 mm thermal roll
+  A4
 }
 
 enum PaymentStatus {

@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
-import { appBaseUrl } from "@/lib/storefront-razorpay";
-import { formatWhatsAppReceiptMessage, receiptStorefrontUrl } from "@/lib/whatsapp-message";
+import { loadVendorReceipt } from "@/lib/receipt-data";
+import { formatWhatsAppReceiptMessage } from "@/lib/whatsapp-message";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,7 +36,9 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
  * no Business API, so it's free and available on every plan.
  *
  * The text carries no customer PII: the customer's number only ever lives in
- * the wa.me URL the vendor's browser builds.
+ * the wa.me URL the vendor's browser builds. It links the customer's receipt
+ * page (`receiptUrl`, /r/<token>); the first share of an older bill mints
+ * that token, which is why this GET can write.
  */
 export async function GET(req: NextRequest) {
   try {
@@ -52,53 +53,19 @@ export async function GET(req: NextRequest) {
     }
 
     // Vendor-scoped lookup: a guessed id or bill number from another tenant is a 404.
-    const where = parsed.data.transactionId
-      ? { id: parsed.data.transactionId, vendorId: ctx.vendor.id }
-      : { billNumber: parsed.data.billNumber!, vendorId: ctx.vendor.id };
-
-    const tx = await prisma.transaction.findFirst({
-      where,
-      select: {
-        billNumber: true,
-        createdAt: true,
-        taxPaise: true,
-        totalPaise: true,
-        orderItems: {
-          select: { name: true, qty: true, priceInPaise: true, menuItem: { select: { hsnCode: true } } },
-        },
-      },
-    });
-    if (!tx) {
+    const receipt = await loadVendorReceipt(
+      ctx.vendor.id,
+      parsed.data.transactionId
+        ? { transactionId: parsed.data.transactionId }
+        : { billNumber: parsed.data.billNumber! },
+    );
+    if (!receipt) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
 
-    const settings = await prisma.vendorSettings.findUnique({
-      where: { vendorId: ctx.vendor.id },
-      select: { receiptFooter: true, fssaiNumber: true, publishStorefront: true },
-    });
+    const text = formatWhatsAppReceiptMessage(receipt.view);
 
-    const text = formatWhatsAppReceiptMessage({
-      vendorName: ctx.vendor.name,
-      billNumber: tx.billNumber,
-      createdAt: tx.createdAt,
-      items: tx.orderItems.map((o) => ({
-        name: o.name,
-        qty: o.qty,
-        priceInPaise: o.priceInPaise,
-        hsnCode: o.menuItem?.hsnCode ?? null,
-      })),
-      taxPaise: tx.taxPaise,
-      totalPaise: tx.totalPaise,
-      receiptFooter: settings?.receiptFooter,
-      fssaiNumber: settings?.fssaiNumber,
-      storefrontUrl: receiptStorefrontUrl({
-        slug: ctx.vendor.slug,
-        publishStorefront: settings?.publishStorefront,
-        baseUrl: appBaseUrl(),
-      }),
-    });
-
-    const res = NextResponse.json({ data: { text } });
+    const res = NextResponse.json({ data: { text, receiptUrl: receipt.view.receiptUrl } });
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {
     if (err instanceof AuthError) {

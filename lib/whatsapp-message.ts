@@ -1,14 +1,31 @@
+import type { PaymentMethod, PaymentStatus } from "@prisma/client";
+
 import { formatINR } from "@/lib/currency";
 import { formatIstDateTime } from "@/lib/datetime";
+import { DEFAULT_RECEIPT_FOOTER, receiptStatusLine } from "@/lib/receipt";
 
+/**
+ * What the WhatsApp text needs. A full `ReceiptView` (lib/receipt.ts) fits;
+ * the optional fields are optional only so older callers (the dormant Gupshup
+ * worker) still compile.
+ */
 export type ReceiptMessageInput = {
   vendorName: string;
+  vendorLocation?: string | null;
+  gstin?: string | null;
   billNumber: string;
   /** Transaction createdAt */
-  createdAt: Date;
+  createdAt: Date | string;
   items: { name: string; qty: number; priceInPaise: number; hsnCode?: string | null }[];
+  subtotalPaise?: number;
+  discountPaise?: number;
+  deliveryFeePaise?: number;
   taxPaise: number;
   totalPaise: number;
+  /** With `paymentStatus`, adds a "Paid · UPI" line under the total. */
+  paymentMethod?: PaymentMethod;
+  paymentStatus?: PaymentStatus;
+  cancelled?: boolean;
   receiptFooter?: string | null;
   /** VendorSettings.fssaiNumber — printed when set (home food businesses must show it). */
   fssaiNumber?: string | null;
@@ -18,6 +35,8 @@ export type ReceiptMessageInput = {
    * formatter never builds it, so it can't leak an unpublished storefront.
    */
   storefrontUrl?: string | null;
+  /** Absolute `/r/<token>` link to the customer's receipt page. */
+  receiptUrl?: string | null;
 };
 
 /**
@@ -38,15 +57,14 @@ export function receiptStorefrontUrl(args: {
 
 /**
  * Plain-text WhatsApp body (Markdown-style asterisks for bold on WhatsApp).
+ * No emoji: some WhatsApp clients render them as "�".
  */
 export function formatWhatsAppReceiptMessage(input: ReceiptMessageInput): string {
   const dateLine = formatIstDateTime(input.createdAt);
-  const lines: string[] = [
-    `🧾 *${input.vendorName}*`,
-    `Bill: ${input.billNumber}`,
-    `Date: ${dateLine} IST`,
-    "",
-  ];
+  const lines: string[] = [`*${input.vendorName}*`];
+  if (input.vendorLocation?.trim()) lines.push(input.vendorLocation.trim());
+  if (input.gstin?.trim()) lines.push(`GSTIN: ${input.gstin.trim()}`);
+  lines.push(`Bill: ${input.billNumber}`, `Date: ${dateLine} IST`, "");
 
   for (const it of input.items) {
     const lineTotal = it.priceInPaise * it.qty;
@@ -58,22 +76,43 @@ export function formatWhatsAppReceiptMessage(input: ReceiptMessageInput): string
 
   lines.push("");
 
+  const discount = input.discountPaise ?? 0;
+  const delivery = input.deliveryFeePaise ?? 0;
+  // A subtotal line only earns its place when something sits between it and the total.
+  if (input.subtotalPaise !== undefined && (discount > 0 || delivery > 0 || input.taxPaise > 0)) {
+    lines.push(`Subtotal: ${formatINR(input.subtotalPaise)}`);
+  }
+  if (discount > 0) lines.push(`Discount: −${formatINR(discount)}`);
+  if (delivery > 0) lines.push(`Delivery: ${formatINR(delivery)}`);
   if (input.taxPaise > 0) {
     lines.push(`Tax: ${formatINR(input.taxPaise)}`);
   }
 
-  lines.push(`*Total: ${formatINR(input.totalPaise)}*`, "");
+  lines.push(`*Total: ${formatINR(input.totalPaise)}*`);
+  if (input.paymentStatus && input.paymentMethod) {
+    lines.push(
+      receiptStatusLine({
+        paymentStatus: input.paymentStatus,
+        paymentMethod: input.paymentMethod,
+        cancelled: input.cancelled ?? false,
+      }),
+    );
+  }
+  lines.push("");
 
   const fssai = input.fssaiNumber?.trim();
   if (fssai) {
     lines.push(`FSSAI Lic. No: ${fssai}`, "");
   }
 
-  lines.push(input.receiptFooter?.trim() || "Thanks for visiting!");
+  lines.push(input.receiptFooter?.trim() || DEFAULT_RECEIPT_FOOTER);
+  if (input.receiptUrl) {
+    lines.push(`View receipt: ${input.receiptUrl}`);
+  }
   if (input.storefrontUrl) {
     lines.push(`Order again: ${input.storefrontUrl}`);
   }
-  lines.push("Powered by AwaazOS 🇮🇳");
+  lines.push("Powered by AwaazOS");
 
   return lines.join("\n");
 }

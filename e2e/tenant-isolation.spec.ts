@@ -98,6 +98,31 @@ test.describe("tenant isolation", () => {
     expect(bodyB.total).toBe(0);
   });
 
+  test("vendor B cannot read vendor A's receipt (404, not 403)", async () => {
+    const itemA = await createMenuItem(pageA, { name: "A Receipt Idli", priceInRupees: 30 });
+    const saleA = await pageA.request.post("/api/transactions", {
+      data: {
+        items: [{ menuItemId: itemA.id, name: itemA.name, priceInPaise: itemA.priceInPaise, qty: 1 }],
+        subtotalPaise: 3000,
+        discountPaise: 0,
+        taxPaise: 0,
+        totalPaise: 3000,
+        paymentMethod: "CASH",
+        source: "MANUAL",
+      },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(saleA.status()).toBe(201);
+    const { transaction } = (await saleA.json()) as TransactionCreated;
+
+    const msg = await pageB.request.get(`/api/receipts/message?transactionId=${transaction.id}`);
+    expect(msg.status(), "cross-tenant receipt text must 404").toBe(404);
+
+    // B has no sales yet, so A's bill number matches nothing of B's.
+    const print = await pageB.goto(`/receipts/${transaction.billNumber}`);
+    expect(print?.status(), "cross-tenant print page must 404").toBe(404);
+  });
+
   test("each vendor's bill sequence is independent", async () => {
     const itemA = await createMenuItem(pageA, { name: "A Item", priceInRupees: 10 });
     const itemB = await createMenuItem(pageB, { name: "B Item", priceInRupees: 10 });

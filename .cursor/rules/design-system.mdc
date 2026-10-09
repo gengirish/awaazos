@@ -34,7 +34,8 @@ via CSS variables — never hardcode hex in components.
 ## Icons
 
 - **Lucide React only.**
-- Emojis allowed ONLY in user-content fields (menu item `emoji`, receipt header).
+- Emojis allowed ONLY in user-content fields (menu item `emoji`). Never in receipt text:
+  some WhatsApp clients render them as "�".
 - Never use emojis as UI affordances.
 
 ## Mobile-first breakpoints

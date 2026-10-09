@@ -1,4 +1,4 @@
-import type { FulfilmentMode, Plan } from "@prisma/client";
+import type { FulfilmentMode, Plan, ReceiptPaper } from "@prisma/client";
 
 import { PLAN_LIMITS, VOICE_LANGUAGES } from "./constants";
 
@@ -76,6 +76,15 @@ export function paymentsStatus(
     on: parts[0]!.on || parts[1]!.on,
     parts,
   };
+}
+
+const RECEIPT_PAPER_SHORT: Record<ReceiptPaper, string> = { MM58: "58 mm", MM80: "80 mm", A4: "A4" };
+
+export function receiptsStatus(s: { receiptPaper: ReceiptPaper; autoPrintReceipt: boolean; gstin: string | null }): SectionStatus {
+  const bits = [`${RECEIPT_PAPER_SHORT[s.receiptPaper]} paper`];
+  if (s.gstin) bits.push("GSTIN set");
+  if (s.autoPrintReceipt) bits.push("auto-print on");
+  return { text: bits.join(" · "), on: true };
 }
 
 export function voiceLanguageLabel(voiceLang: string): string {

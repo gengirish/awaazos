@@ -242,3 +242,35 @@
     padding-bottom: var(--cookie-banner-h, 0px);
   }
 }
+
+/* Printed receipts (/receipts/[bill], /r/[token]). Each paper width is a CSS
+   named page, so the sheet's class alone picks the @page size. */
+@page receipt-mm58 {
+  size: 58mm auto;
+  margin: 2mm;
+}
+@page receipt-mm80 {
+  size: 80mm auto;
+  margin: 2mm;
+}
+@page receipt-a4 {
+  size: A4;
+  margin: 15mm;
+}
+.receipt-page-mm58 {
+  page: receipt-mm58;
+}
+.receipt-page-mm80 {
+  page: receipt-mm80;
+}
+.receipt-page-a4 {
+  page: receipt-a4;
+}
+@media print {
+  body {
+    padding-bottom: 0;
+  }
+  [data-sonner-toaster] {
+    display: none;
+  }
+}
