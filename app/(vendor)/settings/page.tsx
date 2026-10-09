@@ -2,6 +2,7 @@ import { CheckCircle2, ChevronRight, CircleDashed, ListChecks, MinusCircle } fro
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
 import { LegacyAnchorRedirect } from "@/components/settings/LegacyAnchorRedirect";
 import { SETTINGS_SECTIONS, type SettingsSectionId } from "@/components/settings/sections";
 import { prisma } from "@/lib/prisma";
@@ -62,7 +63,7 @@ function StatusLine({ status }: { status: SectionStatus }) {
 }
 
 export default async function SettingsHubPage() {
-  const { vendor } = await requireSettingsContext();
+  const { vendor, user } = await requireSettingsContext();
 
   const pushConfigured = isPushConfigured();
   const [settings, availableItemCount, pushDeviceCount] = await Promise.all([
@@ -173,6 +174,20 @@ export default async function SettingsHubPage() {
           })}
         </ul>
       </nav>
+
+      <section aria-labelledby="account-heading" className="mt-6">
+        <h2 id="account-heading" className="mb-2 font-display text-base font-semibold text-foreground">
+          Account
+        </h2>
+        <div className="overflow-hidden rounded-lg border bg-card">
+          <p className="border-b border-border px-4 py-3 text-sm text-muted-foreground">
+            Signed in as{" "}
+            <span className="break-all font-semibold text-foreground">{user.name?.trim() || user.email}</span>
+            {user.name?.trim() && user.email ? <span className="block break-all">{user.email}</span> : null}
+          </p>
+          <VendorSignOutButton variant="row" vendorId={vendor.id} storeName={vendor.name} />
+        </div>
+      </section>
     </>
   );
 }
