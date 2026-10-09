@@ -63,9 +63,10 @@ In the route: `if (!verifyRazorpaySignature(rawBody, sig)) return NextResponse.j
 
 - No `eval`, `Function()`, `dangerouslySetInnerHTML` without explicit review
 - `next-auth` is pinned exactly (`5.0.0-beta.32`) — keep it exact; betas break between builds.
-- `@anthropic-ai/sdk` is `^0.39.0`. On a 0.x version the caret allows patch
-  releases only (`<0.40.0`), so minor bumps are already manual. Bump it
-  deliberately and re-run the golden parse-order suite.
+- `@anthropic-ai/sdk` is `^0.132.1`. On a 0.x version the caret allows patch
+  releases only (`<0.133.0`), so minor bumps are already manual. Bump it
+  deliberately, re-run the golden parse-order and parse-drop suites, and keep
+  `lib/__tests__/anthropic-request-shape.test.ts` (wire-body fixture) green.
 - Run `npm audit` weekly; fix HIGH/CRITICAL before deploy
 
 ## DPDP Act readiness

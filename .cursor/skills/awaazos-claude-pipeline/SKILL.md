@@ -22,7 +22,7 @@ skill if it has one, otherwise the official Anthropic docs (TypeScript SDK).
 Topics that matter here: tool use (CRITICAL — we use the `add_items` tool),
 prompt caching (`cache_control: ephemeral`), and model IDs.
 
-The installed SDK is `@anthropic-ai/sdk` `^0.39.0` — check that the method you
+The installed SDK is `@anthropic-ai/sdk` `^0.132.1` — check that the method you
 want exists in that version. NEVER guess SDK shape.
 
 ## 3. Two-tier model strategy
