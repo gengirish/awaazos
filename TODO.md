@@ -130,6 +130,14 @@ is now set in `fly.toml` `[env]`, effective once the worker app exists again (1.
 Unit-tested; never seen in a real WhatsApp message because no receipt has been sent (see 1.1).
 
 ### 3.2 Tap-to-compose WhatsApp order on the storefront
+**Status:** implemented on `feat/whatsapp-order`. When `VendorSettings.whatsappNumber` is set,
+checkout (drops and menu) also offers "Place order & send on WhatsApp": the order is saved exactly
+as today (`source` stays `STOREFRONT`, so the board, payment, stock and plan-cap rules are
+unchanged), then `/s/[slug]/o/[token]?wa=1` leads with a wa.me link pre-filled with the whole order
+(`formatWhatsAppOrderMessage` in `lib/storefront-order.ts`). Not done: tagging these orders
+`OrderSource.WHATSAPP` (16 `source: "STOREFRONT"` filters would need widening), and a
+cart-only WhatsApp message for kitchens with no payment path.
+
 Buyer taps items on `/s/[slug]`, the page composes a pre-filled WhatsApp message to the vendor.
 Buyer never leaves WhatsApp; vendor stops parsing prose out of a group chat. Also the compliant
 path — a customer-initiated message opens the 24-hour window legitimately, so no templates and no

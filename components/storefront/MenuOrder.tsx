@@ -63,12 +63,23 @@ export type MenuOrderProps = {
   deliveryFeePaise: number;
   pickupNote: string | null;
   payment: { upi: boolean; cod: boolean };
+  /** The kitchen has a usable WhatsApp number (see CheckoutSheet). */
+  whatsapp?: boolean;
   prefill?: BuyerPrefill | null;
 };
 
 export function MenuOrder(props: MenuOrderProps) {
-  const { slug, vendorName, categories, fulfilmentTypes, deliveryFeePaise, pickupNote, payment, prefill } =
-    props;
+  const {
+    slug,
+    vendorName,
+    categories,
+    fulfilmentTypes,
+    deliveryFeePaise,
+    pickupNote,
+    payment,
+    whatsapp,
+    prefill,
+  } = props;
   const router = useRouter();
 
   const [open, setOpen] = useState(false);
@@ -266,6 +277,7 @@ export function MenuOrder(props: MenuOrderProps) {
         deliveryFeePaise={deliveryFeePaise}
         pickupNote={pickupNote}
         payment={payment}
+        whatsapp={whatsapp}
         prefill={prefill}
         returnFocusRef={inHub ? undefined : checkoutRef}
         onOrdered={clearCart}

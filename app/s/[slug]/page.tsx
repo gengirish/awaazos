@@ -38,6 +38,7 @@ import {
   STOREFRONT_MENU_ITEM_WHERE,
   storefrontDropVisibility,
   type StorefrontDropVisibility,
+  whatsappChatLink,
 } from "@/lib/storefront-order";
 import { qrSvgDataUrl } from "@/lib/qr";
 import { buildUpiCollectLink } from "@/lib/upi";
@@ -121,6 +122,7 @@ const loadStorefront = cache(async (slug: string) => {
           fssaiNumber: true,
           acceptPayOnDelivery: true,
           acceptMenuOrders: true,
+          whatsappNumber: true, // presence only — reduced to a boolean below
           menuFulfilmentMode: true,
           menuDeliveryFeePaise: true,
           menuPickupNote: true,
@@ -325,6 +327,7 @@ function DropSection({
   view,
   slug,
   payment,
+  whatsapp,
   now,
   prefill,
   menuOrdering,
@@ -332,6 +335,7 @@ function DropSection({
   view: DropView;
   slug: string;
   payment: { upi: boolean; cod: boolean };
+  whatsapp: boolean;
   now: Date;
   prefill: BuyerPrefill | null;
   /** Everyday menu is orderable — a sold-out drop points buyers at it. */
@@ -436,6 +440,7 @@ function DropSection({
           pickupNote={drop.pickupNote}
           pickupWindow={formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt)}
           payment={payment}
+          whatsapp={whatsapp}
           prefill={prefill}
         />
       </div>
@@ -485,6 +490,8 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
     upi: !!vendor.upiId,
     cod: vendor.settings?.acceptPayOnDelivery ?? false,
   };
+  // Usable number → checkout also offers "send on WhatsApp". Only the boolean reaches the client.
+  const whatsapp = !!(vendor.settings?.whatsappNumber && whatsappChatLink(vendor.settings.whatsappNumber, ""));
   const menuCategories: MenuOrderCategory[] = categories.map(([category, items], i) => ({
     category,
     anchor: categoryAnchor(category, i),
@@ -649,6 +656,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                   view={view}
                   slug={vendor.slug}
                   payment={payment}
+                  whatsapp={whatsapp}
                   now={now}
                   prefill={prefill}
                   menuOrdering={menuOrdering}
@@ -722,6 +730,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                   deliveryFeePaise={vendor.settings?.menuDeliveryFeePaise ?? 0}
                   pickupNote={vendor.settings?.menuPickupNote ?? null}
                   payment={payment}
+                  whatsapp={whatsapp}
                   prefill={prefill}
                 />
               ) : null}

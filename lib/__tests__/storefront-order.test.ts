@@ -4,6 +4,7 @@ import {
   CLOSED_DROP_GRACE_MS,
   dropHasStock,
   formatIstDeadline,
+  formatWhatsAppOrderMessage,
   formatTimeLeft,
   holdMinutesLeft,
   maxOrderableQty,
@@ -158,5 +159,66 @@ describe("whatsappChatLink", () => {
   it("rejects unusable numbers", () => {
     expect(whatsappChatLink("12345", "x")).toBeNull();
     expect(whatsappChatLink("", "x")).toBeNull();
+  });
+});
+
+describe("formatWhatsAppOrderMessage", () => {
+  const base = {
+    vendorName: "Amma's Kitchen",
+    billNumber: "AWZ-20261005-0007",
+    items: [
+      { name: "Ragi laddu", qty: 2, totalPaise: 30000 },
+      { name: "Masala chai", qty: 1, totalPaise: 2000 },
+    ],
+    deliveryFeePaise: 0,
+    totalPaise: 32000,
+    paymentMethod: "UPI" as const,
+    fulfilmentType: "PICKUP" as const,
+    deliveryAddress: null,
+    customerName: "Priya",
+    notes: null,
+    orderUrl: "https://a.example/s/ammas-kitchen/o/tok",
+  };
+
+  it("lists items, total, pickup, payment and the order link", () => {
+    const text = formatWhatsAppOrderMessage(base);
+    expect(text.split("\n")).toEqual([
+      "Hi Amma's Kitchen, I'd like to order:",
+      "",
+      "2 x Ragi laddu - ₹300.00",
+      "1 x Masala chai - ₹20.00",
+      "*Total: ₹320.00*",
+      "",
+      "Pickup",
+      "Payment: UPI",
+      "Name: Priya",
+      "",
+      "Order AWZ-20261005-0007",
+      "https://a.example/s/ammas-kitchen/o/tok",
+    ]);
+  });
+
+  it("adds delivery fee, address, drop and note; omits a missing link", () => {
+    const text = formatWhatsAppOrderMessage({
+      ...base,
+      deliveryFeePaise: 3000,
+      totalPaise: 35000,
+      paymentMethod: "CASH",
+      fulfilmentType: "DELIVERY",
+      deliveryAddress: "12 MG Road",
+      dropTitle: "Saturday bakes",
+      fulfilmentWindow: "Sat 10 Oct, 6–8 pm",
+      notes: "less sugar",
+      orderUrl: null,
+    });
+    expect(text).toContain("*Saturday bakes*\n2 x Ragi laddu");
+    expect(text).toContain("Delivery fee - ₹30.00");
+    expect(text).toContain("Delivery to: 12 MG Road\nWhen: Sat 10 Oct, 6–8 pm\nPayment: Pay on delivery");
+    expect(text).toContain("Note: less sugar");
+    expect(text.endsWith("Order AWZ-20261005-0007")).toBe(true);
+  });
+
+  it("never carries a phone number", () => {
+    expect(formatWhatsAppOrderMessage(base)).not.toMatch(/\+91|\d{10}/);
   });
 });
