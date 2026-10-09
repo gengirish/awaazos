@@ -1,0 +1,45 @@
+{
+  "id": "hi-001-headline",
+  "lang": "hi-IN",
+  "transcript": "Masala chai 15 rupaye, cutting chai 10, samosa 20, vada pav 25 — snacks mein. Mango lassi 60, drinks.",
+  "expected": {
+    "items": [
+      {
+        "name": "Masala Chai",
+        "action": "unchanged",
+        "existingMenuItemId": "mi-masala-chai",
+        "priceInPaise": 1500
+      },
+      {
+        "name": "Cutting Chai",
+        "action": "create",
+        "priceInPaise": 1000
+      },
+      {
+        "name": "Samosa",
+        "action": "unchanged",
+        "existingMenuItemId": "mi-samosa",
+        "priceInPaise": 2000
+      },
+      {
+        "name": "Vada Pav",
+        "action": "update_price",
+        "existingMenuItemId": "mi-vada-pav",
+        "priceInPaise": 2500
+      },
+      {
+        "name": "Mango Lassi",
+        "action": "create",
+        "priceInPaise": 6000,
+        "category": "Drinks"
+      }
+    ]
+  },
+  "tags": [
+    "headline",
+    "existing-match",
+    "update-price",
+    "category-scope"
+  ],
+  "notes": "Which category cutting chai lands in is genuinely ambiguous here, so it is not asserted."
+}

@@ -5,8 +5,8 @@
  * `fetch` returns canned HTTP errors (or hangs / rejects), so the SDK itself
  * raises RateLimitError, InternalServerError, APIConnectionTimeoutError, etc.
  * Asserts that a Haiku failure still escalates to Sonnet and that both-failed
- * still maps to the same HTTP responses in /api/ai/parse-order and
- * /api/ai/parse-drop. No network, no API key.
+ * still maps to the same HTTP responses in /api/ai/parse-order,
+ * /api/ai/parse-drop and /api/ai/parse-menu. No network, no API key.
  */
 import { NextRequest } from "next/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -87,6 +87,7 @@ vi.mock("@/lib/anthropic", async (importOriginal) => {
 
 import { POST as parseOrderPOST } from "@/app/api/ai/parse-order/route";
 import { POST as parseDropPOST } from "@/app/api/ai/parse-drop/route";
+import { POST as parseMenuPOST } from "@/app/api/ai/parse-menu/route";
 import { anthropicHaiku } from "@/lib/anthropic";
 
 const json = (status: number, body: unknown, headers: Record<string, string> = {}) =>
@@ -131,6 +132,14 @@ const DROP_OK = toolReply("build_drop", {
   items: [{ menuItemId: "mi_samosa", spokenName: "samosa", quantity: 30 }],
 });
 
+const MENU_OK = toolReply("add_menu_items", {
+  items: [
+    { name: "Samosa", priceRupees: 20, category: "Snacks", existingMenuItemId: "mi_samosa" },
+    { name: "Cutting Chai", priceRupees: 10, category: "Chai" },
+  ],
+  unparsed: [],
+});
+
 function post(url: string, body: unknown) {
   return new NextRequest(url, {
     method: "POST",
@@ -140,6 +149,8 @@ function post(url: string, body: unknown) {
 }
 const orderReq = () =>
   post("http://localhost/api/ai/parse-order", { transcript: "do chai", lang: "hi-IN", sttSource: "webspeech" });
+const menuReq = () =>
+  post("http://localhost/api/ai/parse-menu", { transcript: "samosa 20, cutting chai 10", lang: "hi-IN" });
 const dropReq = () => post("http://localhost/api/ai/parse-drop", { transcript: "kal 30 samosa", lang: "hi-IN" });
 
 beforeEach(() => {
@@ -234,5 +245,37 @@ describe("POST /api/ai/parse-drop with SDK errors", () => {
     const res = await parseDropPOST(dropReq());
     expect(res.status).toBe(500);
     expect(await res.json()).toEqual({ error: "Internal server error", fallback: "form" });
+  });
+});
+
+describe("POST /api/ai/parse-menu with SDK errors", () => {
+  it.each([
+    ["429 rate limit", apiError(429, "rate_limit_error")],
+    ["529 overloaded", apiError(529, "overloaded_error")],
+    ["network down", networkDown],
+  ])("Haiku %s → escalates to Sonnet, 200", async (_label, haikuReply) => {
+    h.haiku = haikuReply;
+    h.sonnet = MENU_OK;
+    const res = await parseMenuPOST(menuReq());
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      data: { model: string; items: { name: string; action: string; existingMenuItemId: string | null }[] };
+    };
+    expect(body.data.model).toBe("sonnet");
+    expect(body.data.items.map((i) => [i.name, i.action, i.existingMenuItemId])).toEqual([
+      ["Samosa", "update_price", "mi_samosa"],
+      ["Cutting Chai", "create", null],
+    ]);
+    // Per-request maxRetries (Haiku 1, Sonnet 0) — a 429/529 Haiku is retried once.
+    expect([h.haikuCalls, h.sonnetCalls]).toEqual([2, 1]);
+  });
+
+  it("both tiers fail → 500 with form fallback", async () => {
+    h.haiku = apiError(500, "api_error");
+    h.sonnet = apiError(529, "overloaded_error");
+    const res = await parseMenuPOST(menuReq());
+    expect(res.status).toBe(500);
+    expect(await res.json()).toEqual({ error: "Internal server error", fallback: "form" });
+    expect([h.haikuCalls, h.sonnetCalls]).toEqual([2, 1]);
   });
 });

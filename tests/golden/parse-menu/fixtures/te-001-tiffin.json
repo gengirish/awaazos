@@ -1,0 +1,32 @@
+{
+  "id": "te-001-tiffin",
+  "lang": "te-IN",
+  "transcript": "idli iravai rupayalu, masala dosa nalabhai, upma muppai, anni tiffin lo",
+  "expected": {
+    "items": [
+      {
+        "name": "Idli",
+        "action": "create",
+        "priceInPaise": 2000,
+        "category": "Tiffin"
+      },
+      {
+        "name": "Masala Dosa",
+        "action": "create",
+        "priceInPaise": 4000,
+        "category": "Tiffin"
+      },
+      {
+        "name": "Upma",
+        "action": "create",
+        "priceInPaise": 3000,
+        "category": "Tiffin"
+      }
+    ]
+  },
+  "tags": [
+    "telugu",
+    "indic-numerals",
+    "category-scope"
+  ]
+}

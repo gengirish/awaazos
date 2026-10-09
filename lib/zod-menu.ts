@@ -123,3 +123,44 @@ export const menuItemUpdateSchema = z
 
 export type MenuItemCreateParsed = z.infer<typeof menuItemCreateSchema>;
 export type MenuItemUpdateBody = z.infer<typeof menuItemUpdateSchema>;
+
+// ─── Voice menu builder: POST /api/menu/bulk ─────────────────────────────────
+
+/** Most rows one voice menu draft / one bulk save may carry. */
+export const MENU_BULK_MAX_ITEMS = 50;
+/** ₹1,00,000 — above this a spoken price is a mishearing, not a menu price. */
+export const MENU_MAX_PRICE_PAISE = 10_000_000;
+export const MENU_NAME_MAX = 80;
+
+const bulkItemSchema = z.object({
+  name: z.string().trim().min(1, "Name is required").max(MENU_NAME_MAX),
+  priceInPaise: z
+    .number()
+    .int("Price must be whole paise")
+    .positive("Price must be greater than 0")
+    .max(MENU_MAX_PRICE_PAISE, "Price looks too high"),
+  category: z
+    .string()
+    .trim()
+    .max(80)
+    .optional()
+    .transform((c) => (c ? c : "General")),
+  emoji: z
+    .string()
+    .max(8)
+    .optional()
+    .transform((e) => (e?.trim() ? e : "🍽️")),
+  aliases: z.array(z.string().trim().min(1).max(MENU_NAME_MAX)).max(30).default([]),
+  existingMenuItemId: z.string().trim().min(1).max(64).nullish(),
+});
+
+/**
+ * Body of POST /api/menu/bulk. Extra keys on a row (key, action, priceSpoken…
+ * from a MenuDraftItem) are stripped, so the UI can post draft rows as-is.
+ */
+export const menuBulkBodySchema = z.object({
+  items: z.array(bulkItemSchema).min(1).max(MENU_BULK_MAX_ITEMS),
+});
+
+export type MenuBulkItem = z.infer<typeof bulkItemSchema>;
+export type MenuBulkBody = z.infer<typeof menuBulkBodySchema>;

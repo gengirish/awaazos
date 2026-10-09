@@ -7,7 +7,7 @@ export type ParsedLine = {
   qty: number;
 };
 
-function normalizeForMatch(s: string): string {
+export function normalizeForMatch(s: string): string {
   return s
     .toLowerCase()
     .replace(/[^a-z0-9\u0900-\u097F\s]/g, " ")
@@ -57,7 +57,7 @@ const ENGLISH_QTY: Record<string, number> = {
   ten: 10,
 };
 
-function levenshtein(a: string, b: string): number {
+export function levenshtein(a: string, b: string): number {
   if (a === b) return 0;
   if (!a.length) return b.length;
   if (!b.length) return a.length;

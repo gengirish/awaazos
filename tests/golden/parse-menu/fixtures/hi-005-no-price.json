@@ -1,0 +1,31 @@
+{
+  "id": "hi-005-no-price",
+  "lang": "hi-IN",
+  "transcript": "pav bhaji, misal pav aur dabeli, snacks mein. rate baad mein bataunga",
+  "expected": {
+    "items": [
+      {
+        "name": "Pav Bhaji",
+        "action": "create",
+        "priceSpoken": false,
+        "category": "Snacks"
+      },
+      {
+        "name": "Misal Pav",
+        "action": "create",
+        "priceSpoken": false,
+        "category": "Snacks"
+      },
+      {
+        "name": "Dabeli",
+        "action": "create",
+        "priceSpoken": false,
+        "category": "Snacks"
+      }
+    ]
+  },
+  "tags": [
+    "no-price",
+    "existing-category"
+  ]
+}

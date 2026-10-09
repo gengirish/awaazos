@@ -1,0 +1,114 @@
+[
+  {
+    "id": "mi-masala-chai",
+    "slug": "masala-chai",
+    "name": "Masala Chai",
+    "aliases": [
+      "chai",
+      "masala chai"
+    ],
+    "tags": [],
+    "priceInPaise": 1500,
+    "category": "Chai",
+    "emoji": "☕"
+  },
+  {
+    "id": "mi-filter-coffee",
+    "slug": "filter-coffee",
+    "name": "Filter Coffee",
+    "aliases": [
+      "coffee",
+      "filter coffee",
+      "kaapi"
+    ],
+    "tags": [],
+    "priceInPaise": 3000,
+    "category": "Chai",
+    "emoji": "☕"
+  },
+  {
+    "id": "mi-samosa",
+    "slug": "samosa",
+    "name": "Samosa",
+    "aliases": [
+      "samosa"
+    ],
+    "tags": [
+      "fried"
+    ],
+    "priceInPaise": 2000,
+    "category": "Snacks",
+    "emoji": "🥟"
+  },
+  {
+    "id": "mi-vada-pav",
+    "slug": "vada-pav",
+    "name": "Vada Pav",
+    "aliases": [
+      "vada pav",
+      "vada pao",
+      "wada pav"
+    ],
+    "tags": [],
+    "priceInPaise": 2000,
+    "category": "Snacks",
+    "emoji": "🍔"
+  },
+  {
+    "id": "mi-kachori",
+    "slug": "kachori",
+    "name": "Kachori",
+    "aliases": [
+      "kachori"
+    ],
+    "tags": [
+      "fried"
+    ],
+    "priceInPaise": 2000,
+    "category": "Snacks",
+    "emoji": "🥟"
+  },
+  {
+    "id": "mi-bun-maska",
+    "slug": "bun-maska",
+    "name": "Bun Maska",
+    "aliases": [
+      "bun maska",
+      "maska pav"
+    ],
+    "tags": [],
+    "priceInPaise": 2500,
+    "category": "Snacks",
+    "emoji": "🍽️"
+  },
+  {
+    "id": "mi-poha",
+    "slug": "poha",
+    "name": "Poha",
+    "aliases": [
+      "poha"
+    ],
+    "tags": [
+      "breakfast"
+    ],
+    "priceInPaise": 3000,
+    "category": "Breakfast",
+    "emoji": "🍛"
+  },
+  {
+    "id": "mi-sweet-lassi",
+    "slug": "sweet-lassi",
+    "name": "Sweet Lassi",
+    "aliases": [
+      "lassi",
+      "meethi lassi",
+      "sweet lassi"
+    ],
+    "tags": [
+      "cold"
+    ],
+    "priceInPaise": 4000,
+    "category": "Drinks",
+    "emoji": "🥛"
+  }
+]

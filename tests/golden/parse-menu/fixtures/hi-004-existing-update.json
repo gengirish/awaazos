@@ -1,0 +1,32 @@
+{
+  "id": "hi-004-existing-update",
+  "lang": "hi-IN",
+  "transcript": "samosa ab pachees ka, poha paintees, bun maska wahi pachees",
+  "expected": {
+    "items": [
+      {
+        "name": "Samosa",
+        "action": "update_price",
+        "existingMenuItemId": "mi-samosa",
+        "priceInPaise": 2500
+      },
+      {
+        "name": "Poha",
+        "action": "update_price",
+        "existingMenuItemId": "mi-poha",
+        "priceInPaise": 3500
+      },
+      {
+        "name": "Bun Maska",
+        "action": "unchanged",
+        "existingMenuItemId": "mi-bun-maska",
+        "priceInPaise": 2500
+      }
+    ]
+  },
+  "tags": [
+    "existing-match",
+    "update-price",
+    "indic-numerals"
+  ]
+}

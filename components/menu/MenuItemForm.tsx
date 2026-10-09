@@ -39,7 +39,8 @@ import { paiseToRupees } from "@/lib/currency";
 import { suggestEmoji } from "@/lib/menu-suggestions";
 import { menuItemCreateInputSchema, menuItemUpdateSchema } from "@/lib/zod-menu";
 
-const FOOD_EMOJIS = [
+/** Starter emoji grid, shared with the voice menu builder's review rows. */
+export const FOOD_EMOJIS = [
   "🍽️",
   "🥘",
   "🍛",

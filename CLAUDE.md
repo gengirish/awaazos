@@ -151,6 +151,21 @@ and anything `dropUpsertSchema` would reject becomes a `warnings` entry, not an 
 (the log has no kind column). Golden set `tests/golden/parse-drop/`:
 `npm run test:golden:drop:validate` offline, `GOLDEN_PARSE_DROP_LIVE=1 npm run test:golden:drop` live.
 
+**Voice menu builder** — `POST /api/ai/parse-menu` (`lib/parse-menu.ts`, CASHIER) turns a spoken dish
+list ("masala chai 15, samosa 20, vada pav 25 — snacks mein; mango lassi 60, drinks") into a **draft**
+`MenuDraft` (`lib/parse-menu-types.ts`, client-safe); it saves nothing. Forced `add_menu_items` tool,
+Haiku → Sonnet (`shouldEscalateMenu()`: Haiku throws, empty items on a >3-word transcript, or most
+dishes priceless although the transcript has numbers); cached block = `stableMenuJson()` of the
+vendor's WHOLE menu (unavailable items too) + its sorted category list. `postProcessMenuDraft()`
+never trusts the model: existing items match by exact name/alias, then a model id only if it is this
+vendor's and ≥ 0.6 similar, then server fuzzy ≥ 0.85 with a clear winner (else a new dish);
+`rupeesToPaise`, prices ≤ 0 or > ₹1,00,000 dropped (`priceSpoken: false`, new rows carry 0 — the UI
+must ask), repeats merged (last price wins), 50-row cap, categories snapped to existing spellings.
+The UI saves confirmed rows with `POST /api/menu/bulk` (one `$transaction`: price-only updates with
+compound `where { id, vendorId }`, foreign ids → `skipped`; creates via `lib/menu-create.ts`, the same
+slug/alias/sortOrder path as `POST /api/menu`). Golden set `tests/golden/parse-menu/`:
+`npm run test:golden:menu:validate` offline, `GOLDEN_PARSE_MENU_LIVE=1 npm run test:golden:menu` live.
+
 ### Money is integer paise, everywhere
 
 `Int` in Prisma, `number` in TS. `parseFloat`, `toFixed`, `Decimal`, and `Math.round` on prices are
