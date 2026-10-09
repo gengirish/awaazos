@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Clock, Loader2, MapPin, Minus, Plus, ShoppingBag } from "lucide-react";
+import { AlertCircle, Clock, Loader2, MapPin, MessageCircle, Minus, Plus, ShoppingBag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -303,6 +303,12 @@ export type CheckoutSheetProps = {
   /** When to collect (drops: the fulfilment window label), if known. */
   pickupWindow?: string | null;
   payment: { upi: boolean; cod: boolean };
+  /**
+   * The kitchen has a WhatsApp number: also offer "Place order & send on
+   * WhatsApp". Same order, same endpoint — the order page then leads with a
+   * wa.me link carrying the whole order (`?wa=1`).
+   */
+  whatsapp?: boolean;
   prefill?: BuyerPrefill | null;
   /** Focus goes back here when the sheet closes (the Checkout button). */
   returnFocusRef?: React.RefObject<HTMLElement | null>;
@@ -334,6 +340,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     pickupNote,
     pickupWindow,
     payment,
+    whatsapp = false,
     prefill,
     returnFocusRef,
     buildBody,
@@ -351,7 +358,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
   const [method, setMethod] = useState<PaymentMethod | null>(
     payment.upi ? "UPI" : payment.cod ? "CASH" : null,
   );
-  const [submitting, setSubmitting] = useState(false);
+  const [submitting, setSubmitting] = useState<false | "order" | "whatsapp">(false);
   const [fieldErrors, setFieldErrors] = useState<CheckoutFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ field: CheckoutField; n: number } | null>(null);
@@ -521,6 +528,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     e.preventDefault();
     if (submitting) return;
     setFormError(null);
+    // Enter in a field submits via the first (plain) button.
+    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null | undefined;
+    const viaWhatsapp = whatsapp && submitter?.dataset.via === "whatsapp";
 
     const errors = validateCheckout(input);
     showFieldErrors(errors);
@@ -531,7 +541,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     // a response (network drop), so a retry can't create a second order.
     if (!idemKeyRef.current) idemKeyRef.current = newIdempotencyKey();
 
-    setSubmitting(true);
+    setSubmitting(viaWhatsapp ? "whatsapp" : "order");
     let res: Response;
     try {
       res = await fetch(endpoint, {
@@ -571,7 +581,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
       else writeSavedBuyerRaw(null);
       onOrdered?.();
       if (token) {
-        router.push(`/s/${encodeURIComponent(slug)}/o/${encodeURIComponent(token)}`);
+        router.push(
+          `/s/${encodeURIComponent(slug)}/o/${encodeURIComponent(token)}${viaWhatsapp ? "?wa=1" : ""}`,
+        );
         return; // keep the spinner while navigating
       }
     }
@@ -860,15 +872,31 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
 
           <button
             type="submit"
-            disabled={submitting || lines.length === 0}
-            aria-busy={submitting}
+            disabled={!!submitting || lines.length === 0}
+            aria-busy={submitting === "order"}
             className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
           >
-            {submitting ? (
+            {submitting === "order" ? (
               <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
             ) : null}
-            {submitting ? "Placing order…" : `Place order · ${formatINR(totalPaise)}`}
+            {submitting === "order" ? "Placing order…" : `Place order · ${formatINR(totalPaise)}`}
           </button>
+          {whatsapp ? (
+            <button
+              type="submit"
+              data-via="whatsapp"
+              disabled={!!submitting || lines.length === 0}
+              aria-busy={submitting === "whatsapp"}
+              className="-mt-2 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-green-600/40 bg-background px-6 text-base font-bold text-green-800 hover:bg-green-600/5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2 disabled:opacity-60"
+            >
+              {submitting === "whatsapp" ? (
+                <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+              ) : (
+                <MessageCircle className="h-5 w-5" aria-hidden="true" />
+              )}
+              {submitting === "whatsapp" ? "Placing order…" : "Place order & send on WhatsApp"}
+            </button>
+          ) : null}
         </form>
       </SheetContent>
     </Sheet>

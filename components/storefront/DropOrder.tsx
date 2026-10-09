@@ -67,6 +67,8 @@ export type DropOrderProps = {
   /** Fulfilment window label ("Sat, 5 Oct · 5:00 pm – 8:00 pm"), shown with Pickup at checkout. */
   pickupWindow?: string | null;
   payment: { upi: boolean; cod: boolean };
+  /** The kitchen has a usable WhatsApp number (see CheckoutSheet). */
+  whatsapp?: boolean;
   /**
    * Signed-in buyer's own saved details (lib/customer-auth.ts). Non-empty
    * fields win over the device's "remember me" values; absent for guests.
@@ -86,6 +88,7 @@ export function DropOrder(props: DropOrderProps) {
     pickupNote,
     pickupWindow,
     payment,
+    whatsapp,
     prefill,
   } = props;
   const router = useRouter();
@@ -277,6 +280,7 @@ export function DropOrder(props: DropOrderProps) {
         pickupNote={pickupNote}
         pickupWindow={pickupWindow}
         payment={payment}
+        whatsapp={whatsapp}
         prefill={prefill}
         returnFocusRef={inHub ? undefined : checkoutRef}
         onOrdered={clearCart}

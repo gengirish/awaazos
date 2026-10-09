@@ -7,6 +7,8 @@
 
 import type { FulfilmentStatus } from "@prisma/client";
 
+import { formatINR } from "@/lib/currency";
+
 const IST = "Asia/Kolkata";
 
 /** Schema ceiling on a single line's qty (storefrontOrderSchema: max 99). */
@@ -554,4 +556,53 @@ export function whatsappChatLink(number: string, text: string): string | null {
   if (digits.length === 10) digits = `91${digits}`;
   if (digits.length < 11 || digits.length > 15) return null;
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
+}
+
+export type WhatsAppOrderMessageInput = {
+  vendorName: string;
+  billNumber: string;
+  items: { name: string; qty: number; totalPaise: number }[];
+  deliveryFeePaise: number;
+  totalPaise: number;
+  paymentMethod: "UPI" | "CASH";
+  fulfilmentType: "DELIVERY" | "PICKUP" | null;
+  /** Only rendered for DELIVERY. */
+  deliveryAddress: string | null;
+  /** Drop orders: the drop title and its fulfilment window label. */
+  dropTitle?: string | null;
+  fulfilmentWindow?: string | null;
+  customerName: string | null;
+  notes: string | null;
+  /** Absolute link to the buyer's order page; omitted when no base URL is configured. */
+  orderUrl: string | null;
+};
+
+/**
+ * The order as a message the buyer sends to the kitchen from their own
+ * WhatsApp (tap-to-compose, TODO 3.2). Every amount comes from the saved
+ * order, so the text matches what the kitchen sees on its board; the bill
+ * number ties the chat to that order. The buyer is the sender, so their own
+ * name, address and note are theirs to share — the phone is not repeated
+ * (WhatsApp already shows it). Asterisks are WhatsApp bold; no emoji (some
+ * clients render them as "�").
+ */
+export function formatWhatsAppOrderMessage(o: WhatsAppOrderMessageInput): string {
+  const lines: string[] = [`Hi ${o.vendorName}, I'd like to order:`, ""];
+  if (o.dropTitle) lines.push(`*${o.dropTitle}*`);
+  for (const i of o.items) lines.push(`${i.qty} x ${i.name} - ${formatINR(i.totalPaise)}`);
+  if (o.deliveryFeePaise > 0) lines.push(`Delivery fee - ${formatINR(o.deliveryFeePaise)}`);
+  lines.push(`*Total: ${formatINR(o.totalPaise)}*`, "");
+
+  if (o.fulfilmentType === "DELIVERY") {
+    lines.push(o.deliveryAddress ? `Delivery to: ${o.deliveryAddress}` : "Delivery");
+  } else if (o.fulfilmentType === "PICKUP") {
+    lines.push("Pickup");
+  }
+  if (o.fulfilmentWindow) lines.push(`When: ${o.fulfilmentWindow}`);
+  lines.push(`Payment: ${o.paymentMethod === "CASH" ? "Pay on delivery" : "UPI"}`);
+  if (o.customerName) lines.push(`Name: ${o.customerName}`);
+  if (o.notes) lines.push(`Note: ${o.notes}`);
+  lines.push("", `Order ${o.billNumber}`);
+  if (o.orderUrl) lines.push(o.orderUrl);
+  return lines.join("\n");
 }

@@ -11,9 +11,15 @@ import { UtrForm } from "@/components/storefront/UtrForm";
 import { formatINR, paiseToRupees } from "@/lib/currency";
 import { orderDisplayState, PENDING_HOLD_MINUTES } from "@/lib/drops";
 import { formatFulfilmentWindow, formatIstDate, formatIstTime } from "@/lib/drops-time";
-import { holdMinutesLeft, orderStatusLabel, whatsappChatLink, type StatusTone } from "@/lib/storefront-order";
+import {
+  formatWhatsAppOrderMessage,
+  holdMinutesLeft,
+  orderStatusLabel,
+  whatsappChatLink,
+  type StatusTone,
+} from "@/lib/storefront-order";
 import { prisma } from "@/lib/prisma";
-import { isOnlinePaymentEnabled } from "@/lib/storefront-razorpay";
+import { appBaseUrl, isOnlinePaymentEnabled } from "@/lib/storefront-razorpay";
 import { qrSvgDataUrl } from "@/lib/qr";
 import { buildUpiDeepLink } from "@/lib/upi";
 import { cn } from "@/lib/utils";
@@ -40,6 +46,12 @@ export const runtime = "nodejs";
  * Menu orders ("Order from menu", lib/menu-orders.ts) have `drop = null`: no
  * drop title or fulfilment window; a pickup shows the vendor's
  * `menuPickupNote` instead of the drop's.
+ *
+ * WhatsApp: the kitchen's opted-in number gets a wa.me link pre-filled with
+ * the whole order (`formatWhatsAppOrderMessage`). `?wa=1` — set when the buyer
+ * chose "Place order & send on WhatsApp" at checkout — puts that link at the
+ * top as the next step. The buyer sends it from their own WhatsApp; nothing is
+ * sent from our side.
  */
 
 const BRAND_THEMES = new Set(["green", "amber", "red", "blue", "purple"]);
@@ -134,8 +146,12 @@ function ToneIcon({ tone }: { tone: StatusTone }) {
   return <Clock className={cls} aria-hidden="true" />;
 }
 
-export default async function StorefrontOrderPage(props: { params: Promise<{ slug: string; token: string }> }) {
+export default async function StorefrontOrderPage(props: {
+  params: Promise<{ slug: string; token: string }>;
+  searchParams: Promise<{ wa?: string | string[] }>;
+}) {
   const params = await props.params;
+  const viaWhatsapp = (await props.searchParams).wa === "1";
   const order = await loadOrder(params.slug, params.token);
   if (!order) notFound();
 
@@ -173,8 +189,27 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
   const payOnline = awaitingUpi && minsLeft > 0 && isOnlinePaymentEnabled(vendor, vendor.settings, now);
 
   const waLink = vendor.settings?.whatsappNumber
-    ? whatsappChatLink(vendor.settings.whatsappNumber, `Hi, I placed order ${order.billNumber} on your store`)
+    ? whatsappChatLink(
+        vendor.settings.whatsappNumber,
+        formatWhatsAppOrderMessage({
+          vendorName: vendor.name,
+          billNumber: order.billNumber,
+          items: order.orderItems,
+          deliveryFeePaise: order.deliveryFeePaise,
+          totalPaise: order.totalPaise,
+          paymentMethod: order.paymentMethod === "CASH" ? "CASH" : "UPI",
+          fulfilmentType: order.fulfilmentType,
+          deliveryAddress: order.deliveryAddress,
+          dropTitle: drop?.title ?? null,
+          fulfilmentWindow: drop ? formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt) : null,
+          customerName: order.customerName,
+          notes: order.notes,
+          orderUrl: `${appBaseUrl()}/s/${encodeURIComponent(slug)}/o/${encodeURIComponent(params.token)}`,
+        }),
+      )
     : null;
+  // Chosen at checkout and still worth sending: lead with it.
+  const waFirst = viaWhatsapp && !!waLink && order.fulfilmentStatus !== "CANCELLED";
 
   return (
     <div data-theme={theme} className="min-h-screen bg-awaaz-cream/40">
@@ -223,6 +258,30 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
             ) : null}
           </div>
         </section>
+
+        {waFirst && waLink ? (
+          <section
+            aria-labelledby="wa-heading"
+            className="space-y-3 rounded-2xl border border-green-600/30 bg-green-600/5 p-4 text-center sm:p-6"
+          >
+            <h2 id="wa-heading" className="font-display text-xl font-bold text-awaaz-charcoal">
+              Send your order on WhatsApp
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Your order is saved. Send it to {vendor.name} on WhatsApp. They&apos;ll reply there.
+              {awaitingUpi ? " Then come back here to pay." : ""}
+            </p>
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-green-700 px-6 text-base font-bold text-white shadow-md hover:bg-green-800 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2"
+            >
+              <MessageCircle className="h-5 w-5" aria-hidden="true" />
+              Send order on WhatsApp
+            </a>
+          </section>
+        ) : null}
 
         {awaitingUpi ? (
           <section
@@ -358,7 +417,7 @@ export default async function StorefrontOrderPage(props: { params: Promise<{ slu
 
         <OtherCartsNotice slug={slug} vendorName={vendor.name} />
 
-        {waLink ? (
+        {waLink && !waFirst ? (
           <a
             href={waLink}
             target="_blank"
