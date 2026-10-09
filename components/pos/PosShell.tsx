@@ -126,6 +126,7 @@ export function PosShell({
         todaysRevenuePaise={todaysRevenuePaise}
         pendingPaise={outbox.pendingTodayPaise}
         storePath={vendor.storefrontPublished ? `/s/${encodeURIComponent(vendor.slug)}` : null}
+        vendorId={vendor.id}
       />
       <PosSyncStatus
         online={online}

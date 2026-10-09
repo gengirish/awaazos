@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ExternalLink, Eye, EyeOff, Settings } from "lucide-react";
 
+import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
 import { formatINR } from "@/lib/currency";
 
 export type PosHeaderProps = {
@@ -13,10 +14,12 @@ export type PosHeaderProps = {
   pendingPaise?: number;
   /** Public storefront path (`/s/<slug>`); omitted when the store isn't published. */
   storePath?: string | null;
+  /** Active vendor; lets Sign out warn about this device's unsynced sales. */
+  vendorId?: string;
 };
 
 const ICON_BTN =
-  "flex h-11 min-w-[44px] items-center justify-center gap-1.5 rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
+  "flex h-11 min-w-[44px] items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 /** Per-device preference: hide today's takings from a customer looking at the screen. */
 const HIDE_REVENUE_KEY = "awz_pos_hide_revenue_v1";
@@ -38,7 +41,7 @@ function writeHidden(hidden: boolean): void {
   }
 }
 
-export function PosHeader({ stallName, todaysRevenuePaise, pendingPaise = 0, storePath }: PosHeaderProps) {
+export function PosHeader({ stallName, todaysRevenuePaise, pendingPaise = 0, storePath, vendorId }: PosHeaderProps) {
   // Default shown; the stored preference is applied after mount so the server
   // render and the first client render agree. Until it has been read
   // (`prefLoaded`), the amount is masked so a vendor who chose "hidden" never
@@ -107,6 +110,7 @@ export function PosHeader({ stallName, todaysRevenuePaise, pendingPaise = 0, sto
         <Link href="/settings" className={ICON_BTN} aria-label="Settings">
           <Settings className="h-5 w-5" aria-hidden />
         </Link>
+        <VendorSignOutButton variant="icon" vendorId={vendorId} storeName={stallName} />
       </div>
     </header>
   );
