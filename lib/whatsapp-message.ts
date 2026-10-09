@@ -57,10 +57,11 @@ export function receiptStorefrontUrl(args: {
 
 /**
  * Plain-text WhatsApp body (Markdown-style asterisks for bold on WhatsApp).
+ * No emoji: some WhatsApp clients render them as "�".
  */
 export function formatWhatsAppReceiptMessage(input: ReceiptMessageInput): string {
   const dateLine = formatIstDateTime(input.createdAt);
-  const lines: string[] = [`🧾 *${input.vendorName}*`];
+  const lines: string[] = [`*${input.vendorName}*`];
   if (input.vendorLocation?.trim()) lines.push(input.vendorLocation.trim());
   if (input.gstin?.trim()) lines.push(`GSTIN: ${input.gstin.trim()}`);
   lines.push(`Bill: ${input.billNumber}`, `Date: ${dateLine} IST`, "");
@@ -111,7 +112,7 @@ export function formatWhatsAppReceiptMessage(input: ReceiptMessageInput): string
   if (input.storefrontUrl) {
     lines.push(`Order again: ${input.storefrontUrl}`);
   }
-  lines.push("Powered by AwaazOS 🇮🇳");
+  lines.push("Powered by AwaazOS");
 
   return lines.join("\n");
 }

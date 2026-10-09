@@ -124,3 +124,9 @@ describe("receiptsStatus", () => {
     );
   });
 });
+
+describe("WhatsApp text has no emoji", () => {
+  it("is plain text, so no client shows a replacement character", () => {
+    expect(formatWhatsAppReceiptMessage(view)).not.toMatch(/\p{Extended_Pictographic}|\p{Regional_Indicator}/u);
+  });
+});
