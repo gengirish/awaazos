@@ -1,3 +1,4 @@
+import type { StaffRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 
 import { PosShell } from "@/components/pos/PosShell";
@@ -9,9 +10,11 @@ export const dynamic = "force-dynamic";
 
 export default async function PosPage() {
   let vendorId: string;
+  let staffRole: StaffRole;
   try {
     const ctx = await requireVendorRole("CASHIER");
     vendorId = ctx.vendor.id;
+    staffRole = ctx.staff.role;
   } catch (e) {
     if (e instanceof AuthError) {
       redirect("/sign-in");
@@ -81,6 +84,7 @@ export default async function PosPage() {
       settings={settings}
       todaysRevenuePaise={todaysRevenuePaise}
       renderedAt={new Date().toISOString()}
+      staffRole={staffRole}
     />
   );
 }

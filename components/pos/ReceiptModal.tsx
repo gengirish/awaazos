@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { PaymentMethod } from "@prisma/client";
 
@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useReceiptText, WhatsAppReceiptButton } from "@/components/receipts/WhatsAppReceipt";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { paymentMethodLabel } from "@/lib/cash-tender";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
 import { receiptWhatsappUrl } from "@/lib/whatsapp-message";
@@ -50,9 +51,33 @@ export function ReceiptModal({
   const waUrl = receiptText ? receiptWhatsappUrl(receiptText, phone) : null;
   const phoneInvalid = Boolean(receiptText) && !waUrl;
 
+  const newOrderRef = useRef<HTMLButtonElement>(null);
+  const waWrapRef = useRef<HTMLDivElement>(null);
+  const methodLabel = paymentMethodLabel(paymentMethod);
+
   useEffect(() => {
     if (!open) setPhone("");
   }, [open]);
+
+  // The receipt text arrives after the sheet opens. When it does, move focus
+  // from "New order" to the WhatsApp link, unless the vendor has already moved
+  // focus elsewhere (e.g. into the phone field).
+  const receiptReady = typeof receiptText === "string";
+  useEffect(() => {
+    if (!open || !receiptReady) return;
+    const active = document.activeElement;
+    if (active && active !== document.body && active !== newOrderRef.current) return;
+    waWrapRef.current?.querySelector<HTMLElement>("a[href]")?.focus();
+  }, [open, receiptReady]);
+
+  function focusPrimary(e: Event) {
+    const wa = waWrapRef.current?.querySelector<HTMLElement>("a[href]");
+    const target = wa ?? newOrderRef.current;
+    if (target) {
+      e.preventDefault();
+      target.focus();
+    }
+  }
 
   function newOrder() {
     clearCart();
@@ -68,7 +93,7 @@ export function ReceiptModal({
         <p className="text-xs text-muted-foreground">Saved on this phone</p>
         <p className="font-mono text-lg font-semibold tabular-nums text-foreground">Offline #{queued.localNo}</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Paid {formatINR(totalPaise)} via {paymentMethod}
+          Paid {formatINR(totalPaise)} via {methodLabel}
         </p>
       </div>
       <p className="text-sm text-muted-foreground" role="status">
@@ -76,8 +101,8 @@ export function ReceiptModal({
           ? "Sign in again to sync it. It gets a bill number and receipt once it syncs."
           : "No connection right now. It syncs by itself and gets a bill number when you're back online."}
       </p>
-      <Button type="button" className="h-12 w-full" onClick={newOrder}>
-        New order 🆕
+      <Button ref={newOrderRef} type="button" className="h-12 w-full" onClick={newOrder}>
+        New order
       </Button>
     </div>
   ) : (
@@ -86,7 +111,7 @@ export function ReceiptModal({
         <p className="text-xs text-muted-foreground">Bill number</p>
         <p className="font-mono text-lg font-semibold tabular-nums text-foreground">{billNumber}</p>
         <p className="mt-2 text-sm text-muted-foreground">
-          Paid {formatINR(totalPaise)} via {paymentMethod}
+          Paid {formatINR(totalPaise)} via {methodLabel}
         </p>
       </div>
       <div className="space-y-2">
@@ -112,9 +137,11 @@ export function ReceiptModal({
             : "Opens your WhatsApp with the receipt ready — tap send."}
         </p>
       </div>
-      <WhatsAppReceiptButton url={waUrl} loading={receiptText === undefined} />
-      <Button type="button" className="h-12 w-full" onClick={newOrder}>
-        New order 🆕
+      <div ref={waWrapRef}>
+        <WhatsAppReceiptButton url={waUrl} loading={receiptText === undefined} />
+      </div>
+      <Button ref={newOrderRef} type="button" className="h-12 w-full" onClick={newOrder}>
+        New order
       </Button>
     </div>
   );
@@ -122,7 +149,7 @@ export function ReceiptModal({
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent>
+        <DialogContent onOpenAutoFocus={focusPrimary}>
           <DialogHeader>
             <DialogTitle>{queued ? "Paid · saved offline" : "Paid"}</DialogTitle>
             <DialogDescription>
@@ -137,7 +164,11 @@ export function ReceiptModal({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[90vh] overflow-y-auto rounded-t-xl">
+      <SheetContent
+        side="bottom"
+        className="max-h-[90vh] overflow-y-auto rounded-t-xl"
+        onOpenAutoFocus={focusPrimary}
+      >
         <SheetHeader>
           <SheetTitle>{queued ? "Paid · saved offline" : "Paid"}</SheetTitle>
           <SheetDescription>

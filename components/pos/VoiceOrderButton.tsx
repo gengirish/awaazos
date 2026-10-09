@@ -1,22 +1,20 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { AlertCircle, Check, Loader2, Mic } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { AlertCircle, Check, Languages, Loader2, Mic, Square } from "lucide-react";
 
 import { useOnline } from "@/hooks/useOnline";
 import { useVoiceOrder } from "@/hooks/useVoiceOrder";
 import { useCartStore } from "@/lib/cartStore";
-import { VOICE_LANGUAGES } from "@/lib/constants";
 import { cn } from "@/lib/utils";
-
-function voiceLangBadgeLabel(lang: string): string {
-  const known = VOICE_LANGUAGES.find((l) => l.value === lang);
-  if (known) return known.label;
-  if (lang === "te-IN") return "తెలుగు";
-  if (lang === "kn-IN") return "ಕನ್ನಡ";
-  if (lang === "ta-IN") return "தமிழ்";
-  return lang;
-}
+import {
+  browserStorage,
+  nextVoiceLang,
+  readVoiceLangOverride,
+  resolveVoiceLang,
+  voiceLangLabel,
+  writeVoiceLangOverride,
+} from "@/lib/voice-lang-pref";
 
 const ERROR_MESSAGES: Record<string, string> = {
   stt_unsupported: "Voice not supported — use the grid below",
@@ -39,14 +37,17 @@ function mapError(reason: string | null): string {
   return ERROR_MESSAGES[reason] ?? "Something went wrong — use the grid below";
 }
 
+
 type VoiceCoreProps = {
+  /** Effective language: the device override if any, else the vendor's saved one. */
   voiceLang: string;
+  onCycleLang: () => void;
   onScheduleReset: () => void;
-  onNeedsConfirmationChange?: (flag: boolean) => void;
 };
 
-function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationChange }: VoiceCoreProps) {
+function VoiceOrderButtonCore({ voiceLang, onCycleLang, onScheduleReset }: VoiceCoreProps) {
   const setItemsFromVoice = useCartStore((s) => s.setItemsFromVoice);
+  const setVoiceReview = useCartStore((s) => s.setVoiceReview);
   const {
     startListening,
     stopListening,
@@ -61,29 +62,29 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
   const appliedVoiceSigRef = useRef<string>("");
 
   useEffect(() => {
-    onNeedsConfirmationChange?.(needsConfirmation);
-  }, [needsConfirmation, onNeedsConfirmationChange]);
-
-  useEffect(() => {
     if (parsedItems.length === 0) appliedVoiceSigRef.current = "";
   }, [parsedItems.length]);
 
+  // Apply each parse result to the cart exactly once. The review warnings go to
+  // the store (OrderCart renders them) so they outlive this core remounting.
   useEffect(() => {
     if (state !== "success" || parsedItems.length === 0) return;
     const sig = JSON.stringify(parsedItems);
     if (appliedVoiceSigRef.current === sig) return;
     appliedVoiceSigRef.current = sig;
     setItemsFromVoice(parsedItems);
-  }, [state, parsedItems, setItemsFromVoice]);
+    setVoiceReview(
+      needsConfirmation || unmatched.length > 0
+        ? { lowConfidence: needsConfirmation, unmatched: [...unmatched] }
+        : null,
+    );
+  }, [state, parsedItems, unmatched, needsConfirmation, setItemsFromVoice, setVoiceReview]);
 
   useEffect(() => {
     if (state !== "success") return;
     const t = window.setTimeout(onScheduleReset, 1500);
     return () => window.clearTimeout(t);
   }, [state, onScheduleReset]);
-
-  const reducedMotion =
-    typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   const label =
     state === "idle"
@@ -100,7 +101,8 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
                 ? mapError(errorReason)
                 : "Voice order";
 
-  const langLabel = voiceLangBadgeLabel(voiceLang);
+  const langLabel = voiceLangLabel(voiceLang);
+  const busy = state === "listening" || state === "transcribing" || state === "parsing";
 
   // Web Speech and the parser both need the network; offline, say so up front
   // instead of letting the mic fail slowly. Tap input keeps working.
@@ -112,14 +114,17 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
       <h2 id="voice-order-heading" className="sr-only">
         Voice order
       </h2>
-      <div
-        className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground"
-        aria-label={`Voice language: ${langLabel}`}
+      <button
+        type="button"
+        onClick={onCycleLang}
+        disabled={busy}
+        aria-label={`Voice language: ${langLabel} — tap to change`}
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-muted px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        <span aria-hidden>🎙️</span>
+        <Languages className="h-3.5 w-3.5" aria-hidden />
         <span>{langLabel}</span>
-      </div>
-      {unmatched.length > 0 ? (
+      </button>
+      {state === "error" && unmatched.length > 0 ? (
         <p className="w-full text-center text-xs text-muted-foreground">
           Not on menu: {unmatched.join(", ")}
         </p>
@@ -137,20 +142,21 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
           "relative flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-full shadow-md ring-4 ring-offset-2 ring-offset-background transition-transform focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-safe:transition-colors",
           state === "idle" && !offlineIdle && "bg-primary text-primary-foreground ring-transparent",
           offlineIdle && "cursor-not-allowed bg-muted text-muted-foreground ring-border",
+          // Listening is the mic working, not an error: primary colour with a
+          // halo, a stop square instead of the mic, and the "Listening…" text.
+          // `motion-safe:` drops the pulse under prefers-reduced-motion.
           state === "listening" &&
-            "bg-destructive text-destructive-foreground ring-2 ring-white/90 motion-safe:animate-pulse",
-          state === "listening" && reducedMotion && "motion-safe:animate-none",
+            "bg-primary text-primary-foreground ring-primary/40 motion-safe:animate-pulse",
           (state === "transcribing" || state === "parsing") &&
             "bg-purple-600 text-white ring-purple-300 dark:bg-purple-700 cursor-wait",
           state === "success" && "bg-green-600 text-white ring-green-300",
           state === "error" && "bg-muted text-muted-foreground ring-border",
         )}
       >
-        {state === "idle" || state === "listening" ? (
-          <Mic className="h-9 w-9" strokeWidth={state === "listening" ? 2.5 : 2} aria-hidden />
-        ) : null}
+        {state === "idle" ? <Mic className="h-9 w-9" aria-hidden /> : null}
+        {state === "listening" ? <Square className="h-8 w-8 fill-current" aria-hidden /> : null}
         {state === "transcribing" || state === "parsing" ? (
-          <Loader2 className="h-9 w-9 animate-spin" aria-hidden />
+          <Loader2 className="h-9 w-9 motion-safe:animate-spin" aria-hidden />
         ) : null}
         {state === "success" ? <Check className="h-9 w-9" aria-hidden /> : null}
         {state === "error" ? <AlertCircle className="h-9 w-9" aria-hidden /> : null}
@@ -165,9 +171,9 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
             {mapError(errorReason)}
           </p>
         ) : (
-          <p aria-live="polite" aria-atomic="true" className={cn("text-sm font-medium", state === "listening" && "text-destructive")}>
+          <p aria-live="polite" aria-atomic="true" className={cn("text-sm font-medium", state === "listening" && "text-primary")}>
             {state === "idle" ? "Tap to speak" : null}
-            {state === "listening" ? "Listening…" : null}
+            {state === "listening" ? "Listening… tap to stop" : null}
             {state === "transcribing" ? "Hearing you…" : null}
             {state === "parsing" ? "Understanding…" : null}
             {state === "success" ? "Got it!" : null}
@@ -182,18 +188,35 @@ function VoiceOrderButtonCore({ voiceLang, onScheduleReset, onNeedsConfirmationC
 }
 
 export type VoiceOrderButtonProps = {
+  /** The vendor's saved `VendorSettings.voiceLang`. */
   voiceLang: string;
-  onNeedsConfirmationChange?: (flag: boolean) => void;
 };
 
-export function VoiceOrderButton({ voiceLang, onNeedsConfirmationChange }: VoiceOrderButtonProps) {
+export function VoiceOrderButton({ voiceLang: vendorLang }: VoiceOrderButtonProps) {
   const [tick, setTick] = useState(0);
+  // Device-local override, read after mount so server and client markup match.
+  const [override, setOverride] = useState<string | null>(null);
+
+  useEffect(() => {
+    setOverride(readVoiceLangOverride(browserStorage()));
+  }, []);
+
+  const voiceLang = resolveVoiceLang(override, vendorLang);
+
+  const cycleLang = useCallback(() => {
+    const next = nextVoiceLang(voiceLang, vendorLang);
+    writeVoiceLangOverride(browserStorage(), next, vendorLang);
+    setOverride(next === vendorLang ? null : next);
+  }, [voiceLang, vendorLang]);
+
+  const scheduleReset = useCallback(() => setTick((t) => t + 1), []);
+
   return (
     <VoiceOrderButtonCore
       key={tick}
       voiceLang={voiceLang}
-      onScheduleReset={() => setTick((t) => t + 1)}
-      onNeedsConfirmationChange={onNeedsConfirmationChange}
+      onCycleLang={cycleLang}
+      onScheduleReset={scheduleReset}
     />
   );
 }

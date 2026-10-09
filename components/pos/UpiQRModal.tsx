@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import Link from "next/link";
 import { PaymentMethod } from "@prisma/client";
+import { Check, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -15,7 +17,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { formatINR, paiseToRupees } from "@/lib/currency";
+import { cashChange, paiseToRupeesInput, parseRupeesInput, quickTenderPaise } from "@/lib/cash-tender";
+import { formatINR, formatINRCompact, paiseToRupees } from "@/lib/currency";
 import { useQrDataUrl } from "@/hooks/useQrDataUrl";
 import { checkoutSale } from "@/lib/pos-outbox";
 import { buildUpiDeepLink } from "@/lib/upi";
@@ -55,19 +58,45 @@ export function UpiQRModal({
   items,
   onPaid,
 }: UpiQRModalProps) {
-  const [payMode, setPayMode] = useState<"UPI" | "CASH">("UPI");
+  const effectiveUpiId = upiId?.trim() || "";
+  // No UPI ID means no QR to show, so cash is the mode that can actually be paid.
+  const defaultMode: "UPI" | "CASH" = effectiveUpiId ? "UPI" : "CASH";
+
+  const [payMode, setPayMode] = useState<"UPI" | "CASH">(defaultMode);
   const [upiRef, setUpiRef] = useState("");
+  const [showUpiRef, setShowUpiRef] = useState(false);
+  const [received, setReceived] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const markPaidRef = useRef<HTMLButtonElement>(null);
+  const ids = useId();
+  const upiRefFieldId = `${ids}-upi-ref-field`;
+  const receivedHintId = `${ids}-received-hint`;
 
   useEffect(() => {
     if (!open) {
-      setPayMode("UPI");
+      setPayMode(defaultMode);
       setUpiRef("");
+      setShowUpiRef(false);
+      setReceived("");
       setSubmitting(false);
     }
-  }, [open]);
+  }, [open, defaultMode]);
 
-  const effectiveUpiId = upiId?.trim() || "";
+  // Change calculator is informational only: never sent to the server and it
+  // never blocks "Mark as paid".
+  const receivedPaise = parseRupeesInput(received);
+  const change = receivedPaise === null ? null : cashChange(totalPaise, receivedPaise);
+  const tenders = quickTenderPaise(totalPaise);
+
+  function focusPrimary(e: Event) {
+    // Radix would focus the first focusable (the mode toggle); land on the
+    // action the vendor most likely wants instead.
+    if (markPaidRef.current && !markPaidRef.current.disabled) {
+      e.preventDefault();
+      markPaidRef.current.focus({ preventScroll: true });
+    }
+  }
+
   const effectiveName = (upiName?.trim() || stallName || "Merchant").slice(0, 80);
   const billRef = stallName.slice(0, 40) || "AwaazOS";
 
@@ -142,6 +171,7 @@ export function UpiQRModal({
         <Button
           type="button"
           variant={payMode === "UPI" ? "default" : "ghost"}
+          aria-pressed={payMode === "UPI"}
           className="h-11 flex-1"
           onClick={() => setPayMode("UPI")}
         >
@@ -150,6 +180,7 @@ export function UpiQRModal({
         <Button
           type="button"
           variant={payMode === "CASH" ? "default" : "ghost"}
+          aria-pressed={payMode === "CASH"}
           className="h-11 flex-1"
           onClick={() => setPayMode("CASH")}
         >
@@ -160,7 +191,15 @@ export function UpiQRModal({
       {payMode === "UPI" ? (
         <>
           {!effectiveUpiId ? (
-            <p className="text-center text-sm text-destructive">Add a UPI ID in Settings → Payments to show a QR code.</p>
+            <p className="text-center text-sm text-destructive">
+              <Link
+                href="/settings/payments"
+                className="inline-flex min-h-11 items-center font-medium underline underline-offset-4"
+              >
+                Add a UPI ID
+              </Link>{" "}
+              to show a QR code.
+            </p>
           ) : (
             <>
               <div className="flex flex-col items-center gap-2">
@@ -179,32 +218,106 @@ export function UpiQRModal({
                 <p className="text-center text-xs text-muted-foreground">Scan with GPay / PhonePe / Paytm</p>
                 <p className="break-all text-center font-mono text-sm text-foreground">{effectiveUpiId}</p>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="upi-ref">Customer&apos;s UPI Reference (UTR)</Label>
-                <Input
-                  id="upi-ref"
-                  name="upiRef"
-                  value={upiRef}
-                  onChange={(e) => setUpiRef(e.target.value)}
-                  autoComplete="off"
-                  placeholder="Optional"
-                  className="font-mono"
-                />
-              </div>
+              {showUpiRef ? (
+                <div className="space-y-2" id={upiRefFieldId}>
+                  <Label htmlFor="upi-ref">Customer&apos;s UPI Reference (UTR)</Label>
+                  <Input
+                    id="upi-ref"
+                    name="upiRef"
+                    value={upiRef}
+                    onChange={(e) => setUpiRef(e.target.value)}
+                    autoComplete="off"
+                    placeholder="Optional"
+                    className="font-mono"
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="h-11 w-full text-muted-foreground"
+                  aria-expanded={false}
+                  onClick={() => setShowUpiRef(true)}
+                >
+                  <ChevronDown className="mr-1 h-4 w-4" aria-hidden />
+                  Add UPI reference (optional)
+                </Button>
+              )}
             </>
           )}
         </>
       ) : (
-        <p className="text-center text-sm text-muted-foreground">Confirm once you have taken cash from the customer.</p>
+        <div className="space-y-3">
+          <div className="space-y-2">
+            <Label htmlFor="cash-received">Received (₹)</Label>
+            <Input
+              id="cash-received"
+              name="received"
+              inputMode="numeric"
+              autoComplete="off"
+              placeholder="Optional"
+              value={received}
+              onChange={(e) => setReceived(e.target.value)}
+              aria-describedby={receivedHintId}
+              className="h-12 font-mono text-lg tabular-nums"
+            />
+          </div>
+          <div className="grid grid-cols-3 gap-2" role="group" aria-label="Amount received">
+            <Button
+              type="button"
+              variant={receivedPaise === totalPaise ? "default" : "outline"}
+              className="h-11"
+              aria-pressed={receivedPaise === totalPaise}
+              onClick={() => setReceived(paiseToRupeesInput(totalPaise))}
+            >
+              Exact
+            </Button>
+            {tenders.map((p) => (
+              <Button
+                key={p}
+                type="button"
+                variant={receivedPaise === p ? "default" : "outline"}
+                className="h-11 font-mono tabular-nums"
+                aria-pressed={receivedPaise === p}
+                onClick={() => setReceived(paiseToRupeesInput(p))}
+              >
+                {formatINRCompact(p)}
+              </Button>
+            ))}
+          </div>
+          <div id={receivedHintId} aria-live="polite" className="min-h-12">
+            {change === null ? (
+              <p className="text-center text-sm text-muted-foreground">
+                {received.trim() ? "Enter rupees, e.g. 100" : "Confirm once you have taken cash from the customer."}
+              </p>
+            ) : change.kind === "change" ? (
+              <p className="rounded-lg border border-primary/40 bg-primary/10 px-4 py-2 text-center">
+                <span className="block text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                  Change to return
+                </span>
+                <span className="font-mono text-2xl font-bold tabular-nums text-foreground">
+                  {formatINR(change.changePaise)}
+                </span>
+              </p>
+            ) : (
+              <p className="rounded-lg border border-destructive/40 bg-destructive/10 px-4 py-2 text-center font-semibold text-destructive">
+                {formatINR(change.shortPaise)} short
+              </p>
+            )}
+          </div>
+        </div>
       )}
 
       <Button
+        ref={markPaidRef}
         type="button"
         className="h-12 w-full"
         disabled={submitting || (payMode === "UPI" && !effectiveUpiId)}
         onClick={() => void markPaid()}
       >
-        Mark as paid ✓
+        Mark as paid
+        <Check className="ml-1 h-5 w-5" aria-hidden />
       </Button>
     </div>
   );
@@ -212,7 +325,7 @@ export function UpiQRModal({
   if (isDesktop) {
     return (
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-h-[90vh] overflow-y-auto" onOpenAutoFocus={focusPrimary}>
           <DialogHeader>
             <DialogTitle>Collect payment</DialogTitle>
             <DialogDescription>Show the QR code or record cash received.</DialogDescription>
@@ -225,7 +338,11 @@ export function UpiQRModal({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="bottom" className="max-h-[92vh] overflow-y-auto rounded-t-xl">
+      <SheetContent
+        side="bottom"
+        className="max-h-[92vh] overflow-y-auto rounded-t-xl"
+        onOpenAutoFocus={focusPrimary}
+      >
         <SheetHeader>
           <SheetTitle>Collect payment</SheetTitle>
           <SheetDescription>Show the QR code or record cash received.</SheetDescription>

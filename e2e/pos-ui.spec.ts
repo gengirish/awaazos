@@ -52,7 +52,7 @@ test.describe("POS sale — driven through the UI", () => {
 
     // Receipt modal — bill number is AWZ-YYYYMMDD-NNNN.
     await expect(page.getByText(/AWZ-\d{8}-\d{4}/)).toBeVisible({ timeout: 20_000 });
-    await expect(page.getByText(/Paid ₹40\.00 via CASH/)).toBeVisible();
+    await expect(page.getByText(/Paid ₹40\.00 via Cash/)).toBeVisible();
 
     await page.getByRole("button", { name: /New order/ }).click();
 
