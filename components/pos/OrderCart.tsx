@@ -1,16 +1,15 @@
 "use client";
 
-import { Minus, Plus, X } from "lucide-react";
+import { AlertTriangle, Mic, Minus, Plus, Trash2, X } from "lucide-react";
+import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
+import { computeCartTotals, type PosTaxSettings } from "@/lib/pos-totals";
 import { cn } from "@/lib/utils";
 
-export type PosSettings = {
-  taxEnabled: boolean;
-  taxPercent: string;
-};
+export type PosSettings = PosTaxSettings;
 
 export type OrderCartProps = {
   settings: PosSettings;
@@ -21,17 +20,53 @@ export type OrderCartProps = {
   }) => void;
 };
 
+/** Ask before clearing more lines than this (a slip on a long order is costly). */
+const CONFIRM_CLEAR_ABOVE_LINES = 2;
+
+/** One shared id: each remove replaces the previous Undo toast (the store keeps one `lastRemoved`). */
+export const UNDO_TOAST_ID = "cart-undo";
+
 export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
   const items = useCartStore((s) => s.items);
   const incQty = useCartStore((s) => s.incQty);
   const decQty = useCartStore((s) => s.decQty);
   const removeItem = useCartStore((s) => s.removeItem);
-  const getSubtotalPaise = useCartStore((s) => s.getSubtotalPaise);
+  const undoRemove = useCartStore((s) => s.undoRemove);
+  const clearCart = useCartStore((s) => s.clearCart);
+  const voiceAddedIds = useCartStore((s) => s.voiceAddedIds);
+  const voiceReview = useCartStore((s) => s.voiceReview);
+  const setVoiceReview = useCartStore((s) => s.setVoiceReview);
 
-  const subtotalPaise = getSubtotalPaise();
-  const taxBps = settings.taxEnabled ? Math.round(Number(settings.taxPercent) * 100) : 0;
-  const taxPaise = settings.taxEnabled ? Math.floor((subtotalPaise * taxBps) / 10000) : 0;
-  const totalPaise = subtotalPaise + taxPaise;
+  const { subtotalPaise, taxPaise, totalPaise, itemCount } = computeCartTotals(items, settings);
+
+  const showReview = voiceReview !== null && (voiceReview.lowConfidence || voiceReview.unmatched.length > 0);
+
+  const onClear = () => {
+    if (items.length > CONFIRM_CLEAR_ABOVE_LINES) {
+      let ok = true;
+      try {
+        ok = window.confirm(`Clear all ${items.length} items from the cart?`);
+      } catch {
+        ok = true;
+      }
+      if (!ok) return;
+    }
+    toast.dismiss(UNDO_TOAST_ID);
+    clearCart();
+  };
+
+  const onRemove = (menuItemId: string, name: string) => {
+    removeItem(menuItemId);
+    // The store keeps only one `lastRemoved`, so a fixed id makes each remove
+    // replace the previous toast — an older "Undo" can never restore the wrong line.
+    toast(`Removed ${name}`, {
+      id: UNDO_TOAST_ID,
+      action: { label: "Undo", onClick: () => undoRemove() },
+      // sonner sets `height: 24px` but no min-height, so min-h/min-w lift the
+      // action to the 44×44 tap-target floor without !important.
+      classNames: { actionButton: "min-h-11 min-w-11" },
+    });
+  };
 
   return (
     <section
@@ -40,61 +75,134 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
       aria-atomic="false"
       className="rounded-lg border bg-card text-card-foreground shadow-xs"
     >
-      <div className="border-b px-4 py-3">
+      <div className="flex min-h-[60px] items-center justify-between gap-2 border-b px-4 py-2">
         <h2 id="cart-heading" className="font-display text-lg font-semibold">
           Cart
         </h2>
+        {items.length > 0 ? (
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">
+              {itemCount} {itemCount === 1 ? "item" : "items"}
+            </span>
+            <Button
+              type="button"
+              variant="ghost"
+              className="h-11 min-w-11 gap-1.5 px-3 text-muted-foreground hover:text-destructive"
+              aria-label="Clear cart"
+              onClick={onClear}
+            >
+              <Trash2 className="h-4 w-4" aria-hidden />
+              <span aria-hidden>Clear</span>
+            </Button>
+          </div>
+        ) : null}
       </div>
+
+      {showReview && voiceReview ? (
+        <div
+          role="status"
+          className="flex items-start gap-3 border-b border-amber-300 bg-amber-50 px-4 py-2 text-amber-950 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100"
+        >
+          <AlertTriangle className="mt-3 h-5 w-5 shrink-0" aria-hidden />
+          <div className="min-w-0 flex-1 space-y-0.5 py-2 text-sm">
+            {voiceReview.lowConfidence ? (
+              <p className="font-medium">Check this order — voice wasn&apos;t sure</p>
+            ) : null}
+            {voiceReview.unmatched.length > 0 ? (
+              <p className={cn(!voiceReview.lowConfidence && "font-medium")}>
+                Not on menu: {voiceReview.unmatched.join(", ")}
+              </p>
+            ) : null}
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            className="h-11 min-w-11 shrink-0 px-3"
+            onClick={() => setVoiceReview(null)}
+          >
+            Dismiss
+          </Button>
+        </div>
+      ) : null}
+
       {items.length === 0 ? (
         <p className="px-4 py-8 text-center text-sm text-muted-foreground">Tap items or use voice to build an order.</p>
       ) : (
         <ul className="divide-y">
-          {items.map((line) => (
-            <li key={line.menuItemId} className="flex items-center gap-2 px-4 py-3">
-              <span className="text-xl" aria-hidden>
-                {line.emoji}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate font-medium text-foreground">{line.name}</p>
-                <p className="font-mono text-xs tabular-nums text-muted-foreground">
-                  {formatINR(line.priceInPaise)} each
-                </p>
-              </div>
-              <div className="flex items-center gap-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-11 w-11 shrink-0"
-                  aria-label={`Decrease ${line.name}`}
-                  onClick={() => decQty(line.menuItemId)}
-                >
-                  <Minus className="h-4 w-4" aria-hidden />
-                </Button>
-                <span className="min-w-[2ch] text-center font-mono text-sm tabular-nums">{line.qty}</span>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="icon"
-                  className="h-11 w-11 shrink-0"
-                  aria-label={`Increase ${line.name}`}
-                  onClick={() => incQty(line.menuItemId)}
-                >
-                  <Plus className="h-4 w-4" aria-hidden />
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-11 w-11 shrink-0 text-destructive hover:text-destructive"
-                  aria-label={`Remove ${line.name}`}
-                  onClick={() => removeItem(line.menuItemId)}
-                >
-                  <X className="h-4 w-4" aria-hidden />
-                </Button>
-              </div>
-            </li>
-          ))}
+          {items.map((line) => {
+            const fromVoice = voiceAddedIds.includes(line.menuItemId);
+            const lineTotal = line.priceInPaise * line.qty;
+            return (
+              <li
+                key={line.menuItemId}
+                className={cn(
+                  "flex items-center gap-2 px-4 py-3",
+                  fromVoice && "border-l-4 border-l-primary bg-primary/5 pl-3",
+                )}
+              >
+                <span className="text-xl" aria-hidden>
+                  {line.emoji}
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="flex min-w-0 items-center gap-1.5 font-medium text-foreground">
+                    <span className="truncate">{line.name}</span>
+                    {fromVoice ? (
+                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-primary/40 px-1.5 text-[11px] font-medium uppercase leading-4 tracking-wide text-primary">
+                        <Mic className="h-3 w-3" aria-hidden />
+                        <span className="sr-only">added by </span>
+                        voice
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                    {line.qty} × {formatINR(line.priceInPaise)}
+                  </p>
+                </div>
+                <div className="flex flex-col items-end gap-1">
+                  <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+                    <span className="sr-only">Line total </span>
+                    {formatINR(lineTotal)}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11 shrink-0"
+                      aria-label={`Decrease ${line.name}`}
+                      onClick={() => decQty(line.menuItemId)}
+                    >
+                      <Minus className="h-4 w-4" aria-hidden />
+                    </Button>
+                    <span className="min-w-[2.5ch] text-center font-mono text-base font-bold tabular-nums">
+                      <span className="sr-only">Quantity </span>
+                      {line.qty}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      className="h-11 w-11 shrink-0"
+                      aria-label={`Increase ${line.name}`}
+                      onClick={() => incQty(line.menuItemId)}
+                    >
+                      <Plus className="h-4 w-4" aria-hidden />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-11 w-11 shrink-0 text-destructive hover:text-destructive"
+                      aria-label={`Remove ${line.name}`}
+                      onClick={() => onRemove(line.menuItemId, line.name)}
+                    >
+                      <X className="h-4 w-4" aria-hidden />
+                    </Button>
+                  </div>
+                </div>
+              </li>
+            );
+          })}
         </ul>
       )}
       <div className="space-y-2 border-t px-4 py-4">
@@ -112,11 +220,16 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
           <span className="text-foreground">Total</span>
           <span className="font-mono tabular-nums text-foreground">{formatINR(totalPaise)}</span>
         </div>
+        {/* Phones get this from StickyCheckoutBar (md:hidden); one visible button per breakpoint. */}
         <Button
           type="button"
-          className={cn("h-14 w-full text-base font-semibold")}
+          className="hidden h-14 w-full text-base font-semibold md:inline-flex"
           disabled={items.length === 0}
-          onClick={() => onCollectPayment({ subtotalPaise, taxPaise, totalPaise })}
+          onClick={() => {
+            // A stale Undo must not put a line back into an order being paid for.
+            toast.dismiss(UNDO_TOAST_ID);
+            onCollectPayment({ subtotalPaise, taxPaise, totalPaise });
+          }}
         >
           Collect payment
         </Button>

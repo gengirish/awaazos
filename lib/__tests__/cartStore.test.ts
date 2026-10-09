@@ -4,7 +4,7 @@ import { useCartStore } from "@/lib/cartStore";
 
 describe("cartStore", () => {
   beforeEach(() => {
-    useCartStore.setState({ items: [] });
+    useCartStore.getState().clearCart();
   });
 
   it("addItem increments qty when item already in cart", () => {
@@ -91,5 +91,52 @@ describe("cartStore", () => {
     clearCart();
     expect(useCartStore.getState().items).toEqual([]);
     expect(getItemCount()).toBe(0);
+  });
+
+  it("removeItem can be undone into its old position", () => {
+    const { addItem, removeItem, undoRemove } = useCartStore.getState();
+    addItem({ menuItemId: "a", name: "Chai", emoji: "☕", priceInPaise: 1000 });
+    addItem({ menuItemId: "b", name: "Samosa", emoji: "🥟", priceInPaise: 1500, qty: 2 });
+    addItem({ menuItemId: "c", name: "Vada", emoji: "🍩", priceInPaise: 1200 });
+    removeItem("b");
+    expect(useCartStore.getState().items.map((i) => i.menuItemId)).toEqual(["a", "c"]);
+    undoRemove();
+    expect(useCartStore.getState().items.map((i) => [i.menuItemId, i.qty])).toEqual([
+      ["a", 1],
+      ["b", 2],
+      ["c", 1],
+    ]);
+    expect(useCartStore.getState().lastRemoved).toBeNull();
+  });
+
+  it("undoRemove does not duplicate a line that was re-added", () => {
+    const { addItem, removeItem, undoRemove } = useCartStore.getState();
+    addItem({ menuItemId: "a", name: "Chai", emoji: "☕", priceInPaise: 1000 });
+    removeItem("a");
+    addItem({ menuItemId: "a", name: "Chai", emoji: "☕", priceInPaise: 1000 });
+    undoRemove();
+    expect(useCartStore.getState().items).toHaveLength(1);
+  });
+
+  it("setItemsFromVoice records which items voice touched", () => {
+    const { addItem, setItemsFromVoice } = useCartStore.getState();
+    addItem({ menuItemId: "a", name: "Chai", emoji: "☕", priceInPaise: 1000 });
+    setItemsFromVoice([{ menuItemId: "b", name: "Samosa", priceInPaise: 1500, qty: 2 }]);
+    expect(useCartStore.getState().voiceAddedIds).toEqual(["b"]);
+  });
+
+  it("clearCart resets voice and undo markers", () => {
+    const s = useCartStore.getState();
+    s.addItem({ menuItemId: "a", name: "Chai", emoji: "☕", priceInPaise: 1000 });
+    s.setItemsFromVoice([{ menuItemId: "b", name: "Samosa", priceInPaise: 1500, qty: 1 }]);
+    s.setVoiceReview({ lowConfidence: true, unmatched: ["pakoda"] });
+    s.removeItem("a");
+    s.clearCart();
+    expect(useCartStore.getState()).toMatchObject({
+      items: [],
+      voiceAddedIds: [],
+      voiceReview: null,
+      lastRemoved: null,
+    });
   });
 });

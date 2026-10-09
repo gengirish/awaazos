@@ -1,14 +1,15 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
-import { PaymentMethod } from "@prisma/client";
+import { PaymentMethod, type StaffRole } from "@prisma/client";
 
 import { PosHeader } from "@/components/pos/PosHeader";
+import { PosNav } from "@/components/pos/PosNav";
 import { PosSyncStatus } from "@/components/pos/PosSyncStatus";
 import { QuickAddGrid, type MenuTile } from "@/components/pos/QuickAddGrid";
 import { OrderCart, type PosSettings } from "@/components/pos/OrderCart";
 import { ReceiptModal } from "@/components/pos/ReceiptModal";
+import { POS_CART_ANCHOR_ID, StickyCheckoutBar } from "@/components/pos/StickyCheckoutBar";
 import { UpiQRModal, type PaidResult } from "@/components/pos/UpiQRModal";
 import { VoiceOrderButton } from "@/components/pos/VoiceOrderButton";
 import { useOnline } from "@/hooks/useOnline";
@@ -31,9 +32,18 @@ export type PosShellProps = {
   todaysRevenuePaise: number;
   /** ISO time the server rendered this page; shown as "menu as of" when offline. */
   renderedAt: string;
+  /** Role of the signed-in staff member at this vendor; trims the nav for cashiers. */
+  staffRole: StaffRole;
 };
 
-export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise, renderedAt }: PosShellProps) {
+export function PosShell({
+  vendor,
+  initialItems,
+  settings,
+  todaysRevenuePaise,
+  renderedAt,
+  staffRole,
+}: PosShellProps) {
   const items = useCartStore((s) => s.items);
   const online = useOnline();
   const outbox = usePosOutbox(vendor.id);
@@ -41,7 +51,6 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise, r
   const [isDesktop, setIsDesktop] = useState(false);
   const [payOpen, setPayOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
-  const [voiceDoubleCheck, setVoiceDoubleCheck] = useState(false);
   const [payTotals, setPayTotals] = useState({
     subtotalPaise: 0,
     taxPaise: 0,
@@ -76,6 +85,10 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise, r
   );
 
   const onPaid = useCallback((result: PaidResult) => {
+    // The sale is saved (synced or queued in the outbox) — empty the cart now,
+    // so dismissing the receipt by swipe/Esc can never leave paid items behind.
+    // UpiQRModal has already captured the lines it posted.
+    useCartStore.getState().clearCart();
     setReceiptMeta(
       result.kind === "synced"
         ? {
@@ -100,50 +113,14 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise, r
   };
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg px-4 pb-28 pt-4 md:max-w-4xl md:pb-10 md:pt-6">
+    <div className="mx-auto min-h-screen max-w-lg px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 md:max-w-6xl md:pb-10 md:pt-6">
       <a
         href="#main-pos"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-100 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground"
       >
         Skip to main content
       </a>
-      <nav
-        className="mb-4 flex items-center justify-between gap-2"
-        aria-label="POS navigation"
-      >
-        <Link
-          href="/menu"
-          className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          Menu
-        </Link>
-        <Link
-          href="/drops"
-          className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          Drops
-        </Link>
-        <Link
-          href="/orders"
-          className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          Orders
-        </Link>
-        <div className="ml-auto flex items-center gap-2">
-          <Link
-            href="/transactions"
-            className="hidden min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:inline-flex"
-          >
-            Transactions
-          </Link>
-          <Link
-            href="/analytics"
-            className="hidden min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:inline-flex"
-          >
-            Analytics
-          </Link>
-        </div>
-      </nav>
+      <PosNav staffRole={staffRole} />
       <PosHeader
         stallName={vendor.name}
         todaysRevenuePaise={todaysRevenuePaise}
@@ -159,19 +136,24 @@ export function PosShell({ vendor, initialItems, settings, todaysRevenuePaise, r
         onSync={outbox.sync}
         onDiscard={(ref) => void outbox.discard(ref)}
       />
-      <main id="main-pos" className="mt-6 flex flex-col gap-8">
-        <VoiceOrderButton voiceLang={settings.voiceLang} onNeedsConfirmationChange={setVoiceDoubleCheck} />
-        <QuickAddGrid items={initialItems} />
-        {voiceDoubleCheck ? (
-          <div
-            role="status"
-            className="rounded-md border border-amber-500/50 bg-amber-50 px-3 py-2 text-center text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-          >
-            Double-check this order — voice confidence is low.
-          </div>
-        ) : null}
-        <OrderCart settings={cartSettings} onCollectPayment={onCollectPayment} />
+      <main
+        id="main-pos"
+        className="mt-6 flex flex-col gap-8 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] md:items-start md:gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]"
+      >
+        <div className="flex min-w-0 flex-col gap-8">
+          <VoiceOrderButton voiceLang={settings.voiceLang} />
+          <QuickAddGrid items={initialItems} />
+        </div>
+        <div
+          id={POS_CART_ANCHOR_ID}
+          tabIndex={-1}
+          className="min-w-0 scroll-mt-4 focus:outline-hidden md:sticky md:top-6 md:max-h-[calc(100dvh-3rem)] md:overflow-y-auto"
+        >
+          <OrderCart settings={cartSettings} onCollectPayment={onCollectPayment} />
+        </div>
       </main>
+
+      <StickyCheckoutBar settings={cartSettings} onCollectPayment={onCollectPayment} />
 
       <UpiQRModal
         vendorId={vendor.id}
