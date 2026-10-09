@@ -18,6 +18,7 @@ import { cache } from "react";
 
 import { CartHubProvider } from "@/components/storefront/CartHub";
 import { CopyUpiId } from "@/components/storefront/CopyUpiId";
+import { CustomerSignOut } from "@/components/storefront/CustomerProfile";
 import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
 import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
@@ -520,7 +521,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
           }}
         />
 
-        <div className="relative mx-auto flex max-w-2xl justify-end px-4 pt-3 sm:px-6">
+        <div className="relative mx-auto flex max-w-2xl items-center justify-end gap-2 px-4 pt-3 sm:px-6">
           <Link
             href={`/s/${vendor.slug}/account`}
             className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
@@ -530,6 +531,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
               {customer ? `Hi${customer.name ? `, ${customer.name.split(/\s+/)[0]}` : ""} · My orders` : "Sign in"}
             </span>
           </Link>
+          {customer ? <CustomerSignOut variant="pill" /> : null}
         </div>
 
         <div className="relative mx-auto max-w-2xl px-4 pb-7 pt-4 sm:px-6 sm:pb-9 sm:pt-8">

@@ -109,7 +109,7 @@ export default async function StorefrontAccountPage(
       </a>
 
       <header className="border-b border-border/50 bg-linear-to-b from-primary/15 to-background">
-        <div className="mx-auto flex max-w-2xl items-center gap-3 px-4 py-4 sm:px-6">
+        <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
           <Link
             href={`/s/${vendor.slug}`}
             className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
@@ -117,6 +117,7 @@ export default async function StorefrontAccountPage(
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Back to {vendor.name}
           </Link>
+          {customer ? <CustomerSignOut variant="pill" /> : null}
         </div>
       </header>
 

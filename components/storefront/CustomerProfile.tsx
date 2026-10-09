@@ -133,7 +133,12 @@ export function CustomerProfile(props: CustomerProfileProps) {
   );
 }
 
-export function CustomerSignOut() {
+/**
+ * Signs the buyer out of the storefront (deletes the awz_cust session) and
+ * refreshes so the header and prefill reflect it. `pill` matches the store
+ * header's "Hi, … · My orders" chip; `button` is the account-page style.
+ */
+export function CustomerSignOut({ variant = "button" }: { variant?: "button" | "pill" }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
 
@@ -155,7 +160,11 @@ export function CustomerSignOut() {
       onClick={signOut}
       disabled={busy}
       aria-busy={busy}
-      className="inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground hover:border-primary/40 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
+      className={
+        variant === "pill"
+          ? "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
+          : "inline-flex min-h-11 items-center gap-2 rounded-xl border border-border bg-background px-4 text-sm font-semibold text-foreground hover:border-primary/40 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
+      }
     >
       <LogOut className="h-4 w-4" aria-hidden="true" />
       Sign out
