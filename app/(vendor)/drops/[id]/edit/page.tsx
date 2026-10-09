@@ -86,6 +86,7 @@ export default async function EditDropPage(props: { params: Promise<{ id: string
 
         {effectiveStatus === "OPEN" || effectiveStatus === "SCHEDULED" ? (
           <ShareDropButton
+            dropId={drop.id}
             vendorName={vendor.name}
             vendorSlug={vendor.slug}
             dropTitle={drop.title}

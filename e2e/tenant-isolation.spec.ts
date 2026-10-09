@@ -123,6 +123,36 @@ test.describe("tenant isolation", () => {
     expect(print?.status(), "cross-tenant print page must 404").toBe(404);
   });
 
+  test("vendor B cannot render vendor A's drop story image (404, not 403)", async () => {
+    const itemA = await createMenuItem(pageA, { name: "A Story Laddu", priceInRupees: 150 });
+    // A draft two days out (IST) — the story route serves any drop of the caller's own vendor.
+    const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(
+      new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+    );
+    const created = await pageA.request.post("/api/drops", {
+      data: {
+        title: "A Story Drop",
+        date: ymd,
+        fulfilmentMode: "PICKUP",
+        fulfilmentStart: "17:00",
+        fulfilmentEnd: "19:00",
+        closesAtDate: ymd,
+        closesAtTime: "12:00",
+        items: [{ menuItemId: itemA.id, priceInPaise: 15000 }],
+      },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(created.status()).toBe(201);
+    const { data: dropA } = (await created.json()) as { data: { id: string } };
+
+    const own = await pageA.request.get(`/api/drops/${dropA.id}/story-image`);
+    expect(own.status()).toBe(200);
+    expect(own.headers()["content-type"]).toContain("image/png");
+
+    const cross = await pageB.request.get(`/api/drops/${dropA.id}/story-image`);
+    expect(cross.status(), "cross-tenant story image must 404").toBe(404);
+  });
+
   test("each vendor's bill sequence is independent", async () => {
     const itemA = await createMenuItem(pageA, { name: "A Item", priceInRupees: 10 });
     const itemB = await createMenuItem(pageB, { name: "B Item", priceInRupees: 10 });

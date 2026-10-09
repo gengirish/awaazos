@@ -1,9 +1,9 @@
 import { ImageResponse } from "next/og";
 import type { ReactNode } from "react";
 
-import { formatINR } from "@/lib/currency";
 import { effectiveDropStatus } from "@/lib/drops";
 import { formatFulfilmentWindow, formatIstDayLabel, formatIstTime } from "@/lib/drops-time";
+import { fulfilmentModeLabel, OG_COLORS as C, Price, truncate } from "@/lib/og-parts";
 import { prisma } from "@/lib/prisma";
 import { everydayMenuHiddenByDrops, STOREFRONT_MENU_ITEM_WHERE } from "@/lib/storefront-order";
 
@@ -25,10 +25,8 @@ import { everydayMenuHiddenByDrops, STOREFRONT_MENU_ITEM_WHERE } from "@/lib/sto
  *
  * The Prisma `select` is a hand-written allowlist: never `phone` / `email`.
  *
- * Satori only supports inline styles, so this file is the one place in the UI
- * that uses them; colours are literal because CSS variables don't exist here.
- * Default bundled font only (Latin). The ₹ glyph isn't in it and would trigger
- * a Google Fonts fetch, so it is drawn as an inline SVG instead.
+ * Satori only supports inline styles; the shared colours, ₹ glyph and price
+ * row live in lib/og-parts.tsx (also used by the Instagram story image).
  *
  * Rendered only when a crawler fetches a shared link — event-driven, no timer.
  */
@@ -40,14 +38,6 @@ export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
 const MAX_ITEMS = 4;
-
-const C = {
-  primary: "#FF6B00",
-  ink: "#1A1A1A",
-  muted: "#475569",
-  surface: "#FFFFFF",
-  tint: "#FFF4EC",
-};
 
 async function loadCard(slug: string, now: Date) {
   const vendor = await prisma.vendor.findFirst({
@@ -98,32 +88,6 @@ async function loadCard(slug: string, now: Date) {
       ? { mode: vendor.settings?.menuFulfilmentMode ?? "PICKUP", items: vendor.menuItems }
       : null;
   return { name: vendor.name, city: vendor.city, drop, menuOrdering };
-}
-
-function RupeeGlyph({ size: px }: { size: number }) {
-  return (
-    <svg width={px * 0.62} height={px} viewBox="0 0 20 32" style={{ marginRight: px * 0.06 }}>
-      <path
-        d="M3 5 H18 M3 12 H18 M3 5 H8 C13 5 15 8 15 11.5 C15 15 12 18 8 18 H4 L15 29"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth={2.6}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
-
-/** formatINR output with the ₹ drawn as SVG. */
-function Price({ paise, fontSize }: { paise: number; fontSize: number }) {
-  const digits = formatINR(paise).replace("₹", "").trim();
-  return (
-    <div style={{ display: "flex", alignItems: "center", fontSize }}>
-      <RupeeGlyph size={fontSize * 0.8} />
-      <span>{digits}</span>
-    </div>
-  );
 }
 
 function Brand() {
@@ -182,7 +146,7 @@ function ItemRows({ items }: { items: { name: string; priceInPaise: number }[] }
             alignItems: "center",
             fontSize: 34,
             padding: "8px 0",
-            borderBottom: "1px solid #E2E8F0",
+            borderBottom: `1px solid ${C.rule}`,
           }}
         >
           <span>{truncate(it.name, 40)}</span>
@@ -191,11 +155,6 @@ function ItemRows({ items }: { items: { name: string; priceInPaise: number }[] }
       ))}
     </div>
   );
-}
-
-function truncate(s: string, max: number): string {
-  const t = s.trim();
-  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
 }
 
 function GenericCard() {
@@ -270,7 +229,7 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
                 {`Order by ${formatIstDayLabel(drop.closesAt)}, ${formatIstTime(drop.closesAt)}`}
               </div>
               <div style={{ display: "flex", fontSize: 26, color: C.muted, marginTop: 10 }}>
-                {`${drop.fulfilmentMode === "PICKUP" ? "Pickup" : drop.fulfilmentMode === "BOTH" ? "Delivery or pickup" : "Delivery"} ${formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt)}`}
+                {`${fulfilmentModeLabel(drop.fulfilmentMode)} ${formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt)}`}
               </div>
             </div>
           ) : menuOrdering ? (
