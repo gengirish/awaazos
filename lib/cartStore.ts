@@ -15,13 +15,32 @@ export type VoiceCartItem = {
   qty: number;
 };
 
+/**
+ * What the last voice order needs the cashier to check. Lives in the store (not
+ * in the mic component) so it survives the mic resetting and shows beside the
+ * cart until the next voice order or a cleared cart.
+ */
+export type VoiceReview = {
+  lowConfidence: boolean;
+  /** Spoken words that matched no menu item. */
+  unmatched: string[];
+};
+
 type CartState = {
   items: CartLine[];
+  /** Menu item ids the most recent voice order added or bumped. */
+  voiceAddedIds: string[];
+  voiceReview: VoiceReview | null;
+  /** The last line removed with `removeItem`, for a one-step undo. */
+  lastRemoved: { line: CartLine; index: number } | null;
   addItem: (item: Omit<CartLine, "qty"> & { qty?: number }) => void;
   incQty: (menuItemId: string) => void;
   decQty: (menuItemId: string) => void;
   removeItem: (menuItemId: string) => void;
+  undoRemove: () => void;
+  /** Empties the cart and every voice / undo marker that refers to it. */
   clearCart: () => void;
+  setVoiceReview: (review: VoiceReview | null) => void;
   setItemsFromVoice: (parsed: VoiceCartItem[]) => void;
   getSubtotalPaise: () => number;
   getItemCount: () => number;
@@ -33,6 +52,9 @@ function lineTotalPaise(line: CartLine): number {
 
 export const useCartStore = create<CartState>((set, get) => ({
   items: [],
+  voiceAddedIds: [],
+  voiceReview: null,
+  lastRemoved: null,
 
   addItem: (item) => {
     const qty = item.qty ?? 1;
@@ -83,12 +105,34 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   removeItem: (menuItemId) => {
-    set((state) => ({
-      items: state.items.filter((i) => i.menuItemId !== menuItemId),
-    }));
+    set((state) => {
+      const index = state.items.findIndex((i) => i.menuItemId === menuItemId);
+      if (index < 0) return {};
+      return {
+        items: state.items.filter((i) => i.menuItemId !== menuItemId),
+        lastRemoved: { line: state.items[index]!, index },
+        voiceAddedIds: state.voiceAddedIds.filter((id) => id !== menuItemId),
+      };
+    });
   },
 
-  clearCart: () => set({ items: [] }),
+  undoRemove: () => {
+    set((state) => {
+      const removed = state.lastRemoved;
+      if (!removed) return {};
+      // Re-added by a tap since the remove: nothing to restore.
+      if (state.items.some((i) => i.menuItemId === removed.line.menuItemId)) {
+        return { lastRemoved: null };
+      }
+      const next = [...state.items];
+      next.splice(Math.min(removed.index, next.length), 0, removed.line);
+      return { items: next, lastRemoved: null };
+    });
+  },
+
+  clearCart: () => set({ items: [], voiceAddedIds: [], voiceReview: null, lastRemoved: null }),
+
+  setVoiceReview: (review) => set({ voiceReview: review }),
 
   setItemsFromVoice: (parsed) => {
     const defaultEmoji = "🍽️";
@@ -130,7 +174,10 @@ export const useCartStore = create<CartState>((set, get) => ({
           });
         }
       }
-      return { items: Array.from(byId.values()) };
+      return {
+        items: Array.from(byId.values()),
+        voiceAddedIds: Array.from(voiceMerged.keys()),
+      };
     });
   },
 
