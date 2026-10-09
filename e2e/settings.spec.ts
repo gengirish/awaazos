@@ -156,7 +156,7 @@ test.describe("settings hub", () => {
     };
 
     await page.goto("/settings/store");
-    const input = page.getByLabel("Store name");
+    const input = page.getByRole("textbox", { name: "Store name" });
     await expect(input).toHaveValue(before.vendor.name);
     const save = page.getByRole("button", { name: /^(save|saved)$/i });
     const box = await save.boundingBox();
@@ -174,7 +174,7 @@ test.describe("settings hub", () => {
     await expect(page.getByRole("button", { name: "Saved" })).toBeVisible();
 
     await page.reload();
-    await expect(page.getByLabel("Store name")).toHaveValue(newName);
+    await expect(page.getByRole("textbox", { name: "Store name" })).toHaveValue(newName);
 
     const after = (await (await page.request.get("/api/vendor")).json()) as {
       vendor: { name: string; slug: string };
