@@ -57,6 +57,34 @@ test.describe("public storefront", () => {
     }
   });
 
+  test("Share hands over the canonical store link", async ({ page, request, browser }) => {
+    await createVendorSession(page, request, "storefront-share", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, { name: "Share Chai", priceInRupees: 20, category: "Drinks" });
+    await setPublished(page, true);
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    // Deterministic across platforms: no native share sheet, recorded clipboard.
+    await anon.addInitScript(() => {
+      Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+      const w = window as unknown as { __copied?: string };
+      Object.defineProperty(navigator, "clipboard", {
+        value: { writeText: async (t: string) => void (w.__copied = t) },
+        configurable: true,
+      });
+    });
+    const anonPage = await anon.newPage();
+    try {
+      await anonPage.goto(`/s/${slug}#menu`);
+      await anonPage.getByRole("button", { name: "Share" }).click();
+      await expect(anonPage.getByRole("button", { name: "Link copied" })).toBeVisible();
+      const copied = await anonPage.evaluate(() => (window as unknown as { __copied?: string }).__copied);
+      expect(copied).toBe(new URL(`/s/${slug}`, anonPage.url()).toString());
+    } finally {
+      await anon.close();
+    }
+  });
+
   test("never exposes the vendor's phone or email", async ({ page, request, browser }) => {
     await createVendorSession(page, request, "storefront-pii", "/menu");
     const slug = await vendorSlug(page);
