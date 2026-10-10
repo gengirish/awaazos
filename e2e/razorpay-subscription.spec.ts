@@ -23,35 +23,40 @@ test.describe("Razorpay create-subscription API", () => {
 });
 
 test.describe("Billing page — upgrade calls create-subscription", () => {
-  test("FREE owner sees Starter control; mocked API receives correct body", async ({
-    page,
-    request,
-  }) => {
-    const base = process.env.BASE_URL ?? "http://localhost:3000";
-    let capturedBody: string | null = null;
+  for (const interval of ["monthly", "yearly"] as const) {
+    test(`FREE owner picks Starter ${interval}; mocked API receives correct body`, async ({
+      page,
+      request,
+    }) => {
+      const base = process.env.BASE_URL ?? "http://localhost:3000";
+      let capturedBody: string | null = null;
 
-    await page.route("**/api/razorpay/create-subscription", async (route) => {
-      capturedBody = route.request().postData() ?? null;
-      await route.fulfill({
-        status: 200,
-        contentType: "application/json",
-        body: JSON.stringify({
-          subscriptionId: "sub_e2e_mock",
-          shortUrl: `${base}/pricing`,
-        }),
+      await page.route("**/api/razorpay/create-subscription", async (route) => {
+        capturedBody = route.request().postData() ?? null;
+        await route.fulfill({
+          status: 200,
+          contentType: "application/json",
+          body: JSON.stringify({
+            subscriptionId: "sub_e2e_mock",
+            shortUrl: `${base}/pricing`,
+          }),
+        });
       });
+
+      await registerOwnerAndSignIn(page, request);
+
+      await expect(page.getByRole("heading", { name: /billing/i })).toBeVisible();
+      // The accessible name also carries the price line ("… + GST = ₹352.82").
+      const button = page.getByRole("button", { name: new RegExp(`^starter ${interval}`, "i") });
+      await expect(button).toBeVisible();
+      await expect(button).toContainText("+ GST");
+
+      await button.click();
+
+      await expect.poll(() => capturedBody, { timeout: 15_000 }).toBeTruthy();
+      expect(JSON.parse(capturedBody!)).toEqual({ plan: "STARTER", interval });
+
+      await page.waitForURL(/\/pricing/, { timeout: 15_000 });
     });
-
-    await registerOwnerAndSignIn(page, request);
-
-    await expect(page.getByRole("heading", { name: /billing/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /upgrade to starter/i })).toBeVisible();
-
-    await page.getByRole("button", { name: /upgrade to starter/i }).click();
-
-    await expect.poll(() => capturedBody, { timeout: 15_000 }).toBeTruthy();
-    expect(JSON.parse(capturedBody!)).toEqual({ plan: "STARTER" });
-
-    await page.waitForURL(/\/pricing/, { timeout: 15_000 });
-  });
+  }
 });
