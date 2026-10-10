@@ -22,6 +22,7 @@ model Vendor {
   upiId          String? // e.g. vendor@okaxis
   upiName        String? // Name shown on UPI screen
   logoUrl        String? // Vercel Blob URL
+  bannerUrl      String? // Vercel Blob URL — wide cover photo on /s/[slug] (POST /api/vendor/banner)
   plan           Plan      @default(FREE)
   planExpiresAt  DateTime?
   // End of the 30-day free trial (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md). Set at

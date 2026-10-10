@@ -208,6 +208,11 @@ Rules every one of them follows:
 
 - Gated on `VendorSettings.publishStorefront` (default `false`); not opted in → **404, not 403**.
 - Prisma `select` is a hand-written allowlist. `Vendor.phone` / `Vendor.email` never appear.
+- Store banner and logo (`Vendor.bannerUrl` / `logoUrl`): OWNER-only `POST`/`DELETE /api/vendor/banner`
+  and `/api/vendor/logo` (`lib/store-image.ts`), edited in Settings → Online store. Upload rules (4 MB,
+  JPEG/PNG/WebP, validate before Blob) are shared with menu photos in `lib/blob-image.ts`; the browser
+  shrinks photos first (`lib/image-downscale.ts`). No Blob token → 503. The banner is decorative
+  (`alt=""`); without one the header keeps its theme gradient.
 - Order pages are keyed on `Transaction.orderToken` alone (192-bit random, `generateOrderToken()`),
   always looked up together with the slug's `vendorId`. Never expose or accept a transaction `id`.
 - Every write is IP rate-limited (`makeLimiter` in `lib/ratelimit.ts`; buyer login also per-email).
@@ -401,7 +406,7 @@ database.
 ## Stack is locked
 
 Auth.js v5 (`next-auth` beta) with `@auth/prisma-adapter` + bcryptjs, Neon Postgres, Prisma 6,
-Vercel Blob (menu item photos, `app/api/menu/[id]/image`). Don't install `@clerk/nextjs`,
+Vercel Blob (menu item photos `app/api/menu/[id]/image`; store banner and logo `app/api/vendor/banner|logo`). Don't install `@clerk/nextjs`,
 `@supabase/supabase-js` or `svix`.
 
 ## Further reading

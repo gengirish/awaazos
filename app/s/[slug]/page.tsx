@@ -92,6 +92,12 @@ export const runtime = "nodejs";
 
 type StorefrontVendor = NonNullable<Awaited<ReturnType<typeof loadStorefront>>>;
 
+/**
+ * Top padding that drops the 88 px logo so it straddles the banner's bottom
+ * edge: banner height (160 / 224 px) − pill row above (56 px) − half the logo.
+ */
+const BANNER_LOGO_OFFSET = "pt-[60px] sm:pt-[124px]";
+
 /** Themes with a `[data-theme=…]` block in globals.css; anything else stays saffron. */
 const BRAND_THEMES = new Set(["green", "amber", "red", "blue", "purple"]);
 
@@ -115,6 +121,7 @@ const loadStorefront = cache(async (slug: string) => {
       state: true,
       stallType: true,
       logoUrl: true,
+      bannerUrl: true,
       upiId: true,
       upiName: true,
       settings: {
@@ -518,16 +525,25 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
       {/* Brand band. The vendor's theme colour is the only thing that differs
           between one storefront and the next, so it carries the whole identity. */}
       <header className="relative overflow-hidden border-b border-border/50 bg-linear-to-b from-primary/20 via-primary/[0.07] to-background">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-40"
-          style={{
-            backgroundImage: "radial-gradient(hsl(var(--primary)) 1px, transparent 1px)",
-            backgroundSize: "18px 18px",
-            maskImage: "linear-gradient(to bottom, black, transparent 70%)",
-            WebkitMaskImage: "linear-gradient(to bottom, black, transparent 70%)",
-          }}
-        />
+        {vendor.bannerUrl ? (
+          // Decorative cover photo. BANNER_LOGO_OFFSET below is derived from these heights.
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-40 sm:h-56">
+            <Image src={vendor.bannerUrl} alt="" fill priority sizes="100vw" className="object-cover" />
+            {/* Darkens the top edge so the Share / Sign in pills read on any photo. */}
+            <div className="absolute inset-0 bg-linear-to-b from-black/30 via-transparent to-transparent" />
+          </div>
+        ) : (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-40"
+            style={{
+              backgroundImage: "radial-gradient(hsl(var(--primary)) 1px, transparent 1px)",
+              backgroundSize: "18px 18px",
+              maskImage: "linear-gradient(to bottom, black, transparent 70%)",
+              WebkitMaskImage: "linear-gradient(to bottom, black, transparent 70%)",
+            }}
+          />
+        )}
 
         <div className="relative mx-auto flex max-w-2xl items-center justify-end gap-2 px-4 pt-3 sm:px-6">
           <ShareStoreButton vendorName={vendor.name} slug={vendor.slug} />
@@ -543,7 +559,11 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
           {customer ? <CustomerSignOut variant="pill" /> : null}
         </div>
 
-        <div className="relative mx-auto max-w-2xl px-4 pb-7 pt-4 sm:px-6 sm:pb-9 sm:pt-8">
+        <div
+          className={`relative mx-auto max-w-2xl px-4 pb-7 sm:px-6 sm:pb-9 ${
+            vendor.bannerUrl ? BANNER_LOGO_OFFSET : "pt-4 sm:pt-8"
+          }`}
+        >
           <div className="flex flex-col items-center text-center">
             {vendor.logoUrl ? (
               <Image

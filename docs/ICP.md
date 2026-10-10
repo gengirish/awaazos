@@ -31,7 +31,7 @@ Instagram and sell directly, not through Swiggy or Zomato.
 
 | Pain | Feature | Where |
 |---|---|---|
-| Link in bio | Public storefront `/s/[slug]` (opt-in `publishStorefront`) | `app/s/[slug]` |
+| Link in bio | Public storefront `/s/[slug]` (opt-in `publishStorefront`) with the kitchen's own banner and logo | `app/s/[slug]`, `lib/store-image.ts` |
 | Batches with a cut-off | Drops: lazy cut-off, capped stock, no overselling | `lib/drops.ts` |
 | Everyday menu | Order from menu (`acceptMenuOrders`) | `lib/menu-orders.ts` |
 | "Did they pay?" | UPI intent + buyer UTR, pay on delivery, vendor's own Razorpay keys | `lib/storefront-razorpay.ts` |
