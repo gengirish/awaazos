@@ -312,6 +312,15 @@ Fulfilment/fee/pickup note come from `menuFulfilmentMode` / `menuDeliveryFeePais
 The menu board has no cut-off to stop it, so it polls every 6 min — keep it above Neon's idle
 timeout.
 
+**Bulk order actions** (`lib/order-bulk.ts` client-safe, `lib/storefront-order-bulk.ts` server): both
+boards select orders and apply confirm / mark_paid / deliver via `POST /api/drops/[id]/orders/bulk`
+and `POST /api/storefront-orders/bulk` (`{ orderIds: 1..50 unique, action }`, CASHIER). One
+transaction per order, run in sequence, each through `applyStorefrontOrderAction` with the
+single-order compound scope, so one stale order never rolls back the rest. Response
+`{ data: { succeeded, failed: [{ id, error }], orders } }`; unknown and cross-tenant ids are both
+`not_found`. Cancel and undeliver stay per-order. Card buttons and bulk eligibility share
+`availableOrderActions()` (`lib/drops-board.ts`) — keep them on that one function.
+
 DB-backed drops tests are opt-in: `npm run test:drops:db` (needs a throwaway `DATABASE_URL`).
 
 ### Auth edge split

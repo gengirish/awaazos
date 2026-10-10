@@ -20,6 +20,7 @@ import { CartHubProvider } from "@/components/storefront/CartHub";
 import { CustomerSignOut } from "@/components/storefront/CustomerProfile";
 import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
 import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
+import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
 import { getIstTodayStart } from "@/lib/billing-period";
@@ -529,6 +530,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
         />
 
         <div className="relative mx-auto flex max-w-2xl items-center justify-end gap-2 px-4 pt-3 sm:px-6">
+          <ShareStoreButton vendorName={vendor.name} slug={vendor.slug} />
           <Link
             href={`/s/${vendor.slug}/account`}
             className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"

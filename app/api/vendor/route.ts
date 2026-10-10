@@ -14,6 +14,7 @@ import {
 import { prisma } from "@/lib/prisma";
 import { requireVendorRole } from "@/lib/rbac";
 import { GSTIN_FORMAT_MESSAGE, GSTIN_PATTERN, RECEIPT_FOOTER_MAX } from "@/lib/receipt";
+import { storeNameSchema } from "@/lib/store-name";
 import { UPI_ID_FORMAT_MESSAGE, UPI_ID_PATTERN } from "@/lib/upi";
 
 // Served to cashiers: the encrypted Razorpay secrets must never leave the server
@@ -21,6 +22,10 @@ import { UPI_ID_FORMAT_MESSAGE, UPI_ID_PATTERN } from "@/lib/upi";
 const SETTINGS_SECRET_OMIT = { razorpayKeySecretEnc: true, razorpayWebhookSecretEnc: true } as const;
 
 const patchSchema = z.object({
+  // Store display name (Settings → Online store). Only Vendor.name changes —
+  // Vendor.slug is never rewritten, because shared /s/[slug] links, printed QR
+  // codes and receipt links depend on it.
+  name: storeNameSchema.optional(),
   city: z.string().trim().min(1).max(80).optional(),
   state: z.string().trim().min(1).max(80).optional(),
   stallType: z.nativeEnum(StallType).optional(),
@@ -181,6 +186,7 @@ export async function PATCH(req: NextRequest) {
       }
 
       const data: Prisma.VendorUpdateInput = {};
+      if (vendorFields.name !== undefined) data.name = vendorFields.name;
       if (vendorFields.city !== undefined) data.city = vendorFields.city;
       if (vendorFields.state !== undefined) data.state = vendorFields.state;
       if (vendorFields.stallType !== undefined) data.stallType = vendorFields.stallType;
