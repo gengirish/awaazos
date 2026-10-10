@@ -206,6 +206,10 @@ Rules every one of them follows:
 
 - Gated on `VendorSettings.publishStorefront` (default `false`); not opted in → **404, not 403**.
 - Prisma `select` is a hand-written allowlist. `Vendor.phone` / `Vendor.email` never appear.
+- The vendor's WhatsApp number reaches a public page only through `buyerWhatsappNumber()`
+  (`lib/storefront-order.ts`): `VendorSettings.whatsappNumber`, and only once the vendor opts in
+  with `acceptWhatsappOrders` (default `false`; Settings → Online orders). A saved number is not
+  consent — onboarding pre-fills it from the sign-up phone.
 - Order pages are keyed on `Transaction.orderToken` alone (192-bit random, `generateOrderToken()`),
   always looked up together with the slug's `vendorId`. Never expose or accept a transaction `id`.
 - Every write is IP rate-limited (`makeLimiter` in `lib/ratelimit.ts`; buyer login also per-email).
