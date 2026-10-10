@@ -27,12 +27,14 @@ export type MarketedPlan = (typeof MARKETED_PLANS)[number];
 export type PlanMarketing = {
   /** Display name, e.g. "Starter". */
   label: string;
-  /** "₹0" or "₹299/mo". */
+  /** "₹0" or "₹299/mo + GST". */
   price: string;
   /** Just the amount: "₹0" / "₹299". */
   amount: string;
   /** Billing period suffix, or null for a free tier. */
   period: "/mo" | null;
+  /** Paid prices exclude GST (`GST_BPS`); null for a free tier. */
+  taxNote: "+ GST" | null;
   /** One line for the landing-page teaser card. */
   teaser: string;
   /** Short tagline above the bullets on the pricing-page card (no numbers — those live in bullets). */
@@ -52,15 +54,14 @@ function analyticsDays(plan: Plan): string {
   return `${PLAN_LIMITS[plan].analyticsDays} days of sales analytics`;
 }
 
-function pricing(plan: Plan): Pick<PlanMarketing, "price" | "amount" | "period"> {
+function pricing(plan: Plan): Pick<PlanMarketing, "price" | "amount" | "period" | "taxNote"> {
   const paise = PLAN_PRICES_PAISE[plan];
   const amount = formatINRCompact(paise);
-  const period = paise === 0 ? null : "/mo";
-  return { amount, period, price: `${amount}${period ?? ""}` };
+  if (paise === 0) return { amount, period: null, taxNote: null, price: amount };
+  return { amount, period: "/mo", taxNote: "+ GST", price: `${amount}/mo + GST` };
 }
 
 const FREE_CAP = PLAN_LIMITS.FREE.monthlyTxnCap;
-const STARTER_CAP = PLAN_LIMITS.STARTER.monthlyTxnCap;
 const STARTER_CSV = PLAN_LIMITS.STARTER.csvExport;
 
 export const PLAN_MARKETING: Record<MarketedPlan, PlanMarketing> = {
@@ -81,7 +82,7 @@ export const PLAN_MARKETING: Record<MarketedPlan, PlanMarketing> = {
   STARTER: {
     label: PLAN_LIMITS.STARTER.label,
     ...pricing("STARTER"),
-    teaser: `Up to ${STARTER_CAP} bills a month and ${PLAN_LIMITS.STARTER.analyticsDays} days of analytics${
+    teaser: `${billsPerMonth("STARTER")} and ${PLAN_LIMITS.STARTER.analyticsDays} days of analytics${
       STARTER_CSV ? ", with CSV export" : ""
     }. Most vendors live here.`,
     summary: "For a counter that's getting busy.",

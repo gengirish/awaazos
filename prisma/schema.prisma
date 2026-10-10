@@ -24,6 +24,10 @@ model Vendor {
   logoUrl        String? // Vercel Blob URL
   plan           Plan      @default(FREE)
   planExpiresAt  DateTime?
+  // End of the 30-day free trial (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md). Set at
+  // sign-up; null = grandfathered vendor on FREE, never locked. Evaluated
+  // lazily by billingAccess() in lib/plan.ts — nothing runs at this instant.
+  trialEndsAt    DateTime?
   stallType      StallType @default(GENERAL)
   city           String?
   state          String    @default("Telangana")
@@ -33,16 +37,17 @@ model Vendor {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  menuItems         MenuItem[]
-  transactions      Transaction[]
-  receipts          Receipt[]
-  staff             StaffMember[]
-  settings          VendorSettings?
-  dailySummaries    DailySummary[]
-  billSequences     BillSequence[]
-  voiceParseLogs    VoiceParseLog[]
-  drops             Drop[]
-  pushSubscriptions PushSubscription[]
+  menuItems          MenuItem[]
+  transactions       Transaction[]
+  receipts           Receipt[]
+  staff              StaffMember[]
+  settings           VendorSettings?
+  dailySummaries     DailySummary[]
+  billSequences      BillSequence[]
+  voiceParseLogs     VoiceParseLog[]
+  drops              Drop[]
+  pushSubscriptions  PushSubscription[]
+  subscriptionEvents SubscriptionEvent[]
 
   @@index([slug])
   @@map("vendors")
@@ -78,10 +83,35 @@ model VendorSettings {
   razorpayKeyId            String?
   razorpayKeySecretEnc     String?
   razorpayWebhookSecretEnc String?
+  // Platform SaaS subscription (AwaazOS's own Razorpay account, not the
+  // vendor's). Written by the subscription webhook / verify route only.
   razorpaySubId            String?
+  razorpaySubStatus        String? // created|authenticated|active|pending|halted|cancelled|completed|paused
+  razorpaySubCancelAtEnd   Boolean        @default(false)
+  billingInterval          String? // monthly | yearly
   razorpayCustomerId       String?
 
   @@map("vendor_settings")
+}
+
+// One row per platform-subscription webhook delivery (or verify call).
+// The unique event id is the idempotency key: a replayed delivery hits P2002
+// and is dropped. Also the vendor's payment history on the billing page.
+model SubscriptionEvent {
+  id              String    @id @default(cuid())
+  vendorId        String?
+  vendor          Vendor?   @relation(fields: [vendorId], references: [id], onDelete: SetNull)
+  razorpayEventId String    @unique // x-razorpay-event-id, or "verify:<payment_id>"
+  event           String // e.g. "subscription.charged"
+  subscriptionId  String
+  paymentId       String?
+  amountPaise     Int?
+  status          String // subscription status after the event
+  currentEnd      DateTime?
+  createdAt       DateTime  @default(now())
+
+  @@index([vendorId, createdAt])
+  @@map("subscription_events")
 }
 
 // ─── MENU ───────────────────────────────────────────────────────────

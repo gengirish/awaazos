@@ -34,7 +34,7 @@ test.describe("public surfaces", () => {
 
   test("pricing shows whole-rupee prices, matching the landing teaser", async ({ page }) => {
     await page.goto("/pricing");
-    await expect(page.getByText("₹299/mo", { exact: true })).toBeVisible();
+    await expect(page.getByText("₹299/mo + GST", { exact: true })).toBeVisible();
     await expect(page.getByText(/₹\s*299\.00/)).toHaveCount(0);
   });
 
