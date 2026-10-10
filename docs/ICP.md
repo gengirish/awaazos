@@ -43,17 +43,27 @@ Instagram and sell directly, not through Swiggy or Zomato.
 The voice counter POS (`/pos`) still works and stays, but it is a secondary feature for this
 customer: most of their orders are remote.
 
-## Gaps, in order
+## Plan, in order (revised 2026-10-10)
 
-1. **Instagram in-app browser.** Most buyers open the storefront inside Instagram. Checkout, the
-   UPI app hand-off and email sign-in have not been tested there; an email link opened in another
-   browser loses the session.
-2. **DM quick replies.** A one-tap "menu + order link" text for answering "price?" DMs.
-3. **Delivery hand-off.** Copy or share one order's address and contact for Porter/Rapido from the
+1. **Validate the ICP.** Get 5–10 Instagram kitchens to each run one real drop. Nothing below is
+   proven until that happens.
+2. **Instagram in-app browser.** Most buyers open the storefront inside Instagram. Test and fix
+   storefront → checkout → UPI app hand-off → WhatsApp hand-off on iOS and Android, and show an
+   "Open in browser" hint only where a step fails. Guest checkout needs no sign-in; only the
+   buyer's Account page relies on an email link, which loses the session in another browser.
+   iPhone UPI payment is PR #35.
+3. **Measure Instagram demand.** Count storefront orders that arrive from Instagram (a `?src=ig`
+   tag on shared links plus the in-app browser's user agent) on `/admin/metrics`.
+4. **Store-level story image** for kitchens that sell from the everyday menu rather than drops.
+5. **30-day unlimited trial replaces FREE** (decided 2026-10-09/10): new sign-ups get STARTER
+   features for 30 days, then are locked until paid; existing FREE vendors are grandfathered.
+   Spec and phases: `docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md` (PR #38).
+6. **Delivery hand-off.** Copy or share one order's address and contact for Porter/Rapido from the
    prep sheet.
-4. **Pricing copy** still describes a counter POS (`lib/plan-copy.ts`, the pricing page). The
-   FREE tier's 50 transactions/month is about two batches — see `TODO.md` §2.
-5. **Pitch.** `PITCH.md` Parts A–F still tell the street-stall story.
+7. **Pitch.** `PITCH.md` Parts A–F still tell the street-stall story.
+
+Dropped: a separate "DM quick reply". The storefront Share button and the WhatsApp order flow
+cover it; revisit if the kitchens in step 1 still paste prices into DMs.
 
 ## Not the customer
 
