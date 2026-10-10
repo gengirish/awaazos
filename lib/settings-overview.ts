@@ -18,6 +18,11 @@ export type SettingsSnapshot = {
   razorpayConfigured: boolean;
   voiceLang: string;
   plan: Plan;
+  /**
+   * Billing state when it isn't simply "on `plan`" (lib/plan.ts billingAccess):
+   * days left in the free trial, or locked. Omitted for paid and free vendors.
+   */
+  billing?: { kind: "trial"; daysLeft: number } | { kind: "locked" };
   availableItemCount: number;
   /** VAPID keys present on this deployment (lib/push.ts isPushConfigured). */
   pushConfigured: boolean;
@@ -97,7 +102,12 @@ export function voiceStatus(s: Pick<SettingsSnapshot, "voiceLang">): SectionStat
   return { text: voiceLanguageLabel(s.voiceLang), on: true };
 }
 
-export function planStatus(s: Pick<SettingsSnapshot, "plan">): SectionStatus {
+export function planStatus(s: Pick<SettingsSnapshot, "plan" | "billing">): SectionStatus {
+  if (s.billing?.kind === "locked") return { text: "No active plan", on: false };
+  if (s.billing?.kind === "trial") {
+    const d = s.billing.daysLeft;
+    return { text: `Free trial · ${d} ${d === 1 ? "day" : "days"} left`, on: true };
+  }
   return { text: `${PLAN_LIMITS[s.plan].label} plan`, on: true };
 }
 

@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { generateReceiptToken } from "@/lib/receipt-data";
 import { getReceiptQueue } from "@/lib/queues";
 import { tooManyRequests, writeRateLimit } from "@/lib/ratelimit";
-import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { AuthError, BillingLockedError, requireVendorRole } from "@/lib/rbac";
 import { parseTransactionListQuery } from "@/lib/transaction-list-params";
 import {
   checkTransactionTotals,
@@ -191,6 +191,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: saleTime.code, code: saleTime.code }, { status: 422 });
     }
     const { saleAt, fromClient } = saleTime;
+
+    // Trial over and not subscribed: no new sales. A queued offline sale rung
+    // up before the lock is still recorded — the money already changed hands.
+    if (
+      ctx.access.kind === "locked" &&
+      !(body.deferred && saleAt.getTime() < ctx.access.since.getTime())
+    ) {
+      throw new BillingLockedError(ctx.access.since);
+    }
 
     const cap = PLAN_LIMITS[vendor.plan].monthlyTxnCap;
     if (cap !== null) {

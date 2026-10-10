@@ -73,7 +73,7 @@ export default async function TransactionsPage(props: Props) {
           initialHasMore={hasMore}
           initialQuery={queryForClient}
           vendorName={ctx.vendor.name}
-          canExportCsv={PLAN_LIMITS[ctx.vendor.plan].csvExport}
+          canExportCsv={PLAN_LIMITS[ctx.vendor.plan].csvExport || ctx.access.kind === "locked"}
           defaultExportRange={defaultExportRange}
         />
       </div>

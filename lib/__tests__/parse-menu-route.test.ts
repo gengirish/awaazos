@@ -44,7 +44,7 @@ vi.mock("@/lib/rbac", () => {
     if (!h.auth) throw new AuthError(401, "Unauthorized");
     return { vendor: { id: "v_1", plan: "STARTER" }, setVendorCookie: "v_1" };
   });
-  return { AuthError, requireVendorRole: h.requireVendorRole };
+  return { AuthError, requireActiveBilling: () => {}, requireVendorRole: h.requireVendorRole };
 });
 
 vi.mock("@/lib/prisma", () => ({

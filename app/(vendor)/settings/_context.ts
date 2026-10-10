@@ -15,6 +15,7 @@ export const requireSettingsContext = cache(async () => {
     const ctx = await requireVendorRole("CASHIER");
     return {
       vendor: ctx.vendor,
+      access: ctx.access,
       isOwner: ctx.staff.role === "OWNER",
       user: { name: ctx.user.name, email: ctx.user.email },
     };

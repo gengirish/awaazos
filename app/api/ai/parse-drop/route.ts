@@ -6,7 +6,7 @@ import { requireEnv } from "@/lib/env";
 import { parseDropFromTranscript } from "@/lib/parse-drop";
 import { prisma } from "@/lib/prisma";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
-import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { AuthError, requireActiveBilling, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,6 +30,7 @@ const bodySchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("MANAGER", undefined, req);
+    requireActiveBilling(ctx);
 
     const aiLimiter = getAiLimiterForPlan(ctx.vendor.plan);
     const burst = await aiLimiter.burst.check(ctx.vendor.id);

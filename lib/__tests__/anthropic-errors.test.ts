@@ -38,6 +38,7 @@ vi.mock("@/lib/rbac", () => {
   }
   return {
     AuthError,
+    requireActiveBilling: () => {},
     requireVendorRole: async () => ({ vendor: { id: "v_1", plan: "STARTER" }, setVendorCookie: null }),
   };
 });

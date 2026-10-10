@@ -133,7 +133,13 @@ export function UpiQRModal({
         upiRef: payMode === "UPI" ? (upiRef.trim() || null) : null,
       });
       if (result.kind === "rejected") {
-        throw new Error(result.code === "monthly_txn_cap_reached" ? "Monthly bill limit reached for your plan" : result.code);
+        throw new Error(
+          result.code === "monthly_txn_cap_reached"
+            ? "Monthly bill limit reached for your plan"
+            : result.code === "billing_locked"
+              ? "Your free trial has ended. Subscribe in Settings → Plan & billing to keep selling."
+              : result.code,
+        );
       }
       onPaid(
         result.kind === "synced"

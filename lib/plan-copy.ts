@@ -1,12 +1,17 @@
 /**
- * Marketing copy for the plans we sell — the ONE place tier text lives.
+ * Marketing copy for the plan we sell — the ONE place tier text lives.
  *
  * Rendered by the landing teaser (`components/marketing/PricingTeaser.tsx`) and
  * the pricing page (`app/(marketing)/pricing/page.tsx`). Numbers are derived
- * from `PLAN_LIMITS` so copy cannot drift from what the gates enforce;
- * `lib/__tests__/plan-copy.test.ts` checks it.
+ * from `PLAN_LIMITS`, the price constants and `TRIAL_DAYS` so copy cannot
+ * drift from what the gates enforce; `lib/__tests__/plan-copy.test.ts` checks it.
  *
  * Rules:
+ * - One offer: a `TRIAL_DAYS`-day free trial with Starter limits, then Starter
+ *   monthly or yearly (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md). FREE is not
+ *   marketed — it stays in `PLAN_LIMITS` only for vendors who signed up before
+ *   the trial existed.
+ * - Prices exclude GST (`GST_BPS`); every paid price says "+ GST".
  * - Only advertise what ships. No "staff logins" until invites exist and
  *   `maxStaff` is enforced (TODO.md §2).
  * - Voice is English & Hindi only — te/kn/ta are dormant (`VOICE_LANGUAGES`).
@@ -17,24 +22,31 @@
  */
 import type { Plan } from "@prisma/client";
 
-import { PLAN_LIMITS, PLAN_PRICES_PAISE } from "@/lib/constants";
+import { PLAN_LIMITS, TRIAL_DAYS } from "@/lib/constants";
 import { formatINRCompact } from "@/lib/currency";
+import { subscriptionBasePaise } from "@/lib/subscription";
 
-/** Tiers shown on the marketing surface, in display order. PRO stays hidden. */
-export const MARKETED_PLANS = ["FREE", "STARTER"] as const satisfies readonly Plan[];
+/** Tiers shown on the marketing surface, in display order. FREE and PRO stay hidden. */
+export const MARKETED_PLANS = ["STARTER"] as const satisfies readonly Plan[];
 export type MarketedPlan = (typeof MARKETED_PLANS)[number];
 
 export type PlanMarketing = {
   /** Display name, e.g. "Starter". */
   label: string;
-  /** "₹0" or "₹299/mo + GST". */
+  /** "₹299/mo + GST". */
   price: string;
-  /** Just the amount: "₹0" / "₹299". */
+  /** Just the monthly amount: "₹299". */
   amount: string;
-  /** Billing period suffix, or null for a free tier. */
-  period: "/mo" | null;
-  /** Paid prices exclude GST (`GST_BPS`); null for a free tier. */
-  taxNote: "+ GST" | null;
+  /** Billing period suffix for `amount`. */
+  period: "/mo";
+  /** Prices exclude GST (`GST_BPS`). */
+  taxNote: "+ GST";
+  /** "₹2,990/yr + GST". */
+  yearlyPrice: string;
+  /** Why yearly is worth it: "2 months free". */
+  yearlyNote: string;
+  /** "30 days free". */
+  trial: string;
   /** One line for the landing-page teaser card. */
   teaser: string;
   /** Short tagline above the bullets on the pricing-page card (no numbers — those live in bullets). */
@@ -54,41 +66,36 @@ function analyticsDays(plan: Plan): string {
   return `${PLAN_LIMITS[plan].analyticsDays} days of sales analytics`;
 }
 
-function pricing(plan: Plan): Pick<PlanMarketing, "price" | "amount" | "period" | "taxNote"> {
-  const paise = PLAN_PRICES_PAISE[plan];
-  const amount = formatINRCompact(paise);
-  if (paise === 0) return { amount, period: null, taxNote: null, price: amount };
-  return { amount, period: "/mo", taxNote: "+ GST", price: `${amount}/mo + GST` };
-}
-
-const FREE_CAP = PLAN_LIMITS.FREE.monthlyTxnCap;
+const STARTER_MONTHLY_PAISE = subscriptionBasePaise("STARTER", "monthly");
+const STARTER_YEARLY_PAISE = subscriptionBasePaise("STARTER", "yearly");
 const STARTER_CSV = PLAN_LIMITS.STARTER.csvExport;
 
+/** Whole months of the monthly price that paying yearly saves. */
+export const YEARLY_MONTHS_FREE = Math.floor(
+  (12 * STARTER_MONTHLY_PAISE - STARTER_YEARLY_PAISE) / STARTER_MONTHLY_PAISE,
+);
+
+const starterAmount = formatINRCompact(STARTER_MONTHLY_PAISE);
+const trial = `${TRIAL_DAYS} days free`;
+
 export const PLAN_MARKETING: Record<MarketedPlan, PlanMarketing> = {
-  FREE: {
-    label: PLAN_LIMITS.FREE.label,
-    ...pricing("FREE"),
-    teaser: `${FREE_CAP} bills a month free. Voice + UPI QR + WhatsApp receipts.`,
-    summary: "Try AwaazOS on your stall.",
+  STARTER: {
+    label: PLAN_LIMITS.STARTER.label,
+    amount: starterAmount,
+    period: "/mo",
+    taxNote: "+ GST",
+    price: `${starterAmount}/mo + GST`,
+    yearlyPrice: `${formatINRCompact(STARTER_YEARLY_PAISE)}/yr + GST`,
+    yearlyNote: `${YEARLY_MONTHS_FREE} months free`,
+    trial,
+    teaser: `${trial}, no card needed. ${billsPerMonth("STARTER")}, voice billing, UPI QR and WhatsApp receipts.`,
+    summary: "Everything a busy counter needs, on one plan.",
     bullets: [
-      billsPerMonth("FREE"),
+      `${trial} — no card needed`,
+      billsPerMonth("STARTER"),
       "Voice billing in English & Hindi",
       "UPI QR on every bill",
       "WhatsApp receipts from your own WhatsApp",
-      analyticsDays("FREE"),
-    ],
-    emphasis: false,
-  },
-  STARTER: {
-    label: PLAN_LIMITS.STARTER.label,
-    ...pricing("STARTER"),
-    teaser: `${billsPerMonth("STARTER")} and ${PLAN_LIMITS.STARTER.analyticsDays} days of analytics${
-      STARTER_CSV ? ", with CSV export" : ""
-    }. Most vendors live here.`,
-    summary: "For a counter that's getting busy.",
-    bullets: [
-      "Everything in Free",
-      billsPerMonth("STARTER"),
       analyticsDays("STARTER"),
       ...(STARTER_CSV ? ["CSV export of your bills"] : []),
     ],

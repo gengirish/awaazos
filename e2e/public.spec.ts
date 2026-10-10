@@ -10,32 +10,44 @@ test.describe("public surfaces", () => {
     await expect(page.getByRole("link", { name: /(get started|sign up)/i }).first()).toBeVisible();
   });
 
-  test("pricing page lists FREE and STARTER with paise-correct rupee amounts", async ({ page }) => {
+  test("pricing page sells one plan: free trial, then Starter monthly or yearly", async ({ page }) => {
     await page.goto("/pricing");
-    await expect(page.getByText(/FREE/i).first()).toBeVisible();
-    await expect(page.getByText(/STARTER/i).first()).toBeVisible();
-    await expect(page.getByText(/₹\s*0/).first()).toBeVisible();
-    await expect(page.getByText(/₹\s*299/).first()).toBeVisible();
-    // Copy comes from lib/plan-copy.ts: Starter sells CSV export, and no tier
+    await expect(page.getByRole("heading", { name: /^starter$/i })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText("30 days free");
+    await expect(page.getByText("₹2,990/yr + GST")).toBeVisible();
+    await expect(page.getByText(/2 months free/i).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /start 30 days free/i })).toHaveAttribute("href", "/sign-up");
+    // Copy comes from lib/plan-copy.ts: Starter sells CSV export, and nothing
     // promises staff logins (there is no invite flow — see TODO.md §2).
     await expect(page.getByText(/CSV export/i).first()).toBeVisible();
     await expect(page.getByText(/staff/i)).toHaveCount(0);
   });
 
-  test("PRO stays off the marketing surface until STARTER is GA", async ({ page }) => {
+  test("FREE and PRO stay off the marketing surface", async ({ page }) => {
     await page.goto("/pricing");
-    // VISIBLE_TIERS in app/(marketing)/pricing/page.tsx is ["FREE", "STARTER"] —
-    // PRO is a deliberate cut (PITCH.md "minimal product"), not an oversight.
-    // PLAN_PRICES_PAISE still carries 79900 for gates, so only the marketing
-    // surface should be free of it.
+    // MARKETED_PLANS in lib/plan-copy.ts is ["STARTER"]. FREE is kept only for
+    // vendors who signed up before the trial; PRO is a deliberate cut (PITCH.md
+    // "minimal product"). PLAN_PRICES_PAISE still carries both for the gates.
     await expect(page.getByText(/₹\s*799/)).toHaveCount(0);
     await expect(page.getByRole("heading", { name: /^pro$/i })).toHaveCount(0);
+    await expect(page.getByRole("heading", { name: /^free$/i })).toHaveCount(0);
+    await expect(page.getByText(/₹\s*0\b/)).toHaveCount(0);
+    await expect(page.getByText(/bills a month/i)).toHaveCount(0);
   });
 
-  test("pricing shows whole-rupee prices, matching the landing teaser", async ({ page }) => {
+  test("pricing shows whole-rupee prices, all exclusive of GST", async ({ page }) => {
     await page.goto("/pricing");
     await expect(page.getByText("₹299/mo + GST", { exact: true })).toBeVisible();
     await expect(page.getByText(/₹\s*299\.00/)).toHaveCount(0);
+    await expect(page.getByText(/exclude 18% GST/i)).toBeVisible();
+  });
+
+  test("landing teaser offers the same trial and prices", async ({ page }) => {
+    await page.goto("/");
+    const teaser = page.getByRole("region", { name: /one simple plan/i });
+    await expect(teaser).toContainText("30 days free");
+    await expect(teaser).toContainText("₹299/mo + GST");
+    await expect(teaser).toContainText("₹2,990/yr + GST");
   });
 
   for (const path of ["/legal/privacy", "/legal/terms"]) {

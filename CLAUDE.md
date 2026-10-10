@@ -225,6 +225,40 @@ Two role axes: platform `UserRole` (`USER < ADMIN < SUPER_ADMIN`) and per-tenant
 throws `PlanGateError` (402) carrying `{ required, current }` so the UI can render an upgrade CTA.
 Limits live in `PLAN_LIMITS` in `lib/constants.ts`.
 
+### Billing: trial, lock and platform subscriptions
+
+Full design in `docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md`. One offer is sold: a `TRIAL_DAYS` (30) day
+free trial with STARTER limits, then STARTER monthly or yearly. Prices exclude 18% GST
+(`GST_BPS`); the Razorpay plan amount is base + GST (`subscriptionChargePaise`).
+
+`billingAccess(vendor)` in `lib/plan.ts` derives one of four states from `Vendor.plan`,
+`planExpiresAt` and `trialEndsAt` on every read. **No timers** — nothing is written when a date
+passes, so Neon can sleep.
+
+| State | When | Effect |
+| --- | --- | --- |
+| `paid` | paid plan, not past `planExpiresAt` + 3-day grace | that plan's limits |
+| `trial` | not paid, before `trialEndsAt` (set at sign-up) | STARTER limits |
+| `locked` | not paid, `trialEndsAt` passed | no new sales, storefront orders or AI calls |
+| `free` | not paid, `trialEndsAt` null (signed up before the trial) | FREE limits, never locked |
+
+- `requireVendorRole` returns `access` and the effective `vendor.plan`. Anything that makes a new
+  sale, takes a new order or spends on AI calls `requireActiveBilling(ctx)` → 402
+  `{ error: "billing_locked" }`. **Never call it on reads, settings, billing, CSV export, or
+  actions that finish an existing order** — a locked vendor keeps access to their records.
+- Code that loads a vendor without `requireVendorRole` (storefront routes) must select
+  `planExpiresAt` **and** `trialEndsAt`; leaving `trialEndsAt` out treats a trial vendor as FREE.
+  Buyers of a locked vendor get `orders_paused` (409) and are never told why.
+- A `deferred` offline sale rung up before the lock (`clientCreatedAt < access.since`) still syncs.
+- The subscription webhook (`/api/webhooks/razorpay`) is idempotent through the `SubscriptionEvent`
+  ledger (unique `x-razorpay-event-id`). Transitions are the pure `applySubscriptionEvent`
+  (`lib/subscription.ts`): `planExpiresAt` comes from Razorpay's `current_end`, only moves forward,
+  and the webhook never downgrades a paying vendor — expiry is lazy.
+- Marketing copy (`lib/plan-copy.ts`) and the legal pages read the trial length and prices from
+  the constants. FREE is not marketed.
+- E2E: new vendors are on the trial. Specs that need another state set it in the database with
+  `e2e/helpers/billing-db.ts` (local databases only).
+
 ### Transaction write path
 
 `POST /api/transactions` recomputes subtotal/total server-side and rejects mismatches with 400, then

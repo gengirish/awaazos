@@ -1,10 +1,8 @@
 "use client";
 
-import type { Plan } from "@prisma/client";
 import Link from "next/link";
 import { useState } from "react";
 
-import { PLAN_RANK } from "@/lib/constants";
 import { formatINR, formatINRCompact } from "@/lib/currency";
 import {
   subscriptionBasePaise,
@@ -19,11 +17,12 @@ const INTERVAL_LABEL: Record<BillingInterval, { button: string; per: string }> =
 };
 
 export function BillingManageClient({
-  currentPlan,
+  canSubscribe,
   hasRazorpaySubscription,
   cancelAtEnd,
 }: {
-  currentPlan: Plan;
+  /** Not on a paid plan and no subscription already collecting (trial, locked or free). */
+  canSubscribe: boolean;
   hasRazorpaySubscription: boolean;
   /** Cancelled, still paid up until the cycle ends. */
   cancelAtEnd: boolean;
@@ -60,11 +59,9 @@ export function BillingManageClient({
     window.setTimeout(() => window.location.reload(), 1500);
   }
 
-  const belowStarter = PLAN_RANK[currentPlan] < PLAN_RANK.STARTER;
-
   return (
     <div className="flex flex-col gap-3">
-      {belowStarter ? (
+      {canSubscribe ? (
         <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           {(["monthly", "yearly"] as const).map((interval) => (
             <Button

@@ -41,7 +41,7 @@ import { formatBillDateYYYYMMDD, getIstMonthStart, getIstTodayStart } from "@/li
 import { PLAN_LIMITS } from "@/lib/constants";
 import { sumPaise } from "@/lib/currency";
 import { bumpDropOrderSignal } from "@/lib/drops-signal";
-import { effectivePlan } from "@/lib/plan";
+import { effectivePlan, isBillingLocked } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
 import { generateReceiptToken } from "@/lib/receipt-data";
@@ -269,10 +269,12 @@ export async function nextBillNumber(
 
 export type PlaceOrderInput = {
   /**
-   * Stored plan + raw expiry; the cap uses `effectivePlan()` (lib/plan.ts).
-   * Omitting `planExpiresAt` means "no expiry" — always pass it from a DB row.
+   * Stored plan + raw expiry + trial end; the cap uses `effectivePlan()` and
+   * a locked vendor takes no orders (lib/plan.ts). Omitting `planExpiresAt`
+   * means "no expiry" and omitting `trialEndsAt` means "no trial" — always
+   * pass both from a DB row.
    */
-  vendor: { id: string; plan: Plan; planExpiresAt?: Date | null };
+  vendor: { id: string; plan: Plan; planExpiresAt?: Date | null; trialEndsAt?: Date | null };
   acceptPayOnDelivery: boolean;
   dropId: string;
   items: { dropItemId: string; qty: number }[];
@@ -296,7 +298,8 @@ export type PlaceOrderError =
   | { code: "fulfilment_unavailable" }
   | { code: "address_required" }
   | { code: "pay_on_delivery_disabled" }
-  | { code: "monthly_txn_cap_reached" };
+  | { code: "monthly_txn_cap_reached" }
+  | { code: "orders_paused" };
 
 export type PlacedOrder = {
   id: string;
@@ -374,10 +377,17 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
         return { item, qty: l.qty };
       });
 
-      const plan = effectivePlan(
-        { plan: input.vendor.plan, planExpiresAt: input.vendor.planExpiresAt ?? null },
-        now,
-      );
+      const planFields = {
+        plan: input.vendor.plan,
+        planExpiresAt: input.vendor.planExpiresAt ?? null,
+        trialEndsAt: input.vendor.trialEndsAt ?? null,
+      };
+      // Trial over and not subscribed: the vendor can't take new orders. The
+      // buyer is told the shop is paused, never why.
+      if (isBillingLocked(planFields, now)) {
+        throw new OrderRejected({ code: "orders_paused" });
+      }
+      const plan = effectivePlan(planFields, now);
       const cap = PLAN_LIMITS[plan].monthlyTxnCap;
       if (cap !== null && (await countBillableTxnThisMonth(tx, vendorId, now)) >= cap) {
         throw new OrderRejected({ code: "monthly_txn_cap_reached" });

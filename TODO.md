@@ -83,6 +83,12 @@ and approved marketing templates first. The customer-initiated design in 3.2 avo
 
 ## 2. Packaging contradicts the customer we sell to
 
+**Resolved 2026-10-10** by the proposed fix at the end of this section, as built in
+`docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md`: new sign-ups get a 30-day free trial with STARTER limits,
+STARTER is unlimited, and one plan is sold (₹299/month or ₹2,990/year, + GST). FREE (50/month)
+remains only for vendors who signed up before the trial. The bullets below are kept as the record
+of why; the staff-invite and "Pro is not sold" items are still open.
+
 **ICP changed 2026-10-09** to Instagram cloud kitchens (`docs/ICP.md`): roughly 10–80 orders per
 batch or day, so STARTER's 500/month now fits and the "10× below the ICP" point below applies only
 to the old street-stall ICP (~200 sales/day). FREE's 50/month is still only about two batches.

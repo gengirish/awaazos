@@ -104,6 +104,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         id: true,
         plan: true,
         planExpiresAt: true,
+        trialEndsAt: true,
         settings: {
           select: {
             acceptMenuOrders: true,
@@ -135,7 +136,12 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     }
 
     const result = await placeMenuOrder({
-      vendor: { id: vendor.id, plan: vendor.plan, planExpiresAt: vendor.planExpiresAt },
+      vendor: {
+        id: vendor.id,
+        plan: vendor.plan,
+        planExpiresAt: vendor.planExpiresAt,
+        trialEndsAt: vendor.trialEndsAt,
+      },
       settings: vendor.settings,
       items: input.items,
       customerName: input.customerName,

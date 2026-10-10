@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { NextResponse } from "next/server";
 
+import { TRIAL_DAYS } from "@/lib/constants";
 import { hashPassword } from "@/lib/password";
 import { checkPasswordPolicy } from "@/lib/password-strength";
 import { prisma } from "@/lib/prisma";
@@ -94,6 +95,9 @@ export async function POST(req: Request) {
             stallType,
             phone: phoneE164,
             email,
+            // Free trial with STARTER limits; billingAccess() (lib/plan.ts)
+            // evaluates it lazily — nothing runs when it ends.
+            trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
           },
         });
         await tx.vendorSettings.create({

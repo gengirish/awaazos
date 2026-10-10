@@ -1,15 +1,20 @@
 import type { Metadata } from "next";
 
+import { TRIAL_DAYS } from "@/lib/constants";
+import { PLAN_MARKETING } from "@/lib/plan-copy";
+
 export const metadata: Metadata = {
   title: "Terms of Service — AwaazOS",
   description: "Terms governing use of AwaazOS.",
 };
 
+const starter = PLAN_MARKETING.STARTER;
+
 export default function TermsPage() {
   return (
     <>
       <h1>Terms of Service</h1>
-      <p>Last updated: 23 April 2026</p>
+      <p>Last updated: 10 October 2026</p>
 
       <h2>Acceptance</h2>
       <p>By using AwaazOS, you agree to these Terms.</p>
@@ -28,8 +33,33 @@ export default function TermsPage() {
 
       <h2>Billing and subscriptions</h2>
       <ul>
-        <li>Paid plans are billed via Razorpay according to selected plan terms.</li>
-        <li>Applicable taxes (including GST where required) may be charged separately.</li>
+        <li>
+          New accounts get a {TRIAL_DAYS}-day free trial with every feature of the {starter.label} plan. No card is
+          needed to start it.
+        </li>
+        <li>
+          After the trial, creating new bills and taking new orders needs a paid subscription: {starter.price} or{" "}
+          {starter.yearlyPrice}. Without one, your existing bills, reports and settings stay available to view and
+          export, and orders already placed can still be completed.
+        </li>
+        <li>
+          Prices exclude GST. GST at 18% is added to every charge and shown before you pay.
+        </li>
+        <li>
+          Subscriptions are billed in advance through Razorpay and renew automatically each month or year until
+          cancelled. If you subscribe during the trial, the first charge is made when the trial ends.
+        </li>
+        <li>
+          You can cancel anytime from Billing settings. Your plan stays active until the end of the period you have
+          paid for and does not renew.
+        </li>
+        <li>
+          If a renewal payment fails, Razorpay retries it. Your plan stays active for a short grace period, after
+          which the paid features stop until payment succeeds.
+        </li>
+        <li>
+          Accounts created before the free trial was introduced keep their free plan and its monthly bill limit.
+        </li>
       </ul>
 
       <h2>Service availability</h2>

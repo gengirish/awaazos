@@ -40,7 +40,7 @@ vi.mock("@/lib/rbac", () => {
     if (minRole === "MANAGER" && h.role === "CASHIER") throw new AuthError(403, "Forbidden");
     return { vendor: { id: "v_1", plan: "STARTER" }, setVendorCookie: "v_1" };
   });
-  return { AuthError, requireVendorRole: h.requireVendorRole };
+  return { AuthError, requireActiveBilling: () => {}, requireVendorRole: h.requireVendorRole };
 });
 
 vi.mock("@/lib/prisma", () => ({ prisma: { menuItem: { findMany: h.findMany } } }));

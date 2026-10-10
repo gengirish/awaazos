@@ -158,6 +158,13 @@ export const PLAN_PRICES_YEARLY_PAISE: Partial<Record<Plan, number>> = {
 };
 
 /**
+ * Length of the free trial every new vendor gets at sign-up, with STARTER
+ * limits (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md). Marketing copy reads it from
+ * here so the promise can't drift from what sign-up grants.
+ */
+export const TRIAL_DAYS = 30;
+
+/**
  * GST on the SaaS subscription, in basis points (18%). Prices above are
  * exclusive of it; the Razorpay plan amount is base + GST
  * (`subscriptionChargePaise` in lib/subscription.ts).

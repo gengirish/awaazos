@@ -474,6 +474,7 @@ export function orderErrorMessage(err: OrderApiError, itemName?: string): string
     case "pay_on_delivery_disabled":
       return "Pay on delivery isn't available. Please pay by UPI.";
     case "monthly_txn_cap_reached":
+    case "orders_paused":
       return "This kitchen can't take online orders right now — message them directly.";
     case "rate_limited":
       return "Too many attempts. Please wait a minute and try again.";
