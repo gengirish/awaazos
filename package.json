@@ -20,6 +20,7 @@
     "smoke:groq": "node scripts/groq-stt-smoke.mjs",
     "smoke:whisper": "node scripts/whisper-stt-smoke.mjs",
     "sync:agent-rules": "node scripts/sync-agent-rules.mjs",
+    "razorpay:create-plans": "tsx scripts/razorpay-create-plans.ts",
     "test:golden": "vitest run tests/golden/parse-order/live.test.ts",
     "test:golden:validate": "vitest run tests/golden/parse-order/validate.test.ts",
     "test:golden:drop": "vitest run tests/golden/parse-drop/live.test.ts",
@@ -28,7 +29,7 @@
     "test:golden:menu:validate": "vitest run tests/golden/parse-menu/validate.test.ts",
     "test:golden:stt": "vitest run tests/golden/stt/live.test.ts",
     "test:golden:stt:validate": "vitest run tests/golden/stt/validate.test.ts",
-    "test:drops:db": "node -e \"process.env.DROPS_DB_TEST='1';process.exit(require('child_process').spawnSync('npx vitest run --no-file-parallelism lib/__tests__/drops.db.test.ts lib/__tests__/menu-orders.db.test.ts lib/__tests__/menu-visibility.db.test.ts lib/__tests__/everyday-menu-control.db.test.ts lib/__tests__/storefront-orders.db.test.ts lib/__tests__/push.db.test.ts lib/__tests__/push-routes.db.test.ts lib/__tests__/payment-guard.db.test.ts lib/__tests__/menu-bulk.db.test.ts',{stdio:'inherit',shell:true}).status ?? 1)\"",
+    "test:drops:db": "node -e \"process.env.DROPS_DB_TEST='1';process.exit(require('child_process').spawnSync('npx vitest run --no-file-parallelism lib/__tests__/drops.db.test.ts lib/__tests__/menu-orders.db.test.ts lib/__tests__/menu-visibility.db.test.ts lib/__tests__/everyday-menu-control.db.test.ts lib/__tests__/storefront-orders.db.test.ts lib/__tests__/push.db.test.ts lib/__tests__/push-routes.db.test.ts lib/__tests__/payment-guard.db.test.ts lib/__tests__/menu-bulk.db.test.ts lib/__tests__/subscription-webhook.db.test.ts',{stdio:'inherit',shell:true}).status ?? 1)\"",
     "precommit:checks": "lint-staged",
     "prepare": "husky"
   },

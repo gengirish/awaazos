@@ -10,6 +10,7 @@ Operational utilities. Not deployed; run locally only.
 | `whisper-stt-smoke.mjs` | `npm run smoke:whisper` | Self-hosted Whisper (`services/whisper-stt`) on a local clip |
 | `generate-pwa-icons.mjs` | none | Regenerates the PWA / push icons in `public/` |
 | `sync-agent-rules.mjs` | `npm run sync:agent-rules` | Regenerates `.claude/rules` + `.claude/skills` from `.cursor/` |
+| `razorpay-create-plans.ts` | `npm run razorpay:create-plans` | Dry-runs (or with `-- --create`, creates) the Starter monthly/yearly subscription plans in Razorpay; prints the env ids |
 
 The smoke scripts are one-shot round trips against a live provider, for checking credentials and
 connectivity. They read keys from `.env.local` (an already-set environment variable wins) and never

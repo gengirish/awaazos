@@ -142,6 +142,16 @@ export const writeRateLimit = makeLimiter({
 });
 
 /**
+ * 5 subscription create/cancel calls per vendor per minute. Each one creates
+ * or mutates an object in the platform Razorpay account.
+ */
+export const billingRateLimit = makeLimiter({
+  name: "billing",
+  windowMs: 60_000,
+  max: 5,
+});
+
+/**
  * Best-effort client IP extraction from a Next.js request.
  * Vercel populates x-forwarded-for; falls back to x-real-ip; "unknown"
  * means the limiter buckets all anonymous traffic together (safe default).

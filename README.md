@@ -127,7 +127,7 @@ cp .env.local.example .env.local
 # Required for voice parsing: ANTHROPIC_API_KEY
 # Optional server STT: OPENAI_API_KEY, GROQ_API_KEY, WHISPER_STT_URL + WHISPER_STT_SECRET
 #   (SARVAM_API_KEY only matters for the dormant te/kn/ta path)
-# Optional: RAZORPAY_* (incl. RAZORPAY_PLAN_STARTER / _PRO), BLOB_READ_WRITE_TOKEN,
+# Optional: RAZORPAY_* (incl. RAZORPAY_PLAN_STARTER_MONTHLY / _YEARLY), BLOB_READ_WRITE_TOKEN,
 #   VAPID keys (Web Push), AGENTMAIL_*, SENTRY_*
 # Redis: UPSTASH_REDIS_REST_* (HTTP) and REDIS_URL (TCP, BullMQ) — see "Two Redis surfaces" in CLAUDE.md
 # Every variable is documented in .env.local.example
