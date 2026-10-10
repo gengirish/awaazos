@@ -5,6 +5,7 @@ import Link from "next/link";
 import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
 import { LegacyAnchorRedirect } from "@/components/settings/LegacyAnchorRedirect";
 import { SETTINGS_SECTIONS, type SettingsSectionId } from "@/components/settings/sections";
+import { trialDaysLeft } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { isPushConfigured } from "@/lib/push";
 import { countVendorPushDevices } from "@/lib/push-devices";
@@ -64,7 +65,7 @@ function StatusLine({ status }: { status: SectionStatus }) {
 }
 
 export default async function SettingsHubPage() {
-  const { vendor, user } = await requireSettingsContext();
+  const { vendor, user, access } = await requireSettingsContext();
 
   const pushConfigured = isPushConfigured();
   const [settings, availableItemCount, pushDeviceCount] = await Promise.all([
@@ -98,6 +99,12 @@ export default async function SettingsHubPage() {
     razorpayConfigured: hasStoredRazorpayCreds(settings),
     voiceLang: settings?.voiceLang ?? "en-IN",
     plan: vendor.plan,
+    billing:
+      access.kind === "trial"
+        ? { kind: "trial", daysLeft: trialDaysLeft(access.endsAt) }
+        : access.kind === "locked"
+          ? { kind: "locked" }
+          : undefined,
     availableItemCount,
     pushConfigured,
     pushDeviceCount,

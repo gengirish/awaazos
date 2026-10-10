@@ -29,7 +29,7 @@ import {
   type WhisperSttLang,
 } from "@/lib/whisper-stt";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
-import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
+import { AuthError, PlanGateError, requirePlan, requireActiveBilling, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -136,6 +136,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
+    requireActiveBilling(ctx);
     vendorId = ctx.vendor.id;
 
     const aiLimiter = getAiLimiterForPlan(ctx.vendor.plan);

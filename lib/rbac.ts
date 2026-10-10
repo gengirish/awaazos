@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 
 import { auth } from "@/lib/auth";
 import { PLAN_RANK } from "@/lib/constants";
-import { effectivePlan } from "@/lib/plan";
+import { billingAccess, effectivePlan, type BillingAccess } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 
 const USER_ROLE_RANK: Record<UserRole, number> = {
@@ -37,6 +37,29 @@ export class PlanGateError extends AuthError {
   ) {
     super(402, "Plan upgrade required");
     this.name = "PlanGateError";
+  }
+}
+
+/**
+ * 402 for a vendor whose trial (or paid period) has ended and who hasn't
+ * subscribed. The message is the stable code clients switch on; routes that
+ * map `AuthError` to `{ error: err.message }` need no extra handling.
+ */
+export class BillingLockedError extends AuthError {
+  constructor(public readonly since: Date) {
+    super(402, "billing_locked");
+    this.name = "BillingLockedError";
+  }
+}
+
+/**
+ * Throws `BillingLockedError` when the vendor is locked. Call it on anything
+ * that makes a new sale, takes a new order or spends on AI. Do NOT call it on
+ * reads, settings, billing, export, or actions that finish an existing order.
+ */
+export function requireActiveBilling(ctx: { access: BillingAccess }): void {
+  if (ctx.access.kind === "locked") {
+    throw new BillingLockedError(ctx.access.since);
   }
 }
 
@@ -105,6 +128,8 @@ export type VendorRoleContext = {
   vendor: Vendor;
   /** `Vendor.plan` as stored in the DB, before expiry is applied (billing UI only). */
   storedPlan: Plan;
+  /** paid / trial / locked / free — see lib/plan.ts. Gate writes with `requireActiveBilling`. */
+  access: BillingAccess;
   staff: NonNullable<Awaited<ReturnType<typeof prisma.staffMember.findFirst>>>;
   /** When non-null, API route should `Set-Cookie: awz_vendor=...` */
   setVendorCookie: string | null;
@@ -157,7 +182,9 @@ export async function requireVendorRole(
   }
 
   const storedPlan = staff.vendor.plan;
-  const vendor: Vendor = { ...staff.vendor, plan: effectivePlan(staff.vendor) };
+  const now = new Date();
+  const access = billingAccess(staff.vendor, now);
+  const vendor: Vendor = { ...staff.vendor, plan: effectivePlan(staff.vendor, now) };
   if (!staffRoleAtLeast(staff.role, minRole)) {
     throw new AuthError(403, `Requires staff role ${minRole} or higher.`);
   }
@@ -168,5 +195,5 @@ export async function requireVendorRole(
   // The row was loaded with `include: { vendor }`; swap in the effective-plan
   // vendor so nothing reading `staff.vendor` at runtime sees the raw plan.
   const staffRow = { ...staff, vendor };
-  return { user, vendor, storedPlan, staff: staffRow, setVendorCookie };
+  return { user, vendor, storedPlan, access, staff: staffRow, setVendorCookie };
 }

@@ -55,7 +55,9 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
 export async function GET(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
-    requirePlan(ctx.vendor, Plan.STARTER);
+    // A locked vendor (trial over, not subscribed) can always take their own
+    // records out, whatever the plan gate says.
+    if (ctx.access.kind !== "locked") requirePlan(ctx.vendor, Plan.STARTER);
 
     const sp = req.nextUrl.searchParams;
     const fromStr = sp.get("from");

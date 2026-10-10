@@ -51,7 +51,9 @@ export async function POST(req: NextRequest) {
 
     const body = bodySchema.parse(await req.json());
 
-    if (PLAN_RANK[ctx.vendor.plan] >= PLAN_RANK[body.plan]) {
+    // Only a plan that is paid for blocks this — a vendor on the free trial
+    // reads as STARTER but must still be able to subscribe.
+    if (ctx.access.kind === "paid" && PLAN_RANK[ctx.access.plan] >= PLAN_RANK[body.plan]) {
       return NextResponse.json(
         { error: "You are already on this plan or higher." },
         { status: 400 },

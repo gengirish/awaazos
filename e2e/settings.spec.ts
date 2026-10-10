@@ -50,7 +50,7 @@ test.describe("settings hub", () => {
     await expect(hubRow(page, "Payments")).toContainText("Pay on delivery");
     await expect(hubRow(page, "Receipts")).toContainText("80 mm paper");
     await expect(hubRow(page, "Counter & voice")).toContainText("English");
-    await expect(hubRow(page, "Plan & billing")).toContainText("Free plan");
+    await expect(hubRow(page, "Plan & billing")).toContainText("Free trial · 30 days left");
 
     const checklist = page.getByRole("region", { name: /setup checklist/i });
     await expect(checklist).toBeVisible();

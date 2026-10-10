@@ -24,7 +24,7 @@ test.describe("Razorpay create-subscription API", () => {
 
 test.describe("Billing page — upgrade calls create-subscription", () => {
   for (const interval of ["monthly", "yearly"] as const) {
-    test(`FREE owner picks Starter ${interval}; mocked API receives correct body`, async ({
+    test(`owner on the free trial picks Starter ${interval}; mocked API receives correct body`, async ({
       page,
       request,
     }) => {

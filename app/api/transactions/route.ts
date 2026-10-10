@@ -9,7 +9,7 @@ import { prisma } from "@/lib/prisma";
 import { generateReceiptToken } from "@/lib/receipt-data";
 import { getReceiptQueue } from "@/lib/queues";
 import { tooManyRequests, writeRateLimit } from "@/lib/ratelimit";
-import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { AuthError, BillingLockedError, requireVendorRole } from "@/lib/rbac";
 import { parseTransactionListQuery } from "@/lib/transaction-list-params";
 import {
   checkTransactionTotals,
@@ -18,9 +18,13 @@ import {
   type TransactionPostBody,
 } from "@/lib/transaction-post-body";
 import { listVendorTransactions } from "@/lib/transactions-list";
+import { withTimeout } from "@/lib/with-timeout";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+/** How long a sale waits for the WhatsApp receipt enqueue before giving up on it. */
+const RECEIPT_ENQUEUE_TIMEOUT_MS = 2_000;
 
 const receiptJobOpts = {
   attempts: 3,
@@ -192,6 +196,15 @@ export async function POST(req: NextRequest) {
     }
     const { saleAt, fromClient } = saleTime;
 
+    // Trial over and not subscribed: no new sales. A queued offline sale rung
+    // up before the lock is still recorded — the money already changed hands.
+    if (
+      ctx.access.kind === "locked" &&
+      !(body.deferred && saleAt.getTime() < ctx.access.since.getTime())
+    ) {
+      throw new BillingLockedError(ctx.access.since);
+    }
+
     const cap = PLAN_LIMITS[vendor.plan].monthlyTxnCap;
     if (cap !== null) {
       // Unpaid storefront pre-orders don't burn the cap (lib/drops.ts).
@@ -247,10 +260,17 @@ export async function POST(req: NextRequest) {
     const phone = body.customerPhone?.trim();
     if (phone && PLAN_LIMITS[vendor.plan].whatsapp) {
       try {
-        await getReceiptQueue().add(
-          "send-receipt",
-          { transactionId: transaction.id, vendorId: vendor.id, customerPhone: phone },
-          receiptJobOpts,
+        // Bounded: with REDIS_URL set but Redis unreachable, BullMQ's add()
+        // never settles, and Redis must never hold up a sale that has
+        // already committed.
+        await withTimeout(
+          getReceiptQueue().add(
+            "send-receipt",
+            { transactionId: transaction.id, vendorId: vendor.id, customerPhone: phone },
+            receiptJobOpts,
+          ),
+          RECEIPT_ENQUEUE_TIMEOUT_MS,
+          "receipt.enqueue",
         );
         whatsappQueued = true;
       } catch (e) {

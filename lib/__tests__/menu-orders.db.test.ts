@@ -202,4 +202,50 @@ describe.skipIf(!ENABLED)("menu orders — DB integration", () => {
     const res = await mo.placeMenuOrder({ ...base(vendor), items: [{ menuItemId: bhel.id, qty: 1 }] });
     expect(res).toEqual({ ok: false, error: { code: "monthly_txn_cap_reached" } });
   });
+
+  // Free trial and lock (lib/plan.ts): the vendor row is FREE; trialEndsAt decides.
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const inDays = (n: number) => new Date(Date.now() + n * DAY_MS);
+
+  it("a vendor on the free trial has no monthly cap", async () => {
+    const { vendor, bhel } = await seed("FREE");
+    await prisma.transaction.createMany({
+      data: Array.from({ length: 50 }, (_, i) => ({
+        vendorId: vendor.id,
+        billNumber: `TRIAL-${i}`,
+        subtotalPaise: 100,
+        totalPaise: 100,
+        paymentMethod: "CASH" as const,
+        paymentStatus: "PAID" as const,
+        source: "MANUAL" as const,
+      })),
+    });
+    const res = await mo.placeMenuOrder({
+      ...base(vendor),
+      vendor: { id: vendor.id, plan: vendor.plan, planExpiresAt: null, trialEndsAt: inDays(10) },
+      items: [{ menuItemId: bhel.id, qty: 1 }],
+    });
+    expect(res.ok).toBe(true);
+  });
+
+  it("a locked vendor (trial over, not subscribed) takes no orders and stores nothing", async () => {
+    const { vendor, bhel } = await seed("FREE");
+    const res = await mo.placeMenuOrder({
+      ...base(vendor),
+      vendor: { id: vendor.id, plan: vendor.plan, planExpiresAt: null, trialEndsAt: inDays(-1) },
+      items: [{ menuItemId: bhel.id, qty: 1 }],
+    });
+    expect(res).toEqual({ ok: false, error: { code: "orders_paused" } });
+    expect(await prisma.transaction.count({ where: { vendorId: vendor.id } })).toBe(0);
+  });
+
+  it("a paid plan takes orders after the trial has ended", async () => {
+    const { vendor, bhel } = await seed("STARTER");
+    const res = await mo.placeMenuOrder({
+      ...base(vendor),
+      vendor: { id: vendor.id, plan: "STARTER", planExpiresAt: inDays(20), trialEndsAt: inDays(-40) },
+      items: [{ menuItemId: bhel.id, qty: 1 }],
+    });
+    expect(res.ok).toBe(true);
+  });
 });

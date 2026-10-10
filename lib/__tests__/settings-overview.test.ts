@@ -67,6 +67,18 @@ describe("settings hub status lines", () => {
 
   it("plan: uses the plan label", () => {
     expect(planStatus({ plan: "FREE" }).text).toBe("Free plan");
+    expect(planStatus({ plan: "STARTER" })).toEqual({ text: "Starter plan", on: true });
+  });
+
+  it("plan: shows the free trial and the lock instead of a plan name", () => {
+    expect(planStatus({ plan: "STARTER", billing: { kind: "trial", daysLeft: 30 } })).toEqual({
+      text: "Free trial · 30 days left",
+      on: true,
+    });
+    expect(planStatus({ plan: "STARTER", billing: { kind: "trial", daysLeft: 1 } }).text).toBe(
+      "Free trial · 1 day left",
+    );
+    expect(planStatus({ plan: "FREE", billing: { kind: "locked" } })).toEqual({ text: "No active plan", on: false });
   });
 });
 

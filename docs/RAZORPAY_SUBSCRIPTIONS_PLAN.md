@@ -1,10 +1,21 @@
 # Razorpay subscriptions + 30-day trial — plan
 
-Status: decisions taken 2026-10-09 (see "Decisions"). Schema for Phases 1 and 3 pushed to Neon
-2026-10-10. Phase 0 script and Phase 1 built on `feat/razorpay-subscriptions`. Phases 2–5 not started.
+Status: decisions taken 2026-10-09 (see "Decisions"). Phases 0–1 shipped 2026-10-10 (PR #38); the
+live Razorpay plans exist. Phases 2–3 built on `feat/trial-pricing-copy`. Phases 4–5 not started.
 
-Phase 1 also shipped two Phase 2 pieces, because the new plans charge base + GST: "+ GST" on every
-paid price (`PlanMarketing.taxNote`), and STARTER copy now reads "Unlimited bills".
+Differences from the plan below, as built:
+
+- Phase 1 also shipped "+ GST" on every paid price and "Unlimited bills" for STARTER, because the
+  new plans charge base + GST.
+- The lock blocks new POS sales, new storefront orders and the four AI routes. It does **not**
+  block drafting a drop or editing the menu: neither costs anything and buyers can't order from a
+  locked vendor anyway.
+- The storefront page still renders for a locked vendor; the order is refused at checkout with
+  `orders_paused`. Hiding checkout up front is a follow-up.
+- The lock card replaces `/pos` only. `/drops` and `/orders` stay open so existing orders can be
+  finished.
+- "Second trial on a second vendor" can't happen: sign-up is the only place a vendor is created,
+  and it creates exactly one per user.
 
 Platform SaaS billing: a vendor pays AwaazOS for STARTER through the **platform** Razorpay account
 (`RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`). This is separate from storefront payments, which use

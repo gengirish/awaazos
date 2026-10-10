@@ -1,17 +1,22 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 
 import { PricingPlanButtons } from "@/components/billing/PricingPlanButtons";
 import { auth } from "@/lib/auth";
+import { TRIAL_DAYS } from "@/lib/constants";
 import { MARKETED_PLANS, PLAN_MARKETING } from "@/lib/plan-copy";
+
+const starter = PLAN_MARKETING.STARTER;
 
 export const metadata: Metadata = {
   title: "Pricing — AwaazOS",
-  description: "₹299/mo + GST. Speak the order. Print the bill. Take UPI. Done.",
+  description: `${starter.trial}, then ${starter.price}. Speak the order. Print the bill. Take UPI. Done.`,
 };
 
-// PRO and ENTERPRISE are not sold: they stay in `lib/constants` (PLAN_PRICES_PAISE,
-// PLAN_LIMITS, PLAN_RANK) and in the Razorpay routes for the gates, but never on the
-// marketing surface. Tier copy is shared with the landing teaser via lib/plan-copy.ts.
+// One offer: a free trial, then Starter monthly or yearly. FREE (grandfathered
+// vendors only), PRO and ENTERPRISE stay in `lib/constants` for the gates but
+// never on the marketing surface. Copy is shared with the landing teaser via
+// lib/plan-copy.ts.
 const VISIBLE_TIERS = MARKETED_PLANS;
 
 export default async function PricingPage() {
@@ -23,14 +28,15 @@ export default async function PricingPage() {
       <div className="mx-auto max-w-3xl">
         <header className="mb-10 text-center">
           <h1 className="font-display text-4xl font-semibold text-foreground md:text-5xl">
-            ₹299/mo + GST. Speak. Bill. Done.
+            {starter.trial}. Then {starter.price}.
           </h1>
           <p className="mt-3 text-muted-foreground">
-            Voice-first POS for Indian vendors. Start free, upgrade when your counter gets busy.
+            Voice-first POS for Indian vendors. Try everything for {TRIAL_DAYS} days, no card needed. Subscribe
+            only if it earns its place on your counter.
           </p>
         </header>
 
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="mx-auto grid max-w-md gap-6">
           {VISIBLE_TIERS.map((tier) => (
             <section
               key={tier}
@@ -40,6 +46,10 @@ export default async function PricingPage() {
             >
               <h2 className="font-display text-xl font-semibold">{PLAN_MARKETING[tier].label}</h2>
               <p className="mt-2 text-3xl font-bold tracking-tight">{PLAN_MARKETING[tier].price}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                or <span className="font-medium text-foreground">{PLAN_MARKETING[tier].yearlyPrice}</span> —{" "}
+                {PLAN_MARKETING[tier].yearlyNote}
+              </p>
               <p className="mt-4 text-sm text-muted-foreground">{PLAN_MARKETING[tier].summary}</p>
               <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-foreground">
                 {PLAN_MARKETING[tier].bullets.map((b) => (
@@ -47,11 +57,19 @@ export default async function PricingPage() {
                 ))}
               </ul>
               <div className="mt-6 flex flex-1 flex-col justify-end gap-4">
-                <PricingPlanButtons tier={tier} signedIn={signedIn} />
+                <PricingPlanButtons signedIn={signedIn} />
               </div>
             </section>
           ))}
         </div>
+
+        <p className="mt-6 text-center text-sm text-muted-foreground">
+          Prices exclude 18% GST. Cancel anytime — your plan runs to the end of the period you paid for. See the{" "}
+          <Link href="/legal/refund" className="underline underline-offset-4">
+            refund policy
+          </Link>
+          .
+        </p>
 
         {/* HIDDEN — see PITCH.md "minimal product" cut list. Re-enable when STARTER GA.
         <div className="mt-12 overflow-x-auto rounded-lg border">

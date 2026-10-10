@@ -27,7 +27,7 @@ import {
   nextBillNumber,
 } from "@/lib/drops";
 import { bumpDropOrderSignal } from "@/lib/drops-signal";
-import { effectivePlan } from "@/lib/plan";
+import { effectivePlan, isBillingLocked } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
 import { generateReceiptToken } from "@/lib/receipt-data";
@@ -44,10 +44,12 @@ export type MenuOrderSettings = {
 
 export type PlaceMenuOrderInput = {
   /**
-   * Stored plan + raw expiry; the cap uses `effectivePlan()` (lib/plan.ts).
-   * Omitting `planExpiresAt` means "no expiry" — always pass it from a DB row.
+   * Stored plan + raw expiry + trial end; the cap uses `effectivePlan()` and
+   * a locked vendor takes no orders (lib/plan.ts). Omitting `planExpiresAt`
+   * means "no expiry" and omitting `trialEndsAt` means "no trial" — always
+   * pass both from a DB row.
    */
-  vendor: { id: string; plan: Plan; planExpiresAt?: Date | null };
+  vendor: { id: string; plan: Plan; planExpiresAt?: Date | null; trialEndsAt?: Date | null };
   settings: MenuOrderSettings;
   items: { menuItemId: string; qty: number }[];
   customerName: string;
@@ -67,7 +69,8 @@ export type PlaceMenuOrderError =
   | { code: "fulfilment_unavailable" }
   | { code: "address_required" }
   | { code: "pay_on_delivery_disabled" }
-  | { code: "monthly_txn_cap_reached" };
+  | { code: "monthly_txn_cap_reached" }
+  | { code: "orders_paused" };
 
 export type PlacedMenuOrder = {
   id: string;
@@ -157,10 +160,17 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
         return { item, qty: l.qty };
       });
 
-      const plan = effectivePlan(
-        { plan: input.vendor.plan, planExpiresAt: input.vendor.planExpiresAt ?? null },
-        now,
-      );
+      const planFields = {
+        plan: input.vendor.plan,
+        planExpiresAt: input.vendor.planExpiresAt ?? null,
+        trialEndsAt: input.vendor.trialEndsAt ?? null,
+      };
+      // Trial over and not subscribed: the vendor can't take new orders. The
+      // buyer is told the shop is paused, never why.
+      if (isBillingLocked(planFields, now)) {
+        throw new MenuOrderRejected({ code: "orders_paused" });
+      }
+      const plan = effectivePlan(planFields, now);
       const cap = PLAN_LIMITS[plan].monthlyTxnCap;
       if (cap !== null && (await countBillableTxnThisMonth(tx, vendorId, now)) >= cap) {
         throw new MenuOrderRejected({ code: "monthly_txn_cap_reached" });

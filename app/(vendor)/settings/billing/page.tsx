@@ -3,12 +3,13 @@ import { redirect } from "next/navigation";
 
 import { BillingManageClient } from "@/components/billing/BillingManageClient";
 import { SettingsPageHeader } from "@/components/settings/SettingsChrome";
-import { PLAN_LIMITS } from "@/lib/constants";
+import { PLAN_LIMITS, TRIAL_DAYS } from "@/lib/constants";
 import { formatIstDate } from "@/lib/datetime";
 import { countBillableTxnThisMonth } from "@/lib/drops";
-import { isPlanExpired, isPlanInGrace, planGraceEndsAt } from "@/lib/plan";
+import { isPlanExpired, isPlanInGrace, planGraceEndsAt, trialDaysLeft } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { LIVE_SUBSCRIPTION_STATUSES } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +23,7 @@ export default async function BillingSettingsPage() {
   try {
     // `vendor.plan` is already the effective plan (lib/plan.ts); `storedPlan` is
     // the raw DB value, used only to explain an expiry.
-    const { vendor, storedPlan } = await requireVendorRole("OWNER");
+    const { vendor, storedPlan, access } = await requireVendorRole("OWNER");
     const now = new Date();
     const storedPlanFields = { plan: storedPlan, planExpiresAt: vendor.planExpiresAt };
     const planExpired = isPlanExpired(storedPlanFields, now);
@@ -37,6 +38,7 @@ export default async function BillingSettingsPage() {
     const limits = PLAN_LIMITS[vendor.plan];
     const cap = limits.monthlyTxnCap;
     const usageLabel = cap === null ? `${txnCount} / Unlimited` : `${txnCount} / ${cap}`;
+    const hasLiveSubscription = LIVE_SUBSCRIPTION_STATUSES.includes(settings?.razorpaySubStatus ?? "");
 
     return (
       <>
@@ -44,8 +46,24 @@ export default async function BillingSettingsPage() {
         <div className="space-y-4">
           <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
             <h2 className="font-medium">Current plan</h2>
-            <p className="mt-2 text-2xl font-semibold">{limits.label}</p>
-            {planExpired && vendor.planExpiresAt ? (
+            <p className="mt-2 text-2xl font-semibold">
+              {access.kind === "trial"
+                ? `${limits.label} — free trial`
+                : access.kind === "locked"
+                  ? "No active plan"
+                  : limits.label}
+            </p>
+            {access.kind === "trial" ? (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {trialDaysLeft(access.endsAt, now)} of {TRIAL_DAYS} days left — ends on{" "}
+                {formatIstDate(access.endsAt)}. Subscribe any time; you won&apos;t be charged until the trial ends.
+              </p>
+            ) : access.kind === "locked" ? (
+              <p className="mt-1 text-sm font-medium text-destructive">
+                Your free trial or paid period ended on {formatIstDate(access.since)}. New bills and online orders
+                are paused until you subscribe. Your records are still here.
+              </p>
+            ) : planExpired && vendor.planExpiresAt ? (
               <p className="mt-1 text-sm font-medium text-destructive">
                 {PLAN_LIMITS[storedPlan].label} expired on {formatIstDate(vendor.planExpiresAt)} — you&apos;re
                 now on {PLAN_LIMITS.FREE.label}.
@@ -80,7 +98,7 @@ export default async function BillingSettingsPage() {
           <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
             <h2 className="mb-4 font-medium">Actions</h2>
             <BillingManageClient
-              currentPlan={vendor.plan}
+              canSubscribe={access.kind !== "paid" && !hasLiveSubscription}
               hasRazorpaySubscription={Boolean(settings?.razorpaySubId)}
               cancelAtEnd={settings?.razorpaySubCancelAtEnd ?? false}
             />

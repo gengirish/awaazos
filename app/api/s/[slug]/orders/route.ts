@@ -107,6 +107,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         id: true,
         plan: true,
         planExpiresAt: true,
+        trialEndsAt: true,
         settings: { select: { acceptPayOnDelivery: true } },
       },
     });
@@ -133,7 +134,12 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     }
 
     const result = await placeStorefrontOrder({
-      vendor: { id: vendor.id, plan: vendor.plan, planExpiresAt: vendor.planExpiresAt },
+      vendor: {
+        id: vendor.id,
+        plan: vendor.plan,
+        planExpiresAt: vendor.planExpiresAt,
+        trialEndsAt: vendor.trialEndsAt,
+      },
       acceptPayOnDelivery: vendor.settings?.acceptPayOnDelivery ?? false,
       dropId: input.dropId,
       items: input.items,

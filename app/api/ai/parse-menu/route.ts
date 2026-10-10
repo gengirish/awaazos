@@ -6,7 +6,7 @@ import { requireEnv } from "@/lib/env";
 import { parseMenuFromTranscript } from "@/lib/parse-menu";
 import { prisma } from "@/lib/prisma";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
-import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { AuthError, requireActiveBilling, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -34,6 +34,7 @@ const MAX_OUTPUT_TOKENS = 4096;
 export async function POST(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
+    requireActiveBilling(ctx);
 
     const aiLimiter = getAiLimiterForPlan(ctx.vendor.plan);
     const burst = await aiLimiter.burst.check(ctx.vendor.id);
