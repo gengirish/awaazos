@@ -18,9 +18,13 @@ import {
   type TransactionPostBody,
 } from "@/lib/transaction-post-body";
 import { listVendorTransactions } from "@/lib/transactions-list";
+import { withTimeout } from "@/lib/with-timeout";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
+
+/** How long a sale waits for the WhatsApp receipt enqueue before giving up on it. */
+const RECEIPT_ENQUEUE_TIMEOUT_MS = 2_000;
 
 const receiptJobOpts = {
   attempts: 3,
@@ -256,10 +260,17 @@ export async function POST(req: NextRequest) {
     const phone = body.customerPhone?.trim();
     if (phone && PLAN_LIMITS[vendor.plan].whatsapp) {
       try {
-        await getReceiptQueue().add(
-          "send-receipt",
-          { transactionId: transaction.id, vendorId: vendor.id, customerPhone: phone },
-          receiptJobOpts,
+        // Bounded: with REDIS_URL set but Redis unreachable, BullMQ's add()
+        // never settles, and Redis must never hold up a sale that has
+        // already committed.
+        await withTimeout(
+          getReceiptQueue().add(
+            "send-receipt",
+            { transactionId: transaction.id, vendorId: vendor.id, customerPhone: phone },
+            receiptJobOpts,
+          ),
+          RECEIPT_ENQUEUE_TIMEOUT_MS,
+          "receipt.enqueue",
         );
         whatsappQueued = true;
       } catch (e) {
