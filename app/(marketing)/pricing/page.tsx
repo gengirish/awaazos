@@ -6,7 +6,7 @@ import { MARKETED_PLANS, PLAN_MARKETING } from "@/lib/plan-copy";
 
 export const metadata: Metadata = {
   title: "Pricing — AwaazOS",
-  description: "₹299/mo. Speak the order. Print the bill. Take UPI. Done.",
+  description: "₹299/mo + GST. Speak the order. Print the bill. Take UPI. Done.",
 };
 
 // PRO and ENTERPRISE are not sold: they stay in `lib/constants` (PLAN_PRICES_PAISE,
@@ -23,7 +23,7 @@ export default async function PricingPage() {
       <div className="mx-auto max-w-3xl">
         <header className="mb-10 text-center">
           <h1 className="font-display text-4xl font-semibold text-foreground md:text-5xl">
-            ₹299/mo. Speak. Bill. Done.
+            ₹299/mo + GST. Speak. Bill. Done.
           </h1>
           <p className="mt-3 text-muted-foreground">
             Voice-first POS for Indian vendors. Start free, upgrade when your counter gets busy.

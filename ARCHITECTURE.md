@@ -616,7 +616,7 @@ To stay focused, AwaazOS is explicitly **not**:
 - An accounting / tax filing tool (we'll integrate; not build)
 - A general-purpose SaaS (we will not pivot to "POS for restaurants in the US")
 
-If a feature isn't on the path to "Indian micro-merchant takes their first 100 voice orders without thinking", it's a no.
+If a feature isn't on the path to "an Instagram cloud kitchen takes, gets paid for and delivers a batch of orders with less DM work" (`docs/ICP.md`), it's a no. The voice counter POS is maintained but no longer the first filter.
 
 ---
 

@@ -9,6 +9,7 @@ Index of the operational and planning docs. Code wins wherever a doc disagrees w
 | [`../CLAUDE.md`](../CLAUDE.md) | Working conventions: commands, deploy topology, the two Redis surfaces, money, tenancy, PII |
 | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | System diagrams, data model, ADRs |
 | [`../TODO.md`](../TODO.md) | Open items, each with where the code is and how to verify it |
+| [`ICP.md`](ICP.md) | Who we build for (Instagram cloud kitchens), what fits them today, gaps in order |
 
 ## Operations
 

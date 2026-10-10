@@ -22,8 +22,9 @@ describe("plan marketing copy", () => {
     expect(copy.label).toBe(limits.label);
     expect(copy.amount).toBe(formatINRCompact(PLAN_PRICES_PAISE[plan]));
 
-    expect(limits.monthlyTxnCap).not.toBeNull();
-    expect(copy.bullets).toContain(`${limits.monthlyTxnCap} bills a month`);
+    expect(copy.bullets).toContain(
+      limits.monthlyTxnCap === null ? "Unlimited bills" : `${limits.monthlyTxnCap} bills a month`,
+    );
     expect(copy.bullets).toContain(`${limits.analyticsDays} days of sales analytics`);
 
     // Every number in the copy must be one PLAN_LIMITS / price actually holds.
@@ -35,6 +36,16 @@ describe("plan marketing copy", () => {
     for (const n of text.match(/\d+/g) ?? []) {
       expect(allowed, `unexpected number "${n}" in ${plan} copy`).toContain(n);
     }
+  });
+
+  it.each(MARKETED_PLANS)("%s price says + GST iff it is paid (prices exclude GST)", (plan) => {
+    const paid = PLAN_PRICES_PAISE[plan] > 0;
+    expect(PLAN_MARKETING[plan].price.endsWith("+ GST")).toBe(paid);
+    expect(PLAN_MARKETING[plan].taxNote).toBe(paid ? "+ GST" : null);
+  });
+
+  it("Starter is unlimited (matches the 30-day trial)", () => {
+    expect(PLAN_LIMITS.STARTER.monthlyTxnCap).toBeNull();
   });
 
   it.each(MARKETED_PLANS)("%s copy never promises staff logins (maxStaff is unenforced)", (plan) => {

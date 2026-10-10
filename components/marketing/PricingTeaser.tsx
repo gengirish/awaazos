@@ -31,7 +31,10 @@ export function PricingTeaser() {
                 <p className="mt-2 font-display text-3xl font-bold text-awaaz-charcoal">
                   {tier.amount}
                   {tier.period ? (
-                    <span className="text-base font-normal text-muted-foreground">{tier.period}</span>
+                    <span className="text-base font-normal text-muted-foreground">
+                      {tier.period}
+                      {tier.taxNote ? ` ${tier.taxNote}` : null}
+                    </span>
                   ) : null}
                 </p>
               </CardHeader>

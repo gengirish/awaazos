@@ -43,11 +43,13 @@ export const PLAN_LIMITS: Record<
   STARTER: {
     label: "Starter",
     pricePaise: 29900,
-    txnPerMonth: 500,
+    // Unlimited: STARTER is the one paid tier and matches the 30-day trial
+    // (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md), so converting changes nothing.
+    txnPerMonth: null,
     maxStaff: 3,
     whatsappReceipts: true,
     razorpayLinks: false,
-    monthlyTxnCap: 500,
+    monthlyTxnCap: null,
     whatsapp: true,
     csvExport: true,
     sarvamStt: true,
@@ -146,6 +148,21 @@ export const PLAN_PRICES_PAISE: Record<Plan, number> = {
   PRO: 79900,
   ENTERPRISE: 0,
 };
+
+/**
+ * Per-plan SaaS price in paise for yearly billing (10× monthly — two months
+ * free). Only plans that can be bought yearly are listed.
+ */
+export const PLAN_PRICES_YEARLY_PAISE: Partial<Record<Plan, number>> = {
+  STARTER: 299000,
+};
+
+/**
+ * GST on the SaaS subscription, in basis points (18%). Prices above are
+ * exclusive of it; the Razorpay plan amount is base + GST
+ * (`subscriptionChargePaise` in lib/subscription.ts).
+ */
+export const GST_BPS = 1800;
 
 /** Plan ordering for subscription gates (higher = better). */
 export const PLAN_RANK: Record<Plan, number> = {

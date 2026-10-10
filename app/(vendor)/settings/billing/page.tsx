@@ -73,7 +73,7 @@ export default async function BillingSettingsPage() {
           <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
             <h2 className="font-medium">Invoices</h2>
             <p className="mt-2 text-sm text-muted-foreground">
-              Invoice PDFs and history live in your Razorpay merchant dashboard for the linked account.
+              Prices are exclusive of 18% GST. Razorpay emails a receipt for every charge.
             </p>
           </section>
 
@@ -82,6 +82,7 @@ export default async function BillingSettingsPage() {
             <BillingManageClient
               currentPlan={vendor.plan}
               hasRazorpaySubscription={Boolean(settings?.razorpaySubId)}
+              cancelAtEnd={settings?.razorpaySubCancelAtEnd ?? false}
             />
           </section>
         </div>
