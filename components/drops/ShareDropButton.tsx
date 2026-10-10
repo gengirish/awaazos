@@ -3,10 +3,12 @@
 import { Check, Copy, MessageCircle, Share2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { InstagramStoryButton } from "@/components/drops/InstagramStoryButton";
 import { buildDropShareText, buildWhatsAppShareUrl } from "@/lib/drops-share";
 import { cn } from "@/lib/utils";
 
 export type ShareDropButtonProps = {
+  dropId: string;
   vendorName: string;
   vendorSlug: string;
   dropTitle: string;
@@ -23,11 +25,13 @@ const baseBtn =
 /**
  * Vendor-side "share today's menu" control. The native share sheet is the
  * primary path on Android/iOS; desktop browsers without it fall back to a
- * wa.me link. Every navigator call is best-effort: a dismissed share sheet
+ * wa.me link. "Instagram story" makes a 1080×1920 image of the drop
+ * (InstagramStoryButton). Every navigator call is best-effort: a dismissed share sheet
  * (AbortError) or a blocked clipboard is not an error the vendor needs to see.
  */
 export function ShareDropButton(props: ShareDropButtonProps) {
   const {
+    dropId,
     vendorName,
     vendorSlug,
     dropTitle,
@@ -127,6 +131,7 @@ export function ShareDropButton(props: ShareDropButtonProps) {
           <MessageCircle className="h-4 w-4" aria-hidden="true" />
           WhatsApp
         </button>
+        <InstagramStoryButton dropId={dropId} url={url} className={baseBtn} onStatus={setStatus} />
       </div>
       <p aria-live="polite" role="status" className="min-h-5 text-xs text-muted-foreground">
         {status}

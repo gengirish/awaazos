@@ -83,7 +83,10 @@ and approved marketing templates first. The customer-initiated design in 3.2 avo
 
 ## 2. Packaging contradicts the customer we sell to
 
-Stated ICP does ~200 sales/day (~5,200/month). Limits live in `PLAN_LIMITS` (`lib/constants.ts`).
+**ICP changed 2026-10-09** to Instagram cloud kitchens (`docs/ICP.md`): roughly 10–80 orders per
+batch or day, so STARTER's 500/month now fits and the "10× below the ICP" point below applies only
+to the old street-stall ICP (~200 sales/day). FREE's 50/month is still only about two batches.
+Limits live in `PLAN_LIMITS` (`lib/constants.ts`).
 
 - **FREE is 50 txn/month** — about four hours of trading. A habit cannot form before the wall
   arrives. Competing free trials in this market run 14 days, unlimited.
@@ -117,7 +120,8 @@ spend on vendors who would never convert.
 
 ## 3. Conditional on the repositioning decision
 
-Only start these if the two-week discovery test says the fire is real.
+**Decided 2026-10-09:** repositioned to Instagram cloud kitchens (`docs/ICP.md`). The items below
+were built ahead of that decision; their verification steps still stand.
 
 ### 3.1 Storefront link inside the WhatsApp receipt
 **Status:** implemented on `feat/home-kitchen-drops`; delivery still unverified (blocked by 1.1).

@@ -1,7 +1,7 @@
 # AwaazOS — Bol. Bill. Becho.
 
-> **Voice-first POS + digital billing for India's 60 million small vendors.**
-> Speak the order in Hindi or English → instant UPI QR → WhatsApp receipt → live sales dashboard. ₹0 to start.
+> **Pre-orders and billing for India's Instagram cloud kitchens.**
+> Post a batch with a cut-off → buyers order from your link in bio → paid by UPI → cook list and delivery list on the day. Voice POS for counter sales. ₹0 to start.
 
 [![Live](https://img.shields.io/badge/live-awaazos.vercel.app-brightgreen)](https://awaazos.vercel.app)
 [![Stack](https://img.shields.io/badge/stack-Next.js%2014%20%C2%B7%20Auth.js%20%C2%B7%20Neon%20%C2%B7%20Claude%204.5-blueviolet)](#-tech-stack)
@@ -36,7 +36,21 @@
 
 ---
 
-## 🌶️ The problem
+## 🎯 Who it's for
+
+**Instagram-based cloud kitchens**: home bakers, meal-box kitchens, snack and sweet makers who find
+buyers on Instagram and sell direct, not through Swiggy or Zomato. Today their orders live in DMs,
+payments are UPI screenshots, and the cook list is a notebook. Full profile, fit and gaps:
+[docs/ICP.md](./docs/ICP.md).
+
+What they use: the storefront `/s/[slug]` as their link in bio, **Drops** (a batch with a cut-off
+and capped stock), UPI / pay-on-delivery / their own Razorpay, the orders board and prep sheet,
+Web Push alerts, and a ready-made Instagram story image for each drop.
+
+The sections below describe the original counter-POS wedge (street stalls and kiranas). That
+product still ships and still works; it is no longer who we build for first.
+
+## 🌶️ The problem (original counter-POS wedge)
 
 India has **63 million MSMEs** and **~25 million micro-merchants** — chai walas, dosa carts, kirana shops, samosa stalls, paan shops. They:
 
@@ -78,6 +92,7 @@ All of this on a phone, in <8 seconds per transaction. **Hindi + English at MVP.
 - 🏢 **Multi-tenant** — `vendorId` scoping enforced on every query, two-layer RBAC (platform `UserRole` + per-tenant `StaffRole`)
 - 💸 **Razorpay subscriptions** — ₹299/mo per vendor, FREE up to 50 transactions a month, plan gates with `PlanGateError(402)` returning structured upgrade prompts
 - 🛍️ **Public storefront + Drops** — opt-in `/s/[slug]` page where buyers order from the everyday menu or from a pre-order "drop" (cut-off, capped stock, orders board, prep sheet). Payment by UPI + UTR, pay on delivery, or the vendor's own Razorpay keys
+- 📸 **Instagram story image** — one tap on a drop makes a 1080×1920 PNG (items, prices, cut-off, order link) inside Instagram's safe zones, and copies the storefront link for the Link sticker (`GET /api/drops/[id]/story-image`)
 - 🔔 **Web Push alerts** — new storefront orders and submitted UPI references push to the vendor's opted-in devices (`lib/push.ts`, `public/sw.js`)
 - 🇮🇳 **India-first defaults** — IST timezone, DD/MM/YYYY dates, `+91` 10-digit phone validation, `Intl.NumberFormat('en-IN', { currency: 'INR' })`, `libphonenumber-js`
 - 🔐 **Auth.js v5 (NextAuth)** — Edge-split config, JWT sessions, Credentials provider with bcrypt, single `prisma.$transaction` for sign-up
@@ -85,7 +100,8 @@ All of this on a phone, in <8 seconds per transaction. **Hindi + English at MVP.
 
 ### Roadmap
 
-Depth in Hindi, then add Telugu / Kannada / Tamil based on cohort demand. No other features ship until weekly active vendors > 100.
+Driven by [docs/ICP.md](./docs/ICP.md) "Gaps": checkout inside Instagram's in-app browser, DM
+quick replies, delivery hand-off from the prep sheet, then pricing copy for kitchens.
 
 _Also planned, not shipped:_ automated accessibility audits in CI (`@axe-core/playwright` is not installed today — a11y is hand-checked against the `aria-live`, contrast, and chart-data-table work listed above).
 
