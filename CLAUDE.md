@@ -213,6 +213,10 @@ Rules every one of them follows:
   JPEG/PNG/WebP, validate before Blob) are shared with menu photos in `lib/blob-image.ts`; the browser
   shrinks photos first (`lib/image-downscale.ts`). No Blob token → 503. The banner is decorative
   (`alt=""`); without one the header keeps its theme gradient.
+- The vendor's WhatsApp number reaches a public page only through `buyerWhatsappNumber()`
+  (`lib/storefront-order.ts`): `VendorSettings.whatsappNumber`, and only once the vendor opts in
+  with `acceptWhatsappOrders` (default `false`; Settings → Online orders). A saved number is not
+  consent — onboarding pre-fills it from the sign-up phone.
 - Order pages are keyed on `Transaction.orderToken` alone (192-bit random, `generateOrderToken()`),
   always looked up together with the slug's `vendorId`. Never expose or accept a transaction `id`.
 - Every write is IP rate-limited (`makeLimiter` in `lib/ratelimit.ts`; buyer login also per-email).

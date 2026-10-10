@@ -32,6 +32,7 @@ import { formatDropDayLabel, formatFulfilmentWindow } from "@/lib/drops-time";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
 import { prisma } from "@/lib/prisma";
 import {
+  buyerWhatsappNumber,
   dropHasStock,
   formatIstDeadline,
   formatTimeLeft,
@@ -39,7 +40,6 @@ import {
   STOREFRONT_MENU_ITEM_WHERE,
   storefrontDropVisibility,
   type StorefrontDropVisibility,
-  whatsappChatLink,
 } from "@/lib/storefront-order";
 import { qrSvgDataUrl } from "@/lib/qr";
 import { buildUpiCollectLink } from "@/lib/upi";
@@ -131,6 +131,7 @@ const loadStorefront = cache(async (slug: string) => {
           acceptPayOnDelivery: true,
           acceptMenuOrders: true,
           whatsappNumber: true, // presence only — reduced to a boolean below
+          acceptWhatsappOrders: true,
           menuFulfilmentMode: true,
           menuDeliveryFeePaise: true,
           menuPickupNote: true,
@@ -498,8 +499,8 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
     upi: !!vendor.upiId,
     cod: vendor.settings?.acceptPayOnDelivery ?? false,
   };
-  // Usable number → checkout also offers "send on WhatsApp". Only the boolean reaches the client.
-  const whatsapp = !!(vendor.settings?.whatsappNumber && whatsappChatLink(vendor.settings.whatsappNumber, ""));
+  // Opted in with a usable number → checkout also offers "send on WhatsApp". Only the boolean reaches the client.
+  const whatsapp = buyerWhatsappNumber(vendor.settings) !== null;
   const menuCategories: MenuOrderCategory[] = categories.map(([category, items], i) => ({
     category,
     anchor: categoryAnchor(category, i),

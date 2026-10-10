@@ -13,6 +13,7 @@ import { formatINR, paiseToRupees } from "@/lib/currency";
 import { orderDisplayState, PENDING_HOLD_MINUTES } from "@/lib/drops";
 import { formatFulfilmentWindow, formatIstDate, formatIstTime } from "@/lib/drops-time";
 import {
+  buyerWhatsappNumber,
   formatWhatsAppOrderMessage,
   holdMinutesLeft,
   orderStatusLabel,
@@ -111,6 +112,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
             select: {
               theme: true,
               whatsappNumber: true,
+              acceptWhatsappOrders: true,
               fssaiNumber: true,
               menuPickupNote: true,
               razorpayKeyId: true,
@@ -194,9 +196,10 @@ export default async function StorefrontOrderPage(props: {
   const minsLeft = awaitingUpi ? holdMinutesLeft(order.createdAt, PENDING_HOLD_MINUTES, now) : 0;
   const payOnline = awaitingUpi && minsLeft > 0 && isOnlinePaymentEnabled(vendor, vendor.settings, now);
 
-  const waLink = vendor.settings?.whatsappNumber
+  const waNumber = buyerWhatsappNumber(vendor.settings);
+  const waLink = waNumber
     ? whatsappChatLink(
-        vendor.settings.whatsappNumber,
+        waNumber,
         formatWhatsAppOrderMessage({
           vendorName: vendor.name,
           billNumber: order.billNumber,

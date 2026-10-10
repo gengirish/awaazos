@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { MenuOrdersClient } from "@/components/settings/MenuOrdersClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
+import { WhatsappOrdersClient } from "@/components/settings/WhatsappOrdersClient";
 import { prisma } from "@/lib/prisma";
 
 import { requireSettingsContext } from "../_context";
@@ -22,6 +23,8 @@ export default async function OrdersSettingsPage() {
       menuFulfilmentMode: true,
       menuDeliveryFeePaise: true,
       menuPickupNote: true,
+      whatsappNumber: true,
+      acceptWhatsappOrders: true,
     },
   });
 
@@ -39,6 +42,14 @@ export default async function OrdersSettingsPage() {
             initialFulfilmentMode={settings?.menuFulfilmentMode ?? "PICKUP"}
             initialDeliveryFeePaise={settings?.menuDeliveryFeePaise ?? 0}
             initialPickupNote={settings?.menuPickupNote ?? null}
+            isOwner={isOwner}
+          />
+        </SettingsCard>
+
+        <SettingsCard title="WhatsApp orders">
+          <WhatsappOrdersClient
+            initialWhatsappNumber={settings?.whatsappNumber ?? null}
+            initialAcceptWhatsappOrders={settings?.acceptWhatsappOrders ?? false}
             isOwner={isOwner}
           />
         </SettingsCard>

@@ -558,6 +558,19 @@ export function whatsappChatLink(number: string, text: string): string | null {
   return `https://wa.me/${digits}?text=${encodeURIComponent(text)}`;
 }
 
+/**
+ * The vendor's WhatsApp number as buyers may see it, or null. Public pages
+ * (`/s/[slug]`, `/s/[slug]/o/[token]`) must go through this: the number is only
+ * shown once the vendor has opted in (`acceptWhatsappOrders`, default off) and
+ * only when it makes a working wa.me link. Never `Vendor.phone`.
+ */
+export function buyerWhatsappNumber(
+  settings: { acceptWhatsappOrders?: boolean | null; whatsappNumber?: string | null } | null | undefined,
+): string | null {
+  if (!settings?.acceptWhatsappOrders || !settings.whatsappNumber) return null;
+  return whatsappChatLink(settings.whatsappNumber, "") ? settings.whatsappNumber : null;
+}
+
 export type WhatsAppOrderMessageInput = {
   vendorName: string;
   billNumber: string;
