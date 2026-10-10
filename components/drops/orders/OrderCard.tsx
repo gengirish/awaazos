@@ -28,6 +28,7 @@ import {
 import { formatINR } from "@/lib/currency";
 import {
   DISPLAY_STATE_LABEL,
+  availableOrderActions,
   firstName,
   whatsappHref,
   type BoardOrder,
@@ -44,6 +45,12 @@ type Props = {
   isNew: boolean;
   pendingAction: OrderAction | null;
   onAction: (orderId: string, action: OrderAction) => void;
+  /** Offer a selection checkbox (the order has at least one bulk action). */
+  selectable?: boolean;
+  selected?: boolean;
+  onToggleSelect?: (orderId: string) => void;
+  /** A bulk run is in progress: the card's own buttons wait. */
+  locked?: boolean;
 };
 
 const STATE_STYLE: Record<BoardOrder["displayState"], string> = {
@@ -74,22 +81,33 @@ function StateIcon({ state }: { state: BoardOrder["displayState"] }) {
   }
 }
 
-export function OrderCard({ order, vendorName, frozen, isNew, pendingAction, onAction }: Props) {
+export function OrderCard({
+  order,
+  vendorName,
+  frozen,
+  isNew,
+  pendingAction,
+  onAction,
+  selectable = false,
+  selected = false,
+  onToggleSelect,
+  locked = false,
+}: Props) {
   const [confirmCancel, setConfirmCancel] = useState(false);
-  const busy = pendingAction !== null;
+  const busy = pendingAction !== null || locked;
+  const customerLabel = order.customerName?.trim() || "Customer";
   const fs = order.fulfilmentStatus;
-  const live = fs === "PLACED" || fs === "CONFIRMED";
   const unpaid = order.paymentStatus !== "PAID";
   const isPickup = order.fulfilmentType === "PICKUP";
   const created = new Date(order.createdAt);
   const titleId = `order-${order.id}-title`;
 
-  const canConfirm = fs === "PLACED" && !frozen;
-  const canMarkPaid =
-    fs !== "CANCELLED" && unpaid && (order.paymentMethod !== "CASH" || fs === "DELIVERED");
-  const canDeliver = live;
-  const canUndeliver = fs === "DELIVERED";
-  const canCancel = live && !frozen;
+  const actions = availableOrderActions(order, frozen);
+  const canConfirm = actions.has("confirm");
+  const canMarkPaid = actions.has("mark_paid");
+  const canDeliver = actions.has("deliver");
+  const canUndeliver = actions.has("undeliver");
+  const canCancel = actions.has("cancel");
 
   const deliverLabel =
     order.paymentMethod === "CASH" && unpaid
@@ -118,16 +136,34 @@ export function OrderCard({ order, vendorName, frozen, isNew, pendingAction, onA
       className={cn(
         "rounded-lg border bg-card p-4 text-card-foreground shadow-xs",
         isNew && "ring-2 ring-primary",
+        selected && "border-primary bg-primary/5 ring-2 ring-primary",
         (order.displayState === "CANCELLED" || order.displayState === "EXPIRED") && "opacity-80",
       )}
     >
       <header className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
+        {selectable && onToggleSelect && (
+          <label className="-ml-2 -mt-2 inline-flex min-h-11 min-w-11 shrink-0 cursor-pointer items-center justify-center rounded-md focus-within:ring-2 focus-within:ring-ring">
+            <input
+              type="checkbox"
+              className="h-5 w-5 cursor-pointer accent-primary"
+              checked={selected}
+              onChange={() => onToggleSelect(order.id)}
+              disabled={locked}
+              aria-label={`Select order ${order.billNumber} from ${customerLabel}`}
+            />
+          </label>
+        )}
+        <div className="min-w-0 flex-1">
           <h3 id={titleId} className="truncate text-base font-semibold">
-            {order.customerName?.trim() || "Customer"}
+            {customerLabel}
             {isNew && (
               <span className="ml-2 rounded bg-primary px-1.5 py-0.5 align-middle text-xs font-bold text-primary-foreground">
                 New
+              </span>
+            )}
+            {selected && (
+              <span className="ml-2 rounded border border-primary px-1.5 py-0.5 align-middle text-xs font-bold">
+                Selected
               </span>
             )}
           </h3>
