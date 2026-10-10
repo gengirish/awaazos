@@ -7,6 +7,7 @@ import { cache } from "react";
 
 import { OtherCartsNotice } from "@/components/storefront/OtherCartsNotice";
 import { RazorpayPayButton } from "@/components/storefront/RazorpayPayButton";
+import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
 import { UtrForm } from "@/components/storefront/UtrForm";
 import { formatINR, paiseToRupees } from "@/lib/currency";
 import { orderDisplayState, PENDING_HOLD_MINUTES } from "@/lib/drops";
@@ -36,6 +37,11 @@ export const runtime = "nodejs";
  * Vendor contact PII (`Vendor.phone`, `Vendor.email`) is never selected; the
  * only contact route is the vendor's opted-in WhatsApp business number. The UTR
  * is read only as a boolean ("payment submitted") and never rendered.
+ *
+ * UPI pay: `UpiPayOptions` (client) leads with the generic `upi://` button on
+ * Android and with per-app buttons (GPay / PhonePe / Paytm) on iPhone, where
+ * `upi://` has no app chooser; plus copy-UPI-ID / copy-amount. The QR below is
+ * for scanning from a second phone. Only the vendor VPA and total reach it.
  *
  * When the kitchen has connected her own Razorpay account (PRO plan), "Pay
  * online" is offered above the UPI intent/QR. The buyer's own name and phone
@@ -309,17 +315,13 @@ export default async function StorefrontOrderPage(props: {
             ) : null}
             {upiLink ? (
               <>
-                <a
-                  href={upiLink}
-                  className={cn(
-                    "inline-flex min-h-12 w-full items-center justify-center rounded-xl px-6 text-base font-bold focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2",
-                    payOnline
-                      ? "border border-primary/40 bg-background text-primary"
-                      : "bg-primary text-primary-foreground shadow-md",
-                  )}
-                >
-                  Pay {formatINR(order.totalPaise)} with a UPI app
-                </a>
+                <UpiPayOptions
+                  upiLink={upiLink}
+                  upiId={vendor.upiId ?? ""}
+                  amountPaise={order.totalPaise}
+                  genericLabel={`Pay ${formatINR(order.totalPaise)} with a UPI app`}
+                  emphasis={payOnline ? "secondary" : "primary"}
+                />
                 <div className="mx-auto w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
                   <Image
                     src={qrSrc}
@@ -330,6 +332,9 @@ export default async function StorefrontOrderPage(props: {
                     className="rounded-lg"
                   />
                 </div>
+                <p className="text-xs text-muted-foreground">
+                  Paying from another phone? Scan this QR with it.
+                </p>
                 <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Paying {payeeName} · ref {order.billNumber}
                 </p>
