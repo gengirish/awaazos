@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buyerWhatsappNumber,
   CLOSED_DROP_GRACE_MS,
   dropHasStock,
   formatIstDeadline,
@@ -159,6 +160,24 @@ describe("whatsappChatLink", () => {
   it("rejects unusable numbers", () => {
     expect(whatsappChatLink("12345", "x")).toBeNull();
     expect(whatsappChatLink("", "x")).toBeNull();
+  });
+});
+
+describe("buyerWhatsappNumber", () => {
+  it("is null until the vendor opts in", () => {
+    expect(buyerWhatsappNumber({ acceptWhatsappOrders: false, whatsappNumber: "+919876543210" })).toBeNull();
+    expect(buyerWhatsappNumber({ whatsappNumber: "+919876543210" })).toBeNull();
+    expect(buyerWhatsappNumber(null)).toBeNull();
+    expect(buyerWhatsappNumber(undefined)).toBeNull();
+  });
+
+  it("returns the number once opted in with a usable number", () => {
+    expect(buyerWhatsappNumber({ acceptWhatsappOrders: true, whatsappNumber: "+919876543210" })).toBe("+919876543210");
+  });
+
+  it("is null when opted in but the number is missing or unusable", () => {
+    expect(buyerWhatsappNumber({ acceptWhatsappOrders: true, whatsappNumber: null })).toBeNull();
+    expect(buyerWhatsappNumber({ acceptWhatsappOrders: true, whatsappNumber: "12345" })).toBeNull();
   });
 });
 

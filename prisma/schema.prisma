@@ -63,6 +63,8 @@ model VendorSettings {
   taxPercent               Decimal        @default(0) @db.Decimal(5, 2)
   discountEnabled          Boolean        @default(false)
   whatsappNumber           String? // +91XXXXXXXXXX
+  // Opt-in: buyers may see whatsappNumber (as a wa.me link) on public storefront/order pages.
+  acceptWhatsappOrders     Boolean        @default(false)
   voiceLang                String         @default("en-IN") // hi-IN, te-IN, kn-IN, ta-IN
   receiptFooter            String? // "Thanks for visiting!"
   receiptPaper             ReceiptPaper   @default(MM80) // Width of the printed receipt (/receipts/[bill])

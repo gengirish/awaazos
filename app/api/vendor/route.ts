@@ -11,10 +11,12 @@ import {
   lastPaymentMethodBlockers,
   type PaymentGuardBlocker,
 } from "@/lib/payment-guard";
+import { normaliseIndianMobile } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { requireVendorRole } from "@/lib/rbac";
 import { GSTIN_FORMAT_MESSAGE, GSTIN_PATTERN, RECEIPT_FOOTER_MAX } from "@/lib/receipt";
 import { storeNameSchema } from "@/lib/store-name";
+import { buyerWhatsappNumber } from "@/lib/storefront-order";
 import { UPI_ID_FORMAT_MESSAGE, UPI_ID_PATTERN } from "@/lib/upi";
 
 // Served to cashiers: the encrypted Razorpay secrets must never leave the server
@@ -40,6 +42,8 @@ const patchSchema = z.object({
   upiName: z.string().trim().max(120).optional().nullable(),
   onboardingDone: z.boolean().optional(),
   whatsappNumber: z.string().trim().max(20).optional().nullable(),
+  // Show whatsappNumber to storefront buyers (wa.me links). Off by default.
+  acceptWhatsappOrders: z.boolean().optional(),
   voiceLang: z.enum(SUPPORTED_VOICE_LANGS).optional(),
   publishStorefront: z.boolean().optional(),
   // FSSAI registration/licence numbers are exactly 14 digits. "" clears it.
@@ -81,6 +85,13 @@ const patchSchema = z.object({
 class SettingsConflict extends Error {
   constructor(public readonly code: MenuOrdersBlocker) {
     super(code);
+  }
+}
+
+/** Turning on WhatsApp orders needs a number that makes a working wa.me link. */
+class WhatsappNumberRequired extends Error {
+  constructor() {
+    super("whatsapp_number_required");
   }
 }
 
@@ -145,7 +156,27 @@ export async function PATCH(req: NextRequest) {
 
     const { menuItems, ...vendorFields } = parsed.data;
 
+    // One stored format (E.164 for Indian mobiles) so wa.me links don't depend on how it was typed.
+    if (vendorFields.whatsappNumber) {
+      vendorFields.whatsappNumber = normaliseIndianMobile(vendorFields.whatsappNumber);
+    }
+
     await prisma.$transaction(async (tx) => {
+      if (vendorFields.acceptWhatsappOrders === true) {
+        const number =
+          vendorFields.whatsappNumber !== undefined
+            ? vendorFields.whatsappNumber
+            : (
+                await tx.vendorSettings.findUnique({
+                  where: { vendorId: ctx.vendor.id },
+                  select: { whatsappNumber: true },
+                })
+              )?.whatsappNumber;
+        if (!buyerWhatsappNumber({ acceptWhatsappOrders: true, whatsappNumber: number })) {
+          throw new WhatsappNumberRequired();
+        }
+      }
+
       const touchesPayment = vendorFields.upiId !== undefined || vendorFields.acceptPayOnDelivery !== undefined;
       if (vendorFields.acceptMenuOrders === true || touchesPayment) {
         const current = await tx.vendor.findUnique({
@@ -205,6 +236,9 @@ export async function PATCH(req: NextRequest) {
       const settingsUpdate: Prisma.VendorSettingsUpdateInput = {};
       if (vendorFields.whatsappNumber !== undefined) {
         settingsUpdate.whatsappNumber = vendorFields.whatsappNumber ?? null;
+      }
+      if (vendorFields.acceptWhatsappOrders !== undefined) {
+        settingsUpdate.acceptWhatsappOrders = vendorFields.acceptWhatsappOrders;
       }
       if (vendorFields.voiceLang !== undefined) {
         settingsUpdate.voiceLang = vendorFields.voiceLang;
@@ -278,6 +312,9 @@ export async function PATCH(req: NextRequest) {
   } catch (e) {
     if (e instanceof SettingsConflict) {
       return NextResponse.json({ error: e.code }, { status: 409 });
+    }
+    if (e instanceof WhatsappNumberRequired) {
+      return NextResponse.json({ error: e.message }, { status: 409 });
     }
     if (e instanceof LastPaymentMethodConflict) {
       return NextResponse.json({ error: LAST_PAYMENT_METHOD_ERROR, blockers: e.blockers }, { status: 409 });
