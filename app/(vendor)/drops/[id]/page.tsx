@@ -28,7 +28,7 @@ export default async function DropOrdersPage(props: Props) {
   if (!board) notFound();
 
   return (
-    <main id="main" className="min-h-screen bg-background p-4 pb-16 md:p-6">
+    <main id="main" className="bg-background p-4 pb-16 md:p-6">
       <a href="#orders-list" className="sr-only focus:not-sr-only">
         Skip to orders
       </a>

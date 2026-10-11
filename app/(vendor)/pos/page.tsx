@@ -28,8 +28,14 @@ export default async function PosPage() {
   }
 
   // Trial over and not subscribed: no till. POST /api/transactions enforces it.
+  // `data-pos-page` (here and on PosShell) tells public/sw.js this response is
+  // a fully rendered /pos — the only kind it may keep as the offline copy.
   if (access.kind === "locked") {
-    return <BillingLockedCard since={access.since} staffRole={staffRole} />;
+    return (
+      <div data-pos-page="locked">
+        <BillingLockedCard since={access.since} staffRole={staffRole} />
+      </div>
+    );
   }
 
   const today = getIstTodayStart();
@@ -94,16 +100,13 @@ export default async function PosPage() {
         vendor={{
           id: vendorRecord.id,
           name: vendorRecord.name,
-          slug: vendorRecord.slug,
           upiId: vendorRecord.upiId,
           upiName: vendorRecord.upiName,
-          storefrontPublished: s?.publishStorefront ?? false,
         }}
         initialItems={initialItems}
         settings={settings}
         todaysRevenuePaise={todaysRevenuePaise}
         renderedAt={new Date().toISOString()}
-        staffRole={staffRole}
       />
     </>
   );

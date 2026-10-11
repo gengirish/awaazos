@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { OrdersBoard } from "@/components/drops/orders/OrdersBoard";
@@ -33,15 +32,10 @@ export default async function OnlineOrdersPage() {
   ]);
 
   return (
-    <main id="main" className="min-h-screen bg-background p-4 pb-16 md:p-6">
+    <main id="main" className="bg-background p-4 pb-16 md:p-6">
       <a href="#orders-list" className="sr-only focus:not-sr-only">
         Skip to orders
       </a>
-      <nav aria-label="Breadcrumb" className="mx-auto mb-3 max-w-3xl text-sm">
-        <Link href="/pos" className="inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline">
-          ← Back to POS
-        </Link>
-      </nav>
       <OrdersBoard
         vendorName={ctx.vendor.name}
         vendorSlug={ctx.vendor.slug}

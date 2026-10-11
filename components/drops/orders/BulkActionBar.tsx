@@ -69,7 +69,7 @@ export function BulkActionBar({ selectedCount, counts, pending, targetsFor, onRu
     <div
       role="region"
       aria-label="Bulk actions"
-      className="sticky bottom-0 z-10 -mx-4 mt-4 border-t bg-background px-4 py-3 shadow-lg"
+      className="sticky bottom-[var(--app-bottom-inset,0px)] z-10 -mx-4 mt-4 border-t bg-background px-4 py-3 shadow-lg"
     >
       <div className="flex flex-wrap items-center gap-2">
         <p className="mr-auto text-sm font-semibold" aria-live="polite" aria-atomic="true">

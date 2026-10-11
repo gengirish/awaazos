@@ -94,7 +94,7 @@ export default async function DropPrepPage(props: Props) {
   const notFrozen = drop.status !== "FROZEN" && drop.status !== "FULFILLED";
 
   return (
-    <main id="main" className="min-h-screen bg-background p-4 pb-16 text-foreground md:p-6 print:min-h-0 print:p-0">
+    <main id="main" className="bg-background p-4 pb-16 text-foreground md:p-6 print:p-0">
       <div className="mx-auto max-w-3xl print:max-w-none">
         <nav aria-label="Breadcrumb" className="mb-3 flex flex-wrap items-center justify-between gap-2 print:hidden">
           <Link

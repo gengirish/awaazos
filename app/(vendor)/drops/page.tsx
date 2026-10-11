@@ -59,22 +59,13 @@ export default async function DropsPage() {
   const { upcoming, past } = groupDropsByDay(rows, istTodayYmd(now));
 
   return (
-    <div className="min-h-screen bg-background p-4 pb-10 md:p-6">
-      <a
-        href="#main-drops"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-100 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground"
-      >
-        Skip to drops
-      </a>
+    <div className="bg-background p-4 pb-10 md:p-6">
       <header className="mx-auto mb-6 flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-foreground">Drops</h1>
           <p className="text-sm text-muted-foreground">Daily pre-order menus. Customers order ahead, you cook once.</p>
         </div>
         <div className="flex gap-2">
-          <Link href="/pos" className={linkBtn}>
-            Back to POS
-          </Link>
           <Link
             href="/drops/new"
             className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:flex-none"

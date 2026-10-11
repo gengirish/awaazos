@@ -15,7 +15,7 @@ export function BillingLockedCard({ since, staffRole }: { since: Date; staffRole
   const starter = PLAN_MARKETING.STARTER;
   const isOwner = staffRole === "OWNER";
   return (
-    <main className="mx-auto flex min-h-screen max-w-lg flex-col justify-center px-4 py-10">
+    <main className="mx-auto flex min-h-[70dvh] max-w-lg flex-col justify-center px-4 py-10">
       <section className="rounded-xl border bg-card p-6 shadow-xs" aria-labelledby="billing-locked-heading">
         <h1 id="billing-locked-heading" className="font-display text-2xl font-semibold">
           Subscribe to keep selling

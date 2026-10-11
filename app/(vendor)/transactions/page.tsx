@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { TransactionsTable } from "@/components/transactions/TransactionsTable";
@@ -50,21 +49,13 @@ export default async function TransactionsPage(props: Props) {
   }
 
   return (
-    <div className="min-h-screen bg-background p-4 pb-10 md:p-6">
-      <header className="mx-auto mb-6 flex max-w-5xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">Transactions</h1>
-          <p className="text-sm text-muted-foreground">Bills and payments for {ctx.vendor.name}</p>
-        </div>
-        <Link
-          href="/pos"
-          className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-        >
-          Back to POS
-        </Link>
+    <div className="bg-background p-4 pb-10 md:p-6">
+      <header className="mx-auto mb-6 max-w-5xl">
+        <h1 className="font-display text-2xl font-bold text-foreground">Transactions</h1>
+        <p className="text-sm text-muted-foreground">Bills and payments for {ctx.vendor.name}</p>
       </header>
 
-      <div className="mx-auto max-w-5xl">
+      <main id="main" className="mx-auto max-w-5xl">
         <TransactionsTable
           initialItems={items}
           initialTotal={total}
@@ -76,7 +67,7 @@ export default async function TransactionsPage(props: Props) {
           canExportCsv={PLAN_LIMITS[ctx.vendor.plan].csvExport || ctx.access.kind === "locked"}
           defaultExportRange={defaultExportRange}
         />
-      </div>
+      </main>
     </div>
   );
 }

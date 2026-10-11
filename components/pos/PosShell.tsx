@@ -1,10 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PaymentMethod, type StaffRole } from "@prisma/client";
+import { PaymentMethod } from "@prisma/client";
 
 import { PosHeader } from "@/components/pos/PosHeader";
-import { PosNav } from "@/components/pos/PosNav";
 import { PosSyncStatus } from "@/components/pos/PosSyncStatus";
 import { QuickAddGrid, type MenuTile } from "@/components/pos/QuickAddGrid";
 import { OrderCart, type PosSettings } from "@/components/pos/OrderCart";
@@ -21,19 +20,14 @@ export type PosShellProps = {
   vendor: {
     id: string;
     name: string;
-    slug: string;
     upiId: string | null;
     upiName: string | null;
-    /** `VendorSettings.publishStorefront` — the store link is shown only when true. */
-    storefrontPublished: boolean;
   };
   initialItems: MenuTile[];
   settings: PosSettings & { voiceLang: string; autoPrintReceipt: boolean };
   todaysRevenuePaise: number;
   /** ISO time the server rendered this page; shown as "menu as of" when offline. */
   renderedAt: string;
-  /** Role of the signed-in staff member at this vendor; trims the nav for cashiers. */
-  staffRole: StaffRole;
 };
 
 export function PosShell({
@@ -42,7 +36,6 @@ export function PosShell({
   settings,
   todaysRevenuePaise,
   renderedAt,
-  staffRole,
 }: PosShellProps) {
   const items = useCartStore((s) => s.items);
   const online = useOnline();
@@ -113,20 +106,17 @@ export function PosShell({
   };
 
   return (
-    <div className="mx-auto min-h-screen max-w-lg px-4 pb-[calc(7rem+env(safe-area-inset-bottom))] pt-4 md:max-w-6xl md:pb-10 md:pt-6">
-      <a
-        href="#main-pos"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-100 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground"
-      >
-        Skip to main content
-      </a>
-      <PosNav staffRole={staffRole} />
+    // Navigation, the skip link and Sign out come from the app shell
+    // (components/shell). `pb-28` clears the phone checkout bar, which sits on
+    // top of the shell's tab bar; the shell pads for the tab bar itself.
+    <div
+      data-pos-page="ready"
+      className="mx-auto max-w-lg px-4 pb-28 pt-4 md:max-w-6xl md:pb-10 md:pt-6"
+    >
       <PosHeader
         stallName={vendor.name}
         todaysRevenuePaise={todaysRevenuePaise}
         pendingPaise={outbox.pendingTodayPaise}
-        storePath={vendor.storefrontPublished ? `/s/${encodeURIComponent(vendor.slug)}` : null}
-        vendorId={vendor.id}
       />
       <PosSyncStatus
         online={online}

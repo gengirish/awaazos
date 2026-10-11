@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { ExternalLink, Eye, EyeOff, Settings } from "lucide-react";
+import { Eye, EyeOff } from "lucide-react";
 
-import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
 import { formatINR } from "@/lib/currency";
 
 export type PosHeaderProps = {
@@ -12,14 +10,7 @@ export type PosHeaderProps = {
   todaysRevenuePaise: number;
   /** Today's sales saved on this device that haven't synced yet. */
   pendingPaise?: number;
-  /** Public storefront path (`/s/<slug>`); omitted when the store isn't published. */
-  storePath?: string | null;
-  /** Active vendor; lets Sign out warn about this device's unsynced sales. */
-  vendorId?: string;
 };
-
-const ICON_BTN =
-  "flex h-11 min-w-[44px] items-center justify-center gap-1.5 whitespace-nowrap rounded-md border border-input bg-background px-3 text-sm font-medium text-foreground ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
 /** Per-device preference: hide today's takings from a customer looking at the screen. */
 const HIDE_REVENUE_KEY = "awz_pos_hide_revenue_v1";
@@ -41,7 +32,11 @@ function writeHidden(hidden: boolean): void {
   }
 }
 
-export function PosHeader({ stallName, todaysRevenuePaise, pendingPaise = 0, storePath, vendorId }: PosHeaderProps) {
+/**
+ * Store name and today's takings. Settings, Live store and Sign out used to
+ * sit here; they are in the app shell's navigation now (components/shell).
+ */
+export function PosHeader({ stallName, todaysRevenuePaise, pendingPaise = 0 }: PosHeaderProps) {
   // Default shown; the stored preference is applied after mount so the server
   // render and the first client render agree. Until it has been read
   // (`prefLoaded`), the amount is masked so a vendor who chose "hidden" never
@@ -65,7 +60,7 @@ export function PosHeader({ stallName, todaysRevenuePaise, pendingPaise = 0, sto
   };
 
   return (
-    <header className="flex items-start justify-between gap-3 border-b border-border pb-4">
+    <header className="border-b border-border pb-4">
       <div className="min-w-0">
         <h1 className="font-display text-xl font-semibold text-foreground">{stallName}</h1>
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Today (IST)</p>
@@ -98,19 +93,6 @@ export function PosHeader({ stallName, todaysRevenuePaise, pendingPaise = 0, sto
         {pendingPaise > 0 && !masked ? (
           <p className="text-xs text-muted-foreground">incl. {formatINR(pendingPaise)} not yet synced</p>
         ) : null}
-      </div>
-      <div className="flex items-center gap-2">
-        {storePath ? (
-          <a href={storePath} target="_blank" rel="noopener noreferrer" className={ICON_BTN}>
-            <ExternalLink className="h-4 w-4" aria-hidden />
-            Live store
-            <span className="sr-only"> (opens in a new tab)</span>
-          </a>
-        ) : null}
-        <Link href="/settings" className={ICON_BTN} aria-label="Settings">
-          <Settings className="h-5 w-5" aria-hidden />
-        </Link>
-        <VendorSignOutButton variant="icon" vendorId={vendorId} storeName={stallName} />
       </div>
     </header>
   );

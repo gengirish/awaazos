@@ -7,8 +7,8 @@ import { AuthError, requireVendorRole } from "@/lib/rbac";
  * Every Settings page is readable by any staff member (CASHIER+); owner-only
  * controls are disabled in the client components. Signed-out → /sign-in.
  *
- * Wrapped in React `cache` so the settings layout (Sign out button) and the
- * page share one lookup per request.
+ * Wrapped in React `cache` so everything rendering one settings page shares
+ * one lookup per request.
  */
 export const requireSettingsContext = cache(async () => {
   try {

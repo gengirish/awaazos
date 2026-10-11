@@ -18,7 +18,9 @@ export type StickyCheckoutBarProps = {
 };
 
 /**
- * Phone-only checkout bar pinned to the bottom of /pos (`md:hidden`). Below md
+ * Phone-only checkout bar pinned just above the app shell's tab bar on /pos
+ * (`md:hidden`; `--app-bottom-inset` is set by `.app-shell` in globals.css,
+ * and the tab bar below it owns the safe-area inset). Below md
  * this holds the only visible "Collect payment" button; OrderCart's own button
  * takes over at md and up. Always rendered on phones so the thumb target never
  * moves — disabled while the cart is empty.
@@ -38,7 +40,7 @@ export function StickyCheckoutBar({ settings, onCollectPayment }: StickyCheckout
 
   return (
     <div
-      className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/95 px-4 pt-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm pb-[calc(0.75rem+env(safe-area-inset-bottom))] supports-backdrop-filter:bg-background/80 md:hidden"
+      className="fixed inset-x-0 bottom-[var(--app-bottom-inset,0px)] z-40 border-t border-border bg-background/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm supports-backdrop-filter:bg-background/80 md:hidden"
       data-testid="sticky-checkout-bar"
     >
       <div className="mx-auto flex max-w-lg items-center gap-3">

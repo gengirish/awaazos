@@ -857,7 +857,7 @@ export function DropForm({
       ) : null}
 
       {!locked ? (
-        <div className="sticky bottom-0 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm">
+        <div className="sticky bottom-[var(--app-bottom-inset,0px)] -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm">
           <Button type="submit" size="lg" className="min-h-12 w-full text-base" disabled={pending}>
             {pending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
             {pending ? "Saving…" : dropId ? "Save changes" : "Create drop"}
