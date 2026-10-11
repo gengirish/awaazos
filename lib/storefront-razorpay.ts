@@ -289,6 +289,7 @@ export async function findStorefrontOrderForPayment(slug: string, token: string)
       paymentStatus: true,
       fulfilmentStatus: true,
       upiRef: true,
+      paymentClaimedAt: true,
       createdAt: true,
       razorpayOrderId: true,
       vendor: {

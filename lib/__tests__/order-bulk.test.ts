@@ -37,6 +37,22 @@ describe("BULK_ORDER_ACTIONS", () => {
   });
 });
 
+describe("availableOrderActions: Not received", () => {
+  const base = { fulfilmentStatus: "PLACED", paymentStatus: "PENDING", paymentMethod: "UPI" } as const;
+
+  it("is offered only while the buyer's claim is waiting for an answer", () => {
+    expect(availableOrderActions({ ...base, displayState: "PAYMENT_SUBMITTED" }, false).has("reject_payment")).toBe(true);
+    expect(availableOrderActions({ ...base, displayState: "PAYMENT_SUBMITTED" }, true).has("reject_payment")).toBe(true);
+    expect(availableOrderActions({ ...base, displayState: "AWAITING_PAYMENT" }, false).has("reject_payment")).toBe(false);
+    expect(availableOrderActions({ ...base, paymentStatus: "PAID", displayState: "PAID" }, false).has("reject_payment")).toBe(false);
+    expect(availableOrderActions(base, false).has("reject_payment")).toBe(false);
+  });
+
+  it("is never a bulk action", () => {
+    expect(BULK_ORDER_ACTIONS as readonly string[]).not.toContain("reject_payment");
+  });
+});
+
 describe("availableOrderActions (card buttons)", () => {
   it("matches the card rules for a new UPI order", () => {
     expect([...availableOrderActions(o("a", "PLACED"), false)].sort()).toEqual(

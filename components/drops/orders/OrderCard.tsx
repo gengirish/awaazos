@@ -105,6 +105,7 @@ export function OrderCard({
   const actions = availableOrderActions(order, frozen);
   const canConfirm = actions.has("confirm");
   const canMarkPaid = actions.has("mark_paid");
+  const canRejectPayment = actions.has("reject_payment");
   const canDeliver = actions.has("deliver");
   const canUndeliver = actions.has("undeliver");
   const canCancel = actions.has("cancel");
@@ -189,10 +190,19 @@ export function OrderCard({
         {fs === "PLACED" && order.displayState !== "EXPIRED" && " · New"}
       </p>
 
-      {order.displayState === "PAYMENT_SUBMITTED" && order.upiRef && (
+      {order.displayState === "PAYMENT_SUBMITTED" && (
         <div className="mt-3 rounded-md border border-amber-500/60 bg-amber-50 p-3 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          <p className="text-xs font-medium">Buyer says they paid. Match this UTR in your UPI app:</p>
-          <p className="mt-1 select-all break-all font-mono text-lg font-bold tracking-wider">{order.upiRef}</p>
+          {order.upiRef ? (
+            <>
+              <p className="text-xs font-medium">Customer says they paid. Match this UTR in your UPI app:</p>
+              <p className="mt-1 select-all break-all font-mono text-lg font-bold tracking-wider">{order.upiRef}</p>
+            </>
+          ) : (
+            <p className="text-xs font-medium">
+              Customer says they paid {formatINR(order.totalPaise)}. Check your UPI app for that amount, then
+              answer below.
+            </p>
+          )}
         </div>
       )}
 
@@ -263,16 +273,17 @@ export function OrderCard({
         </div>
       )}
 
-      {(canConfirm || canMarkPaid || canDeliver || canUndeliver || canCancel) && (
+      {(canConfirm || canMarkPaid || canRejectPayment || canDeliver || canUndeliver || canCancel) && (
         <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
           {canConfirm && btn("confirm", "Confirm", <CheckCircle2 aria-hidden />, "default")}
           {canMarkPaid &&
             btn(
               "mark_paid",
-              "Mark paid",
+              "Payment received",
               <IndianRupee aria-hidden />,
               order.displayState === "PAYMENT_SUBMITTED" ? "default" : "outline",
             )}
+          {canRejectPayment && btn("reject_payment", "Not received", <XCircle aria-hidden />)}
           {canDeliver && btn("deliver", deliverLabel, isPickup ? <ShoppingBag aria-hidden /> : <Bike aria-hidden />, "secondary")}
           {canUndeliver && btn("undeliver", "Undo delivered", <Undo2 aria-hidden />)}
           {canCancel && (
