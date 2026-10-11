@@ -3,16 +3,16 @@
 import type { PaymentMethod, PaymentStatus } from "@prisma/client";
 
 import { PrintReceiptLink, useReceiptText, WhatsAppReceiptButton } from "@/components/receipts/WhatsAppReceipt";
-import { Badge } from "@/components/ui/badge";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { PaymentMethodBadge, PaymentStatusBadge } from "@/components/transactions/payment-badges";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  ResponsiveDialog,
+  ResponsiveDialogBody,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { formatINR } from "@/lib/currency";
 import { formatIstDateTime } from "@/lib/datetime";
 import { receiptWhatsappUrl } from "@/lib/whatsapp-message";
@@ -51,6 +51,11 @@ type Props = {
   vendorName: string;
 };
 
+/**
+ * One bill's detail: a bottom sheet on phones, a centred dialog from md
+ * (ResponsiveDialog). Items are a stacked list at every width — a four-column
+ * table does not fit a 360px sheet.
+ */
 export function TransactionDetailDrawer({ open, onOpenChange, transaction, vendorName }: Props) {
   const receiptText = useReceiptText(open, { transactionId: transaction?.id });
   // A bad stored number shouldn't block the resend — fall back to WhatsApp's chat picker.
@@ -61,51 +66,43 @@ export function TransactionDetailDrawer({ open, onOpenChange, transaction, vendo
   if (!transaction) return null;
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="flex w-full flex-col overflow-y-auto sm:max-w-lg">
-        <SheetHeader>
-          <SheetTitle>{transaction.billNumber}</SheetTitle>
-          <SheetDescription>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent data-testid="transaction-detail">
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="truncate font-mono text-base">
+            {transaction.billNumber}
+          </ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             {vendorName} · {formatIstDateTime(transaction.createdAt)} IST
-          </SheetDescription>
-        </SheetHeader>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
-        <div className="mt-4 space-y-4">
+        <ResponsiveDialogBody className="space-y-4">
           <div className="flex flex-wrap gap-2">
-            <Badge variant="secondary">{transaction.paymentMethod}</Badge>
-            <Badge
-              variant={
-                transaction.paymentStatus === "PAID"
-                  ? "default"
-                  : transaction.paymentStatus === "PENDING"
-                    ? "outline"
-                    : "destructive"
-              }
-            >
-              {transaction.paymentStatus}
-            </Badge>
+            <PaymentMethodBadge method={transaction.paymentMethod} />
+            <PaymentStatusBadge status={transaction.paymentStatus} />
           </div>
 
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Item</TableHead>
-                <TableHead className="text-right">Qty</TableHead>
-                <TableHead className="text-right">Price</TableHead>
-                <TableHead className="text-right">Line</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+          <section aria-labelledby="tx-detail-items">
+            <h3 id="tx-detail-items" className="mb-2 text-sm font-medium text-foreground">
+              Items
+            </h3>
+            <ul className="divide-y rounded-md border">
               {transaction.orderItems.map((row) => (
-                <TableRow key={row.id}>
-                  <TableCell>{row.name}</TableCell>
-                  <TableCell className="text-right tabular-nums">{row.qty}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatINR(row.priceInPaise)}</TableCell>
-                  <TableCell className="text-right tabular-nums">{formatINR(row.totalPaise)}</TableCell>
-                </TableRow>
+                <li key={row.id} className="flex items-start justify-between gap-3 px-3 py-2.5">
+                  <div className="min-w-0">
+                    <p className="break-words text-sm font-medium text-foreground">{row.name}</p>
+                    <p className="text-sm tabular-nums text-muted-foreground">
+                      {row.qty} × {formatINR(row.priceInPaise)}
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-sm font-medium tabular-nums text-foreground">
+                    {formatINR(row.totalPaise)}
+                  </p>
+                </li>
               ))}
-            </TableBody>
-          </Table>
+            </ul>
+          </section>
 
           <dl className="space-y-1 text-sm">
             <div className="flex justify-between">
@@ -120,7 +117,7 @@ export function TransactionDetailDrawer({ open, onOpenChange, transaction, vendo
               <dt className="text-muted-foreground">Tax</dt>
               <dd className="tabular-nums">{formatINR(transaction.taxPaise)}</dd>
             </div>
-            <div className="flex justify-between font-semibold">
+            <div className="flex justify-between border-t pt-2 text-base font-semibold">
               <dt>Total</dt>
               <dd className="tabular-nums">{formatINR(transaction.totalPaise)}</dd>
             </div>
@@ -129,13 +126,13 @@ export function TransactionDetailDrawer({ open, onOpenChange, transaction, vendo
           {(transaction.customerName || transaction.customerPhone) && (
             <div className="rounded-md border p-3 text-sm">
               <p className="font-medium text-foreground">Customer</p>
-              {transaction.customerName ? <p>{transaction.customerName}</p> : null}
+              {transaction.customerName ? <p className="break-words">{transaction.customerName}</p> : null}
               {transaction.customerPhone ? <p className="font-mono">{transaction.customerPhone}</p> : null}
             </div>
           )}
 
           {transaction.upiRef ? (
-            <p className="font-mono text-xs text-muted-foreground">UPI ref: {transaction.upiRef}</p>
+            <p className="break-all font-mono text-xs text-muted-foreground">UPI ref: {transaction.upiRef}</p>
           ) : null}
 
           {transaction.voiceTranscript ? (
@@ -152,20 +149,24 @@ export function TransactionDetailDrawer({ open, onOpenChange, transaction, vendo
             </p>
           ) : null}
 
-          <WhatsAppReceiptButton
-            url={waUrl}
-            loading={receiptText === undefined}
-            label={transaction.customerPhone?.trim() ? "Resend on WhatsApp" : "Send on WhatsApp"}
-            className="h-11 w-full"
-          />
-          <PrintReceiptLink billNumber={transaction.billNumber} className="h-11 w-full" />
           {receiptText === null ? (
             <p className="text-xs text-muted-foreground" role="status">
               Couldn&apos;t load the receipt. Close and reopen to try again.
             </p>
           ) : null}
-        </div>
-      </SheetContent>
-    </Sheet>
+        </ResponsiveDialogBody>
+
+        {/* Pinned under the scrolling body, so both actions stay in reach on a long bill. */}
+        <ResponsiveDialogFooter className="flex-col md:flex-row">
+          <WhatsAppReceiptButton
+            url={waUrl}
+            loading={receiptText === undefined}
+            label={transaction.customerPhone?.trim() ? "Resend on WhatsApp" : "Send on WhatsApp"}
+            className="h-11 w-full md:flex-1"
+          />
+          <PrintReceiptLink billNumber={transaction.billNumber} className="h-11 w-full md:flex-1" />
+        </ResponsiveDialogFooter>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

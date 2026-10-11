@@ -50,7 +50,7 @@ export default async function TransactionsPage(props: Props) {
 
   return (
     <div className="bg-background p-4 pb-10 md:p-6">
-      <header className="mx-auto mb-6 max-w-5xl">
+      <header className="mx-auto mb-4 max-w-5xl md:mb-6">
         <h1 className="font-display text-2xl font-bold text-foreground">Transactions</h1>
         <p className="text-sm text-muted-foreground">Bills and payments for {ctx.vendor.name}</p>
       </header>
