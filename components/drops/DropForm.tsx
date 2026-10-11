@@ -48,6 +48,21 @@ import type { DropUpsertInput } from "@/lib/zod-drops";
 const inputCls =
   "flex min-h-11 w-full rounded-md border border-input bg-background px-3 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 aria-invalid:border-destructive";
 
+/**
+ * Native date / time pickers. `appearance-none` + `min-w-0` make iOS Safari
+ * honour the full width (its native control keeps an intrinsic width and can
+ * poke out of a narrow grid cell); the 44px floor comes from `inputCls`.
+ */
+const pickerCls = `${inputCls} min-w-0 appearance-none`;
+
+/**
+ * Section heading row. On phones it sticks to the top of the screen while its
+ * section scrolls, so a cook half-way down a long item list still sees where
+ * she is (and how many items are picked). From md it is the plain heading.
+ */
+const sectionHeadCls =
+  "-mx-4 -mt-4 flex flex-wrap items-center justify-between gap-2 rounded-t-xl bg-card px-4 pt-4 max-md:sticky max-md:top-[env(safe-area-inset-top)] max-md:z-10 max-md:border-b max-md:border-border max-md:pb-2 max-md:pt-3";
+
 type Issue = { path: (string | number)[]; message: string };
 type ApiError = { error?: string; issues?: Issue[]; menuItemId?: string };
 
@@ -443,7 +458,14 @@ export function DropForm({
     [fieldErrors[key] ? `${key}-error` : null, hintId].filter(Boolean).join(" ") || undefined;
 
   return (
-    <form onSubmit={submit} noValidate className="space-y-6" aria-busy={pending}>
+    <form
+      onSubmit={submit}
+      noValidate
+      // A field scrolled into view (focus, keyboard, validation) stops clear of
+      // the sticky save bar below and, on phones, the sticky section heading above.
+      className="space-y-6 [&_:is(input,textarea,button,a)]:scroll-mb-24 max-md:[&_:is(input,textarea,button,a)]:scroll-mt-16"
+      aria-busy={pending}
+    >
       {locked ? (
         <p role="status" className="rounded-md border border-border bg-muted/50 p-3 text-sm">
           Orders are frozen, so this drop can&apos;t be edited any more.
@@ -463,9 +485,11 @@ export function DropForm({
       <fieldset disabled={locked || pending} className="space-y-6">
         {/* ── Basics ── */}
         <section aria-labelledby="drop-basics" className="space-y-4 rounded-xl border border-border bg-card p-4">
-          <h2 id="drop-basics" className="font-display text-lg font-semibold">
-            What are you cooking?
-          </h2>
+          <div className={sectionHeadCls}>
+            <h2 id="drop-basics" className="font-display text-lg font-semibold">
+              What are you cooking?
+            </h2>
+          </div>
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <label htmlFor="drop-title" className="text-sm font-medium">
@@ -512,7 +536,7 @@ export function DropForm({
             <input
               id="drop-date"
               type="date"
-              className={inputCls}
+              className={pickerCls}
               value={form.date}
               onChange={(e) => setCookingDate(e.target.value)}
               {...errProps("date")}
@@ -524,7 +548,7 @@ export function DropForm({
 
         {/* ── Fulfilment ── */}
         <section aria-labelledby="drop-fulfilment" className="space-y-4 rounded-xl border border-border bg-card p-4">
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className={sectionHeadCls}>
             <h2 id="drop-fulfilment" className="font-display text-lg font-semibold">
               Delivery or pickup
             </h2>
@@ -562,7 +586,7 @@ export function DropForm({
               <input
                 id="drop-start"
                 type="time"
-                className={inputCls}
+                className={pickerCls}
                 value={form.fulfilmentStart}
                 onChange={(e) => set("fulfilmentStart", e.target.value)}
                 {...errProps("fulfilmentStart")}
@@ -579,7 +603,7 @@ export function DropForm({
               <input
                 id="drop-end"
                 type="time"
-                className={inputCls}
+                className={pickerCls}
                 value={form.fulfilmentEnd}
                 onChange={(e) => set("fulfilmentEnd", e.target.value)}
                 {...errProps("fulfilmentEnd")}
@@ -632,17 +656,19 @@ export function DropForm({
 
         {/* ── Ordering window ── */}
         <section aria-labelledby="drop-window" className="space-y-4 rounded-xl border border-border bg-card p-4">
-          <h2 id="drop-window" className="font-display text-lg font-semibold">
-            When can customers order?
-          </h2>
+          <div className={sectionHeadCls}>
+            <h2 id="drop-window" className="font-display text-lg font-semibold">
+              When can customers order?
+            </h2>
+          </div>
           <fieldset className="space-y-1.5">
             <legend className="text-sm font-medium">Last time to order</legend>
             <FromVoiceBadge show={fromVoice("closesAtDate", "closesAtTime")} />
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 min-[400px]:gap-3">
               <input
                 type="date"
                 aria-label="Order cut-off date"
-                className={inputCls}
+                className={pickerCls}
                 value={form.closesAtDate}
                 onChange={(e) => setOrderWindowDate("closesAtDate", e.target.value)}
                 {...errProps("closesAtDate")}
@@ -651,7 +677,7 @@ export function DropForm({
               <input
                 type="time"
                 aria-label="Order cut-off time"
-                className={inputCls}
+                className={pickerCls}
                 value={form.closesAtTime}
                 onChange={(e) => set("closesAtTime", e.target.value)}
                 {...errProps("closesAtTime")}
@@ -676,11 +702,11 @@ export function DropForm({
             <fieldset className="space-y-1.5">
               <legend className="text-sm font-medium">Orders open at</legend>
               <FromVoiceBadge show={fromVoice("opensAtDate", "opensAtTime")} />
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 gap-2 min-[400px]:grid-cols-2 min-[400px]:gap-3">
                 <input
                   type="date"
                   aria-label="Orders open date"
-                  className={inputCls}
+                  className={pickerCls}
                   value={form.opensAtDate}
                   onChange={(e) => setOrderWindowDate("opensAtDate", e.target.value)}
                   {...errProps("opensAtDate")}
@@ -688,7 +714,7 @@ export function DropForm({
                 <input
                   type="time"
                   aria-label="Orders open time"
-                  className={inputCls}
+                  className={pickerCls}
                   value={form.opensAtTime}
                   onChange={(e) => set("opensAtTime", e.target.value)}
                   {...errProps("opensAtTime")}
@@ -724,7 +750,7 @@ export function DropForm({
 
         {/* ── Items ── */}
         <section aria-labelledby="drop-items" className="space-y-4 rounded-xl border border-border bg-card p-4">
-          <div className="flex items-baseline justify-between gap-2">
+          <div className={sectionHeadCls}>
             <h2 id="drop-items" className="font-display text-lg font-semibold">
               Items
             </h2>
@@ -789,8 +815,11 @@ export function DropForm({
                         </div>
                       ) : null}
                       {r.selected ? (
-                        <div className="mt-3 grid grid-cols-3 gap-2">
-                          <div className="space-y-1">
+                        // Phones: two per row (three 85px inputs cut off "No limit"
+                        // and wrap the labels unevenly). `justify-end` keeps the
+                        // inputs level if a label still wraps.
+                        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                          <div className="flex flex-col justify-end gap-1">
                             <label htmlFor={`price-${id}`} className="text-xs font-medium">
                               Price (₹)
                             </label>
@@ -804,7 +833,7 @@ export function DropForm({
                               aria-describedby={itemErrors[id] ? errorId : undefined}
                             />
                           </div>
-                          <div className="space-y-1">
+                          <div className="flex flex-col justify-end gap-1">
                             <label htmlFor={`max-${id}`} className="text-xs font-medium">
                               How many can you make?
                             </label>
@@ -819,7 +848,7 @@ export function DropForm({
                               aria-describedby={itemErrors[id] ? errorId : undefined}
                             />
                           </div>
-                          <div className="space-y-1">
+                          <div className="flex flex-col justify-end gap-1">
                             <label htmlFor={`limit-${id}`} className="text-xs font-medium">
                               Max per order
                             </label>
@@ -857,7 +886,7 @@ export function DropForm({
       ) : null}
 
       {!locked ? (
-        <div className="sticky bottom-[var(--app-bottom-inset,0px)] -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm">
+        <div className="sticky bottom-[var(--app-bottom-inset,0px)] z-20 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm">
           <Button type="submit" size="lg" className="min-h-12 w-full text-base" disabled={pending}>
             {pending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
             {pending ? "Saving…" : dropId ? "Save changes" : "Create drop"}
