@@ -1,7 +1,8 @@
 # Razorpay subscriptions + 30-day trial — plan
 
 Status: decisions taken 2026-10-09 (see "Decisions"). Phases 0–1 shipped 2026-10-10 (PR #38); the
-live Razorpay plans exist. Phases 2–3 built on `feat/trial-pricing-copy`. Phases 4–5 not started.
+live Razorpay plans exist. Phases 2–3 shipped 2026-10-10 (PR #41): the first trials end
+2026-11-09. Phase 4 built on `feat/subscription-checkout`. Phase 5 not started.
 
 Differences from the plan below, as built:
 
@@ -16,6 +17,11 @@ Differences from the plan below, as built:
   finished.
 - "Second trial on a second vendor" can't happen: sign-up is the only place a vendor is created,
   and it creates exactly one per user.
+- Phase 4: the verify ledger key is `verify:<payment_id>:<status>`, not `verify:<payment_id>`, so
+  a retry after `authenticated` became `active` still applies. The client confirms at most three
+  times, then tells the vendor to refresh; the webhook finishes the job.
+- Phase 4: `POST /api/transactions` bounds the dormant WhatsApp-receipt enqueue to 2 s (found by
+  CI when the trial put every new vendor on a plan with `whatsapp: true`).
 
 Platform SaaS billing: a vendor pays AwaazOS for STARTER through the **platform** Razorpay account
 (`RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`). This is separate from storefront payments, which use

@@ -259,6 +259,15 @@ passes, so Neon can sleep.
   ledger (unique `x-razorpay-event-id`). Transitions are the pure `applySubscriptionEvent`
   (`lib/subscription.ts`): `planExpiresAt` comes from Razorpay's `current_end`, only moves forward,
   and the webhook never downgrades a paying vendor — expiry is lazy.
+- Subscribing happens on the billing page with Razorpay Checkout in place
+  (`components/billing/BillingManageClient.tsx`, loader shared with the storefront in
+  `lib/razorpay-checkout.ts`): `create-subscription` → Checkout → `POST
+  /api/razorpay/verify-subscription`. Verify never trusts the browser: it checks
+  `HMAC(payment_id|subscription_id)` with the platform key secret, requires the subscription to be
+  the one on file for the signed-in vendor (else 404), then reads its state from Razorpay.
+- **One write path:** the webhook and verify both go through `recordSubscriptionEvent`
+  (`lib/subscription-store.ts`), so whichever lands second changes nothing. Don't write
+  `plan` / `planExpiresAt` anywhere else.
 - Marketing copy (`lib/plan-copy.ts`) and the legal pages read the trial length and prices from
   the constants. FREE is not marketed.
 - E2E: new vendors are on the trial. Specs that need another state set it in the database with
