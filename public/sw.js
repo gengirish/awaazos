@@ -33,6 +33,14 @@ var CACHE_VERSION = "v1";
 var STATIC_CACHE = "awz-static-" + CACHE_VERSION;
 var POS_CACHE = "awz-pos-" + CACHE_VERSION;
 var POS_PATH = "/pos";
+/**
+ * Rendered by app/(vendor)/pos/page.tsx once its data has loaded. /pos streams
+ * behind the app shell's loading boundary, so a page whose data failed still
+ * answers 200 (skeleton, then the error screen). Only a response carrying this
+ * marker may replace the offline copy — a bad load must never overwrite the
+ * last good one.
+ */
+var POS_READY_MARKER = "data-pos-page=";
 var OFFLINE_URL = "/offline.html";
 var PRECACHE = [OFFLINE_URL, "/icon-192.png", "/icon-512.png", "/apple-touch-icon.png"];
 /** Old deploys' chunks pile up in the static cache; keep the newest this many. */
@@ -123,6 +131,7 @@ function trimStaticCache(cache) {
  */
 function storePosPage(res) {
   return res.text().then(function (html) {
+    if (html.indexOf(POS_READY_MARKER) === -1) return null;
     var page = new Response(html, { status: 200, headers: new Headers(res.headers) });
     return Promise.all([
       caches.open(POS_CACHE).then(function (c) {
