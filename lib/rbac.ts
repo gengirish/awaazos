@@ -1,6 +1,7 @@
 import type { Plan, StaffRole, UserRole, Vendor } from "@prisma/client";
 import type { NextRequest } from "next/server";
 import { cookies } from "next/headers";
+import { cache } from "react";
 
 import { auth } from "@/lib/auth";
 import { PLAN_RANK } from "@/lib/constants";
@@ -102,6 +103,25 @@ function assertSessionNotStale(
     throw new AuthError(401, "Session expired. Please sign in again.");
   }
 }
+
+/**
+ * The two reads behind `requireVendorRole`, de-duplicated per server render:
+ * the signed-in app shell (app/(vendor)/layout.tsx) and the page under it both
+ * call `requireVendorRole`, and React `cache` lets them share one round-trip.
+ * Only the reads are shared — every caller still runs its own role check.
+ * Outside a React server render (route handlers, workers, tests) `cache` does
+ * not memoise, so API routes read fresh rows on every call, as before.
+ */
+const loadUserById = cache((id: string) => prisma.user.findUnique({ where: { id } }));
+
+const loadActiveMemberships = cache((userId: string) =>
+  prisma.staffMember.findMany({
+    where: { userId, isActive: true },
+    include: { vendor: true },
+    orderBy: { createdAt: "asc" },
+  }),
+);
+
 export async function requirePlatformRole(role: UserRole): Promise<{ user: NonNullable<Awaited<ReturnType<typeof prisma.user.findUnique>>> }> {
   const session = await auth();
   if (!session?.user?.id) {
@@ -145,17 +165,13 @@ export async function requireVendorRole(
     throw new AuthError(401, "Unauthorized");
   }
 
-  const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+  const user = await loadUserById(session.user.id);
   if (!user) {
     throw new AuthError(401, "Unauthorized");
   }
   assertSessionNotStale(user, session.user.tokenIssuedAt);
 
-  const memberships = await prisma.staffMember.findMany({
-    where: { userId: user.id, isActive: true },
-    include: { vendor: true },
-    orderBy: { createdAt: "asc" },
-  });
+  const memberships = await loadActiveMemberships(user.id);
 
   if (!memberships.length) {
     throw new AuthError(403, "No vendor membership.");
