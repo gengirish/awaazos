@@ -304,15 +304,28 @@ const PUBLIC_ROUTES: Route[] = [
   { key: "/s/[slug]", path: (s) => `/s/${s.slug}` },
 ];
 
-async function sweepRoute(page: Page, testInfo: TestInfo, s: Seed, route: Route): Promise<void> {
+async function sweepRoute(
+  page: Page,
+  testInfo: TestInfo,
+  s: Seed,
+  route: Route,
+  opts: { signedIn: boolean },
+): Promise<void> {
   const target = route.path(s);
-  for (const viewport of VIEWPORTS) {
-    await page.setViewportSize(viewport);
-    const res = await page.goto(target, { timeout: 120_000 });
+  for (const [i, viewport] of VIEWPORTS.entries()) {
+    // One page per width. A full-page screenshot of a page taller than the
+    // viewport makes Chromium drop touch emulation for the rest of that page's
+    // life: `(pointer: coarse)` stops matching, so the next width would be
+    // measured (and photographed) with desktop-sized controls.
+    const p = i === 0 ? page : await page.context().newPage();
+    if (i > 0) await prepare(p, opts);
+    await p.setViewportSize(viewport);
+    const res = await p.goto(target, { timeout: 120_000 });
     expect(res?.status(), `${target} should load`).toBeLessThan(400);
-    expect(new URL(page.url()).pathname, `${target} should not redirect`).toBe(target);
-    await settle(page);
-    await judge(page, testInfo, s, route.key, viewport.width, { fullPage: true });
+    expect(new URL(p.url()).pathname, `${target} should not redirect`).toBe(target);
+    await settle(p);
+    await judge(p, testInfo, s, route.key, viewport.width, { fullPage: true });
+    if (i > 0) await p.close();
   }
 }
 
@@ -333,7 +346,7 @@ test.describe("mobile baseline sweep", () => {
       test(`${route.key} — no overflow, 44px tap targets`, async ({ page }, testInfo) => {
         test.setTimeout(300_000);
         const s = await prepare(page, { signedIn: true });
-        await sweepRoute(page, testInfo, s, route);
+        await sweepRoute(page, testInfo, s, route, { signedIn: true });
       });
     }
   });
@@ -343,7 +356,7 @@ test.describe("mobile baseline sweep", () => {
       test(`${route.key} — no overflow, 44px tap targets`, async ({ page }, testInfo) => {
         test.setTimeout(300_000);
         const s = await prepare(page, { signedIn: false });
-        await sweepRoute(page, testInfo, s, route);
+        await sweepRoute(page, testInfo, s, route, { signedIn: false });
       });
     }
   });
