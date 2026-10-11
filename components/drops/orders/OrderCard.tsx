@@ -18,13 +18,14 @@ import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogBody,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { formatINR } from "@/lib/currency";
 import {
   DISPLAY_STATE_LABEL,
@@ -290,22 +291,24 @@ export function OrderCard({
         </div>
       )}
 
-      <Dialog open={confirmCancel} onOpenChange={setConfirmCancel}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cancel {order.customerName?.trim() || "this"}&rsquo;s order?</DialogTitle>
-            <DialogDescription>
+      <ResponsiveDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>Cancel {order.customerName?.trim() || "this"}&rsquo;s order?</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>
               {order.billNumber} · {formatINR(order.totalPaise)}. If they paid, refund them from your UPI
               app. Let them know on WhatsApp.
-            </DialogDescription>
-          </DialogHeader>
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
           {order.paymentStatus === "PAID" && (
-            <p className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm font-medium">
-              This order is marked paid. Cancelling removes {formatINR(order.totalPaise)} from your sales; you
-              must refund the buyer yourself.
-            </p>
+            <ResponsiveDialogBody>
+              <p className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm font-medium">
+                This order is marked paid. Cancelling removes {formatINR(order.totalPaise)} from your sales; you
+                must refund the buyer yourself.
+              </p>
+            </ResponsiveDialogBody>
           )}
-          <DialogFooter className="gap-2">
+          <ResponsiveDialogFooter>
             <Button type="button" variant="outline" className="min-h-11" onClick={() => setConfirmCancel(false)}>
               Keep order
             </Button>
@@ -320,9 +323,9 @@ export function OrderCard({
             >
               Yes, cancel order
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </article>
   );
 }

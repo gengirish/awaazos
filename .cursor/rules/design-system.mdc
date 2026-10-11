@@ -46,8 +46,48 @@ via CSS variables — never hardcode hex in components.
 ## shadcn/ui usage
 
 - Init with `slate` base, `default` style, CSS variables.
-- Customize via CSS vars in `globals.css` — never modify primitives in `components/ui/`.
-- Always pull components via `npx shadcn@latest add <name>` (don't hand-write).
+- Customize colours and radius via CSS vars in `globals.css`.
+- Primitives in `components/ui/` may be edited for **system-wide touch /
+  accessibility defaults** only (sizes, hit areas, motion, safe areas). A
+  one-screen tweak belongs at the call site via `className`. Re-running
+  `npx shadcn@latest add` over an edited primitive drops those edits — diff first.
+- Pull new components via `npx shadcn@latest add <name>` (don't hand-write).
+  The exception is `responsive-dialog.tsx`, which is ours.
+
+## Touch defaults built into the primitives
+
+- **44 px on coarse pointers, by default.** `Button` (`default`, `sm`, `icon`),
+  `Input`, `SelectTrigger` and `SelectItem` carry `touch-target` /
+  `touch-target-square` (defined in `app/globals.css`, `@layer components`,
+  `@media (pointer: coarse)`). Mouse users keep the 36/40 px desktop density.
+  Don't add `min-h-11` to a new `<Button>` to reach 44 px; it already does.
+- The floor is in the components layer on purpose: any utility a call site
+  passes (`h-12`, `min-h-14`) still wins. Don't replace it with
+  `pointer-coarse:min-h-11` in the class list — that variant is emitted after
+  plain utilities and would shrink a `min-h-12` call site on phones.
+- A hand-rolled `<button>` / `<a>` gets no floor: give it `min-h-11` (and
+  `min-w-11` if icon-only) or the `touch-target` class.
+- Dialog / Sheet close buttons are a 44×44 hit area around the 16 px icon.
+
+## Modals
+
+- Use `ResponsiveDialog` (`components/ui/responsive-dialog.tsx`) for any modal a
+  vendor or buyer meets on a phone: bottom sheet below `md`, centred dialog from
+  `md`. Header and Footer stay put, `ResponsiveDialogBody` scrolls.
+- The sheet/dialog switch is CSS breakpoints on one element. Never pick the
+  layout from `useIsDesktop()` / `matchMedia`: swapping component trees remounts
+  the content and loses form state. `hooks/useMediaQuery.ts` is for behaviour
+  (e.g. desktop-only auto-print).
+- Heights in `dvh`, never `vh` (`max-h-[92dvh]`): `vh` ignores mobile browser
+  toolbars and hides the bottom of the modal.
+
+## Safe areas
+
+`app/layout.tsx` sets `viewportFit: "cover"`, so `env(safe-area-inset-*)` is
+live. `body` pads left/right/bottom itself, which covers in-flow and `sticky`
+content. Anything `fixed` is positioned against the viewport and must add its
+own inset: `pb-[max(0.75rem,env(safe-area-inset-bottom))]` on bottom bars,
+`pl-[max(1rem,env(safe-area-inset-left))]` / `pr-[…]` on full-width ones.
 
 ## Spacing scale
 
@@ -58,6 +98,7 @@ Use Tailwind defaults. POS-specific:
 ## Motion
 
 - Respect `prefers-reduced-motion` — disable mic pulse, slide-up sheets become fade
+  (`Sheet` and `ResponsiveDialog` already do: slides are `motion-safe:` only)
 - Transition durations: 150–300 ms
 - Mic listening: Tailwind `motion-safe:animate-pulse` on `VoiceOrderButton`
   (there is no custom `mic-pulse` keyframe)

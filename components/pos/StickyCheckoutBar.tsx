@@ -40,7 +40,7 @@ export function StickyCheckoutBar({ settings, onCollectPayment }: StickyCheckout
 
   return (
     <div
-      className="fixed inset-x-0 bottom-[var(--app-bottom-inset,0px)] z-40 border-t border-border bg-background/95 px-4 py-3 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm supports-backdrop-filter:bg-background/80 md:hidden"
+      className="fixed inset-x-0 bottom-[var(--app-bottom-inset,0px)] z-40 border-t border-border bg-background/95 py-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm supports-backdrop-filter:bg-background/80 md:hidden"
       data-testid="sticky-checkout-bar"
     >
       <div className="mx-auto flex max-w-lg items-center gap-3">

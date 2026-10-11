@@ -79,7 +79,7 @@ function SignUpForm() {
         <CardDescription>One account — your vendor workspace on AwaazOS.</CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit}>
-        <CardContent className="max-h-[70vh] space-y-4 overflow-y-auto pr-1">
+        <CardContent className="max-h-[70dvh] space-y-4 overflow-y-auto pr-1">
           {error ? (
             <p className="text-sm text-destructive" role="alert">
               {error}

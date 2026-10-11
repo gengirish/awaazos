@@ -7,16 +7,16 @@ import { Check, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogBody,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { cashChange, paiseToRupeesInput, parseRupeesInput, quickTenderPaise } from "@/lib/cash-tender";
 import { formatINR, formatINRCompact, paiseToRupees } from "@/lib/currency";
 import { useQrDataUrl } from "@/hooks/useQrDataUrl";
@@ -33,7 +33,6 @@ export type UpiQRModalProps = {
   vendorId: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  isDesktop: boolean;
   stallName: string;
   upiId: string | null;
   upiName: string | null;
@@ -48,7 +47,6 @@ export function UpiQRModal({
   vendorId,
   open,
   onOpenChange,
-  isDesktop,
   stallName,
   upiId,
   upiName,
@@ -328,33 +326,16 @@ export function UpiQRModal({
     </div>
   );
 
-  if (isDesktop) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-h-[90vh] overflow-y-auto" onOpenAutoFocus={focusPrimary}>
-          <DialogHeader>
-            <DialogTitle>Collect payment</DialogTitle>
-            <DialogDescription>Show the QR code or record cash received.</DialogDescription>
-          </DialogHeader>
-          {body}
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
+  // Bottom sheet on phones, centred dialog from md up (CSS breakpoint).
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="max-h-[92vh] overflow-y-auto rounded-t-xl"
-        onOpenAutoFocus={focusPrimary}
-      >
-        <SheetHeader>
-          <SheetTitle>Collect payment</SheetTitle>
-          <SheetDescription>Show the QR code or record cash received.</SheetDescription>
-        </SheetHeader>
-        <div className="mt-4">{body}</div>
-      </SheetContent>
-    </Sheet>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent onOpenAutoFocus={focusPrimary}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>Collect payment</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>Show the QR code or record cash received.</ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
+        <ResponsiveDialogBody>{body}</ResponsiveDialogBody>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
