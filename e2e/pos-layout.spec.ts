@@ -174,6 +174,7 @@ test.describe("app shell navigation", () => {
 
   test("phone: Live store appears under More once the store is published", async ({ page, request }) => {
     await createVendorSession(page, request, "shell-live");
+    await createMenuItem(page, { name: "Dhokla", priceInRupees: 30 });
     const publish = await page.request.patch("/api/vendor", {
       data: { publishStorefront: true },
       headers: { "Content-Type": "application/json" },
