@@ -48,7 +48,7 @@ describe("push payload builders", () => {
 
   it("payment submitted: right URL and tag per event", () => {
     expect(paymentSubmittedPayload({ billNumber: "AWZ-9", totalPaise: 5000, dropId: null })).toMatchObject({
-      title: "💸 Payment to check",
+      title: "💸 Customer says paid",
       url: "/orders",
       tag: "pay-AWZ-9",
     });

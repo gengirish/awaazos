@@ -298,6 +298,10 @@ model Transaction {
   source            OrderSource   @default(VOICE)
   notes             String?
   paidAt            DateTime?
+  // Buyer tapped "I've paid" on the order page (UTR optional). The seller still
+  // confirms with "Payment received" (markOrderPaid) or "Not received".
+  paymentClaimedAt  DateTime?
+  paymentRejectedAt DateTime? // Seller tapped "Not received"; a new claim then needs a UTR
 
   // Storefront pre-orders (source = STOREFRONT). Null for counter sales.
   dropId           String?

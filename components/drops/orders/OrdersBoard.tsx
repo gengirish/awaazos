@@ -112,6 +112,7 @@ const MENU_MODE_LABEL: Record<FulfilmentMode, string> = {
 const ACTION_DONE: Record<OrderAction, string> = {
   confirm: "Order confirmed",
   mark_paid: "Marked paid",
+  reject_payment: "Marked not received",
   cancel: "Order cancelled",
   deliver: "Marked delivered",
   undeliver: "Moved back to confirmed",

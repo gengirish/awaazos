@@ -4,7 +4,10 @@
  * (`/api/storefront-orders/[orderId]`).
  *
  *   confirm    PLACED → CONFIRMED
- *   mark_paid  markOrderPaid (credits DailySummary once)
+ *   mark_paid  markOrderPaid (credits DailySummary once) — "Payment received"
+ *   reject_payment  "Not received": clears the buyer's "I've paid" claim (and any
+ *              UTR), stamps paymentRejectedAt. The order stops holding stock once
+ *              its 15-minute window has passed; a new claim then needs a UTR.
  *   cancel     cancelOrder (reverses revenue if it was paid; vendor refunds via UPI)
  *   deliver    PLACED|CONFIRMED → DELIVERED; unpaid CASH is marked paid in the same txn
  *   undeliver  DELIVERED → CONFIRMED (mistake fix; payment untouched)
@@ -101,6 +104,19 @@ export async function applyStorefrontOrderAction(
     case "mark_paid": {
       // Order already verified in this txn against the full compound scope.
       applied = await markOrderPaid(tx, { vendorId, transactionId, now: args.now });
+      break;
+    }
+    case "reject_payment": {
+      const r = await tx.transaction.updateMany({
+        where: {
+          ...scope,
+          paymentStatus: "PENDING",
+          fulfilmentStatus: { not: "CANCELLED" },
+          OR: [{ paymentClaimedAt: { not: null } }, { upiRef: { not: null } }],
+        },
+        data: { paymentClaimedAt: null, upiRef: null, paymentRejectedAt: args.now ?? new Date() },
+      });
+      applied = r.count === 1;
       break;
     }
     case "cancel": {

@@ -206,4 +206,11 @@ describe("utrSubmitSchema", () => {
     expect(utrSubmitSchema.safeParse({ upiRef: "412345678901" }).success).toBe(true);
     expect(utrSubmitSchema.safeParse({ upiRef: "12-34" }).success).toBe(false);
   });
+
+  it("the UTR is optional: a bare I've paid tap sends none", () => {
+    expect(utrSubmitSchema.parse({})).toEqual({ upiRef: undefined });
+    expect(utrSubmitSchema.parse({ upiRef: "" }).upiRef).toBeUndefined();
+    expect(utrSubmitSchema.parse({ upiRef: "   " }).upiRef).toBeUndefined();
+    expect(utrSubmitSchema.parse({ upiRef: " 412345678901 " }).upiRef).toBe("412345678901");
+  });
 });

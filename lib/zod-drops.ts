@@ -156,12 +156,20 @@ export const storefrontOrderSchema = z.object({
 
 export type StorefrontOrderInput = z.infer<typeof storefrontOrderSchema>;
 
-/** Buyer submits the UTR after paying by UPI. 12 digits is the NPCI norm. */
+/**
+ * Buyer says "I've paid" after paying by UPI. The UTR is optional (12 digits is
+ * the NPCI norm); "" counts as not given. It becomes required again after the
+ * seller answered "Not received" — the route enforces that.
+ */
 export const utrSubmitSchema = z.object({
-  upiRef: z
-    .string()
-    .trim()
-    .regex(/^[A-Za-z0-9]{10,22}$/, "Enter the 12-digit UPI reference (UTR) from your payment app"),
+  upiRef: z.preprocess(
+    (v) => (typeof v === "string" && v.trim() === "" ? undefined : v),
+    z
+      .string()
+      .trim()
+      .regex(/^[A-Za-z0-9]{10,22}$/, "Enter the 12-digit UPI reference (UTR) from your payment app")
+      .optional(),
+  ),
 });
 
 /** Public "order from menu" body (no drop). Prices are never accepted from the client. */

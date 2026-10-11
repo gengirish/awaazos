@@ -37,6 +37,7 @@ export const boardOrderSelect = {
   paymentMethod: true,
   paymentStatus: true,
   upiRef: true,
+  paymentClaimedAt: true,
   subtotalPaise: true,
   deliveryFeePaise: true,
   totalPaise: true,

@@ -112,6 +112,7 @@ export function stockHoldingOrderWhere(now: Date = new Date()): Prisma.Transacti
       { paymentStatus: "PAID" },
       { paymentMethod: "CASH" }, // pay on delivery — vendor accepted the risk
       { upiRef: { not: null } }, // buyer submitted a UTR; awaiting vendor check
+      { paymentClaimedAt: { not: null } }, // buyer tapped "I've paid"; awaiting vendor check
       { fulfilmentStatus: { in: ["CONFIRMED", "DELIVERED"] } },
       // Strictly after: at exactly PENDING_HOLD_MINUTES the hold has lapsed,
       // matching `orderHoldsStock` (`< hold`) and the EXPIRED display state.
@@ -125,15 +126,22 @@ type HoldFields = {
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
   upiRef: string | null;
+  /** Buyer's "I've paid" tap. Holds stock like a UTR until the vendor answers. */
+  paymentClaimedAt: Date | null;
   createdAt: Date;
 };
+
+/** The buyer says they paid (tap or UTR) and the vendor has not answered yet. */
+function hasPaymentClaim(o: Pick<HoldFields, "upiRef" | "paymentClaimedAt">): boolean {
+  return !!o.upiRef || o.paymentClaimedAt !== null;
+}
 
 /** Pure twin of `stockHoldingOrderWhere` — keep the two in lockstep (tested). */
 export function orderHoldsStock(o: HoldFields, now: Date = new Date()): boolean {
   if (o.fulfilmentStatus === "CANCELLED") return false;
   if (o.paymentStatus === "PAID") return true;
   if (o.paymentMethod === "CASH") return true;
-  if (o.upiRef) return true;
+  if (hasPaymentClaim(o)) return true;
   if (o.fulfilmentStatus === "CONFIRMED" || o.fulfilmentStatus === "DELIVERED") return true;
   return now.getTime() - o.createdAt.getTime() < PENDING_HOLD_MINUTES * 60_000;
 }
@@ -153,7 +161,7 @@ export function orderDisplayState(o: HoldFields, now: Date = new Date()): OrderD
   if (o.fulfilmentStatus === "DELIVERED") return "DELIVERED";
   if (o.paymentStatus === "PAID") return "PAID";
   if (o.paymentMethod === "CASH") return "PAY_ON_DELIVERY";
-  if (o.upiRef) return "PAYMENT_SUBMITTED";
+  if (hasPaymentClaim(o)) return "PAYMENT_SUBMITTED";
   return orderHoldsStock(o, now) ? "AWAITING_PAYMENT" : "EXPIRED";
 }
 

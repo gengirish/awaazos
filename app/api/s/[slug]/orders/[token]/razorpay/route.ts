@@ -71,7 +71,8 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
       order.paymentMethod !== "UPI" ||
       order.paymentStatus !== "PENDING" ||
       order.fulfilmentStatus === "CANCELLED" ||
-      order.upiRef
+      order.upiRef ||
+      order.paymentClaimedAt
     ) {
       return err("not_awaiting_payment", 409);
     }
