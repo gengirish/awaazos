@@ -18,9 +18,15 @@ export default function manifest(): MetadataRoute.Manifest {
     start_url: "/pos",
     scope: "/",
     display: "standalone",
-    orientation: "portrait",
     theme_color: "#FF6600",
     background_color: "#FFFFFF",
+    // Long-press on the Home Screen icon (Android). The same destinations as
+    // the app shell's tabs (lib/app-nav.ts); each page enforces its own role.
+    shortcuts: [
+      { name: "Orders", url: "/orders", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }] },
+      { name: "New drop", url: "/drops/new", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }] },
+      { name: "Sell", url: "/pos", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }] },
+    ],
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
       { src: "/icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
