@@ -5,6 +5,13 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
+// Phone section pills: the link is the 44px hit area, the pill inside it keeps
+// its 32px look, so the second header row stays as short as it was.
+const sectionLinkClass =
+  "inline-flex min-h-11 shrink-0 items-center rounded-full outline-hidden focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2";
+const sectionPillClass =
+  "rounded-full bg-muted px-3 py-2 text-xs font-medium text-foreground";
+
 const navLinkClass =
   "inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-awaaz-charcoal/90 outline-hidden transition-colors hover:text-awaaz-orange focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2";
 
@@ -28,7 +35,7 @@ export function MarketingHeader() {
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Link
           href="/"
-          className="font-display text-xl font-bold tracking-tight text-awaaz-charcoal outline-hidden focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+          className="inline-flex min-h-11 items-center rounded-md font-display text-xl font-bold tracking-tight text-awaaz-charcoal outline-hidden focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
         >
           AwaazOS
         </Link>
@@ -69,19 +76,13 @@ export function MarketingHeader() {
       </div>
       <nav
         aria-label="Mobile sections"
-        className="flex gap-2 overflow-x-auto border-t border-border/50 px-4 py-2 md:hidden"
+        className="flex gap-2 overflow-x-auto border-t border-border/50 px-4 py-0.5 md:hidden"
       >
-        <Link
-          href="/#how-it-works"
-          className="shrink-0 rounded-full bg-muted px-3 py-2 text-xs font-medium text-foreground outline-hidden focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
-        >
-          How it works
+        <Link href="/#how-it-works" className={sectionLinkClass}>
+          <span className={sectionPillClass}>How it works</span>
         </Link>
-        <Link
-          href="/pricing"
-          className="shrink-0 rounded-full bg-muted px-3 py-2 text-xs font-medium text-foreground outline-hidden focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
-        >
-          Pricing
+        <Link href="/pricing" className={sectionLinkClass}>
+          <span className={sectionPillClass}>Pricing</span>
         </Link>
       </nav>
     </header>

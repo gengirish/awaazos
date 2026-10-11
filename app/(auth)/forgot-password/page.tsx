@@ -10,7 +10,7 @@ export default function ForgotPasswordPage() {
       <RequestResetForm />
       <p className="text-center text-xs text-muted-foreground">
         Remembered it?{" "}
-        <Link href="/sign-in" className="font-medium text-primary hover:underline">
+        <Link href="/sign-in" className="inline-flex min-h-11 items-center font-medium text-primary hover:underline">
           Back to sign in
         </Link>
       </p>

@@ -4,6 +4,10 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useState } from "react";
 
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { cn } from "@/lib/utils";
+
 import type { AnalyticsRange } from "./types";
 
 const PRESETS: { value: Exclude<AnalyticsRange, "custom">; label: string }[] = [
@@ -15,6 +19,20 @@ const PRESETS: { value: Exclude<AnalyticsRange, "custom">; label: string }[] = [
 
 function buildPresetHref(range: Exclude<AnalyticsRange, "custom">): string {
   return `/analytics?range=${range}`;
+}
+
+/**
+ * Below `sm` the five tabs share one row as equal grid columns (about 60 px
+ * each at 360 px), so "Custom" never wraps onto a line of its own. The active
+ * tab is filled and bold, not just a different colour.
+ */
+function tabClass(isActive: boolean): string {
+  return cn(
+    "inline-flex min-h-11 items-center justify-center rounded-full px-1 text-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-4",
+    isActive
+      ? "bg-primary font-semibold text-primary-foreground"
+      : "bg-muted font-medium text-muted-foreground hover:bg-muted/80",
+  );
 }
 
 export type RangeSwitcherProps = {
@@ -54,8 +72,8 @@ export function RangeSwitcher({
   const customHref = `/analytics?range=custom&from=${encodeURIComponent(suggestedCustomFrom)}&to=${encodeURIComponent(suggestedCustomTo)}`;
 
   return (
-    <nav aria-label="Date range" className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label="Preset ranges">
+    <nav aria-label="Date range" className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+      <div className="grid grid-cols-5 gap-1.5 sm:flex sm:flex-wrap sm:gap-2" role="tablist" aria-label="Preset ranges">
         {PRESETS.map((p) => {
           const isActive = active === p.value;
           return (
@@ -65,9 +83,7 @@ export function RangeSwitcher({
               role="tab"
               aria-selected={isActive}
               scroll={false}
-              className={`min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
-                isActive ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
-              }`}
+              className={tabClass(isActive)}
             >
               {p.label}
             </Link>
@@ -78,45 +94,40 @@ export function RangeSwitcher({
           role="tab"
           aria-selected={active === "custom"}
           scroll={false}
-          className={`min-h-11 rounded-full px-4 py-2 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring ${
-            active === "custom" ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground hover:bg-muted/80"
-          }`}
+          className={tabClass(active === "custom")}
         >
           Custom
         </Link>
       </div>
-      <div className="flex flex-wrap items-end gap-2 border-t border-border pt-3 sm:border-0 sm:pt-0">
-        <div>
+      {/* Phones: From and To share a row at full width, Apply spans beneath them. */}
+      <div className="grid grid-cols-2 items-end gap-2 border-t border-border pt-3 sm:flex sm:flex-wrap sm:border-0 sm:pt-0">
+        <div className="min-w-0">
           <label htmlFor="analytics-from" className="mb-1 block text-xs font-medium text-muted-foreground">
             From
           </label>
-          <input
+          <Input
             id="analytics-from"
             type="date"
             value={from}
             onChange={(e) => setFrom(e.target.value)}
-            className="min-h-11 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-11 min-w-0 sm:w-auto"
           />
         </div>
-        <div>
+        <div className="min-w-0">
           <label htmlFor="analytics-to" className="mb-1 block text-xs font-medium text-muted-foreground">
             To
           </label>
-          <input
+          <Input
             id="analytics-to"
             type="date"
             value={to}
             onChange={(e) => setTo(e.target.value)}
-            className="min-h-11 rounded-md border border-input bg-background px-3 text-sm"
+            className="h-11 min-w-0 sm:w-auto"
           />
         </div>
-        <button
-          type="button"
-          onClick={applyCustom}
-          className="min-h-11 rounded-full bg-primary px-4 text-sm font-medium text-primary-foreground hover:opacity-90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-        >
+        <Button type="button" onClick={applyCustom} className="col-span-2 h-11 rounded-full sm:col-span-1">
           Apply
-        </button>
+        </Button>
       </div>
     </nav>
   );

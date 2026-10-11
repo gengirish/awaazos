@@ -39,7 +39,7 @@ export function Features() {
   return (
     <section aria-labelledby="features-heading" className="bg-muted/40 px-4 py-16 sm:px-6 sm:py-20">
       <div className="mx-auto max-w-6xl">
-        <h2 id="features-heading" className="font-display text-3xl font-bold text-awaaz-charcoal sm:text-4xl">
+        <h2 id="features-heading" className="font-display text-3xl font-bold text-balance text-awaaz-charcoal sm:text-4xl">
           Everything you need to run the counter
         </h2>
         <p className="mt-3 max-w-2xl text-muted-foreground">

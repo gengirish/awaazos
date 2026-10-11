@@ -1,9 +1,11 @@
 "use client";
 
-import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
-
 import { BRAND } from "@/lib/constants";
-import { formatINR, paiseToRupees } from "@/lib/currency";
+import { formatINR } from "@/lib/currency";
+
+import { sharePercent } from "./axis-format";
+import { ChartDataTable } from "./ChartDataTable";
+import { PaymentPiePlot } from "./lazy-plots";
 
 export type PaymentSlice = {
   key: string;
@@ -18,65 +20,60 @@ export type PaymentMethodBreakdownProps = {
 };
 
 export function PaymentMethodBreakdown({ slices }: PaymentMethodBreakdownProps) {
-  const data = slices.filter((s) => s.paise > 0).map((s) => ({
-    ...s,
-    rupees: paiseToRupees(s.paise),
-  }));
+  const data = slices
+    .filter((s) => s.paise > 0)
+    .map((s, index) => ({ ...s, color: COLORS[index % COLORS.length]! }));
+  const totalPaise = data.reduce((sum, s) => sum + s.paise, 0);
 
   return (
     <section
-      className="rounded-xl border border-border bg-card p-4 shadow-xs"
+      className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-xs"
       aria-labelledby="payment-mix-heading"
     >
       <h2 id="payment-mix-heading" className="font-display text-lg font-semibold text-foreground">
         Payment mix
       </h2>
       <p className="mt-1 text-sm text-muted-foreground">By revenue in the selected range.</p>
-      <div className="mt-4 h-64 w-full" role="img" aria-label="Pie chart of revenue by payment method">
-        {data.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No paid volume in this range.</p>
-        ) : (
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={data}
-                dataKey="rupees"
-                nameKey="label"
-                cx="50%"
-                cy="50%"
-                innerRadius={48}
-                outerRadius={88}
-                paddingAngle={2}
-              >
-                {data.map((entry, index) => (
-                  <Cell key={entry.key} fill={COLORS[index % COLORS.length]!} />
-                ))}
-              </Pie>
-              <Tooltip formatter={(value: number) => formatINR(Math.round(value * 100))} />
-            </PieChart>
-          </ResponsiveContainer>
-        )}
-      </div>
-      <details className="mt-4 rounded-md border border-border bg-muted/30 p-3 text-sm">
-        <summary className="cursor-pointer font-medium text-foreground">Show data table</summary>
-        <table className="mt-3 w-full text-left text-sm">
-          <caption className="sr-only">Revenue by payment method</caption>
-          <thead>
-            <tr>
-              <th className="pb-2 pr-4 font-medium">Method</th>
-              <th className="pb-2 font-medium">Revenue</th>
-            </tr>
-          </thead>
-          <tbody>
-            {slices.map((row) => (
-              <tr key={row.key} className="border-t border-border">
-                <td className="py-2 pr-4">{row.label}</td>
-                <td className="py-2 tabular-nums">{formatINR(row.paise)}</td>
-              </tr>
+      {data.length === 0 ? (
+        <p className="mt-3 text-sm text-muted-foreground">No paid volume in this range.</p>
+      ) : (
+        <>
+          <div className="mt-4 h-52 w-full sm:h-64" role="img" aria-label="Pie chart of revenue by payment method">
+            <PaymentPiePlot data={data} />
+          </div>
+          {/* The legend names every slice in text, so a slice is never identified by colour alone. */}
+          <ul className="mt-3 list-none space-y-1.5 p-0 text-sm" aria-label="Payment mix legend">
+            {data.map((s) => (
+              <li key={s.key} className="flex items-center gap-2">
+                <svg viewBox="0 0 10 10" className="h-2.5 w-2.5 shrink-0" aria-hidden="true">
+                  <circle cx="5" cy="5" r="5" fill={s.color} />
+                </svg>
+                <span className="min-w-0 flex-1 text-foreground">{s.label}</span>
+                <span className="shrink-0 tabular-nums text-foreground">{formatINR(s.paise)}</span>
+                <span className="w-10 shrink-0 text-right tabular-nums text-muted-foreground">
+                  {sharePercent(s.paise, totalPaise)}%
+                </span>
+              </li>
             ))}
-          </tbody>
-        </table>
-      </details>
+          </ul>
+        </>
+      )}
+      <ChartDataTable caption="Revenue by payment method">
+        <thead>
+          <tr>
+            <th className="pb-2 pr-4 font-medium">Method</th>
+            <th className="pb-2 font-medium">Revenue</th>
+          </tr>
+        </thead>
+        <tbody>
+          {slices.map((row) => (
+            <tr key={row.key} className="border-t border-border">
+              <td className="py-2 pr-4">{row.label}</td>
+              <td className="py-2 tabular-nums">{formatINR(row.paise)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </ChartDataTable>
     </section>
   );
 }
