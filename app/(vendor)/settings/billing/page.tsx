@@ -23,7 +23,7 @@ export default async function BillingSettingsPage() {
   try {
     // `vendor.plan` is already the effective plan (lib/plan.ts); `storedPlan` is
     // the raw DB value, used only to explain an expiry.
-    const { vendor, storedPlan, access } = await requireVendorRole("OWNER");
+    const { vendor, storedPlan, access, user } = await requireVendorRole("OWNER");
     const now = new Date();
     const storedPlanFields = { plan: storedPlan, planExpiresAt: vendor.planExpiresAt };
     const planExpired = isPlanExpired(storedPlanFields, now);
@@ -99,8 +99,13 @@ export default async function BillingSettingsPage() {
             <h2 className="mb-4 font-medium">Actions</h2>
             <BillingManageClient
               canSubscribe={access.kind !== "paid" && !hasLiveSubscription}
-              hasRazorpaySubscription={Boolean(settings?.razorpaySubId)}
+              // Live, or a subscription from before the status column existed.
+              canCancel={
+                hasLiveSubscription || Boolean(settings?.razorpaySubId && !settings.razorpaySubStatus)
+              }
               cancelAtEnd={settings?.razorpaySubCancelAtEnd ?? false}
+              prefillName={user.name}
+              prefillEmail={user.email}
             />
           </section>
         </div>

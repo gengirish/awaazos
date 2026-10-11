@@ -4,6 +4,8 @@ import { CreditCard, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { loadCheckout, type RazorpayOrderSuccess } from "@/lib/razorpay-checkout";
+
 /**
  * "Pay online" for a storefront order, through the kitchen's OWN Razorpay
  * account (Razorpay Standard Checkout). Flow:
@@ -20,58 +22,6 @@ import { useState } from "react";
  * `prefillName` / `prefillContact` are the buyer's own details on the buyer's
  * own order page; they go only to Razorpay Checkout, never to a log.
  */
-
-const CHECKOUT_SRC = "https://checkout.razorpay.com/v1/checkout.js";
-
-type RazorpaySuccess = {
-  razorpay_order_id: string;
-  razorpay_payment_id: string;
-  razorpay_signature: string;
-};
-
-type RazorpayOptions = {
-  key: string;
-  amount: number;
-  currency: string;
-  name: string;
-  description: string;
-  order_id: string;
-  prefill?: { name?: string; contact?: string };
-  notes?: Record<string, string>;
-  handler: (resp: RazorpaySuccess) => void;
-  modal?: { ondismiss?: () => void; confirm_close?: boolean };
-  retry?: { enabled: boolean };
-};
-
-type RazorpayInstance = {
-  open: () => void;
-  on: (event: "payment.failed", cb: (resp: unknown) => void) => void;
-};
-
-declare global {
-  interface Window {
-    Razorpay?: new (options: RazorpayOptions) => RazorpayInstance;
-  }
-}
-
-let checkoutPromise: Promise<void> | null = null;
-
-function loadCheckout(): Promise<void> {
-  if (typeof window !== "undefined" && window.Razorpay) return Promise.resolve();
-  if (checkoutPromise) return checkoutPromise;
-  checkoutPromise = new Promise<void>((resolve, reject) => {
-    const s = document.createElement("script");
-    s.src = CHECKOUT_SRC;
-    s.async = true;
-    s.onload = () => (window.Razorpay ? resolve() : reject(new Error("checkout_missing")));
-    s.onerror = () => reject(new Error("checkout_load_failed"));
-    document.body.appendChild(s);
-  }).catch((e: unknown) => {
-    checkoutPromise = null; // allow a retry on the next tap
-    throw e;
-  });
-  return checkoutPromise;
-}
 
 type StartPaymentData = {
   keyId: string;
@@ -110,7 +60,7 @@ export function RazorpayPayButton({
 
   const base = `/api/s/${encodeURIComponent(slug)}/orders/${encodeURIComponent(token)}/razorpay`;
 
-  async function confirm(resp: RazorpaySuccess) {
+  async function confirm(resp: RazorpayOrderSuccess) {
     setBusy(true);
     setMessage({ text: "Payment received — confirming with the kitchen…", tone: "info" });
     try {
@@ -189,7 +139,7 @@ export function RazorpayPayButton({
           ...(prefillName ? { name: prefillName } : {}),
           ...(prefillContact ? { contact: prefillContact } : {}),
         },
-        handler: (resp) => {
+        handler: (resp: RazorpayOrderSuccess) => {
           void confirm(resp);
         },
         modal: {

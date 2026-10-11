@@ -5,6 +5,7 @@ import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 import { getReceiptQueue } from "@/lib/queues";
 import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
+import { withTimeout } from "@/lib/with-timeout";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -87,14 +88,19 @@ export async function POST(req: NextRequest) {
     }
 
     try {
-      await getReceiptQueue().add(
-        "send-receipt",
-        {
-          transactionId: transaction.id,
-          vendorId: ctx.vendor.id,
-          customerPhone: dest,
-        },
-        jobOpts,
+      // Bounded: with REDIS_URL set but Redis unreachable, add() never settles.
+      await withTimeout(
+        getReceiptQueue().add(
+          "send-receipt",
+          {
+            transactionId: transaction.id,
+            vendorId: ctx.vendor.id,
+            customerPhone: dest,
+          },
+          jobOpts,
+        ),
+        2_000,
+        "receipt.enqueue",
       );
     } catch (e) {
       console.error(

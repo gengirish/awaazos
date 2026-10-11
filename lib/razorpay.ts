@@ -8,6 +8,7 @@ import {
   SUBSCRIPTION_TOTAL_COUNT,
   type BillingInterval,
   type SubscribablePlan,
+  type SubscriptionSnapshot,
 } from "@/lib/subscription";
 import { withTimeout } from "@/lib/with-timeout";
 
@@ -123,6 +124,46 @@ export async function cancelSubscription(subscriptionId: string, atCycleEnd: boo
     RAZORPAY_API_TIMEOUT_MS,
     "razorpay.subscriptions.cancel",
   );
+}
+
+/**
+ * Razorpay Checkout success for a subscription:
+ * HMAC-SHA256(`${paymentId}|${subscriptionId}`, key secret). Note the order —
+ * it is the reverse of the Orders signature in lib/storefront-razorpay.ts.
+ */
+export function verifySubscriptionPaymentSignature(
+  paymentId: string,
+  subscriptionId: string,
+  signature: string | null | undefined,
+): boolean {
+  if (!signature || !paymentId || !subscriptionId || !/^[0-9a-f]+$/i.test(signature)) return false;
+  const secret = requireEnv("RAZORPAY_KEY_SECRET");
+  const expectedHex = crypto
+    .createHmac("sha256", secret)
+    .update(`${paymentId}|${subscriptionId}`, "utf8")
+    .digest("hex");
+  const sigBuf = Buffer.from(signature, "hex");
+  const expBuf = Buffer.from(expectedHex, "hex");
+  if (sigBuf.length !== expBuf.length) return false;
+  return crypto.timingSafeEqual(sigBuf, expBuf);
+}
+
+/** The platform account's public key id, for Checkout in the browser. */
+export function getRazorpayKeyId(): string {
+  return requireEnv("RAZORPAY_KEY_ID");
+}
+
+/** A subscription entity (webhook payload or a fetch) → the fields the state machine reads. */
+export function toSubscriptionSnapshot(id: string, entity: Record<string, unknown>): SubscriptionSnapshot {
+  const planId = typeof entity.plan_id === "string" ? entity.plan_id : "";
+  return {
+    id,
+    status: typeof entity.status === "string" && entity.status ? entity.status : "unknown",
+    mapped: planFromRazorpayPlanId(planId),
+    currentEnd: fromUnixSeconds(entity.current_end),
+    startAt: fromUnixSeconds(entity.start_at),
+    paidCount: typeof entity.paid_count === "number" ? entity.paid_count : null,
+  };
 }
 
 /** Unix seconds from a Razorpay entity → Date, or null. */

@@ -1,27 +1,22 @@
-import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
-import { prisma } from "@/lib/prisma";
-import { fromUnixSeconds, planFromRazorpayPlanId, verifyRazorpaySignature } from "@/lib/razorpay";
+import { toSubscriptionSnapshot, verifyRazorpaySignature } from "@/lib/razorpay";
 import { getClientIp, tooManyRequests, webhookRateLimit } from "@/lib/ratelimit";
-import {
-  applySubscriptionEvent,
-  isSubscriptionEvent,
-  type SubscriptionSnapshot,
-} from "@/lib/subscription";
+import { isSubscriptionEvent } from "@/lib/subscription";
+import { recordSubscriptionEvent } from "@/lib/subscription-store";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
  * Platform SaaS subscription webhook (AwaazOS's own Razorpay account).
- * State transitions live in lib/subscription.ts; this route only verifies,
- * dedupes and writes. See docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md.
+ * State transitions live in lib/subscription.ts and the write (ledger + vendor,
+ * one transaction) in lib/subscription-store.ts; this route only verifies and
+ * parses. See docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md.
  *
- * Idempotency: every delivery is recorded in `SubscriptionEvent` keyed on the
- * `x-razorpay-event-id` header, in the same transaction as the vendor update.
- * A replay hits the unique index (P2002) and is acknowledged without effect,
- * so a DB failure can safely return 500 and let Razorpay retry.
+ * Idempotency: every delivery is recorded keyed on the `x-razorpay-event-id`
+ * header. A replay is acknowledged without effect, so a DB failure can safely
+ * return 500 and let Razorpay retry.
  */
 
 type Obj = Record<string, unknown>;
@@ -87,14 +82,7 @@ export async function POST(req: NextRequest) {
     `nohdr:${event}:${subId}:${String(body.created_at ?? "")}`;
 
   const planId = str(entity.plan_id) ?? "";
-  const sub: SubscriptionSnapshot = {
-    id: subId,
-    status: str(entity.status) ?? "unknown",
-    mapped: planFromRazorpayPlanId(planId),
-    currentEnd: fromUnixSeconds(entity.current_end),
-    startAt: fromUnixSeconds(entity.start_at),
-    paidCount: typeof entity.paid_count === "number" ? entity.paid_count : null,
-  };
+  const sub = toSubscriptionSnapshot(subId, entity);
 
   const payment = entityOf(payload, "payment");
   const paymentId = str(payment?.id);
@@ -115,71 +103,20 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    await prisma.$transaction(async (tx) => {
-      let vendorId = notedVendorId;
-      if (!vendorId) {
-        const row = await tx.vendorSettings.findFirst({
-          where: { razorpaySubId: subId },
-          select: { vendorId: true },
-        });
-        vendorId = row?.vendorId ?? null;
-      }
-
-      // Serialise deliveries for one vendor so two events can't both read the
-      // old planExpiresAt. Also confirms the vendor still exists.
-      const locked = vendorId
-        ? await tx.$queryRaw<{ id: string }[]>`SELECT id FROM vendors WHERE id = ${vendorId} FOR UPDATE`
-        : [];
-      if (locked.length === 0) vendorId = null;
-
-      await tx.subscriptionEvent.create({
-        data: {
-          vendorId,
-          razorpayEventId: eventId,
-          event,
-          subscriptionId: subId,
-          paymentId,
-          amountPaise,
-          status: sub.status,
-          currentEnd: sub.currentEnd,
-        },
-      });
-
-      if (!vendorId) {
-        console.warn("[webhooks/razorpay] %s: no vendor for sub %s", event, maskId(subId));
-        return;
-      }
-
-      const vendor = await tx.vendor.findUniqueOrThrow({
-        where: { id: vendorId },
-        select: { plan: true, planExpiresAt: true, settings: { select: { razorpaySubId: true } } },
-      });
-      const patch = applySubscriptionEvent(
-        {
-          plan: vendor.plan,
-          planExpiresAt: vendor.planExpiresAt,
-          razorpaySubId: vendor.settings?.razorpaySubId ?? null,
-        },
-        event,
-        sub,
-      );
-
-      if (patch.vendor) {
-        await tx.vendor.update({ where: { id: vendorId }, data: patch.vendor });
-      }
-      if (patch.settings) {
-        await tx.vendorSettings.upsert({
-          where: { vendorId },
-          create: { vendorId, ...patch.settings },
-          update: patch.settings,
-        });
-      }
+    const result = await recordSubscriptionEvent({
+      eventId,
+      event,
+      sub,
+      vendorId: notedVendorId,
+      paymentId,
+      amountPaise,
     });
-  } catch (e) {
-    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+    if (result.kind === "duplicate") {
       console.info("[webhooks/razorpay] duplicate event %s ignored", maskId(eventId));
-      return NextResponse.json({ ok: true });
+    } else if (result.kind === "no_vendor") {
+      console.warn("[webhooks/razorpay] %s: no vendor for sub %s", event, maskId(subId));
     }
+  } catch (e) {
     console.error(
       "[webhooks/razorpay] handler error event=%s: %s",
       event,

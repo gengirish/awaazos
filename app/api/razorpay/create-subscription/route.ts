@@ -7,6 +7,7 @@ import {
   cancelSubscription,
   createSubscription,
   fetchSubscription,
+  getRazorpayKeyId,
   planFromRazorpayPlanId,
 } from "@/lib/razorpay";
 import { billingRateLimit, tooManyRequests } from "@/lib/ratelimit";
@@ -60,6 +61,11 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // Public key id for in-app Checkout; `shortUrl` stays as the fallback
+    // when checkout.js can't load. Throws (→ 500) before anything is created
+    // if billing isn't configured on this deploy.
+    const keyId = getRazorpayKeyId();
+
     const now = new Date();
     // Subscribing during the trial defers the first charge to the trial's end.
     const trialEndsAt = ctx.vendor.trialEndsAt;
@@ -92,7 +98,11 @@ export async function POST(req: NextRequest) {
             sameStart &&
             previous.short_url
           ) {
-            const res = NextResponse.json({ subscriptionId: previous.id, shortUrl: previous.short_url });
+            const res = NextResponse.json({
+              subscriptionId: previous.id,
+              shortUrl: previous.short_url,
+              keyId,
+            });
             return withVendorCookie(res, ctx.setVendorCookie);
           }
           await cancelSubscription(previousId, false);
@@ -126,7 +136,7 @@ export async function POST(req: NextRequest) {
       update: subFields,
     });
 
-    const res = NextResponse.json({ subscriptionId, shortUrl });
+    const res = NextResponse.json({ subscriptionId, shortUrl, keyId });
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {
     if (err instanceof AuthError) {
