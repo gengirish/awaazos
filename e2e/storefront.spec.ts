@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { secondaryNav } from "./helpers/nav";
 import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
@@ -203,7 +204,7 @@ test.describe("public storefront", () => {
     }
   });
 
-  test("the POS gear reaches Settings, so the storefront control is discoverable", async ({
+  test("Settings is reachable from the POS navigation, so the storefront control is discoverable", async ({
     page,
     request,
   }) => {
@@ -211,7 +212,7 @@ test.describe("public storefront", () => {
     await createMenuItem(page, { name: "Idli", priceInRupees: 30 });
 
     await page.goto("/pos");
-    await page.getByRole("link", { name: "Settings" }).click();
+    await (await secondaryNav(page)).getByRole("link", { name: "Settings", exact: true }).click();
 
     await expect(page).toHaveURL(/\/settings$/);
     await page.getByRole("link", { name: /Online store/ }).first().click();

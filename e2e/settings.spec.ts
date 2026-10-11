@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { mainNav } from "./helpers/nav";
 import { createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
@@ -96,7 +97,7 @@ test.describe("settings hub", () => {
     await expect(page.getByRole("heading", { level: 1, name: "Online orders" })).toBeVisible();
   });
 
-  test("phone: no sidebar, back link to Settings, way back to the POS, no sideways scroll", async ({
+  test("phone: no sidebar, back link to Settings, tab bar back to the POS, no sideways scroll", async ({
     page,
     request,
   }) => {
@@ -106,7 +107,10 @@ test.describe("settings hub", () => {
     await page.goto("/settings/payments");
     await expect(page.getByRole("heading", { level: 1, name: "Payments" })).toBeVisible();
     await expect(page.getByRole("navigation", { name: "Settings", exact: true })).toBeHidden();
-    await expect(page.getByRole("link", { name: "Back to POS" })).toBeVisible();
+    // Settings lives under "More" in the shell's tab bar, so that is the marked tab.
+    const tabs = mainNav(page);
+    await expect(tabs).toBeVisible();
+    await expect(tabs.getByRole("button", { name: "More" })).toHaveAttribute("aria-current", "page");
 
     const noSideScroll = () =>
       page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
@@ -117,7 +121,7 @@ test.describe("settings hub", () => {
     await expect(hubRow(page, "Payments")).toBeVisible();
     expect(await noSideScroll(), "hub must not scroll sideways at 390px").toBe(true);
 
-    await page.getByRole("link", { name: "Back to POS" }).click();
+    await tabs.getByRole("link", { name: "Sell", exact: true }).click();
     await expect(page).toHaveURL(/\/pos$/);
   });
 
