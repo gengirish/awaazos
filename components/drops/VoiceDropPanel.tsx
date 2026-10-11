@@ -181,31 +181,37 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
     <section
       aria-labelledby="voice-drop-heading"
       aria-busy={busy}
-      className="space-y-4 rounded-xl border border-primary/40 bg-primary/5 p-4"
+      className="space-y-3 rounded-xl border border-primary/40 bg-primary/5 p-3 md:space-y-4 md:p-4"
     >
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 id="voice-drop-heading" className="font-display text-lg font-semibold">
-          Fill this form by voice
-        </h2>
-        <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-          <Mic className="h-3 w-3" aria-hidden="true" />
-          <span>
-            <span className="sr-only">Voice language: </span>
-            {langLabel}
+      {/*
+        Phones: the mic sits beside the heading and the status line (one block
+        instead of two stacked rows), so the form starts sooner. From md: the
+        heading row on top, mic and status under it. Same DOM order either way
+        (heading, note, mic, status); only the grid placement changes.
+      */}
+      <div className="grid grid-cols-[auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5 md:gap-x-4 md:gap-y-4">
+        <div className="col-start-2 row-start-1 flex flex-wrap items-center justify-between gap-x-2 gap-y-1 md:col-span-2 md:col-start-1">
+          <h2 id="voice-drop-heading" className="font-display text-lg font-semibold leading-tight">
+            Fill this form by voice
+          </h2>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
+            <Mic className="h-3 w-3" aria-hidden="true" />
+            <span>
+              <span className="sr-only">Voice language: </span>
+              {langLabel}
+            </span>
           </span>
-        </span>
-      </div>
+        </div>
 
-      {isEdit ? (
-        <p className="flex items-start gap-1.5 text-sm text-muted-foreground">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
-          <span>
-            Voice replaces the values you say in the form below. Nothing is saved until you press Save changes.
-          </span>
-        </p>
-      ) : null}
+        {isEdit ? (
+          <p className="col-span-2 row-start-3 flex items-start gap-1.5 text-xs text-muted-foreground md:row-start-2 md:text-sm">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>
+              Voice replaces the values you say in the form below. Nothing is saved until you press Save changes.
+            </span>
+          </p>
+        ) : null}
 
-      <div className="flex items-center gap-4">
         <button
           ref={micRef}
           type="button"
@@ -215,7 +221,8 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
           aria-pressed={state === "listening"}
           aria-describedby="voice-drop-status"
           className={cn(
-            "flex h-20 w-20 shrink-0 items-center justify-center rounded-full shadow-md ring-4 ring-offset-2 ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring motion-safe:transition-colors",
+            "col-start-1 row-span-2 row-start-1 flex h-20 w-20 shrink-0 items-center justify-center rounded-full shadow-md ring-4 ring-offset-2 ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring motion-safe:transition-colors",
+            isEdit ? "md:row-span-1 md:row-start-3" : "md:row-span-1 md:row-start-2",
             (state === "idle" || state === "error") && !offline && "bg-primary text-primary-foreground ring-transparent",
             offline && "cursor-not-allowed bg-muted text-muted-foreground ring-border",
             state === "listening" && "bg-destructive text-destructive-foreground ring-destructive/30 motion-safe:animate-pulse",
@@ -231,7 +238,7 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
           )}
         </button>
 
-        <div className="min-w-0 flex-1">
+        <div className={cn("col-start-2 row-start-2 min-w-0 self-start md:self-center", isEdit && "md:row-start-3")}>
           {state === "error" || offline ? (
             <p
               id="voice-drop-status"
@@ -264,7 +271,9 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
           </p>
         </div>
       ) : (
-        <p className="text-xs text-muted-foreground">
+        // Phones, before the first tap: one line of the example is enough to show
+        // the pattern. The whole sentence shows once the cook starts speaking.
+        <p className={cn("text-xs text-muted-foreground", state === "idle" && "max-md:line-clamp-1")}>
           For example: <span lang={voiceLang}>&ldquo;{example}&rdquo;</span>
         </p>
       )}
