@@ -27,7 +27,7 @@ export default async function PricingPage() {
     <div className="min-h-screen bg-background px-4 py-10 md:px-6">
       <div className="mx-auto max-w-3xl">
         <header className="mb-10 text-center">
-          <h1 className="font-display text-4xl font-semibold text-foreground md:text-5xl">
+          <h1 className="font-display text-3xl font-semibold text-balance text-foreground sm:text-4xl md:text-5xl">
             {starter.trial}. Then {starter.price}.
           </h1>
           <p className="mt-3 text-muted-foreground">
@@ -41,7 +41,7 @@ export default async function PricingPage() {
             <section
               key={tier}
               className={`flex flex-col rounded-xl border bg-card p-6 shadow-xs ${
-                PLAN_MARKETING[tier].emphasis ? "ring-2 ring-[#FF6B00] ring-offset-2 ring-offset-background" : ""
+                PLAN_MARKETING[tier].emphasis ? "ring-2 ring-awaaz-orange ring-offset-2 ring-offset-background" : ""
               }`}
             >
               <h2 className="font-display text-xl font-semibold">{PLAN_MARKETING[tier].label}</h2>

@@ -865,10 +865,13 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
           ) : null}
           <Link
             href="/"
-            className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+            className="group inline-flex min-h-11 items-center rounded-full"
           >
-            <span aria-hidden="true">🎙️</span>
-            Billing by AwaazOS — Bol. Bill. Becho.
+            {/* The link is the 44px tap target; the pill inside keeps its size. */}
+            <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors group-hover:border-primary/40 group-hover:text-primary">
+              <span aria-hidden="true">🎙️</span>
+              Billing by AwaazOS — Bol. Bill. Becho.
+            </span>
           </Link>
         </footer>
       </CartHubProvider>
