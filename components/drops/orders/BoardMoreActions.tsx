@@ -39,7 +39,7 @@ export function BoardMoreActions({ description, children }: Props) {
   return (
     <ResponsiveDialog open={open} onOpenChange={setOpen}>
       <ResponsiveDialogTrigger asChild>
-        <Button type="button" variant="outline" className="ml-auto min-h-11 md:hidden" aria-label="More actions">
+        <Button type="button" variant="outline" className="ml-auto min-h-11 shrink-0 md:hidden" aria-label="More actions">
           <MoreHorizontal aria-hidden />
           More
         </Button>

@@ -517,7 +517,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
       </Button>
     ),
     lastChecked: lastChecked ? (
-      <span className="text-xs text-muted-foreground">Last checked {formatIstTime(lastChecked)}</span>
+      <span className="min-w-0 text-xs leading-tight text-muted-foreground">Last checked {formatIstTime(lastChecked)}</span>
     ) : null,
     // Rendered twice (header from md, "More actions" sheet on phones). Both carry
     // data-sound-toggle so the "first tap enables sound" listener leaves them alone.
@@ -868,7 +868,7 @@ function ActionRow({
   sheetRows: (close: () => void) => ReactNode;
 }) {
   return (
-    <div className="mt-2 flex flex-wrap items-center gap-2 md:mt-3">
+    <div className="mt-2 flex items-center gap-2 md:mt-3 md:flex-wrap">
       {lead ? <div className="hidden md:block">{lead}</div> : null}
       {tools.refreshButton}
       {tools.lastChecked}
