@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -75,7 +75,8 @@ function SignUpForm() {
   return (
     <Card className="w-full max-w-md border-border/80 shadow-lg">
       <CardHeader>
-        <CardTitle className="font-display text-2xl">Create your stall</CardTitle>
+        {/* <h1>, not CardTitle (an <h3>): this is the page's only heading. */}
+        <h1 className="font-display text-2xl font-semibold leading-none tracking-tight">Create your stall</h1>
         <CardDescription>One account — your vendor workspace on AwaazOS.</CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit}>
@@ -87,16 +88,37 @@ function SignUpForm() {
           ) : null}
           <div className="space-y-2">
             <Label htmlFor="name">Your name</Label>
-            <Input id="name" required value={name} onChange={(e) => setName(e.target.value)} />
+            <Input
+              id="name"
+              name="name"
+              required
+              autoComplete="name"
+              autoCapitalize="words"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" type="email" required autoComplete="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+            <Input
+              id="email"
+              name="email"
+              type="email"
+              inputMode="email"
+              required
+              autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password (min 8 characters)</Label>
             <Input
               id="password"
+              name="password"
               type="password"
               required
               minLength={8}
@@ -107,7 +129,15 @@ function SignUpForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="stallName">Stall / shop name</Label>
-            <Input id="stallName" required value={stallName} onChange={(e) => setStallName(e.target.value)} />
+            <Input
+              id="stallName"
+              name="stallName"
+              required
+              autoComplete="organization"
+              autoCapitalize="words"
+              value={stallName}
+              onChange={(e) => setStallName(e.target.value)}
+            />
           </div>
           <div className="space-y-2">
             <Label>Stall type</Label>
@@ -128,7 +158,11 @@ function SignUpForm() {
             <Label htmlFor="phone">Phone (optional, +91)</Label>
             <Input
               id="phone"
+              name="phone"
               type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              enterKeyHint="done"
               placeholder="+91 98765 43210"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
@@ -150,10 +184,10 @@ function SignUpForm() {
 
 export default function SignUpPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-muted/30 p-4">
+    <main id="main" className="flex min-h-dvh flex-col items-center justify-center bg-muted/30 p-4">
       <Suspense fallback={<div className="text-muted-foreground">Loading…</div>}>
         <SignUpForm />
       </Suspense>
-    </div>
+    </main>
   );
 }

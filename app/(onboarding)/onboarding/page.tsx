@@ -256,11 +256,11 @@ export default function OnboardingPage() {
             <>
               <div className="space-y-2">
                 <Label htmlFor="city">City</Label>
-                <Input id="city" value={city} onChange={(e) => setCity(e.target.value)} />
+                <Input id="city" autoComplete="address-level2" value={city} onChange={(e) => setCity(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="state">State</Label>
-                <Input id="state" value={stateName} onChange={(e) => setStateName(e.target.value)} />
+                <Input id="state" autoComplete="address-level1" value={stateName} onChange={(e) => setStateName(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Stall type</Label>
@@ -284,7 +284,16 @@ export default function OnboardingPage() {
             <>
               <div className="space-y-2">
                 <Label htmlFor="upiId">UPI ID</Label>
-                <Input id="upiId" placeholder="you@okaxis" value={upiId} onChange={(e) => setUpiId(e.target.value)} />
+                <Input
+                  id="upiId"
+                  placeholder="you@okaxis"
+                  inputMode="email"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  value={upiId}
+                  onChange={(e) => setUpiId(e.target.value)}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="upiName">Name shown on UPI screen</Label>
@@ -374,6 +383,8 @@ export default function OnboardingPage() {
                 <Input
                   id="wa"
                   type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   placeholder="+91 98765 43210"
                   value={whatsapp}
                   onChange={(e) => setWhatsapp(e.target.value)}

@@ -9,7 +9,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,7 +53,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Set a new password</CardTitle>
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">Set a new password</h1>
         <CardDescription>
           At least 8 characters, using two of: lowercase, uppercase, digits or
           symbols. You&apos;ll sign in again afterwards.
@@ -85,6 +84,7 @@ export function ResetPasswordForm({ token }: { token: string }) {
               name="confirmPassword"
               type="password"
               autoComplete="new-password"
+              enterKeyHint="go"
               minLength={8}
               required
               value={confirmPassword}

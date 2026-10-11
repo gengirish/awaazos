@@ -5,7 +5,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 
 import { ResetPasswordForm } from "./_components/ResetPasswordForm";
@@ -30,7 +29,7 @@ export default async function ResetPasswordPage(
       <main id="main" className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-4 px-4 py-12">
         <Card>
           <CardHeader>
-            <CardTitle>Invalid or expired link</CardTitle>
+            <h1 className="text-2xl font-semibold leading-none tracking-tight">Invalid or expired link</h1>
             <CardDescription>
               This reset link is missing its token, has already been used, or has
               expired. Links are valid for 30 minutes and can be used once.
@@ -39,7 +38,7 @@ export default async function ResetPasswordPage(
           <CardContent>
             <Link
               href="/forgot-password"
-              className="text-sm font-medium text-primary hover:underline"
+              className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
             >
               Request a new link
             </Link>
@@ -54,7 +53,7 @@ export default async function ResetPasswordPage(
       <ResetPasswordForm token={token} />
       <p className="text-center text-xs text-muted-foreground">
         Back to{" "}
-        <Link href="/sign-in" className="font-medium text-primary hover:underline">
+        <Link href="/sign-in" className="inline-flex min-h-11 items-center font-medium text-primary hover:underline">
           sign in
         </Link>
       </p>
