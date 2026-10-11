@@ -12,6 +12,7 @@ import { ReceiptModal } from "@/components/pos/ReceiptModal";
 import { POS_CART_ANCHOR_ID, StickyCheckoutBar } from "@/components/pos/StickyCheckoutBar";
 import { UpiQRModal, type PaidResult } from "@/components/pos/UpiQRModal";
 import { VoiceOrderButton } from "@/components/pos/VoiceOrderButton";
+import { useIsDesktop } from "@/hooks/useMediaQuery";
 import { useOnline } from "@/hooks/useOnline";
 import { usePosOutbox } from "@/hooks/usePosOutbox";
 import { useCartStore } from "@/lib/cartStore";
@@ -48,7 +49,7 @@ export function PosShell({
   const online = useOnline();
   const outbox = usePosOutbox(vendor.id);
 
-  const [isDesktop, setIsDesktop] = useState(false);
+  const isDesktop = useIsDesktop();
   const [payOpen, setPayOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [payTotals, setPayTotals] = useState({
@@ -66,14 +67,6 @@ export function PosShell({
   // Lets /pos open from the Home Screen with no network (public/sw.js).
   useEffect(() => {
     registerAppServiceWorker();
-  }, []);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(min-width: 768px)");
-    const update = () => setIsDesktop(mq.matches);
-    update();
-    mq.addEventListener("change", update);
-    return () => mq.removeEventListener("change", update);
   }, []);
 
   const onCollectPayment = useCallback(
@@ -160,7 +153,6 @@ export function PosShell({
         vendorId={vendor.id}
         open={payOpen}
         onOpenChange={setPayOpen}
-        isDesktop={isDesktop}
         stallName={vendor.name}
         upiId={vendor.upiId}
         upiName={vendor.upiName}

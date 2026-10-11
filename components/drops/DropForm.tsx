@@ -10,13 +10,13 @@ import { toast } from "sonner";
 import { VoiceDropPanel, type VoiceApplyResult } from "@/components/drops/VoiceDropPanel";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { formatINR, rupeesToPaise } from "@/lib/currency";
 import type { EffectiveDropStatus } from "@/lib/drops";
 import {
@@ -1013,17 +1013,17 @@ export function DropStatusControls({
         </Button>
       ) : null}
 
-      <Dialog open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>{confirm === "DELETE" ? "Delete this drop?" : "Freeze orders?"}</DialogTitle>
-            <DialogDescription>
+      <ResponsiveDialog open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)}>
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>{confirm === "DELETE" ? "Delete this drop?" : "Freeze orders?"}</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>
               {confirm === "DELETE"
                 ? "The drop and its item list will be removed. This can't be undone."
                 : "Customers can no longer change orders. New orders stop too. You'll get the final cooking and delivery list."}
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
+          <ResponsiveDialogFooter>
             <Button type="button" variant="outline" className="min-h-11" onClick={() => setConfirm(null)}>
               Cancel
             </Button>
@@ -1036,9 +1036,9 @@ export function DropStatusControls({
             >
               {confirm === "DELETE" ? "Delete" : "Freeze orders"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </section>
   );
 }

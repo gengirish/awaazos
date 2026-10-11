@@ -5,22 +5,22 @@ import { useRouter } from "next/navigation";
 import { PaymentMethod } from "@prisma/client";
 
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogBody,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import {
   PrintReceiptLink,
   useAutoPrintReceipt,
   useReceiptText,
   WhatsAppReceiptButton,
 } from "@/components/receipts/WhatsAppReceipt";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { paymentMethodLabel } from "@/lib/cash-tender";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
@@ -29,6 +29,7 @@ import { receiptWhatsappUrl } from "@/lib/whatsapp-message";
 export type ReceiptModalProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Behaviour only (auto-print). The sheet/dialog layout switches in CSS. */
   isDesktop: boolean;
   billNumber: string;
   totalPaise: number;
@@ -158,37 +159,18 @@ export function ReceiptModal({
     </div>
   );
 
-  if (isDesktop) {
-    return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent onOpenAutoFocus={focusPrimary}>
-          <DialogHeader>
-            <DialogTitle>{queued ? "Paid · saved offline" : "Paid"}</DialogTitle>
-            <DialogDescription>
-              {queued ? "This sale syncs when you're back online." : "Share the receipt or start a new order."}
-            </DialogDescription>
-          </DialogHeader>
-          {body}
-        </DialogContent>
-      </Dialog>
-    );
-  }
-
+  // Bottom sheet on phones, centred dialog from md up (CSS breakpoint).
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent
-        side="bottom"
-        className="max-h-[90vh] overflow-y-auto rounded-t-xl"
-        onOpenAutoFocus={focusPrimary}
-      >
-        <SheetHeader>
-          <SheetTitle>{queued ? "Paid · saved offline" : "Paid"}</SheetTitle>
-          <SheetDescription>
+    <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
+      <ResponsiveDialogContent onOpenAutoFocus={focusPrimary}>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle>{queued ? "Paid · saved offline" : "Paid"}</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>
             {queued ? "This sale syncs when you're back online." : "Share the receipt or start a new order."}
-          </SheetDescription>
-        </SheetHeader>
-        <div className="mt-4">{body}</div>
-      </SheetContent>
-    </Sheet>
+          </ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
+        <ResponsiveDialogBody>{body}</ResponsiveDialogBody>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }

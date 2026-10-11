@@ -7,13 +7,13 @@ import { toast } from "sonner";
 import { signOutVendor } from "@/app/(vendor)/actions/sign-out";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { listSales } from "@/lib/pos-outbox";
 import { cn } from "@/lib/utils";
 import { PENDING_SALES_TITLE, pendingSalesMessage } from "@/lib/vendor-sign-out";
@@ -201,19 +201,19 @@ export function VendorSignOutButton({ variant, vendorId, storeName, className }:
   return (
     <>
       {trigger}
-      <Dialog open={confirmOpen} onOpenChange={(open) => !busy && setConfirmOpen(open)}>
-        <DialogContent
-          className="max-w-[calc(100vw-2rem)] rounded-lg sm:max-w-md"
+      <ResponsiveDialog open={confirmOpen} onOpenChange={(open) => !busy && setConfirmOpen(open)}>
+        <ResponsiveDialogContent
+          className="md:max-w-md"
           onOpenAutoFocus={(e) => {
             e.preventDefault();
             cancelRef.current?.focus();
           }}
         >
-          <DialogHeader>
-            <DialogTitle>{PENDING_SALES_TITLE}</DialogTitle>
-            <DialogDescription>{pendingSalesMessage(pendingCount, storeName)}</DialogDescription>
-          </DialogHeader>
-          <DialogFooter className="gap-2">
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>{PENDING_SALES_TITLE}</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>{pendingSalesMessage(pendingCount, storeName)}</ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
+          <ResponsiveDialogFooter>
             <Button
               ref={cancelRef}
               type="button"
@@ -235,9 +235,9 @@ export function VendorSignOutButton({ variant, vendorId, storeName, className }:
               {busy ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
               {busy ? "Signing out…" : "Sign out anyway"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </>
   );
 }

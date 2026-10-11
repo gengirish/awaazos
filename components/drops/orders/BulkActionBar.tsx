@@ -5,13 +5,14 @@ import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogBody,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { formatINR } from "@/lib/currency";
 import type { BoardOrder } from "@/lib/drops-board";
 import { bulkNeedsConfirm, cashToCollectPaise, type BulkOrderAction } from "@/lib/order-bulk";
@@ -113,32 +114,34 @@ export function BulkActionBar({ selectedCount, counts, pending, targetsFor, onRu
         )}
       </div>
 
-      <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>
+      <ResponsiveDialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>
               {confirming === "mark_paid"
                 ? `Mark ${nOrders(dialogTargets.length)} paid?`
                 : `Mark ${nOrders(dialogTargets.length)} delivered?`}
-            </DialogTitle>
-            <DialogDescription>
+            </ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>
               {confirming === "mark_paid"
                 ? `Adds ${formatINR(totalPaise)} to your sales. Only do this after you have seen the money in your UPI app.`
                 : `${nOrders(cashCount)} ${cashCount === 1 ? "is" : "are"} pay on delivery. This records ${formatINR(cashPaise)} cash collected.`}
-            </DialogDescription>
-          </DialogHeader>
-          <ul className="max-h-48 divide-y overflow-y-auto rounded-md border text-sm" aria-label="Orders to change">
-            {dialogTargets.map((o) => (
-              <li key={o.id} className="flex justify-between gap-2 px-3 py-2">
-                <span className="min-w-0 truncate">
-                  <span className="font-mono text-xs text-muted-foreground">{o.billNumber}</span>{" "}
-                  {o.customerName?.trim() || "Customer"}
-                </span>
-                <span className="font-mono tabular-nums">{formatINR(o.totalPaise)}</span>
-              </li>
-            ))}
-          </ul>
-          <DialogFooter className="gap-2">
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
+          <ResponsiveDialogBody>
+            <ul className="max-h-48 divide-y overflow-y-auto rounded-md border text-sm" aria-label="Orders to change">
+              {dialogTargets.map((o) => (
+                <li key={o.id} className="flex justify-between gap-2 px-3 py-2">
+                  <span className="min-w-0 truncate">
+                    <span className="font-mono text-xs text-muted-foreground">{o.billNumber}</span>{" "}
+                    {o.customerName?.trim() || "Customer"}
+                  </span>
+                  <span className="font-mono tabular-nums">{formatINR(o.totalPaise)}</span>
+                </li>
+              ))}
+            </ul>
+          </ResponsiveDialogBody>
+          <ResponsiveDialogFooter>
             <Button type="button" variant="outline" className="min-h-11" onClick={() => setConfirming(null)}>
               Go back
             </Button>
@@ -153,9 +156,9 @@ export function BulkActionBar({ selectedCount, counts, pending, targetsFor, onRu
             >
               {confirming === "mark_paid" ? "Yes, mark paid" : "Yes, mark delivered"}
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </div>
   );
 }
