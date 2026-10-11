@@ -125,7 +125,7 @@ export function CartHubProvider({ children }: { children: React.ReactNode }) {
         <div
           ref={barRef}
           // Above the cookie banner while it shows (CookieConsentBanner publishes its height).
-          className="fixed inset-x-0 bottom-(--cookie-banner-h,0px) z-30 px-4 pb-[max(env(safe-area-inset-bottom),0.75rem)] pt-2 sm:px-6"
+          className="fixed inset-x-0 bottom-(--cookie-banner-h,0px) z-30 pb-[max(env(safe-area-inset-bottom),0.75rem)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-2 sm:pl-[max(1.5rem,env(safe-area-inset-left))] sm:pr-[max(1.5rem,env(safe-area-inset-right))]"
         >
           <div className="mx-auto max-w-2xl rounded-2xl bg-awaaz-charcoal px-4 py-3 text-white shadow-lg animate-in fade-in slide-in-from-bottom-2 motion-reduce:animate-none">
             {active.length > 1 ? (
