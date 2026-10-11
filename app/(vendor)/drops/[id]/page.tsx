@@ -32,7 +32,7 @@ export default async function DropOrdersPage(props: Props) {
       <a href="#orders-list" className="sr-only focus:not-sr-only">
         Skip to orders
       </a>
-      <nav aria-label="Breadcrumb" className="mx-auto mb-3 max-w-3xl text-sm">
+      <nav aria-label="Breadcrumb" className="mx-auto mb-1 max-w-3xl text-sm md:mb-3">
         <Link href="/drops" className="inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline">
           ← All drops
         </Link>

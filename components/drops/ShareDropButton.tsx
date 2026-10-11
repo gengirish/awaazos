@@ -3,7 +3,7 @@
 import { Check, Copy, MessageCircle, Share2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { InstagramStoryButton } from "@/components/drops/InstagramStoryButton";
+import { InstagramStoryButton, type StoryImage } from "@/components/drops/InstagramStoryButton";
 import { buildDropShareText, buildWhatsAppShareUrl } from "@/lib/drops-share";
 import { cn } from "@/lib/utils";
 
@@ -17,6 +17,9 @@ export type ShareDropButtonProps = {
   fulfilmentEndsAt: string; // ISO
   fulfilmentMode: "DELIVERY" | "PICKUP" | "BOTH";
   itemNames: string[];
+  /** Prepared Instagram story image held by the parent (see InstagramStoryButton). */
+  story?: StoryImage | null;
+  onStory?: (story: StoryImage) => void;
 };
 
 const baseBtn =
@@ -40,6 +43,8 @@ export function ShareDropButton(props: ShareDropButtonProps) {
     fulfilmentEndsAt,
     fulfilmentMode,
     itemNames,
+    story,
+    onStory,
   } = props;
 
   // window is unavailable during SSR; fill the origin in after mount.
@@ -131,7 +136,7 @@ export function ShareDropButton(props: ShareDropButtonProps) {
           <MessageCircle className="h-4 w-4" aria-hidden="true" />
           WhatsApp
         </button>
-        <InstagramStoryButton dropId={dropId} url={url} className={baseBtn} onStatus={setStatus} />
+        <InstagramStoryButton dropId={dropId} url={url} className={baseBtn} onStatus={setStatus} story={story} onStory={onStory} />
       </div>
       <p aria-live="polite" role="status" className="min-h-5 text-xs text-muted-foreground">
         {status}
