@@ -134,7 +134,8 @@ sub-exports.
   - `Receipt.pdfUrl`;
   - `OrderSource.WHATSAPP` and `OrderSource.API`.
 
-  `Vendor.logoUrl`, `VendorSettings.theme`, `taxEnabled` and `taxPercent` are read but never written.
+  `VendorSettings.theme`, `taxEnabled` and `taxPercent` are read but never written (`Vendor.logoUrl`
+  has been written by `POST /api/vendor/logo` since 2026-10-10).
   Dropping columns is destructive with `db push` and there are no migrations, so record these in
   TODO.md and decide later.
 

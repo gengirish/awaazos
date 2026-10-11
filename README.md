@@ -91,6 +91,7 @@ All of this on a phone, in <8 seconds per transaction. **Hindi + English at MVP.
 - 📊 **Analytics dashboard** — Recharts revenue trend, hourly heatmap, top sellers, voice adoption %, payment method breakdown — every chart has a `<details>` data table for accessibility
 - 🏢 **Multi-tenant** — `vendorId` scoping enforced on every query, two-layer RBAC (platform `UserRole` + per-tenant `StaffRole`)
 - 💸 **Razorpay subscriptions** — ₹299/mo per vendor, FREE up to 50 transactions a month, plan gates with `PlanGateError(402)` returning structured upgrade prompts
+- 🖼️ **Store banner & logo** — the owner uploads a cover photo and logo for `/s/[slug]` in Settings → Online store; photos are shrunk on the phone before upload
 - 🛍️ **Public storefront + Drops** — opt-in `/s/[slug]` page where buyers order from the everyday menu or from a pre-order "drop" (cut-off, capped stock, orders board, prep sheet). Payment by UPI + UTR, pay on delivery, or the vendor's own Razorpay keys
 - 📸 **Instagram story image** — one tap on a drop makes a 1080×1920 PNG (items, prices, cut-off, order link) inside Instagram's safe zones, and copies the storefront link for the Link sticker (`GET /api/drops/[id]/story-image`)
 - 🔔 **Web Push alerts** — new storefront orders and submitted UPI references push to the vendor's opted-in devices (`lib/push.ts`, `public/sw.js`)

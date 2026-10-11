@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 
 import { FssaiNumberClient } from "@/components/settings/FssaiNumberClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
+import { StoreImagesClient } from "@/components/settings/StoreImagesClient";
 import { StoreNameClient } from "@/components/settings/StoreNameClient";
 import { StorefrontClient } from "@/components/settings/StorefrontClient";
 import { prisma } from "@/lib/prisma";
@@ -32,6 +33,14 @@ export default async function StoreSettingsPage() {
       <div className="space-y-4">
         <SettingsCard title="Store name">
           <StoreNameClient initialName={vendor.name} isOwner={isOwner} />
+        </SettingsCard>
+        <SettingsCard title="Banner & logo" description="Shown at the top of your store page.">
+          <StoreImagesClient
+            storeName={vendor.name}
+            initialBannerUrl={vendor.bannerUrl}
+            initialLogoUrl={vendor.logoUrl}
+            isOwner={isOwner}
+          />
         </SettingsCard>
         <SettingsCard title="Your store page">
           <StorefrontClient

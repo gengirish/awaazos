@@ -200,4 +200,39 @@ test.describe("settings hub", () => {
     });
     expect(blank.status()).toBe(400);
   });
+
+  test("online store has a banner & logo card; the upload routes validate before storing", async ({ page, request }) => {
+    await createVendorSession(page, request, "settings-images", "/settings/store");
+
+    const card = page.getByRole("region", { name: "Banner & logo" });
+    await expect(card).toBeVisible();
+    await expect(card.getByText("No banner yet")).toBeVisible();
+    await expect(card.getByText("Upload banner")).toBeVisible();
+    await expect(card.getByText("Upload logo")).toBeVisible();
+    // Nothing set yet, so there is nothing to remove.
+    await expect(card.getByRole("button", { name: "Remove" })).toHaveCount(0);
+
+    // Validation runs before Blob storage is touched, so these hold with no Blob token (CI).
+    for (const kind of ["banner", "logo"] as const) {
+      const wrongType = await page.request.post(`/api/vendor/${kind}`, {
+        multipart: { file: { name: "a.gif", mimeType: "image/gif", buffer: Buffer.from("GIF89a") } },
+        failOnStatusCode: false,
+      });
+      expect(wrongType.status()).toBe(400);
+
+      const noFile = await page.request.post(`/api/vendor/${kind}`, { multipart: {}, failOnStatusCode: false });
+      expect(noFile.status()).toBe(400);
+
+      // Removing when nothing is set is a harmless success.
+      const remove = await page.request.delete(`/api/vendor/${kind}`);
+      expect(remove.status()).toBe(200);
+    }
+
+    // Signed out → 401 JSON, not a redirect.
+    const anon = await request.post("/api/vendor/banner", {
+      multipart: { file: { name: "a.png", mimeType: "image/png", buffer: Buffer.from("x") } },
+      failOnStatusCode: false,
+    });
+    expect(anon.status()).toBe(401);
+  });
 });

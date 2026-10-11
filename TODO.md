@@ -281,8 +281,9 @@ Never referenced in `app/`, `lib/`, `components/`, `workers/` or `hooks/` (re-ch
 - `Receipt.pdfUrl`
 - `OrderSource.WHATSAPP` and `OrderSource.API`
 
-Read but never written: `Vendor.logoUrl` (storefront), `VendorSettings.theme` (storefront) and
-`VendorSettings.taxEnabled` / `taxPercent` (POS cart). Nothing in the app sets them.
+Read but never written: `VendorSettings.theme` (storefront) and `VendorSettings.taxEnabled` /
+`taxPercent` (POS cart). Nothing in the app sets them. (`Vendor.logoUrl` is now set by
+`POST /api/vendor/logo`, Settings → Online store.)
 
 `Transaction.razorpayOrderId` and `razorpayPaymentId` were on the original audit list but are now
 used by storefront Razorpay checkout (Drops).
