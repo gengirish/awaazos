@@ -1,23 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  ResponsiveDialog,
-  ResponsiveDialogBody,
-  ResponsiveDialogContent,
-  ResponsiveDialogDescription,
-  ResponsiveDialogHeader,
-  ResponsiveDialogTitle,
-} from "@/components/ui/responsive-dialog";
-import {
-  detectInstallGuide,
-  INSTALL_STEPS,
-  type BeforeInstallPromptEvent,
-  type InstallGuide,
-} from "@/lib/install-app";
+import { detectInstallGuide, type BeforeInstallPromptEvent, type InstallGuide } from "@/lib/install-app";
 import { isStandalone } from "@/lib/push-client";
+
+// The written steps (and the dialog primitives) load on the first tap.
+const InstallGuideDialog = dynamic(() => import("@/components/marketing/InstallGuideDialog"), { ssr: false });
 
 /**
  * Landing-page "Install app". Uses the browser's own install prompt when
@@ -27,7 +18,9 @@ import { isStandalone } from "@/lib/push-client";
 export function InstallAppButton() {
   const promptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
+  // `guide` stays set after closing so the dialog can play its exit animation.
   const [guide, setGuide] = useState<InstallGuide | null>(null);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     if (isStandalone()) setInstalled(true);
@@ -62,11 +55,10 @@ export function InstallAppButton() {
       }
     }
     setGuide(detectInstallGuide(navigator.userAgent, navigator.maxTouchPoints ?? 0));
+    setOpen(true);
   }
 
   if (installed) return null;
-
-  const content = guide ? INSTALL_STEPS[guide] : null;
 
   return (
     <>
@@ -80,21 +72,7 @@ export function InstallAppButton() {
         <Download aria-hidden="true" />
         Install app
       </Button>
-      <ResponsiveDialog open={guide !== null} onOpenChange={(open) => !open && setGuide(null)}>
-        <ResponsiveDialogContent>
-          <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>Install AwaazOS</ResponsiveDialogTitle>
-            <ResponsiveDialogDescription>{content?.intro}</ResponsiveDialogDescription>
-          </ResponsiveDialogHeader>
-          <ResponsiveDialogBody>
-            <ol className="list-decimal space-y-2 pl-5 text-sm text-awaaz-charcoal">
-              {content?.steps.map((step) => (
-                <li key={step}>{step}</li>
-              ))}
-            </ol>
-          </ResponsiveDialogBody>
-        </ResponsiveDialogContent>
-      </ResponsiveDialog>
+      {guide ? <InstallGuideDialog guide={guide} open={open} onOpenChange={setOpen} /> : null}
     </>
   );
 }
