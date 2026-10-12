@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { ShowOnlineSwitch } from "@/components/menu/ShowOnlineSwitch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatINR } from "@/lib/currency";
 
 export type MenuItemCardProps = {
@@ -19,6 +20,7 @@ export type MenuItemCardProps = {
 
 export function MenuItemCard({ item, onEdit, onChanged }: MenuItemCardProps) {
   const [saving, setSaving] = useState(false);
+  const [confirmRemove, setConfirmRemove] = useState(false);
 
   async function patch(body: { isAvailable: boolean } | { showOnline: boolean }): Promise<boolean> {
     setSaving(true);
@@ -54,7 +56,6 @@ export function MenuItemCard({ item, onEdit, onChanged }: MenuItemCardProps) {
   }
 
   async function softDelete() {
-    if (!window.confirm(`Remove “${item.name}” from the menu? It will be marked unavailable.`)) return;
     try {
       const res = await fetch(`/api/menu/${item.id}`, { method: "DELETE" });
       const json = await res.json().catch(() => ({}));
@@ -148,7 +149,7 @@ export function MenuItemCard({ item, onEdit, onChanged }: MenuItemCardProps) {
             variant="destructive"
             size="sm"
             className="min-h-11 flex-1"
-            onClick={softDelete}
+            onClick={() => setConfirmRemove(true)}
             aria-label={`Remove ${item.name}`}
           >
             <Trash2 className="mr-1 h-4 w-4" aria-hidden />
@@ -156,6 +157,14 @@ export function MenuItemCard({ item, onEdit, onChanged }: MenuItemCardProps) {
           </Button>
         </div>
       </CardContent>
+      <ConfirmDialog
+        open={confirmRemove}
+        onOpenChange={setConfirmRemove}
+        title={`Remove “${item.name}” from the menu?`}
+        description="It will be marked unavailable. Past bills keep it."
+        confirmLabel="Remove"
+        onConfirm={() => void softDelete()}
+      />
     </Card>
   );
 }
