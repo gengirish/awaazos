@@ -259,6 +259,13 @@
   html {
     scroll-padding-bottom: var(--cookie-banner-h, 0px);
   }
+  /* The banner is in the server HTML so a first-time visitor sees it with the
+     first paint, not after hydration (it was the storefront's LCP element).
+     For someone who already answered, the inline script in app/layout.tsx
+     sets data-cookie-pref before first paint and this keeps it from flashing. */
+  html[data-cookie-pref] [data-cookie-banner] {
+    display: none;
+  }
   /* viewport-fit=cover (app/layout.tsx) lets the page run under the notch and
      the home indicator. Padding the body keeps in-flow content clear of them;
      `fixed` elements are positioned against the viewport and add their own

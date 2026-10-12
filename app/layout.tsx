@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Baloo_2, Nunito } from "next/font/google";
 import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
+import { COOKIE_PREF_BOOT_SCRIPT } from "@/lib/cookie-pref";
 import "./globals.css";
 
 const baloo = Baloo_2({
@@ -47,6 +48,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en-IN" suppressHydrationWarning>
+      <head>
+        {/* Static string, see lib/cookie-pref.ts. Must run before first paint. */}
+        <script dangerouslySetInnerHTML={{ __html: COOKIE_PREF_BOOT_SCRIPT }} />
+      </head>
       <body className={`${baloo.variable} ${nunito.variable} min-h-screen font-body antialiased`}>
         {children}
         <CookieConsentBanner />
