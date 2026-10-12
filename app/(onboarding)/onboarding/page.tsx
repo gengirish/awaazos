@@ -20,6 +20,7 @@ import {
 import { useQrDataUrl } from "@/hooks/useQrDataUrl";
 import { ALLOWED_VOICE_LANGS, STALL_TYPES, VOICE_LANGUAGES } from "@/lib/constants";
 import { rupeesToPaise } from "@/lib/currency";
+import { HOME_PATH } from "@/lib/home";
 import { buildUpiDeepLink, isValidUpiId, UPI_ID_FORMAT_MESSAGE } from "@/lib/upi";
 import type { StallType, Vendor, VendorSettings } from "@prisma/client";
 
@@ -76,7 +77,7 @@ export default function OnboardingPage() {
         if (cancelled) return;
         const v = data.vendor;
         if (v.onboardingDone) {
-          router.replace("/pos");
+          router.replace(HOME_PATH);
           return;
         }
         setCity(v.city ?? "");
@@ -211,7 +212,7 @@ export default function OnboardingPage() {
       return;
     }
 
-    router.push(speakMenu ? "/menu?voice=1" : "/pos");
+    router.push(speakMenu ? "/menu?voice=1" : HOME_PATH);
     router.refresh();
   }
 

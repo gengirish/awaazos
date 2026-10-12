@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
+import { InstallRailButton, InstallSheetRow } from "@/components/pwa/InstallPrompt";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { appNavItemsForRole, isAppNavItemActive, type AppNavId } from "@/lib/app-nav";
 import { cn } from "@/lib/utils";
@@ -175,6 +176,8 @@ export function AppTabBar({ role, vendorId, vendorName, storePath }: AppNavProps
                       </a>
                     </li>
                   ) : null}
+                  {/* "Install app" where this browser can install; nothing otherwise. */}
+                  <InstallSheetRow rowClassName={SHEET_ROW} onPrompt={() => setMoreOpen(false)} />
                   <li className="mt-2 border-t border-border pt-2">
                     {/* Stays mounted while its "unsynced sales" warning is open, so the sheet is not closed on tap. */}
                     <VendorSignOutButton
@@ -241,6 +244,7 @@ export function AppRail({ role, vendorId, vendorName, storePath }: AppNavProps) 
             {NEW_TAB_NOTE}
           </a>
         ) : null}
+        <InstallRailButton className={cn(RAIL_ITEM, FOCUS_RING, RAIL_IDLE)} />
         <VendorSignOutButton
           variant="header"
           vendorId={vendorId}
