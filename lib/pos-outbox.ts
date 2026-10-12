@@ -6,6 +6,12 @@
  * or not the network is up. Offline (or on a 5xx / timeout) the entry stays and
  * is drained later by `syncOutbox()`.
  *
+ * If the device write itself fails (IndexedDB blocked or its backing store
+ * broken), the sale is POSTed directly with the same `clientRef`. Nothing holds
+ * it then, so a post that doesn't get an answer is reported as `unsaved`, never
+ * as queued: the caller keeps the cart and passes the same `clientRef` back in
+ * on the next attempt, which cannot bill twice.
+ *
  * Rules:
  *   - Sync is event-driven only (page load, `online`, tab visible, after a
  *     successful sale). Never add an interval: Neon must be able to sleep.
@@ -54,7 +60,7 @@ export type PostOutcome =
   /** Session expired: keep, ask the vendor to sign in. */
   | { kind: "auth" }
   /** The server will never accept this body as it stands. */
-  | { kind: "rejected"; code: string };
+  | { kind: "rejected"; code: string; status: number };
 
 /** Fired on `window` whenever this device's outbox changes or a sync finishes. */
 export const OUTBOX_CHANGED_EVENT = "awaazos:pos-outbox-changed";
@@ -92,6 +98,32 @@ export function syncOrder(sales: OutboxSale[]): OutboxSale[] {
   return [...sales]
     .filter((s) => s.status === "pending")
     .sort((a, b) => a.clientCreatedAt.localeCompare(b.clientCreatedAt) || a.localNo - b.localNo);
+}
+
+// A Map, not an object: a code like "toString" must not find a prototype member.
+const SALE_REJECTED_MESSAGES = new Map<string, string>([
+  ["monthly_txn_cap_reached", "Monthly bill limit reached for your plan"],
+  ["billing_locked", "Your free trial has ended. Subscribe in Settings → Plan & billing to keep selling."],
+  ["subtotal_mismatch", "This bill's total didn't add up. Close this, check the cart and try again."],
+  ["total_mismatch", "This bill's total didn't add up. Close this, check the cart and try again."],
+]);
+
+/**
+ * What the vendor is told when a live checkout is refused. Only known codes
+ * get their own line: a server string is never shown as it came.
+ */
+export function saleRejectedMessage(code: string, status?: number): string {
+  const known = SALE_REJECTED_MESSAGES.get(code);
+  if (known) return known;
+  if (status === 403) return "This account can't record sales for this store. Ask the owner to check your access.";
+  return "Could not record payment";
+}
+
+/** What the vendor is told when a sale was neither committed nor saved on the device. */
+export function saleUnsavedMessage(reason: "network" | "auth"): string {
+  return reason === "auth"
+    ? "Couldn't save this sale. Sign in again, then try again."
+    : "Couldn't save this sale. Check your connection and try again.";
 }
 
 // ── IndexedDB ─────────────────────────────────────────────────────────────
@@ -136,8 +168,14 @@ async function putSale(sale: OutboxSale): Promise<void> {
   await set(saleKey(sale.vendorId, sale.clientRef), sale, db());
 }
 
+/** Never rejects: an entry that can't be deleted is simply still listed. */
 export async function removeSale(vendorId: string, clientRef: string): Promise<void> {
-  await del(saleKey(vendorId, clientRef), db());
+  try {
+    await del(saleKey(vendorId, clientRef), db());
+  } catch {
+    // IndexedDB unavailable. If the entry did sync, the next drain replays its
+    // clientRef, gets the original bill back and tries the delete again.
+  }
   announce();
 }
 
@@ -175,7 +213,7 @@ async function postSale(sale: OutboxSale, opts: { deferred: boolean; timeoutMs?:
     }
     if (kind === "rejected") {
       const data = (await res.json().catch(() => null)) as { code?: string; error?: string } | null;
-      return { kind, code: String(data?.code ?? data?.error ?? res.status).slice(0, 64) };
+      return { kind, code: String(data?.code ?? data?.error ?? res.status).slice(0, 64), status: res.status };
     }
     return { kind };
   } catch {
@@ -190,20 +228,39 @@ async function postSale(sale: OutboxSale, opts: { deferred: boolean; timeoutMs?:
 export type CheckoutResult =
   | { kind: "synced"; bill: SyncedBill }
   | { kind: "queued"; localNo: number; needsSignIn: boolean }
-  | { kind: "rejected"; code: string };
+  | { kind: "rejected"; code: string; status: number }
+  /**
+   * The device could not store the sale and the server did not confirm it, so
+   * nothing holds it. Retry with this `clientRef` to stay idempotent.
+   */
+  | { kind: "unsaved"; clientRef: string; reason: "network" | "auth" };
 
-/** Ring up a sale: save it on the device, then try to commit it right away. */
-export async function checkoutSale(vendorId: string, body: OutboxSaleBody): Promise<CheckoutResult> {
+/**
+ * Ring up a sale: save it on the device, then try to commit it right away.
+ * Pass the `clientRef` of an earlier `unsaved` result to retry that sale.
+ */
+export async function checkoutSale(
+  vendorId: string,
+  body: OutboxSaleBody,
+  opts: { clientRef?: string } = {},
+): Promise<CheckoutResult> {
   const sale: OutboxSale = {
-    clientRef: crypto.randomUUID(),
+    clientRef: opts.clientRef ?? crypto.randomUUID(),
     vendorId,
     clientCreatedAt: new Date().toISOString(),
-    localNo: await nextLocalNo(vendorId),
+    localNo: 0,
     body,
     status: "pending",
   };
-  await putSale(sale);
-  announce();
+  let stored = false;
+  try {
+    sale.localNo = await nextLocalNo(vendorId);
+    await putSale(sale);
+    stored = true;
+  } catch {
+    // IndexedDB blocked or broken: go straight to the server instead.
+  }
+  if (stored) announce();
 
   const outcome: PostOutcome =
     typeof navigator !== "undefined" && navigator.onLine === false
@@ -212,7 +269,7 @@ export async function checkoutSale(vendorId: string, body: OutboxSaleBody): Prom
 
   if (outcome.kind !== "retry") signInNeeded.set(vendorId, outcome.kind === "auth");
   if (outcome.kind === "ok") {
-    await removeSale(vendorId, sale.clientRef);
+    if (stored) await removeSale(vendorId, sale.clientRef);
     // The network is evidently up: push anything older that was waiting.
     void syncOutbox(vendorId);
     return { kind: "synced", bill: outcome.bill };
@@ -220,8 +277,11 @@ export async function checkoutSale(vendorId: string, body: OutboxSaleBody): Prom
   if (outcome.kind === "rejected") {
     // Live rejection (plan cap, tampered totals): same as before the outbox,
     // the vendor sees the error and the sale isn't kept.
-    await removeSale(vendorId, sale.clientRef);
-    return { kind: "rejected", code: outcome.code };
+    if (stored) await removeSale(vendorId, sale.clientRef);
+    return { kind: "rejected", code: outcome.code, status: outcome.status };
+  }
+  if (!stored) {
+    return { kind: "unsaved", clientRef: sale.clientRef, reason: outcome.kind === "auth" ? "auth" : "network" };
   }
   return { kind: "queued", localNo: sale.localNo, needsSignIn: outcome.kind === "auth" };
 }
