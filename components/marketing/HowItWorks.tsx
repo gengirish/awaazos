@@ -22,7 +22,7 @@ export function HowItWorks() {
   return (
     <section id="how-it-works" aria-labelledby="how-heading" className="px-4 py-16 sm:px-6 sm:py-20">
       <div className="mx-auto max-w-6xl">
-        <h2 id="how-heading" className="font-display text-3xl font-bold text-awaaz-charcoal sm:text-4xl">
+        <h2 id="how-heading" className="font-display text-3xl font-bold text-balance text-awaaz-charcoal sm:text-4xl">
           How it works
         </h2>
         <p className="mt-3 max-w-2xl text-muted-foreground">

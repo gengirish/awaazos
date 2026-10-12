@@ -53,7 +53,7 @@ export default async function NewDropPage() {
   };
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
+    <div className="bg-background p-4 md:p-6">
       <header className="mx-auto mb-6 flex max-w-2xl items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-semibold text-foreground">New drop</h1>

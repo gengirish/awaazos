@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
@@ -42,7 +42,8 @@ function SignInForm() {
   return (
     <Card className="w-full max-w-md border-border/80 shadow-lg">
       <CardHeader>
-        <CardTitle className="font-display text-2xl">Sign in</CardTitle>
+        {/* <h1>, not CardTitle (an <h3>): this is the page's only heading. */}
+        <h1 className="font-display text-2xl font-semibold leading-none tracking-tight">Sign in</h1>
         <CardDescription>Welcome back to AwaazOS — Bol. Bill. Becho.</CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit}>
@@ -58,7 +59,11 @@ function SignInForm() {
               id="email"
               name="email"
               type="email"
+              inputMode="email"
               autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -71,6 +76,7 @@ function SignInForm() {
               name="password"
               type="password"
               autoComplete="current-password"
+              enterKeyHint="go"
               required
               minLength={8}
               value={password}
@@ -78,9 +84,10 @@ function SignInForm() {
             />
           </div>
           <div className="flex justify-end">
+            {/* 44px hit area; -my-2 gives most of the extra height back to the layout. */}
             <Link
               href="/forgot-password"
-              className="text-sm font-medium text-primary hover:underline"
+              className="-my-2 inline-flex min-h-11 items-center rounded-md text-sm font-medium text-primary hover:underline"
             >
               Forgot password?
             </Link>
@@ -101,10 +108,10 @@ function SignInForm() {
 
 export default function SignInPage() {
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-muted/30 p-4">
+    <main id="main" className="flex min-h-dvh flex-col items-center justify-center bg-muted/30 p-4">
       <Suspense fallback={<div className="text-muted-foreground">Loading…</div>}>
         <SignInForm />
       </Suspense>
-    </div>
+    </main>
   );
 }

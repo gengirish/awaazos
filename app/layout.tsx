@@ -27,6 +27,9 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#FF6600",
+  // Without `cover`, env(safe-area-inset-*) is 0 on iPhones. The body and the
+  // fixed bars pad themselves back inside the safe area (app/globals.css).
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

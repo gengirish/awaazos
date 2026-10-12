@@ -19,6 +19,10 @@ Every voice-only path MUST have a tap fallback (`QuickAddGrid`).
 ## Touch targets — POS-critical
 
 - **Minimum 44×44 px** for any tap target.
+- The shared primitives meet this on touch devices by default: `Button`, `Input`,
+  `SelectTrigger`, `SelectItem` and the Dialog / Sheet close buttons are 44 px on
+  coarse pointers (see `design-system.mdc`, "Touch defaults"). Hand-rolled
+  `<button>` / `<a>` elements still need `min-h-11` (+ `min-w-11` when icon-only).
 - Mic button: **80×80 px** (per spec) — must be reachable in single-handed thumb arc.
 - Cart qty +/- buttons: 44×44 px minimum, with 8 px spacing.
 - Disable tap-highlight only after replacing with a custom focus ring.
@@ -29,11 +33,14 @@ Every voice-only path MUST have a tap fallback (`QuickAddGrid`).
 - Numeric inputs: `inputMode="decimal"` for ₹, `inputMode="tel"` for phone.
 - Currency input: format as the user types (₹X,XXX.XX) but submit paise integer.
 
-## Modals (UpiQRModal, ReceiptModal)
+## Modals
 
 - Focus trap + Escape to close
-- `aria-modal="true"`, `role="dialog"`, labeled by `aria-labelledby`
-- Mobile: bottom sheet (shadcn `Sheet`) — swipe-down to dismiss
+- `role="dialog"`, labelled by its title (`aria-labelledby`). Radix hides the
+  rest of the page from assistive tech (`aria-hidden`) while it is open.
+- Mobile: bottom sheet via `ResponsiveDialog` (`components/ui/responsive-dialog.tsx`),
+  centred dialog from `md`. Closes with the 44×44 close button, a tap on the
+  overlay, or Escape. Swipe-down to dismiss is **not implemented**.
 
 ## Voice button states (must be distinguishable beyond color)
 

@@ -211,7 +211,10 @@ function basic(body: string, init?: ResponseInit, type = "basic"): Response {
 }
 
 const POS_HTML =
-  '<html><link rel="stylesheet" href="/_next/static/css/app.css"><script src="/_next/static/chunks/pos-abc.js"></script></html>';
+  '<html><link rel="stylesheet" href="/_next/static/css/app.css"><script src="/_next/static/chunks/pos-abc.js"></script><div data-pos-page="ready"></div></html>';
+/** What /pos streams when its data fails: the shell and a skeleton, still 200, no ready marker. */
+const POS_FAILED_HTML =
+  '<html><script src="/_next/static/chunks/pos-abc.js"></script><div role="status" aria-busy="true"></div></html>';
 
 function offlineWorker(fetchImpl: (url: string) => Promise<Response>) {
   const caches = new FakeCacheStorage();
@@ -292,6 +295,20 @@ describe("sw.js fetch handler", () => {
     const stat = await caches.open("awz-static-v1");
     expect(await stat.match("/_next/static/chunks/pos-abc.js")).toBeDefined();
     expect(await stat.match("/_next/static/css/app.css")).toBeDefined();
+  });
+
+  it("keeps the last good /pos when a later load renders without its data", async () => {
+    const { handlers, caches } = offlineWorker(async (url) =>
+      url.endsWith("/pos") ? basic(POS_FAILED_HTML, { headers: { "content-type": "text/html" } }) : basic("asset"),
+    );
+    const pos = await caches.open("awz-pos-v1");
+    await pos.put("/pos", basic(POS_HTML));
+
+    const out = await fetchEvent(handlers.fetch!, "/pos", { mode: "navigate" });
+    // The vendor still gets what the server sent…
+    expect(await out.response!.text()).toBe(POS_FAILED_HTML);
+    // …but it does not replace the offline copy.
+    expect(await (await pos.match("/pos"))!.text()).toBe(POS_HTML);
   });
 
   it("opens the cached /pos when offline, and the offline page when nothing is cached", async () => {

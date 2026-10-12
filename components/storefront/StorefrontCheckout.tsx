@@ -611,7 +611,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     <Sheet open={open} onOpenChange={(v) => !submitting && onOpenChange(v)}>
       <SheetContent
         side="bottom"
-        className="mx-auto max-h-[92vh] max-w-2xl overflow-y-auto rounded-t-2xl px-4 pb-6 sm:px-6"
+        className="mx-auto max-h-[92dvh] max-w-2xl overflow-y-auto rounded-t-2xl px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6"
         onCloseAutoFocus={(e) => {
           const target = returnFocusRef?.current;
           if (target && target.isConnected) {

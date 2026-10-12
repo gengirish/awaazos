@@ -6,6 +6,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import type { StoryImage } from "@/components/drops/InstagramStoryButton";
+import { BoardMoreActions, MORE_ACTION_ROW } from "@/components/drops/orders/BoardMoreActions";
 import { BulkActionBar } from "@/components/drops/orders/BulkActionBar";
 import { OrderCard } from "@/components/drops/orders/OrderCard";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
@@ -109,6 +111,8 @@ const MENU_MODE_LABEL: Record<FulfilmentMode, string> = {
   BOTH: "Delivery or pickup",
 };
 
+const MENU_BOARD_SCOPE = "Orders customers placed from your menu in the last 3 days, plus older ones still open.";
+
 const ACTION_DONE: Record<OrderAction, string> = {
   confirm: "Order confirmed",
   mark_paid: "Marked paid",
@@ -120,6 +124,21 @@ const ACTION_DONE: Record<OrderAction, string> = {
 
 const LINK_BTN =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
+
+/** Summary tile: one line (label · figure) on phones, label over figure from sm. */
+const KPI_TILE =
+  "flex min-w-0 flex-wrap items-baseline justify-between gap-x-1.5 rounded-lg border bg-card px-2 py-1.5 sm:block sm:p-3";
+const KPI_VALUE = "font-mono text-sm font-bold tabular-nums sm:text-lg";
+
+const STATUS_BADGE = "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold";
+
+/** Header controls built by the board (they need its state), laid out by each header. */
+type BoardTools = {
+  refreshButton: ReactNode;
+  lastChecked: ReactNode;
+  soundButton: (className?: string) => ReactNode;
+  pollNote: ReactNode;
+};
 
 function beep(ctx: AudioContext | null) {
   if (!ctx) return;
@@ -480,8 +499,8 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
     if (result.failed.length > 0) await refresh();
   };
 
-  const controls = (
-    <>
+  const tools: BoardTools = {
+    refreshButton: (
       <Button
         type="button"
         variant="outline"
@@ -497,13 +516,17 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
         )}
         Refresh
       </Button>
-      {lastChecked && (
-        <span className="text-xs text-muted-foreground">Last checked {formatIstTime(lastChecked)}</span>
-      )}
+    ),
+    lastChecked: lastChecked ? (
+      <span className="min-w-0 text-xs leading-tight text-muted-foreground">Last checked {formatIstTime(lastChecked)}</span>
+    ) : null,
+    // Rendered twice (header from md, "More actions" sheet on phones). Both carry
+    // data-sound-toggle so the "first tap enables sound" listener leaves them alone.
+    soundButton: (className) => (
       <Button
         type="button"
         variant="outline"
-        className="min-h-11"
+        className={cn("min-h-11", className)}
         onClick={toggleSound}
         aria-pressed={soundOn}
         data-sound-toggle
@@ -511,17 +534,15 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
         {soundOn || soundPending ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />}
         {soundOn ? "Sound on" : soundPending ? "Sound on — tap to enable" : "Sound off"}
       </Button>
-      <PushAlertsButton variant="board" />
-    </>
-  );
-
-  const pollNote = (
-    <p className="mt-2 text-xs text-muted-foreground">
-      {pollKind
-        ? "New orders appear automatically while this screen is open."
-        : "Not checking for new orders automatically. Tap Refresh to update."}
-    </p>
-  );
+    ),
+    pollNote: (
+      <p className="mt-2 text-xs text-muted-foreground">
+        {pollKind
+          ? "New orders appear automatically while this screen is open."
+          : "Not checking for new orders automatically. Tap Refresh to update."}
+      </p>
+    ),
+  };
 
   const emptyText =
     orders.length === 0
@@ -542,16 +563,14 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
           effective={effective}
           vendorName={vendorName}
           vendorSlug={vendorSlug}
-          controls={controls}
-          pollNote={pollNote}
+          tools={tools}
         />
       ) : source.kind === "menu" ? (
         <MenuHeader
           acceptMenuOrders={source.acceptMenuOrders}
           fulfilmentMode={source.fulfilmentMode}
           vendorSlug={vendorSlug}
-          controls={controls}
-          pollNote={pollNote}
+          tools={tools}
         />
       ) : null}
 
@@ -564,28 +583,27 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
         </p>
       )}
 
-      <section aria-labelledby="summary-h" className="mb-4">
+      <section aria-labelledby="summary-h" className="mb-3 sm:mb-4">
         <h2 id="summary-h" className="sr-only">
           Summary
         </h2>
-        <ul className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <li className="rounded-lg border bg-card p-3">
+        {/* Phones: label and figure share a line, so the 2×2 block is about half as tall. */}
+        <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
+          <li className={KPI_TILE}>
             <p className="text-xs text-muted-foreground">Paid</p>
-            <p className="font-mono text-lg font-bold tabular-nums">{formatINR(summary.paidPaise)}</p>
+            <p className={KPI_VALUE}>{formatINR(summary.paidPaise)}</p>
           </li>
-          <li className="rounded-lg border bg-card p-3">
+          <li className={KPI_TILE}>
             <p className="text-xs text-muted-foreground">To collect</p>
-            <p className="font-mono text-lg font-bold tabular-nums">{formatINR(summary.pendingPaise)}</p>
+            <p className={KPI_VALUE}>{formatINR(summary.pendingPaise)}</p>
           </li>
-          <li className="rounded-lg border bg-card p-3">
+          <li className={KPI_TILE}>
             <p className="text-xs text-muted-foreground">Live orders</p>
-            <p className="font-mono text-lg font-bold tabular-nums">{summary.activeOrders}</p>
+            <p className={KPI_VALUE}>{summary.activeOrders}</p>
           </li>
-          <li className="rounded-lg border bg-card p-3">
+          <li className={KPI_TILE}>
             <p className="text-xs text-muted-foreground">Payment to check</p>
-            <p className="font-mono text-lg font-bold tabular-nums">
-              {summary.counts.PAYMENT_SUBMITTED + summary.counts.AWAITING_PAYMENT}
-            </p>
+            <p className={KPI_VALUE}>{summary.counts.PAYMENT_SUBMITTED + summary.counts.AWAITING_PAYMENT}</p>
           </li>
         </ul>
         {toCook.length > 0 && (
@@ -597,16 +615,20 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
           </p>
         )}
         {isMenu && (
-          <div className="mt-3 rounded-lg border bg-card p-3" aria-live="polite">
-            <h3 className="text-sm font-semibold">To make</h3>
+          // Phones: heading and chips share a row, no card. From sm: the card as before.
+          <div
+            className="mt-2 flex items-start gap-2 sm:mt-3 sm:block sm:rounded-lg sm:border sm:bg-card sm:p-3"
+            aria-live="polite"
+          >
+            <h3 className="shrink-0 text-sm font-semibold leading-7 sm:leading-normal">To make</h3>
             {toMake.length === 0 ? (
-              <p className="mt-1 text-sm text-muted-foreground">Nothing to make right now.</p>
+              <p className="text-sm leading-7 text-muted-foreground sm:mt-1 sm:leading-normal">Nothing to make right now.</p>
             ) : (
-              <ul className="mt-2 flex flex-wrap gap-2" aria-label="Items to make">
+              <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5 sm:mt-2 sm:gap-2" aria-label="Items to make">
                 {toMake.map((r) => (
                   <li
                     key={r.name}
-                    className="inline-flex min-h-9 items-center gap-1.5 rounded-full border bg-background px-3 text-sm"
+                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border bg-background px-2.5 text-sm sm:min-h-9 sm:px-3"
                   >
                     <span className="font-mono font-bold tabular-nums">{r.qty} ×</span>
                     <span>{r.name}</span>
@@ -618,26 +640,45 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
         )}
       </section>
 
-      <nav aria-label="Filter orders" className="-mx-4 mb-4 overflow-x-auto px-4">
-        <div role="tablist" className="flex gap-2">
-          {BOARD_FILTERS.map((f) => (
-            <button
-              key={f.id}
-              type="button"
-              role="tab"
-              aria-selected={filter === f.id}
-              aria-controls="orders-list"
-              onClick={() => changeFilter(f.id)}
-              className={cn(
-                "min-h-11 shrink-0 whitespace-nowrap rounded-full border px-4 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
-                filter === f.id
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-input bg-background hover:bg-accent",
-              )}
-            >
-              {f.label} ({counts[f.id]})
-            </button>
-          ))}
+      {/*
+        Sticks to the top of the screen while the list scrolls. Phones: five
+        segments that all fit at 360px (label over count), so no tab is cut off.
+        From md: the pill row as before. aria-label keeps each tab's name
+        "Label (count)" in both layouts.
+      */}
+      <nav
+        aria-label="Filter orders"
+        className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-3 border-b bg-background px-4 py-2 md:mb-4 md:overflow-x-auto md:border-b-0"
+      >
+        <div
+          role="tablist"
+          className="grid grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,1.2fr)_minmax(2.75rem,0.7fr)] gap-1 md:flex md:gap-2"
+        >
+          {BOARD_FILTERS.map((f) => {
+            const active = filter === f.id;
+            return (
+              <button
+                key={f.id}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                aria-controls="orders-list"
+                aria-label={`${f.label} (${counts[f.id]})`}
+                onClick={() => changeFilter(f.id)}
+                className={cn(
+                  "flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border px-0.5 py-1 text-center text-[11px] font-medium leading-tight focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring min-[390px]:text-xs",
+                  "md:min-h-11 md:shrink-0 md:flex-row md:gap-1 md:whitespace-nowrap md:rounded-full md:px-4 md:py-0 md:text-sm",
+                  active
+                    ? "border-primary bg-primary text-primary-foreground max-md:font-bold max-md:underline max-md:underline-offset-2"
+                    : "border-input bg-background hover:bg-accent",
+                )}
+              >
+                <span className="max-w-full break-words">{f.label}</span>
+                <span className="font-mono text-sm font-bold tabular-nums md:hidden">{counts[f.id]}</span>
+                <span className="hidden md:inline">({counts[f.id]})</span>
+              </button>
+            );
+          })}
         </div>
       </nav>
 
@@ -703,48 +744,69 @@ function DropHeader({
   effective,
   vendorName,
   vendorSlug,
-  controls,
-  pollNote,
+  tools,
 }: {
   drop: BoardDrop;
   effective: EffectiveDropStatus;
   vendorName: string;
   vendorSlug: string;
-  controls: ReactNode;
-  pollNote: ReactNode;
+  tools: BoardTools;
 }) {
+  // Held here, not in the share button: on phones the button lives in the "More
+  // actions" sheet, which unmounts on close. The Instagram flow is two taps
+  // (fetch, then share), and the fetched image must outlive a closed sheet.
+  const [story, setStory] = useState<StoryImage | null>(null);
+
   const closesAt = new Date(drop.closesAt);
   const fStart = new Date(drop.fulfilmentStartsAt);
   const fEnd = new Date(drop.fulfilmentEndsAt);
 
+  const editHref = `/drops/${drop.id}/edit`;
+  const prepHref = `/drops/${drop.id}/prep`;
+
+  // Rendered in two places (header from md, sheet on phones); only one shows.
+  const share =
+    effective === "OPEN" ? (
+      <ShareDropButton
+        dropId={drop.id}
+        vendorName={vendorName}
+        vendorSlug={vendorSlug}
+        dropTitle={drop.title}
+        closesAt={drop.closesAt}
+        fulfilmentStartsAt={drop.fulfilmentStartsAt}
+        fulfilmentEndsAt={drop.fulfilmentEndsAt}
+        fulfilmentMode={drop.fulfilmentMode}
+        itemNames={drop.items.map((i) => i.name)}
+        story={story}
+        onStory={setStory}
+      />
+    ) : null;
+
   return (
-    <header className="mb-4">
+    <header className="mb-3 md:mb-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <h1 className="font-display text-2xl font-bold text-foreground">{drop.title}</h1>
-          <p className="mt-1 text-sm">
-            <span
-              className={cn(
-                "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
-                effective === "OPEN" ? "border-primary bg-primary/10" : "border-border bg-muted",
-              )}
-            >
-              {DROP_STATUS_LABEL[effective]}
-            </span>
-          </p>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <h1 className="min-w-0 break-words font-display text-xl font-bold text-foreground md:text-2xl">
+            {drop.title}
+          </h1>
+          <span
+            className={cn(STATUS_BADGE, effective === "OPEN" ? "border-primary bg-primary/10" : "border-border bg-muted")}
+          >
+            {DROP_STATUS_LABEL[effective]}
+          </span>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Link href={`/drops/${drop.id}/edit`} className={LINK_BTN}>
+        <div className="hidden flex-wrap gap-2 md:flex">
+          <Link href={editHref} className={LINK_BTN}>
             <Pencil className="h-4 w-4" aria-hidden />
             Edit
           </Link>
-          <Link href={`/drops/${drop.id}/prep`} className={LINK_BTN}>
+          <Link href={prepHref} className={LINK_BTN}>
             <ChefHat className="h-4 w-4" aria-hidden />
             Prep sheet
           </Link>
         </div>
       </div>
-      <dl className="mt-3 grid grid-cols-1 gap-1 text-sm text-muted-foreground sm:grid-cols-2">
+      <dl className="mt-2 grid grid-cols-1 gap-1 text-sm text-muted-foreground sm:grid-cols-2 md:mt-3">
         <div>
           <dt className="inline font-medium text-foreground">Orders close: </dt>
           <dd className="inline">
@@ -760,24 +822,73 @@ function DropHeader({
           </dd>
         </div>
       </dl>
-      <div className="mt-3 flex flex-wrap items-center gap-2">
-        {effective === "OPEN" && (
-          <ShareDropButton
-            dropId={drop.id}
-            vendorName={vendorName}
-            vendorSlug={vendorSlug}
-            dropTitle={drop.title}
-            closesAt={drop.closesAt}
-            fulfilmentStartsAt={drop.fulfilmentStartsAt}
-            fulfilmentEndsAt={drop.fulfilmentEndsAt}
-            fulfilmentMode={drop.fulfilmentMode}
-            itemNames={drop.items.map((i) => i.name)}
-          />
+      <ActionRow
+        tools={tools}
+        lead={share}
+        sheetDescription="Edit, share and alert settings for this drop."
+        sheetRows={() => (
+          <>
+            <Link href={editHref} className={MORE_ACTION_ROW}>
+              <Pencil className="h-4 w-4 shrink-0" aria-hidden />
+              Edit
+            </Link>
+            <Link href={prepHref} className={MORE_ACTION_ROW}>
+              <ChefHat className="h-4 w-4 shrink-0" aria-hidden />
+              Prep sheet
+            </Link>
+            {share ? (
+              <div className="rounded-md border border-input p-3">
+                <h3 className="mb-2 text-sm font-semibold">Share this drop</h3>
+                {share}
+              </div>
+            ) : null}
+          </>
         )}
-        {controls}
-      </div>
-      {pollNote}
+      />
+      {tools.pollNote}
     </header>
+  );
+}
+
+/**
+ * Refresh and "last checked" at every width. From md the other controls sit
+ * beside them, as before. On phones they move into the "More actions" sheet,
+ * so one row of controls is all that stands between the title and the orders.
+ */
+function ActionRow({
+  tools,
+  lead,
+  sheetDescription,
+  sheetRows,
+}: {
+  tools: BoardTools;
+  /** Shown before Refresh, from md only. Phones get it through `sheetRows`. */
+  lead?: ReactNode;
+  sheetDescription: string;
+  /** Rows only the sheet shows (the header shows them elsewhere from md). */
+  sheetRows: (close: () => void) => ReactNode;
+}) {
+  return (
+    <div className="mt-2 flex items-center gap-2 md:mt-3 md:flex-wrap">
+      {lead ? <div className="hidden md:block">{lead}</div> : null}
+      {tools.refreshButton}
+      {tools.lastChecked}
+      {tools.soundButton("hidden md:inline-flex")}
+      <div className="hidden md:contents">
+        <PushAlertsButton variant="board" />
+      </div>
+      <BoardMoreActions description={sheetDescription}>
+        {(close) => (
+          <>
+            {sheetRows(close)}
+            {tools.soundButton("min-h-12 w-full justify-start gap-3")}
+            <div className="flex flex-wrap items-center gap-2">
+              <PushAlertsButton variant="board" />
+            </div>
+          </>
+        )}
+      </BoardMoreActions>
+    </div>
   );
 }
 
@@ -785,38 +896,39 @@ function MenuHeader({
   acceptMenuOrders,
   fulfilmentMode,
   vendorSlug,
-  controls,
-  pollNote,
+  tools,
 }: {
   acceptMenuOrders: boolean;
   fulfilmentMode: FulfilmentMode;
   vendorSlug: string;
-  controls: ReactNode;
-  pollNote: ReactNode;
+  tools: BoardTools;
 }) {
+  const storeHref = `/s/${vendorSlug}`;
+
   return (
-    <header className="mb-4">
+    <header className="mb-3 md:mb-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h1 className="font-display text-2xl font-bold text-foreground">Online orders</h1>
-          <p className="mt-1 flex flex-wrap items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h1 className="font-display text-xl font-bold text-foreground md:text-2xl">Online orders</h1>
             <span
               className={cn(
-                "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold",
+                STATUS_BADGE,
                 acceptMenuOrders ? "border-primary bg-primary/10" : "border-border bg-muted",
               )}
             >
               {acceptMenuOrders ? "Taking orders" : "Not taking orders"}
             </span>
-            {acceptMenuOrders && <span className="text-muted-foreground">{MENU_MODE_LABEL[fulfilmentMode]}</span>}
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Orders customers placed from your menu in the last 3 days, plus older ones still open.
-          </p>
+            {acceptMenuOrders && (
+              <span className="text-sm text-muted-foreground">{MENU_MODE_LABEL[fulfilmentMode]}</span>
+            )}
+          </div>
+          {/* Phones read this in the "More actions" sheet instead. */}
+          <p className="mt-1 hidden text-xs text-muted-foreground md:block">{MENU_BOARD_SCOPE}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="hidden flex-wrap gap-2 md:flex">
           {acceptMenuOrders && (
-            <a href={`/s/${vendorSlug}`} target="_blank" rel="noopener noreferrer" className={LINK_BTN}>
+            <a href={storeHref} target="_blank" rel="noopener noreferrer" className={LINK_BTN}>
               <ExternalLink className="h-4 w-4" aria-hidden />
               My store
             </a>
@@ -827,8 +939,31 @@ function MenuHeader({
           </Link>
         </div>
       </div>
-      <div className="mt-3 flex flex-wrap items-center gap-2">{controls}</div>
-      {pollNote}
+      <ActionRow
+        tools={tools}
+        sheetDescription={MENU_BOARD_SCOPE}
+        sheetRows={(close) => (
+          <>
+            {acceptMenuOrders && (
+              <a
+                href={storeHref}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={MORE_ACTION_ROW}
+                onClick={close}
+              >
+                <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
+                My store
+              </a>
+            )}
+            <Link href="/settings/orders" className={MORE_ACTION_ROW}>
+              <Settings className="h-4 w-4 shrink-0" aria-hidden />
+              Settings
+            </Link>
+          </>
+        )}
+      />
+      {tools.pollNote}
     </header>
   );
 }

@@ -18,13 +18,14 @@ import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+  ResponsiveDialog,
+  ResponsiveDialogBody,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { formatINR } from "@/lib/currency";
 import {
   DISPLAY_STATE_LABEL,
@@ -117,11 +118,12 @@ export function OrderCard({
         ? "Picked up"
         : "Delivered";
 
+  // The next step for this order: full width, a little taller on phones.
   const btn = (action: OrderAction, label: string, icon: ReactNode, variant: "default" | "outline" | "secondary" = "outline") => (
     <Button
       type="button"
       variant={variant}
-      className="min-h-11 flex-1 basis-[45%] text-sm"
+      className="min-h-12 flex-1 basis-[45%] text-sm font-semibold md:min-h-11 md:font-medium"
       disabled={busy}
       aria-busy={pendingAction === action}
       onClick={() => onAction(order.id, action)}
@@ -168,11 +170,16 @@ export function OrderCard({
               </span>
             )}
           </h3>
+          {/* Two short lines on a phone (bill, then time) instead of one that wraps mid-number. */}
           <p className="font-mono text-xs text-muted-foreground">
-            {order.billNumber} · {formatIstDate(created)} {formatIstTime(created)}
+            <span className="block sm:inline">{order.billNumber}</span>
+            <span className="hidden sm:inline"> · </span>
+            <span className="block sm:inline">
+              {formatIstDate(created)} {formatIstTime(created)}
+            </span>
           </p>
         </div>
-        <div className="text-right">
+        <div className="shrink-0 text-right">
           <p className="font-mono text-lg font-bold tabular-nums">{formatINR(order.totalPaise)}</p>
           <p className="text-xs text-muted-foreground">{order.paymentMethod === "CASH" ? "Cash" : "UPI"}</p>
         </div>
@@ -247,8 +254,24 @@ export function OrderCard({
         </p>
       </div>
 
+      {/* Next step first: the buttons that move the order forward, full width. */}
+      {(canConfirm || canMarkPaid || canRejectPayment || canDeliver) && (
+        <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
+          {canConfirm && btn("confirm", "Confirm", <CheckCircle2 aria-hidden />, "default")}
+          {canMarkPaid &&
+            btn(
+              "mark_paid",
+              "Payment received",
+              <IndianRupee aria-hidden />,
+              order.displayState === "PAYMENT_SUBMITTED" ? "default" : "outline",
+            )}
+          {canRejectPayment && btn("reject_payment", "Not received", <XCircle aria-hidden />)}
+          {canDeliver && btn("deliver", deliverLabel, isPickup ? <ShoppingBag aria-hidden /> : <Bike aria-hidden />, "secondary")}
+        </div>
+      )}
+
       {order.customerPhone && (
-        <div className="mt-3 flex gap-2">
+        <div className="mt-2 flex gap-2">
           <a
             href={`tel:${order.customerPhone}`}
             className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
@@ -273,24 +296,35 @@ export function OrderCard({
         </div>
       )}
 
-      {(canConfirm || canMarkPaid || canRejectPayment || canDeliver || canUndeliver || canCancel) && (
-        <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
-          {canConfirm && btn("confirm", "Confirm", <CheckCircle2 aria-hidden />, "default")}
-          {canMarkPaid &&
-            btn(
-              "mark_paid",
-              "Payment received",
-              <IndianRupee aria-hidden />,
-              order.displayState === "PAYMENT_SUBMITTED" ? "default" : "outline",
-            )}
-          {canRejectPayment && btn("reject_payment", "Not received", <XCircle aria-hidden />)}
-          {canDeliver && btn("deliver", deliverLabel, isPickup ? <ShoppingBag aria-hidden /> : <Bike aria-hidden />, "secondary")}
-          {canUndeliver && btn("undeliver", "Undo delivered", <Undo2 aria-hidden />)}
+      {/*
+        Going back or cancelling sits last, on its own line, small and at the
+        start edge: away from the full-width buttons a thumb aims for. Cancel
+        still asks before it does anything.
+      */}
+      {(canUndeliver || canCancel) && (
+        <div className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
+          {canUndeliver && (
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-h-11 px-2 text-sm first:-ml-2"
+              disabled={busy}
+              aria-busy={pendingAction === "undeliver"}
+              onClick={() => onAction(order.id, "undeliver")}
+            >
+              {pendingAction === "undeliver" ? (
+                <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <Undo2 aria-hidden />
+              )}
+              Undo delivered
+            </Button>
+          )}
           {canCancel && (
             <Button
               type="button"
-              variant="outline"
-              className="min-h-11 flex-1 basis-[45%] border-destructive/50 text-sm text-destructive hover:bg-destructive/10 hover:text-destructive"
+              variant="ghost"
+              className="min-h-11 px-2 text-sm text-destructive first:-ml-2 hover:bg-destructive/10 hover:text-destructive"
               disabled={busy}
               onClick={() => setConfirmCancel(true)}
             >
@@ -301,22 +335,24 @@ export function OrderCard({
         </div>
       )}
 
-      <Dialog open={confirmCancel} onOpenChange={setConfirmCancel}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Cancel {order.customerName?.trim() || "this"}&rsquo;s order?</DialogTitle>
-            <DialogDescription>
+      <ResponsiveDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>Cancel {order.customerName?.trim() || "this"}&rsquo;s order?</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>
               {order.billNumber} · {formatINR(order.totalPaise)}. If they paid, refund them from your UPI
               app. Let them know on WhatsApp.
-            </DialogDescription>
-          </DialogHeader>
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
           {order.paymentStatus === "PAID" && (
-            <p className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm font-medium">
-              This order is marked paid. Cancelling removes {formatINR(order.totalPaise)} from your sales; you
-              must refund the buyer yourself.
-            </p>
+            <ResponsiveDialogBody>
+              <p className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm font-medium">
+                This order is marked paid. Cancelling removes {formatINR(order.totalPaise)} from your sales; you
+                must refund the buyer yourself.
+              </p>
+            </ResponsiveDialogBody>
           )}
-          <DialogFooter className="gap-2">
+          <ResponsiveDialogFooter>
             <Button type="button" variant="outline" className="min-h-11" onClick={() => setConfirmCancel(false)}>
               Keep order
             </Button>
@@ -331,9 +367,9 @@ export function OrderCard({
             >
               Yes, cancel order
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </article>
   );
 }

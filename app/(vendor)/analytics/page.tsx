@@ -259,24 +259,10 @@ export default async function AnalyticsPage(props: Props) {
     range === "today" ? "Today's revenue (daily rollup)" : "Daily revenue (IST calendar days)";
 
   return (
-    <div className="min-h-screen bg-background p-4 pb-10 md:p-6">
-      <a
-        href="#main"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-3 focus:py-2 focus:text-primary-foreground"
-      >
-        Skip to main content
-      </a>
-      <header className="mx-auto mb-6 flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-bold text-foreground">Analytics</h1>
-          <p className="text-sm text-muted-foreground">Sales snapshot for {ctx.vendor.name}</p>
-        </div>
-        <a
-          href="/pos"
-          className="text-sm font-medium text-primary underline-offset-4 hover:underline"
-        >
-          Back to POS
-        </a>
+    <div className="bg-background p-4 pb-10 md:p-6">
+      <header className="mx-auto mb-6 max-w-6xl">
+        <h1 className="font-display text-2xl font-bold text-foreground">Analytics</h1>
+        <p className="text-sm text-muted-foreground">Sales snapshot for {ctx.vendor.name}</p>
       </header>
 
       <main id="main" className="mx-auto max-w-6xl">

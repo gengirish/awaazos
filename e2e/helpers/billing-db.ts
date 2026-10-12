@@ -1,4 +1,4 @@
-import { PrismaClient, type Plan } from "@prisma/client";
+import { PrismaClient, type Plan, type StaffRole } from "@prisma/client";
 
 /**
  * Billing state can't be reached through the app (a trial takes 30 days to
@@ -38,6 +38,19 @@ export async function setVendorBilling(
   const res = await db().vendor.updateMany({ where: { email }, data });
   if (res.count !== 1) {
     throw new Error(`setVendorBilling: expected 1 vendor for the e2e email, got ${res.count}`);
+  }
+}
+
+/**
+ * Change the role of the staff member registered with `email`. Registration
+ * only ever creates an OWNER and there is no staff-invite flow yet, so this is
+ * the one way a spec can see the app as a CASHIER or MANAGER. Same guard as
+ * above: local throwaway database only (`CAN_SET_BILLING`).
+ */
+export async function setStaffRole(email: string, role: StaffRole): Promise<void> {
+  const res = await db().staffMember.updateMany({ where: { user: { email } }, data: { role } });
+  if (res.count !== 1) {
+    throw new Error(`setStaffRole: expected 1 staff row for the e2e email, got ${res.count}`);
   }
 }
 

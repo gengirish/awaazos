@@ -52,7 +52,7 @@ export default async function EditDropPage(props: { params: Promise<{ id: string
   const itemNames = [...drop.items].sort((a, b) => a.sortOrder - b.sortOrder).map((i) => i.menuItem.name);
 
   return (
-    <div className="min-h-screen bg-background p-4 md:p-6">
+    <div className="bg-background p-4 md:p-6">
       <header className="mx-auto mb-6 flex max-w-2xl flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="truncate font-display text-2xl font-semibold text-foreground">{drop.title}</h1>

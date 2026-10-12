@@ -3,19 +3,26 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { ReceiptText, SlidersHorizontal } from "lucide-react";
 
+import { TransactionCardList } from "@/components/transactions/TransactionCardList";
 import { TransactionDetailDrawer, type TransactionDetailModel } from "@/components/transactions/TransactionDetailDrawer";
+import {
+  EMPTY_TRANSACTION_FILTERS,
+  TransactionFilterFields,
+  type TransactionFilterValues,
+} from "@/components/transactions/TransactionFilterFields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  ResponsiveDialog,
+  ResponsiveDialogBody,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import {
   Table,
   TableBody,
@@ -95,13 +102,28 @@ export function TransactionsTable({
   const router = useRouter();
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selected, setSelected] = useState<TransactionDetailModel | null>(null);
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const [from, setFrom] = useState(initialQuery.from ?? "");
-  const [to, setTo] = useState(initialQuery.to ?? "");
-  const [status, setStatus] = useState(initialQuery.paymentStatus ?? "all");
-  const [method, setMethod] = useState(initialQuery.paymentMethod ?? "all");
+  // One set of values behind both filter UIs (inline row on md+, sheet on phones).
+  const [filters, setFilters] = useState<TransactionFilterValues>({
+    from: initialQuery.from ?? "",
+    to: initialQuery.to ?? "",
+    status: initialQuery.paymentStatus ?? "all",
+    method: initialQuery.paymentMethod ?? "all",
+  });
+  const { from, to } = filters;
+  const patchFilters = (patch: Partial<TransactionFilterValues>) => setFilters((f) => ({ ...f, ...patch }));
 
   const totalPages = Math.max(1, Math.ceil(initialTotal / initialLimit));
+
+  // Counts what the list on screen is filtered by (the URL), not what is typed in the fields.
+  const activeFilterCount = [
+    initialQuery.from,
+    initialQuery.to,
+    initialQuery.paymentStatus !== "all" ? initialQuery.paymentStatus : undefined,
+    initialQuery.paymentMethod !== "all" ? initialQuery.paymentMethod : undefined,
+  ].filter(Boolean).length;
+  const neverSold = initialTotal === 0 && activeFilterCount === 0 && !initialQuery.source;
 
   function buildListUrl(page: number) {
     const sp = new URLSearchParams();
@@ -118,14 +140,20 @@ export function TransactionsTable({
     return `/transactions?${sp.toString()}`;
   }
 
-  function applyFilters() {
+  function applyFilters(values: TransactionFilterValues = filters) {
     const sp = new URLSearchParams();
-    if (from) sp.set("from", from);
-    if (to) sp.set("to", to);
-    if (status !== "all") sp.set("paymentStatus", status);
-    if (method !== "all") sp.set("paymentMethod", method);
+    if (values.from) sp.set("from", values.from);
+    if (values.to) sp.set("to", values.to);
+    if (values.status !== "all") sp.set("paymentStatus", values.status);
+    if (values.method !== "all") sp.set("paymentMethod", values.method);
     sp.set("page", "1");
     router.push(`/transactions?${sp.toString()}`);
+  }
+
+  function clearFilters() {
+    setFilters(EMPTY_TRANSACTION_FILTERS);
+    applyFilters(EMPTY_TRANSACTION_FILTERS);
+    setFiltersOpen(false);
   }
 
   function openRow(row: TransactionListRow) {
@@ -143,50 +171,44 @@ export function TransactionsTable({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:flex-wrap md:items-end">
-        <div className="grid gap-2 sm:grid-cols-2 md:flex md:flex-1 md:flex-wrap">
-          <div className="space-y-1">
-            <Label htmlFor="tx-from">From</Label>
-            <Input id="tx-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="tx-to">To</Label>
-            <Input id="tx-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label>Status</Label>
-            <Select value={status} onValueChange={setStatus}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="PENDING">Pending</SelectItem>
-                <SelectItem value="PAID">Paid</SelectItem>
-                <SelectItem value="FAILED">Failed</SelectItem>
-                <SelectItem value="REFUNDED">Refunded</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1">
-            <Label>Method</Label>
-            <Select value={method} onValueChange={setMethod}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All</SelectItem>
-                <SelectItem value="UPI">UPI</SelectItem>
-                <SelectItem value="CASH">Cash</SelectItem>
-                <SelectItem value="CARD">Card</SelectItem>
-                <SelectItem value="RAZORPAY_LINK">Razorpay link</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+      {/* Phones: a compact bar (Filters + Export). md+: the inline filter row.
+          The export controls are one set of elements shared by both. */}
+      <div className="flex flex-col gap-3 md:flex-row md:flex-wrap md:items-end md:rounded-lg md:border md:p-4">
+        <div className="hidden md:flex md:flex-1 md:flex-wrap md:gap-2">
+          <TransactionFilterFields
+            idPrefix="tx"
+            values={filters}
+            onChange={patchFilters}
+            selectClassName="w-[180px]"
+          />
         </div>
         <div className="flex flex-col gap-2">
           <div className="flex flex-wrap gap-2">
-            <Button type="button" variant="secondary" className="min-h-11" onClick={() => applyFilters()}>
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 flex-1 md:hidden"
+              aria-haspopup="dialog"
+              onClick={() => setFiltersOpen(true)}
+            >
+              <SlidersHorizontal aria-hidden="true" />
+              Filters
+              {activeFilterCount > 0 ? (
+                <span
+                  data-testid="active-filter-count"
+                  className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-xs font-semibold tabular-nums text-primary-foreground"
+                >
+                  {activeFilterCount}
+                  <span className="sr-only"> active</span>
+                </span>
+              ) : null}
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              className="hidden min-h-11 md:inline-flex"
+              onClick={() => applyFilters()}
+            >
               Apply filters
             </Button>
             {!canExportCsv ? (
@@ -216,94 +238,155 @@ export function TransactionsTable({
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Bill #</TableHead>
-            <TableHead>Date / time (IST)</TableHead>
-            <TableHead className="text-right">Items</TableHead>
-            <TableHead className="text-right">Total</TableHead>
-            <TableHead>Method</TableHead>
-            <TableHead>Status</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {initialItems.length === 0 ? (
+      {/* One list, two layouts, switched in CSS: display:none keeps the unused
+          one out of the accessibility tree and nothing flashes on hydration. */}
+      {initialItems.length === 0 ? (
+        <div
+          data-testid="transactions-empty"
+          className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center md:hidden"
+        >
+          <ReceiptText className="size-8 text-muted-foreground" aria-hidden="true" />
+          <p className="text-sm text-muted-foreground">
+            {neverSold ? "No transactions yet. Bills you ring up show here." : "No transactions match your filters."}
+          </p>
+          {activeFilterCount > 0 ? (
+            <Button type="button" variant="outline" className="min-h-11" onClick={clearFilters}>
+              Clear filters
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <TransactionCardList
+          items={initialItems}
+          onOpen={openRow}
+          className="overflow-hidden rounded-lg border md:hidden"
+        />
+      )}
+
+      <div className="hidden md:block" data-testid="transactions-table">
+        <Table>
+          <TableHeader>
             <TableRow>
-              <TableCell colSpan={6} className="text-center text-muted-foreground">
-                No transactions match your filters.
-              </TableCell>
+              <TableHead>Bill #</TableHead>
+              <TableHead>Date / time (IST)</TableHead>
+              <TableHead className="text-right">Items</TableHead>
+              <TableHead className="text-right">Total</TableHead>
+              <TableHead>Method</TableHead>
+              <TableHead>Status</TableHead>
             </TableRow>
-          ) : (
-            initialItems.map((row) => (
-              <TableRow
-                key={row.id}
-                className="cursor-pointer"
-                onClick={() => openRow(row)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" || e.key === " ") {
-                    e.preventDefault();
-                    openRow(row);
-                  }
-                }}
-                tabIndex={0}
-                role="button"
-              >
-                <TableCell className="font-mono text-xs">{row.billNumber}</TableCell>
-                <TableCell className="whitespace-nowrap text-sm">{formatIstDateTime(row.createdAt)}</TableCell>
-                <TableCell className="text-right tabular-nums">{itemQtySum(row)}</TableCell>
-                <TableCell className="text-right font-medium tabular-nums">{formatINR(row.totalPaise)}</TableCell>
-                <TableCell>
-                  <Badge variant="outline">{row.paymentMethod}</Badge>
-                </TableCell>
-                <TableCell>
-                  <Badge
-                    variant={
-                      row.paymentStatus === "PAID"
-                        ? "default"
-                        : row.paymentStatus === "PENDING"
-                          ? "secondary"
-                          : "destructive"
-                    }
-                  >
-                    {row.paymentStatus}
-                  </Badge>
+          </TableHeader>
+          <TableBody>
+            {initialItems.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={6} className="text-center text-muted-foreground">
+                  No transactions match your filters.
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            ) : (
+              initialItems.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="cursor-pointer"
+                  onClick={() => openRow(row)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      openRow(row);
+                    }
+                  }}
+                  tabIndex={0}
+                  role="button"
+                >
+                  <TableCell className="font-mono text-xs">{row.billNumber}</TableCell>
+                  <TableCell className="whitespace-nowrap text-sm">{formatIstDateTime(row.createdAt)}</TableCell>
+                  <TableCell className="text-right tabular-nums">{itemQtySum(row)}</TableCell>
+                  <TableCell className="text-right font-medium tabular-nums">{formatINR(row.totalPaise)}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">{row.paymentMethod}</Badge>
+                  </TableCell>
+                  <TableCell>
+                    <Badge
+                      variant={
+                        row.paymentStatus === "PAID"
+                          ? "default"
+                          : row.paymentStatus === "PENDING"
+                            ? "secondary"
+                            : "destructive"
+                      }
+                    >
+                      {row.paymentStatus}
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
-      <div className="flex items-center justify-between gap-4">
+      <nav
+        aria-label="Pagination"
+        className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+      >
         <p className="text-sm text-muted-foreground">
           Page {initialPage} of {totalPages} · {initialTotal} total
         </p>
-        <div className="flex gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:flex">
           {initialPage > 1 ? (
-            <Button type="button" variant="outline" asChild>
+            <Button type="button" variant="outline" className="min-h-11" asChild>
               <Link href={buildListUrl(initialPage - 1)} className="no-underline">
                 Previous
               </Link>
             </Button>
           ) : (
-            <Button type="button" variant="outline" disabled title="You are on the first page">
+            <Button type="button" variant="outline" className="min-h-11" disabled title="You are on the first page">
               Previous
             </Button>
           )}
           {initialHasMore ? (
-            <Button type="button" variant="outline" asChild>
+            <Button type="button" variant="outline" className="min-h-11" asChild>
               <Link href={buildListUrl(initialPage + 1)} className="no-underline">
                 Next
               </Link>
             </Button>
           ) : (
-            <Button type="button" variant="outline" disabled title="You are on the last page">
+            <Button type="button" variant="outline" className="min-h-11" disabled title="You are on the last page">
               Next
             </Button>
           )}
         </div>
-      </div>
+      </nav>
+
+      <ResponsiveDialog open={filtersOpen} onOpenChange={setFiltersOpen}>
+        <ResponsiveDialogContent>
+          <form
+            className="flex min-h-0 flex-1 flex-col"
+            onSubmit={(e) => {
+              e.preventDefault();
+              applyFilters();
+              setFiltersOpen(false);
+            }}
+          >
+            <ResponsiveDialogHeader>
+              <ResponsiveDialogTitle>Filters</ResponsiveDialogTitle>
+              <ResponsiveDialogDescription>
+                Narrow the list by date, status or payment method.
+              </ResponsiveDialogDescription>
+            </ResponsiveDialogHeader>
+            <ResponsiveDialogBody className="grid gap-4">
+              <TransactionFilterFields idPrefix="tx-sheet" values={filters} onChange={patchFilters} />
+            </ResponsiveDialogBody>
+            <ResponsiveDialogFooter>
+              <Button type="button" variant="outline" className="min-h-11" onClick={clearFilters}>
+                Clear
+              </Button>
+              <Button type="submit" className="min-h-11">
+                Apply filters
+              </Button>
+            </ResponsiveDialogFooter>
+          </form>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       <TransactionDetailDrawer
         open={drawerOpen}

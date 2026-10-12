@@ -3,7 +3,7 @@
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 
 import { HourlyHeatmap, type HourlyRow } from "./HourlyHeatmap";
 import { KpiGrid } from "./KpiGrid";
@@ -57,11 +57,12 @@ export function AnalyticsDashboard({
   hasSales,
 }: AnalyticsDashboardProps) {
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 sm:space-y-8">
       {wasClamped ? (
         <Card className="border-dashed border-primary/40 bg-primary/5">
           <CardHeader className="pb-2">
-            <CardTitle className="font-display text-lg">Showing partial history</CardTitle>
+            {/* <h2>, not CardTitle (an <h3>): these sit directly under the page <h1>. */}
+            <h2 className="font-display text-lg font-semibold leading-none tracking-tight">Showing partial history</h2>
             <CardDescription>
               Your plan limits how far back analytics can go. Upgrade for full history and longer ranges.
             </CardDescription>
@@ -85,7 +86,9 @@ export function AnalyticsDashboard({
       {!hasSales ? (
         <Card className="border-dashed">
           <CardHeader>
-            <CardTitle className="font-display text-lg">No sales yet — head to the POS and bol bill becho!</CardTitle>
+            <h2 className="font-display text-lg font-semibold leading-snug tracking-tight">
+              No sales yet — head to the POS and bol bill becho!
+            </h2>
             <CardDescription>Charts and KPIs will fill in once you record bills.</CardDescription>
           </CardHeader>
           <CardFooter>
@@ -105,14 +108,14 @@ export function AnalyticsDashboard({
         hasSales={hasSales}
       />
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <RevenueTrendChart data={revenueTrend} title={trendTitle} />
         <HourlyHeatmap rows={hourly} />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <TopItemsList items={topItems} maxQty={maxQty} />
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <VoiceAdoptionCard voiceCount={voice.voiceCount} totalCount={voice.totalCount} percent={voice.percent} />
           <PaymentMethodBreakdown slices={paymentSlices} />
         </div>

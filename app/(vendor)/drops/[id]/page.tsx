@@ -28,11 +28,11 @@ export default async function DropOrdersPage(props: Props) {
   if (!board) notFound();
 
   return (
-    <main id="main" className="min-h-screen bg-background p-4 pb-16 md:p-6">
+    <main id="main" className="bg-background p-4 pb-16 md:p-6">
       <a href="#orders-list" className="sr-only focus:not-sr-only">
         Skip to orders
       </a>
-      <nav aria-label="Breadcrumb" className="mx-auto mb-3 max-w-3xl text-sm">
+      <nav aria-label="Breadcrumb" className="mx-auto mb-1 max-w-3xl text-sm md:mb-3">
         <Link href="/drops" className="inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline">
           ← All drops
         </Link>

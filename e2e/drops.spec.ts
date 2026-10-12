@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { boardHeaderAction, closeBoardActions } from "./helpers/board";
 import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
@@ -145,6 +146,16 @@ test.describe("drops: home-kitchen pre-order day", () => {
       await expect(card).toBeVisible();
       await expect(card.getByText(`2 × ${laddu}`)).toBeVisible();
       await expect(card.getByText("Pay on delivery")).toBeVisible();
+
+      // Header actions: beside the title from md, in the "More actions" sheet on a phone.
+      await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible();
+      await expect(await boardHeaderAction(page, "link", "Prep sheet")).toHaveAttribute(
+        "href",
+        `/drops/${dropId}/prep`,
+      );
+      await expect(await boardHeaderAction(page, "link", "Edit")).toHaveAttribute("href", `/drops/${dropId}/edit`);
+      await expect(await boardHeaderAction(page, "button", "Instagram story")).toBeVisible();
+      await closeBoardActions(page);
 
       await card.getByRole("button", { name: /picked up · ₹240\.00 collected/i }).click();
 

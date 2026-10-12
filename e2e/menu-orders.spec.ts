@@ -1,5 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
+import { boardHeaderAction, closeBoardActions } from "./helpers/board";
 import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
@@ -93,6 +94,17 @@ test.describe("menu orders: order straight from the everyday menu", () => {
     await expect(page.getByRole("heading", { name: "Online orders" })).toBeVisible();
     await expect(page.getByText("Ravi Buyer").first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "To make" })).toBeVisible();
+
+    // Every filter tab is on screen at once (a phone used to cut the later ones off).
+    for (const name of [/^Needs action/, /^Confirmed/, /^Delivered/, /^Cancelled \/ Expired/, /^All/]) {
+      await expect(page.getByRole("tab", { name })).toBeInViewport();
+    }
+
+    // Header actions: beside the title from md, in the "More actions" sheet on a phone.
+    await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible();
+    await expect(await boardHeaderAction(page, "link", "Settings")).toHaveAttribute("href", "/settings/orders");
+    await expect(await boardHeaderAction(page, "button", "Sound off")).toHaveAttribute("aria-pressed", "false");
+    await closeBoardActions(page);
 
     const card = page.getByRole("article", { name: /Ravi Buyer/ });
     await expect(card.getByText(`2 × ${bhel}`)).toBeVisible();

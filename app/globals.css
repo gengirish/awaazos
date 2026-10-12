@@ -150,6 +150,28 @@
   }
 }
 
+/*
+  Touch floor for the shared primitives (Button, Input, SelectTrigger,
+  SelectItem): 44px on coarse pointers, desktop density kept for mouse users.
+
+  Deliberately the components layer and not `pointer-coarse:min-h-11` in the
+  class list: a variant utility is emitted after the plain utilities, so it
+  would shrink a call site that asks for more with `min-h-12`, and
+  tailwind-merge does not see the two as conflicting. From this layer any
+  utility a call site passes (h-12, min-h-14, min-w-0) still wins.
+*/
+@layer components {
+  @media (pointer: coarse) {
+    .touch-target {
+      min-height: 2.75rem;
+    }
+    .touch-target-square {
+      min-height: 2.75rem;
+      min-width: 2.75rem;
+    }
+  }
+}
+
 @layer base {
   :root {
     --background: 0 0% 100%;
@@ -237,9 +259,44 @@
   html {
     scroll-padding-bottom: var(--cookie-banner-h, 0px);
   }
+  /* viewport-fit=cover (app/layout.tsx) lets the page run under the notch and
+     the home indicator. Padding the body keeps in-flow content clear of them;
+     `fixed` elements are positioned against the viewport and add their own
+     env(safe-area-inset-*). All three are 0 outside a notched device. */
   body {
     @apply bg-background text-foreground;
-    padding-bottom: var(--cookie-banner-h, 0px);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: max(var(--cookie-banner-h, 0px), env(safe-area-inset-bottom));
+  }
+}
+
+/* Signed-in app shell (components/shell/AppShell.tsx). The shell's bars are
+   fixed, so their sizes are published as custom properties for the page
+   content and for anything a page pins to the bottom of the screen:
+     --app-tabbar-h      phone tab bar; 0 from md up (the rail takes over)
+     --app-rail-w        md+ rail; 0 on phones
+     --app-bottom-inset  tab bar + cookie banner — use as `bottom` on sticky /
+                         fixed bars so they sit above both
+   Declared in CSS, not measured in JS like --cookie-banner-h: the tab bar has
+   a fixed height, and this way nothing overlaps before hydration.
+   Unlayered on purpose — these must beat utility classes without !important. */
+.app-shell {
+  --app-tabbar-h: calc(3.5rem + env(safe-area-inset-bottom, 0px));
+  --app-rail-w: 0px;
+  --app-bottom-inset: calc(var(--app-tabbar-h) + var(--cookie-banner-h, 0px));
+}
+@media (min-width: 48rem) {
+  .app-shell {
+    --app-tabbar-h: 0px;
+    --app-rail-w: 6.5rem;
+  }
+}
+/* Where :has() is supported, focused / scrolled-into-view elements also land
+   above the tab bar (html cannot see a variable set on .app-shell). */
+@media (max-width: 47.99rem) {
+  html:has(.app-shell) {
+    scroll-padding-bottom: calc(3.5rem + env(safe-area-inset-bottom, 0px) + var(--cookie-banner-h, 0px));
   }
 }
 
@@ -271,6 +328,17 @@
     padding-bottom: 0;
   }
   [data-sonner-toaster] {
+    display: none;
+  }
+  /* Nothing of the app shell on paper (e.g. the drop prep sheet). */
+  .app-shell {
+    --app-tabbar-h: 0px;
+    --app-rail-w: 0px;
+    --app-bottom-inset: 0px;
+    /* The screen wrapper fills the viewport; on paper that can add a blank page. */
+    min-height: 0;
+  }
+  .app-shell-chrome {
     display: none;
   }
 }

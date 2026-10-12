@@ -8,7 +8,6 @@ import {
   CardContent,
   CardDescription,
   CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -42,7 +41,7 @@ export function RequestResetForm() {
     return (
       <Card>
         <CardHeader>
-          <CardTitle>Check your email</CardTitle>
+          <h1 className="text-2xl font-semibold leading-none tracking-tight">Check your email</h1>
           <CardDescription>
             If an AwaazOS account exists for that address, we&apos;ve sent a reset link.
             It is valid for 30 minutes and can be used once.
@@ -60,7 +59,7 @@ export function RequestResetForm() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Forgot your password?</CardTitle>
+        <h1 className="text-2xl font-semibold leading-none tracking-tight">Forgot your password?</h1>
         <CardDescription>
           Enter the email you signed up with and we&apos;ll send a reset link.
         </CardDescription>
@@ -73,7 +72,12 @@ export function RequestResetForm() {
               id="email"
               name="email"
               type="email"
+              inputMode="email"
               autoComplete="email"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellCheck={false}
+              enterKeyHint="send"
               required
               autoFocus
               placeholder="you@example.com"

@@ -11,9 +11,18 @@ type Props = {
   url: string;
   className: string;
   onStatus: (message: string) => void;
+  /**
+   * A prepared image kept by a parent that outlives this button. The orders
+   * board puts the share controls in a bottom sheet, which unmounts when it
+   * closes; without this, closing the sheet between the two taps would throw
+   * the downloaded image away and ask for it again.
+   */
+  story?: StoryImage | null;
+  onStory?: (story: StoryImage) => void;
 };
 
-type Ready = { file: File; objectUrl: string };
+export type StoryImage = { file: File; objectUrl: string };
+type Ready = StoryImage;
 
 /**
  * Two taps on purpose: the first fetches the story PNG, the second hands it to
@@ -21,9 +30,14 @@ type Ready = { file: File; objectUrl: string };
  * so calling navigator.share right after the download would throw
  * NotAllowedError. Browsers that can't share files get a plain download.
  */
-export function InstagramStoryButton({ dropId, url, className, onStatus }: Props) {
+export function InstagramStoryButton({ dropId, url, className, onStatus, story, onStory }: Props) {
   const [loading, setLoading] = useState(false);
-  const [ready, setReady] = useState<Ready | null>(null);
+  const [ownReady, setOwnReady] = useState<Ready | null>(null);
+  const ready = ownReady ?? story ?? null;
+  const setReady = (r: Ready) => {
+    setOwnReady(r);
+    onStory?.(r);
+  };
 
   async function copyLink() {
     try {
