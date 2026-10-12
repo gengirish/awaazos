@@ -1,5 +1,7 @@
 import type { MetadataRoute } from "next";
 
+import { HOME_PATH } from "@/lib/home";
+
 /**
  * Web app manifest, served at /manifest.webmanifest.
  *
@@ -14,8 +16,13 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "AwaazOS",
     short_name: "AwaazOS",
     description: "Voice-first POS and UPI billing for Indian vendors.",
+    // `id` is the app's identity: changing it would make every installed copy a
+    // different app. `start_url` can move underneath it.
     id: "/",
-    start_url: "/pos",
+    // The landing resolver: /orders for a published store, /pos otherwise
+    // (lib/home.ts). With no network the service worker answers it with the
+    // cached /pos instead (public/sw.js).
+    start_url: HOME_PATH,
     scope: "/",
     display: "standalone",
     theme_color: "#FF6600",
