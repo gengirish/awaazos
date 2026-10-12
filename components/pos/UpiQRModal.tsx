@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import Link from "next/link";
-import { PaymentMethod } from "@prisma/client";
+import type { PaymentMethod } from "@prisma/client";
 import { Check, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
@@ -114,7 +114,7 @@ export function UpiQRModal({
   async function markPaid() {
     setSubmitting(true);
     try {
-      const paymentMethod = payMode === "CASH" ? PaymentMethod.CASH : PaymentMethod.UPI;
+      const paymentMethod: PaymentMethod = payMode === "CASH" ? "CASH" : "UPI";
       // Saved on the device first, then committed; offline it stays queued and
       // syncs later (lib/pos-outbox.ts). Either way the sale is not lost.
       const result = await checkoutSale(vendorId, {

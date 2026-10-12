@@ -17,6 +17,7 @@ npm run lint           # eslint . (ESLint 9 flat config, eslint.config.mjs)
 npm test               # vitest run
 npm run build          # next build
 npm run e2e            # playwright (auto-starts dev server unless BASE_URL is set)
+npm run perf:budget    # after a build: first-load JS per route vs perf-budget.json (CI gate)
 
 npx prisma db push     # apply schema to Neon (no migration files and no seed script in this repo)
 npm run db:studio
@@ -457,8 +458,8 @@ voice-only path needs a tap fallback** (`QuickAddGrid`).
 
 ## Before pushing
 
-CI (`.github/workflows/ci.yml`) runs lint → typecheck → unit → build, then Playwright against a
-Postgres service, plus gitleaks (full history) and `npm audit --audit-level=high`. A husky
+CI (`.github/workflows/ci.yml`) runs lint → typecheck → unit → build → bundle-size budget
+(`npm run perf:budget`, see `docs/PERFORMANCE.md`), then Playwright against a Postgres service, plus gitleaks (full history) and `npm audit --audit-level=high`. A husky
 pre-commit hook runs `lint-staged` (eslint `--max-warnings=0`) and gitleaks if installed locally.
 
 Repo workflow for a meaningful change: `npm test && npm run typecheck && npm run lint && npm run build`
@@ -478,5 +479,6 @@ Vercel Blob (menu item photos `app/api/menu/[id]/image`; store banner and logo `
 - `ARCHITECTURE.md` — system diagrams, full data model, latency budget, ADRs, trade-offs
 - `TODO.md` — open items, ordered by what breaks if ignored
 - `docs/README.md` (index), `docs/OBSERVABILITY.md`, `docs/runbooks/` — production ops
+- `docs/PERFORMANCE.md` — mobile numbers, what is in the shared bundle, the CI bundle budget
 - `docs/archive/` — frozen April 2026 material (kickoff spec, course, demo-video script); not a
   description of the current product

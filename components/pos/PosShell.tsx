@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { PaymentMethod } from "@prisma/client";
+import type { PaymentMethod } from "@prisma/client";
 
 import { PosHeader } from "@/components/pos/PosHeader";
 import { PosSyncStatus } from "@/components/pos/PosSyncStatus";
@@ -54,7 +54,7 @@ export function PosShell({
   const [receiptMeta, setReceiptMeta] = useState({
     billNumber: "",
     totalPaise: 0,
-    paymentMethod: PaymentMethod.UPI as PaymentMethod,
+    paymentMethod: "UPI" as PaymentMethod,
     queued: null as { localNo: number; needsSignIn: boolean } | null,
   });
 

@@ -16,6 +16,7 @@ Index of the operational and planning docs. Code wins wherever a doc disagrees w
 | File | Purpose |
 |---|---|
 | [`OBSERVABILITY.md`](OBSERVABILITY.md) | Sentry, logs, health checks, `/admin/metrics`, log-drain alerts |
+| [`PERFORMANCE.md`](PERFORMANCE.md) | Mobile baseline numbers, what is in the shared JS bundle, the CI bundle-size budget, manual Lighthouse runs |
 | [`runbooks/INCIDENT_RESPONSE.md`](runbooks/INCIDENT_RESPONSE.md) | Severity levels, first 10 minutes, triage, mitigations |
 | [`runbooks/ON_CALL.md`](runbooks/ON_CALL.md) | Daily checks, alert routing, provider escalation contacts |
 | [`runbooks/ROLLBACK.md`](runbooks/ROLLBACK.md) | Rolling back Vercel, the Fly worker app and the Fly Whisper app |

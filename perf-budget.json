@@ -1,0 +1,17 @@
+{
+  "$comment": "First-load JS budgets in kB gzip (1 kB = 1000 B), checked by scripts/check-bundle-budget.mjs after `npm run build`. Re-record with `npm run perf:budget -- --update` only for a growth you can justify; see docs/PERFORMANCE.md.",
+  "headroomPercent": 8,
+  "sharedKb": 176,
+  "anyRouteKb": 304,
+  "routesKb": {
+    "/s/[slug]": 231,
+    "/s/[slug]/o/[token]": 208,
+    "/": 194,
+    "/sign-in": 197,
+    "/orders": 264,
+    "/pos": 268,
+    "/menu": 304,
+    "/transactions": 258,
+    "/drops/[id]": 264
+  }
+}

@@ -70,9 +70,9 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 /**
  * Sign out and make sure it sticks. Every request that passes through the
- * Auth.js middleware re-issues the session cookie, so a router prefetch or a
- * SessionProvider refetch that was already in flight when the cookie was
- * deleted can set it again when its response lands. Check the session until
+ * Auth.js middleware re-issues the session cookie, so a router prefetch that
+ * was already in flight when the cookie was deleted can set it again when its
+ * response lands. Check the session until
  * it reads as signed out twice in a row, signing out again if it came back.
  * Returns false if the server could not be reached.
  */
