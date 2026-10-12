@@ -11,6 +11,7 @@ import { ReceiptModal } from "@/components/pos/ReceiptModal";
 import { POS_CART_ANCHOR_ID, StickyCheckoutBar } from "@/components/pos/StickyCheckoutBar";
 import { UpiQRModal, type PaidResult } from "@/components/pos/UpiQRModal";
 import { VoiceOrderButton } from "@/components/pos/VoiceOrderButton";
+import { InstallBanner } from "@/components/pwa/InstallPrompt";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
 import { useOnline } from "@/hooks/useOnline";
 import { usePosOutbox } from "@/hooks/usePosOutbox";
@@ -120,6 +121,8 @@ export function PosShell({
         onSync={outbox.sync}
         onDiscard={(ref) => void outbox.discard(ref)}
       />
+      {/* In flow, above the menu: never over the checkout bar or the tab bar. */}
+      <InstallBanner className="mt-4" />
       <main
         id="main-pos"
         className="mt-6 flex flex-col gap-8 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] md:items-start md:gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]"

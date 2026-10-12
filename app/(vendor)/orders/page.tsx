@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { OrdersBoard } from "@/components/drops/orders/OrdersBoard";
+import { InstallBanner } from "@/components/pwa/InstallPrompt";
 import { loadMenuOrdersBoard } from "@/lib/drops-board-server";
 import { getDropOrderSignal } from "@/lib/drops-signal";
 import { MENU_ORDERS_SIGNAL_ID } from "@/lib/menu-orders";
@@ -36,6 +37,8 @@ export default async function OnlineOrdersPage() {
       <a href="#orders-list" className="sr-only focus:not-sr-only">
         Skip to orders
       </a>
+      {/* Same column as the board. Renders nothing once installed or dismissed. */}
+      <InstallBanner className="mx-auto mb-3 max-w-3xl" />
       <OrdersBoard
         vendorName={ctx.vendor.name}
         vendorSlug={ctx.vendor.slug}
