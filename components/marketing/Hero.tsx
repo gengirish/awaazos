@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Mic } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { InstallAppButton } from "@/components/marketing/InstallAppButton";
 
 function PhoneMockup() {
   return (
@@ -47,6 +48,7 @@ export function Hero() {
             >
               <Link href="/sign-up">Start Free — No Credit Card</Link>
             </Button>
+            <InstallAppButton />
           </div>
           <div className="mt-8 flex flex-wrap items-center gap-2">
             <Badge variant="secondary" className="border border-border bg-white px-3 py-1 text-xs font-semibold">
