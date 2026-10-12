@@ -1,8 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Baloo_2, Nunito } from "next/font/google";
 import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
-import { Toaster } from "@/components/ui/sonner";
-import { Providers } from "@/components/providers";
 import "./globals.css";
 
 const baloo = Baloo_2({
@@ -32,6 +30,16 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
+/**
+ * Everything here ships to every page, including the public storefront a buyer
+ * opens on mobile data — keep client code out of it:
+ *  - no `SessionProvider`: nothing calls `useSession()`, and it fetched
+ *    /api/auth/session on every page load and tab focus;
+ *  - no `<Toaster />`: only the signed-in app raises toasts, so it lives in
+ *    app/(vendor)/layout.tsx and app/(print)/layout.tsx. A toast fired from a
+ *    page outside those groups will not show until its layout renders one.
+ * scripts/check-bundle-budget.mjs fails CI when first-load JS grows.
+ */
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -40,11 +48,8 @@ export default function RootLayout({
   return (
     <html lang="en-IN" suppressHydrationWarning>
       <body className={`${baloo.variable} ${nunito.variable} min-h-screen font-body antialiased`}>
-        <Providers>
-          {children}
-          <CookieConsentBanner />
-          <Toaster richColors position="top-center" />
-        </Providers>
+        {children}
+        <CookieConsentBanner />
       </body>
     </html>
   );
