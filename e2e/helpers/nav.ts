@@ -28,7 +28,7 @@ export async function openMoreSheet(page: Page): Promise<Locator> {
 }
 
 /**
- * Where Transactions, Analytics, Settings, Live store and Sign out live: the
+ * Where Transactions, Analytics, Settings, Help, Live store and Sign out live: the
  * "More" sheet on a phone (opened here), the rail itself on md+.
  */
 export async function secondaryNav(page: Page): Promise<Locator> {

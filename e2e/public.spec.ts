@@ -88,6 +88,7 @@ test.describe("auth-protected surfaces redirect to sign-in", () => {
     "/analytics",
     "/settings",
     "/settings/billing",
+    "/help",
     "/onboarding",
   ]) {
     test(`${path} → /sign-in when unauthenticated`, async ({ page }) => {
