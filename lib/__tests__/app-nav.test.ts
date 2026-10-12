@@ -4,13 +4,13 @@ import { activeAppNavId, appNavItemsForRole, isAppNavItemActive } from "@/lib/ap
 
 describe("appNavItemsForRole", () => {
   it("shows an owner and a manager every destination", () => {
-    const all = ["orders", "drops", "sell", "menu", "transactions", "analytics", "settings"];
+    const all = ["orders", "drops", "sell", "menu", "transactions", "analytics", "settings", "help"];
     expect(appNavItemsForRole("OWNER").map((i) => i.id)).toEqual(all);
     expect(appNavItemsForRole("MANAGER").map((i) => i.id)).toEqual(all);
   });
 
-  it("trims a cashier to Orders, Sell and Settings", () => {
-    expect(appNavItemsForRole("CASHIER").map((i) => i.id)).toEqual(["orders", "sell", "settings"]);
+  it("trims a cashier to Orders, Sell, Settings and Help", () => {
+    expect(appNavItemsForRole("CASHIER").map((i) => i.id)).toEqual(["orders", "sell", "settings", "help"]);
   });
 
   it("keeps Orders, Drops, Sell and Menu on the tab bar and the rest behind More", () => {
@@ -20,6 +20,7 @@ describe("appNavItemsForRole", () => {
       "Transactions",
       "Analytics",
       "Settings",
+      "Help",
     ]);
   });
 });
@@ -37,6 +38,7 @@ describe("active destination", () => {
     ["/analytics", "analytics"],
     ["/settings", "settings"],
     ["/settings/payments", "settings"],
+    ["/help", "help"],
   ] as const)("%s → %s", (pathname, id) => {
     expect(activeAppNavId(pathname)).toBe(id);
   });

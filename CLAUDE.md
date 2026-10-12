@@ -402,6 +402,15 @@ single-order compound scope, so one stale order never rolls back the rest. Respo
 
 DB-backed drops tests are opt-in: `npm run test:drops:db` (needs a throwaway `DATABASE_URL`).
 
+### In-app Help (`/help`)
+
+A self-help guide to getting around, linked from the shell (the "More" sheet on phones, the rail from
+md). All content is in `lib/help-guide.ts` (pure, client-safe) and is trimmed to the viewer's role
+through `lib/app-nav.ts`, so it never points a cashier at a screen their navigation hides. The page is
+static — no reads beyond the shell's. **When you rename a screen, a Settings section or a button the
+guide quotes, update `lib/help-guide.ts`**; `lib/__tests__/help-guide.test.ts` catches drifted
+Settings titles and uncovered destinations, not button labels.
+
 ### Auth edge split
 
 `lib/auth.config.ts` is edge-safe (no Prisma) and is the **only** auth module `middleware.ts` may

@@ -4,24 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { StaffRole } from "@prisma/client";
-import {
-  BarChart3,
-  Calculator,
-  CalendarClock,
-  ChevronRight,
-  ClipboardList,
-  ExternalLink,
-  MoreHorizontal,
-  ReceiptText,
-  Settings,
-  UtensilsCrossed,
-  type LucideIcon,
-} from "lucide-react";
+import { ChevronRight, ExternalLink, MoreHorizontal } from "lucide-react";
 
 import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
 import { InstallRailButton, InstallSheetRow } from "@/components/pwa/InstallPrompt";
+import { APP_NAV_ICONS as ICONS } from "@/components/shell/nav-icons";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { appNavItemsForRole, isAppNavItemActive, type AppNavId } from "@/lib/app-nav";
+import { appNavItemsForRole, isAppNavItemActive } from "@/lib/app-nav";
 import { cn } from "@/lib/utils";
 
 export type AppNavProps = {
@@ -32,16 +21,6 @@ export type AppNavProps = {
   vendorName: string;
   /** Public storefront path (`/s/<slug>`); null when the store isn't published. */
   storePath: string | null;
-};
-
-const ICONS: Record<AppNavId, LucideIcon> = {
-  orders: ClipboardList,
-  drops: CalendarClock,
-  sell: Calculator,
-  menu: UtensilsCrossed,
-  transactions: ReceiptText,
-  analytics: BarChart3,
-  settings: Settings,
 };
 
 const FOCUS_RING =

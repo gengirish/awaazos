@@ -9,9 +9,10 @@ import type { StaffRole } from "@prisma/client";
  * `requireVendorRole`; hiding a link only keeps a cashier from tapping into a
  * dead end. `/drops` (the list) and `/analytics` require MANAGER; Menu and
  * Transactions are hidden from cashiers by product choice (they're owner tools).
+ * Help (`/help`, content in lib/help-guide.ts) describes only what this list shows a role.
  */
 
-export type AppNavId = "orders" | "drops" | "sell" | "menu" | "transactions" | "analytics" | "settings";
+export type AppNavId = "orders" | "drops" | "sell" | "menu" | "transactions" | "analytics" | "settings" | "help";
 
 export type AppNavItem = {
   id: AppNavId;
@@ -31,6 +32,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
   { id: "transactions", href: "/transactions", label: "Transactions", placement: "more", managerOnly: true },
   { id: "analytics", href: "/analytics", label: "Analytics", placement: "more", managerOnly: true },
   { id: "settings", href: "/settings", label: "Settings", placement: "more", managerOnly: false },
+  { id: "help", href: "/help", label: "Help", placement: "more", managerOnly: false },
 ];
 
 /** The destinations a staff member of this role is shown, in display order. */

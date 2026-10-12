@@ -141,7 +141,7 @@ test.describe("app shell navigation", () => {
     await more.click();
     const sheet = page.getByRole("dialog", { name: "More" });
     await expect(sheet).toBeVisible();
-    for (const name of ["Transactions", "Analytics", "Settings"]) {
+    for (const name of ["Transactions", "Analytics", "Settings", "Help"]) {
       await expect(sheet.getByRole("link", { name, exact: true })).toBeVisible();
     }
     await expect(sheet.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
@@ -202,7 +202,7 @@ test.describe("app shell navigation", () => {
     await expect(page.getByTestId("app-tabbar")).toBeHidden();
 
     const item = (name: string) => rail.getByRole("link", { name, exact: true });
-    for (const name of ["Orders", "Drops", "Sell", "Menu", "Transactions", "Analytics", "Settings"]) {
+    for (const name of ["Orders", "Drops", "Sell", "Menu", "Transactions", "Analytics", "Settings", "Help"]) {
       await expect(item(name)).toBeVisible();
       await expectTapTarget(item(name), `${name} rail link`);
     }
@@ -229,7 +229,7 @@ test.describe("app shell navigation", () => {
     await expect(page.getByRole("navigation", { name: "Settings", exact: true })).toBeVisible();
   });
 
-  test("a cashier sees only Orders, Sell, Settings and Sign out", async ({ page, request }) => {
+  test("a cashier sees only Orders, Sell, Settings, Help and Sign out", async ({ page, request }) => {
     // Registration only creates an OWNER; the role is changed straight in the database.
     test.skip(!CAN_SET_BILLING, "needs a local throwaway database to demote the owner to CASHIER");
     const creds = await createVendorSession(page, request, "shell-cashier");
@@ -253,7 +253,7 @@ test.describe("app shell navigation", () => {
 
     await page.setViewportSize(DESKTOP);
     const rail = page.getByRole("navigation", { name: "Main" });
-    await expect(rail.getByRole("link")).toHaveText(["Orders", "Sell", "Settings"]);
+    await expect(rail.getByRole("link")).toHaveText(["Orders", "Sell", "Settings", "Help"]);
 
     // Hiding links is cosmetic: the server still turns a cashier away from /drops.
     await page.goto("/drops");
