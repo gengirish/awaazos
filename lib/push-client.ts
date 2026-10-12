@@ -142,7 +142,8 @@ function hasWindow(): boolean {
   return typeof window !== "undefined" && typeof navigator !== "undefined";
 }
 
-function isStandalone(): boolean {
+/** Running as an installed app (Home Screen / standalone window). */
+export function isStandalone(): boolean {
   if (!hasWindow()) return false;
   const nav = navigator as Navigator & { standalone?: boolean };
   if (nav.standalone === true) return true;
