@@ -91,4 +91,11 @@ export default withSentryConfig(nextConfig, {
   widenClientFileUpload: true,
   hideSourceMaps: true,
   disableLogger: true,
+  bundleSizeOptimizations: {
+    // Session Replay starts its compression worker from a blob: URL, which the
+    // CSP above (worker-src 'self') refuses, so the worker never ran and replays
+    // already upload uncompressed. Leaving the worker's source out of the replay
+    // chunk changes nothing except its size (and one CSP console error).
+    excludeReplayWorker: true,
+  },
 });
