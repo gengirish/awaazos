@@ -1,4 +1,8 @@
+import bundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs";
+
+// `ANALYZE=true npm run build` writes treemaps to .next/analyze/ (docs/PERFORMANCE.md).
+const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === "true", openAnalyzer: false });
 
 /** @type {import('next').NextConfig} */
 
@@ -81,7 +85,7 @@ const nextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withBundleAnalyzer(nextConfig), {
   // Enabled only when SENTRY_AUTH_TOKEN is set in CI/deploy environment.
   // Local builds without token keep working.
   org: process.env.SENTRY_ORG,

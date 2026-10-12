@@ -47,6 +47,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      # First-load JS per route, read from the build above (no server, no network).
+      # Fails when a route or the shared runtime outgrows perf-budget.json.
+      - name: Bundle size budget
+        run: npm run perf:budget
+
   e2e:
     name: E2E (Playwright)
     runs-on: ubuntu-latest
