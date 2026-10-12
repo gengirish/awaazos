@@ -6,9 +6,9 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { OtherCartsNotice } from "@/components/storefront/OtherCartsNotice";
+import { PaidClaimForm } from "@/components/storefront/PaidClaimForm";
 import { RazorpayPayButton } from "@/components/storefront/RazorpayPayButton";
 import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
-import { UtrForm } from "@/components/storefront/UtrForm";
 import { formatINR, paiseToRupees } from "@/lib/currency";
 import { orderDisplayState, PENDING_HOLD_MINUTES } from "@/lib/drops";
 import { formatFulfilmentWindow, formatIstDate, formatIstTime } from "@/lib/drops-time";
@@ -83,6 +83,8 @@ const loadOrder = cache(async (slug: string, token: string) => {
       paymentMethod: true,
       paymentStatus: true,
       upiRef: true,
+      paymentClaimedAt: true,
+      paymentRejectedAt: true,
       fulfilmentStatus: true,
       fulfilmentType: true,
       deliveryAddress: true,
@@ -170,6 +172,7 @@ export default async function StorefrontOrderPage(props: {
       paymentStatus: order.paymentStatus,
       paymentMethod: order.paymentMethod,
       upiRef: order.upiRef,
+      paymentClaimedAt: order.paymentClaimedAt,
       createdAt: order.createdAt,
     },
     now,
@@ -182,6 +185,13 @@ export default async function StorefrontOrderPage(props: {
   const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
 
   const awaitingUpi = state === "AWAITING_PAYMENT" && order.paymentMethod === "UPI";
+  // The seller answered "Not received" to an earlier "I've paid" and nothing has changed since.
+  const paymentRejected =
+    order.paymentRejectedAt !== null &&
+    order.paymentMethod === "UPI" &&
+    (state === "AWAITING_PAYMENT" || state === "EXPIRED");
+  // Claimed with a bare tap: the buyer can still add the reference to help the seller.
+  const canAddReference = state === "PAYMENT_SUBMITTED" && order.paymentMethod === "UPI" && !order.upiRef;
   const payeeName = vendor.upiName ?? vendor.name;
   const upiLink =
     awaitingUpi && vendor.upiId
@@ -262,7 +272,15 @@ export default async function StorefrontOrderPage(props: {
                   : `Pay within ${minsLeft} min to confirm your order.`}
               </p>
             ) : null}
-            {state === "EXPIRED" && order.paymentMethod === "UPI" ? (
+            {paymentRejected ? (
+              <p className="text-sm font-semibold">
+                The kitchen couldn&apos;t find your payment. Check your UPI app
+                {awaitingUpi
+                  ? ". If the money left your account, enter the UPI reference below."
+                  : ". If the money left your account, message the kitchen with the UPI reference."}
+              </p>
+            ) : null}
+            {state === "EXPIRED" && order.paymentMethod === "UPI" && !paymentRejected ? (
               <p className="text-sm">If you already paid, message the kitchen with your UPI reference.</p>
             ) : null}
           </div>
@@ -347,7 +365,19 @@ export default async function StorefrontOrderPage(props: {
                 The kitchen hasn&apos;t added a UPI ID yet — message them to pay.
               </p>
             )}
-            <UtrForm slug={slug} token={params.token} />
+            <PaidClaimForm slug={slug} token={params.token} requireReference={paymentRejected} />
+          </section>
+        ) : null}
+
+        {canAddReference ? (
+          <section
+            aria-labelledby="add-ref-heading"
+            className="space-y-3 rounded-2xl border border-border/60 bg-background p-4 shadow-xs sm:p-6"
+          >
+            <h2 id="add-ref-heading" className="text-base font-bold text-awaaz-charcoal">
+              Help the kitchen find your payment
+            </h2>
+            <PaidClaimForm slug={slug} token={params.token} claimed />
           </section>
         ) : null}
 

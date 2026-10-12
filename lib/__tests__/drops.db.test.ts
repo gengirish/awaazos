@@ -155,6 +155,8 @@ describe.skipIf(!ENABLED)("drops — DB integration", () => {
       mk("paid", 120, { paymentStatus: "PAID", paidAt: base }),
       mk("cash", 120, { paymentMethod: "CASH" }),
       mk("utr", 120, { upiRef: "412345678901" }),
+      mk("claimed", 120, { paymentClaimedAt: base }), // "I've paid", no UTR
+      mk("rejected", 120, { paymentRejectedAt: base }), // "Not received": claim cleared
       mk("expired", 20),
       mk("fresh", 5),
       mk("boundary", 15), // exactly at the hold edge when now = base
@@ -173,10 +175,11 @@ describe.skipIf(!ENABLED)("drops — DB integration", () => {
         paymentStatus: true,
         paymentMethod: true,
         upiRef: true,
+        paymentClaimedAt: true,
         createdAt: true,
       },
     });
-    expect(all).toHaveLength(10);
+    expect(all).toHaveLength(12);
 
     const instants = [
       base,
@@ -204,6 +207,8 @@ describe.skipIf(!ENABLED)("drops — DB integration", () => {
     expect(drops.orderHoldsStock(at("boundary"), base)).toBe(false);
     expect(drops.orderHoldsStock(at("fresh"), base)).toBe(true);
     expect(drops.orderHoldsStock(at("expired"), base)).toBe(false);
+    expect(drops.orderHoldsStock(at("claimed"), base)).toBe(true);
+    expect(drops.orderHoldsStock(at("rejected"), base)).toBe(false);
   });
 
   it("(c) markOrderPaid credits DailySummary once; cancelOrder reverses it and frees stock", async () => {

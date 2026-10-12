@@ -116,6 +116,7 @@ const MENU_BOARD_SCOPE = "Orders customers placed from your menu in the last 3 d
 const ACTION_DONE: Record<OrderAction, string> = {
   confirm: "Order confirmed",
   mark_paid: "Marked paid",
+  reject_payment: "Marked not received",
   cancel: "Order cancelled",
   deliver: "Marked delivered",
   undeliver: "Moved back to confirmed",

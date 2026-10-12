@@ -237,11 +237,16 @@ export function groupByFulfilment<T extends { fulfilmentType: FulfilmentType | n
 
 // ─── Order actions ──────────────────────────────────────────────────
 
-export const ORDER_ACTIONS = ["confirm", "mark_paid", "cancel", "deliver", "undeliver"] as const;
+export const ORDER_ACTIONS = ["confirm", "mark_paid", "reject_payment", "cancel", "deliver", "undeliver"] as const;
 export type OrderAction = (typeof ORDER_ACTIONS)[number];
 
 /** Once orders are frozen the list is locked; only payment / handover bookkeeping remains. */
-const FROZEN_ALLOWED: ReadonlySet<OrderAction> = new Set<OrderAction>(["mark_paid", "deliver", "undeliver"]);
+const FROZEN_ALLOWED: ReadonlySet<OrderAction> = new Set<OrderAction>([
+  "mark_paid",
+  "reject_payment",
+  "deliver",
+  "undeliver",
+]);
 
 export type ActionCheck = { ok: true } | { ok: false; error: "drop_frozen" | "invalid_state" };
 
@@ -268,6 +273,9 @@ export function checkOrderAction(
         return fs === "PLACED";
       case "mark_paid":
         return fs !== "CANCELLED" && o.paymentStatus !== "PAID";
+      case "reject_payment":
+        // Whether the buyer actually claimed is checked by the conditional write.
+        return fs !== "CANCELLED" && o.paymentStatus === "PENDING";
       case "cancel":
         return fs === "PLACED" || fs === "CONFIRMED";
       case "deliver":
@@ -283,14 +291,17 @@ export function checkOrderAction(
  * The action buttons an order card offers. Stricter than `checkOrderAction`
  * in one place: an unpaid pay-on-delivery order is "marked paid" by the
  * "Delivered · ₹X collected" tap, so plain "Mark paid" only shows for it once
- * delivered. Bulk selection (lib/order-bulk.ts) builds on the same list, so the
- * card and the bulk bar never disagree about what an order can do.
+ * delivered. "Not received" (`reject_payment`) is only offered while the buyer's
+ * "I've paid" claim is waiting for an answer. Bulk selection (lib/order-bulk.ts)
+ * builds on the same list, so the card and the bulk bar never disagree about
+ * what an order can do.
  */
 export function availableOrderActions(
   o: {
     fulfilmentStatus: FulfilmentStatus | null;
     paymentStatus: PaymentStatus;
     paymentMethod: PaymentMethod;
+    displayState?: OrderDisplayState;
   },
   frozen: boolean,
 ): Set<OrderAction> {
@@ -301,6 +312,7 @@ export function availableOrderActions(
   if (fs !== "CANCELLED" && o.paymentStatus !== "PAID" && (o.paymentMethod !== "CASH" || fs === "DELIVERED")) {
     out.add("mark_paid");
   }
+  if (o.displayState === "PAYMENT_SUBMITTED") out.add("reject_payment");
   if (live) out.add("deliver");
   if (fs === "DELIVERED") out.add("undeliver");
   if (live && !frozen) out.add("cancel");
@@ -357,7 +369,7 @@ export function newOrderIds(prev: { id: string }[], next: { id: string }[]): str
 
 export const DISPLAY_STATE_LABEL: Record<OrderDisplayState, string> = {
   AWAITING_PAYMENT: "Awaiting payment",
-  PAYMENT_SUBMITTED: "Payment to check",
+  PAYMENT_SUBMITTED: "Customer says paid",
   PAY_ON_DELIVERY: "Pay on delivery",
   PAID: "Paid",
   DELIVERED: "Delivered",

@@ -198,7 +198,7 @@ storefront surface** — unauthenticated, and no longer read-only (buyers place 
 | Surface | What |
 | --- | --- |
 | `/s/[slug]` | Menu + open drops + checkout |
-| `/s/[slug]/o/[token]` | Buyer's order page (status, UPI pay, UTR form) |
+| `/s/[slug]/o/[token]` | Buyer's order page (status, UPI pay, "I've paid" claim) |
 | `/s/[slug]/account` | Signed-in buyer's own orders/profile |
 | `/r/[token]` | Customer receipt page (see "Receipt module"; not gated on `publishStorefront`) |
 | `/api/s/**` | Order placement, UTR submit, vendor-Razorpay start/verify, buyer magic-link auth |
@@ -318,6 +318,7 @@ Three invariants, enforced in `lib/drops.ts` and nowhere else:
 3. **Sold counts are derived, never stored.** Summed from `OrderItem` rows that still hold stock
    (`stockHoldingOrderWhere` / `orderHoldsStock` — keep the twins in lockstep). An unpaid UPI order
    holds stock for `PENDING_HOLD_MINUTES` (15) then silently stops counting; cancel frees stock.
+   A buyer's "I've paid" claim (`paymentClaimedAt`, or a UTR) keeps the hold until the vendor answers.
 
 Money and plan rules:
 
@@ -333,7 +334,12 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
 - Online payment uses the **vendor's own Razorpay keys** (`lib/storefront-razorpay.ts`), secrets
   AES-256-GCM-encrypted with `PAYMENT_KEYS_ENCRYPTION_KEY` (`lib/secret-box.ts`). Never the platform
   `RAZORPAY_*` account — collecting on a vendor's behalf makes us an RBI payment aggregator.
-  The other paths are UPI intent + buyer-submitted UTR (vendor verifies) and pay on delivery.
+  The other paths are UPI intent + the buyer's "I've paid" claim (vendor verifies) and pay on delivery.
+- **"I've paid" never marks an order paid.** `POST /api/s/[slug]/orders/[token]/utr` records
+  `Transaction.paymentClaimedAt` (UTR optional) → display state `PAYMENT_SUBMITTED`. The vendor answers
+  on the board: "Payment received" (`mark_paid` → `markOrderPaid`) or "Not received"
+  (`reject_payment`: clears the claim and UTR, stamps `paymentRejectedAt`, per-order only). After a
+  rejection the next claim needs a UTR (400 `reference_required`), so a hold can't be renewed by tapping.
 
 Buyer accounts are **not** NextAuth: `Customer` + passwordless email magic link
 (`lib/customer-auth.ts`), tokens and sessions stored as SHA-256 hashes only, session in the

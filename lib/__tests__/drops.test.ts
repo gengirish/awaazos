@@ -107,6 +107,7 @@ type Hold = {
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
   upiRef: string | null;
+  paymentClaimedAt: Date | null;
   createdAt: Date;
 };
 
@@ -115,6 +116,7 @@ const pending = (over: Partial<Hold> = {}): Hold => ({
   paymentStatus: "PENDING",
   paymentMethod: "UPI",
   upiRef: null,
+  paymentClaimedAt: null,
   createdAt: T0,
   ...over,
 });
@@ -169,6 +171,34 @@ describe("orderHoldsStock / orderDisplayState", () => {
       at: new Date(T0.getTime() + 24 * 60 * MIN),
       holds: true,
       state: "PAYMENT_SUBMITTED",
+    },
+    {
+      name: "buyer tapped I've paid without a UTR, old",
+      o: pending({ paymentClaimedAt: T0 }),
+      at: new Date(T0.getTime() + 24 * 60 * MIN),
+      holds: true,
+      state: "PAYMENT_SUBMITTED",
+    },
+    {
+      name: "claim cleared by Not received, past the hold window",
+      o: pending({ paymentClaimedAt: null, upiRef: null }),
+      at: new Date(T0.getTime() + holdMs),
+      holds: false,
+      state: "EXPIRED",
+    },
+    {
+      name: "claimed, then paid",
+      o: pending({ paymentClaimedAt: T0, paymentStatus: "PAID" }),
+      at: new Date(T0.getTime() + 24 * 60 * MIN),
+      holds: true,
+      state: "PAID",
+    },
+    {
+      name: "claimed, then cancelled",
+      o: pending({ paymentClaimedAt: T0, fulfilmentStatus: "CANCELLED" }),
+      at: T0,
+      holds: false,
+      state: "CANCELLED",
     },
     {
       name: "confirmed by vendor, unpaid, old",

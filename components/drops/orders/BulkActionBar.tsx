@@ -29,7 +29,7 @@ type Props = {
 
 const LABEL: Record<BulkOrderAction, string> = {
   confirm: "Confirm",
-  mark_paid: "Mark paid",
+  mark_paid: "Payment received",
   deliver: "Delivered",
 };
 

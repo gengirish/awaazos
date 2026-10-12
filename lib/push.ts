@@ -90,8 +90,8 @@ export function paymentSubmittedPayload(o: {
   dropId: string | null;
 }): PushPayload {
   return {
-    title: "💸 Payment to check",
-    body: `${o.billNumber} · ${formatINR(o.totalPaise)} — match the UPI reference in your UPI app`,
+    title: "💸 Customer says paid",
+    body: `${o.billNumber} · ${formatINR(o.totalPaise)} — check your UPI app, then tap Payment received`,
     url: o.dropId ? `/drops/${o.dropId}` : "/orders",
     tag: `pay-${o.billNumber}`,
   };

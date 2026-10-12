@@ -209,4 +209,48 @@ describe("applyStorefrontOrderAction", () => {
     });
     expect(markOrderPaid).not.toHaveBeenCalled();
   });
+
+  it("reject_payment (Not received): clears the claim and the UTR, stamps paymentRejectedAt, within scope", async () => {
+    const now = new Date("2026-10-11T10:00:00.000Z");
+    const { tx, asTx } = fakeTx(placedUpi);
+    await applyStorefrontOrderAction(asTx, { scope: scopeMenu, action: "reject_payment", dropStatus: null, now });
+    expect(tx.transaction.updateMany).toHaveBeenCalledWith({
+      where: {
+        ...scopeMenu,
+        paymentStatus: "PENDING",
+        fulfilmentStatus: { not: "CANCELLED" },
+        OR: [{ paymentClaimedAt: { not: null } }, { upiRef: { not: null } }],
+      },
+      data: { paymentClaimedAt: null, upiRef: null, paymentRejectedAt: now },
+    });
+    expect(markOrderPaid).not.toHaveBeenCalled();
+    expect(cancelOrder).not.toHaveBeenCalled();
+  });
+
+  it("reject_payment with no claim to answer → 409 invalid_state", async () => {
+    const { asTx } = fakeTx(placedUpi, 0);
+    await expectActionError(
+      applyStorefrontOrderAction(asTx, { scope: scopeDrop, action: "reject_payment", dropStatus: "OPEN" }),
+      409,
+      "invalid_state",
+    );
+  });
+
+  it("reject_payment is refused once paid or cancelled, and allowed on a frozen drop", async () => {
+    for (const state of [
+      { ...placedUpi, paymentStatus: "PAID" as const },
+      { ...placedUpi, fulfilmentStatus: "CANCELLED" as const },
+    ]) {
+      const { tx, asTx } = fakeTx(state);
+      await expectActionError(
+        applyStorefrontOrderAction(asTx, { scope: scopeDrop, action: "reject_payment", dropStatus: "OPEN" }),
+        409,
+        "invalid_state",
+      );
+      expect(tx.transaction.updateMany).not.toHaveBeenCalled();
+    }
+    const { tx, asTx } = fakeTx(placedUpi);
+    await applyStorefrontOrderAction(asTx, { scope: scopeDrop, action: "reject_payment", dropStatus: "FROZEN" });
+    expect(tx.transaction.updateMany).toHaveBeenCalledTimes(1);
+  });
 });
