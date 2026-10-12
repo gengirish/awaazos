@@ -44,7 +44,7 @@ test.describe("POS layout — phone", () => {
     await expect(collect).toHaveCount(1);
     await expect(collect).toBeVisible();
     await expect(collect).toBeDisabled();
-    await expect(page.getByRole("button", { name: "View cart (0)" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "View cart, 0 items" })).toBeVisible();
 
     await page.getByRole("button", { name: /^Samosa/ }).click();
     await page.getByRole("button", { name: /^Samosa/ }).click();
@@ -57,9 +57,11 @@ test.describe("POS layout — phone", () => {
     const collectBox = await collect.boundingBox();
     expect(collectBox, "collect button laid out").not.toBeNull();
     expect(Math.round(collectBox!.height)).toBeGreaterThanOrEqual(44);
+    // The whole button, amount included, stays on screen (it used to run off the right edge).
+    expect(Math.round(collectBox!.x + collectBox!.width)).toBeLessThanOrEqual(PHONE.width);
 
-    // "View cart (3)" brings the cart into view.
-    await page.getByRole("button", { name: "View cart (3)" }).click();
+    // The cart button (icon + count on phones) brings the cart into view.
+    await page.getByRole("button", { name: "View cart, 3 items" }).click();
     const cart = page.getByRole("region", { name: "Cart" });
     await expect(cart).toBeInViewport();
 

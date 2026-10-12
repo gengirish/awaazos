@@ -329,7 +329,7 @@ function QuickAddTile({ item: it, qty }: { item: MenuTile; qty: number }) {
           {it.emoji}
         </span>
       )}
-      <span className="line-clamp-2 w-full text-center text-sm font-medium text-foreground">{it.name}</span>
+      <span className="line-clamp-2 w-full whitespace-normal break-words text-center text-sm font-medium text-foreground">{it.name}</span>
       <span className="font-mono text-xs tabular-nums text-muted-foreground">{formatINR(it.priceInPaise)}</span>
       {inCart ? (
         <>

@@ -118,18 +118,15 @@ test.describe("POS grid and cart", () => {
     await page.goto("/pos");
     await expect(page.getByRole("button", { name: "Clear cart" })).toHaveCount(0);
 
-    // Two lines: clears straight away, no dialog.
+    const clear = page.getByRole("button", { name: "Clear cart" });
+    const confirm = page.getByRole("dialog", { name: "Clear the cart?" });
+
+    // Two lines: clears straight away, no confirm.
     await page.getByRole("button", { name: /^Idli/ }).click();
     await page.getByRole("button", { name: /^Dosa/ }).click();
-    let dialogSeen = false;
-    const onDialog = () => {
-      dialogSeen = true;
-    };
-    page.on("dialog", onDialog);
-    await page.getByRole("button", { name: "Clear cart" }).click();
+    await clear.click();
     await expect(page.getByText("Tap items or use voice to build an order.")).toBeVisible();
-    expect(dialogSeen).toBe(false);
-    page.off("dialog", onDialog);
+    await expect(confirm).toHaveCount(0);
 
     // Three lines: dismissing the confirm keeps the cart.
     await page.getByRole("button", { name: /^Idli/ }).click();
@@ -138,12 +135,25 @@ test.describe("POS grid and cart", () => {
     const cart = page.getByRole("region", { name: "Cart" });
     await expect(cart).toContainText("₹120.00");
 
-    page.once("dialog", (d) => void d.dismiss());
-    await page.getByRole("button", { name: "Clear cart" }).click();
+    // Cancel takes the focus, so a stray Enter cannot clear a long order.
+    await clear.click();
+    await expect(confirm).toContainText("All 3 items");
+    const cancel = confirm.getByRole("button", { name: "Cancel" });
+    await expect(cancel).toBeFocused();
+    await cancel.click();
+    await expect(confirm).toHaveCount(0);
     await expect(cart).toContainText("₹120.00");
 
-    page.once("dialog", (d) => void d.accept());
-    await page.getByRole("button", { name: "Clear cart" }).click();
+    // Escape dismisses too.
+    await clear.click();
+    await expect(confirm).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(confirm).toHaveCount(0);
+    await expect(cart).toContainText("₹120.00");
+
+    await clear.click();
+    await confirm.getByRole("button", { name: "Clear cart" }).click();
+    await expect(confirm).toHaveCount(0);
     await expect(page.getByText("Tap items or use voice to build an order.")).toBeVisible();
   });
 

@@ -1,9 +1,11 @@
 "use client";
 
 import { AlertTriangle, Mic, Minus, Plus, Trash2, X } from "lucide-react";
+import { useState } from "react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
 import { computeCartTotals, type PosTaxSettings } from "@/lib/pos-totals";
@@ -41,18 +43,20 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
 
   const showReview = voiceReview !== null && (voiceReview.lowConfidence || voiceReview.unmatched.length > 0);
 
-  const onClear = () => {
-    if (items.length > CONFIRM_CLEAR_ABOVE_LINES) {
-      let ok = true;
-      try {
-        ok = window.confirm(`Clear all ${items.length} items from the cart?`);
-      } catch {
-        ok = true;
-      }
-      if (!ok) return;
-    }
+  // `lines` outlives `open` so the sheet's text holds still while it closes.
+  const [confirmClear, setConfirmClear] = useState({ open: false, lines: 0 });
+
+  const clearNow = () => {
     toast.dismiss(UNDO_TOAST_ID);
     clearCart();
+  };
+
+  const onClear = () => {
+    if (items.length > CONFIRM_CLEAR_ABOVE_LINES) {
+      setConfirmClear({ open: true, lines: items.length });
+      return;
+    }
+    clearNow();
   };
 
   const onRemove = (menuItemId: string, name: string) => {
@@ -135,35 +139,40 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
             return (
               <li
                 key={line.menuItemId}
+                // Phones: a three-row grid. The name gets the full width (two
+                // lines, then clamps); line total and "qty × price" stack on the
+                // left under it, with the 44px controls on the right. The two
+                // wrappers are `contents` there, so their children are the grid
+                // items. From md it is the original single flex row.
                 className={cn(
-                  "flex items-center gap-2 px-4 py-3",
+                  "grid grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-x-2 px-4 py-3 md:flex md:gap-2",
                   fromVoice && "border-l-4 border-l-primary bg-primary/5 pl-3",
                 )}
               >
-                <span className="text-xl" aria-hidden>
+                <span className="col-start-1 row-start-1 self-start text-xl md:self-auto" aria-hidden>
                   {line.emoji}
                 </span>
-                <div className="min-w-0 flex-1">
-                  <p className="flex min-w-0 items-center gap-1.5 font-medium text-foreground">
-                    <span className="truncate">{line.name}</span>
+                <div className="contents md:block md:min-w-0 md:flex-1">
+                  <p className="col-span-2 col-start-2 row-start-1 flex min-w-0 items-start gap-1.5 font-medium text-foreground md:items-center">
+                    <span className="max-md:line-clamp-2 max-md:break-words md:truncate">{line.name}</span>
                     {fromVoice ? (
-                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-primary/40 px-1.5 text-[11px] font-medium uppercase leading-4 tracking-wide text-primary">
+                      <span className="inline-flex shrink-0 items-center gap-0.5 rounded-full border border-primary/40 px-1.5 text-[11px] font-medium uppercase leading-4 tracking-wide text-primary max-md:mt-1">
                         <Mic className="h-3 w-3" aria-hidden />
                         <span className="sr-only">added by </span>
                         voice
                       </span>
                     ) : null}
                   </p>
-                  <p className="font-mono text-xs tabular-nums text-muted-foreground">
+                  <p className="col-span-2 col-start-1 row-start-3 self-start font-mono text-xs tabular-nums text-muted-foreground md:self-auto">
                     {line.qty} × {formatINR(line.priceInPaise)}
                   </p>
                 </div>
-                <div className="flex flex-col items-end gap-1">
-                  <span className="font-mono text-sm font-semibold tabular-nums text-foreground">
+                <div className="contents md:flex md:flex-col md:items-end md:gap-1">
+                  <span className="col-span-2 col-start-1 row-start-2 self-end font-mono text-sm font-semibold tabular-nums text-foreground max-md:mt-2 md:self-auto">
                     <span className="sr-only">Line total </span>
                     {formatINR(lineTotal)}
                   </span>
-                  <div className="flex items-center gap-1">
+                  <div className="col-start-3 row-span-2 row-start-2 flex items-center gap-1 max-md:mt-2">
                     <Button
                       type="button"
                       variant="outline"
@@ -234,6 +243,15 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
           Collect payment
         </Button>
       </div>
+      {/* Portalled to <body>, so it is not announced as a cart update. */}
+      <ConfirmDialog
+        open={confirmClear.open}
+        onOpenChange={(open) => setConfirmClear((c) => ({ ...c, open }))}
+        title="Clear the cart?"
+        description={`All ${confirmClear.lines} items will be removed from this order.`}
+        confirmLabel="Clear cart"
+        onConfirm={clearNow}
+      />
     </section>
   );
 }

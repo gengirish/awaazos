@@ -2,8 +2,10 @@
 
 import Link from "next/link";
 import { CloudOff, RefreshCw, TriangleAlert } from "lucide-react";
+import { useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatINR } from "@/lib/currency";
 import { formatIstDateTime } from "@/lib/datetime";
 import type { OutboxSale } from "@/lib/pos-outbox";
@@ -39,6 +41,12 @@ export function PosSyncStatus({
   onSync,
   onDiscard,
 }: PosSyncStatusProps) {
+  // `sale` outlives `open` so the sheet's text holds still while it closes.
+  const [confirmDiscard, setConfirmDiscard] = useState<{ open: boolean; sale: OutboxSale | null }>({
+    open: false,
+    sale: null,
+  });
+
   if (online && pending.length === 0 && failed.length === 0) {
     return <div aria-live="polite" className="sr-only" />;
   }
@@ -113,11 +121,7 @@ export function PosSyncStatus({
                   type="button"
                   variant="ghost"
                   className="h-11 shrink-0"
-                  onClick={() => {
-                    if (window.confirm(`Remove Offline #${s.localNo} (${formatINR(s.body.totalPaise)}) from this phone?`)) {
-                      onDiscard(s.clientRef);
-                    }
-                  }}
+                  onClick={() => setConfirmDiscard({ open: true, sale: s })}
                 >
                   Remove
                 </Button>
@@ -126,6 +130,21 @@ export function PosSyncStatus({
           </ul>
         </details>
       ) : null}
+
+      <ConfirmDialog
+        open={confirmDiscard.open}
+        onOpenChange={(open) => setConfirmDiscard((c) => ({ ...c, open }))}
+        title={confirmDiscard.sale ? `Remove Offline #${confirmDiscard.sale.localNo} from this phone?` : ""}
+        description={
+          confirmDiscard.sale
+            ? `This ${formatINR(confirmDiscard.sale.body.totalPaise)} sale never reached the server, and removing it can't be undone.`
+            : ""
+        }
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (confirmDiscard.sale) onDiscard(confirmDiscard.sale.clientRef);
+        }}
+      />
     </div>
   );
 }
