@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
+
 export const metadata: Metadata = {
   title: "DPDP Rights — AwaazOS",
   description: "How AwaazOS supports rights under India’s DPDP Act.",
@@ -25,8 +27,10 @@ export default function DpdpRightsPage() {
 
       <h2>How to submit a request</h2>
       <ul>
-        <li>Authenticated users can call the account deletion endpoint: <code>DELETE /api/me</code>.</li>
-        <li>You may also email contact@intelliforge.tech from your registered account email.</li>
+        <li>
+          Email <SupportEmailLink /> from your registered account email and tell us which right you want to exercise.
+        </li>
+        <li>To delete your account, ask for erasure in that email.</li>
       </ul>
 
       <h2>Processing timelines</h2>

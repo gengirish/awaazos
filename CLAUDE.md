@@ -363,7 +363,9 @@ screens are public). 404/410 from the push service deletes the row. Feature-gate
 **Offline counter sales** (`docs/PWA_OFFLINE_PLAN.md`): `/sw.js` (registered on `/pos` load) caches
 `/pos` and its chunks; it never intercepts `/api/**`, `/s/**` or non-GET. Every POS checkout goes
 through the IndexedDB outbox (`lib/pos-outbox.ts`): saved first, then POSTed with a `clientRef` uuid
-(`@@unique([vendorId, clientRef])` — replays return the original bill with 200). Queued sales show
+(`@@unique([vendorId, clientRef])` — replays return the original bill with 200). If the device write
+fails (broken IndexedDB) the sale is POSTed directly; with no answer it is `unsaved`, never queued:
+the payment sheet stays open and the next tap replays the same `clientRef`. Queued sales show
 "Offline #N" and sync on page load / `online` / tab visible — **never on a timer**. A `deferred` sale
 is billed to the IST day in its `clientCreatedAt` (≤ 7 days old, `resolveSaleTime`), and its body
 `vendorId` must match the resolved vendor or the route 404s (`requireVendorRole` falls back to the

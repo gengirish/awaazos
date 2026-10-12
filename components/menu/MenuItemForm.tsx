@@ -283,7 +283,7 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle id="menu-item-form-title">{isEdit ? "Edit item" : "Add menu item"}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription id="menu-item-form-desc">
-            Prices are entered in rupees; they are stored as paise in the database.
+            Enter the price in rupees.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         <Form {...form}>
@@ -525,22 +525,21 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
                 control={form.control}
                 name="isPopular"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center gap-3 space-y-0">
-                    <FormControl>
-                      <input
-                        type="checkbox"
-                        id="isPopular"
-                        className="h-5 w-5 min-h-11 min-w-11 cursor-pointer accent-primary"
-                        checked={field.value ?? false}
-                        onChange={field.onChange}
-                        aria-label="Mark as popular"
-                      />
-                    </FormControl>
-                    <div className="leading-none">
-                      <FormLabel htmlFor="isPopular" className="cursor-pointer font-normal">
-                        Popular item
-                      </FormLabel>
-                    </div>
+                  <FormItem className="space-y-0">
+                    {/* The label is the 44px tap area; the box itself draws at 20px. */}
+                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          id="isPopular"
+                          className="h-5 w-5 shrink-0 cursor-pointer accent-primary"
+                          checked={field.value ?? false}
+                          onChange={field.onChange}
+                          aria-label="Mark as popular"
+                        />
+                      </FormControl>
+                      <span>Popular item</span>
+                    </label>
                   </FormItem>
                 )}
               />
@@ -548,22 +547,20 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
                 control={form.control}
                 name="isAvailable"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center gap-3 space-y-0">
-                    <FormControl>
-                      <input
-                        type="checkbox"
-                        id="isAvailable"
-                        className="h-5 w-5 min-h-11 min-w-11 cursor-pointer accent-primary"
-                        checked={field.value ?? true}
-                        onChange={field.onChange}
-                        aria-label="Available for sale"
-                      />
-                    </FormControl>
-                    <div className="leading-none">
-                      <FormLabel htmlFor="isAvailable" className="cursor-pointer font-normal">
-                        Available
-                      </FormLabel>
-                    </div>
+                  <FormItem className="space-y-0">
+                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+                      <FormControl>
+                        <input
+                          type="checkbox"
+                          id="isAvailable"
+                          className="h-5 w-5 shrink-0 cursor-pointer accent-primary"
+                          checked={field.value ?? true}
+                          onChange={field.onChange}
+                          aria-label="Available for sale"
+                        />
+                      </FormControl>
+                      <span>Available</span>
+                    </label>
                   </FormItem>
                 )}
               />

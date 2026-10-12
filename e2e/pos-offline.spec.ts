@@ -104,6 +104,84 @@ test.describe("POS offline", () => {
   });
 });
 
+/**
+ * Make every IndexedDB open fail the way a broken backing store does in
+ * Chromium: the request errors with `UnknownError: Internal error.`.
+ */
+async function breakIndexedDb(page: Page): Promise<void> {
+  await page.addInitScript(() => {
+    IDBFactory.prototype.open = function open() {
+      const req = {
+        result: undefined,
+        error: new DOMException("Internal error.", "UnknownError"),
+        onsuccess: null,
+        onupgradeneeded: null,
+        onblocked: null,
+        onerror: null as null | ((e: Event) => void),
+      };
+      queueMicrotask(() => req.onerror?.(new Event("error")));
+      return req as unknown as IDBOpenDBRequest;
+    };
+  });
+}
+
+test.describe("POS with broken device storage", () => {
+  test("a sale still commits when IndexedDB cannot be opened", async ({ page, request }) => {
+    await createVendorSession(page, request, "posnoidb");
+    await createMenuItem(page, CHAI);
+    await breakIndexedDb(page);
+    await page.goto("/pos");
+
+    await cashSale(page);
+
+    // The normal post-sale receipt, with a real bill number.
+    await expect(page.getByRole("button", { name: /New order/ })).toBeVisible();
+    await expect(page.getByText(/AWZ-\d{8}-\d{4}/).first()).toBeVisible();
+    await expect(page.getByText(/Offline #/)).toHaveCount(0);
+
+    const list = await page.request.get("/api/transactions?limit=50");
+    const { items } = (await list.json()) as { items: { billNumber: string; totalPaise: number }[] };
+    expect(items).toHaveLength(1);
+    expect(items[0]!.totalPaise).toBe(1000);
+  });
+
+  test("a failed save is not shown as queued, and the retry cannot bill twice", async ({ page, request }) => {
+    await createVendorSession(page, request, "posnoidb-retry");
+    await createMenuItem(page, CHAI);
+    await breakIndexedDb(page);
+    await page.goto("/pos");
+
+    // The first POST reaches the server and commits, but its answer is lost.
+    const clientRefs: string[] = [];
+    let dropAnswer = true;
+    await page.route("**/api/transactions?*", async (route) => {
+      if (route.request().method() !== "POST") return route.continue();
+      clientRefs.push((route.request().postDataJSON() as { clientRef: string }).clientRef);
+      if (!dropAnswer) return route.continue();
+      await route.fetch();
+      await route.abort("connectionreset");
+    });
+
+    await cashSale(page);
+
+    const dialog = page.getByRole("dialog");
+    await expect(page.getByText("Couldn't save this sale. Check your connection and try again.")).toBeVisible();
+    // Nothing holds the sale, so it is not "queued": the sheet and cart stay.
+    await expect(dialog.getByRole("button", { name: /Mark as paid/ })).toBeEnabled();
+    await expect(page.getByText(/Offline #/)).toHaveCount(0);
+    await expect(page.getByText(/waiting to sync/)).toHaveCount(0);
+
+    dropAnswer = false;
+    await dialog.getByRole("button", { name: /Mark as paid/ }).click();
+    await expect(page.getByRole("button", { name: /New order/ })).toBeVisible();
+
+    expect(clientRefs).toHaveLength(2);
+    expect(clientRefs[1]).toBe(clientRefs[0]);
+    const list = await page.request.get("/api/transactions?limit=50");
+    expect(((await list.json()) as { total: number }).total).toBe(1);
+  });
+});
+
 test.describe("POST /api/transactions — offline outbox contract", () => {
   test("a replayed clientRef returns the original bill with 200, not a new sale", async ({ page, request }) => {
     await createVendorSession(page, request, "outbox-replay");

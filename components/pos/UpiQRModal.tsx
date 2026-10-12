@@ -20,7 +20,7 @@ import {
 import { cashChange, paiseToRupeesInput, parseRupeesInput, quickTenderPaise } from "@/lib/cash-tender";
 import { formatINR, formatINRCompact, paiseToRupees } from "@/lib/currency";
 import { useQrDataUrl } from "@/hooks/useQrDataUrl";
-import { checkoutSale } from "@/lib/pos-outbox";
+import { checkoutSale, saleRejectedMessage, saleUnsavedMessage } from "@/lib/pos-outbox";
 import { buildUpiDeepLink } from "@/lib/upi";
 import type { CartLine } from "@/lib/cartStore";
 
@@ -66,6 +66,10 @@ export function UpiQRModal({
   const [received, setReceived] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const markPaidRef = useRef<HTMLButtonElement>(null);
+  // clientRef of a sale that could be neither committed nor saved on the
+  // device. Reused while this sheet stays open, so a second tap replays the
+  // same sale and can't bill twice if the first post did land.
+  const unsavedRef = useRef<string | null>(null);
   const ids = useId();
   const upiRefFieldId = `${ids}-upi-ref-field`;
   const receivedHintId = `${ids}-received-hint`;
@@ -77,6 +81,7 @@ export function UpiQRModal({
       setShowUpiRef(false);
       setReceived("");
       setSubmitting(false);
+      unsavedRef.current = null;
     }
   }, [open, defaultMode]);
 
@@ -117,27 +122,33 @@ export function UpiQRModal({
       const paymentMethod: PaymentMethod = payMode === "CASH" ? "CASH" : "UPI";
       // Saved on the device first, then committed; offline it stays queued and
       // syncs later (lib/pos-outbox.ts). Either way the sale is not lost.
-      const result = await checkoutSale(vendorId, {
-        items: items.map((i) => ({
-          menuItemId: i.menuItemId,
-          name: i.name,
-          priceInPaise: i.priceInPaise,
-          qty: i.qty,
-        })),
-        subtotalPaise,
-        taxPaise,
-        totalPaise,
-        paymentMethod,
-        upiRef: payMode === "UPI" ? (upiRef.trim() || null) : null,
-      });
+      const result = await checkoutSale(
+        vendorId,
+        {
+          items: items.map((i) => ({
+            menuItemId: i.menuItemId,
+            name: i.name,
+            priceInPaise: i.priceInPaise,
+            qty: i.qty,
+          })),
+          subtotalPaise,
+          taxPaise,
+          totalPaise,
+          paymentMethod,
+          upiRef: payMode === "UPI" ? (upiRef.trim() || null) : null,
+        },
+        { clientRef: unsavedRef.current ?? undefined },
+      );
       if (result.kind === "rejected") {
-        throw new Error(
-          result.code === "monthly_txn_cap_reached"
-            ? "Monthly bill limit reached for your plan"
-            : result.code === "billing_locked"
-              ? "Your free trial has ended. Subscribe in Settings → Plan & billing to keep selling."
-              : result.code,
-        );
+        toast.error(saleRejectedMessage(result.code, result.status));
+        return;
+      }
+      if (result.kind === "unsaved") {
+        // Nothing holds this sale (device storage failed and the server did
+        // not confirm it): keep the cart and this sheet, never show it as queued.
+        unsavedRef.current = result.clientRef;
+        toast.error(saleUnsavedMessage(result.reason));
+        return;
       }
       onPaid(
         result.kind === "synced"
@@ -157,8 +168,9 @@ export function UpiQRModal({
       );
       onOpenChange(false);
     } catch (e) {
-      console.error(e instanceof Error ? e.message : "checkout_failed");
-      toast.error(e instanceof Error ? e.message : "Could not record payment");
+      // Never show (or log) a raw thrown message: only the error's class name.
+      console.error("checkout_failed", e instanceof Error ? e.name : "unknown");
+      toast.error("Could not record payment");
     } finally {
       setSubmitting(false);
     }

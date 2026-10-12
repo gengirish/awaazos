@@ -53,7 +53,7 @@ via CSS variables — never hardcode hex in components.
   one-screen tweak belongs at the call site via `className`. Re-running
   `npx shadcn@latest add` over an edited primitive drops those edits — diff first.
 - Pull new components via `npx shadcn@latest add <name>` (don't hand-write).
-  The exception is `responsive-dialog.tsx`, which is ours.
+  The exceptions are `responsive-dialog.tsx` and `confirm-dialog.tsx`, which are ours.
 
 ## Touch defaults built into the primitives
 

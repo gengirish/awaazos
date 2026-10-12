@@ -1,4 +1,7 @@
 import type { Metadata } from "next";
+import Link from "next/link";
+
+import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
 
 export const metadata: Metadata = {
   title: "Privacy Policy — AwaazOS",
@@ -60,14 +63,14 @@ export default function PrivacyPage() {
 
       <h2>Your rights</h2>
       <p>
-        You can request access, correction, export, or deletion of your personal data through our data-rights endpoint
-        or by contacting support.
+        You can request access, correction, export, or deletion of your personal data by contacting support. See{" "}
+        <Link href="/legal/dpdp-rights">DPDP Rights</Link> for how.
       </p>
 
       <h2>Contact</h2>
       <p>
         IntelliForge AI, Hyderabad, India<br />
-        Email: contact@intelliforge.tech
+        Email: <SupportEmailLink />
       </p>
     </>
   );

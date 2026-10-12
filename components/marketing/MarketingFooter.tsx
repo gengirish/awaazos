@@ -11,9 +11,14 @@ export function MarketingFooter() {
               🇮🇳
             </span>
           </p>
-          <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} AwaazOS. All rights reserved.</p>
+          <p className="text-xs text-muted-foreground">
+            © {new Date().getFullYear()} AwaazOS. All rights reserved.
+          </p>
         </div>
-        <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2 text-sm">
+        <nav
+          aria-label="Footer"
+          className="flex flex-wrap gap-x-6 gap-y-2 text-sm"
+        >
           <Link
             href="/legal/privacy"
             className="inline-flex min-h-11 min-w-11 items-center font-medium text-awaaz-charcoal/80 underline-offset-4 outline-hidden hover:text-awaaz-orange hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
@@ -25,6 +30,18 @@ export function MarketingFooter() {
             className="inline-flex min-h-11 min-w-11 items-center font-medium text-awaaz-charcoal/80 underline-offset-4 outline-hidden hover:text-awaaz-orange hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
           >
             Terms
+          </Link>
+          <Link
+            href="/legal/refund"
+            className="inline-flex min-h-11 min-w-11 items-center font-medium text-awaaz-charcoal/80 underline-offset-4 outline-hidden hover:text-awaaz-orange hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+          >
+            Refunds
+          </Link>
+          <Link
+            href="/legal/dpdp-rights"
+            className="inline-flex min-h-11 min-w-11 items-center font-medium text-awaaz-charcoal/80 underline-offset-4 outline-hidden hover:text-awaaz-orange hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+          >
+            DPDP rights
           </Link>
         </nav>
       </div>

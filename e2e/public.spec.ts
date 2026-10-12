@@ -10,6 +10,14 @@ test.describe("public surfaces", () => {
     await expect(page.getByRole("link", { name: /(get started|sign up)/i }).first()).toBeVisible();
   });
 
+  test("landing page offers Install app, with written steps when the browser has no prompt", async ({ page }) => {
+    await page.goto("/");
+    await page.getByRole("button", { name: /install app/i }).click();
+    const dialog = page.getByRole("dialog", { name: /install awaazos/i });
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByRole("listitem").first()).toBeVisible();
+  });
+
   test("pricing page sells one plan: free trial, then Starter monthly or yearly", async ({ page }) => {
     await page.goto("/pricing");
     await expect(page.getByRole("heading", { name: /^starter$/i })).toBeVisible();
