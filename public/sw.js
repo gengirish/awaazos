@@ -12,6 +12,10 @@
  *   - navigation to /pos: network-first, falling back to the last /pos page
  *     this device rendered. Sales made offline go to the IndexedDB outbox
  *     (lib/pos-outbox.ts), never through this worker.
+ *   - navigation to /home (the manifest's start_url, i.e. the Home Screen
+ *     icon; it only redirects, see lib/home.ts): network. With no network it
+ *     redirects to /pos when this device holds a cached /pos, so the installed
+ *     app still opens on the working offline till; otherwise /offline.html.
  *   - other vendor navigations: network, falling back to /offline.html.
  *   - never touched: /api/**, /s/** (buyers), non-GET, other origins.
  * The cached /pos page is tenant data (menu, UPI ID, revenue). It is dropped
@@ -33,6 +37,8 @@ var CACHE_VERSION = "v1";
 var STATIC_CACHE = "awz-static-" + CACHE_VERSION;
 var POS_CACHE = "awz-pos-" + CACHE_VERSION;
 var POS_PATH = "/pos";
+/** HOME_PATH in lib/home.ts: the signed-in landing resolver and the manifest start_url. */
+var HOME_PATH = "/home";
 /**
  * Rendered by app/(vendor)/pos/page.tsx once its data has loaded. /pos streams
  * behind the app shell's loading boundary, so a page whose data failed still
@@ -182,6 +188,27 @@ function posNavigation(event) {
     });
 }
 
+/**
+ * The Home Screen icon opens /home, which is a server redirect and so can never
+ * be cached itself. Online, the network's answer (a redirect to /orders, /pos,
+ * /onboarding or /sign-in) is passed through untouched. Offline, a device that
+ * has rendered /pos before is sent there — a real redirect, so the address bar
+ * and the app's router both say /pos, and posNavigation() serves the copy.
+ */
+function homeNavigation(event) {
+  return fetch(event.request).catch(function () {
+    return caches
+      .open(POS_CACHE)
+      .then(function (c) {
+        return c.match(POS_PATH, { ignoreSearch: true, ignoreVary: true });
+      })
+      .then(function (hit) {
+        if (hit) return Response.redirect(new URL(POS_PATH, self.location.origin).href, 302);
+        return caches.match(OFFLINE_URL);
+      });
+  });
+}
+
 function staticNetworkFirst(event) {
   var req = event.request;
   return fetch(req)
@@ -270,6 +297,10 @@ self.addEventListener("fetch", function (event) {
     }
     if (path === POS_PATH) {
       event.respondWith(posNavigation(event));
+      return;
+    }
+    if (path === HOME_PATH) {
+      event.respondWith(homeNavigation(event));
       return;
     }
     event.respondWith(

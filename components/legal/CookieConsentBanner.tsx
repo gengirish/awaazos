@@ -4,8 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
-
-const COOKIE_PREF_KEY = "awz_cookie_pref_v1";
+import { COOKIE_PREF_KEY } from "@/lib/cookie-pref";
 
 /**
  * While shown, the banner publishes its height as `--cookie-banner-h` on
@@ -16,8 +15,17 @@ const COOKIE_PREF_KEY = "awz_cookie_pref_v1";
 const HEIGHT_VAR = "--cookie-banner-h";
 type CookiePref = "accepted" | "declined";
 
+/**
+ * Rendered on the server, shown by default. It used to mount only after
+ * hydration, which made its paragraph the largest late paint on a phone (the
+ * storefront's LCP at ~4.5 s on slow 4G). The stored answer lives in
+ * localStorage, which the server can't read, so for returning visitors
+ * `COOKIE_PREF_BOOT_SCRIPT` (inline in app/layout.tsx) flags <html> before
+ * first paint and app/globals.css hides `[data-cookie-banner]`; the effect
+ * below then unmounts it.
+ */
 export function CookieConsentBanner() {
-  const [show, setShow] = useState(false);
+  const [show, setShow] = useState(true);
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -57,6 +65,7 @@ export function CookieConsentBanner() {
   return (
     <div
       ref={ref}
+      data-cookie-banner=""
       className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/98 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] shadow-lg backdrop-blur-sm print:hidden"
       role="dialog"
       aria-live="polite"

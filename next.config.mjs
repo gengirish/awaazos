@@ -1,4 +1,8 @@
+import bundleAnalyzer from "@next/bundle-analyzer";
 import { withSentryConfig } from "@sentry/nextjs";
+
+// `ANALYZE=true npm run build` writes treemaps to .next/analyze/ (docs/PERFORMANCE.md).
+const withBundleAnalyzer = bundleAnalyzer({ enabled: process.env.ANALYZE === "true", openAnalyzer: false });
 
 /** @type {import('next').NextConfig} */
 
@@ -81,7 +85,7 @@ const nextConfig = {
   },
 };
 
-export default withSentryConfig(nextConfig, {
+export default withSentryConfig(withBundleAnalyzer(nextConfig), {
   // Enabled only when SENTRY_AUTH_TOKEN is set in CI/deploy environment.
   // Local builds without token keep working.
   org: process.env.SENTRY_ORG,
@@ -91,4 +95,11 @@ export default withSentryConfig(nextConfig, {
   widenClientFileUpload: true,
   hideSourceMaps: true,
   disableLogger: true,
+  bundleSizeOptimizations: {
+    // Session Replay starts its compression worker from a blob: URL, which the
+    // CSP above (worker-src 'self') refuses, so the worker never ran and replays
+    // already upload uncompressed. Leaving the worker's source out of the replay
+    // chunk changes nothing except its size (and one CSP console error).
+    excludeReplayWorker: true,
+  },
 });

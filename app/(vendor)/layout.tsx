@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 
 import { AppShell } from "@/components/shell/AppShell";
+import { Toaster } from "@/components/ui/sonner";
 
 import { getShellContext } from "./_shell-context";
 
@@ -14,12 +15,19 @@ import { getShellContext } from "./_shell-context";
  *
  * Pages that must print without any chrome live outside this group:
  * `/receipts/[bill]` is in app/(print)/.
+ *
+ * The toast host is here (and in app/(print)/layout.tsx), not in the root
+ * layout: only signed-in screens raise toasts, and public pages should not
+ * download sonner.
  */
 export default async function VendorLayout({ children }: { children: ReactNode }) {
   const { vendor, role, storePath } = await getShellContext();
   return (
-    <AppShell role={role} vendorId={vendor.id} vendorName={vendor.name} storePath={storePath}>
-      {children}
-    </AppShell>
+    <>
+      <AppShell role={role} vendorId={vendor.id} vendorName={vendor.name} storePath={storePath}>
+        {children}
+      </AppShell>
+      <Toaster richColors position="top-center" />
+    </>
   );
 }

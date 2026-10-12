@@ -17,12 +17,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { STALL_TYPES } from "@/lib/constants";
+import { HOME_PATH } from "@/lib/home";
 import type { StallType } from "@prisma/client";
 
 function SignUpForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/onboarding";
+  // A new store still has setup to finish, so the landing resolver sends it
+  // to /onboarding (lib/home.ts). An explicit callbackUrl still wins.
+  const callbackUrl = searchParams.get("callbackUrl") || HOME_PATH;
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -68,7 +71,7 @@ function SignUpForm() {
       setSubmitting(false);
       return;
     }
-    router.push(sign.url || "/onboarding");
+    router.push(sign.url || callbackUrl);
     router.refresh();
   }
 

@@ -9,11 +9,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { HOME_PATH } from "@/lib/home";
 
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/onboarding";
+  // An explicit callbackUrl (a deep link, or the page middleware bounced) wins;
+  // otherwise the landing resolver picks the screen (lib/home.ts).
+  const callbackUrl = searchParams.get("callbackUrl") || HOME_PATH;
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

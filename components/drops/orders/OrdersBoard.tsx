@@ -11,7 +11,7 @@ import { BoardMoreActions, MORE_ACTION_ROW } from "@/components/drops/orders/Boa
 import { BulkActionBar } from "@/components/drops/orders/BulkActionBar";
 import { OrderCard } from "@/components/drops/orders/OrderCard";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
-import { PushAlertsButton } from "@/components/push/PushAlertsButton";
+import { PushAlertsButton, PushAlertsPrompt } from "@/components/push/PushAlertsButton";
 import { Button } from "@/components/ui/button";
 import { formatINR } from "@/lib/currency";
 import type { EffectiveDropStatus } from "@/lib/drops";
@@ -573,6 +573,9 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
           tools={tools}
         />
       ) : null}
+
+      {/* Phones, until this device has alerts on: the opt-in must not hide in the sheet. */}
+      <PushAlertsPrompt className="mb-3" />
 
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}

@@ -3,6 +3,8 @@ import path from "node:path";
 import vm from "node:vm";
 import { describe, expect, it, vi } from "vitest";
 
+import manifest from "@/app/manifest";
+import { HOME_PATH } from "@/lib/home";
 import { safeNotificationPath } from "@/lib/push-client";
 
 /**
@@ -348,6 +350,76 @@ describe("sw.js fetch handler", () => {
     await stat.put("/offline.html", basic("OFFLINE PAGE"));
     const out = await fetchEvent(handlers.fetch!, "/orders", { mode: "navigate" });
     expect(await out.response!.text()).toBe("OFFLINE PAGE");
+  });
+
+  // The Home Screen icon opens the manifest's start_url, the landing resolver.
+  describe("opening the installed app (start_url)", () => {
+    it("is the path the worker special-cases, under an unchanged app id", () => {
+      const m = manifest();
+      expect(m.start_url).toBe(HOME_PATH);
+      expect(m.id).toBe("/");
+      const { context } = loadWorker();
+      expect((context as unknown as { HOME_PATH: string }).HOME_PATH).toBe(HOME_PATH);
+    });
+
+    it("offline: redirects to /pos, which then opens from the cache", async () => {
+      const { handlers, caches } = offlineWorker(offlineNet);
+      const stat = await caches.open("awz-static-v1");
+      await stat.put("/offline.html", basic("OFFLINE PAGE"));
+      const pos = await caches.open("awz-pos-v1");
+      await pos.put("/pos", basic(POS_HTML));
+
+      const home = await fetchEvent(handlers.fetch!, HOME_PATH, { mode: "navigate" });
+      expect(home.responded).toBe(true);
+      expect(home.response!.status).toBe(302);
+      const location = new URL(home.response!.headers.get("location")!);
+      expect(location.origin).toBe(ORIGIN);
+      expect(location.pathname).toBe("/pos");
+
+      // The browser follows the redirect with a new navigation through the worker.
+      const followed = await fetchEvent(handlers.fetch!, location.pathname, { mode: "navigate" });
+      expect(await followed.response!.text()).toBe(POS_HTML);
+      // Nothing was dropped or rewritten on the way.
+      expect(await (await pos.match("/pos"))!.text()).toBe(POS_HTML);
+    });
+
+    it("offline: a start_url with a query string still reaches the cached /pos", async () => {
+      const { handlers, caches } = offlineWorker(offlineNet);
+      const pos = await caches.open("awz-pos-v1");
+      await pos.put("/pos", basic(POS_HTML));
+      const home = await fetchEvent(handlers.fetch!, `${HOME_PATH}?source=pwa`, { mode: "navigate" });
+      expect(home.response!.status).toBe(302);
+      expect(new URL(home.response!.headers.get("location")!).pathname).toBe("/pos");
+    });
+
+    it("offline with no cached /pos: the offline page, never a redirect loop", async () => {
+      const { handlers, caches } = offlineWorker(offlineNet);
+      const stat = await caches.open("awz-static-v1");
+      await stat.put("/offline.html", basic("OFFLINE PAGE"));
+      const home = await fetchEvent(handlers.fetch!, HOME_PATH, { mode: "navigate" });
+      expect(home.response!.status).toBe(200);
+      expect(await home.response!.text()).toBe("OFFLINE PAGE");
+    });
+
+    it("online: passes the server's redirect through and leaves the caches alone", async () => {
+      const serverRedirect = basic("", { status: 200 }, "opaqueredirect");
+      const { handlers, caches, fetchFn } = offlineWorker(async () => serverRedirect);
+      const pos = await caches.open("awz-pos-v1");
+      await pos.put("/pos", basic(POS_HTML));
+
+      const home = await fetchEvent(handlers.fetch!, HOME_PATH, { mode: "navigate" });
+      expect(home.response).toBe(serverRedirect);
+      expect(fetchFn).toHaveBeenCalledTimes(1);
+      // A published store is redirected to /orders; its cached till must survive that.
+      expect(await (await pos.match("/pos"))!.text()).toBe(POS_HTML);
+      expect(await caches.keys()).toEqual(["awz-pos-v1"]);
+    });
+
+    it("is only special for navigations: a non-navigation GET of /home is left alone", async () => {
+      const { handlers } = offlineWorker(offlineNet);
+      expect((await fetchEvent(handlers.fetch!, HOME_PATH)).responded).toBe(false);
+      expect((await fetchEvent(handlers.fetch!, HOME_PATH, { mode: "navigate", method: "POST" })).responded).toBe(false);
+    });
   });
 
   it("serves static chunks from the network and caches them", async () => {

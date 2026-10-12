@@ -39,7 +39,7 @@ This keeps the blast radius to auth plumbing. The tenant-isolation rules, 404-no
 | `app/api/auth/register/route.ts` | Creates User + Vendor + VendorSettings + StaffMember(OWNER) | Becomes `POST /api/onboarding/vendor` (see Phase 3) |
 | `app/api/auth/forgot-password`, `reset-password` + pages | Own reset flow, `PasswordResetToken` | Delete (Clerk handles reset) |
 | `app/(auth)/sign-in`, `sign-up` pages | Custom forms, `signIn("credentials")` | Clerk `<SignIn />` / `<SignUp />` catch-all routes, kept on-brand via `appearance` |
-| `components/providers.tsx` | `SessionProvider` | `ClerkProvider` (inside `<body>`) |
+| `app/layout.tsx` | No client auth provider (the unused `SessionProvider` wrapper, `components/providers.tsx`, was removed) | `ClerkProvider` (inside `<body>`) — check what it adds to the public storefront's first-load JS (`npm run perf:budget`) |
 | `app/(marketing)/pricing/page.tsx` | `auth()` for "signed in?" | Clerk `auth()` |
 | `app/api/me/route.ts` | `requireUser()`; DELETE removes the account | Also delete the Clerk user (Backend API) |
 | `app/admin/metrics/page.tsx` | `session.user` | `requirePlatformRole()` |
@@ -168,7 +168,7 @@ Keep the existing exclusions: webhooks must accept anonymous signed POSTs, and `
 
 UI:
 
-- `components/providers.tsx`: `ClerkProvider` inside `<body>`, with `appearance` mapped to the
+- `app/layout.tsx`: `ClerkProvider` inside `<body>`, with `appearance` mapped to the
   design-system tokens. Check the 44 px tap-target and label rules (`accessibility.mdc`) against
   Clerk's components and fix with `appearance.elements` where needed.
 - `app/(auth)/sign-in/[[...sign-in]]/page.tsx` and `sign-up/[[...sign-up]]/page.tsx` render

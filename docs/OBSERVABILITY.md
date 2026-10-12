@@ -33,6 +33,17 @@ Notes:
 - PII is disabled (`sendDefaultPii=false`).
 - Request bodies and cookies are stripped in `beforeSend`.
 - Known non-actionable errors (`rate_limited`, `plan_upgrade_required`) are ignored on the server.
+- Session Replay (browser) is not in the JS a page loads first. `sentry.client.config.ts` imports
+  `@sentry/replay` in its own chunk once the page has loaded and the browser is idle, then adds it
+  with `Sentry.addIntegration`. Sampling is unchanged (session rate from
+  `NEXT_PUBLIC_SENTRY_REPLAY_SAMPLE_RATE`, 100% on error, all text masked, media blocked). The one
+  difference: an error thrown before the replay chunk has loaded (roughly the first seconds of a
+  page view, longer on a slow connection) is reported without a replay. Errors and traces
+  themselves are captured from the first line, as before.
+- Replays upload uncompressed. Replay's compression worker starts from a `blob:` URL, which the
+  CSP (`worker-src 'self'` in `next.config.mjs`) blocks, so `bundleSizeOptimizations.excludeReplayWorker`
+  leaves it out of the bundle. To compress replays, host the worker on our origin and pass
+  `workerUrl` to `replayIntegration` rather than loosening the CSP.
 
 ## 2) Logs
 

@@ -10,6 +10,8 @@ Operational utilities. Not deployed; run locally only.
 | `whisper-stt-smoke.mjs` | `npm run smoke:whisper` | Self-hosted Whisper (`services/whisper-stt`) on a local clip |
 | `generate-pwa-icons.mjs` | none | Regenerates the PWA / push icons in `public/` |
 | `sync-agent-rules.mjs` | `npm run sync:agent-rules` | Regenerates `.claude/rules` + `.claude/skills` from `.cursor/` |
+| `check-bundle-budget.mjs` | `npm run perf:budget` | First-load JS per route from the last `npm run build`, against `perf-budget.json`. Runs in CI. See `docs/PERFORMANCE.md` |
+| `perf-lighthouse.mjs` | `npm run perf:lighthouse` | Mobile Lighthouse (median of 3) against a locally running production build. Manual only. See `docs/PERFORMANCE.md` |
 | `razorpay-create-plans.ts` | `npm run razorpay:create-plans` | Dry-runs (or with `-- --create`, creates) the Starter monthly/yearly subscription plans in Razorpay; prints the env ids |
 
 The smoke scripts are one-shot round trips against a live provider, for checking credentials and
