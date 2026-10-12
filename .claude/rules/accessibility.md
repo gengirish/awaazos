@@ -42,6 +42,9 @@ Every voice-only path MUST have a tap fallback (`QuickAddGrid`).
 - Mobile: bottom sheet via `ResponsiveDialog` (`components/ui/responsive-dialog.tsx`),
   centred dialog from `md`. Closes with the 44×44 close button, a tap on the
   overlay, or Escape. Swipe-down to dismiss is **not implemented**.
+- Confirmations: `ConfirmDialog` (`components/ui/confirm-dialog.tsx`), never
+  `window.confirm`. Title + one sentence, Cancel and confirm both 44 px high;
+  for a destructive action the initial focus is Cancel.
 
 ## Voice button states (must be distinguishable beyond color)
 

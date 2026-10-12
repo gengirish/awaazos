@@ -24,6 +24,10 @@ export type StickyCheckoutBarProps = {
  * this holds the only visible "Collect payment" button; OrderCart's own button
  * takes over at md and up. Always rendered on phones so the thumb target never
  * moves — disabled while the cart is empty.
+ *
+ * Width budget at 360px: 328px inside the padding. The cart button is icon +
+ * count only so the pay button gets the rest, and inside the pay button the
+ * label is what gives way (ellipsis) — the amount never shrinks or clips.
  */
 export function StickyCheckoutBar({ settings, onCollectPayment }: StickyCheckoutBarProps) {
   const items = useCartStore((s) => s.items);
@@ -43,18 +47,19 @@ export function StickyCheckoutBar({ settings, onCollectPayment }: StickyCheckout
       className="fixed inset-x-0 bottom-[var(--app-bottom-inset,0px)] z-40 border-t border-border bg-background/95 py-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur-sm supports-backdrop-filter:bg-background/80 md:hidden"
       data-testid="sticky-checkout-bar"
     >
-      <div className="mx-auto flex max-w-lg items-center gap-3">
+      <div className="mx-auto flex max-w-lg items-center gap-2">
         <button
           type="button"
           onClick={viewCart}
-          className="flex min-h-12 min-w-[44px] shrink-0 items-center gap-1.5 rounded-md border border-input px-3 text-sm font-medium text-foreground ring-offset-background hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          aria-label={`View cart, ${itemCount} ${itemCount === 1 ? "item" : "items"}`}
+          className="flex min-h-12 min-w-12 shrink-0 items-center justify-center gap-1.5 rounded-md border border-input px-2.5 text-sm font-medium text-foreground ring-offset-background hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
         >
-          <ShoppingBag className="h-4 w-4" aria-hidden />
-          View cart ({itemCount})
+          <ShoppingBag className="h-4 w-4 shrink-0" aria-hidden />
+          <span className="font-mono tabular-nums">{itemCount}</span>
         </button>
         <Button
           type="button"
-          className="h-12 flex-1 text-base font-semibold"
+          className="h-12 min-w-0 flex-1 gap-0 px-3 text-base font-semibold"
           disabled={empty}
           onClick={() => {
             // An Undo left over from the cart must not put a line back into an order being paid.
@@ -62,8 +67,11 @@ export function StickyCheckoutBar({ settings, onCollectPayment }: StickyCheckout
             onCollectPayment({ subtotalPaise, taxPaise, totalPaise });
           }}
         >
-          Collect payment
-          <span className="font-mono tabular-nums"> · {formatINR(totalPaise)}</span>
+          <span className="min-w-0 truncate">Collect payment</span>
+          <span className="shrink-0 whitespace-pre">
+            {" · "}
+            <span className="font-mono tabular-nums">{formatINR(totalPaise)}</span>
+          </span>
         </Button>
       </div>
     </div>
