@@ -64,7 +64,7 @@
     "razorpay": "^2.9.5",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
-    "react-hook-form": "^7.54.2",
+    "react-hook-form": "^7.89.0",
     "recharts": "^2.15.0",
     "sonner": "^1.7.1",
     "tailwind-merge": "^2.6.0",
