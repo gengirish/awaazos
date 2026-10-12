@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
+
 import { TRIAL_DAYS } from "@/lib/constants";
 
 export const metadata: Metadata = {
@@ -38,7 +40,7 @@ export default function RefundPage() {
 
       <h2>How to request support</h2>
       <p>
-        Contact support at contact@intelliforge.tech with your vendor ID, bill reference, and Razorpay transaction
+        Contact support at <SupportEmailLink /> with your vendor ID, bill reference, and Razorpay transaction
         reference.
       </p>
     </>
