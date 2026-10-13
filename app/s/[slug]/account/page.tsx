@@ -6,6 +6,8 @@ import { cache } from "react";
 
 import { CustomerProfile, CustomerSignOut } from "@/components/storefront/CustomerProfile";
 import { CustomerSignIn } from "@/components/storefront/CustomerSignIn";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Notice } from "@/components/ui/notice";
 import { formatINR } from "@/lib/currency";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { orderDisplayState } from "@/lib/drops";
@@ -133,9 +135,9 @@ export default async function StorefrontAccountPage(
               Sign in
             </h2>
             {searchParams.login === "expired" ? (
-              <p role="alert" className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900">
+              <Notice role="alert" className="mb-4 rounded-xl">
                 That sign-in link has expired or was already used. Enter your email for a new one.
-              </p>
+              </Notice>
             ) : null}
             <p className="mb-4 text-sm text-muted-foreground">
               Optional — you can always order as a guest. Signing in fills in your details at checkout and
@@ -150,9 +152,10 @@ export default async function StorefrontAccountPage(
                 My orders at {vendor.name}
               </h2>
               {orders.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted-foreground">
-                  No orders yet. Orders you place while signed in show up here.
-                </p>
+                <EmptyState
+                  className="rounded-2xl bg-background px-4 py-8"
+                  description="No orders yet. Orders you place while signed in show up here."
+                />
               ) : (
                 <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs">
                   {orders.map((o) => {

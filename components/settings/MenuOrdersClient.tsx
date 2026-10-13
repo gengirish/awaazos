@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { Notice } from "@/components/ui/notice";
 import { paiseToRupees, rupeesToPaise } from "@/lib/currency";
 import type { MenuOrdersBlocker } from "@/lib/menu-orders-board";
 import { cn } from "@/lib/utils";
@@ -190,11 +191,7 @@ export function MenuOrdersClient({
       </div>
 
       {blockerCopy && (
-        <div
-          id="menu-orders-blocker"
-          role="alert"
-          className="rounded-md border border-amber-500/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-        >
+        <Notice id="menu-orders-blocker" role="alert">
           <p>{blockerCopy.text}</p>
           <Link
             href={blockerCopy.href}
@@ -202,7 +199,7 @@ export function MenuOrdersClient({
           >
             {blockerCopy.link}
           </Link>
-        </div>
+        </Notice>
       )}
 
       {enabled && (

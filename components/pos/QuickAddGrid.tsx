@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
@@ -106,26 +107,26 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
 
   if (items.length === 0) {
     return (
-      <section
+      <EmptyState
+        as="section"
         aria-labelledby="quick-add-heading"
-        className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-6 text-center"
+        title="No items yet"
+        titleAs="h2"
+        titleId="quick-add-heading"
+        description="Add menu items so cashiers can tap or speak them into the cart."
+        action={
+          <Link
+            href="/menu"
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            Open menu &rarr;
+          </Link>
+        }
       >
-        <h2 id="quick-add-heading" className="font-display text-lg font-semibold text-foreground">
-          No items yet
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Add menu items so cashiers can tap or speak them into the cart.
-        </p>
-        <Link
-          href="/menu"
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          Open menu &rarr;
-        </Link>
         <p className="text-xs text-muted-foreground">
           Tip: items marked unavailable on /menu will not appear here.
         </p>
-      </section>
+      </EmptyState>
     );
   }
 
@@ -188,9 +189,7 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
       ) : null}
 
       {visibleItems.length === 0 ? (
-        <p role="status" className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No items match &ldquo;{query.trim()}&rdquo;.
-        </p>
+        <EmptyState role="status" description={<>No items match &ldquo;{query.trim()}&rdquo;.</>} />
       ) : (
         <div className="space-y-6">
           {groups.map((group) => (
