@@ -67,6 +67,9 @@ model VendorSettings {
   whatsappNumber           String? // +91XXXXXXXXXX
   // Opt-in: buyers may see whatsappNumber (as a wa.me link) on public storefront/order pages.
   acceptWhatsappOrders     Boolean        @default(false)
+  // Opt-in: every visitor of /s/<slug> sees a WhatsApp chat link to whatsappNumber.
+  showWhatsappOnStore      Boolean        @default(false)
+  instagramHandle          String? // bare, lower-case (lib/instagram.ts); linked on the storefront
   voiceLang                String         @default("en-IN") // hi-IN, te-IN, kn-IN, ta-IN
   receiptFooter            String? // "Thanks for visiting!"
   receiptPaper             ReceiptPaper   @default(MM80) // Width of the printed receipt (/receipts/[bill])

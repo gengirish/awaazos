@@ -21,6 +21,7 @@ import { waitUntil } from "@vercel/functions";
 import webpush from "web-push";
 
 import { formatINR } from "@/lib/currency";
+import { dropOrdersHref } from "@/lib/drops-board";
 import { prisma } from "@/lib/prisma";
 
 export type PushPayload = {
@@ -78,7 +79,7 @@ export function newOrderPayload(o: {
   return {
     title: "🛒 New order",
     body: `${o.billNumber} · ${formatINR(o.totalPaise)} · ${plural(o.itemCount, "item", "items")}`,
-    url: o.dropId ? `/drops/${o.dropId}` : "/orders",
+    url: o.dropId ? dropOrdersHref(o.dropId) : "/orders",
     tag: `order-${o.billNumber}`,
   };
 }
@@ -92,7 +93,7 @@ export function paymentSubmittedPayload(o: {
   return {
     title: "💸 Customer says paid",
     body: `${o.billNumber} · ${formatINR(o.totalPaise)} — check your UPI app, then tap Payment received`,
-    url: o.dropId ? `/drops/${o.dropId}` : "/orders",
+    url: o.dropId ? dropOrdersHref(o.dropId) : "/orders",
     tag: `pay-${o.billNumber}`,
   };
 }

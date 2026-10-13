@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 // Keep Prisma / env / KV out of the unit run; money helpers are spied on.
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
-vi.mock("@/lib/drops-signal", () => ({ bumpDropOrderSignal: vi.fn() }));
+vi.mock("@/lib/drops-signal", () => ({ bumpOrderSignal: vi.fn() }));
 vi.mock("@/lib/drops", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/drops")>()),
   markOrderPaid: vi.fn(),

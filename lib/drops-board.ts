@@ -41,6 +41,8 @@ export type BoardOrderItem = {
 /** One storefront order as the vendor board sees it (JSON-safe: dates are ISO strings). */
 export type BoardOrder = {
   id: string;
+  /** The drop this order belongs to, or null for an "order from menu" order. */
+  dropId: string | null;
   billNumber: string;
   createdAt: string;
   customerName: string | null;
@@ -322,6 +324,47 @@ export function availableOrderActions(
   return out;
 }
 
+// ─── One board, two kinds of order ──────────────────────────────────
+
+/** What the board is showing: everything, only menu orders, or one drop (its id). */
+export type BoardScope = "all" | "menu" | (string & {});
+
+export function ordersInScope<T extends { dropId: string | null }>(orders: T[], scope: BoardScope): T[] {
+  if (scope === "all") return orders;
+  if (scope === "menu") return orders.filter((o) => o.dropId === null);
+  return orders.filter((o) => o.dropId === scope);
+}
+
+/** The orders board narrowed to one drop. Every "orders of this drop" link and alert goes here. */
+export function dropOrdersHref(dropId: string): string {
+  return `/orders?drop=${encodeURIComponent(dropId)}`;
+}
+
+/** Stored FROZEN / FULFILLED: the drop's order list is locked (see `checkOrderAction`). */
+export function isDropFrozen(status: DropStatus): boolean {
+  return status === "FROZEN" || status === "FULFILLED";
+}
+
+/**
+ * Where a vendor action on this order goes. The two route families keep their
+ * own compound scope (`dropId` = this drop, or `dropId: null`), so the board
+ * picks the family per order rather than one route accepting any order.
+ */
+export function orderActionBase(dropId: string | null): string {
+  return dropId === null ? "/api/storefront-orders" : `/api/drops/${encodeURIComponent(dropId)}/orders`;
+}
+
+/** Split a bulk run by route family, keeping board order inside each group. */
+export function groupIdsByDrop(orders: { id: string; dropId: string | null }[]): { dropId: string | null; ids: string[] }[] {
+  const groups = new Map<string | null, string[]>();
+  for (const o of orders) {
+    const ids = groups.get(o.dropId);
+    if (ids) ids.push(o.id);
+    else groups.set(o.dropId, [o.id]);
+  }
+  return Array.from(groups, ([dropId, ids]) => ({ dropId, ids }));
+}
+
 // ─── Small display helpers ──────────────────────────────────────────
 
 export function firstName(name: string | null | undefined): string {
@@ -362,6 +405,26 @@ export const DROP_STATUS_LABEL: Record<EffectiveDropStatus, string> = {
 /** Board polls the KV signal only while a drop can still receive orders. */
 export function shouldPollForOrders(status: EffectiveDropStatus): boolean {
   return status === "OPEN" || status === "SCHEDULED";
+}
+
+export type BoardPollKind = "signal" | "fallback" | null;
+
+/**
+ * Whether the board checks for new orders on its own, and how. Nothing polls
+ * unless a buyer could order right now: "order from menu" is on, or a drop is
+ * open or about to open. Without KV the fallback refetches Postgres directly,
+ * so it runs only while something is actually taking orders.
+ */
+export function boardPollKind(args: {
+  acceptMenuOrders: boolean;
+  dropStatuses: EffectiveDropStatus[];
+  signalMode: "kv" | "fallback";
+}): BoardPollKind {
+  const { acceptMenuOrders, dropStatuses, signalMode } = args;
+  if (signalMode === "kv") {
+    return acceptMenuOrders || dropStatuses.some(shouldPollForOrders) ? "signal" : null;
+  }
+  return acceptMenuOrders || dropStatuses.includes("OPEN") ? "fallback" : null;
 }
 
 /** Ids present in `next` but not in `prev` — "new order" detection after a refetch. */

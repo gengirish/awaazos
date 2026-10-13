@@ -622,7 +622,7 @@ If a feature isn't on the path to "an Instagram cloud kitchen takes, gets paid f
 
 ## 11. Drops (home-kitchen pre-orders)
 
-A **Drop** is one batch of cooking a home kitchen sells ahead of time: "Saturday bakes — order by Fri 9 pm, delivery Sat 5–8 pm". The vendor builds it from her existing menu, shares `/s/<slug>`, buyers order against capped stock, and on the day she gets a cook list and a delivery list. Core rules: `lib/drops.ts` (read its header). Vendor UI: `/drops`, `/drops/[id]` (orders board), `/drops/[id]/edit`, `/drops/[id]/prep`. Buyer UI: `/s/[slug]`, `/s/[slug]/o/[token]`, `/s/[slug]/account`.
+A **Drop** is one batch of cooking a home kitchen sells ahead of time: "Saturday bakes — order by Fri 9 pm, delivery Sat 5–8 pm". The vendor builds it from her existing menu, shares `/s/<slug>`, buyers order against capped stock, and on the day she gets a cook list and a delivery list. Core rules: `lib/drops.ts` (read its header). Vendor UI: `/drops`, `/orders` (the one orders board: drop and menu orders together; `/drops/[id]` redirects to `/orders?drop=<id>`), `/drops/[id]/edit`, `/drops/[id]/prep`. Buyer UI: `/s/[slug]`, `/s/[slug]/o/[token]`, `/s/[slug]/account`.
 
 ### Data model
 
@@ -706,7 +706,7 @@ sequenceDiagram
     participant API as POST /api/s/[slug]/orders
     participant DB as Postgres (Neon)
     participant KV as Upstash
-    participant V as Vendor board /drops/[id]
+    participant V as Vendor board /orders
 
     B->>S: open storefront
     S->>DB: vendor (publish-gated, allowlisted select) + OPEN drops + sold counts
@@ -717,9 +717,9 @@ sequenceDiagram
     API->>DB: effective status, fulfilment, per-order limit, stock, plan cap
     API->>DB: billSequence.upsert, transaction + orderItems + receipt
     API->>DB: COMMIT
-    API--)KV: bump drop-orders:{vendorId}:{dropId} (fire-and-forget)
+    API--)KV: bump orders:{vendorId} (fire-and-forget)
     API-->>B: 201 { orderToken }, redirect to /s/[slug]/o/[token]
-    V->>KV: GET /api/drops/[id]/signal every 6 min (visible + accepting only; Web Push is the instant path)
+    V->>KV: GET /api/storefront-orders/signal every 6 min (visible + accepting only; Web Push is the instant path)
     V->>DB: refetch orders only when the counter moved
 ```
 

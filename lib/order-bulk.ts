@@ -2,6 +2,7 @@
  * Bulk actions on storefront orders — pure, client-safe helpers shared by the
  * board's selection bar (components/drops/orders/OrdersBoard.tsx) and the bulk
  * routes (`POST /api/drops/[id]/orders/bulk`, `POST /api/storefront-orders/bulk`).
+ * The board sends each selected order to its own route (`groupIdsByDrop`).
  *
  * Bulk-eligible actions are the forward, everyday ones: confirm, mark paid,
  * deliver. Cancel (moves money back, vendor must refund by hand) and undeliver
@@ -46,6 +47,17 @@ type ActionableOrder = {
   paymentMethod: PaymentMethod;
 };
 
+/**
+ * The frozen-drop rule for the orders at hand: one answer for all of them (a
+ * single drop's list), or asked per order when the list mixes drops and menu
+ * orders.
+ */
+export type FrozenRule<T> = boolean | ((o: T) => boolean);
+
+function frozenFor<T>(rule: FrozenRule<T>, o: T): boolean {
+  return typeof rule === "function" ? rule(o) : rule;
+}
+
 type MoneyOrder = { paymentMethod: PaymentMethod; paymentStatus: PaymentStatus; totalPaise: number };
 
 /** Bulk actions this order would accept right now (same rules as its card buttons). */
@@ -64,21 +76,21 @@ export function bulkTargets<T extends ActionableOrder>(
   orders: T[],
   selected: ReadonlySet<string>,
   action: BulkOrderAction,
-  frozen: boolean,
+  frozen: FrozenRule<T>,
 ): T[] {
-  return orders.filter((o) => selected.has(o.id) && bulkActionsFor(o, frozen).includes(action));
+  return orders.filter((o) => selected.has(o.id) && bulkActionsFor(o, frozenFor(frozen, o)).includes(action));
 }
 
 /** How many selected orders each bulk action would change — for the bar's button labels. */
-export function bulkActionCounts(
-  orders: ActionableOrder[],
+export function bulkActionCounts<T extends ActionableOrder>(
+  orders: T[],
   selected: ReadonlySet<string>,
-  frozen: boolean,
+  frozen: FrozenRule<T>,
 ): Record<BulkOrderAction, number> {
   const out: Record<BulkOrderAction, number> = { confirm: 0, mark_paid: 0, deliver: 0 };
   for (const o of orders) {
     if (!selected.has(o.id)) continue;
-    for (const a of bulkActionsFor(o, frozen)) out[a] += 1;
+    for (const a of bulkActionsFor(o, frozenFor(frozen, o))) out[a] += 1;
   }
   return out;
 }
@@ -88,13 +100,13 @@ export function bulkActionCounts(
  * refetch, a filter change or a bulk run). Returns the same Set when nothing
  * changed so React can skip the re-render.
  */
-export function pruneSelection(
+export function pruneSelection<T extends ActionableOrder>(
   selected: ReadonlySet<string>,
-  visible: ActionableOrder[],
-  frozen: boolean,
+  visible: T[],
+  frozen: FrozenRule<T>,
 ): ReadonlySet<string> {
   if (selected.size === 0) return selected;
-  const keep = new Set(visible.filter((o) => isBulkSelectable(o, frozen)).map((o) => o.id));
+  const keep = new Set(visible.filter((o) => isBulkSelectable(o, frozenFor(frozen, o))).map((o) => o.id));
   let changed = false;
   const next = new Set<string>();
   selected.forEach((id) => {

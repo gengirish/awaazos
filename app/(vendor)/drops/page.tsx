@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { CopyDropButton, DropStatusBadge } from "@/components/drops/DropForm";
 import { EmptyState } from "@/components/ui/empty-state";
 import { liveDropOrderWhere } from "@/lib/drops-api";
+import { dropOrdersHref } from "@/lib/drops-board";
 import { groupDropsByDay, istTodayYmd } from "@/lib/drops-builder";
 import { effectiveDropStatus, type EffectiveDropStatus } from "@/lib/drops";
 import { dbDateToYmd, formatDropDayLabel, formatFulfilmentWindow, formatIstDate, formatIstTime, utcToIstParts } from "@/lib/drops-time";
@@ -104,7 +105,7 @@ function DropSection({ title, rows }: { title: string; rows: Row[] }) {
         {rows.map((d) => (
           <li key={d.id} className="rounded-xl border border-border bg-card p-4 shadow-xs">
             <Link
-              href={`/drops/${d.id}`}
+              href={dropOrdersHref(d.id)}
               className="-m-1 flex items-start justify-between gap-3 rounded-md p-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
               <div className="min-w-0 space-y-1">

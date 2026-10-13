@@ -5,6 +5,7 @@ import { notFound, redirect } from "next/navigation";
 import { DropForm, DropStatusControls } from "@/components/drops/DropForm";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
 import { allowedTransitions, liveDropOrderWhere } from "@/lib/drops-api";
+import { dropOrdersHref } from "@/lib/drops-board";
 import { dropToFormInput } from "@/lib/drops-builder";
 import { effectiveDropStatus, soldQtyByDropItem } from "@/lib/drops";
 import { prisma } from "@/lib/prisma";
@@ -68,7 +69,7 @@ export default async function EditDropPage(props: { params: Promise<{ id: string
             All drops
           </Link>
           <Link
-            href={`/drops/${drop.id}`}
+            href={dropOrdersHref(drop.id)}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <ClipboardList className="h-4 w-4" aria-hidden="true" />

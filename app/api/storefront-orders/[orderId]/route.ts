@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { toBoardOrder } from "@/lib/drops-board-server";
-import { bumpDropOrderSignal } from "@/lib/drops-signal";
-import { MENU_ORDERS_SIGNAL_ID } from "@/lib/menu-orders";
+import { bumpOrderSignal } from "@/lib/drops-signal";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import {
@@ -49,7 +48,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ orderId
     );
 
     // Let the vendor's other phones notice the change. Fire-and-forget.
-    void bumpDropOrderSignal(ctx.vendor.id, MENU_ORDERS_SIGNAL_ID);
+    void bumpOrderSignal(ctx.vendor.id);
 
     const res = NextResponse.json({ data: toBoardOrder(updated) });
     return withVendorCookie(res, ctx.setVendorCookie);

@@ -285,7 +285,7 @@ const VENDOR_ROUTES: Route[] = [
   { key: "/orders", path: () => "/orders" },
   { key: "/drops", path: () => "/drops" },
   { key: "/drops/new", path: () => "/drops/new" },
-  { key: "/drops/[id]", path: (s) => `/drops/${s.dropId}` },
+  { key: "/orders?drop=[id]", path: (s) => `/orders?drop=${s.dropId}` },
   { key: "/menu", path: () => "/menu" },
   { key: "/transactions", path: () => "/transactions" },
   { key: "/analytics", path: () => "/analytics" },
@@ -322,7 +322,8 @@ async function sweepRoute(
     await p.setViewportSize(viewport);
     const res = await p.goto(target, { timeout: 120_000 });
     expect(res?.status(), `${target} should load`).toBeLessThan(400);
-    expect(new URL(p.url()).pathname, `${target} should not redirect`).toBe(target);
+    const landed = new URL(p.url());
+    expect(landed.pathname + landed.search, `${target} should not redirect`).toBe(target);
     await settle(p);
     await judge(p, testInfo, s, route.key, viewport.width, { fullPage: true });
     if (i > 0) await p.close();

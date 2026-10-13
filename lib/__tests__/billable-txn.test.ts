@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 // Keep Prisma/env/KV out of the unit run (same as drops.test.ts).
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
-vi.mock("@/lib/drops-signal", () => ({ bumpDropOrderSignal: vi.fn() }));
+vi.mock("@/lib/drops-signal", () => ({ bumpOrderSignal: vi.fn() }));
 
 import {
   billableTxnSql,

@@ -87,4 +87,82 @@ test.describe("WhatsApp orders opt-in", () => {
       await after.close();
     }
   });
+
+  test("store page shows WhatsApp and Instagram links only once the owner adds them", async ({ page, request, browser }) => {
+    test.setTimeout(240_000);
+
+    await createVendorSession(page, request, "store-handles", "/menu");
+    const slug = ((await (await page.request.get("/api/vendor")).json()) as { vendor: { slug: string } }).vendor.slug;
+    await createMenuItem(page, { name: "Ragi laddu", priceInRupees: 40, category: "Sweets" });
+    for (const data of [{ publishStorefront: true }, { whatsappNumber: "98765 43210" }, { acceptWhatsappOrders: true }]) {
+      expect((await patchVendor(page, data)).status(), JSON.stringify(data)).toBe(200);
+    }
+
+    async function storeHtml() {
+      const ctx = await browser.newContext(CONTEXT_OPTIONS);
+      try {
+        const buyer = await ctx.newPage();
+        await buyer.goto(`/s/${slug}`);
+        await expect(buyer.getByRole("heading", { level: 1 })).toBeVisible();
+        return await buyer.content();
+      } finally {
+        await ctx.close();
+      }
+    }
+
+    // WhatsApp orders being on does not put the number on the store page.
+    const before = await storeHtml();
+    expect(before).not.toContain("wa.me/");
+    expect(before).not.toContain("9876543210");
+    expect(before).not.toContain("instagram.com/");
+
+    // A handle that is not a username is refused; a pasted profile link is stored bare.
+    const bad = await patchVendor(page, { instagramHandle: "https://evil.example/ammas" });
+    expect(bad.status()).toBe(400);
+    const good = await patchVendor(page, { instagramHandle: "https://www.instagram.com/Ammas.Kitchen/?hl=en" });
+    expect(good.status()).toBe(200);
+    expect(
+      ((await good.json()) as { vendor: { settings: { instagramHandle: string | null } } }).vendor.settings.instagramHandle,
+    ).toBe("ammas.kitchen");
+
+    // ── Owner turns on the store-page WhatsApp button ──────────────────
+    await page.goto("/settings/orders");
+    const toggle = page.getByRole("switch", { name: /whatsapp button on your store page/i });
+    await expect(toggle).toHaveAttribute("aria-checked", "false");
+    await expect(page.getByText("Anyone who opens your store page will be able to see this phone number.")).toBeVisible();
+    expect((await toggle.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+    await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-checked", "true");
+
+    const ctx = await browser.newContext(CONTEXT_OPTIONS);
+    try {
+      const buyer = await ctx.newPage();
+      await buyer.goto(`/s/${slug}`);
+      const contact = buyer.getByRole("list", { name: "Contact" });
+      const wa = contact.locator('a[href^="https://wa.me/919876543210"]');
+      const ig = contact.locator('a[href="https://www.instagram.com/ammas.kitchen/"]');
+      await expect(wa).toBeVisible();
+      await expect(ig).toHaveText(/@ammas\.kitchen/);
+      for (const link of [wa, ig]) {
+        expect((await link.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
+        await expect(link).toHaveAttribute("rel", /noopener/);
+      }
+    } finally {
+      await ctx.close();
+    }
+
+    // Clearing the handle and turning the button off removes both again.
+    expect((await patchVendor(page, { instagramHandle: "", showWhatsappOnStore: false })).status()).toBe(200);
+    const after = await storeHtml();
+    expect(after).not.toContain("wa.me/");
+    expect(after).not.toContain("instagram.com/");
+  });
+
+  test("the store-page WhatsApp button needs a saved number", async ({ page, request }) => {
+    await createVendorSession(page, request, "store-wa-guard", "/menu");
+    expect((await patchVendor(page, { whatsappNumber: null })).status()).toBe(200);
+    const res = await patchVendor(page, { showWhatsappOnStore: true });
+    expect(res.status()).toBe(409);
+    expect(((await res.json()) as { error: string }).error).toBe("whatsapp_number_required");
+  });
 });

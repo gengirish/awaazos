@@ -3,14 +3,19 @@ import { describe, expect, it } from "vitest";
 
 import {
   boardBucket,
+  boardPollKind,
   checkOrderAction,
   countByFilter,
   filterOrders,
   firstName,
   groupByFulfilment,
+  groupIdsByDrop,
   handoverDue,
+  isDropFrozen,
   liveEffectiveStatus,
   newOrderIds,
+  orderActionBase,
+  ordersInScope,
   ordersToPack,
   prepFromOrders,
   shouldPollForOrders,
@@ -221,5 +226,72 @@ describe("display helpers", () => {
   it("newOrderIds", () => {
     expect(newOrderIds([{ id: "a" }, { id: "b" }], [{ id: "c" }, { id: "a" }, { id: "b" }])).toEqual(["c"]);
     expect(newOrderIds([{ id: "a" }], [{ id: "a" }])).toEqual([]);
+  });
+});
+
+describe("one board for menu and drop orders", () => {
+  const orders = [
+    { id: "m1", dropId: null },
+    { id: "a1", dropId: "dropA" },
+    { id: "m2", dropId: null },
+    { id: "b1", dropId: "dropB" },
+    { id: "a2", dropId: "dropA" },
+  ];
+
+  it("ordersInScope: everything, only menu orders, or one drop", () => {
+    expect(ordersInScope(orders, "all")).toBe(orders);
+    expect(ordersInScope(orders, "menu").map((o) => o.id)).toEqual(["m1", "m2"]);
+    expect(ordersInScope(orders, "dropA").map((o) => o.id)).toEqual(["a1", "a2"]);
+    expect(ordersInScope(orders, "no-such-drop")).toEqual([]);
+  });
+
+  it("orderActionBase: each order goes to its own route family", () => {
+    expect(orderActionBase(null)).toBe("/api/storefront-orders");
+    expect(orderActionBase("dropA")).toBe("/api/drops/dropA/orders");
+    expect(orderActionBase("a/b")).toBe("/api/drops/a%2Fb/orders");
+  });
+
+  it("groupIdsByDrop: one group per drop plus one for menu orders, board order kept", () => {
+    expect(groupIdsByDrop(orders)).toEqual([
+      { dropId: null, ids: ["m1", "m2"] },
+      { dropId: "dropA", ids: ["a1", "a2"] },
+      { dropId: "dropB", ids: ["b1"] },
+    ]);
+    expect(groupIdsByDrop([])).toEqual([]);
+  });
+
+  it("isDropFrozen: only the stored FROZEN / FULFILLED states lock a drop's orders", () => {
+    const frozen: DropStatus[] = ["FROZEN", "FULFILLED"];
+    for (const s of ["DRAFT", "OPEN", "CLOSED", "FROZEN", "FULFILLED"] as DropStatus[]) {
+      expect(isDropFrozen(s)).toBe(frozen.includes(s));
+    }
+  });
+});
+
+describe("boardPollKind", () => {
+  it("never polls when nothing can take an order", () => {
+    for (const signalMode of ["kv", "fallback"] as const) {
+      expect(boardPollKind({ acceptMenuOrders: false, dropStatuses: [], signalMode })).toBeNull();
+      expect(
+        boardPollKind({ acceptMenuOrders: false, dropStatuses: ["DRAFT", "CLOSED", "FROZEN", "FULFILLED"], signalMode }),
+      ).toBeNull();
+    }
+  });
+
+  it("order from menu on: polls the KV signal when available, else falls back", () => {
+    expect(boardPollKind({ acceptMenuOrders: true, dropStatuses: [], signalMode: "kv" })).toBe("signal");
+    expect(boardPollKind({ acceptMenuOrders: true, dropStatuses: ["CLOSED"], signalMode: "fallback" })).toBe("fallback");
+  });
+
+  it("one open drop among closed ones is enough", () => {
+    expect(boardPollKind({ acceptMenuOrders: false, dropStatuses: ["FULFILLED", "OPEN"], signalMode: "kv" })).toBe("signal");
+    expect(boardPollKind({ acceptMenuOrders: false, dropStatuses: ["FULFILLED", "OPEN"], signalMode: "fallback" })).toBe(
+      "fallback",
+    );
+  });
+
+  it("a drop that only opens later polls the cheap signal, never Postgres directly", () => {
+    expect(boardPollKind({ acceptMenuOrders: false, dropStatuses: ["SCHEDULED"], signalMode: "kv" })).toBe("signal");
+    expect(boardPollKind({ acceptMenuOrders: false, dropStatuses: ["SCHEDULED"], signalMode: "fallback" })).toBeNull();
   });
 });

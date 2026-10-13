@@ -21,11 +21,12 @@ import {
   stockHoldingOrderWhere,
   type EffectiveDropStatus,
 } from "@/lib/drops";
-import { MENU_BOARD_MAX_ORDERS, menuBoardWindowStart } from "@/lib/menu-orders-board";
+import { BOARD_MAX_ORDERS, menuBoardWindowStart } from "@/lib/menu-orders-board";
 import { prisma } from "@/lib/prisma";
 
 export const boardOrderSelect = {
   id: true,
+  dropId: true,
   billNumber: true,
   createdAt: true,
   customerName: true,
@@ -55,6 +56,7 @@ export function toBoardOrder(row: BoardOrderRow, now: Date = new Date()): BoardO
   const displayState = orderDisplayState(row, now);
   return {
     id: row.id,
+    dropId: row.dropId,
     billNumber: row.billNumber,
     createdAt: row.createdAt.toISOString(),
     customerName: row.customerName,
@@ -102,91 +104,142 @@ export type DropBoard = {
   prep: PrepRow[];
 };
 
-/** Everything the board / prep sheet need. null = not this vendor's drop (caller 404s). */
+const boardDropInclude = {
+  items: {
+    orderBy: { sortOrder: "asc" },
+    include: { menuItem: { select: { name: true, emoji: true } } },
+  },
+} satisfies Prisma.DropInclude;
+
+type BoardDropRow = Prisma.DropGetPayload<{ include: typeof boardDropInclude }>;
+
+function toBoardDrop(drop: BoardDropRow, now: Date): BoardDrop {
+  return {
+    id: drop.id,
+    title: drop.title,
+    status: drop.status,
+    effectiveStatus: effectiveDropStatus(drop, now),
+    date: drop.date.toISOString(),
+    opensAt: drop.opensAt?.toISOString() ?? null,
+    closesAt: drop.closesAt.toISOString(),
+    fulfilmentMode: drop.fulfilmentMode,
+    fulfilmentStartsAt: drop.fulfilmentStartsAt.toISOString(),
+    fulfilmentEndsAt: drop.fulfilmentEndsAt.toISOString(),
+    pickupNote: drop.pickupNote,
+    deliveryFeePaise: drop.deliveryFeePaise,
+    items: drop.items.map((i) => ({
+      id: i.id,
+      name: i.menuItem.name,
+      emoji: i.menuItem.emoji,
+      maxQty: i.maxQty,
+    })),
+  };
+}
+
+/** One drop with all its orders, for the prep sheet. null = not this vendor's drop (caller 404s). */
 export async function loadDropBoard(
   vendorId: string,
   dropId: string,
   now: Date = new Date(),
 ): Promise<DropBoard | null> {
-  const drop = await prisma.drop.findFirst({
-    where: { id: dropId, vendorId },
-    include: {
-      items: {
-        orderBy: { sortOrder: "asc" },
-        include: { menuItem: { select: { name: true, emoji: true } } },
-      },
-    },
-  });
-  if (!drop) return null;
+  const row = await prisma.drop.findFirst({ where: { id: dropId, vendorId }, include: boardDropInclude });
+  if (!row) return null;
 
   const rows = await prisma.transaction.findMany({
-    where: { vendorId, dropId: drop.id, source: "STOREFRONT" },
+    where: { vendorId, dropId: row.id, source: "STOREFRONT" },
     orderBy: { createdAt: "desc" },
     select: boardOrderSelect,
   });
 
   const orders = rows.map((r) => toBoardOrder(r, now));
-  const items = drop.items.map((i) => ({
-    id: i.id,
-    name: i.menuItem.name,
-    emoji: i.menuItem.emoji,
-    maxQty: i.maxQty,
-  }));
+  const drop = toBoardDrop(row, now);
 
   return {
-    drop: {
-      id: drop.id,
-      title: drop.title,
-      status: drop.status,
-      effectiveStatus: effectiveDropStatus(drop, now),
-      date: drop.date.toISOString(),
-      opensAt: drop.opensAt?.toISOString() ?? null,
-      closesAt: drop.closesAt.toISOString(),
-      fulfilmentMode: drop.fulfilmentMode,
-      fulfilmentStartsAt: drop.fulfilmentStartsAt.toISOString(),
-      fulfilmentEndsAt: drop.fulfilmentEndsAt.toISOString(),
-      pickupNote: drop.pickupNote,
-      deliveryFeePaise: drop.deliveryFeePaise,
-      items,
-    },
+    drop,
     orders,
     summary: summarizeOrders(orders),
-    prep: prepFromOrders(items, orders),
+    prep: prepFromOrders(drop.items, orders),
   };
 }
 
-// ─── "Order from menu" board ────────────────────────────────────────
+// ─── The orders board: menu orders and drop orders together ─────────
 
-export type MenuOrdersBoard = {
+export type OrdersBoardData = {
   orders: BoardOrder[];
+  /** Drops the board can be narrowed to, soonest handover first. */
+  drops: BoardDrop[];
   summary: BoardSummary;
 };
 
 /**
- * Prisma filter for the menu-orders board: this vendor's storefront orders
- * with no drop, placed in the last MENU_BOARD_WINDOW_DAYS IST days, plus any
- * older one still open (PLACED / CONFIRMED) that holds stock — i.e. still
- * needs the vendor. Old expired unpaid UPI orders fall off rather than pile up.
+ * Drops that are still in play: published, with a pickup / delivery window
+ * that has not ended more than MENU_BOARD_WINDOW_DAYS IST days ago. Every
+ * order of such a drop is on the board, however early it was placed, so the
+ * drop's totals and "to cook" figures are whole.
  */
-export function menuOrdersBoardWhere(vendorId: string, now: Date = new Date()): Prisma.TransactionWhereInput {
+function currentDropWhere(now: Date): Prisma.DropWhereInput {
+  return { status: { not: "DRAFT" }, fulfilmentEndsAt: { gte: menuBoardWindowStart(now) } };
+}
+
+/**
+ * Prisma filter for the orders board: this vendor's storefront orders (menu and
+ * drop alike) that are
+ *   - placed in the last MENU_BOARD_WINDOW_DAYS IST days, or
+ *   - older but still open (PLACED / CONFIRMED) and holding stock — i.e. they
+ *     still need the vendor, or
+ *   - part of a current drop (see `currentDropWhere`), or of `pinDropId`.
+ * Old expired unpaid UPI orders fall off rather than pile up.
+ */
+export function ordersBoardWhere(
+  vendorId: string,
+  now: Date = new Date(),
+  pinDropId?: string | null,
+): Prisma.TransactionWhereInput {
   return {
     vendorId,
     source: "STOREFRONT",
-    dropId: null,
     OR: [
       { createdAt: { gte: menuBoardWindowStart(now) } },
       { AND: [{ fulfilmentStatus: { in: ["PLACED", "CONFIRMED"] } }, stockHoldingOrderWhere(now)] },
+      { drop: currentDropWhere(now) },
+      ...(pinDropId ? [{ dropId: pinDropId }] : []),
     ],
   };
 }
 
-export async function loadMenuOrdersBoard(vendorId: string, now: Date = new Date()): Promise<MenuOrdersBoard> {
+/**
+ * Everything `/orders` shows. `pinDropId` (from `?drop=`) keeps one older drop
+ * on the board with all its orders, so a past drop can still be opened from the
+ * Drops list; an id that is not this vendor's simply matches nothing.
+ */
+export async function loadOrdersBoard(
+  vendorId: string,
+  opts: { pinDropId?: string | null; now?: Date } = {},
+): Promise<OrdersBoardData> {
+  const now = opts.now ?? new Date();
+  const pinDropId = opts.pinDropId || null;
+
   const rows = await prisma.transaction.findMany({
-    where: menuOrdersBoardWhere(vendorId, now),
+    where: ordersBoardWhere(vendorId, now, pinDropId),
     orderBy: { createdAt: "desc" },
-    take: MENU_BOARD_MAX_ORDERS,
+    take: BOARD_MAX_ORDERS,
     select: boardOrderSelect,
   });
   const orders = rows.map((r) => toBoardOrder(r, now));
-  return { orders, summary: summarizeOrders(orders) };
+
+  const orderDropIds = Array.from(new Set(orders.flatMap((o) => (o.dropId ? [o.dropId] : []))));
+  const dropRows = await prisma.drop.findMany({
+    where: {
+      vendorId,
+      OR: [
+        currentDropWhere(now),
+        { id: { in: orderDropIds } },
+        ...(pinDropId ? [{ id: pinDropId }] : []),
+      ],
+    },
+    orderBy: [{ fulfilmentStartsAt: "asc" }, { createdAt: "asc" }],
+    include: boardDropInclude,
+  });
+
+  return { orders, drops: dropRows.map((d) => toBoardDrop(d, now)), summary: summarizeOrders(orders) };
 }

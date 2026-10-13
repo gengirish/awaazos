@@ -13,6 +13,7 @@ import {
   orderStatusLabel,
   stockLabel,
   storefrontDropVisibility,
+  storeWhatsappNumber,
   whatsappChatLink,
 } from "@/lib/storefront-order";
 
@@ -178,6 +179,26 @@ describe("buyerWhatsappNumber", () => {
   it("is null when opted in but the number is missing or unusable", () => {
     expect(buyerWhatsappNumber({ acceptWhatsappOrders: true, whatsappNumber: null })).toBeNull();
     expect(buyerWhatsappNumber({ acceptWhatsappOrders: true, whatsappNumber: "12345" })).toBeNull();
+  });
+});
+
+describe("storeWhatsappNumber", () => {
+  it("is null until the vendor opts in to the store-page button", () => {
+    expect(storeWhatsappNumber({ whatsappNumber: "+919876543210" })).toBeNull();
+    expect(storeWhatsappNumber({ showWhatsappOnStore: false, whatsappNumber: "+919876543210" })).toBeNull();
+    expect(storeWhatsappNumber(null)).toBeNull();
+  });
+
+  it("does not follow the WhatsApp orders opt-in", () => {
+    const settings = { acceptWhatsappOrders: true, showWhatsappOnStore: false, whatsappNumber: "+919876543210" };
+    expect(buyerWhatsappNumber(settings)).toBe("+919876543210");
+    expect(storeWhatsappNumber(settings)).toBeNull();
+  });
+
+  it("returns the number once opted in, and only a usable one", () => {
+    expect(storeWhatsappNumber({ showWhatsappOnStore: true, whatsappNumber: "+919876543210" })).toBe("+919876543210");
+    expect(storeWhatsappNumber({ showWhatsappOnStore: true, whatsappNumber: "12345" })).toBeNull();
+    expect(storeWhatsappNumber({ showWhatsappOnStore: true, whatsappNumber: null })).toBeNull();
   });
 });
 
