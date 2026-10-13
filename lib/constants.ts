@@ -48,7 +48,8 @@ export const PLAN_LIMITS: Record<
     txnPerMonth: null,
     maxStaff: 3,
     whatsappReceipts: true,
-    razorpayLinks: false,
+    // The vendor's own Razorpay keys for storefront payments (Settings → Payments).
+    razorpayLinks: true,
     monthlyTxnCap: null,
     whatsapp: true,
     csvExport: true,

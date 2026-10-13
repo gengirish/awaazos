@@ -150,10 +150,10 @@ export function RazorpayKeysClient({
         <div className="flex flex-col gap-3 rounded-lg border border-border bg-muted/40 p-4 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-2 text-sm font-medium">
             <Lock className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
-            Online payments are on the Pro plan.
+            Online payments are on the Starter plan.
           </p>
           <Link href="/settings/billing" className={primaryBtn}>
-            Upgrade to Pro
+            Subscribe to Starter
           </Link>
         </div>
       </div>
