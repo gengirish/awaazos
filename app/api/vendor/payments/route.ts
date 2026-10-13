@@ -22,7 +22,7 @@ export const runtime = "nodejs";
  *
  * OWNER only. Secrets are write-only: they go in encrypted (lib/secret-box.ts)
  * and never come back out of this API — GET returns only whether keys are set
- * and the last 4 of the (public) key id. Saving is PRO-gated
+ * and the last 4 of the (public) key id. Saving is STARTER-gated
  * (`PLAN_LIMITS.razorpayLinks`); removing is not, so a downgraded vendor can
  * still clear her keys.
  *
@@ -98,7 +98,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("OWNER", undefined, req);
-    requirePlan(ctx.vendor, "PRO");
+    requirePlan(ctx.vendor, "STARTER");
     if (!isSecretBoxConfigured()) return notConfigured();
 
     const rl = await writeRateLimit.check(`vendor-payments:${ctx.vendor.id}`);

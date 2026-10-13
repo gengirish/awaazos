@@ -110,6 +110,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
           upiName: true,
           plan: true,
           planExpiresAt: true,
+          trialEndsAt: true,
           settings: {
             select: {
               theme: true,
