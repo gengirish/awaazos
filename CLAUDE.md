@@ -437,6 +437,35 @@ single-order compound scope, so one stale order never rolls back the rest. Respo
 
 DB-backed drops tests are opt-in: `npm run test:drops:db` (needs a throwaway `DATABASE_URL`).
 
+### Offers (quantity plan discounts)
+
+An `Offer` is a vendor's plan: "4+ quiches incl. 1 paneer → 10% off". The rules live in
+`lib/offers.ts` (pure, client-safe; read its header before touching it) and nowhere else. Sellers edit
+them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireActiveBilling`).
+
+- **Eligibility:** all items, chosen item ids, or a `MenuItem.tags` tag (seller free text, edited in
+  the menu item form; compared trimmed and case-insensitively). The optional "at least N of tag X" is
+  counted among the eligible lines only.
+- **One offer per order, never stacked.** The largest discount wins; ties go to the higher `minQty`,
+  then the older offer. Only eligible lines are discounted; delivery fees never are.
+- **Rounding:** `floor(eligibleSubtotal × bps / 10 000)`, split across eligible lines by largest
+  remainder into `OrderItem.discountPaise` (item analytics are net of it).
+  `subtotal − discount + delivery + tax = total`; counter tax is charged on `subtotal − discount`.
+- **No timers.** `startsAt` / `endsAt` are compared on every read (`offerIsLive`).
+- **The server prices; browsers preview.** `placeStorefrontOrder` and `placeMenuOrder` call
+  `applyOffers` inside their transaction (buyers send ids and quantities only), so `totalPaise`, and
+  with it the Razorpay amount, UPI QR and `DailySummary`, is the server's. The POS prices its own cart
+  (it works offline), so `POST /api/transactions` re-prices it (`lib/pos-offers.ts`): a live sale
+  whose discount is neither the server's figure nor 0 gets 400 `discount_mismatch`; a `deferred` sale
+  is kept as rung up.
+- **Public pages get resolved offers only** (`resolveOffers` → `offersForItems`): name, description,
+  numbers and the item ids already on that page. Raw tags stay on the server.
+- `Transaction.offerName` is a snapshot (`offerId` is set null on delete), so old bills keep their
+  line. Receipts, WhatsApp text, boards and the CSV label it with `discountLabel()`.
+- Not built: coupon codes, per-customer limits, fixed amount / bundle price (enum values reserved),
+  buy-X-get-Y, stacking, recurring subscriptions.
+- Test store data: `npm run seed:quiche-plans -- <slug>` (dry run; `--create` writes).
+
 ### In-app Help (`/help`)
 
 A self-help guide to getting around, linked from the shell (the "More" sheet on phones, the rail from
