@@ -39,6 +39,8 @@ export const boardOrderSelect = {
   upiRef: true,
   paymentClaimedAt: true,
   subtotalPaise: true,
+  discountPaise: true,
+  offerName: true,
   deliveryFeePaise: true,
   totalPaise: true,
   orderItems: {
@@ -65,6 +67,8 @@ export function toBoardOrder(row: BoardOrderRow, now: Date = new Date()): BoardO
     paymentStatus: row.paymentStatus,
     upiRef: row.upiRef,
     subtotalPaise: row.subtotalPaise,
+    discountPaise: row.discountPaise,
+    offerName: row.offerName,
     deliveryFeePaise: row.deliveryFeePaise,
     totalPaise: row.totalPaise,
     displayState,

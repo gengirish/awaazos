@@ -163,7 +163,9 @@ export default async function AnalyticsPage(props: Props) {
     prisma.$queryRaw<
       { menuItemId: string | null; name: string; qty: number; totalPaise: bigint; emoji: string | null }[]
     >(Prisma.sql`
-      SELECT oi."menuItemId", oi.name, SUM(oi.qty)::int AS qty, SUM(oi."totalPaise")::bigint AS "totalPaise",
+      SELECT oi."menuItemId", oi.name, SUM(oi.qty)::int AS qty,
+        -- Net of the line's share of an offer discount, so items don't overstate revenue.
+        SUM(oi."totalPaise" - oi."discountPaise")::bigint AS "totalPaise",
         MAX(mi.emoji) AS emoji
       FROM order_items oi
       INNER JOIN transactions t ON t.id = oi."transactionId"

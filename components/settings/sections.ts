@@ -6,6 +6,7 @@ import {
   ReceiptText,
   ShoppingBag,
   Store,
+  Tag,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
@@ -14,6 +15,7 @@ import {
 export type SettingsSectionId =
   | "store"
   | "orders"
+  | "offers"
   | "payments"
   | "receipts"
   | "notifications"
@@ -42,6 +44,13 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     title: "Online orders",
     description: "Let customers order from your menu, for pickup or delivery.",
     icon: ShoppingBag,
+  },
+  {
+    id: "offers",
+    href: "/settings/offers",
+    title: "Offers",
+    description: "Plan discounts, like 10% off 4 or more items.",
+    icon: Tag,
   },
   {
     id: "payments",

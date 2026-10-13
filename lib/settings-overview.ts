@@ -68,6 +68,13 @@ export function ordersStatus(
     : { text: "Order from menu: Off", on: false };
 }
 
+/** `activeOffers` = offers switched on (their dates are not looked at here). */
+export function offersStatus(activeOffers: number): SectionStatus {
+  return activeOffers > 0
+    ? { text: `${activeOffers} ${activeOffers === 1 ? "offer" : "offers"} on`, on: true }
+    : { text: "No offers on", on: false };
+}
+
 export function paymentsStatus(
   s: Pick<SettingsSnapshot, "upiId" | "acceptPayOnDelivery" | "razorpayConfigured">,
 ): SectionStatus {

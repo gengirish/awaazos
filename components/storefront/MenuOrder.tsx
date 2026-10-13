@@ -15,7 +15,9 @@ import {
   type BuyerPrefill,
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
-import { formatINRCompact, sumPaise } from "@/lib/currency";
+import { OfferCartNote, OfferChips } from "@/components/storefront/OfferNotes";
+import { formatINRCompact } from "@/lib/currency";
+import { applyOffers, type ResolvedOffer } from "@/lib/offers";
 import {
   cartStorageKey,
   fulfilmentOptionsLabel,
@@ -66,7 +68,11 @@ export type MenuOrderProps = {
   /** The kitchen has a usable WhatsApp number (see CheckoutSheet). */
   whatsapp?: boolean;
   prefill?: BuyerPrefill | null;
+  /** Offers live on menu orders (lib/offers.ts). Preview only; the server re-prices. */
+  offers?: readonly ResolvedOffer[];
 };
+
+const NO_OFFERS: readonly ResolvedOffer[] = [];
 
 export function MenuOrder(props: MenuOrderProps) {
   const {
@@ -79,6 +85,7 @@ export function MenuOrder(props: MenuOrderProps) {
     payment,
     whatsapp,
     prefill,
+    offers = NO_OFFERS,
   } = props;
   const router = useRouter();
 
@@ -114,7 +121,13 @@ export function MenuOrder(props: MenuOrderProps) {
     .map((l) => ({ item: byId.get(l.menuItemId), qty: l.qty }))
     .filter((l): l is { item: MenuOrderItem; qty: number } => !!l.item);
   const itemCount = lines.reduce((s, l) => s + l.qty, 0);
-  const subtotalPaise = sumPaise(lines.map((l) => l.item.priceInPaise * l.qty));
+  const offered = applyOffers(
+    lines.map((l) => ({ key: l.item.id, menuItemId: l.item.id, priceInPaise: l.item.priceInPaise, qty: l.qty })),
+    offers,
+  );
+  const appliedOffer = offered.discounts[0] ?? null;
+  // What the cart bars show: items less the offer discount (delivery is added at checkout).
+  const payablePaise = offered.totalPaise;
   const canPay = payment.upi || payment.cod;
 
   // The page-level cart bar (CartHub) shows this cart next to any drop's.
@@ -122,7 +135,7 @@ export function MenuOrder(props: MenuOrderProps) {
     key: "menu",
     label: "Everyday menu",
     itemCount,
-    subtotalPaise,
+    subtotalPaise: payablePaise,
     canPay,
     onCheckout: () => setOpen(true),
     enabled: true,
@@ -185,6 +198,8 @@ export function MenuOrder(props: MenuOrderProps) {
           <li>Tap + to add items, then check out.</li>
         </ul>
       </div>
+
+      <OfferChips offers={offers} />
 
       <div className="space-y-8">
         {categories.map(({ category, anchor, items }) => (
@@ -250,10 +265,12 @@ export function MenuOrder(props: MenuOrderProps) {
 
       {!canPay ? <NoPaymentNotice /> : null}
 
+      <OfferCartNote appliedName={appliedOffer?.name ?? null} nudge={offered.nudge} />
+
       {inHub ? null : (
         <CartBar
           itemCount={itemCount}
-          subtotalPaise={subtotalPaise}
+          subtotalPaise={payablePaise}
           canPay={canPay}
           onCheckout={() => setOpen(true)}
           buttonRef={checkoutRef}
@@ -273,6 +290,7 @@ export function MenuOrder(props: MenuOrderProps) {
           priceInPaise: l.item.priceInPaise,
           qty: l.qty,
         }))}
+        discount={appliedOffer}
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
         pickupNote={pickupNote}

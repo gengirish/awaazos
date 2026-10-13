@@ -23,6 +23,8 @@ import { useQrDataUrl } from "@/hooks/useQrDataUrl";
 import { checkoutSale, saleRejectedMessage, saleUnsavedMessage } from "@/lib/pos-outbox";
 import { buildUpiDeepLink } from "@/lib/upi";
 import type { CartLine } from "@/lib/cartStore";
+import { discountLabel } from "@/lib/offers";
+import type { PayTotals } from "@/lib/pos-totals";
 
 /** A sale that committed now, or one saved on the device to sync later. */
 export type PaidResult =
@@ -36,9 +38,8 @@ export type UpiQRModalProps = {
   stallName: string;
   upiId: string | null;
   upiName: string | null;
-  totalPaise: number;
-  subtotalPaise: number;
-  taxPaise: number;
+  /** Captured when "Collect payment" was tapped (lib/pos-totals.ts). */
+  totals: PayTotals;
   items: CartLine[];
   onPaid: (result: PaidResult) => void;
 };
@@ -50,12 +51,11 @@ export function UpiQRModal({
   stallName,
   upiId,
   upiName,
-  totalPaise,
-  subtotalPaise,
-  taxPaise,
+  totals,
   items,
   onPaid,
 }: UpiQRModalProps) {
+  const { subtotalPaise, discountPaise, taxPaise, totalPaise } = totals;
   const effectiveUpiId = upiId?.trim() || "";
   // No UPI ID means no QR to show, so cash is the mode that can actually be paid.
   const defaultMode: "UPI" | "CASH" = effectiveUpiId ? "UPI" : "CASH";
@@ -132,6 +132,10 @@ export function UpiQRModal({
             qty: i.qty,
           })),
           subtotalPaise,
+          // Sent only with an offer, so a bill without one posts as it always did.
+          ...(discountPaise > 0
+            ? { discountPaise, offerId: totals.offerId, offerName: totals.offerName }
+            : {}),
           taxPaise,
           totalPaise,
           paymentMethod,
@@ -181,6 +185,11 @@ export function UpiQRModal({
       <div className="rounded-lg bg-muted/50 px-4 py-3 text-center">
         <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Amount due</p>
         <p className="font-mono text-3xl font-bold tabular-nums text-foreground">{formatINR(totalPaise)}</p>
+        {discountPaise > 0 ? (
+          <p className="mt-1 text-sm text-muted-foreground">
+            {discountLabel(totals.offerName)}: −{formatINR(discountPaise)}
+          </p>
+        ) : null}
       </div>
 
       <div className="flex gap-2 rounded-lg border p-1">

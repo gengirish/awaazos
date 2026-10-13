@@ -27,6 +27,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { formatINR } from "@/lib/currency";
+import { discountLabel } from "@/lib/offers";
 import {
   DISPLAY_STATE_LABEL,
   availableOrderActions,
@@ -222,6 +223,12 @@ export function OrderCard({
             <span className="font-mono tabular-nums text-muted-foreground">{formatINR(it.totalPaise)}</span>
           </li>
         ))}
+        {(order.discountPaise ?? 0) > 0 && (
+          <li className="flex justify-between gap-2 py-1.5 font-semibold">
+            <span className="min-w-0 break-words">{discountLabel(order.offerName)}</span>
+            <span className="shrink-0 font-mono tabular-nums">−{formatINR(order.discountPaise ?? 0)}</span>
+          </li>
+        )}
         {order.deliveryFeePaise > 0 && (
           <li className="flex justify-between gap-2 py-1.5 text-muted-foreground">
             <span>Delivery fee</span>

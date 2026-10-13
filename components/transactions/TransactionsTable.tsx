@@ -45,6 +45,7 @@ function toDetailModel(row: TransactionListRow): TransactionDetailModel {
     createdAt: created,
     subtotalPaise: row.subtotalPaise,
     discountPaise: row.discountPaise,
+    offerName: row.offerName,
     taxPaise: row.taxPaise,
     totalPaise: row.totalPaise,
     paymentMethod: row.paymentMethod,

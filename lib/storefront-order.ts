@@ -8,6 +8,7 @@
 import type { FulfilmentStatus } from "@prisma/client";
 
 import { formatINR } from "@/lib/currency";
+import { discountLabel } from "@/lib/offers";
 
 const IST = "Asia/Kolkata";
 
@@ -576,6 +577,9 @@ export type WhatsAppOrderMessageInput = {
   vendorName: string;
   billNumber: string;
   items: { name: string; qty: number; totalPaise: number }[];
+  /** Offer discount on this order (lib/offers.ts); omitted or 0 when none. */
+  discountPaise?: number;
+  offerName?: string | null;
   deliveryFeePaise: number;
   totalPaise: number;
   paymentMethod: "UPI" | "CASH";
@@ -604,6 +608,9 @@ export function formatWhatsAppOrderMessage(o: WhatsAppOrderMessageInput): string
   const lines: string[] = [`Hi ${o.vendorName}, I'd like to order:`, ""];
   if (o.dropTitle) lines.push(`*${o.dropTitle}*`);
   for (const i of o.items) lines.push(`${i.qty} x ${i.name} - ${formatINR(i.totalPaise)}`);
+  if (o.discountPaise && o.discountPaise > 0) {
+    lines.push(`${discountLabel(o.offerName)} - −${formatINR(o.discountPaise)}`);
+  }
   if (o.deliveryFeePaise > 0) lines.push(`Delivery fee - ${formatINR(o.deliveryFeePaise)}`);
   lines.push(`*Total: ${formatINR(o.totalPaise)}*`, "");
 

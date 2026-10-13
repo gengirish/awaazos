@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
-import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { AuthError, requireVendorRole, staffRoleAtLeast } from "@/lib/rbac";
 
 /**
  * Every Settings page is readable by any staff member (CASHIER+); owner-only
@@ -17,6 +17,8 @@ export const requireSettingsContext = cache(async () => {
       vendor: ctx.vendor,
       access: ctx.access,
       isOwner: ctx.staff.role === "OWNER",
+      /** MANAGER or OWNER: may edit offers (same floor as drops). */
+      canManage: staffRoleAtLeast(ctx.staff.role, "MANAGER"),
       user: { name: ctx.user.name, email: ctx.user.email },
     };
   } catch (e) {

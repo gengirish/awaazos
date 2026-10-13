@@ -77,6 +77,7 @@ export type MenuItemFormValues = z.input<typeof menuItemCreateInputSchema>;
 const defaultCreateValues: Partial<MenuItemFormValues> = {
   name: "",
   aliasesCsv: "",
+  tagsCsv: "",
   emoji: DEFAULT_EMOJI,
   category: "General",
   hsnCode: "",
@@ -134,6 +135,7 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
         name: item.name,
         priceInRupees: paiseToRupees(item.priceInPaise),
         aliasesCsv: item.aliases.length ? item.aliases.join(", ") : "",
+        tagsCsv: item.tags.length ? item.tags.join(", ") : "",
         emoji: item.emoji,
         category: item.category,
         hsnCode: item.hsnCode ?? "",
@@ -230,6 +232,7 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
           name: values.name,
           priceInRupees: values.priceInRupees,
           aliasesCsv: values.aliasesCsv,
+          tagsCsv: values.tagsCsv ?? "",
           emoji: values.emoji,
           category: values.category,
           hsnCode: values.hsnCode?.trim() || null,
@@ -329,6 +332,29 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
                       />
                     </FormControl>
                     <FormDescription>Comma-separated phrases customers might say.</FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="tagsCsv"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Tags</FormLabel>
+                    <FormControl>
+                      <Input
+                        autoComplete="off"
+                        autoCapitalize="none"
+                        placeholder="quiche, paneer"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Comma-separated labels of your own. Offers use them to pick items, for example
+                      10% off 4 or more items tagged quiche.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

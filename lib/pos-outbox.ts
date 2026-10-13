@@ -32,6 +32,10 @@ import { getIstTodayStart } from "@/lib/billing-period";
 export type OutboxSaleBody = {
   items: { menuItemId?: string; name: string; priceInPaise: number; qty: number }[];
   subtotalPaise: number;
+  /** Offer discount (lib/offers.ts). Absent on a bill without one. */
+  discountPaise?: number;
+  offerId?: string | null;
+  offerName?: string | null;
   taxPaise: number;
   totalPaise: number;
   paymentMethod: "CASH" | "UPI";
@@ -106,6 +110,7 @@ const SALE_REJECTED_MESSAGES = new Map<string, string>([
   ["billing_locked", "Your free trial has ended. Subscribe in Settings → Plan & billing to keep selling."],
   ["subtotal_mismatch", "This bill's total didn't add up. Close this, check the cart and try again."],
   ["total_mismatch", "This bill's total didn't add up. Close this, check the cart and try again."],
+  ["discount_mismatch", "Your offers have changed. Reload this page, then ring up the order again."],
 ]);
 
 /**

@@ -17,6 +17,7 @@ import {
   receiptsStatus,
   setupChecklist,
   storeStatus,
+  offersStatus,
   voiceStatus,
   type SectionStatus,
   type SettingsSnapshot,
@@ -68,7 +69,7 @@ export default async function SettingsHubPage() {
   const { vendor, user, access } = await requireSettingsContext();
 
   const pushConfigured = isPushConfigured();
-  const [settings, availableItemCount, pushDeviceCount] = await Promise.all([
+  const [settings, availableItemCount, pushDeviceCount, activeOfferCount] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: vendor.id },
       select: {
@@ -87,6 +88,7 @@ export default async function SettingsHubPage() {
     }),
     prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
     pushConfigured ? countVendorPushDevices(vendor.id) : Promise.resolve(0),
+    prisma.offer.count({ where: { vendorId: vendor.id, isActive: true } }),
   ]);
 
   const snapshot: SettingsSnapshot = {
@@ -113,6 +115,7 @@ export default async function SettingsHubPage() {
   const statuses: Record<SettingsSectionId, SectionStatus> = {
     store: storeStatus(snapshot),
     orders: ordersStatus(snapshot),
+    offers: offersStatus(activeOfferCount),
     payments: paymentsStatus(snapshot),
     receipts: receiptsStatus({
       receiptPaper: settings?.receiptPaper ?? "MM80",

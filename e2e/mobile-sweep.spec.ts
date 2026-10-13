@@ -290,7 +290,7 @@ const VENDOR_ROUTES: Route[] = [
   { key: "/transactions", path: () => "/transactions" },
   { key: "/analytics", path: () => "/analytics" },
   { key: "/settings", path: () => "/settings" },
-  ...["store", "orders", "payments", "receipts", "notifications", "voice", "billing"].map((sub) => ({
+  ...["store", "orders", "offers", "payments", "receipts", "notifications", "voice", "billing"].map((sub) => ({
     key: `/settings/${sub}`,
     path: () => `/settings/${sub}`,
   })),

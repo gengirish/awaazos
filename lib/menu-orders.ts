@@ -27,6 +27,8 @@ import {
   nextBillNumber,
 } from "@/lib/drops";
 import { bumpDropOrderSignal } from "@/lib/drops-signal";
+import { applyOffers } from "@/lib/offers";
+import { loadResolvedOffers } from "@/lib/offers-server";
 import { effectivePlan, isBillingLocked } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
@@ -77,6 +79,7 @@ export type PlacedMenuOrder = {
   billNumber: string;
   orderToken: string;
   subtotalPaise: number;
+  discountPaise: number;
   deliveryFeePaise: number;
   totalPaise: number;
   paymentMethod: PaymentMethod;
@@ -176,10 +179,26 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
         throw new MenuOrderRejected({ code: "monthly_txn_cap_reached" });
       }
 
+      // Same rule as drops: offers are priced server-side from this vendor's rows.
+      const offers = await loadResolvedOffers(tx, vendorId, { channel: "MENU", now });
+      const offered = applyOffers(
+        priced.map((p) => ({
+          key: p.item.id,
+          menuItemId: p.item.id,
+          priceInPaise: p.item.priceInPaise,
+          qty: p.qty,
+        })),
+        offers,
+      );
+      const discountByLine = new Map(offered.lines.map((l) => [l.key, l.discountPaise]));
+      const appliedOffer = offered.discounts[0] ?? null;
+      const discountPaise = offered.discountTotalPaise;
+
       const deliveryFeePaise = input.fulfilmentType === "DELIVERY" ? settings.menuDeliveryFeePaise : 0;
       const { subtotalPaise, totalPaise } = computeOrderTotals(
         priced.map((p) => ({ priceInPaise: p.item.priceInPaise, qty: p.qty })),
         deliveryFeePaise,
+        discountPaise,
       );
 
       const billNumber = await nextBillNumber(tx, vendorId, now);
@@ -190,6 +209,9 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
           vendorId,
           billNumber,
           subtotalPaise,
+          discountPaise,
+          offerId: appliedOffer?.offerId ?? null,
+          offerName: appliedOffer?.name ?? null,
           totalPaise,
           deliveryFeePaise,
           paymentMethod: input.paymentMethod,
@@ -211,6 +233,7 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
               priceInPaise: p.item.priceInPaise,
               qty: p.qty,
               totalPaise: p.item.priceInPaise * p.qty,
+              discountPaise: discountByLine.get(p.item.id) ?? 0,
             })),
           },
         },
@@ -231,6 +254,7 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
         billNumber,
         orderToken,
         subtotalPaise,
+        discountPaise,
         deliveryFeePaise,
         totalPaise,
         paymentMethod: created.paymentMethod,
