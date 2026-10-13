@@ -2,6 +2,7 @@
 
 import type { FulfilmentMode } from "@prisma/client";
 import { ChefHat, ExternalLink, Loader2, Pencil, RefreshCw, Settings, Volume2, VolumeX } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -14,7 +15,6 @@ import { ShareDropButton } from "@/components/drops/ShareDropButton";
 import { PushAlertsButton, PushAlertsPrompt } from "@/components/push/PushAlertsButton";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatINR } from "@/lib/currency";
 import type { EffectiveDropStatus } from "@/lib/drops";
 import {
@@ -59,6 +59,13 @@ import {
   type PushArrivedDetail,
 } from "@/lib/order-voice";
 import { cn } from "@/lib/utils";
+
+// The select primitives are heavy and only a vendor with two or more sources
+// gets a picker, so it loads after the board. The placeholder holds its place.
+const BoardScopePicker = dynamic(() => import("@/components/drops/orders/BoardScopePicker"), {
+  ssr: false,
+  loading: () => <div aria-hidden className="h-11 w-40 rounded-md border border-input" />,
+});
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 /** Coming back to the tab (e.g. tapping a push alert) refetches at most this often. */
@@ -1013,23 +1020,7 @@ function BoardHeader({
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h1 className="font-display text-xl font-bold text-foreground md:text-2xl">Orders</h1>
         {hasPicker && (
-          <Select value={scope} onValueChange={onScope}>
-            <SelectTrigger
-              aria-label="Show orders from"
-              className="h-11 w-auto min-w-0 max-w-full flex-1 gap-2 sm:max-w-xs sm:flex-none"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent align="end">
-              <SelectItem value="all">All orders</SelectItem>
-              {sources.includes("menu") && <SelectItem value="menu">Menu orders</SelectItem>}
-              {drops.map((d) => (
-                <SelectItem key={d.id} value={d.id}>
-                  {d.title} · {formatIstDate(new Date(d.fulfilmentStartsAt))}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+          <BoardScopePicker scope={scope} showMenu={sources.includes("menu")} drops={drops} onScope={onScope} />
         )}
       </div>
       <div
