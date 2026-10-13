@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { BusinessDetails } from "@/components/legal/BusinessDetails";
 import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
 
 import { TRIAL_DAYS } from "@/lib/constants";
@@ -13,7 +14,7 @@ export default function RefundPage() {
   return (
     <>
       <h1>Refund Policy</h1>
-      <p>Last updated: 10 October 2026</p>
+      <p>Last updated: 13 October 2026</p>
 
       <h2>Free trial</h2>
       <p>
@@ -38,11 +39,19 @@ export default function RefundPage() {
         <li>Regulatory or legally required refunds will be honored.</li>
       </ul>
 
+      <h2>Orders placed with a kitchen</h2>
+      <p>
+        This policy covers AwaazOS subscription fees only. If you bought something from a kitchen or shop through its
+        AwaazOS store, your payment went directly to that seller, and AwaazOS never received it. Please contact the
+        seller to cancel an order or ask for a refund.
+      </p>
+
       <h2>How to request support</h2>
       <p>
         Contact support at <SupportEmailLink /> with your vendor ID, bill reference, and Razorpay transaction
         reference.
       </p>
+      <BusinessDetails />
     </>
   );
 }

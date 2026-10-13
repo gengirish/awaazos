@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { BUSINESS_NAME, BusinessDetails } from "@/components/legal/BusinessDetails";
 import { TRIAL_DAYS } from "@/lib/constants";
 import { PLAN_MARKETING } from "@/lib/plan-copy";
 
@@ -14,10 +15,14 @@ export default function TermsPage() {
   return (
     <>
       <h1>Terms of Service</h1>
-      <p>Last updated: 10 October 2026</p>
+      <p>Last updated: 13 October 2026</p>
 
       <h2>Acceptance</h2>
       <p>By using AwaazOS, you agree to these Terms.</p>
+
+      <h2>Who we are</h2>
+      <p>AwaazOS is provided by:</p>
+      <BusinessDetails />
 
       <h2>Account responsibilities</h2>
       <ul>
@@ -62,6 +67,14 @@ export default function TermsPage() {
         </li>
       </ul>
 
+      <h2>Orders placed with sellers</h2>
+      <p>
+        Kitchens and shops that use AwaazOS sell to their own customers. Each seller is responsible for its
+        products, prices, taxes, delivery, cancellations and refunds. AwaazOS provides the software only: it is not a
+        party to the sale and does not collect, hold or settle buyers’ payments. A buyer’s payment goes directly to
+        the seller, by UPI or through the seller’s own payment gateway account.
+      </p>
+
       <h2>Service availability</h2>
       <p>
         We target high availability but do not guarantee uninterrupted service. Planned maintenance and third-party
@@ -70,8 +83,8 @@ export default function TermsPage() {
 
       <h2>Limitation of liability</h2>
       <p>
-        To the maximum extent permitted by law, AwaazOS is provided on an “as is” basis and IntelliForge AI is not
-        liable for indirect, incidental, or consequential damages.
+        To the maximum extent permitted by law, AwaazOS is provided on an “as is” basis and {BUSINESS_NAME} is
+        not liable for indirect, incidental, or consequential damages.
       </p>
 
       <h2>Termination</h2>
