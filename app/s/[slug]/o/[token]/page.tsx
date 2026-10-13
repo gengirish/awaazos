@@ -20,6 +20,7 @@ import {
   whatsappChatLink,
   type StatusTone,
 } from "@/lib/storefront-order";
+import { discountLabel } from "@/lib/offers";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl, isOnlinePaymentEnabled } from "@/lib/storefront-razorpay";
 import { qrSvgDataUrl } from "@/lib/qr";
@@ -78,6 +79,8 @@ const loadOrder = cache(async (slug: string, token: string) => {
       billNumber: true,
       createdAt: true,
       subtotalPaise: true,
+      discountPaise: true,
+      offerName: true,
       deliveryFeePaise: true,
       totalPaise: true,
       paymentMethod: true,
@@ -215,6 +218,8 @@ export default async function StorefrontOrderPage(props: {
           vendorName: vendor.name,
           billNumber: order.billNumber,
           items: order.orderItems,
+          discountPaise: order.discountPaise,
+          offerName: order.offerName,
           deliveryFeePaise: order.deliveryFeePaise,
           totalPaise: order.totalPaise,
           paymentMethod: order.paymentMethod === "CASH" ? "CASH" : "UPI",
@@ -404,17 +409,23 @@ export default async function StorefrontOrderPage(props: {
             ))}
           </ul>
           <dl className="space-y-1 border-t border-border/50 px-4 py-3 text-sm">
+            {order.deliveryFeePaise > 0 || order.discountPaise > 0 ? (
+              <div className="flex justify-between">
+                <dt>Items</dt>
+                <dd className="font-mono tabular-nums">{formatINR(order.subtotalPaise)}</dd>
+              </div>
+            ) : null}
+            {order.discountPaise > 0 ? (
+              <div className="flex justify-between gap-3 font-semibold text-primary">
+                <dt className="min-w-0 break-words">{discountLabel(order.offerName)}</dt>
+                <dd className="shrink-0 font-mono tabular-nums">−{formatINR(order.discountPaise)}</dd>
+              </div>
+            ) : null}
             {order.deliveryFeePaise > 0 ? (
-              <>
-                <div className="flex justify-between">
-                  <dt>Items</dt>
-                  <dd className="font-mono tabular-nums">{formatINR(order.subtotalPaise)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Delivery fee</dt>
-                  <dd className="font-mono tabular-nums">{formatINR(order.deliveryFeePaise)}</dd>
-                </div>
-              </>
+              <div className="flex justify-between">
+                <dt>Delivery fee</dt>
+                <dd className="font-mono tabular-nums">{formatINR(order.deliveryFeePaise)}</dd>
+              </div>
             ) : null}
             <div className="flex justify-between text-base font-bold">
               <dt>Total</dt>

@@ -105,6 +105,7 @@ export async function createMenuItem(
     name: string;
     priceInRupees: number;
     aliasesCsv?: string;
+    tagsCsv?: string;
     category?: string;
   },
 ): Promise<MenuItemRow> {

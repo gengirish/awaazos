@@ -230,6 +230,17 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     keywords: "whatsapp pickup delivery fee",
   },
   {
+    id: "offers",
+    group: "setup",
+    title: "Give a discount on bigger orders",
+    steps:
+      "Create an offer with a minimum quantity and a percentage off. Tag items on the Menu page to choose which ones count. The discount is applied for you in your online store, in drops and at the counter.",
+    nav: "settings",
+    href: "/settings/offers",
+    trail: ["Offers"],
+    keywords: "discount plan combo bundle weekly percent off tag",
+  },
+  {
     id: "payment-setup",
     group: "setup",
     title: "Set your UPI ID and how customers pay",

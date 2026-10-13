@@ -55,6 +55,9 @@ export type BoardOrder = {
   paymentStatus: PaymentStatus;
   upiRef: string | null;
   subtotalPaise: number;
+  /** Offer discount on this order (lib/offers.ts); absent or 0 when none. */
+  discountPaise?: number;
+  offerName?: string | null;
   deliveryFeePaise: number;
   totalPaise: number;
   displayState: OrderDisplayState;

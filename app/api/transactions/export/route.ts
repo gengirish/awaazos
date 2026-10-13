@@ -83,7 +83,8 @@ export async function GET(req: NextRequest) {
     );
 
     const lines: string[] = [
-      "Bill#,Date,Time,Items,Subtotal,Discount,Tax,Total,Method,Status,Customer Phone (last 4),UPI Ref",
+      // "Offer" is last so the columns existing spreadsheets read keep their positions.
+      "Bill#,Date,Time,Items,Subtotal,Discount,Tax,Total,Method,Status,Customer Phone (last 4),UPI Ref,Offer",
     ];
 
     for (const r of rows) {
@@ -101,6 +102,7 @@ export async function GET(req: NextRequest) {
         csvEscape(r.paymentStatus),
         csvEscape(maskCustomerPhone(r.customerPhone)),
         csvEscape(r.upiRef ?? ""),
+        csvEscape(r.offerName ?? ""),
       ].join(",");
       lines.push(row);
     }

@@ -49,6 +49,7 @@ model Vendor {
   drops              Drop[]
   pushSubscriptions  PushSubscription[]
   subscriptionEvents SubscriptionEvent[]
+  offers             Offer[]
 
   @@index([slug])
   @@map("vendors")
@@ -148,6 +149,43 @@ model MenuItem {
   @@unique([vendorId, slug])
   @@index([vendorId, isAvailable])
   @@map("menu_items")
+}
+
+// ─── OFFERS (quantity-based plan discounts) ────────────────────────
+//
+// "Weekly Plan: 4+ quiches incl. 1 paneer → 10% off". Rules live in
+// lib/offers.ts (pure, shared by the server and the cart previews). Start/end
+// dates are evaluated lazily on every read — nothing runs when one passes.
+// At most one offer applies to an order (the best one for the buyer).
+
+model Offer {
+  id              String            @id @default(cuid())
+  vendorId        String
+  vendor          Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name            String // "Weekly Plan"
+  description     String? // Shown to buyers
+  eligibility     OfferEligibility  @default(ALL)
+  eligibleItemIds String[]          @default([]) // MenuItem ids, when eligibility = ITEMS
+  eligibleTag     String? // MenuItem tag, when eligibility = TAG
+  minQty          Int // Units of eligible items in one order
+  requiredTag     String? // Optional: at least requiredTagQty of the eligible units carry this tag
+  requiredTagQty  Int               @default(0)
+  discountType    OfferDiscountType @default(PERCENT)
+  percentBps      Int // 1000 = 10%
+  onMenuOrders    Boolean           @default(true) // Storefront "order from menu"
+  onDrops         Boolean           @default(true)
+  onPos           Boolean           @default(true)
+  dropIds         String[]          @default([]) // Empty = every drop
+  isActive        Boolean           @default(true)
+  startsAt        DateTime?
+  endsAt          DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  transactions Transaction[]
+
+  @@index([vendorId, isActive])
+  @@map("offers")
 }
 
 // ─── DROPS (daily pre-order menus) ───────────────────────────────
@@ -287,8 +325,13 @@ model Transaction {
   billNumber        String // AWZ-20260502-0001 (auto-generated)
   subtotalPaise     Int
   discountPaise     Int           @default(0)
+  // The offer behind discountPaise (lib/offers.ts). offerName is a snapshot, so
+  // the bill still names it after the offer is renamed or deleted.
+  offerId           String?
+  offer             Offer?        @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  offerName         String?
   taxPaise          Int           @default(0)
-  totalPaise        Int // subtotal - discount + tax
+  totalPaise        Int // subtotal - discount + delivery fee + tax
   paymentMethod     PaymentMethod @default(UPI)
   paymentStatus     PaymentStatus @default(PENDING)
   upiRef            String? // Customer's UTR reference
@@ -350,6 +393,7 @@ model OrderItem {
   priceInPaise  Int
   qty           Int         @default(1)
   totalPaise    Int // priceInPaise * qty
+  discountPaise Int         @default(0) // This line's share of Transaction.discountPaise
 
   @@index([transactionId])
   @@map("order_items")
@@ -559,6 +603,18 @@ enum StallType {
   KIRANA
   CLOTHING
   SERVICES
+}
+
+enum OfferEligibility {
+  ALL // Every menu item
+  ITEMS // eligibleItemIds
+  TAG // Items carrying eligibleTag
+}
+
+enum OfferDiscountType {
+  PERCENT
+  FIXED_AMOUNT // Reserved; not accepted yet
+  BUNDLE_PRICE // Reserved; not accepted yet
 }
 
 enum PaymentMethod {

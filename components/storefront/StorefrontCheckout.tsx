@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { formatINR, sumPaise } from "@/lib/currency";
+import { discountLabel } from "@/lib/offers";
 import { formatIndianMobile, normaliseIndianMobile } from "@/lib/phone";
 import {
   CHECKOUT_FIELD_MESSAGES,
@@ -296,6 +297,11 @@ export type CheckoutSheetProps = {
   idPrefix: string;
   description: string;
   lines: CheckoutLine[];
+  /**
+   * The offer this cart earns, as previewed in the browser (lib/offers.ts).
+   * The server prices the order again when it is placed.
+   */
+  discount?: { name: string; discountPaise: number } | null;
   fulfilmentTypes: FulfilmentType[];
   deliveryFeePaise: number;
   /** Where to collect, as the vendor wrote it. Never invented when absent. */
@@ -335,6 +341,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     idPrefix,
     description,
     lines,
+    discount,
     fulfilmentTypes,
     deliveryFeePaise,
     pickupNote,
@@ -522,7 +529,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
 
   const subtotalPaise = sumPaise(lines.map((l) => l.priceInPaise * l.qty));
   const feePaise = fulfilment === "DELIVERY" ? deliveryFeePaise : 0;
-  const totalPaise = subtotalPaise + feePaise;
+  const discountPaise = discount?.discountPaise ?? 0;
+  const totalPaise = subtotalPaise - discountPaise + feePaise;
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -846,6 +854,12 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
               <dt>Items</dt>
               <dd className="font-mono tabular-nums">{formatINR(subtotalPaise)}</dd>
             </div>
+            {discount && discountPaise > 0 ? (
+              <div className="flex justify-between gap-3 font-semibold text-primary">
+                <dt className="min-w-0 break-words">{discountLabel(discount.name)}</dt>
+                <dd className="shrink-0 font-mono tabular-nums">−{formatINR(discountPaise)}</dd>
+              </div>
+            ) : null}
             {feePaise > 0 ? (
               <div className="flex justify-between">
                 <dt>Delivery fee</dt>

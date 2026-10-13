@@ -13,6 +13,7 @@ import { createMenuItem, createVendorSession } from "./helpers/vendor";
 const ROWS = [
   { title: "Online store", path: "/settings/store", heading: "Online store" },
   { title: "Online orders", path: "/settings/orders", heading: "Online orders" },
+  { title: "Offers", path: "/settings/offers", heading: "Offers" },
   { title: "Payments", path: "/settings/payments", heading: "Payments" },
   { title: "Receipts", path: "/settings/receipts", heading: "Receipts" },
   { title: "Counter & voice", path: "/settings/voice", heading: "Counter & voice" },

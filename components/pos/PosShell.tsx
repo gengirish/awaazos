@@ -16,6 +16,7 @@ import { useIsDesktop } from "@/hooks/useMediaQuery";
 import { useOnline } from "@/hooks/useOnline";
 import { usePosOutbox } from "@/hooks/usePosOutbox";
 import { useCartStore } from "@/lib/cartStore";
+import type { PayTotals } from "@/lib/pos-totals";
 import { registerAppServiceWorker } from "@/lib/sw-client";
 
 export type PosShellProps = {
@@ -46,8 +47,11 @@ export function PosShell({
   const isDesktop = useIsDesktop();
   const [payOpen, setPayOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
-  const [payTotals, setPayTotals] = useState({
+  const [payTotals, setPayTotals] = useState<PayTotals>({
     subtotalPaise: 0,
+    discountPaise: 0,
+    offerId: null,
+    offerName: null,
     taxPaise: 0,
     totalPaise: 0,
   });
@@ -63,13 +67,10 @@ export function PosShell({
     registerAppServiceWorker();
   }, []);
 
-  const onCollectPayment = useCallback(
-    (totals: { subtotalPaise: number; taxPaise: number; totalPaise: number }) => {
-      setPayTotals(totals);
-      setPayOpen(true);
-    },
-    [],
-  );
+  const onCollectPayment = useCallback((totals: PayTotals) => {
+    setPayTotals(totals);
+    setPayOpen(true);
+  }, []);
 
   const onPaid = useCallback((result: PaidResult) => {
     // The sale is saved (synced or queued in the outbox) — empty the cart now,
@@ -97,6 +98,7 @@ export function PosShell({
   const cartSettings: PosSettings = {
     taxEnabled: settings.taxEnabled,
     taxPercent: settings.taxPercent,
+    offers: settings.offers,
   };
 
   return (
@@ -149,9 +151,7 @@ export function PosShell({
         stallName={vendor.name}
         upiId={vendor.upiId}
         upiName={vendor.upiName}
-        totalPaise={payTotals.totalPaise}
-        subtotalPaise={payTotals.subtotalPaise}
-        taxPaise={payTotals.taxPaise}
+        totals={payTotals}
         items={items}
         onPaid={onPaid}
       />

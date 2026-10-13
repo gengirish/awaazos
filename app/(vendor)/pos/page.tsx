@@ -5,6 +5,7 @@ import { BillingLockedCard } from "@/components/billing/BillingLockedCard";
 import { TrialNotice } from "@/components/billing/TrialNotice";
 import { PosShell } from "@/components/pos/PosShell";
 import { getIstTodayStart } from "@/lib/billing-period";
+import { loadResolvedOffers } from "@/lib/offers-server";
 import { prisma } from "@/lib/prisma";
 import type { BillingAccess } from "@/lib/plan";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
@@ -40,7 +41,10 @@ export default async function PosPage() {
 
   const today = getIstTodayStart();
 
-  const [daily, menuItems, vendorRecord] = await Promise.all([
+  const [offers, daily, menuItems, vendorRecord] = await Promise.all([
+    // Offers live at the counter right now. The page (and its offline copy)
+    // previews with these; POST /api/transactions re-prices every live sale.
+    loadResolvedOffers(prisma, vendorId, { channel: "POS" }),
     prisma.dailySummary.findUnique({
       where: { vendorId_date: { vendorId, date: today } },
     }),
@@ -73,6 +77,7 @@ export default async function PosPage() {
     taxEnabled: s?.taxEnabled ?? false,
     taxPercent: s?.taxPercent != null ? String(s.taxPercent) : "0",
     autoPrintReceipt: s?.autoPrintReceipt ?? false,
+    offers,
   };
 
   const todaysRevenuePaise = daily?.totalRevenuePaise ?? 0;

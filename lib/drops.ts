@@ -41,6 +41,8 @@ import { formatBillDateYYYYMMDD, getIstMonthStart, getIstTodayStart } from "@/li
 import { PLAN_LIMITS } from "@/lib/constants";
 import { sumPaise } from "@/lib/currency";
 import { bumpOrderSignal } from "@/lib/drops-signal";
+import { applyOffers } from "@/lib/offers";
+import { loadResolvedOffers } from "@/lib/offers-server";
 import { effectivePlan, isBillingLocked } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
@@ -194,12 +196,17 @@ export function remainingQty(maxQty: number | null, sold: number): number | null
 
 // ─── Totals ─────────────────────────────────────────────────────────
 
+/**
+ * `total = subtotal − discount + delivery fee`. The discount comes from
+ * `applyOffers` (lib/offers.ts) and never touches the delivery fee.
+ */
 export function computeOrderTotals(
   lines: { priceInPaise: number; qty: number }[],
   deliveryFeePaise: number,
+  discountPaise = 0,
 ): { subtotalPaise: number; totalPaise: number } {
   const subtotalPaise = sumPaise(lines.map((l) => l.priceInPaise * l.qty));
-  return { subtotalPaise, totalPaise: subtotalPaise + deliveryFeePaise };
+  return { subtotalPaise, totalPaise: subtotalPaise - discountPaise + deliveryFeePaise };
 }
 
 /** 32 url-safe chars, 192 bits. The buyer's order page is keyed on this alone. */
@@ -314,6 +321,7 @@ export type PlacedOrder = {
   billNumber: string;
   orderToken: string;
   subtotalPaise: number;
+  discountPaise: number;
   deliveryFeePaise: number;
   totalPaise: number;
   paymentMethod: PaymentMethod;
@@ -401,10 +409,27 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
         throw new OrderRejected({ code: "monthly_txn_cap_reached" });
       }
 
+      // Offers are priced here, from this vendor's rows, inside the same
+      // transaction: the buyer's browser never sends a price or a discount.
+      const offers = await loadResolvedOffers(tx, vendorId, { channel: "DROP", dropId: drop.id, now });
+      const offered = applyOffers(
+        priced.map((p) => ({
+          key: p.item.id,
+          menuItemId: p.item.menuItemId,
+          priceInPaise: p.item.priceInPaise,
+          qty: p.qty,
+        })),
+        offers,
+      );
+      const discountByLine = new Map(offered.lines.map((l) => [l.key, l.discountPaise]));
+      const appliedOffer = offered.discounts[0] ?? null;
+      const discountPaise = offered.discountTotalPaise;
+
       const deliveryFeePaise = input.fulfilmentType === "DELIVERY" ? drop.deliveryFeePaise : 0;
       const { subtotalPaise, totalPaise } = computeOrderTotals(
         priced.map((p) => ({ priceInPaise: p.item.priceInPaise, qty: p.qty })),
         deliveryFeePaise,
+        discountPaise,
       );
 
       const billNumber = await nextBillNumber(tx, vendorId, now);
@@ -415,6 +440,9 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
           vendorId,
           billNumber,
           subtotalPaise,
+          discountPaise,
+          offerId: appliedOffer?.offerId ?? null,
+          offerName: appliedOffer?.name ?? null,
           totalPaise,
           deliveryFeePaise,
           paymentMethod: input.paymentMethod,
@@ -437,6 +465,7 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
               priceInPaise: p.item.priceInPaise,
               qty: p.qty,
               totalPaise: p.item.priceInPaise * p.qty,
+              discountPaise: discountByLine.get(p.item.id) ?? 0,
             })),
           },
         },
@@ -457,6 +486,7 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
         billNumber,
         orderToken,
         subtotalPaise,
+        discountPaise,
         deliveryFeePaise,
         totalPaise,
         paymentMethod: created.paymentMethod,

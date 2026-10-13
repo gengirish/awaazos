@@ -1,5 +1,6 @@
 import { formatINR } from "@/lib/currency";
 import { formatIstDateTime } from "@/lib/datetime";
+import { discountLabel } from "@/lib/offers";
 import { DEFAULT_RECEIPT_FOOTER, receiptState, receiptStatusLine, type ReceiptView } from "@/lib/receipt";
 import { cn } from "@/lib/utils";
 
@@ -93,7 +94,9 @@ export function ReceiptDocument({
 
       <dl className="space-y-0.5 tabular-nums">
         {showSubtotal ? <Row label="Subtotal" value={formatINR(view.subtotalPaise)} /> : null}
-        {view.discountPaise > 0 ? <Row label="Discount" value={`−${formatINR(view.discountPaise)}`} /> : null}
+        {view.discountPaise > 0 ? (
+          <Row label={discountLabel(view.offerName)} value={`−${formatINR(view.discountPaise)}`} />
+        ) : null}
         {view.deliveryFeePaise > 0 ? <Row label="Delivery" value={formatINR(view.deliveryFeePaise)} /> : null}
         {view.taxPaise > 0 ? <Row label="Tax" value={formatINR(view.taxPaise)} /> : null}
         <Row
@@ -117,8 +120,8 @@ export function ReceiptDocument({
 function Row({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
     <div className={cn("flex justify-between gap-3", className)}>
-      <dt>{label}</dt>
-      <dd className="text-right">{value}</dd>
+      <dt className="min-w-0 break-words">{label}</dt>
+      <dd className="shrink-0 text-right">{value}</dd>
     </div>
   );
 }

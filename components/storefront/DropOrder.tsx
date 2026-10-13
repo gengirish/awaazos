@@ -15,7 +15,9 @@ import {
   type BuyerPrefill,
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
-import { formatINRCompact, sumPaise } from "@/lib/currency";
+import { OfferCartNote, OfferChips } from "@/components/storefront/OfferNotes";
+import { formatINRCompact } from "@/lib/currency";
+import { applyOffers, type ResolvedOffer } from "@/lib/offers";
 import {
   cartStorageKey,
   maxOrderableQty,
@@ -40,6 +42,8 @@ export type { BuyerPrefill } from "@/components/storefront/StorefrontCheckout";
 
 export type DropOrderItem = {
   id: string;
+  /** The catalogue item behind this row; offers are matched on it. */
+  menuItemId: string;
   name: string;
   emoji: string;
   imageUrl: string | null;
@@ -74,7 +78,11 @@ export type DropOrderProps = {
    * fields win over the device's "remember me" values; absent for guests.
    */
   prefill?: BuyerPrefill | null;
+  /** Offers live on this drop (lib/offers.ts). Preview only; the server re-prices. */
+  offers?: readonly ResolvedOffer[];
 };
+
+const NO_OFFERS: readonly ResolvedOffer[] = [];
 
 export function DropOrder(props: DropOrderProps) {
   const {
@@ -90,6 +98,7 @@ export function DropOrder(props: DropOrderProps) {
     payment,
     whatsapp,
     prefill,
+    offers = NO_OFFERS,
   } = props;
   const router = useRouter();
 
@@ -131,7 +140,18 @@ export function DropOrder(props: DropOrderProps) {
     .map(([id, qty]) => ({ item: byId.get(id), qty }))
     .filter((l): l is { item: DropOrderItem; qty: number } => !!l.item && l.qty > 0);
   const itemCount = lines.reduce((s, l) => s + l.qty, 0);
-  const subtotalPaise = sumPaise(lines.map((l) => l.item.priceInPaise * l.qty));
+  const offered = applyOffers(
+    lines.map((l) => ({
+      key: l.item.id,
+      menuItemId: l.item.menuItemId,
+      priceInPaise: l.item.priceInPaise,
+      qty: l.qty,
+    })),
+    offers,
+  );
+  const appliedOffer = offered.discounts[0] ?? null;
+  // What the cart bars show: items less the offer discount (delivery is added at checkout).
+  const payablePaise = offered.totalPaise;
   const canPay = payment.upi || payment.cod;
 
   // The page-level cart bar (CartHub) shows this cart next to any others.
@@ -139,7 +159,7 @@ export function DropOrder(props: DropOrderProps) {
     key: `drop:${dropId}`,
     label: `Pre-order · ${dropTitle}`,
     itemCount,
-    subtotalPaise,
+    subtotalPaise: payablePaise,
     canPay,
     onCheckout: () => setOpen(true),
     enabled: orderable,
@@ -177,6 +197,7 @@ export function DropOrder(props: DropOrderProps) {
 
   return (
     <div>
+      {orderable ? <OfferChips offers={offers} /> : null}
       <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs">
         {items.map((item) => {
           const remaining = remainingFor(item);
@@ -252,10 +273,12 @@ export function DropOrder(props: DropOrderProps) {
 
       {orderable && !canPay ? <NoPaymentNotice /> : null}
 
+      {orderable ? <OfferCartNote appliedName={appliedOffer?.name ?? null} nudge={offered.nudge} /> : null}
+
       {orderable && !inHub ? (
         <CartBar
           itemCount={itemCount}
-          subtotalPaise={subtotalPaise}
+          subtotalPaise={payablePaise}
           canPay={canPay}
           onCheckout={() => setOpen(true)}
           buttonRef={checkoutRef}
@@ -275,6 +298,7 @@ export function DropOrder(props: DropOrderProps) {
           priceInPaise: l.item.priceInPaise,
           qty: l.qty,
         }))}
+        discount={appliedOffer}
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
         pickupNote={pickupNote}

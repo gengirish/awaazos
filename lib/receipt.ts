@@ -34,6 +34,8 @@ export type ReceiptView = {
   items: ReceiptItem[];
   subtotalPaise: number;
   discountPaise: number;
+  /** The offer behind `discountPaise` ("Weekly Plan"), snapshotted on the bill. */
+  offerName?: string | null;
   deliveryFeePaise: number;
   taxPaise: number;
   totalPaise: number;

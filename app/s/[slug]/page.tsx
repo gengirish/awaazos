@@ -34,6 +34,8 @@ import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDro
 import { formatDropDayLabel, formatFulfilmentWindow } from "@/lib/drops-time";
 import { instagramProfileUrl } from "@/lib/instagram";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
+import { offersForItems, resolveOffers, type ResolvedOffer } from "@/lib/offers";
+import { loadOfferRules, type OfferSource } from "@/lib/offers-server";
 import { prisma } from "@/lib/prisma";
 import {
   buyerWhatsappNumber,
@@ -89,6 +91,11 @@ export const runtime = "nodejs";
  * drop(s) show (`everydayMenuHiddenByDrop` in lib/menu-orders.ts — the same check
  * placeMenuOrder uses to refuse with `menu_paused_for_drop`). The counter UPI
  * QR stays, collapsed, since the stall may still sell at the counter.
+ *
+ * Offers (lib/offers.ts): each orderable section gets the offers live on it,
+ * resolved on the server to the item ids that section already shows plus the
+ * offer's name, description and numbers. Raw tags and the rest of the Offer row
+ * stay on the server; the browser only previews, the order routes price.
  *
  * Optional buyer sign-in (lib/customer-auth.ts): the `awz_cust` session, when
  * present, only adds a header link and checkout prefill from the buyer's OWN
@@ -300,6 +307,8 @@ type DropView = {
   items: DropOrderItem[];
   /** Open, but every item is sold out — nothing left to pre-order. */
   soldOut: boolean;
+  /** Offers a buyer can earn on this drop right now. */
+  offers: ResolvedOffer[];
 };
 
 /**
@@ -315,6 +324,7 @@ async function buildDropViews(
   drops: StorefrontDrop[],
   now: Date,
   menuAnchorFor: (menuItemId: string) => string | null,
+  offerSource: OfferSource,
 ): Promise<DropView[]> {
   const visible = drops
     .map((drop) => ({
@@ -331,6 +341,7 @@ async function buildDropViews(
         visibility === "open" ? await soldQtyByDropItem(prisma, drop.id, now) : new Map<string, number>();
       const items: DropOrderItem[] = drop.items.map((i) => ({
         id: i.id,
+        menuItemId: i.menuItemId,
         name: i.menuItem.name,
         emoji: i.menuItem.emoji,
         imageUrl: i.menuItem.imageUrl,
@@ -339,7 +350,15 @@ async function buildDropViews(
         perOrderLimit: i.perOrderLimit,
         menuAnchor: menuAnchorFor(i.menuItemId),
       }));
-      return { drop, visibility, items, soldOut: visibility === "open" && !dropHasStock(items) };
+      const soldOut = visibility === "open" && !dropHasStock(items);
+      const offers =
+        visibility === "open" && !soldOut
+          ? offersForItems(
+              resolveOffers(offerSource.rules, offerSource.menuItems, { channel: "DROP", dropId: drop.id, now }),
+              drop.items.map((i) => i.menuItemId),
+            )
+          : [];
+      return { drop, visibility, items, soldOut, offers };
     }),
   );
 }
@@ -463,6 +482,7 @@ function DropSection({
           payment={payment}
           whatsapp={whatsapp}
           prefill={prefill}
+          offers={view.offers}
         />
       </div>
     </section>
@@ -499,8 +519,24 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
   // Everyday-menu rows only take orders (and carry row ids) with menu ordering on.
   const orderableMenuIds = new Set(menuOrdering ? menuItems.map((i) => i.id) : []);
+  // One read covers both channels; a store with nothing orderable skips it.
+  const offerSource: OfferSource =
+    menuOrdering || vendor.drops.length > 0
+      ? await loadOfferRules(prisma, vendor.id, ["MENU", "DROP"])
+      : { rules: [], menuItems: [] };
+  const menuOffers = menuOrdering
+    ? offersForItems(
+        resolveOffers(offerSource.rules, offerSource.menuItems, { channel: "MENU", now }),
+        orderableMenuIds,
+      )
+    : [];
   const [dropViews, customer] = await Promise.all([
-    buildDropViews(vendor.drops, now, (id) => (orderableMenuIds.has(id) ? menuItemAnchor(id) : null)),
+    buildDropViews(
+      vendor.drops,
+      now,
+      (id) => (orderableMenuIds.has(id) ? menuItemAnchor(id) : null),
+      offerSource,
+    ),
     getCurrentCustomer(),
   ]);
   const prefill: BuyerPrefill | null = customer
@@ -797,6 +833,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                   payment={payment}
                   whatsapp={whatsapp}
                   prefill={prefill}
+                  offers={menuOffers}
                 />
               ) : null}
 

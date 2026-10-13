@@ -8,18 +8,15 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
-import { computeCartTotals, type PosTaxSettings } from "@/lib/pos-totals";
+import { discountLabel, offerNudgeText } from "@/lib/offers";
+import { computeCartTotals, toPayTotals, type PayTotals, type PosTaxSettings } from "@/lib/pos-totals";
 import { cn } from "@/lib/utils";
 
 export type PosSettings = PosTaxSettings;
 
 export type OrderCartProps = {
   settings: PosSettings;
-  onCollectPayment: (totals: {
-    subtotalPaise: number;
-    taxPaise: number;
-    totalPaise: number;
-  }) => void;
+  onCollectPayment: (totals: PayTotals) => void;
 };
 
 /** Ask before clearing more lines than this (a slip on a long order is costly). */
@@ -39,7 +36,8 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
   const voiceReview = useCartStore((s) => s.voiceReview);
   const setVoiceReview = useCartStore((s) => s.setVoiceReview);
 
-  const { subtotalPaise, taxPaise, totalPaise, itemCount } = computeCartTotals(items, settings);
+  const totals = computeCartTotals(items, settings);
+  const { subtotalPaise, discountPaise, taxPaise, totalPaise, itemCount } = totals;
 
   const showReview = voiceReview !== null && (voiceReview.lowConfidence || voiceReview.unmatched.length > 0);
 
@@ -219,6 +217,17 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
           <span className="text-muted-foreground">Subtotal</span>
           <span className="font-mono tabular-nums text-foreground">{formatINR(subtotalPaise)}</span>
         </div>
+        {discountPaise > 0 ? (
+          <div className="flex justify-between gap-3 text-sm">
+            <span className="min-w-0 break-words text-muted-foreground">{discountLabel(totals.offer?.name)}</span>
+            <span className="shrink-0 font-mono tabular-nums text-foreground">−{formatINR(discountPaise)}</span>
+          </div>
+        ) : null}
+        {totals.nudge ? (
+          <p className="rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-foreground">
+            {offerNudgeText(totals.nudge)}
+          </p>
+        ) : null}
         {settings.taxEnabled ? (
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Tax ({settings.taxPercent}%)</span>
@@ -237,7 +246,7 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
           onClick={() => {
             // A stale Undo must not put a line back into an order being paid for.
             toast.dismiss(UNDO_TOAST_ID);
-            onCollectPayment({ subtotalPaise, taxPaise, totalPaise });
+            onCollectPayment(toPayTotals(totals));
           }}
         >
           Collect payment
