@@ -346,6 +346,7 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
                       <Input
                         autoComplete="off"
                         autoCapitalize="none"
+                        className="h-11"
                         placeholder="quiche, paneer"
                         {...field}
                         value={field.value ?? ""}

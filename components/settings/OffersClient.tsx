@@ -350,7 +350,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit }: Offer
           description="Reward bigger orders, for example 10% off 4 or more quiches."
           action={
             canEdit ? (
-              <Button type="button" onClick={openCreate}>
+              <Button type="button" className="h-11" onClick={openCreate}>
                 <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
                 New offer
               </Button>
@@ -429,7 +429,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit }: Offer
             })}
           </ul>
           {canEdit ? (
-            <Button type="button" variant="outline" onClick={openCreate}>
+            <Button type="button" variant="outline" className="h-11" onClick={openCreate}>
               <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
               New offer
             </Button>
