@@ -39,11 +39,11 @@ describe("push payload builders", () => {
     expect(p.tag).toBe("order-AWZ-20261006-0007");
   });
 
-  it("new order: singular item, drop orders open the drop board", () => {
+  it("new order: singular item, drop orders open the board on that drop", () => {
     const p = newOrderPayload({ billNumber: "AWZ-1", totalPaise: 2000, itemCount: 1, dropId: "drop_123" });
     expect(p.body).toContain("1 item");
     expect(p.body).not.toContain("1 items");
-    expect(p.url).toBe("/drops/drop_123");
+    expect(p.url).toBe("/orders?drop=drop_123");
   });
 
   it("payment submitted: right URL and tag per event", () => {
@@ -52,7 +52,7 @@ describe("push payload builders", () => {
       url: "/orders",
       tag: "pay-AWZ-9",
     });
-    expect(paymentSubmittedPayload({ billNumber: "AWZ-9", totalPaise: 5000, dropId: "d1" }).url).toBe("/drops/d1");
+    expect(paymentSubmittedPayload({ billNumber: "AWZ-9", totalPaise: 5000, dropId: "d1" }).url).toBe("/orders?drop=d1");
   });
 
   it("builders accept no buyer fields, and extra fields never leak into the payload", () => {

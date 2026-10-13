@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  MENU_FALLBACK_POLL_MS,
-  MENU_SIGNAL_POLL_MS,
-  menuBoardPollKind,
+  BOARD_POLL_MS,
   menuBoardWindowStart,
   menuOrdersEnableBlocker,
   toMakeFromOrders,
@@ -70,20 +68,9 @@ describe("toMakeFromOrders", () => {
   });
 });
 
-describe("menuBoardPollKind", () => {
-  it("never polls when menu ordering is off", () => {
-    expect(menuBoardPollKind(false, "kv")).toBeNull();
-    expect(menuBoardPollKind(false, "fallback")).toBeNull();
-  });
-
-  it("polls the KV signal when available, else falls back", () => {
-    expect(menuBoardPollKind(true, "kv")).toBe("signal");
-    expect(menuBoardPollKind(true, "fallback")).toBe("fallback");
-  });
-
-  it("intervals stay above Neon's 5-minute idle timeout (scale-to-zero)", () => {
-    expect(MENU_SIGNAL_POLL_MS).toBeGreaterThan(5 * 60_000);
-    expect(MENU_FALLBACK_POLL_MS).toBeGreaterThan(5 * 60_000);
+describe("BOARD_POLL_MS", () => {
+  it("stays above Neon's 5-minute idle timeout (scale-to-zero)", () => {
+    expect(BOARD_POLL_MS).toBeGreaterThan(5 * 60_000);
   });
 });
 

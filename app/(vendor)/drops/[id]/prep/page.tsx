@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { PrintButton } from "@/components/drops/orders/PrintButton";
 import { formatINR } from "@/lib/currency";
-import { groupByFulfilment, handoverDue, ordersToPack, type BoardOrder } from "@/lib/drops-board";
+import { dropOrdersHref, groupByFulfilment, handoverDue, ordersToPack, type BoardOrder } from "@/lib/drops-board";
 import { loadDropBoard } from "@/lib/drops-board-server";
 import { formatIstDate, formatIstTime } from "@/lib/drops-time";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
@@ -98,7 +98,7 @@ export default async function DropPrepPage(props: Props) {
       <div className="mx-auto max-w-3xl print:max-w-none">
         <nav aria-label="Breadcrumb" className="mb-3 flex flex-wrap items-center justify-between gap-2 print:hidden">
           <Link
-            href={`/drops/${drop.id}`}
+            href={dropOrdersHref(drop.id)}
             className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
           >
             ← Back to orders

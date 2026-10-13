@@ -7,7 +7,7 @@ import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/
 /**
  * "Order from menu": a stall switches on menu ordering, a guest buyer orders
  * straight from the everyday menu (no drop), and the vendor collects it from
- * the Online orders board.
+ * the orders board.
  *
  * Writes real rows — run against a throwaway Postgres only (see CLAUDE.md).
  */
@@ -90,9 +90,10 @@ test.describe("menu orders: order straight from the everyday menu", () => {
       await buyerCtx.close();
     }
 
-    // ── Vendor: Online orders board ────────────────────────────────────
+    // ── Vendor: the orders board (menu orders only, so no source picker) ─
     await page.goto("/orders");
-    await expect(page.getByRole("heading", { name: "Online orders" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Orders", exact: true })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Show orders from" })).toHaveCount(0);
     await expect(page.getByText("Ravi Buyer").first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "To make" })).toBeVisible();
 

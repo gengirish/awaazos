@@ -35,7 +35,7 @@ Instagram and sell directly, not through Swiggy or Zomato.
 | Batches with a cut-off | Drops: lazy cut-off, capped stock, no overselling | `lib/drops.ts` |
 | Everyday menu | Order from menu (`acceptMenuOrders`) | `lib/menu-orders.ts` |
 | "Did they pay?" | UPI intent + buyer UTR, pay on delivery, vendor's own Razorpay keys | `lib/storefront-razorpay.ts` |
-| Day-of chaos | Orders board, prep sheet (cook list + delivery list), Web Push alerts | `/drops/[id]`, `/drops/[id]/prep`, `lib/push.ts` |
+| Day-of chaos | Orders board, prep sheet (cook list + delivery list), Web Push alerts | `/orders`, `/drops/[id]/prep`, `lib/push.ts` |
 | Posting the batch | WhatsApp share text, link-preview card, **Instagram story image** | `lib/drops-share.ts`, `app/s/[slug]/opengraph-image.tsx`, `lib/drop-story-image.tsx` |
 | Building the batch | Voice drop builder ("aaj 20 ragi laddu 150 rupaye…") | `lib/parse-drop.ts` |
 | Repeat buyers | Buyer accounts (email magic link), receipt with storefront link | `lib/customer-auth.ts` |

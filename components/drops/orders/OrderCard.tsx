@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   Ban,
   Bike,
+  CalendarClock,
   CheckCircle2,
   Clock,
   IndianRupee,
@@ -12,6 +13,7 @@ import {
   Phone,
   ShoppingBag,
   Undo2,
+  UtensilsCrossed,
   XCircle,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -38,11 +40,16 @@ import {
 import { formatIstDate, formatIstTime } from "@/lib/drops-time";
 import { cn } from "@/lib/utils";
 
+/** Where an order came from: the everyday menu, or a drop (label = its title). */
+export type OrderSource = { kind: "menu" | "drop"; label: string };
+
 type Props = {
   order: BoardOrder;
   vendorName: string;
   /** Stored drop status is FROZEN / FULFILLED: confirm & cancel are locked. */
   frozen: boolean;
+  /** Shown on the card while the list mixes menu and drop orders. */
+  source?: OrderSource;
   isNew: boolean;
   pendingAction: OrderAction | null;
   onAction: (orderId: string, action: OrderAction) => void;
@@ -86,6 +93,7 @@ export function OrderCard({
   order,
   vendorName,
   frozen,
+  source,
   isNew,
   pendingAction,
   onAction,
@@ -185,17 +193,30 @@ export function OrderCard({
         </div>
       </header>
 
-      <p
-        className={cn(
-          "mt-3 inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
-          STATE_STYLE[order.displayState],
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <p
+          className={cn(
+            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
+            STATE_STYLE[order.displayState],
+          )}
+        >
+          <StateIcon state={order.displayState} />
+          {DISPLAY_STATE_LABEL[order.displayState]}
+          {fs === "CONFIRMED" && order.displayState !== "DELIVERED" && " · Confirmed"}
+          {fs === "PLACED" && order.displayState !== "EXPIRED" && " · New"}
+        </p>
+        {source && (
+          <p className="inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground">
+            {source.kind === "drop" ? (
+              <CalendarClock className="h-4 w-4 shrink-0" aria-hidden />
+            ) : (
+              <UtensilsCrossed className="h-4 w-4 shrink-0" aria-hidden />
+            )}
+            <span className="sr-only">From: </span>
+            <span className="truncate">{source.label}</span>
+          </p>
         )}
-      >
-        <StateIcon state={order.displayState} />
-        {DISPLAY_STATE_LABEL[order.displayState]}
-        {fs === "CONFIRMED" && order.displayState !== "DELIVERED" && " · Confirmed"}
-        {fs === "PLACED" && order.displayState !== "EXPIRED" && " · New"}
-      </p>
+      </div>
 
       {order.displayState === "PAYMENT_SUBMITTED" && (
         <div className="mt-3 rounded-md border border-amber-500/60 bg-amber-50 p-3 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">

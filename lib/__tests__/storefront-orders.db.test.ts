@@ -181,14 +181,15 @@ describe.skipIf(!ENABLED)("storefront (menu) orders — vendor side, DB integrat
   const summary = (vendorId: string) =>
     prisma.dailySummary.findUnique({ where: { vendorId_date: { vendorId, date: todayStart } } });
 
-  it("GET lists only this vendor's menu orders (no drop orders, no other tenants), in window", async () => {
+  it("GET lists this vendor's menu and drop orders together (no other tenants), in window", async () => {
     const a = await seedVendor();
     const b = await seedVendor();
     const cash = await menuOrder(a, "CASH");
     const upi = await menuOrder(a, "UPI");
     const other = await menuOrder(b, "CASH");
     if (!cash.ok || !upi.ok || !other.ok) throw new Error("seed failed");
-    const { orderId: dropOrderId } = await seedDropOrder(a);
+    const { drop, orderId: dropOrderId } = await seedDropOrder(a);
+    const { drop: otherDrop, orderId: otherDropOrderId } = await seedDropOrder(b);
 
     // Old orders: a delivered one falls out of the window, an open cash one stays.
     const oldDone = await menuOrder(a, "CASH");
@@ -205,18 +206,61 @@ describe.skipIf(!ENABLED)("storefront (menu) orders — vendor side, DB integrat
     const res = await getList();
     expect(res.status).toBe(200);
     const body = (await res.json()) as {
-      data: { id: string; createdAt: string }[];
+      data: { id: string; dropId: string | null; createdAt: string }[];
+      drops: { id: string; title: string }[];
       summary: { activeOrders: number };
       signal: number | null;
     };
     const ids = body.data.map((o) => o.id);
-    expect(new Set(ids)).toEqual(new Set([cash.order.id, upi.order.id, oldOpen.order.id]));
-    expect(ids).not.toContain(dropOrderId);
+    expect(new Set(ids)).toEqual(new Set([cash.order.id, upi.order.id, oldOpen.order.id, dropOrderId]));
     expect(ids).not.toContain(other.order.id);
+    expect(ids).not.toContain(otherDropOrderId);
     expect(ids).not.toContain(oldDone.order.id);
     expect(ids[ids.length - 1]).toBe(oldOpen.order.id); // newest first
-    expect(body.summary.activeOrders).toBe(3);
+    // Each order says which drop it belongs to, and the drop comes along for the picker.
+    expect(body.data.find((o) => o.id === dropOrderId)?.dropId).toBe(drop.id);
+    expect(body.data.find((o) => o.id === cash.order.id)?.dropId).toBeNull();
+    expect(body.drops.map((d) => d.id)).toEqual([drop.id]);
+    expect(body.drops.map((d) => d.id)).not.toContain(otherDrop.id);
+    expect(body.summary.activeOrders).toBe(4);
     expect(body.signal).toBeNull(); // no KV in tests
+  }, 20_000);
+
+  it("GET ?drop= keeps a past drop and all its orders on the board; another vendor's id matches nothing", async () => {
+    const a = await seedVendor();
+    const b = await seedVendor();
+    const { drop, orderId } = await seedDropOrder(a);
+    const { drop: foreign, orderId: foreignOrderId } = await seedDropOrder(b);
+
+    // Fulfilled a fortnight ago, its order delivered: off the board by default.
+    const longAgo = new Date(Date.now() - 14 * 86_400_000);
+    await prisma.drop.update({
+      where: { id: drop.id },
+      data: { status: "FULFILLED", closesAt: longAgo, fulfilmentStartsAt: longAgo, fulfilmentEndsAt: longAgo },
+    });
+    await prisma.transaction.update({
+      where: { id: orderId },
+      data: { createdAt: longAgo, fulfilmentStatus: "DELIVERED", paymentStatus: "PAID" },
+    });
+
+    type Body = { data: { id: string }[]; drops: { id: string }[] };
+    const list = async (query = "") =>
+      (await (
+        await listRoute.GET(new NextRequest(`http://localhost/api/storefront-orders${query}`))
+      ).json()) as Body;
+
+    as(a);
+    const plain = await list();
+    expect(plain.data).toEqual([]);
+    expect(plain.drops).toEqual([]);
+
+    const pinned = await list(`?drop=${drop.id}`);
+    expect(pinned.data.map((o) => o.id)).toEqual([orderId]);
+    expect(pinned.drops.map((d) => d.id)).toEqual([drop.id]);
+
+    const forged = await list(`?drop=${foreign.id}`);
+    expect(forged.data.map((o) => o.id)).not.toContain(foreignOrderId);
+    expect(forged.drops).toEqual([]);
   });
 
   it("PATCH is tenant- and drop-scoped: other vendor, drop order and unknown ids are 404", async () => {

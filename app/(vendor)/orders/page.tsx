@@ -2,18 +2,25 @@ import { redirect } from "next/navigation";
 
 import { OrdersBoard } from "@/components/drops/orders/OrdersBoard";
 import { InstallBanner } from "@/components/pwa/InstallPrompt";
-import { loadMenuOrdersBoard } from "@/lib/drops-board-server";
-import { getDropOrderSignal } from "@/lib/drops-signal";
-import { MENU_ORDERS_SIGNAL_ID } from "@/lib/menu-orders";
+import { loadOrdersBoard } from "@/lib/drops-board-server";
+import { getOrderSignal } from "@/lib/drops-signal";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Online orders · AwaazOS" };
+export const metadata = { title: "Orders · AwaazOS" };
 
-/** "Order from menu" board: storefront orders with no drop. */
-export default async function OnlineOrdersPage() {
+type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
+
+/**
+ * The one orders board: every online order, whether it came from the everyday
+ * menu or from a drop. `?drop=<id>` opens it narrowed to that drop.
+ */
+export default async function OrdersPage(props: Props) {
+  const { drop } = await props.searchParams;
+  const dropId = (Array.isArray(drop) ? drop[0] : drop) || null;
+
   let ctx: Awaited<ReturnType<typeof requireVendorRole>>;
   try {
     ctx = await requireVendorRole("CASHIER");
@@ -23,13 +30,13 @@ export default async function OnlineOrdersPage() {
   }
 
   // Signal first, so an order landing between the reads triggers a refetch.
-  const signal = await getDropOrderSignal(ctx.vendor.id, MENU_ORDERS_SIGNAL_ID);
+  const signal = await getOrderSignal(ctx.vendor.id);
   const [settings, board] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: ctx.vendor.id },
       select: { acceptMenuOrders: true, menuFulfilmentMode: true },
     }),
-    loadMenuOrdersBoard(ctx.vendor.id),
+    loadOrdersBoard(ctx.vendor.id, { pinDropId: dropId }),
   ]);
 
   return (
@@ -42,12 +49,11 @@ export default async function OnlineOrdersPage() {
       <OrdersBoard
         vendorName={ctx.vendor.name}
         vendorSlug={ctx.vendor.slug}
-        source={{
-          kind: "menu",
-          acceptMenuOrders: settings?.acceptMenuOrders ?? false,
-          fulfilmentMode: settings?.menuFulfilmentMode ?? "PICKUP",
-        }}
+        acceptMenuOrders={settings?.acceptMenuOrders ?? false}
+        menuFulfilmentMode={settings?.menuFulfilmentMode ?? "PICKUP"}
         initialOrders={board.orders}
+        initialDrops={board.drops}
+        initialDropId={dropId}
         initialSignal={signal}
       />
     </main>

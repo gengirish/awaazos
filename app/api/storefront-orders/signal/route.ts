@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { getDropOrderSignal } from "@/lib/drops-signal";
-import { MENU_ORDERS_SIGNAL_ID } from "@/lib/menu-orders";
+import { getOrderSignal } from "@/lib/drops-signal";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
@@ -9,14 +8,14 @@ export const runtime = "nodejs";
 
 /**
  * GET /api/storefront-orders/signal — `{ signal: number | null }` for the
- * "order from menu" board. Reads only the vendor-scoped Upstash counter (plus
+ * orders board (menu and drop orders). Reads only the vendor-scoped Upstash counter (plus
  * the session / membership check in requireVendorRole); null = KV unavailable,
  * the client falls back to a slow direct refresh.
  */
 export async function GET(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
-    const signal = await getDropOrderSignal(ctx.vendor.id, MENU_ORDERS_SIGNAL_ID);
+    const signal = await getOrderSignal(ctx.vendor.id);
     const res = NextResponse.json({ signal });
     res.headers.set("Cache-Control", "no-store");
     return res;

@@ -10,7 +10,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  */
 const findFirst = vi.fn();
 vi.mock("@/lib/prisma", () => ({ prisma: { vendor: { findFirst: (...a: unknown[]) => findFirst(...a) } } }));
-vi.mock("@/lib/drops-signal", () => ({ bumpDropOrderSignal: vi.fn() }));
+vi.mock("@/lib/drops-signal", () => ({ bumpOrderSignal: vi.fn() }));
 vi.mock("@/lib/push", () => ({ notifyVendorInBackground: vi.fn(), newOrderPayload: vi.fn() }));
 vi.mock("next/og", () => ({
   ImageResponse: class {

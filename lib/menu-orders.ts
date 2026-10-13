@@ -26,14 +26,11 @@ import {
   generateOrderToken,
   nextBillNumber,
 } from "@/lib/drops";
-import { bumpDropOrderSignal } from "@/lib/drops-signal";
+import { bumpOrderSignal } from "@/lib/drops-signal";
 import { effectivePlan, isBillingLocked } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
 import { generateReceiptToken } from "@/lib/receipt-data";
-
-/** Signal-key stand-in for the vendor's menu-orders board (no drop id). */
-export const MENU_ORDERS_SIGNAL_ID = "menu";
 
 export type MenuOrderSettings = {
   acceptMenuOrders: boolean;
@@ -237,7 +234,7 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
       } satisfies PlacedMenuOrder;
     });
 
-    void bumpDropOrderSignal(vendorId, MENU_ORDERS_SIGNAL_ID);
+    void bumpOrderSignal(vendorId);
     notifyVendorInBackground(
       vendorId,
       newOrderPayload({

@@ -51,7 +51,7 @@ test.describe("install prompt", () => {
     await expect(page.getByTestId(BANNER)).toHaveCount(0);
 
     await page.goto("/orders");
-    await expect(page.getByRole("heading", { level: 1, name: "Online orders" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Orders", exact: true })).toBeVisible();
     // Same here: "Last checked" only appears once a tap on Refresh has been handled.
     await expect(async () => {
       await page.getByRole("button", { name: "Refresh", exact: true }).click();
@@ -119,7 +119,7 @@ test.describe("install prompt", () => {
 
     // And on the other home screen too.
     await page.goto("/orders");
-    await expect(page.getByRole("heading", { level: 1, name: "Online orders" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Orders", exact: true })).toBeVisible();
     nav = await secondaryNav(page);
     await offerInstall(page, () => expect(entry()).toBeVisible({ timeout: 2_000 }));
     await expect(banner).toHaveCount(0);

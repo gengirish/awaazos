@@ -312,7 +312,8 @@ not mutate historical bills.
 
 A `Drop` is one batch a home kitchen sells ahead of time ("Saturday bakes, order by Fri 9 pm").
 Core rules live in `lib/drops.ts` (read its header before touching it); buyers order on
-`/s/[slug]`, the vendor works from `/drops`, `/drops/[id]` (orders board), `/drops/[id]/prep`.
+`/s/[slug]`, the vendor builds drops on `/drops`, works their orders on `/orders` (the one orders
+board, see "One orders board" below) and prints from `/drops/[id]/prep`.
 
 Three invariants, enforced in `lib/drops.ts` and nowhere else:
 
@@ -357,11 +358,22 @@ Buyer accounts are **not** NextAuth: `Customer` + passwordless email magic link
 (`lib/customer-auth.ts`), tokens and sessions stored as SHA-256 hashes only, session in the
 httpOnly `awz_cust` cookie. A buyer session never touches staff RBAC or widens a vendor `select`.
 
-Orders board freshness: order placement and board actions bump a vendor-scoped Upstash counter
-(`lib/drops-signal.ts`, fire-and-forget). Instant alerts come from Web Push; board polling is only
-a fallback, so both boards (`/drops/[id]` and `/orders`) poll every **6 min** (`BOARD_POLL_MS`), only
-while visible (and, for drops, while it accepts orders), refetching from Postgres only when the
-counter moves. Keep it above Neon's idle timeout — each tick's session check reads Postgres.
+**One orders board.** `/orders` lists every storefront order — menu orders and all drops' orders —
+in one list (`loadOrdersBoard` in `lib/drops-board-server.ts`: the last 3 IST days, older orders
+still open, and every order of a drop whose handover window ended within those 3 days).
+`BoardOrder.dropId` says which kind an order is. The "Show orders from" picker narrows the board
+to menu orders or one drop (then the header offers that drop's Edit / Prep sheet / share); with a
+single source there is no picker. `/orders?drop=<id>` opens it on a drop and keeps a past drop on
+the board; `/drops/[id]` only redirects there. **Don't add a second orders page.** Actions still
+go to the order's own route family (`orderActionBase` in `lib/drops-board.ts`), so each keeps its
+compound scope; the frozen rule is per order (`isDropFrozen` on its drop).
+
+Orders board freshness: order placement and board actions bump one per-vendor Upstash counter
+(`bumpOrderSignal` in `lib/drops-signal.ts`, fire-and-forget). Instant alerts come from Web Push;
+board polling is only a fallback, so the board polls every **6 min** (`BOARD_POLL_MS`), only while
+visible and only while a buyer could order (`boardPollKind`: "order from menu" on, or a drop open
+or about to open), refetching from Postgres only when the counter moves. Keep it above Neon's
+idle timeout — each tick's session check reads Postgres.
 
 **Web Push alerts** (`lib/push.ts`): new storefront orders and submitted UPI references push to the
 vendor's opted-in staff devices (`PushSubscription`, one row per device). Event-driven only — never
@@ -407,14 +419,16 @@ Both are event-driven: no timers, no polling.
 everyday `MenuItem`s with no drop — same STOREFRONT transaction with `dropId = null`, same payment
 paths and plan-cap rule, but no cut-off, no stock caps and no row lock (only `isAvailable` items).
 Fulfilment/fee/pickup note come from `menuFulfilmentMode` / `menuDeliveryFeePaise` /
-`menuPickupNote`. Buyer route `POST /api/s/[slug]/menu-orders`; vendor board `/orders` over
-`/api/storefront-orders/**`, sharing order actions with drops via `lib/storefront-order-actions.ts`.
-The menu board has no cut-off to stop it, so it polls every 6 min — keep it above Neon's idle
-timeout.
+`menuPickupNote`. Buyer route `POST /api/s/[slug]/menu-orders`; the vendor sees them on `/orders`
+beside drop orders (`GET /api/storefront-orders` returns both; `PATCH` / `bulk` under it act on
+menu orders only), sharing order actions with drops via `lib/storefront-order-actions.ts`.
+Menu ordering has no cut-off to stop the board polling, so it polls every 6 min — keep it above
+Neon's idle timeout.
 
-**Bulk order actions** (`lib/order-bulk.ts` client-safe, `lib/storefront-order-bulk.ts` server): both
-boards select orders and apply confirm / mark_paid / deliver via `POST /api/drops/[id]/orders/bulk`
-and `POST /api/storefront-orders/bulk` (`{ orderIds: 1..50 unique, action }`, CASHIER). One
+**Bulk order actions** (`lib/order-bulk.ts` client-safe, `lib/storefront-order-bulk.ts` server): the
+board selects orders and applies confirm / mark_paid / deliver via `POST /api/drops/[id]/orders/bulk`
+and `POST /api/storefront-orders/bulk` (`{ orderIds: 1..50 unique, action }`, CASHIER); a selection
+that mixes sources is split per route on the client (`groupIdsByDrop`). One
 transaction per order, run in sequence, each through `applyStorefrontOrderAction` with the
 single-order compound scope, so one stale order never rolls back the rest. Response
 `{ data: { succeeded, failed: [{ id, error }], orders } }`; unknown and cross-tenant ids are both

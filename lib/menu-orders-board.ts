@@ -1,10 +1,12 @@
 /**
- * "Order from menu" board — pure, client-safe helpers (no Prisma, no node:*).
+ * "Order from menu" on the orders board — pure, client-safe helpers (no Prisma,
+ * no node:*).
  *
- * Menu orders are storefront Transactions with `dropId = null`. They reuse the
- * drop board's BoardOrder shape, buckets and summary (lib/drops-board.ts);
- * what differs is the load window, the "To make" strip (no drop items, so
- * lines are grouped by their snapshot name) and the polling rule.
+ * Menu orders are storefront Transactions with `dropId = null`. They sit on the
+ * same board as drop orders and share the BoardOrder shape, buckets and summary
+ * (lib/drops-board.ts); what lives here is the load window, the "To make" strip
+ * (no drop items, so lines are grouped by their snapshot name) and the poll
+ * interval.
  */
 
 import type { FulfilmentStatus } from "@prisma/client";
@@ -15,8 +17,8 @@ import type { OrderDisplayState } from "@/lib/drops";
 
 /** Days of menu orders the board shows (today in IST + the 2 days before). */
 export const MENU_BOARD_WINDOW_DAYS = 3;
-/** Hard cap on rows per board load. Home-kitchen / stall volume is far below this. */
-export const MENU_BOARD_MAX_ORDERS = 300;
+/** Hard cap on rows per board load (menu and drop orders together). Home-kitchen volume is far below this. */
+export const BOARD_MAX_ORDERS = 500;
 
 const IST_OFFSET_MS = 330 * 60_000;
 const DAY_MS = 24 * 60 * 60_000;
@@ -63,29 +65,15 @@ export function toMakeFromOrders(orders: ToMakeOrderInput[]): ToMakeRow[] {
 // ─── Polling ────────────────────────────────────────────────────────
 
 /**
- * Menu ordering has no cut-off, so this board can sit open on a stall's phone
- * all day. Every tick hits Postgres (requireVendorRole reads the user and its
- * memberships), so both intervals stay ABOVE Neon's 5-minute idle timeout —
+ * Menu ordering has no cut-off, so the orders board can sit open on a stall's
+ * phone all day. Every tick hits Postgres (requireVendorRole reads the user and
+ * its memberships), so the interval stays ABOVE Neon's 5-minute idle timeout —
  * anything shorter pins the database awake for as long as the tab is open
  * (global scale-to-zero rule). Faster alerts need a Postgres-free session
- * check on the signal route first; see TODO.md §3.5.
+ * check on the signal route first; see TODO.md §3.5. Whether the board polls
+ * at all is `boardPollKind` in lib/drops-board.ts.
  */
 export const BOARD_POLL_MS = 6 * 60_000;
-export const MENU_SIGNAL_POLL_MS = BOARD_POLL_MS;
-/** No KV: refetch the orders list directly, at the same cadence. */
-export const MENU_FALLBACK_POLL_MS = BOARD_POLL_MS;
-
-export type MenuPollKind = "signal" | "fallback" | null;
-
-/**
- * Menu orders have no cut-off, so the only "stop" condition is the vendor's
- * setting: nothing polls while `acceptMenuOrders` is off. Visibility gating
- * happens in the component (ticks are skipped while the tab is hidden).
- */
-export function menuBoardPollKind(acceptMenuOrders: boolean, signalMode: "kv" | "fallback"): MenuPollKind {
-  if (!acceptMenuOrders) return null;
-  return signalMode === "kv" ? "signal" : "fallback";
-}
 
 // ─── Settings guard ─────────────────────────────────────────────────
 
