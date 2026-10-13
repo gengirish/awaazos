@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 // Pure functions only — keep Prisma/env/KV out of the unit run.
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
-vi.mock("@/lib/drops-signal", () => ({ bumpDropOrderSignal: vi.fn() }));
+vi.mock("@/lib/drops-signal", () => ({ bumpOrderSignal: vi.fn() }));
 vi.mock("@/lib/push", () => ({ notifyVendorInBackground: vi.fn(), newOrderPayload: vi.fn() }));
 
 import type { DropStatus } from "@prisma/client";

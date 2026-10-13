@@ -3,7 +3,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { isPhoneLayout } from "./nav";
 
 /**
- * Orders boards (`/orders`, `/drops/[id]`): the header keeps Refresh on screen
+ * The orders board (`/orders`): the header keeps Refresh on screen
  * at every width. Everything else (Edit, Prep sheet, the share buttons, My
  * store, Settings, Sound, phone alerts) sits beside it from `md`, and inside
  * the "More actions" bottom sheet on a phone. Specs run in both projects, so

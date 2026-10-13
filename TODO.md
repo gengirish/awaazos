@@ -175,7 +175,7 @@ STARTER, so trial vendors have it too.
 ### 3.5 Drops: open items found while building it
 
 - ~~**Orders board keeps Neon awake during order windows.**~~ **Resolved:** with Web Push carrying
-  instant alerts, both boards now poll every 6 min (`BOARD_POLL_MS`), above Neon's idle timeout.
+  instant alerts, the orders board polls every 6 min (`BOARD_POLL_MS`), above Neon's idle timeout.
   A JWT-only session check on the signal route would allow faster polling again if ever needed.
 - **Marking an EXPIRED order paid can oversell.** After the 15-minute hold lapses its stock is
   released and may be resold; the board still lets the vendor tap Mark paid (e.g. a late UTR), which
@@ -214,7 +214,7 @@ STARTER, so trial vendors have it too.
 
 **Web Push implemented on `feat/web-push`** (option 1 below, plus the small wins): `lib/push.ts`,
 `public/sw.js`, `app/manifest.ts`, `/api/push/**`, Settings → Notifications, "Get alerts on this
-phone" on both boards. Still unverified: **real delivery on devices** — Android Chrome with the screen
+phone" on the orders board. Still unverified: **real delivery on devices** — Android Chrome with the screen
 locked, and an iPhone (iOS 16.4+) with AwaazOS added to the Home Screen. Headless CI can't reach a
 push service. Known gap: the button trusts this browser's subscription, so a row removed from another
 device leaves it saying "on" until toggled. The original analysis follows.
@@ -222,7 +222,7 @@ device leaves it saying "on" until toggled. The original analysis follows.
 Today the only alert is the orders board's **Sound** toggle (`components/drops/orders/OrdersBoard.tsx`,
 `beep()`): a Web Audio beep when the board's own poll finds new orders. Its limits:
 
-- **Delay.** It beeps only when the board checks: every 6 min on both boards (Web Push is the
+- **Delay.** It beeps only when the board checks: every 6 min (Web Push is the
   instant path). Refresh checks immediately.
 - **Screen on only.** Polling stops when the tab is hidden or the phone is locked, so nothing beeps
   in a pocket — the vendor has to keep the board open and visible.
@@ -238,7 +238,7 @@ Options, cheapest first:
 2. **WhatsApp to the vendor** on each new order — most reliable for this audience, but needs an
    approved utility template and a running worker, so it is blocked by 1.1 (gates 3 and 4).
 3. **Small wins regardless:** remember the Sound choice per device (localStorage, try/catch), and
-   show "Last checked HH:MM · next check in N min" on the menu board so the delay is visible.
+   show "Last checked HH:MM · next check in N min" on the orders board so the delay is visible.
 
 ---
 

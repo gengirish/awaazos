@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { toBoardOrder } from "@/lib/drops-board-server";
-import { bumpDropOrderSignal } from "@/lib/drops-signal";
+import { bumpOrderSignal } from "@/lib/drops-signal";
 import { bulkOrderActionSchema } from "@/lib/order-bulk";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     });
 
     // One signal bump for the whole batch. Fire-and-forget.
-    if (result.succeeded.length > 0) void bumpDropOrderSignal(vendorId, dropId);
+    if (result.succeeded.length > 0) void bumpOrderSignal(vendorId);
 
     const res = NextResponse.json({
       data: {

@@ -100,12 +100,12 @@ test.describe("landing screen", () => {
 
     await page.goto("/home");
     await expect(page).toHaveURL(/\/orders$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Online orders" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Orders", exact: true })).toBeVisible();
 
     const fresh = await signInWithNoCallback(browser, creds);
     try {
       await expect(fresh).toHaveURL(/\/orders$/);
-      await expect(fresh.getByRole("heading", { level: 1, name: "Online orders" })).toBeVisible();
+      await expect(fresh.getByRole("heading", { level: 1, name: "Orders", exact: true })).toBeVisible();
     } finally {
       await fresh.context().close();
     }

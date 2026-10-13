@@ -40,7 +40,7 @@ import { Prisma } from "@prisma/client";
 import { formatBillDateYYYYMMDD, getIstMonthStart, getIstTodayStart } from "@/lib/billing-period";
 import { PLAN_LIMITS } from "@/lib/constants";
 import { sumPaise } from "@/lib/currency";
-import { bumpDropOrderSignal } from "@/lib/drops-signal";
+import { bumpOrderSignal } from "@/lib/drops-signal";
 import { effectivePlan, isBillingLocked } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
@@ -465,7 +465,7 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
 
     // Fire-and-forget: lets the vendor's board notice without polling Postgres,
     // and pushes an alert to opted-in staff phones (lib/push.ts).
-    void bumpDropOrderSignal(vendorId, input.dropId);
+    void bumpOrderSignal(vendorId);
     notifyVendorInBackground(
       vendorId,
       newOrderPayload({

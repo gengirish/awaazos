@@ -141,7 +141,10 @@ test.describe("drops: home-kitchen pre-order day", () => {
       await expect(buyer.getByText("Pay on delivery").first()).toBeVisible();
 
       // ── Vendor: the board shows it; hand over and collect cash ─────────
+      // The drop's old address still works: it opens the one orders board on this drop.
       await page.goto(`/drops/${dropId}`);
+      await expect(page).toHaveURL(new RegExp(`/orders\\?drop=${dropId}$`));
+      await expect(page.getByRole("heading", { level: 2, name: dropTitle })).toBeVisible();
       const card = page.getByRole("article", { name: /Priya Buyer/ });
       await expect(card).toBeVisible();
       await expect(card.getByText(`2 × ${laddu}`)).toBeVisible();
