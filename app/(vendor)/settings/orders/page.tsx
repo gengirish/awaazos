@@ -25,6 +25,7 @@ export default async function OrdersSettingsPage() {
       menuPickupNote: true,
       whatsappNumber: true,
       acceptWhatsappOrders: true,
+      showWhatsappOnStore: true,
     },
   });
 
@@ -46,10 +47,11 @@ export default async function OrdersSettingsPage() {
           />
         </SettingsCard>
 
-        <SettingsCard title="WhatsApp orders">
+        <SettingsCard title="WhatsApp">
           <WhatsappOrdersClient
             initialWhatsappNumber={settings?.whatsappNumber ?? null}
             initialAcceptWhatsappOrders={settings?.acceptWhatsappOrders ?? false}
+            initialShowOnStore={settings?.showWhatsappOnStore ?? false}
             isOwner={isOwner}
           />
         </SettingsCard>

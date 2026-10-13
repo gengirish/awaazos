@@ -3,7 +3,9 @@ import type { Metadata } from "next";
 import {
   CalendarClock,
   ChevronDown,
+  Instagram,
   MapPin,
+  MessageCircle,
   QrCode,
   ShoppingBag,
   Sparkles,
@@ -30,6 +32,7 @@ import { formatINRCompact } from "@/lib/currency";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
 import { formatDropDayLabel, formatFulfilmentWindow } from "@/lib/drops-time";
+import { instagramProfileUrl } from "@/lib/instagram";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
 import { prisma } from "@/lib/prisma";
 import {
@@ -40,6 +43,8 @@ import {
   menuItemAnchor,
   STOREFRONT_MENU_ITEM_WHERE,
   storefrontDropVisibility,
+  storeWhatsappNumber,
+  whatsappChatLink,
   type StorefrontDropVisibility,
 } from "@/lib/storefront-order";
 import { qrSvgDataUrl } from "@/lib/qr";
@@ -99,6 +104,10 @@ type StorefrontVendor = NonNullable<Awaited<ReturnType<typeof loadStorefront>>>;
  */
 const BANNER_LOGO_OFFSET = "pt-[60px] sm:pt-[124px]";
 
+/** Header contact pills (WhatsApp chat, Instagram profile). */
+const CONTACT_LINK =
+  "inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background px-4 text-sm font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
+
 /** Themes with a `[data-theme=…]` block in globals.css; anything else stays saffron. */
 const BRAND_THEMES = new Set(["green", "amber", "red", "blue", "purple"]);
 
@@ -131,8 +140,10 @@ const loadStorefront = cache(async (slug: string) => {
           fssaiNumber: true,
           acceptPayOnDelivery: true,
           acceptMenuOrders: true,
-          whatsappNumber: true, // presence only — reduced to a boolean below
+          whatsappNumber: true, // rendered only through storeWhatsappNumber(); else a boolean
           acceptWhatsappOrders: true,
+          showWhatsappOnStore: true,
+          instagramHandle: true,
           menuFulfilmentMode: true,
           menuDeliveryFeePaise: true,
           menuPickupNote: true,
@@ -502,6 +513,13 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   };
   // Opted in with a usable number → checkout also offers "send on WhatsApp". Only the boolean reaches the client.
   const whatsapp = buyerWhatsappNumber(vendor.settings) !== null;
+  // Header contact links. WhatsApp has its own opt-in (every visitor sees it, not only buyers).
+  const storeWhatsapp = storeWhatsappNumber(vendor.settings);
+  const whatsappLink = storeWhatsapp
+    ? whatsappChatLink(storeWhatsapp, `Hi ${vendor.name}, I saw your store and have a question.`)
+    : null;
+  const instagramHandle = vendor.settings?.instagramHandle ?? null;
+  const instagramLink = instagramProfileUrl(instagramHandle);
   const menuCategories: MenuOrderCategory[] = categories.map(([category, items], i) => ({
     category,
     anchor: categoryAnchor(category, i),
@@ -600,6 +618,28 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                 </span>
               ) : null}
             </div>
+
+            {whatsappLink || instagramLink ? (
+              <ul aria-label="Contact" className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                {whatsappLink ? (
+                  <li>
+                    <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>
+                      <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      WhatsApp
+                    </a>
+                  </li>
+                ) : null}
+                {instagramLink ? (
+                  <li className="min-w-0">
+                    <a href={instagramLink} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>
+                      <Instagram className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span className="sr-only">Instagram: </span>
+                      <span className="truncate">@{instagramHandle}</span>
+                    </a>
+                  </li>
+                ) : null}
+              </ul>
+            ) : null}
 
             {itemCount > 0 ? (
               <p className="mt-3 text-sm text-muted-foreground">

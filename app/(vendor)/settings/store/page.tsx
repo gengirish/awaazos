@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 
 import { FssaiNumberClient } from "@/components/settings/FssaiNumberClient";
+import { InstagramHandleClient } from "@/components/settings/InstagramHandleClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { StoreImagesClient } from "@/components/settings/StoreImagesClient";
 import { StoreNameClient } from "@/components/settings/StoreNameClient";
@@ -19,7 +20,7 @@ export default async function StoreSettingsPage() {
   const [settings, availableItemCount] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: vendor.id },
-      select: { publishStorefront: true, fssaiNumber: true },
+      select: { publishStorefront: true, fssaiNumber: true, instagramHandle: true },
     }),
     prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
   ]);
@@ -49,6 +50,9 @@ export default async function StoreSettingsPage() {
             hasUpiId={Boolean(vendor.upiId)}
             availableItemCount={availableItemCount}
           />
+        </SettingsCard>
+        <SettingsCard title="Instagram" description="Shown on your store page as a link to your profile.">
+          <InstagramHandleClient initialHandle={settings?.instagramHandle ?? null} isOwner={isOwner} />
         </SettingsCard>
         <SettingsCard title="Food licence" description="Shown on your store page.">
           <FssaiNumberClient initialFssaiNumber={settings?.fssaiNumber ?? null} />
