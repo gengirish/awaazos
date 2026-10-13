@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Notice } from "@/components/ui/notice";
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const router = useRouter();
@@ -94,13 +95,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
           </div>
 
           {error ? (
-            <p
-              role="alert"
-              aria-live="assertive"
-              className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-            >
+            <Notice role="alert" aria-live="assertive" tone="danger">
               {error}
-            </p>
+            </Notice>
           ) : null}
 
           <Button

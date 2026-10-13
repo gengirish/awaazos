@@ -52,7 +52,8 @@ via CSS variables — never hardcode hex in components.
   one-screen tweak belongs at the call site via `className`. Re-running
   `npx shadcn@latest add` over an edited primitive drops those edits — diff first.
 - Pull new components via `npx shadcn@latest add <name>` (don't hand-write).
-  The exceptions are `responsive-dialog.tsx` and `confirm-dialog.tsx`, which are ours.
+  The exceptions are `responsive-dialog.tsx`, `confirm-dialog.tsx`, `empty-state.tsx`
+  and `notice.tsx`, which are ours.
 
 ## Touch defaults built into the primitives
 
@@ -80,6 +81,17 @@ via CSS variables — never hardcode hex in components.
   (e.g. desktop-only auto-print).
 - Heights in `dvh`, never `vh` (`max-h-[92dvh]`): `vh` ignores mobile browser
   toolbars and hides the bottom of the modal.
+
+## Empty states and inline notices
+
+- "Nothing here yet" is `EmptyState` (`components/ui/empty-state.tsx`): the
+  dashed box with an optional icon, title, description and one action. Never
+  fake rows or placeholder numbers. Pass `role="status"` only when it appears
+  in response to an action (a search with no matches).
+- A boxed message about a blocked or failed action is `Notice`
+  (`components/ui/notice.tsx`, `tone="warning" | "danger"`), next to the control
+  it is about, with `role="alert"` when it appears in response to an action.
+  A one-line field error stays plain `text-destructive` text under its input.
 
 ## Safe areas
 

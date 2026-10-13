@@ -13,6 +13,7 @@ import { OrderCard, type OrderSource } from "@/components/drops/orders/OrderCard
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
 import { PushAlertsButton, PushAlertsPrompt } from "@/components/push/PushAlertsButton";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatINR } from "@/lib/currency";
 import type { EffectiveDropStatus } from "@/lib/drops";
@@ -764,7 +765,7 @@ export function OrdersBoard({
 
       <section id="orders-list" role="tabpanel" aria-label="Orders" aria-busy={refreshing}>
         {visible.length === 0 ? (
-          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{emptyText}</p>
+          <EmptyState description={emptyText} />
         ) : (
           <>
             {selectableVisible.length > 1 && (

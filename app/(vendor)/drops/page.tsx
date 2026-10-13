@@ -3,6 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { CopyDropButton, DropStatusBadge } from "@/components/drops/DropForm";
+import { EmptyState } from "@/components/ui/empty-state";
 import { liveDropOrderWhere } from "@/lib/drops-api";
 import { dropOrdersHref } from "@/lib/drops-board";
 import { groupDropsByDay, istTodayYmd } from "@/lib/drops-builder";
@@ -79,12 +80,11 @@ export default async function DropsPage() {
 
       <main id="main-drops" className="mx-auto max-w-3xl space-y-8">
         {rows.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-border p-6 text-center">
-            <p className="font-medium">No drops yet</p>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Create one for tomorrow&apos;s cooking, share the link on WhatsApp, and collect orders before the cut-off.
-            </p>
-          </div>
+          <EmptyState
+            className="rounded-xl"
+            title="No drops yet"
+            description="Create one for tomorrow's cooking, share the link on WhatsApp, and collect orders before the cut-off."
+          />
         ) : null}
 
         {upcoming.length ? <DropSection title="Upcoming" rows={upcoming} /> : null}
