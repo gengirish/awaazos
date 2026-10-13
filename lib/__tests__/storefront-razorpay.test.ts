@@ -14,6 +14,7 @@ vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 import {
   createRazorpayOrder,
   hasStoredRazorpayCreds,
+  isOnlinePaymentEnabled,
   RAZORPAY_KEY_ID_PATTERN,
   RazorpayApiError,
   validateKeys,
@@ -127,5 +128,34 @@ describe("HTTP (mocked fetch)", () => {
     await expect(
       createRazorpayOrder({ creds, amountPaise: 123.5, receipt: "r", notes: { transactionId: "t", vendorId: "v" } }),
     ).rejects.toBeInstanceOf(RazorpayApiError);
+  });
+});
+
+describe("isOnlinePaymentEnabled", () => {
+  const NOW = new Date("2026-10-13T06:00:00.000Z");
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const creds = { razorpayKeyId: "rzp_test_x", razorpayKeySecretEnc: "v1:a", razorpayWebhookSecretEnc: "v1:b" };
+  const inTrial = new Date(NOW.getTime() + 10 * DAY_MS);
+  const trialOver = new Date(NOW.getTime() - 10 * DAY_MS);
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+  });
+
+  it("is on from STARTER, including the free trial; off for FREE and a locked vendor", () => {
+    vi.stubEnv("PAYMENT_KEYS_ENCRYPTION_KEY", crypto.randomBytes(32).toString("base64"));
+    expect(isOnlinePaymentEnabled({ plan: "STARTER", planExpiresAt: null }, creds, NOW)).toBe(true);
+    expect(isOnlinePaymentEnabled({ plan: "PRO", planExpiresAt: null }, creds, NOW)).toBe(true);
+    expect(isOnlinePaymentEnabled({ plan: "FREE", planExpiresAt: null, trialEndsAt: inTrial }, creds, NOW)).toBe(true);
+    expect(isOnlinePaymentEnabled({ plan: "FREE", planExpiresAt: null, trialEndsAt: trialOver }, creds, NOW)).toBe(false);
+    expect(isOnlinePaymentEnabled({ plan: "FREE", planExpiresAt: null, trialEndsAt: null }, creds, NOW)).toBe(false);
+  });
+
+  it("needs saved keys and the encryption key on this deploy", () => {
+    const starter = { plan: "STARTER" as const, planExpiresAt: null };
+    vi.stubEnv("PAYMENT_KEYS_ENCRYPTION_KEY", crypto.randomBytes(32).toString("base64"));
+    expect(isOnlinePaymentEnabled(starter, null, NOW)).toBe(false);
+    vi.stubEnv("PAYMENT_KEYS_ENCRYPTION_KEY", "");
+    expect(isOnlinePaymentEnabled(starter, creds, NOW)).toBe(false);
   });
 });

@@ -114,9 +114,10 @@ Limits live in `PLAN_LIMITS` (`lib/constants.ts`).
   To ship: StaffMember invite/accept, enforce `PLAN_LIMITS.maxStaff`, add a tenant-isolation e2e
   case — then re-add "staff logins" to the Starter copy and relax that test.
 - **Pro is not sold** — hidden from pricing (`MARKETED_PLANS` in `lib/plan-copy.ts`) and billing,
-  but `POST /api/razorpay/create-subscription` still accepts it. Any vendor on PRO was set manually;
-  check `planExpiresAt` on those rows so they don't keep PRO-gated features (own Razorpay keys)
-  indefinitely or lose them silently.
+  and `POST /api/razorpay/create-subscription` rejects it (`SUBSCRIBABLE_PLANS` is STARTER only).
+  Any vendor on PRO was set manually. Since 2026-10-13 the vendor's own Razorpay keys are a STARTER
+  feature (trial included); what PRO still adds is 365 days of analytics instead of 90 and higher
+  AI rate limits and usage caps (`lib/ratelimit.ts`, `lib/ai-usage-guard.ts`).
 
 **Proposed fix:** time-box the trial instead of transaction-boxing it — 30 days, unlimited, every
 language, WhatsApp on — then one paid tier whose cap is above real usage. Cost is some Sarvam
@@ -168,8 +169,8 @@ times evaluated lazily, capped stock, orders board, prep sheet, and three paymen
 UTR, pay on delivery, the vendor's own Razorpay keys). Covered by unit tests, `npm run test:drops:db`
 and `e2e/drops.spec.ts`. Not yet verified in production: vendor-Razorpay checkout and webhook
 against a real Razorpay account, buyer magic-link email delivery, and anything WhatsApp (1.1).
-`razorpayLinks` in `PLAN_LIMITS` is still a flag with nothing behind it — storefront Razorpay does
-not use it.
+`PLAN_LIMITS.*.razorpayLinks` gates it (`isOnlinePaymentEnabled`, `PUT /api/vendor/payments`): on from
+STARTER, so trial vendors have it too.
 
 ### 3.5 Drops: open items found while building it
 

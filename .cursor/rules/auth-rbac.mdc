@@ -56,10 +56,10 @@ const { vendor } = await requireVendorRole("CASHIER");
 // Settings change — Owner only
 const { vendor } = await requireVendorRole("OWNER");
 
-// Saving the vendor's own Razorpay keys for storefront payments — OWNER + PRO
-// (PUT /api/vendor/payments; PRO = PLAN_LIMITS[plan].razorpayLinks)
+// Saving the vendor's own Razorpay keys for storefront payments — OWNER + STARTER
+// (PUT /api/vendor/payments; STARTER = PLAN_LIMITS[plan].razorpayLinks, so the trial has it too)
 const ctx = await requireVendorRole("OWNER", undefined, req);
-requirePlan(ctx.vendor, "PRO");
+requirePlan(ctx.vendor, "STARTER");
 ```
 
 ## Sign-up = one transaction

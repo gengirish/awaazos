@@ -72,7 +72,7 @@ export function hasStoredRazorpayCreds(s: CredFields | null | undefined): boolea
 }
 
 /**
- * Plan flag (PRO/ENTERPRISE, after expiry — lib/plan.ts) + saved creds + the
+ * Plan flag (STARTER and up, incl. the free trial — lib/plan.ts) + saved creds + the
  * encryption key present on this deploy.
  */
 export function isOnlinePaymentEnabled(
@@ -297,6 +297,7 @@ export async function findStorefrontOrderForPayment(slug: string, token: string)
           name: true,
           plan: true,
           planExpiresAt: true,
+          trialEndsAt: true,
           settings: {
             select: { razorpayKeyId: true, razorpayKeySecretEnc: true, razorpayWebhookSecretEnc: true },
           },
