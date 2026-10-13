@@ -1,10 +1,11 @@
 "use client";
 
-import { AlertTriangle, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { useId, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { LastPaymentMethodNotice, lastPaymentMethodBlockersFrom } from "@/components/settings/LastPaymentMethodNotice";
+import { Notice } from "@/components/ui/notice";
 import type { PaymentGuardBlocker } from "@/lib/payment-guard";
 import { isValidUpiId, normalizeUpiId, UPI_ID_FORMAT_MESSAGE } from "@/lib/upi";
 import { cn } from "@/lib/utils";
@@ -185,16 +186,12 @@ export function UpiDetailsClient({
       </div>
 
       {confirmRemove && removeNeedsWarning ? (
-        <div
-          role="alert"
-          className="flex gap-2 rounded-md border border-amber-500/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-        >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <Notice role="alert" icon>
           <p>
             Pay on delivery is off, so without a UPI ID customers will have no way to pay you online. Tap
             &ldquo;Remove UPI ID&rdquo; again to confirm, or turn on pay on delivery below first.
           </p>
-        </div>
+        </Notice>
       ) : null}
 
       {serverBlock ? <LastPaymentMethodNotice blockers={serverBlock} /> : null}

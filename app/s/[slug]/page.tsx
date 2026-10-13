@@ -23,6 +23,7 @@ import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuO
 import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
+import { EmptyState } from "@/components/ui/empty-state";
 import { getIstTodayStart } from "@/lib/billing-period";
 import { STALL_TYPES } from "@/lib/constants";
 import { formatINRCompact } from "@/lib/currency";
@@ -696,9 +697,10 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
 
           {categories.length === 0 ? (
             dropViews.length > 0 ? null : (
-              <p className="rounded-2xl border border-dashed border-border bg-background px-4 py-12 text-center text-sm text-muted-foreground">
-                This stall has not published any items yet. Please check back soon.
-              </p>
+              <EmptyState
+                className="rounded-2xl bg-background px-4 py-12"
+                description="This stall has not published any items yet. Please check back soon."
+              />
             )
           ) : (
             <div className="space-y-8">

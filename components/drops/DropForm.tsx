@@ -9,6 +9,7 @@ import { toast } from "sonner";
 
 import { VoiceDropPanel, type VoiceApplyResult } from "@/components/drops/VoiceDropPanel";
 import { Button } from "@/components/ui/button";
+import { Notice } from "@/components/ui/notice";
 import {
   ResponsiveDialog,
   ResponsiveDialogContent,
@@ -882,9 +883,9 @@ export function DropForm({
       </fieldset>
 
       {formError ? (
-        <p role="alert" className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+        <Notice role="alert" tone="danger">
           {formError}
-        </p>
+        </Notice>
       ) : null}
 
       {!locked ? (
@@ -1048,10 +1049,10 @@ export function DropStatusControls({
       ) : null}
 
       {problem ? (
-        <div role="alert" className="space-y-1 rounded-md border border-amber-500/50 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+        <Notice role="alert" className="space-y-1">
           <p>{problem.message}</p>
           <ConflictFix code={problem.code} canPublishStore={canPublishStore} />
-        </div>
+        </Notice>
       ) : null}
 
       {orderCount === 0 ? (
