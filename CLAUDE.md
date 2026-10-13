@@ -321,6 +321,12 @@ Three invariants, enforced in `lib/drops.ts` and nowhere else:
    holds stock for `PENDING_HOLD_MINUTES` (15) then silently stops counting; cancel frees stock.
    A buyer's "I've paid" claim (`paymentClaimedAt`, or a UTR) keeps the hold until the vendor answers.
 
+A drop is created as `DRAFT` with no storefront check; opening it (`PATCH /api/drops/[id]/status`,
+MANAGER) needs items, a future cut-off, a payment method and a published storefront, else 409.
+Opening never publishes the store by itself: an OWNER confirms "Publish your store too?" on the
+edit page, which sends `publishStorefront: true` and flips the setting in the same transaction as
+the status (a MANAGER sending it gets 403 `owner_required`).
+
 Money and plan rules:
 
 - **Instagram story image:** `GET /api/drops/[id]/story-image` (CASHIER, compound `{ id, vendorId }`)

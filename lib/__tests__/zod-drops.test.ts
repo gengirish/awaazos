@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   dropInputToData,
+  dropStatusChangeSchema,
   dropUpsertSchema,
   indianPhoneE164,
   storefrontOrderSchema,
@@ -136,6 +137,24 @@ describe("dropInputToData", () => {
     const d = dropInputToData(dropUpsertSchema.parse({ ...valid, note: "   ", pickupNote: "" }));
     expect(d.note).toBeNull();
     expect(d.pickupNote).toBeNull();
+  });
+});
+
+describe("dropStatusChangeSchema", () => {
+  it("accepts a bare status change", () => {
+    expect(dropStatusChangeSchema.parse({ status: "CLOSED" })).toEqual({ status: "CLOSED" });
+  });
+
+  it("publishStorefront is only ever true, and only with OPEN", () => {
+    expect(dropStatusChangeSchema.parse({ status: "OPEN", publishStorefront: true })).toEqual({
+      status: "OPEN",
+      publishStorefront: true,
+    });
+    expect(dropStatusChangeSchema.safeParse({ status: "OPEN", publishStorefront: false }).success).toBe(false);
+    expect(dropStatusChangeSchema.safeParse({ status: "OPEN", publishStorefront: "yes" }).success).toBe(false);
+    for (const status of ["DRAFT", "CLOSED", "FROZEN", "FULFILLED"]) {
+      expect(dropStatusChangeSchema.safeParse({ status, publishStorefront: true }).success).toBe(false);
+    }
   });
 });
 

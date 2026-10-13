@@ -122,9 +122,19 @@ export function dropInputToData(v: DropUpsertInput) {
   };
 }
 
-export const dropStatusChangeSchema = z.object({
-  status: z.enum(["DRAFT", "OPEN", "CLOSED", "FROZEN", "FULFILLED"]),
-});
+export const dropStatusChangeSchema = z
+  .object({
+    status: z.enum(["DRAFT", "OPEN", "CLOSED", "FROZEN", "FULFILLED"]),
+    /**
+     * Owner's explicit "publish my store too" when opening orders on a private
+     * storefront. Only ever `true`, and only with OPEN — nothing unpublishes here.
+     */
+    publishStorefront: z.literal(true).optional(),
+  })
+  .refine((v) => !v.publishStorefront || v.status === "OPEN", {
+    path: ["publishStorefront"],
+    message: "Only valid when opening orders",
+  });
 
 /** +91 mobile → E.164, or a Zod issue. */
 export const indianPhoneE164 = z
