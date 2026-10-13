@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import { PushAlertsButton } from "@/components/push/PushAlertsButton";
 import { PushDevicesClient } from "@/components/settings/PushDevicesClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
+import { VoiceAlertToggle } from "@/components/settings/VoiceAlertToggle";
 
 import { requireSettingsContext } from "../_context";
 
@@ -31,6 +32,10 @@ export default async function NotificationsSettingsPage() {
       <div className="space-y-4">
         <SettingsCard title="This phone">
           <PushAlertsButton variant="settings" />
+        </SettingsCard>
+
+        <SettingsCard title="Voice alert" description="Hear new orders spoken aloud while you cook.">
+          <VoiceAlertToggle />
         </SettingsCard>
 
         <SettingsCard title="Your devices" description="Phones and browsers where you get alerts for this stall.">

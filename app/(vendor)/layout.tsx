@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
 
+import { OrderVoiceAlerts } from "@/components/push/OrderVoiceAlerts";
 import { AppShell } from "@/components/shell/AppShell";
 import { Toaster } from "@/components/ui/sonner";
 
@@ -28,6 +29,7 @@ export default async function VendorLayout({ children }: { children: ReactNode }
         {children}
       </AppShell>
       <Toaster richColors position="top-center" />
+      <OrderVoiceAlerts />
     </>
   );
 }

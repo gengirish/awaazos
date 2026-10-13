@@ -47,29 +47,18 @@ import {
   type BulkOrderAction,
   type BulkOrderResult,
 } from "@/lib/order-bulk";
+import {
+  PUSH_ARRIVED_EVENT,
+  readOrderSoundPref,
+  speakNewOrder,
+  writeOrderSoundPref,
+  type PushArrivedDetail,
+} from "@/lib/order-voice";
 import { cn } from "@/lib/utils";
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 /** Coming back to the tab (e.g. tapping a push alert) refetches at most this often. */
 const VISIBLE_REFETCH_MIN_MS = 30_000;
-/** Per-device Sound choice. Audio still needs a tap to unlock after a reload. */
-const SOUND_PREF_KEY = "awz_board_sound_v1";
-
-function readSoundPref(): boolean {
-  try {
-    return window.localStorage.getItem(SOUND_PREF_KEY) === "on";
-  } catch {
-    return false;
-  }
-}
-
-function writeSoundPref(on: boolean): void {
-  try {
-    window.localStorage.setItem(SOUND_PREF_KEY, on ? "on" : "off");
-  } catch {
-    // Blocked storage: the choice just isn't remembered.
-  }
-}
 
 /**
  * Which orders the board shows: one Drop's pre-orders (cut-off, prep sheet,
@@ -192,7 +181,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
   const effective: EffectiveDropStatus | null = drop ? liveEffectiveStatus(drop, now) : null;
   const frozen = drop ? drop.status === "FROZEN" || drop.status === "FULFILLED" : false;
 
-  const refresh = useCallback(async (opts?: { manual?: boolean }) => {
+  const refresh = useCallback(async (opts?: { manual?: boolean; quiet?: boolean }) => {
     if (inFlight.current) return;
     inFlight.current = true;
     if (opts?.manual) setRefreshing(true);
@@ -212,7 +201,11 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
             : `${fresh.length} new orders, latest from ${firstName(newest?.customerName)}`,
         );
         setNewIds((prev) => new Set([...Array.from(prev), ...fresh]));
-        if (soundRef.current) beep(audioRef.current);
+        // Chime, then the spoken alert — unless the push already said it.
+        if (soundRef.current && !opts?.quiet) {
+          beep(audioRef.current);
+          speakNewOrder();
+        }
       }
       signalRef.current = body.signal;
       setSignalMode(body.signal === null ? "fallback" : "kv");
@@ -322,6 +315,19 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
     return () => document.removeEventListener("visibilitychange", onVisible);
   }, [refresh]);
 
+  // A push for this vendor reached the device (components/push/OrderVoiceAlerts.tsx):
+  // show the order now instead of at the next poll. One read, only when
+  // something actually happened.
+  useEffect(() => {
+    const onPush = (e: Event) => {
+      const detail = (e as CustomEvent<PushArrivedDetail>).detail;
+      if (!detail || detail.kind === "test") return;
+      void refresh({ quiet: detail.announced });
+    };
+    window.addEventListener(PUSH_ARRIVED_EVENT, onPush);
+    return () => window.removeEventListener(PUSH_ARRIVED_EVENT, onPush);
+  }, [refresh]);
+
   // Created inside a tap, so mobile browsers allow it to play later.
   const unlockAudio = useCallback((withBeep: boolean) => {
     try {
@@ -341,7 +347,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
   // Restore the per-device Sound choice. Browsers block audio until a tap, so a
   // saved "on" waits for the first tap anywhere on the page.
   useEffect(() => {
-    if (readSoundPref()) setSoundPending(true);
+    if (readOrderSoundPref()) setSoundPending(true);
   }, []);
 
   useEffect(() => {
@@ -359,10 +365,14 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
 
   const toggleSound = () => {
     const turnOn = soundPending || !soundOn;
-    if (turnOn) unlockAudio(true);
+    if (turnOn) {
+      unlockAudio(true);
+      // Inside the tap: lets the vendor hear the alert, and unlocks speech on iOS.
+      speakNewOrder();
+    }
     setSoundPending(false);
     setSoundOn(turnOn);
-    writeSoundPref(turnOn);
+    writeOrderSoundPref(turnOn);
   };
 
   const runAction = async (orderId: string, action: OrderAction) => {

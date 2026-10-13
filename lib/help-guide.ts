@@ -255,11 +255,12 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "order-alerts",
     group: "setup",
     title: "Get an alert on this phone for new orders",
-    steps: "Turn alerts on for this device. On an iPhone, add AwaazOS to your Home Screen first.",
+    steps:
+      "Turn alerts on for this device. On an iPhone, add AwaazOS to your Home Screen first. Turn on Voice alert to hear new orders spoken aloud while AwaazOS is open.",
     nav: "settings",
     href: "/settings/notifications",
     trail: ["Notifications"],
-    keywords: "notification push sound locked",
+    keywords: "notification push sound locked voice speak announce",
   },
   {
     id: "voice-language",
