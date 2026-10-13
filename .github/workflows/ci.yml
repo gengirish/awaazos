@@ -54,6 +54,10 @@ jobs:
 
   e2e:
     name: E2E (Playwright)
+    # Switched off on CI (owner's call, 2026-10-13): the suite is run locally
+    # against a throwaway Postgres instead (CLAUDE.md, "E2E writes real rows").
+    # Remove this line to bring it back.
+    if: false
     runs-on: ubuntu-latest
     timeout-minutes: 45
     needs: quality

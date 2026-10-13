@@ -3,7 +3,9 @@
 import { useEffect } from "react";
 
 import {
+  billFromOrderTag,
   claimAnnouncement,
+  fetchOrderFirstName,
   primeSpeech,
   PUSH_ARRIVED_EVENT,
   pushKindFromTag,
@@ -15,13 +17,15 @@ import {
 } from "@/lib/order-voice";
 
 /**
- * Speaks "New order received from customer" the moment a new-order push
- * reaches this device, on any signed-in screen (lib/order-voice.ts has the
- * rules). Renders nothing.
+ * Speaks "New order received from Priya" the moment a new-order push reaches
+ * this device, on any signed-in screen (lib/order-voice.ts has the rules).
+ * Renders nothing.
  *
- * It only listens: no timer, no request. The service worker posts a message
- * when a push lands; this speaks it if Sound is on for this device, then
- * re-dispatches it on `window` so an open orders board refetches straight away.
+ * It only listens: no timer, nothing while idle. The service worker posts a
+ * message when a push lands; if Sound is on for this device this looks up the
+ * buyer's first name (one request, only for an order that just arrived),
+ * speaks, then re-dispatches the push on `window` so an open orders board
+ * refetches straight away.
  */
 export function OrderVoiceAlerts() {
   useEffect(() => {
@@ -35,8 +39,13 @@ export function OrderVoiceAlerts() {
       void (async () => {
         let announced = false;
         if (shouldSpeakFor(kind) && readOrderSoundPref()) {
-          // Lost the claim = another tab is saying it.
-          announced = (await claimAnnouncement(tag)) ? speakNewOrder() : true;
+          if (await claimAnnouncement(tag)) {
+            const bill = billFromOrderTag(tag);
+            announced = speakNewOrder(bill ? await fetchOrderFirstName(bill) : null);
+          } else {
+            // Lost the claim = another tab is saying it.
+            announced = true;
+          }
         }
         const detail: PushArrivedDetail = { kind, announced };
         window.dispatchEvent(new CustomEvent(PUSH_ARRIVED_EVENT, { detail }));

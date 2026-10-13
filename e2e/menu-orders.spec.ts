@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { boardHeaderAction, closeBoardActions } from "./helpers/board";
+import { isPhoneLayout } from "./helpers/nav";
 import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
@@ -103,7 +104,10 @@ test.describe("menu orders: order straight from the everyday menu", () => {
     // Header actions: beside the title from md, in the "More actions" sheet on a phone.
     await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible();
     await expect(await boardHeaderAction(page, "link", "Settings")).toHaveAttribute("href", "/settings/orders");
-    await expect(await boardHeaderAction(page, "button", "Sound off")).toHaveAttribute("aria-pressed", "false");
+    // Sound is on unless turned off, and waits for the first tap: on a phone,
+    // opening the "More actions" sheet is that tap.
+    const soundLabel = isPhoneLayout(page) ? "Sound on" : "Sound on — tap to enable";
+    await expect(await boardHeaderAction(page, "button", soundLabel)).toBeVisible();
     await closeBoardActions(page);
 
     const card = page.getByRole("article", { name: /Ravi Buyer/ });

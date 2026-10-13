@@ -1,6 +1,6 @@
 /**
- * Spoken new-order alert: "New order received from customer", said aloud by
- * the device the moment an order lands. Safe to import from client components.
+ * Spoken new-order alert: "New order received from Priya", said aloud by the
+ * device the moment an order lands. Safe to import from client components.
  *
  * How it arrives. A new storefront order sends a Web Push (lib/push.ts). The
  * service worker shows the notification and also posts `SW_PUSH_MESSAGE` to
@@ -10,20 +10,31 @@
  * once. Event-driven end to end: no timer, nothing polls.
  *
  * Rules:
- *   - The phrase is fixed and carries no buyer name, amount or item: it is
- *     said out loud in a kitchen.
+ *   - The buyer's first name is spoken, nothing else about them. It never
+ *     rides in the push (lock screens are public, and push services see the
+ *     payload): the page asks GET /api/storefront-orders/announce for it by
+ *     bill number, as signed-in staff. No name in time → "customer".
+ *   - A name is only handed to a voice that runs on the device
+ *     (`localService`). Some desktop browsers offer voices that send the text
+ *     to a server; with only those, the alert says "customer".
  *   - Speech needs a page that is open. With the phone locked or the app
  *     closed only the system notification (and its sound) plays — a service
  *     worker cannot speak.
  *   - Browsers block speech until the page has been tapped once, and iOS wants
  *     the first utterance inside a tap. `primeSpeech()` does that silently.
  *   - One per-device choice, shared with the orders board's Sound button.
+ *     On until the vendor turns it off.
  */
 
-/** Per-device Sound choice ("on" | "off"). The key predates the voice alert. */
+/** Per-device Sound choice ("on" | "off"; unset = on). The key predates the voice alert. */
 export const ORDER_SOUND_PREF_KEY = "awz_board_sound_v1";
 
 export const NEW_ORDER_PHRASE = "New order received from customer";
+
+/** Longest name the alert will say; a longer one is cut, not skipped. */
+const SPOKEN_NAME_MAX = 30;
+/** The alert never waits longer than this for the name. */
+const NAME_FETCH_TIMEOUT_MS = 2_500;
 
 /** `type` of the message public/sw.js posts to open pages when a push lands. */
 export const SW_PUSH_MESSAGE = "awz-push";
@@ -61,6 +72,27 @@ export function pushMessageTag(data: unknown): string | null {
   return m.tag;
 }
 
+/** Bill number of a new-order push (`order-<bill>`), or null. */
+export function billFromOrderTag(tag: string): string | null {
+  if (!tag.startsWith("order-")) return null;
+  return tag.slice("order-".length) || null;
+}
+
+/**
+ * The part of a buyer's name the alert says: the first word, letters only
+ * (buyers type this themselves, so no digits, symbols or sentences), or null.
+ */
+export function spokenName(raw: string | null | undefined): string | null {
+  const first = raw?.trim().split(/\s+/)[0] ?? "";
+  const clean = first.replace(/[^\p{L}\p{M}'.-]/gu, "").slice(0, SPOKEN_NAME_MAX);
+  return /\p{L}/u.test(clean) ? clean : null;
+}
+
+export function newOrderPhrase(name?: string | null): string {
+  const said = spokenName(name);
+  return said ? `New order received from ${said}` : NEW_ORDER_PHRASE;
+}
+
 /** A test alert speaks too, so "Send test alert" checks the voice end to end. */
 export function shouldSpeakFor(kind: PushKind): boolean {
   return kind === "order" || kind === "test";
@@ -70,9 +102,9 @@ export function shouldSpeakFor(kind: PushKind): boolean {
 
 export function readOrderSoundPref(): boolean {
   try {
-    return window.localStorage.getItem(ORDER_SOUND_PREF_KEY) === "on";
+    return window.localStorage.getItem(ORDER_SOUND_PREF_KEY) !== "off";
   } catch {
-    return false;
+    return true;
   }
 }
 
@@ -93,19 +125,60 @@ export function canSpeak(): boolean {
 }
 
 /**
- * Say the new-order phrase. Returns false when this page cannot speak right
- * now (no speech support, or not tapped yet), so the caller can fall back to
- * its beep. A burst of orders is announced once, not queued.
+ * The buyer's first name for a new-order push, asked of our own server as the
+ * signed-in staff member. null on any miss, error or timeout: the alert then
+ * says "customer" instead of waiting.
  */
-export function speakNewOrder(): boolean {
+export async function fetchOrderFirstName(bill: string): Promise<string | null> {
+  try {
+    const res = await fetch(`/api/storefront-orders/announce?bill=${encodeURIComponent(bill)}`, {
+      cache: "no-store",
+      signal: AbortSignal.timeout(NAME_FETCH_TIMEOUT_MS),
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as { data?: { firstName?: unknown } };
+    return typeof body.data?.firstName === "string" ? body.data.firstName : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * An on-device voice, Indian English first. `none` = this browser only has
+ * voices that send the text away; `unknown` = it has not listed its voices
+ * (phones often don't; they speak through the system engine).
+ */
+function localVoice(synth: SpeechSynthesis): SpeechSynthesisVoice | "none" | "unknown" {
+  const voices = synth.getVoices?.() ?? [];
+  if (voices.length === 0) return "unknown";
+  const local = voices.filter((v) => v.localService);
+  if (local.length === 0) return "none";
+  return (
+    local.find((v) => v.lang.replace("_", "-") === "en-IN") ??
+    local.find((v) => v.lang.startsWith("en")) ??
+    local.find((v) => v.default) ??
+    local[0]!
+  );
+}
+
+/**
+ * Say the new-order alert, with the buyer's first name when one is given.
+ * Returns false when this page cannot speak right now (no speech support, or
+ * not tapped yet), so the caller can fall back to its beep. A burst of orders
+ * is announced once, not queued.
+ */
+export function speakNewOrder(name?: string | null): boolean {
   if (!canSpeak()) return false;
   // Chromium/Firefox expose this; where it is missing (older Safari) just try.
   if (navigator.userActivation && !navigator.userActivation.hasBeenActive) return false;
   try {
     const synth = window.speechSynthesis;
     if (synth.speaking || synth.pending) return true;
-    const utterance = new SpeechSynthesisUtterance(NEW_ORDER_PHRASE);
+    const voice = localVoice(synth);
+    // No on-device voice: the name stays here, the alert still speaks.
+    const utterance = new SpeechSynthesisUtterance(voice === "none" ? NEW_ORDER_PHRASE : newOrderPhrase(name));
     utterance.lang = "en-IN";
+    if (typeof voice === "object") utterance.voice = voice;
     synth.speak(utterance);
     return true;
   } catch {
