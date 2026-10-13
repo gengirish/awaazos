@@ -5,6 +5,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import manifest from "@/app/manifest";
 import { HOME_PATH } from "@/lib/home";
+import { SW_PUSH_MESSAGE } from "@/lib/order-voice";
 import { safeNotificationPath } from "@/lib/push-client";
 
 /**
@@ -108,6 +109,29 @@ describe("sw.js push", () => {
       data: { json: () => ({ title: "x", body: "y", url: "https://evil.example", tag: "t" }) },
     });
     expect(showNotification.mock.calls[0]![1].data).toEqual({ url: "/orders" });
+  });
+
+  it("tells every open page, with the tag only, so it can speak the alert", async () => {
+    const pages = [client(`${ORIGIN}/pos`), client(`${ORIGIN}/orders`)].map((c) => ({ ...c, postMessage: vi.fn() }));
+    const { handlers, showNotification } = loadWorker(pages);
+    const payload = { title: "New order", body: "AWZ-1 · ₹240 · 3 items", url: "/orders", tag: "order-AWZ-1" };
+    await dispatch(handlers.push!, { data: { json: () => payload } });
+    expect(showNotification).toHaveBeenCalledTimes(1);
+    for (const page of pages) {
+      expect(page.postMessage).toHaveBeenCalledWith({ type: SW_PUSH_MESSAGE, tag: "order-AWZ-1" });
+    }
+  });
+
+  it("still shows the notification when a page cannot be told", async () => {
+    const broken = {
+      ...client(`${ORIGIN}/pos`),
+      postMessage: vi.fn(() => {
+        throw new Error("gone");
+      }),
+    };
+    const { handlers, showNotification } = loadWorker([broken]);
+    await dispatch(handlers.push!, { data: { json: () => ({ title: "x", body: "y", url: "/orders", tag: "order-1" }) } });
+    expect(showNotification).toHaveBeenCalledTimes(1);
   });
 });
 
