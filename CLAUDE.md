@@ -360,6 +360,14 @@ screens are public). 404/410 from the push service deletes the row. Feature-gate
 `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`. `public/sw.js`, the manifest,
 `offline.html` and the icons are excluded from middleware; iPhones need the site added to the Home Screen.
 
+**Spoken new-order alert** (`lib/order-voice.ts`): on each push `public/sw.js` also posts
+`{ type: "awz-push", tag }` to open pages. `OrderVoiceAlerts` (vendor layout) says the fixed phrase
+"New order received from customer" via `speechSynthesis` — no buyer name or amount, it is said aloud —
+when Sound is on for the device (one localStorage choice shared by the board's Sound button and
+Settings → Notifications), then fires `PUSH_ARRIVED_EVENT` so an open board refetches at once. Web Locks
+keep several tabs from speaking together. Listener only, no timer. It needs an open page: a locked
+phone gets the notification without speech.
+
 **Offline counter sales** (`docs/PWA_OFFLINE_PLAN.md`): `/sw.js` (registered on `/pos` load) caches
 `/pos` and its chunks; it never intercepts `/api/**`, `/s/**` or non-GET. Every POS checkout goes
 through the IndexedDB outbox (`lib/pos-outbox.ts`): saved first, then POSTed with a `clientRef` uuid

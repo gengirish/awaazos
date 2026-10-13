@@ -26,7 +26,8 @@
  * activate deletes every old cache.
  *
  * Push payloads come from lib/push.ts: { title, body, url, tag }. They carry
- * no buyer PII (lock screens are public).
+ * no buyer PII (lock screens are public). Each push is also posted to open
+ * pages (tellOpenPages) so they can speak the new-order alert.
  */
 
 /* eslint-disable no-restricted-globals */
@@ -316,17 +317,41 @@ self.addEventListener("fetch", function (event) {
   }
 });
 
+/**
+ * Tell every open page a push landed. A worker cannot speak, so the page does:
+ * components/push/OrderVoiceAlerts.tsx says the new-order alert aloud and the
+ * orders board refetches. Only the tag is sent (SW_PUSH_MESSAGE in
+ * lib/order-voice.ts — keep the type in step). Never fails the push.
+ */
+function tellOpenPages(tag) {
+  return self.clients
+    .matchAll({ type: "window", includeUncontrolled: true })
+    .then(function (list) {
+      for (var i = 0; i < list.length; i++) {
+        try {
+          list[i].postMessage({ type: "awz-push", tag: tag });
+        } catch (e) {
+          // A page that is going away; the notification still shows.
+        }
+      }
+    })
+    .catch(function () {});
+}
+
 self.addEventListener("push", function (event) {
   var p = parsePayload(event);
   event.waitUntil(
-    self.registration.showNotification(p.title, {
-      body: p.body,
-      tag: p.tag,
-      renotify: true,
-      icon: "/icon-192.png",
-      badge: "/badge-72.png",
-      data: { url: safeNotificationPath(p.url, self.location.origin) },
-    }),
+    Promise.all([
+      self.registration.showNotification(p.title, {
+        body: p.body,
+        tag: p.tag,
+        renotify: true,
+        icon: "/icon-192.png",
+        badge: "/badge-72.png",
+        data: { url: safeNotificationPath(p.url, self.location.origin) },
+      }),
+      tellOpenPages(p.tag),
+    ]),
   );
 });
 
