@@ -218,6 +218,11 @@ Rules every one of them follows:
   (`lib/storefront-order.ts`): `VendorSettings.whatsappNumber`, and only once the vendor opts in
   with `acceptWhatsappOrders` (default `false`; Settings → Online orders). A saved number is not
   consent — onboarding pre-fills it from the sign-up phone.
+- The `/s/[slug]` header has two contact links. WhatsApp goes through `storeWhatsappNumber()`
+  (same file) and its own opt-in, `showWhatsappOnStore` (default `false`) — every visitor sees it,
+  not only buyers, so `acceptWhatsappOrders` does not imply it. Instagram is
+  `VendorSettings.instagramHandle` (Settings → Online store), stored bare and linked only through
+  `instagramProfileUrl()` (`lib/instagram.ts`); saving a handle publishes it.
 - Order pages are keyed on `Transaction.orderToken` alone (192-bit random, `generateOrderToken()`),
   always looked up together with the slug's `vendorId`. Never expose or accept a transaction `id`.
 - Every write is IP rate-limited (`makeLimiter` in `lib/ratelimit.ts`; buyer login also per-email).

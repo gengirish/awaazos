@@ -572,6 +572,18 @@ export function buyerWhatsappNumber(
   return whatsappChatLink(settings.whatsappNumber, "") ? settings.whatsappNumber : null;
 }
 
+/**
+ * The vendor's WhatsApp number as every storefront visitor may see it, or null.
+ * A wider audience than `buyerWhatsappNumber` (which is buyers who placed an
+ * order), so it has its own opt-in: `showWhatsappOnStore`, default off.
+ */
+export function storeWhatsappNumber(
+  settings: { showWhatsappOnStore?: boolean | null; whatsappNumber?: string | null } | null | undefined,
+): string | null {
+  if (!settings?.showWhatsappOnStore || !settings.whatsappNumber) return null;
+  return whatsappChatLink(settings.whatsappNumber, "") ? settings.whatsappNumber : null;
+}
+
 export type WhatsAppOrderMessageInput = {
   vendorName: string;
   billNumber: string;

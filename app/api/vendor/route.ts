@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { SUPPORTED_VOICE_LANGS } from "@/lib/constants";
+import { INSTAGRAM_HANDLE_MESSAGE, normaliseInstagramHandle } from "@/lib/instagram";
 import { menuOrdersEnableBlocker, type MenuOrdersBlocker } from "@/lib/menu-orders-board";
 import {
   dropWillTakeOrdersWhere,
@@ -44,6 +45,17 @@ const patchSchema = z.object({
   whatsappNumber: z.string().trim().max(20).optional().nullable(),
   // Show whatsappNumber to storefront buyers (wa.me links). Off by default.
   acceptWhatsappOrders: z.boolean().optional(),
+  // Show a WhatsApp chat link to every storefront visitor. Off by default.
+  showWhatsappOnStore: z.boolean().optional(),
+  // "@handle" or a profile URL; stored bare. "" or null clears it.
+  instagramHandle: z
+    .string()
+    .trim()
+    .max(200)
+    .refine((v) => normaliseInstagramHandle(v) !== null, INSTAGRAM_HANDLE_MESSAGE)
+    .transform((v) => normaliseInstagramHandle(v))
+    .optional()
+    .nullable(),
   voiceLang: z.enum(SUPPORTED_VOICE_LANGS).optional(),
   publishStorefront: z.boolean().optional(),
   // FSSAI registration/licence numbers are exactly 14 digits. "" clears it.
@@ -88,7 +100,7 @@ class SettingsConflict extends Error {
   }
 }
 
-/** Turning on WhatsApp orders needs a number that makes a working wa.me link. */
+/** Showing the number to buyers (after an order, or on the store page) needs a number that makes a working wa.me link. */
 class WhatsappNumberRequired extends Error {
   constructor() {
     super("whatsapp_number_required");
@@ -162,7 +174,7 @@ export async function PATCH(req: NextRequest) {
     }
 
     await prisma.$transaction(async (tx) => {
-      if (vendorFields.acceptWhatsappOrders === true) {
+      if (vendorFields.acceptWhatsappOrders === true || vendorFields.showWhatsappOnStore === true) {
         const number =
           vendorFields.whatsappNumber !== undefined
             ? vendorFields.whatsappNumber
@@ -239,6 +251,12 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.acceptWhatsappOrders !== undefined) {
         settingsUpdate.acceptWhatsappOrders = vendorFields.acceptWhatsappOrders;
+      }
+      if (vendorFields.showWhatsappOnStore !== undefined) {
+        settingsUpdate.showWhatsappOnStore = vendorFields.showWhatsappOnStore;
+      }
+      if (vendorFields.instagramHandle !== undefined) {
+        settingsUpdate.instagramHandle = vendorFields.instagramHandle || null;
       }
       if (vendorFields.voiceLang !== undefined) {
         settingsUpdate.voiceLang = vendorFields.voiceLang;
