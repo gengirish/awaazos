@@ -6,7 +6,6 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   canSpeak,
-  NEW_ORDER_PHRASE,
   readOrderSoundPref,
   speakNewOrder,
   writeOrderSoundPref,
@@ -15,7 +14,8 @@ import {
 /**
  * Settings → Notifications: the spoken new-order alert for this device. The
  * same per-device choice as the orders board's Sound button
- * (lib/order-voice.ts). Read after mount, so the server render is empty.
+ * (lib/order-voice.ts), on until turned off. Read after mount, so the server
+ * render is empty.
  */
 export function VoiceAlertToggle() {
   const [on, setOn] = useState<boolean | null>(null);
@@ -60,9 +60,9 @@ export function VoiceAlertToggle() {
         ) : null}
       </div>
       <p className="text-sm text-muted-foreground">
-        Says “{NEW_ORDER_PHRASE}” as soon as an order comes in, while AwaazOS is open on this device and its volume is
-        up. Needs alerts turned on above. With the screen locked or the app closed you still get the notification, but
-        the phone can&apos;t speak it.
+        Says “New order received from” and the customer&apos;s first name as soon as an order comes in, while AwaazOS
+        is open on this device and its volume is up. Needs alerts turned on above. With the screen locked or the app
+        closed you still get the notification, but the phone can&apos;t speak it.
       </p>
     </div>
   );

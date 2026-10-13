@@ -1,12 +1,18 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
+  billFromOrderTag,
   claimAnnouncement,
+  fetchOrderFirstName,
   NEW_ORDER_PHRASE,
+  newOrderPhrase,
+  ORDER_SOUND_PREF_KEY,
   pushKindFromTag,
   pushMessageTag,
+  readOrderSoundPref,
   shouldSpeakFor,
   speakNewOrder,
+  spokenName,
   SW_PUSH_MESSAGE,
 } from "@/lib/order-voice";
 import { newOrderPayload, paymentSubmittedPayload } from "@/lib/push";
@@ -49,16 +55,102 @@ describe("shouldSpeakFor", () => {
   });
 });
 
+describe("the push never carries the name", () => {
+  it("a new-order payload has the bill number and nothing about the buyer", () => {
+    const order = newOrderPayload({ billNumber: "AWZ-20261013-0001", totalPaise: 24000, itemCount: 2, dropId: null });
+    expect(Object.keys(order).sort()).toEqual(["body", "tag", "title", "url"]);
+    expect(billFromOrderTag(order.tag)).toBe("AWZ-20261013-0001");
+  });
+
+  it("only a new-order tag yields a bill", () => {
+    expect(billFromOrderTag("pay-AWZ-20261013-0001")).toBeNull();
+    expect(billFromOrderTag("test")).toBeNull();
+    expect(billFromOrderTag("order-")).toBeNull();
+  });
+});
+
+describe("spokenName / newOrderPhrase", () => {
+  it.each([
+    ["Priya Sharma", "Priya"],
+    ["  ravi  ", "ravi"],
+    ["प्रिया शर्मा", "प्रिया"],
+    ["D'Souza", "D'Souza"],
+    ["Anne-Marie K", "Anne-Marie"],
+    ["Priya123 <b>", "Priya"],
+  ])("%j → %j", (raw, said) => {
+    expect(spokenName(raw)).toBe(said);
+  });
+
+  it.each([[null], [undefined], [""], ["   "], ["9848054321"], ["!!!"], ["-"]])("%j has nothing to say", (raw) => {
+    expect(spokenName(raw)).toBeNull();
+    expect(newOrderPhrase(raw)).toBe(NEW_ORDER_PHRASE);
+  });
+
+  it("cuts a very long word instead of reading it all out", () => {
+    expect(spokenName("a".repeat(200))).toHaveLength(30);
+  });
+
+  it("names the customer", () => {
+    expect(newOrderPhrase("Priya Sharma")).toBe("New order received from Priya");
+  });
+});
+
+describe("readOrderSoundPref", () => {
+  const withStored = (value: string | null) =>
+    vi.stubGlobal("window", { localStorage: { getItem: (k: string) => (k === ORDER_SOUND_PREF_KEY ? value : null) } });
+
+  it("is on until the vendor turns it off", () => {
+    withStored(null);
+    expect(readOrderSoundPref()).toBe(true);
+    withStored("on");
+    expect(readOrderSoundPref()).toBe(true);
+    withStored("off");
+    expect(readOrderSoundPref()).toBe(false);
+  });
+});
+
+describe("fetchOrderFirstName", () => {
+  it("asks our own server for the bill and returns the first name", async () => {
+    const fetchFn = vi.fn().mockResolvedValue(new Response(JSON.stringify({ data: { firstName: "Priya" } })));
+    vi.stubGlobal("fetch", fetchFn);
+    await expect(fetchOrderFirstName("AWZ-20261013-0001")).resolves.toBe("Priya");
+    expect(fetchFn.mock.calls[0]![0]).toBe("/api/storefront-orders/announce?bill=AWZ-20261013-0001");
+  });
+
+  it.each([
+    ["a 404", () => Promise.resolve(new Response("{}", { status: 404 }))],
+    ["no name on the order", () => Promise.resolve(new Response(JSON.stringify({ data: { firstName: null } })))],
+    ["a network error or timeout", () => Promise.reject(new Error("timeout"))],
+  ])("gives null on %s, so the alert is not held up", async (_label, respond) => {
+    vi.stubGlobal("fetch", vi.fn(respond));
+    await expect(fetchOrderFirstName("AWZ-20261013-0001")).resolves.toBeNull();
+  });
+});
+
 describe("speakNewOrder", () => {
   class FakeUtterance {
     lang = "";
+    voice: unknown = null;
     constructor(public text: string) {}
   }
 
-  function stubSpeech(opts: { speaking?: boolean; active?: boolean } = {}) {
+  type FakeVoice = { name: string; lang: string; localService: boolean; default: boolean };
+  const voice = (name: string, lang: string, localService: boolean): FakeVoice => ({
+    name,
+    lang,
+    localService,
+    default: false,
+  });
+
+  function stubSpeech(opts: { speaking?: boolean; active?: boolean; voices?: FakeVoice[] } = {}) {
     const speak = vi.fn();
     vi.stubGlobal("window", {
-      speechSynthesis: { speak, speaking: opts.speaking ?? false, pending: false },
+      speechSynthesis: {
+        speak,
+        speaking: opts.speaking ?? false,
+        pending: false,
+        getVoices: () => opts.voices ?? [],
+      },
       SpeechSynthesisUtterance: FakeUtterance,
     });
     vi.stubGlobal("SpeechSynthesisUtterance", FakeUtterance);
@@ -66,13 +158,37 @@ describe("speakNewOrder", () => {
     return speak;
   }
 
-  it("says the fixed phrase in Indian English", () => {
+  it("says the phrase in Indian English, with \"customer\" when there is no name", () => {
     const speak = stubSpeech();
     expect(speakNewOrder()).toBe(true);
     const said = speak.mock.calls[0]![0] as FakeUtterance;
     expect(said.text).toBe(NEW_ORDER_PHRASE);
     expect(said.text).toBe("New order received from customer");
     expect(said.lang).toBe("en-IN");
+  });
+
+  it("says the customer's first name through an on-device voice, Indian English first", () => {
+    const speak = stubSpeech({
+      voices: [voice("Cloud English", "en-IN", false), voice("David", "en-US", true), voice("Heera", "en-IN", true)],
+    });
+    expect(speakNewOrder("Priya Sharma")).toBe(true);
+    const said = speak.mock.calls[0]![0] as FakeUtterance;
+    expect(said.text).toBe("New order received from Priya");
+    expect((said.voice as FakeVoice).name).toBe("Heera");
+  });
+
+  it("keeps the name on the device when every voice sends its text away", () => {
+    const speak = stubSpeech({ voices: [voice("Cloud English", "en-IN", false)] });
+    expect(speakNewOrder("Priya Sharma")).toBe(true);
+    const said = speak.mock.calls[0]![0] as FakeUtterance;
+    expect(said.text).toBe(NEW_ORDER_PHRASE);
+    expect(said.voice).toBeNull();
+  });
+
+  it("says the name through the system voice when the browser lists none (phones)", () => {
+    const speak = stubSpeech({ voices: [] });
+    speakNewOrder("Ravi");
+    expect((speak.mock.calls[0]![0] as FakeUtterance).text).toBe("New order received from Ravi");
   });
 
   it("announces a burst once instead of queueing repeats", () => {

@@ -367,12 +367,14 @@ screens are public). 404/410 from the push service deletes the row. Feature-gate
 `offline.html` and the icons are excluded from middleware; iPhones need the site added to the Home Screen.
 
 **Spoken new-order alert** (`lib/order-voice.ts`): on each push `public/sw.js` also posts
-`{ type: "awz-push", tag }` to open pages. `OrderVoiceAlerts` (vendor layout) says the fixed phrase
-"New order received from customer" via `speechSynthesis` — no buyer name or amount, it is said aloud —
-when Sound is on for the device (one localStorage choice shared by the board's Sound button and
-Settings → Notifications), then fires `PUSH_ARRIVED_EVENT` so an open board refetches at once. Web Locks
-keep several tabs from speaking together. Listener only, no timer. It needs an open page: a locked
-phone gets the notification without speech.
+`{ type: "awz-push", tag }` to open pages. `OrderVoiceAlerts` (vendor layout) says "New order received
+from <first name>" via `speechSynthesis` when Sound is on for the device (one localStorage choice,
+**on by default**, shared by the board's Sound button and Settings → Notifications), then fires
+`PUSH_ARRIVED_EVENT` so an open board refetches at once. **The name never goes in the push payload**:
+the page reads it from `GET /api/storefront-orders/announce?bill=` (CASHIER, `{ vendorId, billNumber }`,
+returns the first name only) and gives it only to an on-device voice (`localService`); otherwise it
+says "customer". Web Locks keep several tabs from speaking together. Listener only, no timer. It needs
+an open page: a locked phone gets the notification without speech.
 
 **Offline counter sales** (`docs/PWA_OFFLINE_PLAN.md`): `/sw.js` (registered on `/pos` load) caches
 `/pos` and its chunks; it never intercepts `/api/**`, `/s/**` or non-GET. Every POS checkout goes
@@ -484,7 +486,8 @@ voice-only path needs a tap fallback** (`QuickAddGrid`).
 ## Before pushing
 
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → unit → build → bundle-size budget
-(`npm run perf:budget`, see `docs/PERFORMANCE.md`), then Playwright against a Postgres service, plus gitleaks (full history) and `npm audit --audit-level=high`. A husky
+(`npm run perf:budget`, see `docs/PERFORMANCE.md`), plus gitleaks (full history) and `npm audit --audit-level=high`. The Playwright job is switched off
+on CI (`if: false`, 2026-10-13) — run the suite locally, see below. A husky
 pre-commit hook runs `lint-staged` (eslint `--max-warnings=0`) and gitleaks if installed locally.
 
 Repo workflow for a meaningful change: `npm test && npm run typecheck && npm run lint && npm run build`

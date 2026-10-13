@@ -204,7 +204,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
         // Chime, then the spoken alert — unless the push already said it.
         if (soundRef.current && !opts?.quiet) {
           beep(audioRef.current);
-          speakNewOrder();
+          speakNewOrder(fresh.length === 1 ? newest?.customerName : null);
         }
       }
       signalRef.current = body.signal;

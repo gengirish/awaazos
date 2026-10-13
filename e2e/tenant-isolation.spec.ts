@@ -177,10 +177,18 @@ test.describe("tenant isolation", () => {
     });
     expect(placed.status()).toBe(201);
 
-    type Board = { data: { id: string; fulfilmentStatus: string }[] };
+    type Board = { data: { id: string; fulfilmentStatus: string; billNumber: string }[] };
     const boardA = (await (await pageA.request.get("/api/storefront-orders")).json()) as Board;
     expect(boardA.data).toHaveLength(1);
     const orderId = boardA.data[0].id;
+
+    // The spoken alert's name lookup: A gets the first name only, B gets a 404.
+    const bill = boardA.data[0].billNumber;
+    const nameA = await pageA.request.get(`/api/storefront-orders/announce?bill=${bill}`);
+    expect(nameA.status()).toBe(200);
+    expect(await nameA.json()).toEqual({ data: { firstName: "Iso" } });
+    const nameB = await pageB.request.get(`/api/storefront-orders/announce?bill=${bill}`);
+    expect(nameB.status(), "cross-tenant name lookup must 404").toBe(404);
 
     // B forges a bulk confirm with A's order id: no existence leak, nothing changes.
     const bulkB = await pageB.request.post("/api/storefront-orders/bulk", {
