@@ -102,8 +102,10 @@ function conflictMessage(body: ApiError, fallback: string): string {
 }
 
 /** Link to the setting that fixes a given 409, if there is one. */
-function ConflictFix({ code }: { code: string | null }) {
+function ConflictFix({ code, canPublishStore }: { code: string | null; canPublishStore: boolean }) {
   if (code === "storefront_not_published") {
+    // Publishing is the owner's call; a manager has nothing to tap here.
+    if (!canPublishStore) return <p className="font-semibold">Ask the owner to publish the store.</p>;
     return (
       <Link href="/settings/store" className="font-semibold underline underline-offset-2">
         Open Online store settings to publish it
@@ -932,6 +934,12 @@ export type DropStatusControlsProps = {
   orderCount: number;
   /** True when this open drop hides the vendor's "Order from menu" everyday menu. */
   hidesEverydayMenu?: boolean;
+  /** VendorSettings.publishStorefront. Opening orders needs it. */
+  storePublished: boolean;
+  /** Owners can publish the store in the same tap that opens orders. */
+  canPublishStore: boolean;
+  /** "/s/<slug>", shown in the publish confirmation. */
+  storePath: string;
 };
 
 export function DropStatusControls({
@@ -940,15 +948,20 @@ export function DropStatusControls({
   allowedTransitions,
   orderCount,
   hidesEverydayMenu = false,
+  storePublished,
+  canPublishStore,
+  storePath,
 }: DropStatusControlsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<{ code: string | null; message: string } | null>(null);
-  const [confirm, setConfirm] = useState<"FROZEN" | "DELETE" | null>(null);
+  const [confirm, setConfirm] = useState<"FROZEN" | "DELETE" | "PUBLISH" | null>(null);
 
   const actions = allowedTransitions.map((to) => actionFor(effectiveStatus, to));
+  const publishLabel = `Publish store and ${actionFor(effectiveStatus, "OPEN").label.toLowerCase()}`;
 
-  function change(to: DropStatus) {
+  /** `publishStore`: the owner confirmed making the store public along with opening orders. */
+  function change(to: DropStatus, publishStore = false) {
     setProblem(null);
     startTransition(async () => {
       try {
@@ -956,14 +969,22 @@ export function DropStatusControls({
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
           credentials: "include",
-          body: JSON.stringify({ status: to }),
+          body: JSON.stringify(publishStore ? { status: to, publishStorefront: true } : { status: to }),
         });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as ApiError;
+          // The store went private after this page loaded: ask, don't dead-end.
+          if (body.error === "storefront_not_published" && canPublishStore && !publishStore) {
+            setConfirm("PUBLISH");
+            return;
+          }
+          setConfirm(null);
           setProblem({ code: body.error ?? null, message: conflictMessage(body, "Could not change the status.") });
           return;
         }
-        toast.success(`${actionFor(effectiveStatus, to).label} — done.`);
+        toast.success(
+          publishStore ? "Your store is live and orders are open." : `${actionFor(effectiveStatus, to).label} — done.`,
+        );
         setConfirm(null);
         router.refresh();
       } catch {
@@ -1014,7 +1035,11 @@ export function DropStatusControls({
               variant={a.variant}
               className="min-h-11"
               disabled={pending}
-              onClick={() => (a.to === "FROZEN" ? setConfirm("FROZEN") : change(a.to))}
+              onClick={() => {
+                if (a.to === "FROZEN") setConfirm("FROZEN");
+                else if (a.to === "OPEN" && !storePublished && canPublishStore) setConfirm("PUBLISH");
+                else change(a.to);
+              }}
             >
               {a.label}
             </Button>
@@ -1025,7 +1050,7 @@ export function DropStatusControls({
       {problem ? (
         <div role="alert" className="space-y-1 rounded-md border border-amber-500/50 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
           <p>{problem.message}</p>
-          <ConflictFix code={problem.code} />
+          <ConflictFix code={problem.code} canPublishStore={canPublishStore} />
         </div>
       ) : null}
 
@@ -1045,11 +1070,26 @@ export function DropStatusControls({
       <ResponsiveDialog open={confirm !== null} onOpenChange={(o) => !o && setConfirm(null)}>
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
-            <ResponsiveDialogTitle>{confirm === "DELETE" ? "Delete this drop?" : "Freeze orders?"}</ResponsiveDialogTitle>
-            <ResponsiveDialogDescription>
+            <ResponsiveDialogTitle>
               {confirm === "DELETE"
-                ? "The drop and its item list will be removed. This can't be undone."
-                : "Customers can no longer change orders. New orders stop too. You'll get the final cooking and delivery list."}
+                ? "Delete this drop?"
+                : confirm === "PUBLISH"
+                  ? "Publish your store too?"
+                  : "Freeze orders?"}
+            </ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>
+              {confirm === "DELETE" ? (
+                "The drop and its item list will be removed. This can't be undone."
+              ) : confirm === "PUBLISH" ? (
+                <>
+                  Your store page is private, so customers can&apos;t order from this drop yet. Publishing it lets
+                  anyone with the link see your item names and prices at{" "}
+                  <span className="break-all font-mono text-foreground">{storePath}</span>. You can make it private
+                  again in Settings → Online store.
+                </>
+              ) : (
+                "Customers can no longer change orders. New orders stop too. You'll get the final cooking and delivery list."
+              )}
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>
           <ResponsiveDialogFooter>
@@ -1061,9 +1101,13 @@ export function DropStatusControls({
               variant={confirm === "DELETE" ? "destructive" : "default"}
               className="min-h-11"
               disabled={pending}
-              onClick={() => (confirm === "DELETE" ? remove() : change("FROZEN"))}
+              onClick={() => {
+                if (confirm === "DELETE") remove();
+                else if (confirm === "PUBLISH") change("OPEN", true);
+                else change("FROZEN");
+              }}
             >
-              {confirm === "DELETE" ? "Delete" : "Freeze orders"}
+              {confirm === "DELETE" ? "Delete" : confirm === "PUBLISH" ? publishLabel : "Freeze orders"}
             </Button>
           </ResponsiveDialogFooter>
         </ResponsiveDialogContent>

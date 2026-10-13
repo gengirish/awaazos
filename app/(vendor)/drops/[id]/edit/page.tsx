@@ -15,9 +15,11 @@ export const dynamic = "force-dynamic";
 export default async function EditDropPage(props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   let vendor: { id: string; name: string; slug: string };
+  let isOwner: boolean;
   try {
     const ctx = await requireVendorRole("MANAGER");
     vendor = { id: ctx.vendor.id, name: ctx.vendor.name, slug: ctx.vendor.slug };
+    isOwner = ctx.staff.role === "OWNER";
   } catch (e) {
     if (e instanceof AuthError) redirect(e.status === 403 ? "/pos" : "/sign-in");
     throw e;
@@ -38,7 +40,7 @@ export default async function EditDropPage(props: { params: Promise<{ id: string
     }),
     soldQtyByDropItem(prisma, drop.id, now),
     prisma.transaction.count({ where: { vendorId: vendor.id, dropId: drop.id, ...liveDropOrderWhere } }),
-    prisma.vendorSettings.findUnique({ where: { vendorId: vendor.id }, select: { acceptMenuOrders: true, voiceLang: true } }),
+    prisma.vendorSettings.findUnique({ where: { vendorId: vendor.id }, select: { acceptMenuOrders: true, voiceLang: true, publishStorefront: true } }),
   ]);
 
   const soldByMenuItem: Record<string, number> = {};
@@ -82,6 +84,9 @@ export default async function EditDropPage(props: { params: Promise<{ id: string
           allowedTransitions={allowedTransitions(drop, now)}
           orderCount={orderCount}
           hidesEverydayMenu={!drop.showEverydayMenu && Boolean(settings?.acceptMenuOrders)}
+          storePublished={settings?.publishStorefront ?? false}
+          canPublishStore={isOwner}
+          storePath={`/s/${vendor.slug}`}
         />
 
         {effectiveStatus === "OPEN" || effectiveStatus === "SCHEDULED" ? (

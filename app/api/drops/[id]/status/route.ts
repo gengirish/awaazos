@@ -2,6 +2,7 @@ import type { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 import {
+  DropApiError,
   conflict,
   dropErrorResponse,
   dropWithItemsInclude,
@@ -22,14 +23,19 @@ export const runtime = "nodejs";
  * PATCH /api/drops/[id]/status — vendor-driven status change.
  * The cut-off itself is never stored (lib/drops.ts), so `from` is the
  * *effective* status.
+ *
+ * Opening needs a published storefront. An OWNER can publish it in the same
+ * request with `publishStorefront: true` (the edit page's one-tap confirm).
  */
 export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
     const ctx = await requireVendorRole("MANAGER", undefined, req);
     const vendorId = ctx.vendor.id;
-    const { status: to } = dropStatusChangeSchema.parse(await req.json());
+    const { status: to, publishStorefront } = dropStatusChangeSchema.parse(await req.json());
     const now = new Date();
+    // Set only when this request also publishes the storefront (see below).
+    let publishStore = false;
 
     const drop = await prisma.drop.findFirst({
       where: { id: params.id, vendorId },
@@ -47,19 +53,38 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
         select: { acceptPayOnDelivery: true, publishStorefront: true },
       });
       if (!ctx.vendor.upiId && !settings?.acceptPayOnDelivery) throw conflict("no_payment_method");
-      if (!settings?.publishStorefront) throw conflict("storefront_not_published");
+      if (!settings?.publishStorefront) {
+        // Publishing makes the menu world-readable, so opening a drop never
+        // implies it: the client must ask for it, and only an OWNER may (the
+        // same bar as PATCH /api/vendor).
+        if (!publishStorefront) throw conflict("storefront_not_published");
+        if (ctx.staff.role !== "OWNER") {
+          throw new DropApiError(403, { error: "owner_required" });
+        }
+        publishStore = true;
+      }
     }
 
     const data: Prisma.DropUpdateManyMutationInput = { status: to };
     if (to === "FROZEN") data.frozenAt = now;
     else if (drop.status === "FROZEN") data.frozenAt = null;
 
-    // Compound where + expected current status: a concurrent change loses cleanly.
-    const res = await prisma.drop.updateMany({
-      where: { id: drop.id, vendorId, status: drop.status },
-      data,
+    // One transaction: the store is published only if the drop really opens.
+    await prisma.$transaction(async (tx) => {
+      // Compound where + expected current status: a concurrent change loses cleanly.
+      const res = await tx.drop.updateMany({
+        where: { id: drop.id, vendorId, status: drop.status },
+        data,
+      });
+      if (res.count === 0) throw conflict("stale");
+      if (publishStore) {
+        await tx.vendorSettings.upsert({
+          where: { vendorId },
+          update: { publishStorefront: true },
+          create: { vendorId, publishStorefront: true },
+        });
+      }
     });
-    if (res.count === 0) throw conflict("stale");
 
     const updated = await prisma.drop.findFirst({
       where: { id: drop.id, vendorId },

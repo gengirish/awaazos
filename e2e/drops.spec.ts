@@ -199,4 +199,58 @@ test.describe("drops: home-kitchen pre-order day", () => {
     // Frozen: no "orders can still change" warning.
     await expect(page.getByText("Orders can still change")).toHaveCount(0);
   });
+
+  test("owner with a private store publishes it in the same step that opens orders", async ({ page, request }) => {
+    test.setTimeout(240_000);
+
+    const suffix = Math.random().toString(36).slice(2, 7);
+    await createVendorSession(page, request, "droppublish", "/menu");
+    const slug = await vendorSlug(page);
+    const item = await createMenuItem(page, { name: `Ragi Laddu ${suffix}`, priceInRupees: 150 });
+
+    const settings = await page.request.patch("/api/vendor", {
+      data: { acceptPayOnDelivery: true },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(settings.ok()).toBe(true);
+
+    // A draft two days out (IST); the store has never been published.
+    const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(
+      new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+    );
+    const created = await page.request.post("/api/drops", {
+      data: {
+        title: `Private store drop ${suffix}`,
+        date: ymd,
+        fulfilmentMode: "PICKUP",
+        fulfilmentStart: "17:00",
+        fulfilmentEnd: "19:00",
+        closesAtDate: ymd,
+        closesAtTime: "12:00",
+        items: [{ menuItemId: item.id, priceInPaise: 15000 }],
+      },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(created.status()).toBe(201);
+    const { data: drop } = (await created.json()) as { data: { id: string } };
+    expect((await page.request.get(`/s/${slug}`)).status()).toBe(404);
+
+    await page.goto(`/drops/${drop.id}/edit`);
+    const status = page.getByRole("region", { name: "Status" });
+    await status.getByRole("button", { name: "Open orders" }).click();
+
+    // Nothing is published until the owner says so: backing out leaves it private.
+    const confirm = page.getByRole("dialog", { name: "Publish your store too?" });
+    await expect(confirm).toContainText(`/s/${slug}`);
+    await confirm.getByRole("button", { name: "Cancel" }).click();
+    await expect(confirm).toBeHidden();
+    await expect(status.getByText("Draft", { exact: true })).toBeVisible();
+    expect((await page.request.get(`/s/${slug}`)).status()).toBe(404);
+
+    await status.getByRole("button", { name: "Open orders" }).click();
+    await confirm.getByRole("button", { name: "Publish store and open orders" }).click();
+    await expect(confirm).toBeHidden();
+    await expect(status.getByText("Taking orders", { exact: true })).toBeVisible();
+    expect((await page.request.get(`/s/${slug}`)).status()).toBe(200);
+  });
 });
