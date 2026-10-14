@@ -416,6 +416,17 @@ describe.skipIf(!ENABLED)("internal demo-store API — DB integration", () => {
     expect((await redeem(tokenOf(second))).status).toBe(200);
   });
 
+  it("keeps a longer admin free-access grant instead of the 30-day trial", async () => {
+    const r = ref("granted");
+    const { json } = await create(r);
+    const granted = new Date(Date.now() + 180 * 24 * 3600_000);
+    await prisma.vendor.update({ where: { id: json.store_id as string }, data: { trialEndsAt: granted } });
+    const url = await claimUrlFor(r, `owner6-${TAG}@example.test`);
+    expect((await redeem(tokenOf(url))).status).toBe(200);
+    const v = await prisma.vendor.findUniqueOrThrow({ where: { id: json.store_id as string } });
+    expect(v.trialEndsAt?.getTime()).toBe(granted.getTime());
+  });
+
   it("refuses to claim with an email that already has an account (409), link stays usable", async () => {
     const r = ref("taken");
     await create(r);

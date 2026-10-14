@@ -447,6 +447,10 @@ export async function claimDemoStore(input: ClaimInput, now: Date = new Date()):
       await tx.pushSubscription.deleteMany({ where: { vendorId: h.vendorId, userId: demoOwner } });
       await tx.staffMember.create({ data: { vendorId: h.vendorId, userId: user.id, name, role: "OWNER" } });
 
+      // The trial starts now, unless an admin already granted free access
+      // further out (/admin/vendors moves trialEndsAt); never shorten that.
+      const current = await tx.vendor.findUniqueOrThrow({ where: { id: h.vendorId }, select: { trialEndsAt: true } });
+      const trialEnd = new Date(now.getTime() + TRIAL_DAYS * DAY_MS);
       const vendor = await tx.vendor.update({
         where: { id: h.vendorId },
         data: {
@@ -456,7 +460,7 @@ export async function claimDemoStore(input: ClaimInput, now: Date = new Date()):
           // The placeholder must not take a real buyer's money: the owner adds
           // their own UPI id in Settings before taking payments.
           upiId: null,
-          trialEndsAt: new Date(now.getTime() + TRIAL_DAYS * DAY_MS),
+          trialEndsAt: current.trialEndsAt && current.trialEndsAt > trialEnd ? current.trialEndsAt : trialEnd,
         },
         select: { slug: true },
       });
