@@ -2,6 +2,10 @@
 
 Written 2026-10-07 against `chore/cleanup-phase-0-1` at `2d3db5c`.
 
+**Status (2026-10-14): shipped** in PR #20 (`64c6c11`, 2026-10-08); `Transaction.clientRef` is live. The
+progress notes below are the record from while it was being built. Current behaviour is described in
+`CLAUDE.md` ("Offline counter sales") and `ARCHITECTURE.md` §4.
+
 **Progress (2026-10-07):** Phases 0–2 are implemented in the working tree (uncommitted), along with
 the Phase 3 header items. D1–D5 are decided as recommended. Still open: the install prompt, the
 Lighthouse audit, the ARCHITECTURE.md ADR and the runbook, and **`npx prisma db push` against Neon

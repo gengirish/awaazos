@@ -15,7 +15,7 @@ Instagram and sell directly, not through Swiggy or Zomato.
 | Where demand comes from | Instagram posts, Reels and stories; repeat buyers who follow the account |
 | How orders arrive today | DMs and story replies → moved to WhatsApp → UPI screenshot → notebook or spreadsheet |
 | How they sell | Batches with a cut-off ("Saturday bakes, order by Fri 9 pm") and/or an everyday menu |
-| Volume | Roughly 10–80 orders per batch or day — within the Starter cap of 500 transactions/month |
+| Volume | Roughly 10–80 orders per batch or day — Starter has no monthly cap |
 | Fulfilment | Pickup, or delivery they book themselves (Porter, Rapido, own rider) |
 | Payment | UPI to their own ID; some cash on delivery; a few have their own Razorpay account |
 
@@ -31,13 +31,14 @@ Instagram and sell directly, not through Swiggy or Zomato.
 
 | Pain | Feature | Where |
 |---|---|---|
-| Link in bio | Public storefront `/s/[slug]` (opt-in `publishStorefront`) with the kitchen's own banner and logo | `app/s/[slug]`, `lib/store-image.ts` |
+| Link in bio | Public storefront `/s/[slug]` (opt-in `publishStorefront`) with the kitchen's own banner and logo, plus optional Instagram and WhatsApp links | `app/s/[slug]`, `lib/store-image.ts`, `lib/instagram.ts` |
 | Batches with a cut-off | Drops: lazy cut-off, capped stock, no overselling | `lib/drops.ts` |
 | Everyday menu | Order from menu (`acceptMenuOrders`) | `lib/menu-orders.ts` |
-| "Did they pay?" | UPI intent + buyer UTR, pay on delivery, vendor's own Razorpay keys | `lib/storefront-razorpay.ts` |
-| Day-of chaos | Orders board, prep sheet (cook list + delivery list), Web Push alerts | `/orders`, `/drops/[id]/prep`, `lib/push.ts` |
+| "Did they pay?" | UPI intent + the buyer's "I've paid" claim (seller confirms), pay on delivery, vendor's own Razorpay keys | `lib/storefront-razorpay.ts` |
+| Day-of chaos | One orders board for menu and drop orders (bulk actions, search, filters), prep sheet (cook list + delivery list), Web Push and spoken new-order alerts | `/orders`, `/drops/[id]/prep`, `lib/push.ts`, `lib/order-voice.ts` |
+| Weekly plans | Offers: "4+ items incl. 1 paneer → 10% off", one per order, priced by the server | `lib/offers.ts`, Settings → Offers |
 | Posting the batch | WhatsApp share text, link-preview card, **Instagram story image** | `lib/drops-share.ts`, `app/s/[slug]/opengraph-image.tsx`, `lib/drop-story-image.tsx` |
-| Building the batch | Voice drop builder ("aaj 20 ragi laddu 150 rupaye…") | `lib/parse-drop.ts` |
+| Building the batch | Voice drop builder ("aaj 20 ragi laddu 150 rupaye…") and voice menu builder | `lib/parse-drop.ts`, `lib/parse-menu.ts` |
 | Repeat buyers | Buyer accounts (email magic link), receipt with storefront link | `lib/customer-auth.ts` |
 
 The voice counter POS (`/pos`) still works and stays, but it is a secondary feature for this
@@ -55,9 +56,10 @@ customer: most of their orders are remote.
 3. **Measure Instagram demand.** Count storefront orders that arrive from Instagram (a `?src=ig`
    tag on shared links plus the in-app browser's user agent) on `/admin/metrics`.
 4. **Store-level story image** for kitchens that sell from the everyday menu rather than drops.
-5. **30-day unlimited trial replaces FREE** (decided 2026-10-09/10): new sign-ups get STARTER
+5. ~~**30-day unlimited trial replaces FREE**~~ **Shipped 2026-10-10:** new sign-ups get STARTER
    features for 30 days, then are locked until paid; existing FREE vendors are grandfathered.
-   Spec and phases: `docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md` (PR #38).
+   Subscribing happens in place on the billing page. The first trials end 2026-11-09. Spec:
+   `docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md`.
 6. **Delivery hand-off.** Copy or share one order's address and contact for Porter/Rapido from the
    prep sheet.
 7. **Pitch.** `PITCH.md` Parts A–F still tell the street-stall story.

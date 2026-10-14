@@ -157,7 +157,7 @@ consent apparatus are needed.
 ### 3.3 `fssaiNumber` on storefront and receipts
 **Status:** implemented on `feat/home-kitchen-drops`. Receipt delivery still blocked by 1.1.
 
-`VendorSettings.fssaiNumber` (Settings → Pre-orders) is shown on the storefront and printed as
+`VendorSettings.fssaiNumber` (Settings → Online store) is shown on the storefront and printed as
 "FSSAI Lic. No: …" on the WhatsApp receipt when set. Still open: confirm the current FSSAI rule for
 home-scale operators (registration vs licence wording) before putting it in a pitch.
 
@@ -219,14 +219,19 @@ locked, and an iPhone (iOS 16.4+) with AwaazOS added to the Home Screen. Headles
 push service. Known gap: the button trusts this browser's subscription, so a row removed from another
 device leaves it saying "on" until toggled. The original analysis follows.
 
-Today the only alert is the orders board's **Sound** toggle (`components/drops/orders/OrdersBoard.tsx`,
-`beep()`): a Web Audio beep when the board's own poll finds new orders. Its limits:
+**Spoken alert since then (`lib/order-voice.ts`):** each push also reaches open pages, which say
+"New order received from <first name>" with an on-device voice and make an open board refetch at
+once. Sound is one per-device localStorage choice, **on by default**, shared by the board's Sound
+button and Settings → Notifications. It still needs an open page: a locked phone gets the
+notification without speech.
 
-- **Delay.** It beeps only when the board checks: every 6 min (Web Push is the
-  instant path). Refresh checks immediately.
-- **Screen on only.** Polling stops when the tab is hidden or the phone is locked, so nothing beeps
-  in a pocket — the vendor has to keep the board open and visible.
-- **Not remembered.** Sound starts off on every page load (browsers need a tap before playing audio).
+Before Web Push, the only alert was a Web Audio beep when the board's own poll found new orders.
+Its limits, kept for the record:
+
+- **Delay.** It beeped only when the board checked: every 6 min.
+- **Screen on only.** Polling stops when the tab is hidden or the phone is locked, so nothing beeped
+  in a pocket — the vendor had to keep the board open and visible.
+- **Not remembered.** Sound started off on every page load. (Now remembered and on by default.)
 
 Options, cheapest first:
 
@@ -244,15 +249,15 @@ Options, cheapest first:
 
 ## 4. Correctness and quality
 
-### 4.1 Tap targets are 40px against a documented 44px rule
-`accessibility.mdc` requires 44×44 for any tap target and globs `**/*.tsx`, but the shared Button
-default is `h-10` (`components/ui/button.tsx`). ~11 buttons across auth and marketing are 4px
-short. The POS is unaffected — its controls set `min-h-11` explicitly.
+### 4.1 Tap targets are 40px for mouse users
+**Mostly resolved (`d2b4996`, 2026-10-11):** `Button`, `Input`, `SelectTrigger`, `SelectItem` and the
+Dialog / Sheet close buttons now carry `touch-target`, which sets a 44px floor under
+`@media (pointer: coarse)` (`app/globals.css`). Phones and tablets get 44px; a desktop with a mouse
+keeps the 40px `h-10` density on purpose.
 
-Parked as a `test.fixme` in `e2e/accessibility.spec.ts` with the reasoning inline. Un-skip it once
-the call is made. It is a design-system decision, not a test one: `design-system.mdc` forbids
-editing `components/ui/` primitives, so it is either a global `h-10 → h-11` (moves every button in
-the app) or `min-h-11` on each call site.
+Still open: the `test.fixme` in `e2e/accessibility.spec.ts` ("auth page buttons meet the 44px
+minimum") predates that change and its comment is stale. Run it on the Pixel 7 project (coarse
+pointer) and un-skip it there, or delete it if desktop density is the accepted rule.
 
 ### 4.2 E2E gaps that need infrastructure first
 - **StaffRole enforcement** (a CASHIER refused an OWNER-only write) — untestable because there is
@@ -260,10 +265,12 @@ the app) or `min-h-11` on each call site.
 - **CSV export contents** — the PII rule says last-4 phone only and DD/MM/YYYY IST, both untested,
   because the route is STARTER-gated and nothing can upgrade a plan from a test.
 
-### 4.3 Confirm CI actually runs e2e on `main`
-`e2e/public.spec.ts` asserted a pricing tier that had been deliberately cut, so it had been failing.
-Fixed in `433164c`. If CI was green through that period, the Playwright job is not gating `main` —
-worth checking `.github/workflows/ci.yml` actually runs and blocks on it.
+### 4.3 E2E does not run on CI
+**Answered:** the Playwright job in `.github/workflows/ci.yml` is switched off (`if: false`,
+2026-10-13), so nothing gates `main` on E2E. The suite runs only locally against a throwaway
+Postgres (recipe in `CLAUDE.md`), and a merge is a production deploy. Decide whether to re-enable
+the job (it is fully defined: Postgres 15 service, `prisma db push`, chromium) or keep the local
+step as the rule. `docs/BRANCH_PROTECTION.md` should match whichever is chosen.
 
 ### 4.4 Customer phone numbers are stored as typed
 `POST /api/transactions` (`transactionPostBodySchema` in `lib/transaction-post-body.ts`) and
