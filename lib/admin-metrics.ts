@@ -5,6 +5,8 @@
  * `istDayStart` below. Money is paise-integer end-to-end; render via
  * `formatINR` from `@/lib/currency` at the UI boundary.
  */
+import type { Prisma } from "@prisma/client";
+
 import { prisma } from "@/lib/prisma";
 
 const MS_PER_DAY = 86_400_000;
@@ -64,6 +66,9 @@ export type AdminMetrics = {
   };
 };
 
+/** Demo stores and their sample orders are not traction (lib/demo-store.ts). */
+const REAL_SALES = { isSample: false, vendor: { isDemo: false } } satisfies Prisma.TransactionWhereInput;
+
 export async function getAdminMetrics(now: Date = new Date()): Promise<AdminMetrics> {
   const thisWeekStart = istDayStart(7, now);
   const lastWeekStart = istDayStart(14, now);
@@ -78,26 +83,40 @@ export async function getAdminMetrics(now: Date = new Date()): Promise<AdminMetr
   ] = await Promise.all([
     prisma.transaction.groupBy({
       by: ["vendorId"],
-      where: { paymentStatus: "PAID", paidAt: { gte: thisWeekStart } },
+      where: {
+        ...REAL_SALES,
+        paymentStatus: "PAID",
+        paidAt: { gte: thisWeekStart },
+      },
       _count: { _all: true },
     }),
     prisma.transaction.count({
       where: {
+        ...REAL_SALES,
         paymentStatus: "PAID",
         paidAt: { gte: thisWeekStart },
         source: "VOICE",
       },
     }),
     prisma.transaction.count({
-      where: { paymentStatus: "PAID", paidAt: { gte: thisWeekStart } },
+      where: {
+        ...REAL_SALES,
+        paymentStatus: "PAID",
+        paidAt: { gte: thisWeekStart },
+      },
     }),
     prisma.transaction.aggregate({
-      where: { paymentStatus: "PAID", paidAt: { gte: thisWeekStart } },
+      where: {
+        ...REAL_SALES,
+        paymentStatus: "PAID",
+        paidAt: { gte: thisWeekStart },
+      },
       _sum: { totalPaise: true },
     }),
     prisma.transaction.groupBy({
       by: ["vendorId"],
       where: {
+        ...REAL_SALES,
         paymentStatus: "PAID",
         paidAt: { gte: lastWeekStart, lt: thisWeekStart },
       },
@@ -105,6 +124,7 @@ export async function getAdminMetrics(now: Date = new Date()): Promise<AdminMetr
     }),
     prisma.transaction.aggregate({
       where: {
+        ...REAL_SALES,
         paymentStatus: "PAID",
         paidAt: { gte: lastWeekStart, lt: thisWeekStart },
       },
@@ -115,7 +135,8 @@ export async function getAdminMetrics(now: Date = new Date()): Promise<AdminMetr
   const weeklyActiveVendors = thisWeekVendorGroups.length;
 
   const ratesPerVendor = thisWeekVendorGroups.map((g) => g._count._all / 7);
-  const billsPerVendorPerDayMedian = Math.round(median(ratesPerVendor) * 10) / 10;
+  const billsPerVendorPerDayMedian =
+    Math.round(median(ratesPerVendor) * 10) / 10;
 
   const voiceSuccessRate7d =
     thisWeekPaidCount === 0 ? 0 : thisWeekVoiceCount / thisWeekPaidCount;

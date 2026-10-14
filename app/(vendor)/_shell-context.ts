@@ -2,6 +2,7 @@ import type { StaffRole } from "@prisma/client";
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
+import { displayStoreName } from "@/lib/demo-store-schema";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
@@ -31,7 +32,8 @@ export const getShellContext = cache(async (): Promise<ShellContext> => {
       select: { publishStorefront: true },
     });
     return {
-      vendor: { id: ctx.vendor.id, name: ctx.vendor.name },
+      // "Prankie's Bakery (DEMO)" while it is an internal demo store (lib/demo-store.ts).
+      vendor: { id: ctx.vendor.id, name: displayStoreName(ctx.vendor) },
       role: ctx.staff.role,
       storePath: settings?.publishStorefront ? `/s/${encodeURIComponent(ctx.vendor.slug)}` : null,
     };

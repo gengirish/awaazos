@@ -7,29 +7,10 @@ import { hashPassword } from "@/lib/password";
 import { checkPasswordPolicy } from "@/lib/password-strength";
 import { prisma } from "@/lib/prisma";
 import { authRateLimit, getClientIp, tooManyRequests } from "@/lib/ratelimit";
+import { newVendorSlug } from "@/lib/store-slug";
 import { signUpSchema } from "@/lib/zod-auth";
 
 export const runtime = "nodejs";
-
-function slugBase(stallName: string): string {
-  const s = stallName
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40);
-  return s || "stall";
-}
-
-function randomSuffix(): string {
-  const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-  let out = "";
-  for (let i = 0; i < 4; i++) {
-    out += chars[Math.floor(Math.random() * chars.length)]!;
-  }
-  return out;
-}
 
 export async function POST(req: Request) {
   const ip = getClientIp(req);
@@ -76,7 +57,7 @@ export async function POST(req: Request) {
 
   const maxAttempts = 8;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const slug = `${slugBase(stallName)}-${randomSuffix()}`;
+    const slug = newVendorSlug(stallName);
     try {
       const result = await prisma.$transaction(async (tx) => {
         const user = await tx.user.create({

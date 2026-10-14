@@ -47,6 +47,8 @@ export type MenuOrderItem = {
   emoji: string;
   imageUrl: string | null;
   priceInPaise: number;
+  /** Selling unit ("kg", "piece"), shown after the price; null = none. */
+  unit?: string | null;
   isPopular: boolean;
 };
 
@@ -243,6 +245,9 @@ export function MenuOrder(props: MenuOrderProps) {
                     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
                       <span className="font-mono font-bold tabular-nums text-foreground">
                         {formatINRCompact(item.priceInPaise)}
+                        {item.unit ? (
+                          <span className="font-sans font-medium text-muted-foreground"> / {item.unit}</span>
+                        ) : null}
                       </span>
                       {item.isPopular ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">

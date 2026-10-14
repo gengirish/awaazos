@@ -50,6 +50,11 @@ export async function POST(req: NextRequest) {
     const rl = await billingRateLimit.check(ctx.vendor.id);
     if (!rl.ok) return tooManyRequests(rl, "billing");
 
+    // A demo store (lib/demo-store.ts) is never billed; its owner subscribes after claiming it.
+    if (ctx.vendor.isDemo) {
+      return NextResponse.json({ error: "demo_store_not_billable" }, { status: 409 });
+    }
+
     const body = bodySchema.parse(await req.json());
 
     // Only a plan that is paid for blocks this — a vendor on the free trial

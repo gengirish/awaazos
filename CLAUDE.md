@@ -484,6 +484,28 @@ them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireAc
   buy-X-get-Y, stacking, recurring subscriptions.
 - Test store data: `npm run seed:quiche-plans -- <slug>` (dry run; `--create` writes).
 
+### Internal demo stores (founder outreach)
+
+`/api/internal/demo-stores` (POST create, GET / DELETE `/{external_ref}`, POST `/{external_ref}/handover`)
+builds a prospect's demo store in one call; full contract, OpenAPI and a sample curl in
+`docs/INTERNAL_DEMO_STORES.md`. Auth is `x-internal-api-key` = `INTERNAL_API_KEY` (≥ 32 chars, server
+only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts` (+ `lib/demo-store-schema.ts`):
+
+- A demo store is a normal `Vendor` with `isDemo`, `demoExternalRef` (idempotency key) and one OWNER, the
+  internal `DEMO_OWNER_EMAIL` user. Created in one transaction; nothing is sent (no WhatsApp, email, push).
+- UPI is always `demo@upi`; payment-credential keys or VPA-looking values anywhere → 400. Sample phones must
+  match `9199999xxxxx`. Sample orders carry `Transaction.isSample`: never in `DailySummary`, not billable
+  (`billableTxnWhere`), not in `/admin/metrics`. Demo vendors can't subscribe and have no trial.
+- Display only: "(DEMO)" via `displayStoreName()` (storefront, app shell), `noindex` on `/s/[slug]`.
+- Handover stores a SHA-256 claim token (7 days); `/claim/[token]` → `POST /api/demo-claim` creates the
+  prospect's User, moves OWNER, flips `isDemo`, clears `upiId`, starts the trial, and archives
+  (`archivedAt`, hidden from board / transactions / CSV) or deletes the samples.
+- Every create, delete, handover and claim writes `DemoAuditLog`; its "create" rows are the 20/day limit.
+
+Also added with it, for real orders too: `MenuItem.unit` ("₹1,200 / kg" on the storefront),
+`Transaction.advancePaidPaise` (order stays PENDING; the board shows "Advance paid · Balance due") and
+`Transaction.fulfilAt` (shown on the board card). Nothing but the demo API writes them yet.
+
 ### In-app Help (`/help`)
 
 A self-help guide to getting around, linked from the shell (the "More" sheet on phones, the rail from

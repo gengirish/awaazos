@@ -76,6 +76,7 @@ export async function GET(req: NextRequest) {
         where: {
           vendorId: ctx.vendor.id,
           createdAt: { gte: from, lte: to },
+          archivedAt: null,
         },
         orderBy: { createdAt: "asc" },
         include: { orderItems: true },
