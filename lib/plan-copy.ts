@@ -14,10 +14,11 @@
  * - Prices exclude GST (`GST_BPS`); every paid price says "+ GST".
  * - Only advertise what ships. No "staff logins" until invites exist and
  *   `maxStaff` is enforced (TODO.md §2).
+ * - Lead with pre-orders (store link, drops, UPI, the orders board): the
+ *   customer is an Instagram home kitchen (docs/ICP.md). Counter billing is
+ *   one line, not the pitch.
  * - Voice is English & Hindi only — te/kn/ta are dormant (`VOICE_LANGUAGES`).
- * - WhatsApp receipts here means wa.me from the vendor's own WhatsApp, which
- *   works on every plan. `PLAN_LIMITS.*.whatsapp` gates the dormant Gupshup
- *   send, not this.
+ * - `cta` is the ONE sign-up label on the marketing and sign-up surfaces.
  * - PRO / ENTERPRISE are not sold; they stay off the marketing surface.
  */
 import type { Plan } from "@prisma/client";
@@ -47,6 +48,10 @@ export type PlanMarketing = {
   yearlyNote: string;
   /** "30 days free". */
   trial: string;
+  /** The one sign-up call to action: "Start 30 days free". */
+  cta: string;
+  /** Line shown beside the CTA: "No card needed. Then ₹299/month + GST." */
+  ctaNote: string;
   /** One line for the landing-page teaser card. */
   teaser: string;
   /** Short tagline above the bullets on the pricing-page card (no numbers — those live in bullets). */
@@ -59,7 +64,7 @@ export type PlanMarketing = {
 
 function billsPerMonth(plan: Plan): string {
   const cap = PLAN_LIMITS[plan].monthlyTxnCap;
-  return cap === null ? "Unlimited bills" : `${cap} bills a month`;
+  return cap === null ? "Unlimited orders and bills" : `${cap} orders and bills a month`;
 }
 
 function analyticsDays(plan: Plan): string {
@@ -88,14 +93,18 @@ export const PLAN_MARKETING: Record<MarketedPlan, PlanMarketing> = {
     yearlyPrice: `${formatINRCompact(STARTER_YEARLY_PAISE)}/yr + GST`,
     yearlyNote: `${YEARLY_MONTHS_FREE} months free`,
     trial,
-    teaser: `${trial}, no card needed. ${billsPerMonth("STARTER")}, voice billing, UPI QR and WhatsApp receipts.`,
-    summary: "Everything a busy counter needs, on one plan.",
+    cta: `Start ${trial}`,
+    ctaNote: `No card needed. Then ${starterAmount}/month + GST.`,
+    teaser: `${trial}, no card needed. Your store link, drops with a cut-off, UPI orders on one board, and ${billsPerMonth("STARTER").toLowerCase()}.`,
+    summary: "Everything a home kitchen needs to take pre-orders, on one plan.",
     bullets: [
       `${trial} — no card needed`,
+      "Your own store link for your Instagram bio",
+      "Drops with a cut-off and stock limits, so you never oversell",
+      "UPI payments you confirm, or pay on delivery",
+      "One orders board, a prep sheet and order alerts on your phone",
       billsPerMonth("STARTER"),
-      "Voice billing in English & Hindi",
-      "UPI QR on every bill",
-      "WhatsApp receipts from your own WhatsApp",
+      "Counter billing by voice in English & Hindi, even offline",
       analyticsDays("STARTER"),
       ...(STARTER_CSV ? ["CSV export of your bills"] : []),
     ],

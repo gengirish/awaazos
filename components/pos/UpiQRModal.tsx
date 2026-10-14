@@ -14,6 +14,7 @@ import {
   ResponsiveDialogBody,
   ResponsiveDialogContent,
   ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
@@ -216,15 +217,18 @@ export function UpiQRModal({
       {payMode === "UPI" ? (
         <>
           {!effectiveUpiId ? (
-            <p className="text-center text-sm text-destructive">
+            // Not a call to action: leaving for Settings mid-sale loses the open bill.
+            <div className="text-center">
+              <p className="text-sm font-medium text-foreground">
+                Take cash now — add a UPI ID in Settings later.
+              </p>
               <Link
                 href="/settings/payments"
-                className="inline-flex min-h-11 items-center font-medium underline underline-offset-4"
+                className="inline-flex min-h-11 items-center text-sm text-muted-foreground underline underline-offset-4"
               >
-                Add a UPI ID
-              </Link>{" "}
-              to show a QR code.
-            </p>
+                Payment settings
+              </Link>
+            </div>
           ) : (
             <>
               <div className="flex flex-col items-center gap-2">
@@ -235,10 +239,10 @@ export function UpiQRModal({
                     alt="UPI payment QR code"
                     width={256}
                     height={256}
-                    className="rounded-md border bg-white p-2"
+                    className="h-[200px] w-[200px] rounded-md border bg-white p-2 md:h-64 md:w-64"
                   />
                 ) : (
-                  <div className="h-[256px] w-[256px] rounded-md border bg-muted" aria-hidden />
+                  <div className="h-[200px] w-[200px] rounded-md border bg-muted md:h-64 md:w-64" aria-hidden />
                 )}
                 <p className="text-center text-xs text-muted-foreground">Scan with GPay / PhonePe / Paytm</p>
                 <p className="break-all text-center font-mono text-sm text-foreground">{effectiveUpiId}</p>
@@ -262,7 +266,6 @@ export function UpiQRModal({
                   type="button"
                   variant="ghost"
                   className="h-11 w-full text-muted-foreground"
-                  aria-expanded={false}
                   onClick={() => setShowUpiRef(true)}
                 >
                   <ChevronDown className="mr-1 h-4 w-4" aria-hidden />
@@ -279,7 +282,7 @@ export function UpiQRModal({
             <Input
               id="cash-received"
               name="received"
-              inputMode="numeric"
+              inputMode="decimal"
               autoComplete="off"
               placeholder="Optional"
               value={received}
@@ -333,17 +336,6 @@ export function UpiQRModal({
           </div>
         </div>
       )}
-
-      <Button
-        ref={markPaidRef}
-        type="button"
-        className="h-12 w-full"
-        disabled={submitting || (payMode === "UPI" && !effectiveUpiId)}
-        onClick={() => void markPaid()}
-      >
-        Mark as paid
-        <Check className="ml-1 h-5 w-5" aria-hidden />
-      </Button>
     </div>
   );
 
@@ -356,6 +348,25 @@ export function UpiQRModal({
           <ResponsiveDialogDescription>Show the QR code or record cash received.</ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         <ResponsiveDialogBody>{body}</ResponsiveDialogBody>
+        {/* Pinned: the one primary action stays in reach however long the body is. */}
+        <ResponsiveDialogFooter>
+          <Button
+            ref={markPaidRef}
+            type="button"
+            className="h-12 w-full"
+            disabled={submitting || (payMode === "UPI" && !effectiveUpiId)}
+            onClick={() => void markPaid()}
+          >
+            {submitting ? (
+              "Saving…"
+            ) : (
+              <>
+                Mark as paid
+                <Check className="ml-1 h-5 w-5" aria-hidden />
+              </>
+            )}
+          </Button>
+        </ResponsiveDialogFooter>
       </ResponsiveDialogContent>
     </ResponsiveDialog>
   );

@@ -1,6 +1,6 @@
 import type { StaffRole } from "@prisma/client";
 
-import { APP_NAV_ITEMS, appNavItemsForRole, type AppNavId, type AppNavItem } from "@/lib/app-nav";
+import { APP_NAV_ITEMS, appNavItemsForRole, appTabBarForRole, type AppNavId, type AppNavItem } from "@/lib/app-nav";
 
 /**
  * Content of the in-app Help page (`/help`): what each screen is for and where
@@ -160,7 +160,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "sold-out",
     group: "menu",
     title: "Mark a dish as sold out",
-    steps: "Switch the dish from Available to Unavailable. It stays off Sell and your online store until you switch it back.",
+    steps: "Tap Selling on the dish so it reads Sold out. It stays off Sell and your online store until you switch it back.",
     nav: "menu",
     keywords: "unavailable hide out of stock availability",
   },
@@ -311,15 +311,16 @@ function navItem(id: AppNavId): AppNavItem {
 }
 
 /** The topics a staff member of this role can act on or look at, in display order. */
-export function helpTopicsForRole(role: StaffRole): ResolvedHelpTopic[] {
+export function helpTopicsForRole(role: StaffRole, storePublished = false): ResolvedHelpTopic[] {
   const visible = new Set(appNavItemsForRole(role).map((item) => item.id));
+  const moreIds = new Set(appTabBarForRole(role, storePublished).more.map((item) => item.id));
   return HELP_TOPICS.filter((topic) => visible.has(topic.nav)).map((topic) => {
     const item = navItem(topic.nav);
     return {
       ...topic,
       href: topic.href ?? item.href,
       path: [item.label, ...(topic.trail ?? [])],
-      behindMore: item.placement === "more",
+      behindMore: moreIds.has(topic.nav),
       ownerLocked: Boolean(topic.ownerOnly) && role !== "OWNER",
     };
   });

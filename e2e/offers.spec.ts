@@ -150,10 +150,10 @@ test.describe("offers: quantity plan discounts", () => {
       await buyer.getByRole("button", { name: `Add ${potato}` }).click();
       await buyer.getByRole("button", { name: `Add one more ${potato}` }).click();
       await buyer.getByRole("button", { name: `Add ${paneer}` }).click();
-      await expect(buyer.getByText("Add 1 more quiche item to unlock 10% off (Weekly Plan)")).toBeVisible();
+      await expect(buyer.getByText("Add 1 more quiche item to unlock 10% off (Weekly Plan)").first()).toBeVisible();
 
       await buyer.getByRole("button", { name: `Add one more ${potato}` }).click();
-      await expect(buyer.getByText("Weekly Plan applied.")).toBeVisible();
+      await expect(buyer.getByText("Weekly Plan applied.").first()).toBeVisible();
 
       await buyer.getByRole("button", { name: "Checkout" }).click();
       const sheet = buyer.getByRole("dialog", { name: "Checkout" });

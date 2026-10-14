@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { activeAppNavId, appNavItemsForRole, isAppNavItemActive } from "@/lib/app-nav";
+import {
+  APP_TAB_BAR_SLOTS,
+  activeAppNavId,
+  appNavItemsForRole,
+  appTabBarForRole,
+  isAppNavItemActive,
+} from "@/lib/app-nav";
 
 describe("appNavItemsForRole", () => {
   it("shows an owner and a manager every destination", () => {
@@ -22,6 +28,52 @@ describe("appNavItemsForRole", () => {
       "Settings",
       "Help",
     ]);
+  });
+});
+
+describe("appTabBarForRole", () => {
+  const ids = (role: "OWNER" | "MANAGER" | "CASHIER", published: boolean) => {
+    const { tabs, more } = appTabBarForRole(role, published);
+    return { tabs: tabs.map((i) => i.id), more: more.map((i) => i.id) };
+  };
+
+  it("keeps the usual bar while the store is not published", () => {
+    for (const role of ["OWNER", "MANAGER"] as const) {
+      expect(ids(role, false)).toEqual({
+        tabs: ["orders", "drops", "sell", "menu"],
+        more: ["transactions", "analytics", "settings", "help"],
+      });
+    }
+    expect(ids("CASHIER", false)).toEqual({ tabs: ["orders", "sell"], more: ["settings", "help"] });
+  });
+
+  it("swaps Sell for Settings once the store is published", () => {
+    for (const role of ["OWNER", "MANAGER"] as const) {
+      expect(ids(role, true)).toEqual({
+        tabs: ["orders", "drops", "menu", "settings"],
+        more: ["sell", "transactions", "analytics", "help"],
+      });
+    }
+  });
+
+  it("leaves a cashier's Sell on the bar when published: their destinations all fit", () => {
+    expect(ids("CASHIER", true)).toEqual({ tabs: ["orders", "sell", "settings"], more: ["help"] });
+  });
+
+  it("never drops or duplicates a destination, and never overfills the bar", () => {
+    for (const role of ["OWNER", "MANAGER", "CASHIER"] as const) {
+      for (const published of [false, true]) {
+        const { tabs, more } = appTabBarForRole(role, published);
+        expect(tabs.length).toBeLessThanOrEqual(APP_TAB_BAR_SLOTS);
+        expect([...tabs, ...more].map((i) => i.id).sort()).toEqual(
+          appNavItemsForRole(role)
+            .map((i) => i.id)
+            .sort(),
+        );
+        expect(tabs.every((i) => i.placement === "tab")).toBe(true);
+        expect(more.every((i) => i.placement === "more")).toBe(true);
+      }
+    }
   });
 });
 

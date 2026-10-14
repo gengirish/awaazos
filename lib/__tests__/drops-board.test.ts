@@ -2,10 +2,12 @@ import type { DropStatus, FulfilmentStatus, PaymentMethod, PaymentStatus } from 
 import { describe, expect, it } from "vitest";
 
 import {
+  availableOrderActions,
   boardBucket,
   boardPollKind,
   checkOrderAction,
   countByFilter,
+  filterByHandover,
   filterOrders,
   firstName,
   groupByFulfilment,
@@ -13,11 +15,14 @@ import {
   handoverDue,
   isDropFrozen,
   liveEffectiveStatus,
+  markPaidNeedsConfirm,
   newOrderIds,
   orderActionBase,
   ordersInScope,
   ordersToPack,
   prepFromOrders,
+  primaryOrderAction,
+  searchOrders,
   shouldPollForOrders,
   summarizeOrders,
   whatsappHref,
@@ -293,5 +298,102 @@ describe("boardPollKind", () => {
   it("a drop that only opens later polls the cheap signal, never Postgres directly", () => {
     expect(boardPollKind({ acceptMenuOrders: false, dropStatuses: ["SCHEDULED"], signalMode: "kv" })).toBe("signal");
     expect(boardPollKind({ acceptMenuOrders: false, dropStatuses: ["SCHEDULED"], signalMode: "fallback" })).toBeNull();
+  });
+});
+
+describe("primaryOrderAction", () => {
+  type Row = [
+    string,
+    {
+      displayState: OrderDisplayState;
+      fulfilmentStatus: FulfilmentStatus;
+      paymentStatus: PaymentStatus;
+      paymentMethod: PaymentMethod;
+    },
+    boolean,
+    string | null,
+  ];
+  const o = (
+    displayState: OrderDisplayState,
+    fulfilmentStatus: FulfilmentStatus,
+    paymentStatus: PaymentStatus,
+    paymentMethod: PaymentMethod,
+  ) => ({ displayState, fulfilmentStatus, paymentStatus, paymentMethod });
+  const cases: Row[] = [
+    ["new, buyer says paid", o("PAYMENT_SUBMITTED", "PLACED", "PENDING", "UPI"), false, "mark_paid"],
+    ["confirmed, buyer says paid", o("PAYMENT_SUBMITTED", "CONFIRMED", "PENDING", "UPI"), false, "mark_paid"],
+    ["new, UPI unpaid", o("AWAITING_PAYMENT", "PLACED", "PENDING", "UPI"), false, "confirm"],
+    ["new, pay on delivery", o("PAY_ON_DELIVERY", "PLACED", "PENDING", "CASH"), false, "confirm"],
+    ["new, already paid", o("PAID", "PLACED", "PAID", "UPI"), false, "confirm"],
+    ["new on a locked drop", o("PAY_ON_DELIVERY", "PLACED", "PENDING", "CASH"), true, "deliver"],
+    ["confirmed, paid", o("PAID", "CONFIRMED", "PAID", "UPI"), false, "deliver"],
+    ["confirmed, pay on delivery", o("PAY_ON_DELIVERY", "CONFIRMED", "PENDING", "CASH"), false, "deliver"],
+    ["confirmed, UPI unpaid", o("AWAITING_PAYMENT", "CONFIRMED", "PENDING", "UPI"), false, "deliver"],
+    ["delivered, still unpaid", o("DELIVERED", "DELIVERED", "PENDING", "UPI"), false, "mark_paid"],
+    ["delivered and paid", o("DELIVERED", "DELIVERED", "PAID", "UPI"), false, null],
+    ["cancelled", o("CANCELLED", "CANCELLED", "PENDING", "UPI"), false, null],
+  ];
+  it.each(cases)("%s", (_name, order, frozen, expected) => {
+    const primary = primaryOrderAction(order, frozen);
+    expect(primary).toBe(expected);
+    // Never something the card would not offer.
+    if (primary) expect(availableOrderActions(order, frozen).has(primary)).toBe(true);
+  });
+
+  it("markPaidNeedsConfirm: only a buyer's claim lets one tap mark an order paid", () => {
+    expect(markPaidNeedsConfirm({ displayState: "PAYMENT_SUBMITTED" })).toBe(false);
+    for (const s of ["AWAITING_PAYMENT", "PAY_ON_DELIVERY", "DELIVERED"] as const) {
+      expect(markPaidNeedsConfirm({ displayState: s })).toBe(true);
+    }
+  });
+});
+
+describe("searchOrders / filterByHandover", () => {
+  const orders = [
+    {
+      id: "a",
+      customerName: "Priya Nair",
+      customerPhone: "+919876543210",
+      billNumber: "AWZ-20261005-0001",
+      fulfilmentType: "PICKUP" as const,
+    },
+    {
+      id: "b",
+      customerName: "Ravi",
+      customerPhone: "+919812300077",
+      billNumber: "AWZ-20261005-0012",
+      fulfilmentType: "DELIVERY" as const,
+    },
+    { id: "c", customerName: null, customerPhone: null, billNumber: "AWZ-20261004-0003", fulfilmentType: null },
+  ];
+  const ids = (q: string) => searchOrders(orders, q).map((x) => x.id);
+
+  it("an empty query keeps every order", () => {
+    expect(ids("")).toEqual(["a", "b", "c"]);
+    expect(ids("   ")).toEqual(["a", "b", "c"]);
+  });
+
+  it("matches the buyer's name, any case", () => {
+    expect(ids("priya")).toEqual(["a"]);
+    expect(ids(" NAIR ")).toEqual(["a"]);
+    expect(ids("zzz")).toEqual([]);
+  });
+
+  it("matches the bill number", () => {
+    expect(ids("0012")).toEqual(["b"]);
+    expect(ids("awz-20261004")).toEqual(["c"]);
+  });
+
+  it("matches the end of the phone number, not its middle", () => {
+    expect(ids("3210")).toEqual(["a"]);
+    expect(ids("0077")).toEqual(["b"]);
+    expect(ids("98765 43210")).toEqual(["a"]);
+    expect(ids("8765")).toEqual([]);
+  });
+
+  it("filterByHandover: pickups on one side, everything else is a delivery", () => {
+    expect(filterByHandover(orders, "all")).toHaveLength(3);
+    expect(filterByHandover(orders, "pickup").map((x) => x.id)).toEqual(["a"]);
+    expect(filterByHandover(orders, "delivery").map((x) => x.id)).toEqual(["b", "c"]);
   });
 });

@@ -155,7 +155,7 @@ export function bulkResultMessage(
   if (bad === 0) return { kind: "success", text: `${nOrders(ok)} ${DONE_VERB[action]}` };
   const frozen = result.failed.some((f) => f.error === "drop_frozen");
   const reason = frozen
-    ? "orders are frozen"
+    ? "orders are locked"
     : result.failed.every((f) => f.error === "error")
       ? "try again"
       : "they changed on another device";

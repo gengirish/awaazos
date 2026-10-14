@@ -11,9 +11,13 @@ export const dynamic = "force-dynamic";
 
 export default async function NewDropPage() {
   let vendorId: string;
+  let vendorSlug: string;
+  let isOwner: boolean;
   try {
     const ctx = await requireVendorRole("MANAGER");
     vendorId = ctx.vendor.id;
+    vendorSlug = ctx.vendor.slug;
+    isOwner = ctx.staff.role === "OWNER";
   } catch (e) {
     if (e instanceof AuthError) redirect(e.status === 403 ? "/pos" : "/sign-in");
     throw e;
@@ -25,7 +29,7 @@ export default async function NewDropPage() {
       orderBy: { sortOrder: "asc" },
       select: { id: true, name: true, emoji: true, priceInPaise: true, isAvailable: true },
     }),
-    prisma.vendorSettings.findUnique({ where: { vendorId }, select: { voiceLang: true } }),
+    prisma.vendorSettings.findUnique({ where: { vendorId }, select: { voiceLang: true, publishStorefront: true } }),
   ]);
 
   // Sensible default: cook tomorrow 5–8 pm, orders close the evening before at
@@ -67,7 +71,13 @@ export default async function NewDropPage() {
         </Link>
       </header>
       <main className="mx-auto max-w-2xl">
-        <DropForm menuItems={menuItems} initial={initial} voiceLang={settings?.voiceLang ?? "en-IN"} />
+        <DropForm
+          menuItems={menuItems}
+          initial={initial}
+          voiceLang={settings?.voiceLang ?? "en-IN"}
+          isOwner={isOwner}
+          openFlow={{ storePublished: settings?.publishStorefront ?? false, storePath: `/s/${vendorSlug}` }}
+        />
       </main>
     </div>
   );

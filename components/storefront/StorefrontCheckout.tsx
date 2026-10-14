@@ -1,12 +1,21 @@
 "use client";
 
-import { AlertCircle, Clock, Loader2, MapPin, MessageCircle, Minus, Plus, ShoppingBag } from "lucide-react";
+import { AlertCircle, Clock, Loader2, MapPin, Minus, Plus, ShoppingBag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { rememberRecentOrder } from "@/components/storefront/recent-orders";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogBody,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
 import { formatINR, sumPaise } from "@/lib/currency";
 import { discountLabel } from "@/lib/offers";
 import { formatIndianMobile, normaliseIndianMobile } from "@/lib/phone";
@@ -41,7 +50,8 @@ import { cn } from "@/lib/utils";
  * sends a price — callers build the request body from ids + quantities only.
  * Buyer details live only in this component's state and (opt-in) the device's
  * localStorage; they are never logged. The saved cart holds ids + quantities
- * only, never buyer details.
+ * only, never buyer details. A placed order is remembered on the device as its
+ * token, bill number and time (recent-orders.ts) so a guest can find it again.
  */
 
 export type FulfilmentType = "DELIVERY" | "PICKUP";
@@ -173,7 +183,14 @@ export function usePersistedCart(opts: {
 
 // ─── Quantity stepper ───────────────────────────────────────────────
 
-/** "Add" button at 0, else 44×44 −/qty/+ group. */
+/**
+ * "Add" button at 0, else 44×44 −/qty/+ group.
+ *
+ * The two states are different elements, so the button that was tapped
+ * unmounts on 0 → 1 and 1 → 0. Focus is moved by hand: to "+" after the first
+ * add, back to "Add" after the last one is removed — a keyboard or switch user
+ * is never dropped at the top of the page.
+ */
 export function QtyStepper({
   itemName,
   qty,
@@ -185,13 +202,31 @@ export function QtyStepper({
   max: number;
   onChange: (qty: number) => void;
 }) {
+  const addRef = useRef<HTMLButtonElement>(null);
+  const minusRef = useRef<HTMLButtonElement>(null);
+  const plusRef = useRef<HTMLButtonElement>(null);
+  /** Set by the tap that swaps the two states; consumed once the new one is mounted. */
+  const moveFocusRef = useRef(false);
+
+  useEffect(() => {
+    if (!moveFocusRef.current) return;
+    moveFocusRef.current = false;
+    if (qty === 0) addRef.current?.focus();
+    // "+" is disabled when one is already the most allowed.
+    else (plusRef.current?.disabled ? minusRef.current : plusRef.current)?.focus();
+  }, [qty]);
+
   if (qty === 0) {
     return (
       <button
+        ref={addRef}
         type="button"
-        onClick={() => onChange(1)}
+        onClick={() => {
+          moveFocusRef.current = true;
+          onChange(1);
+        }}
         disabled={max < 1}
-        className="inline-flex min-h-11 min-w-[72px] items-center justify-center gap-1 rounded-xl border border-primary/40 bg-primary/5 px-4 text-sm font-bold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50"
+        className="inline-flex min-h-11 min-w-[72px] shrink-0 items-center justify-center gap-1 rounded-xl border border-primary/40 bg-primary/5 px-4 text-sm font-bold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50"
         aria-label={`Add ${itemName}`}
       >
         <Plus className="h-4 w-4" aria-hidden="true" />
@@ -202,17 +237,23 @@ export function QtyStepper({
   return (
     <div className="flex shrink-0 items-center gap-2" role="group" aria-label={`${itemName} quantity`}>
       <button
+        ref={minusRef}
         type="button"
-        onClick={() => onChange(qty - 1)}
+        onClick={() => {
+          moveFocusRef.current = qty === 1;
+          onChange(qty - 1);
+        }}
         className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-background text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         aria-label={`Remove one ${itemName}`}
       >
         <Minus className="h-4 w-4" aria-hidden="true" />
       </button>
-      <span className="w-6 text-center font-mono text-base font-bold tabular-nums" aria-hidden="true">
-        {qty}
+      <span className="w-6 text-center font-mono text-base font-bold tabular-nums">
+        <span aria-hidden="true">{qty}</span>
+        <span className="sr-only">{qty} in cart</span>
       </span>
       <button
+        ref={plusRef}
         type="button"
         onClick={() => onChange(Math.min(max, qty + 1))}
         disabled={qty >= max}
@@ -310,9 +351,10 @@ export type CheckoutSheetProps = {
   pickupWindow?: string | null;
   payment: { upi: boolean; cod: boolean };
   /**
-   * The store has a WhatsApp number: also offer "Place order & send on
-   * WhatsApp". Same order, same endpoint — the order page then leads with a
-   * wa.me link carrying the whole order (`?wa=1`).
+   * The store has a WhatsApp number: also offer the "Also send my order to
+   * the store on WhatsApp" checkbox (off by default). Same order, same
+   * endpoint — the order page then leads with a wa.me link carrying the whole
+   * order (`?wa=1`).
    */
   whatsapp?: boolean;
   prefill?: BuyerPrefill | null;
@@ -365,7 +407,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
   const [method, setMethod] = useState<PaymentMethod | null>(
     payment.upi ? "UPI" : payment.cod ? "CASH" : null,
   );
-  const [submitting, setSubmitting] = useState<false | "order" | "whatsapp">(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [sendOnWhatsapp, setSendOnWhatsapp] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<CheckoutFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ field: CheckoutField; n: number } | null>(null);
@@ -536,9 +579,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     e.preventDefault();
     if (submitting) return;
     setFormError(null);
-    // Enter in a field submits via the first (plain) button.
-    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null | undefined;
-    const viaWhatsapp = whatsapp && submitter?.dataset.via === "whatsapp";
+    const viaWhatsapp = whatsapp && sendOnWhatsapp;
 
     const errors = validateCheckout(input);
     showFieldErrors(errors);
@@ -549,7 +590,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     // a response (network drop), so a retry can't create a second order.
     if (!idemKeyRef.current) idemKeyRef.current = newIdempotencyKey();
 
-    setSubmitting(viaWhatsapp ? "whatsapp" : "order");
+    setSubmitting(true);
     let res: Response;
     try {
       res = await fetch(endpoint, {
@@ -584,11 +625,14 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     }
 
     if (res.status === 201) {
-      const token = (json as { data?: { orderToken?: string } } | null)?.data?.orderToken;
+      const data = (json as { data?: { orderToken?: string; billNumber?: string } } | null)?.data;
+      const token = data?.orderToken;
       if (remember) persistDetails();
       else writeSavedBuyerRaw(null);
       onOrdered?.();
       if (token) {
+        // So the store page can point back at it; the order page records it too.
+        if (data?.billNumber) rememberRecentOrder(slug, { token, billNumber: data.billNumber, createdAt: Date.now() });
         router.push(
           `/s/${encodeURIComponent(slug)}/o/${encodeURIComponent(token)}${viaWhatsapp ? "?wa=1" : ""}`,
         );
@@ -616,10 +660,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
   }
 
   return (
-    <Sheet open={open} onOpenChange={(v) => !submitting && onOpenChange(v)}>
-      <SheetContent
-        side="bottom"
-        className="mx-auto max-h-[92dvh] max-w-2xl overflow-y-auto rounded-t-2xl px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6"
+    <ResponsiveDialog open={open} onOpenChange={(v) => !submitting && onOpenChange(v)}>
+      {/* Header (title + close) and footer (total + Place order) stay put; only the fields scroll. */}
+      <ResponsiveDialogContent
         onCloseAutoFocus={(e) => {
           const target = returnFocusRef?.current;
           if (target && target.isConnected) {
@@ -628,254 +671,253 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
           }
         }}
       >
-        <SheetHeader className="text-left">
-          <SheetTitle className="font-display text-xl">Checkout</SheetTitle>
-          <SheetDescription>{description}</SheetDescription>
-        </SheetHeader>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="font-display text-xl">Checkout</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>{description}</ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
-        <form onSubmit={submit} className="mt-4 space-y-5" noValidate>
-          <ul className="space-y-1 rounded-xl bg-muted/50 px-3 py-2 text-sm">
-            {lines.map((l) => (
-              <li key={l.id} className="flex justify-between gap-3">
-                <span className="min-w-0 truncate">
-                  {l.qty} × {l.name}
-                </span>
-                <span className="font-mono tabular-nums">{formatINR(l.priceInPaise * l.qty)}</span>
-              </li>
-            ))}
-          </ul>
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col" noValidate>
+          <ResponsiveDialogBody className="space-y-5">
+            <ul className="space-y-1 rounded-xl bg-muted/50 px-3 py-2 text-sm">
+              {lines.map((l) => (
+                <li key={l.id} className="flex justify-between gap-3">
+                  <span className="min-w-0 truncate">
+                    {l.qty} × {l.name}
+                  </span>
+                  <span className="font-mono tabular-nums">{formatINR(l.priceInPaise * l.qty)}</span>
+                </li>
+              ))}
+            </ul>
 
-          <div className="space-y-2">
-            <Label htmlFor={ids.name}>Your name</Label>
-            <Input
-              id={ids.name}
-              autoComplete="name"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                revalidate("name", { name: e.target.value });
-              }}
-              maxLength={80}
-              required
-              aria-invalid={fieldErrors.name ? true : undefined}
-              aria-describedby={describedBy("name")}
-              className="h-11 scroll-my-24 aria-invalid:border-destructive"
-            />
-            <FieldError id={ids.error("name")} message={fieldErrors.name} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor={ids.phone}>Mobile number</Label>
-            <div className="flex items-center gap-2">
-              <span
-                className="inline-flex h-11 items-center rounded-md border border-input bg-muted px-3 font-mono text-sm text-muted-foreground"
-                aria-hidden="true"
-              >
-                +91
-              </span>
+            <div className="space-y-2">
+              <Label htmlFor={ids.name}>Your name</Label>
               <Input
-                id={ids.phone}
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel-national"
-                placeholder="98765 43210"
-                value={phone}
+                id={ids.name}
+                autoComplete="name"
+                value={name}
                 onChange={(e) => {
-                  setPhone(e.target.value);
-                  revalidate("phone", { phone: e.target.value });
+                  setName(e.target.value);
+                  revalidate("name", { name: e.target.value });
                 }}
-                maxLength={16}
+                maxLength={80}
                 required
-                aria-invalid={fieldErrors.phone ? true : undefined}
-                aria-describedby={describedBy("phone", ids.phoneHint)}
+                aria-invalid={fieldErrors.name ? true : undefined}
+                aria-describedby={describedBy("name")}
                 className="h-11 scroll-my-24 aria-invalid:border-destructive"
               />
+              <FieldError id={ids.error("name")} message={fieldErrors.name} />
             </div>
-            <FieldError id={ids.error("phone")} message={fieldErrors.phone} />
-            <p id={ids.phoneHint} className="text-xs text-muted-foreground">
-              The store uses this to reach you about this order.
-            </p>
-          </div>
 
-          {fulfilmentTypes.length > 1 ? (
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Delivery or pickup</legend>
-              <div className="grid grid-cols-2 gap-2">
-                {fulfilmentTypes.map((t) => (
-                  <label
-                    key={t}
-                    className={cn(
-                      "flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold has-focus-visible:ring-2 has-focus-visible:ring-primary",
-                      fulfilment === t ? "border-primary bg-primary/10 text-primary" : "border-border",
-                    )}
-                  >
-                    <input
-                      type="radio"
-                      name={`${idPrefix}-fulfilment`}
-                      value={t}
-                      checked={fulfilment === t}
-                      onChange={() => {
-                        setFulfilment(t);
-                        revalidate("address", { fulfilment: t });
-                      }}
-                      className="h-4 w-4 accent-[hsl(var(--primary))]"
-                    />
-                    {t === "DELIVERY"
-                      ? deliveryFeePaise > 0
-                        ? `Delivery (+${formatINR(deliveryFeePaise)})`
-                        : "Delivery"
-                      : "Pickup"}
-                  </label>
-                ))}
-              </div>
-            </fieldset>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {fulfilment === "DELIVERY" ? "Delivery only" : "Pickup only"}
-            </p>
-          )}
-
-          {fulfilment === "DELIVERY" ? (
             <div className="space-y-2">
-              <Label htmlFor={ids.address}>Delivery address</Label>
-              <textarea
-                id={ids.address}
-                autoComplete="street-address"
-                value={address}
-                onChange={(e) => {
-                  setAddress(e.target.value);
-                  revalidate("address", { address: e.target.value });
-                }}
-                maxLength={500}
-                rows={3}
-                required
-                placeholder="Flat, building, street, landmark"
-                aria-invalid={fieldErrors.address ? true : undefined}
-                aria-describedby={describedBy("address")}
-                className="flex w-full scroll-my-24 rounded-md border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
-              />
-              <FieldError id={ids.error("address")} message={fieldErrors.address} />
-            </div>
-          ) : (
-            <div className="space-y-1.5 rounded-xl bg-muted/50 px-3 py-2 text-sm">
-              <p className="flex items-start gap-2">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                {pickupNote ? (
-                  <span>
-                    <span className="font-semibold">Pickup: </span>
-                    {pickupNote}
-                  </span>
-                ) : (
-                  <span>{PICKUP_FALLBACK}</span>
-                )}
+              <Label htmlFor={ids.phone}>Mobile number</Label>
+              <div className="flex items-center gap-2">
+                <span
+                  className="inline-flex h-11 items-center rounded-md border border-input bg-muted px-3 font-mono text-sm text-muted-foreground"
+                  aria-hidden="true"
+                >
+                  +91
+                </span>
+                <Input
+                  id={ids.phone}
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel-national"
+                  placeholder="98765 43210"
+                  value={phone}
+                  onChange={(e) => {
+                    setPhone(e.target.value);
+                    revalidate("phone", { phone: e.target.value });
+                  }}
+                  maxLength={16}
+                  required
+                  aria-invalid={fieldErrors.phone ? true : undefined}
+                  aria-describedby={describedBy("phone", ids.phoneHint)}
+                  className="h-11 scroll-my-24 aria-invalid:border-destructive"
+                />
+              </div>
+              <FieldError id={ids.error("phone")} message={fieldErrors.phone} />
+              <p id={ids.phoneHint} className="text-xs text-muted-foreground">
+                The store uses this to reach you about this order.
               </p>
-              {pickupWindow ? (
+            </div>
+
+            {fulfilmentTypes.length > 1 ? (
+              <fieldset className="space-y-2">
+                <legend className="text-sm font-medium">Delivery or pickup</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  {fulfilmentTypes.map((t) => (
+                    <label
+                      key={t}
+                      className={cn(
+                        "flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold has-focus-visible:ring-2 has-focus-visible:ring-primary",
+                        fulfilment === t ? "border-primary bg-primary/10 text-primary" : "border-border",
+                      )}
+                    >
+                      <input
+                        type="radio"
+                        name={`${idPrefix}-fulfilment`}
+                        value={t}
+                        checked={fulfilment === t}
+                        onChange={() => {
+                          setFulfilment(t);
+                          revalidate("address", { fulfilment: t });
+                        }}
+                        className="h-4 w-4 accent-[hsl(var(--primary))]"
+                      />
+                      {t === "DELIVERY"
+                        ? deliveryFeePaise > 0
+                          ? `Delivery (+${formatINR(deliveryFeePaise)})`
+                          : "Delivery"
+                        : "Pickup"}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {fulfilment === "DELIVERY" ? "Delivery only" : "Pickup only"}
+              </p>
+            )}
+
+            {fulfilment === "DELIVERY" ? (
+              <div className="space-y-2">
+                <Label htmlFor={ids.address}>Delivery address</Label>
+                <textarea
+                  id={ids.address}
+                  autoComplete="street-address"
+                  value={address}
+                  onChange={(e) => {
+                    setAddress(e.target.value);
+                    revalidate("address", { address: e.target.value });
+                  }}
+                  maxLength={500}
+                  rows={3}
+                  required
+                  placeholder="Flat, building, street, landmark"
+                  aria-invalid={fieldErrors.address ? true : undefined}
+                  aria-describedby={describedBy("address")}
+                  className="flex w-full scroll-my-24 rounded-md border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
+                />
+                <FieldError id={ids.error("address")} message={fieldErrors.address} />
+              </div>
+            ) : (
+              <div className="space-y-1.5 rounded-xl bg-muted/50 px-3 py-2 text-sm">
                 <p className="flex items-start gap-2">
-                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                  <span>
-                    <span className="font-semibold">When: </span>
-                    {pickupWindow}
-                  </span>
+                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  {pickupNote ? (
+                    <span>
+                      <span className="font-semibold">Pickup: </span>
+                      {pickupNote}
+                    </span>
+                  ) : (
+                    <span>{PICKUP_FALLBACK}</span>
+                  )}
                 </p>
-              ) : null}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-notes`}>Notes for the store (optional)</Label>
-            <Input
-              id={`${idPrefix}-notes`}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              maxLength={280}
-              placeholder="eggless, less spicy…"
-              className="h-11"
-            />
-          </div>
-
-          <fieldset
-            id={ids.payment}
-            aria-invalid={fieldErrors.payment ? true : undefined}
-            aria-describedby={describedBy("payment")}
-            className="space-y-2"
-          >
-            <legend className="text-sm font-medium">Payment</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {payment.upi ? (
-                <PaymentOption
-                  name={`${idPrefix}-payment`}
-                  checked={method === "UPI"}
-                  onSelect={() => {
-                    setMethod("UPI");
-                    revalidate("payment", { method: "UPI" });
-                  }}
-                  label="Pay now by UPI"
-                  hint="Any UPI app — you'll see a QR next"
-                  invalid={!!fieldErrors.payment}
-                  describedBy={describedBy("payment")}
-                />
-              ) : null}
-              {payment.cod ? (
-                <PaymentOption
-                  name={`${idPrefix}-payment`}
-                  checked={method === "CASH"}
-                  onSelect={() => {
-                    setMethod("CASH");
-                    // A pay_on_delivery_disabled rejection stays until they pick UPI.
-                    setFieldErrors((prev) => {
-                      if (prev.payment !== CHECKOUT_FIELD_MESSAGES.payment) return prev;
-                      const next = { ...prev };
-                      delete next.payment;
-                      return next;
-                    });
-                  }}
-                  label="Pay on delivery"
-                  hint={fulfilment === "PICKUP" ? "Pay when you collect" : "Cash or UPI at the door"}
-                  invalid={!!fieldErrors.payment}
-                  describedBy={describedBy("payment")}
-                />
-              ) : null}
-            </div>
-            <FieldError id={ids.error("payment")} message={fieldErrors.payment} />
-          </fieldset>
-
-          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => onRememberChange(e.target.checked)}
-              className="h-5 w-5 accent-[hsl(var(--primary))]"
-            />
-            Remember my details on this device
-          </label>
-
-          <dl className="space-y-1 border-t border-border pt-3 text-sm">
-            <div className="flex justify-between">
-              <dt>Items</dt>
-              <dd className="font-mono tabular-nums">{formatINR(subtotalPaise)}</dd>
-            </div>
-            {discount && discountPaise > 0 ? (
-              <div className="flex justify-between gap-3 font-semibold text-primary">
-                <dt className="min-w-0 break-words">{discountLabel(discount.name)}</dt>
-                <dd className="shrink-0 font-mono tabular-nums">−{formatINR(discountPaise)}</dd>
+                {pickupWindow ? (
+                  <p className="flex items-start gap-2">
+                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    <span>
+                      <span className="font-semibold">When: </span>
+                      {pickupWindow}
+                    </span>
+                  </p>
+                ) : null}
               </div>
-            ) : null}
-            {feePaise > 0 ? (
-              <div className="flex justify-between">
-                <dt>Delivery fee</dt>
-                <dd className="font-mono tabular-nums">{formatINR(feePaise)}</dd>
-              </div>
-            ) : null}
-            <div className="flex justify-between text-base font-bold">
-              <dt>Total</dt>
-              <dd className="font-mono tabular-nums" aria-live="polite">
-                {formatINR(totalPaise)}
-              </dd>
-            </div>
-          </dl>
+            )}
 
-          {/* Order-level problems only (stock, cut-off, network); field problems sit under their field. */}
-          <div role="alert" aria-atomic="true">
+            <div className="space-y-2">
+              <Label htmlFor={`${idPrefix}-notes`}>Notes for the store (optional)</Label>
+              <Input
+                id={`${idPrefix}-notes`}
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                maxLength={280}
+                placeholder="eggless, less spicy…"
+                className="h-11"
+              />
+            </div>
+
+            <fieldset
+              id={ids.payment}
+              aria-invalid={fieldErrors.payment ? true : undefined}
+              aria-describedby={describedBy("payment")}
+              className="space-y-2"
+            >
+              <legend className="text-sm font-medium">Payment</legend>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {payment.upi ? (
+                  <PaymentOption
+                    name={`${idPrefix}-payment`}
+                    checked={method === "UPI"}
+                    onSelect={() => {
+                      setMethod("UPI");
+                      revalidate("payment", { method: "UPI" });
+                    }}
+                    label="Pay now by UPI"
+                    hint="Any UPI app — you'll see a QR next"
+                    invalid={!!fieldErrors.payment}
+                    describedBy={describedBy("payment")}
+                  />
+                ) : null}
+                {payment.cod ? (
+                  <PaymentOption
+                    name={`${idPrefix}-payment`}
+                    checked={method === "CASH"}
+                    onSelect={() => {
+                      setMethod("CASH");
+                      // A pay_on_delivery_disabled rejection stays until they pick UPI.
+                      setFieldErrors((prev) => {
+                        if (prev.payment !== CHECKOUT_FIELD_MESSAGES.payment) return prev;
+                        const next = { ...prev };
+                        delete next.payment;
+                        return next;
+                      });
+                    }}
+                    label="Pay on delivery"
+                    hint={fulfilment === "PICKUP" ? "Pay when you collect" : "Cash or UPI at the door"}
+                    invalid={!!fieldErrors.payment}
+                    describedBy={describedBy("payment")}
+                  />
+                ) : null}
+              </div>
+              <FieldError id={ids.error("payment")} message={fieldErrors.payment} />
+            </fieldset>
+
+            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => onRememberChange(e.target.checked)}
+                className="h-5 w-5 accent-[hsl(var(--primary))]"
+              />
+              Remember my details on this device
+            </label>
+
+            {discountPaise > 0 || feePaise > 0 ? (
+              <dl className="space-y-1 border-t border-border pt-3 text-sm">
+                <div className="flex justify-between">
+                  <dt>Items</dt>
+                  <dd className="font-mono tabular-nums">{formatINR(subtotalPaise)}</dd>
+                </div>
+                {discount && discountPaise > 0 ? (
+                  <div className="flex justify-between gap-3 font-semibold text-primary">
+                    <dt className="min-w-0 break-words">{discountLabel(discount.name)}</dt>
+                    <dd className="shrink-0 font-mono tabular-nums">−{formatINR(discountPaise)}</dd>
+                  </div>
+                ) : null}
+                {feePaise > 0 ? (
+                  <div className="flex justify-between">
+                    <dt>Delivery fee</dt>
+                    <dd className="font-mono tabular-nums">{formatINR(feePaise)}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            ) : null}
+          </ResponsiveDialogBody>
+
+          {/* Order-level problems only (stock, cut-off, network); field problems sit under their field.
+              Outside the scrolling body, so it is in view whatever the scroll position. */}
+          <div role="alert" aria-atomic="true" className={cn("shrink-0 px-4 md:px-6", formError && "pb-3 pt-1")}>
             {formError ? (
               <p className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -884,36 +926,40 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
             ) : null}
           </div>
 
-          <button
-            type="submit"
-            disabled={!!submitting || lines.length === 0}
-            aria-busy={submitting === "order"}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
-          >
-            {submitting === "order" ? (
-              <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
+          <ResponsiveDialogFooter className="flex-col gap-2 md:flex-col md:border-t md:pb-4 md:pt-3">
+            <p className="flex justify-between text-base font-bold">
+              <span>Total</span>
+              <span className="font-mono tabular-nums" aria-live="polite">
+                {formatINR(totalPaise)}
+              </span>
+            </p>
+            {whatsapp ? (
+              <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={sendOnWhatsapp}
+                  onChange={(e) => setSendOnWhatsapp(e.target.checked)}
+                  disabled={submitting}
+                  className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                />
+                Also send my order to the store on WhatsApp
+              </label>
             ) : null}
-            {submitting === "order" ? "Placing order…" : `Place order · ${formatINR(totalPaise)}`}
-          </button>
-          {whatsapp ? (
             <button
               type="submit"
-              data-via="whatsapp"
-              disabled={!!submitting || lines.length === 0}
-              aria-busy={submitting === "whatsapp"}
-              className="-mt-2 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-green-600/40 bg-background px-6 text-base font-bold text-green-800 hover:bg-green-600/5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2 disabled:opacity-60"
+              disabled={submitting || lines.length === 0}
+              aria-busy={submitting}
+              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
             >
-              {submitting === "whatsapp" ? (
+              {submitting ? (
                 <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-              ) : (
-                <MessageCircle className="h-5 w-5" aria-hidden="true" />
-              )}
-              {submitting === "whatsapp" ? "Placing order…" : "Place order & send on WhatsApp"}
+              ) : null}
+              {submitting ? "Placing order…" : `Place order · ${formatINR(totalPaise)}`}
             </button>
-          ) : null}
+          </ResponsiveDialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
   );
 }
 

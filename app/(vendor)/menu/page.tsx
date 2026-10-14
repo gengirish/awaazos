@@ -39,7 +39,7 @@ export default async function MenuPage(props: {
     <div className="bg-background p-4 pb-10 md:p-6">
       <header className="mx-auto mb-6 max-w-5xl">
         <h1 className="font-display text-2xl font-semibold text-foreground">Menu</h1>
-        <p className="text-sm text-muted-foreground">Manage items, order, and availability.</p>
+        <p className="text-sm text-muted-foreground">Add items, set their order, and mark what is sold out.</p>
       </header>
       <main id="main-menu" className="mx-auto max-w-5xl space-y-6">
         <VoiceMenuPanel

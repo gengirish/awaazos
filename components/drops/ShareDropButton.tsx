@@ -20,13 +20,15 @@ export type ShareDropButtonProps = {
   /** Prepared Instagram story image held by the parent (see InstagramStoryButton). */
   story?: StoryImage | null;
   onStory?: (story: StoryImage) => void;
+  /** Only the main Share button (drop list cards). Copy, WhatsApp and the story image stay on the edit page. */
+  compact?: boolean;
 };
 
 const baseBtn =
   "inline-flex min-h-11 min-w-11 items-center justify-center gap-2 rounded-full px-4 py-2 text-sm font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60";
 
 /**
- * Vendor-side "share today's menu" control. The native share sheet is the
+ * Vendor-side "Share this drop" control. The native share sheet is the
  * primary path on Android/iOS; desktop browsers without it fall back to a
  * wa.me link. "Instagram story" makes a 1080×1920 image of the drop
  * (InstagramStoryButton). Every navigator call is best-effort: a dismissed share sheet
@@ -45,6 +47,7 @@ export function ShareDropButton(props: ShareDropButtonProps) {
     itemNames,
     story,
     onStory,
+    compact = false,
   } = props;
 
   // window is unavailable during SSR; fill the origin in after mount.
@@ -109,11 +112,25 @@ export function ShareDropButton(props: ShareDropButtonProps) {
     }
   }
 
+  if (compact) {
+    return (
+      <button
+        type="button"
+        onClick={share}
+        aria-label={`Share this drop: ${dropTitle}`}
+        className={cn(baseBtn, "w-full bg-primary text-primary-foreground hover:bg-primary/90")}
+      >
+        <Share2 className="h-4 w-4" aria-hidden="true" />
+        Share this drop
+      </button>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2">
       <button type="button" onClick={share} className={cn(baseBtn, "bg-primary text-primary-foreground hover:bg-primary/90")}>
         <Share2 className="h-4 w-4" aria-hidden="true" />
-        Share today&apos;s menu
+        Share this drop
       </button>
       <div className="flex flex-wrap gap-2">
         <button

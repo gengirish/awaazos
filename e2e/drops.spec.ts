@@ -138,7 +138,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
 
       await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
       await expect(buyer.getByRole("heading", { name: "Your order" })).toBeVisible();
-      await expect(buyer.getByText("Pay on delivery").first()).toBeVisible();
+      await expect(buyer.getByText("Pay when you collect").first()).toBeVisible();
 
       // ── Vendor: the board shows it; hand over and collect cash ─────────
       // The drop's old address still works: it opens the one orders board on this drop.
@@ -181,14 +181,14 @@ test.describe("drops: home-kitchen pre-order day", () => {
       await staleCtx.close();
     }
 
-    // ── Vendor: freeze, then the prep sheet has the right totals ─────────
+    // ── Vendor: lock orders, then the prep sheet has the right totals ─────────
     await page.goto(`/drops/${dropId}/edit`);
-    await page.getByRole("button", { name: "Freeze orders" }).click();
-    const confirm = page.getByRole("dialog", { name: "Freeze orders?" });
-    await confirm.getByRole("button", { name: "Freeze orders" }).click();
+    await page.getByRole("button", { name: "Lock orders" }).click();
+    const confirm = page.getByRole("dialog", { name: "Lock orders?" });
+    await confirm.getByRole("button", { name: "Lock orders" }).click();
     await expect(confirm).toBeHidden();
     await expect(
-      page.getByRole("region", { name: "Status" }).getByText("Orders frozen", { exact: true }),
+      page.getByRole("region", { name: "Status" }).getByText("Orders locked", { exact: true }),
     ).toBeVisible();
 
     await page.goto(`/drops/${dropId}/prep`);

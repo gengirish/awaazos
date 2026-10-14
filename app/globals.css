@@ -44,6 +44,11 @@
   --color-card: hsl(var(--card));
   --color-card-foreground: hsl(var(--card-foreground));
 
+  --color-success: hsl(var(--success));
+  --color-success-foreground: hsl(var(--success-foreground));
+  --color-warning: hsl(var(--warning));
+  --color-warning-foreground: hsl(var(--warning-foreground));
+
   --color-brand-saffron: #ff6b00;
   --color-brand-green: #16a34a;
   --color-brand-amber: #d97706;
@@ -60,13 +65,8 @@
   --radius-sm: calc(var(--radius) - 4px);
 
   --font-sans: var(--font-nunito), system-ui, sans-serif;
-  /* KNOWN, PRE-EXISTING: `Baloo 2` is unquoted, which makes the whole
-     font-family declaration invalid, so `font-display` falls back to the
-     inherited Nunito. That is exactly what v3 shipped (tailwind.config.ts had
-     the same unquoted name), so it is kept for visual parity. Quoting it turns
-     Baloo 2 on for ~70 headings — a deliberate design change, not part of the
-     Tailwind 4 migration. */
-  --font-display: var(--font-baloo), Baloo 2, system-ui, sans-serif;
+  /* The family name must stay quoted: an unquoted `Baloo 2` invalidates the declaration. */
+  --font-display: var(--font-baloo), "Baloo 2", system-ui, sans-serif;
   --font-body: var(--font-nunito), Nunito, system-ui, sans-serif;
 
   --animate-accordion-down: accordion-down 0.2s ease-out;
@@ -180,8 +180,9 @@
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    /* Primary: saffron orange #FF6B00 */
-    --primary: 24 100% 50%;
+    /* Primary: the brand saffron (#FF6B00, logo only) darkened until white text
+       on it passes WCAG AA: 4.93:1. Every [data-theme] below is held to 4.5:1. */
+    --primary: 25 100% 37%;
     --primary-foreground: 0 0% 100%;
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
@@ -191,24 +192,30 @@
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
+    /* Status colours: readable as text on white and as a fill under their
+       -foreground (success 5.07:1, warning 4.95:1). */
+    --success: 142 72% 29%;
+    --success-foreground: 0 0% 100%;
+    --warning: 35 92% 33%;
+    --warning-foreground: 0 0% 100%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 24 100% 50%;
+    --ring: 25 100% 37%;
     --radius: 0.5rem;
-    /* Brand tokens — awaaz-orange tuned for white text (WCAG AA at bold UI size) */
-    --awaaz-orange: 25 100% 42%;
+    /* Brand tokens — awaaz-orange is the same value as --primary (white text 4.93:1) */
+    --awaaz-orange: 25 100% 37%;
     --awaaz-charcoal: 0 0% 13%;
     --awaaz-cream: 30 50% 96%;
   }
 
   [data-theme="green"] {
-    --primary: 142 71% 45%;
-    --ring: 142 71% 45%;
+    --primary: 142 72% 29%;
+    --ring: 142 72% 29%;
   }
 
   [data-theme="amber"] {
-    --primary: 32 95% 44%;
-    --ring: 32 95% 44%;
+    --primary: 32 95% 33%;
+    --ring: 32 95% 33%;
   }
 
   [data-theme="red"] {
@@ -233,7 +240,7 @@
     --card-foreground: 210 40% 98%;
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-    --primary: 24 100% 50%;
+    --primary: 25 100% 37%;
     --primary-foreground: 0 0% 100%;
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -243,9 +250,13 @@
     --accent-foreground: 210 40% 98%;
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
+    --success: 142 69% 58%;
+    --success-foreground: 144 80% 10%;
+    --warning: 38 92% 50%;
+    --warning-foreground: 26 83% 14%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 24 100% 50%;
+    --ring: 25 100% 37%;
   }
 }
 

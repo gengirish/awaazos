@@ -1,20 +1,24 @@
+import { CalendarClock, ClipboardList, Share2 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 const steps = [
   {
-    emoji: "🎤",
-    title: "Bol",
-    description: "Speak the order in any Indian language — natural and fast.",
+    icon: CalendarClock,
+    title: "Build a drop",
+    description:
+      "List what you are making, the price, how many you can make and the order-by time. Type it in, or say it in English or Hindi.",
   },
   {
-    emoji: "🧾",
-    title: "Bill",
-    description: "AI turns speech into a clean bill with items and totals.",
+    icon: Share2,
+    title: "Share the link",
+    description:
+      "Put your store link in your Instagram bio and share the ready-made story image. Buyers order there, not in your DMs.",
   },
   {
-    emoji: "📲",
-    title: "Becho",
-    description: "Customer pays with UPI QR; receipts go out on WhatsApp.",
+    icon: ClipboardList,
+    title: "Orders on one board",
+    description:
+      "Orders and UPI payments arrive on one board. Confirm each payment, print the prep sheet and hand over.",
   },
 ] as const;
 
@@ -26,23 +30,28 @@ export function HowItWorks() {
           How it works
         </h2>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          Three simple steps from voice to payment — built for busy stalls and small shops.
+          Three steps from &ldquo;taking orders for Saturday&rdquo; to a paid, packed batch.
         </p>
-        <div className="mt-10 grid gap-6 md:grid-cols-3">
-          {steps.map((step) => (
-            <Card key={step.title} className="border-border/80 bg-card shadow-xs">
-              <CardHeader className="pb-2">
-                <div className="mb-2 text-3xl" aria-hidden="true">
-                  {step.emoji}
-                </div>
-                <CardTitle className="font-display text-xl text-awaaz-charcoal">{step.title}</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm leading-relaxed text-muted-foreground">{step.description}</p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+        <ol className="mt-10 grid gap-6 md:grid-cols-3">
+          {steps.map((step) => {
+            const Icon = step.icon;
+            return (
+              <li key={step.title}>
+                <Card className="h-full border-border/80 bg-card shadow-xs">
+                  <CardHeader className="pb-2">
+                    <div className="mb-2 flex h-11 w-11 items-center justify-center rounded-lg bg-awaaz-orange/10 text-awaaz-orange">
+                      <Icon className="h-6 w-6" aria-hidden="true" />
+                    </div>
+                    <CardTitle className="font-display text-xl text-awaaz-charcoal">{step.title}</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm leading-relaxed text-muted-foreground">{step.description}</p>
+                  </CardContent>
+                </Card>
+              </li>
+            );
+          })}
+        </ol>
       </div>
     </section>
   );

@@ -184,8 +184,18 @@ test.describe("app shell navigation", () => {
     expect(publish.status()).toBe(200);
     await openPos(page, PHONE);
 
-    await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "More" }).click();
-    const live = page.getByRole("dialog", { name: "More" }).getByRole("link", { name: /Live store/ });
+    // A published store trades the Sell tab for Settings; Sell moves behind More.
+    const tabs = page.getByRole("navigation", { name: "Main" });
+    for (const name of ["Orders", "Drops", "Menu", "Settings"]) {
+      await expect(tabs.getByRole("link", { name, exact: true })).toBeVisible();
+    }
+    await expect(tabs.getByRole("link", { name: "Sell", exact: true })).toHaveCount(0);
+
+    await tabs.getByRole("button", { name: "More" }).click();
+    const sheet = page.getByRole("dialog", { name: "More" });
+    await expect(sheet.getByRole("link", { name: "Sell", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(sheet.getByRole("button", { name: "Share store link", exact: true })).toBeVisible();
+    const live = sheet.getByRole("link", { name: /Live store/ });
     await expect(live).toBeVisible();
     await expect(live).toHaveAttribute("href", /^\/s\//);
     await expect(live).toHaveAttribute("target", "_blank");

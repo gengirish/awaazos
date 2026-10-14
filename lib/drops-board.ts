@@ -118,6 +118,39 @@ export function countByFilter(orders: { bucket: BoardBucket }[]): Record<BoardFi
   return out;
 }
 
+// ─── Search and handover filter (client-side, over the loaded list) ──
+
+/**
+ * Orders matching what the vendor typed: part of the buyer's name, part of the
+ * bill number, or digits from the end of the phone number (the last 4 is what
+ * she reads off a UPI app or a call log). An empty query matches everything.
+ */
+export function searchOrders<
+  T extends { customerName: string | null; customerPhone: string | null; billNumber: string },
+>(orders: T[], query: string): T[] {
+  const q = query.trim().toLowerCase();
+  if (!q) return orders;
+  const digits = /^[\d\s+-]+$/.test(q) ? q.replace(/\D/g, "") : "";
+  return orders.filter((o) => {
+    if (o.customerName?.toLowerCase().includes(q)) return true;
+    if (o.billNumber.toLowerCase().includes(q)) return true;
+    if (!digits || !o.customerPhone) return false;
+    const phone = o.customerPhone.replace(/\D/g, "");
+    return digits.length >= 4 ? phone.endsWith(digits) : phone.slice(-4).includes(digits);
+  });
+}
+
+export type HandoverFilter = "all" | "pickup" | "delivery";
+
+/** Same split as `groupByFulfilment`: anything that is not a pickup is a delivery. */
+export function filterByHandover<T extends { fulfilmentType: FulfilmentType | null }>(
+  orders: T[],
+  handover: HandoverFilter,
+): T[] {
+  if (handover === "all") return orders;
+  return orders.filter((o) => (o.fulfilmentType === "PICKUP") === (handover === "pickup"));
+}
+
 // ─── Summary ────────────────────────────────────────────────────────
 
 export type BoardSummary = {
@@ -324,6 +357,34 @@ export function availableOrderActions(
   return out;
 }
 
+type CardOrder = Parameters<typeof availableOrderActions>[0];
+
+/**
+ * The one button a card draws as its next step; every other action is outline.
+ * Always one of `availableOrderActions`, so it can never offer something the
+ * card (or the bulk bar) would not:
+ *   - a buyer's "I've paid" claim is waiting → answer it ("Payment received");
+ *   - a new order → "Confirm";
+ *   - a confirmed order → hand it over ("Delivered" / "… collected");
+ *   - handed over but still unpaid → "Payment received".
+ */
+export function primaryOrderAction(o: CardOrder, frozen: boolean): OrderAction | null {
+  const actions = availableOrderActions(o, frozen);
+  if (o.displayState === "PAYMENT_SUBMITTED" && actions.has("mark_paid")) return "mark_paid";
+  if (actions.has("confirm")) return "confirm";
+  if (actions.has("deliver")) return "deliver";
+  if (actions.has("mark_paid")) return "mark_paid";
+  return null;
+}
+
+/**
+ * A single "Payment received" tap asks first unless the buyer has claimed the
+ * payment: then the card already shows the claim (and the UTR) to check against.
+ */
+export function markPaidNeedsConfirm(o: { displayState: OrderDisplayState }): boolean {
+  return o.displayState !== "PAYMENT_SUBMITTED";
+}
+
 // ─── One board, two kinds of order ──────────────────────────────────
 
 /** What the board is showing: everything, only menu orders, or one drop (its id). */
@@ -398,8 +459,8 @@ export const DROP_STATUS_LABEL: Record<EffectiveDropStatus, string> = {
   SCHEDULED: "Opens later",
   OPEN: "Taking orders",
   CLOSED: "Orders closed",
-  FROZEN: "Frozen (cooking)",
-  FULFILLED: "Fulfilled",
+  FROZEN: "Orders locked",
+  FULFILLED: "Done",
 };
 
 /** Board polls the KV signal only while a drop can still receive orders. */

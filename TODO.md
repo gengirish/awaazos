@@ -142,7 +142,7 @@ Unit-tested; never seen in a real WhatsApp message because no receipt has been s
 
 ### 3.2 Tap-to-compose WhatsApp order on the storefront
 **Status:** implemented on `feat/whatsapp-order`. When `VendorSettings.whatsappNumber` is set,
-checkout (drops and menu) also offers "Place order & send on WhatsApp": the order is saved exactly
+checkout (drops and menu) also offers the checkbox "Also send my order to the store on WhatsApp": the order is saved exactly
 as today (`source` stays `STOREFRONT`, so the board, payment, stock and plan-cap rules are
 unchanged), then `/s/[slug]/o/[token]?wa=1` leads with a wa.me link pre-filled with the whole order
 (`formatWhatsAppOrderMessage` in `lib/storefront-order.ts`). Not done: tagging these orders

@@ -201,6 +201,6 @@ describe("bulkResultMessage", () => {
 
   it("frozen and total failure", () => {
     const m = bulkResultMessage("confirm", { succeeded: [], failed: [{ id: "b", error: "drop_frozen" }] });
-    expect(m).toEqual({ kind: "error", text: "No orders changed (orders are frozen). Refreshed." });
+    expect(m).toEqual({ kind: "error", text: "No orders changed (orders are locked). Refreshed." });
   });
 });

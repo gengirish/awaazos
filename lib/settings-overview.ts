@@ -1,4 +1,4 @@
-import type { FulfilmentMode, Plan, ReceiptPaper } from "@prisma/client";
+import type { FulfilmentMode, Plan, ReceiptPaper, StaffRole } from "@prisma/client";
 
 import { PLAN_LIMITS, VOICE_LANGUAGES } from "./constants";
 
@@ -6,6 +6,9 @@ import { PLAN_LIMITS, VOICE_LANGUAGES } from "./constants";
  * Pure helpers behind the Settings hub (/settings): one-line status per area
  * and the "setup checklist" for taking online orders. Kept free of Prisma and
  * React so the wording is unit-tested and identical wherever it is shown.
+ *
+ * The checklist is drawn by components/setup/SetupChecklistCard.tsx (Settings,
+ * /orders, /pos, /drops) from lib/setup-checklist-server.ts.
  */
 
 export type SettingsSnapshot = {
@@ -24,6 +27,8 @@ export type SettingsSnapshot = {
    */
   billing?: { kind: "trial"; daysLeft: number } | { kind: "locked" };
   availableItemCount: number;
+  /** Drops this vendor has ever created, drafts included. */
+  dropCount: number;
   /** VAPID keys present on this deployment (lib/push.ts isPushConfigured). */
   pushConfigured: boolean;
   /** Opted-in alert devices across the vendor's active staff. */
@@ -126,17 +131,29 @@ export function notificationsStatus(
   return { text: `On · ${s.pushDeviceCount} ${s.pushDeviceCount === 1 ? "device" : "devices"}`, on: true };
 }
 
-export type ChecklistItemId = "menu_items" | "publish_store" | "payment_method";
+export type ChecklistItemId = "menu_items" | "publish_store" | "payment_method" | "first_drop";
 
-export type ChecklistItem = { id: ChecklistItemId; text: string; href: string; linkText: string };
+export type ChecklistItem = {
+  id: ChecklistItemId;
+  text: string;
+  href: string;
+  linkText: string;
+  /** Lowest staff role that can do this step (the page behind `href` enforces it). */
+  minRole: StaffRole;
+  /** A second way to tick the step off, in words. */
+  hint?: string;
+};
+
+export type SetupChecklistInput = Pick<
+  SettingsSnapshot,
+  "availableItemCount" | "publishStorefront" | "upiId" | "acceptPayOnDelivery" | "acceptMenuOrders" | "dropCount"
+>;
 
 /**
  * What is still missing before customers can order online. Empty means
- * everything essential is done, and the hub hides the checklist.
+ * everything essential is done, and the checklist is hidden.
  */
-export function setupChecklist(
-  s: Pick<SettingsSnapshot, "availableItemCount" | "publishStorefront" | "upiId" | "acceptPayOnDelivery">,
-): ChecklistItem[] {
+export function setupChecklist(s: SetupChecklistInput): ChecklistItem[] {
   const items: ChecklistItem[] = [];
   if (s.availableItemCount <= 0) {
     items.push({
@@ -144,6 +161,8 @@ export function setupChecklist(
       text: "Add at least one item to your menu",
       href: "/menu",
       linkText: "Go to Menu",
+      // The API lets a cashier add items, but the shell hides Menu from them (lib/app-nav.ts).
+      minRole: "MANAGER",
     });
   }
   if (!s.publishStorefront) {
@@ -152,6 +171,7 @@ export function setupChecklist(
       text: "Publish your online store",
       href: "/settings/store",
       linkText: "Go to Online store",
+      minRole: "OWNER",
     });
   }
   if (!s.upiId?.trim() && !s.acceptPayOnDelivery) {
@@ -160,9 +180,28 @@ export function setupChecklist(
       text: "Add a UPI ID or allow pay on delivery",
       href: "/settings/payments",
       linkText: "Go to Payments",
+      minRole: "OWNER",
+    });
+  }
+  // Customers need something to order from: a drop, or the everyday menu.
+  if (s.dropCount <= 0 && !s.acceptMenuOrders) {
+    items.push({
+      id: "first_drop",
+      text: "Create your first drop or turn on menu orders",
+      href: "/drops/new",
+      linkText: "Create a drop",
+      minRole: "MANAGER",
+      hint: "To sell from your everyday menu instead, the owner turns on Order from menu in Settings → Online orders.",
     });
   }
   return items;
+}
+
+const STAFF_ROLE_RANK: Record<StaffRole, number> = { CASHIER: 0, MANAGER: 1, OWNER: 2 };
+
+/** Only the steps this staff member can act on; nobody is sent to a screen that refuses them. */
+export function checklistForRole(items: ChecklistItem[], role: StaffRole): ChecklistItem[] {
+  return items.filter((item) => STAFF_ROLE_RANK[role] >= STAFF_ROLE_RANK[item.minRole]);
 }
 
 /** Old single-page anchors (`/settings#storefront`) → the section that replaced them. */

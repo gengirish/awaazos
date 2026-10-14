@@ -35,7 +35,7 @@ const MAX_FEE_PAISE = 100_000;
 
 const BLOCKER_COPY: Record<MenuOrdersBlocker, { text: string; href: string; link: string }> = {
   storefront_not_published: {
-    text: "Publish your storefront first, so customers have a page to order from.",
+    text: "Publish your store first, so customers have a page to order from.",
     href: "/settings/store",
     link: "Go to Online store",
   },
@@ -153,7 +153,7 @@ export function MenuOrdersClient({
           </label>
           <p className="text-xs text-muted-foreground">
             {enabled
-              ? "Customers can order available menu items from your storefront. New orders show under Orders."
+              ? "Customers can order available menu items from your store page. New orders show under Orders."
               : "Off. Customers can only see your menu (and order from open Drops)."}
           </p>
           <p className="text-xs text-muted-foreground">
@@ -297,7 +297,7 @@ export function MenuOrdersClient({
               className="rounded-md border border-amber-500/60 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
             >
               <span className="font-semibold">Recommended:</span> Add where and when to collect, e.g.
-              &ldquo;Stall 12, Exhibition Grounds · 5–9 pm&rdquo; — customers see this at checkout.
+              &ldquo;Gate 2, Sunrise Apartments, Indiranagar · 5–8 pm&rdquo; — customers see this at checkout.
             </p>
           ) : (
             <p id="menu-pickup-note-hint" className="text-xs text-muted-foreground">

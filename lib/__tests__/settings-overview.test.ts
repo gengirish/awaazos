@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  checklistForRole,
   LEGACY_SETTINGS_ANCHORS,
   notificationsStatus,
   ordersStatus,
@@ -83,7 +84,22 @@ describe("settings hub status lines", () => {
 });
 
 describe("setupChecklist", () => {
-  const ready = { availableItemCount: 3, publishStorefront: true, upiId: null, acceptPayOnDelivery: true };
+  const ready = {
+    availableItemCount: 3,
+    publishStorefront: true,
+    upiId: null,
+    acceptPayOnDelivery: true,
+    acceptMenuOrders: false,
+    dropCount: 1,
+  };
+  const nothing = {
+    availableItemCount: 0,
+    publishStorefront: false,
+    upiId: "",
+    acceptPayOnDelivery: false,
+    acceptMenuOrders: false,
+    dropCount: 0,
+  };
 
   it("is empty when the stall can take online orders", () => {
     expect(setupChecklist(ready)).toEqual([]);
@@ -91,16 +107,34 @@ describe("setupChecklist", () => {
   });
 
   it("lists every missing step with where to fix it", () => {
-    const items = setupChecklist({ availableItemCount: 0, publishStorefront: false, upiId: "", acceptPayOnDelivery: false });
+    const items = setupChecklist(nothing);
     expect(items.map((i) => [i.id, i.href])).toEqual([
       ["menu_items", "/menu"],
       ["publish_store", "/settings/store"],
       ["payment_method", "/settings/payments"],
+      ["first_drop", "/drops/new"],
     ]);
   });
 
   it("needs a payment method only when both UPI and pay on delivery are missing", () => {
     expect(setupChecklist({ ...ready, acceptPayOnDelivery: false }).map((i) => i.id)).toEqual(["payment_method"]);
+  });
+
+  it("needs something to order from: a drop, or menu orders switched on", () => {
+    expect(setupChecklist({ ...ready, dropCount: 0 }).map((i) => i.id)).toEqual(["first_drop"]);
+    expect(setupChecklist({ ...ready, dropCount: 0, acceptMenuOrders: true })).toEqual([]);
+  });
+
+  it("shows a staff member only the steps their role can act on", () => {
+    const items = setupChecklist(nothing);
+    expect(checklistForRole(items, "OWNER").map((i) => i.id)).toEqual([
+      "menu_items",
+      "publish_store",
+      "payment_method",
+      "first_drop",
+    ]);
+    expect(checklistForRole(items, "MANAGER").map((i) => i.id)).toEqual(["menu_items", "first_drop"]);
+    expect(checklistForRole(items, "CASHIER")).toEqual([]);
   });
 });
 

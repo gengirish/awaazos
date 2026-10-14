@@ -35,7 +35,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     id: "store",
     href: "/settings/store",
     title: "Online store",
-    description: "Your menu page that customers open from a link or QR.",
+    description: "Your store page that customers open from a link or QR.",
     icon: Store,
   },
   {

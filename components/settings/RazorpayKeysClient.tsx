@@ -137,7 +137,7 @@ export function RazorpayKeysClient({
 
   const explainer = (
     <p className="text-sm text-muted-foreground">
-      Customers pay by UPI, card or netbanking on your storefront and the order is marked paid automatically.
+      Customers pay by UPI, card or netbanking on your store page and the order is marked paid automatically.
       The money goes straight into <strong className="font-semibold text-foreground">your own Razorpay account</strong>{" "}
       — AwaazOS never touches it. Razorpay&apos;s own fees apply.
     </p>
