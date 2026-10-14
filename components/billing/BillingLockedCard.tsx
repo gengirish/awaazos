@@ -2,7 +2,6 @@ import type { StaffRole } from "@prisma/client";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { TRIAL_DAYS } from "@/lib/constants";
 import { formatIstDate } from "@/lib/datetime";
 import { PLAN_MARKETING } from "@/lib/plan-copy";
 
@@ -21,7 +20,7 @@ export function BillingLockedCard({ since, staffRole }: { since: Date; staffRole
           Subscribe to keep selling
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Your {TRIAL_DAYS}-day free trial or paid period ended on {formatIstDate(since)}. New bills and online
+          Your free trial or paid period ended on {formatIstDate(since)}. New bills and online
           orders are paused until you subscribe. Your bills, reports and settings are all still here.
         </p>
         <p className="mt-4 text-lg font-semibold">

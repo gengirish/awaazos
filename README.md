@@ -284,6 +284,7 @@ awaazos/
 │   ├── (onboarding)/        first-run vendor setup
 │   ├── (vendor)/            pos, menu, transactions, analytics, orders, drops, settings (hub + sections)
 │   ├── admin/metrics/       platform KPIs (admin only; lib/admin-metrics.ts)
+│   ├── admin/vendors/       give a store free access until a date (super admin; lib/admin-free-access.ts)
 │   ├── s/[slug]/            public storefront: menu, drops, checkout, buyer order + account pages
 │   ├── legal/               terms, privacy, refund, DPDP rights
 │   └── api/                 ai/ (transcribe, parse-order), transactions, menu, receipts, drops,
