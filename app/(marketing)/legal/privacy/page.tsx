@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
-import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
+import { BUSINESS_NAME, BusinessDetails } from "@/components/legal/BusinessDetails";
 
 export const metadata: Metadata = {
   title: "Privacy Policy — AwaazOS",
@@ -12,10 +12,10 @@ export default function PrivacyPage() {
   return (
     <>
       <h1>Privacy Policy</h1>
-      <p>Last updated: 03 May 2026</p>
+      <p>Last updated: 13 October 2026</p>
       <p>
-        AwaazOS is built by IntelliForge AI in Hyderabad, India. This policy explains how we collect, use, and
-        protect data when you use AwaazOS.
+        AwaazOS is built and run by {BUSINESS_NAME} (IntelliForge AI), a proprietorship in Hyderabad, India. This
+        policy explains how we collect, use, and protect data when you use AwaazOS.
       </p>
 
       <h2>Data we collect</h2>
@@ -68,10 +68,7 @@ export default function PrivacyPage() {
       </p>
 
       <h2>Contact</h2>
-      <p>
-        IntelliForge AI, Hyderabad, India<br />
-        Email: <SupportEmailLink />
-      </p>
+      <BusinessDetails />
     </>
   );
 }
