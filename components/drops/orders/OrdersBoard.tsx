@@ -26,7 +26,6 @@ import { BoardMoreActions, MORE_ACTION_ROW } from "@/components/drops/orders/Boa
 import { BulkActionBar } from "@/components/drops/orders/BulkActionBar";
 import { OrderCard, type OrderSource } from "@/components/drops/orders/OrderCard";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
-import { ShareStoreControls } from "@/components/drops/ShareStoreControls";
 import { PushAlertsButton, PushAlertsPrompt } from "@/components/push/PushAlertsButton";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -97,6 +96,11 @@ const BoardScopePicker = dynamic(() => import("@/components/drops/orders/BoardSc
   ssr: false,
   loading: () => <div aria-hidden className="h-11 w-40 rounded-md border border-input" />,
 });
+// Only sellers taking menu orders see the store's share controls; load them after the board.
+const ShareStoreControls = dynamic(
+  () => import("@/components/drops/ShareStoreControls").then((m) => m.ShareStoreControls),
+  { loading: () => <div aria-hidden className="h-11 rounded-full border border-input" /> },
+);
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 /** Coming back to the tab (e.g. tapping a push alert) refetches at most this often. */
