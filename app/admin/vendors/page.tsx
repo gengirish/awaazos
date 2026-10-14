@@ -1,13 +1,15 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AdminNav } from "@/components/admin/AdminNav";
 import { FreeAccessForm } from "@/components/admin/FreeAccessForm";
+import { StoreHealthLine } from "@/components/admin/StoreHealthLine";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { freeAccessMaxYmd, istTodayYmd } from "@/lib/admin-free-access";
+import { healthFor, loadStoreHealth } from "@/lib/admin-store-health";
 import { ADMIN_VENDOR_LIST_LIMIT, listAdminVendors, type AdminVendorRow } from "@/lib/admin-vendors";
 import { PLAN_LIMITS } from "@/lib/constants";
 import { formatIstDate } from "@/lib/datetime";
@@ -61,6 +63,10 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
 
   const now = new Date();
   const vendors = await listAdminVendors(q);
+  const health = await loadStoreHealth(
+    vendors.map((v) => v.id),
+    now,
+  );
   const todayYmd = istTodayYmd(now);
   const maxYmd = freeAccessMaxYmd(now);
 
@@ -76,14 +82,7 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
           Let a store use AwaazOS free until a date you pick. It keeps Starter features and is not asked to pay
           before then.
         </p>
-        <nav aria-label="Admin" className="mt-2">
-          <Link
-            href="/admin/metrics"
-            className="inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
-          >
-            Weekly metrics
-          </Link>
-        </nav>
+        <AdminNav current="/admin/vendors" superAdmin />
       </header>
 
       <main id="main" className="mx-auto max-w-3xl">
@@ -122,10 +121,14 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
                         <h3 className="truncate font-semibold text-foreground">{vendor.name}</h3>
                         <p className="truncate font-mono text-xs text-muted-foreground">/s/{vendor.slug}</p>
                       </div>
-                      {vendor.isActive ? null : <Badge variant="secondary">Inactive</Badge>}
+                      <div className="flex flex-wrap gap-1">
+                        {vendor.isDemo ? <Badge variant="outline">Demo</Badge> : null}
+                        {vendor.isActive ? null : <Badge variant="secondary">Inactive</Badge>}
+                      </div>
                     </div>
                     <p className="mt-2 text-sm text-foreground">{status}</p>
                     <p className="text-xs text-muted-foreground">Signed up {formatIstDate(vendor.createdAt)}</p>
+                    <StoreHealthLine health={healthFor(health, vendor.id)} now={now} />
                     {note ? <p className="mt-2 text-sm text-muted-foreground">{note}</p> : null}
                     <div className="mt-4">
                       <FreeAccessForm

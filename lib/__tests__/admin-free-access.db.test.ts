@@ -167,7 +167,7 @@ describe.skipIf(!ENABLED)("admin free-access route — DB integration", () => {
     const bySlug = await listAdminVendors(v.slug.toUpperCase());
     expect(bySlug.map((r) => r.id)).toEqual([v.id]);
     expect(Object.keys(bySlug[0]).sort()).toEqual(
-      ["createdAt", "id", "isActive", "name", "plan", "planExpiresAt", "slug", "trialEndsAt"].sort(),
+      ["createdAt", "id", "isActive", "isDemo", "name", "plan", "planExpiresAt", "slug", "trialEndsAt"].sort(),
     );
 
     expect((await listAdminVendors(v.name)).map((r) => r.id)).toEqual([v.id]);
