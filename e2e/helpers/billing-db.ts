@@ -1,4 +1,4 @@
-import { PrismaClient, type Plan, type StaffRole } from "@prisma/client";
+import { PrismaClient, type Plan, type StaffRole, type UserRole } from "@prisma/client";
 
 /**
  * Billing state can't be reached through the app (a trial takes 30 days to
@@ -51,6 +51,18 @@ export async function setStaffRole(email: string, role: StaffRole): Promise<void
   const res = await db().staffMember.updateMany({ where: { user: { email } }, data: { role } });
   if (res.count !== 1) {
     throw new Error(`setStaffRole: expected 1 staff row for the e2e email, got ${res.count}`);
+  }
+}
+
+/**
+ * Give the user registered with `email` a platform role. Nothing in the app
+ * grants one (it is set by hand in the database), so this is the only way a
+ * spec can reach /admin/*. Same guard: local throwaway database only.
+ */
+export async function setPlatformRole(email: string, role: UserRole): Promise<void> {
+  const res = await db().user.updateMany({ where: { email }, data: { role } });
+  if (res.count !== 1) {
+    throw new Error(`setPlatformRole: expected 1 user for the e2e email, got ${res.count}`);
   }
 }
 

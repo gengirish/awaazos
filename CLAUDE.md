@@ -281,6 +281,11 @@ passes, so Neon can sleep.
   `plan` / `planExpiresAt` anywhere else.
 - Marketing copy (`lib/plan-copy.ts`) and the legal pages read the trial length and prices from
   the constants. FREE is not marketed.
+- **Free access by hand:** a platform SUPER_ADMIN picks a "free until" day for a store on
+  `/admin/vendors` (`PATCH /api/admin/vendors/[id]/free-access`, `lib/admin-free-access.ts`). It only
+  moves `trialEndsAt` (23:59 IST that day, today … +24 months), so the store is on the trial for
+  longer; `plan` / `planExpiresAt` are untouched. Anyone else gets 404. The log line
+  "admin granted free access" is the only audit trail.
 - E2E: new vendors are on the trial. Specs that need another state set it in the database with
   `e2e/helpers/billing-db.ts` (local databases only).
 

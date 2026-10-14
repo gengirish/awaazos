@@ -450,7 +450,7 @@ flowchart TD
 
 | Layer | Enum | Values | Stored on | Purpose |
 | --- | --- | --- | --- | --- |
-| Platform | `UserRole` | `USER`, `ADMIN`, `SUPER_ADMIN` | `User.role` | AwaazOS internal admin (us); `/admin/metrics` needs `ADMIN`+ |
+| Platform | `UserRole` | `USER`, `ADMIN`, `SUPER_ADMIN` | `User.role` | AwaazOS internal admin (us); `/admin/metrics` needs `ADMIN`+; `/admin/vendors` (free access) needs `SUPER_ADMIN` |
 | Tenant | `StaffRole` | `OWNER`, `MANAGER`, `CASHIER` | `StaffMember.role` | Per-vendor permissions |
 
 A `User` can be staff at multiple `Vendor`s (multi-org). Active vendor resolution priority: `?vendor=` query param → `awz_vendor` cookie → oldest membership. When `requireVendorRole` returns a non-null `setVendorCookie`, the route sets that cookie on its response.

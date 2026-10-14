@@ -2,7 +2,6 @@ import type { StaffRole } from "@prisma/client";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { TRIAL_DAYS } from "@/lib/constants";
 import { formatIstDate } from "@/lib/datetime";
 import { PLAN_MARKETING } from "@/lib/plan-copy";
 
@@ -45,7 +44,7 @@ export function BillingLockedCard({
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
           {reason === "trial"
-            ? `Your ${TRIAL_DAYS}-day free trial ended on ${formatIstDate(since)}.`
+            ? `Your free trial ended on ${formatIstDate(since)}.`
             : `Your paid plan ended on ${formatIstDate(since)}.`}{" "}
           New bills and online orders are paused until you subscribe. Your bills, reports and settings are all
           still here.

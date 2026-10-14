@@ -39,6 +39,8 @@ export default async function BillingSettingsPage() {
     const limits = PLAN_LIMITS[vendor.plan];
     const cap = limits.monthlyTxnCap;
     const usageLabel = cap === null ? `${txnCount} / Unlimited` : `${txnCount} / ${cap}`;
+    // More than TRIAL_DAYS left means free access granted on /admin/vendors.
+    const trialLeft = access.kind === "trial" ? trialDaysLeft(access.endsAt, now) : 0;
     const hasLiveSubscription = LIVE_SUBSCRIPTION_STATUSES.includes(settings?.razorpaySubStatus ?? "");
 
     return (
@@ -56,7 +58,7 @@ export default async function BillingSettingsPage() {
             </p>
             {access.kind === "trial" ? (
               <p className="mt-1 text-sm text-muted-foreground">
-                {trialDaysLeft(access.endsAt, now)} of {TRIAL_DAYS} days left — ends on{" "}
+                {trialLeft > TRIAL_DAYS ? trialLeft : `${trialLeft} of ${TRIAL_DAYS}`} days left — ends on{" "}
                 {formatIstDate(access.endsAt)}. Subscribe any time; you won&apos;t be charged until the trial ends.
               </p>
             ) : access.kind === "locked" ? (

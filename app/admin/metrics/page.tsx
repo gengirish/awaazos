@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -38,10 +39,11 @@ function deltaClass(tone: "pos" | "neg" | "zero"): string {
 }
 
 export default async function AdminMetricsPage() {
+  let canManageStores = false;
   // Re-read the User row rather than trusting `session.user.role` off the JWT, so a
   // role revoked in the database takes effect immediately instead of at token expiry.
   try {
-    await requirePlatformRole("ADMIN");
+    canManageStores = (await requirePlatformRole("ADMIN")).user.role === "SUPER_ADMIN";
   } catch (err) {
     // 404, not 403 — never disclose that this admin surface exists.
     if (err instanceof AuthError) notFound();
@@ -67,6 +69,16 @@ export default async function AdminMetricsPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Rolling 7-day windows, IST midnights · Generated {generatedAt}
         </p>
+        {canManageStores ? (
+          <nav aria-label="Admin" className="mt-2">
+            <Link
+              href="/admin/vendors"
+              className="inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
+            >
+              Stores and free access
+            </Link>
+          </nav>
+        ) : null}
       </header>
 
       <main className="mx-auto grid max-w-5xl grid-cols-1 gap-4 md:grid-cols-6">
