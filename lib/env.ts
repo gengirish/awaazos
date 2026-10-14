@@ -41,6 +41,11 @@ const envSchema = z.object({
   GUPSHUP_SOURCE_NUMBER: z.string().optional(),
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
   REDIS_URL: z.string().optional(),
+  // Internal demo-store API (lib/internal-auth.ts). Absent or < 32 chars →
+  // every /api/internal/* call is 401. Server-side only; never NEXT_PUBLIC_.
+  INTERNAL_API_KEY: z.string().optional(),
+  // Login of the internal account that owns demo stores until handover.
+  DEMO_OWNER_EMAIL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

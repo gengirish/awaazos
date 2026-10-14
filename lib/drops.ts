@@ -219,7 +219,8 @@ export function generateOrderToken(): string {
 /**
  * Transactions that are real sales: every counter sale (any status — it was
  * rung up), plus storefront orders only once they are paid. Unpaid, expired
- * and cancelled pre-orders (cancel of a paid order sets REFUNDED) are excluded.
+ * and cancelled pre-orders (cancel of a paid order sets REFUNDED) are excluded,
+ * and so are a demo store's sample orders (`isSample`, lib/demo-store.ts).
  *
  * This is the one definition of "a bill" for the plan cap, the billing usage
  * line and analytics counts. Spread it into a `where` alongside `vendorId`;
@@ -227,14 +228,14 @@ export function generateOrderToken(): string {
  * `billableTxnSql` is its raw-SQL twin — keep the two in lockstep (tested).
  */
 export function billableTxnWhere(): Prisma.TransactionWhereInput {
-  return { OR: [{ source: { not: "STOREFRONT" } }, { paymentStatus: "PAID" }] };
+  return { isSample: false, OR: [{ source: { not: "STOREFRONT" } }, { paymentStatus: "PAID" }] };
 }
 
 /**
  * Raw-SQL twin of `billableTxnWhere`, for `$queryRaw`. Expects the
  * `transactions` table aliased as `t`.
  */
-export const billableTxnSql = Prisma.sql`(t."source" <> 'STOREFRONT' OR t."paymentStatus" = 'PAID')`;
+export const billableTxnSql = Prisma.sql`(NOT t."isSample" AND (t."source" <> 'STOREFRONT' OR t."paymentStatus" = 'PAID'))`;
 
 const IST_OFFSET_MS = 330 * 60_000;
 
@@ -551,8 +552,10 @@ export async function markOrderPaid(
 
   const t = await tx.transaction.findFirstOrThrow({
     where: { id: args.transactionId, vendorId: args.vendorId },
-    select: { totalPaise: true, paymentMethod: true, orderItems: { select: { qty: true } } },
+    select: { totalPaise: true, paymentMethod: true, isSample: true, orderItems: { select: { qty: true } } },
   });
+  // A demo store's sample order is not revenue (lib/demo-store.ts).
+  if (t.isSample) return true;
   await applyToDailySummary(tx, {
     vendorId: args.vendorId,
     date: getIstTodayStart(now),
@@ -585,6 +588,7 @@ export async function cancelOrder(
       paymentMethod: true,
       paidAt: true,
       totalPaise: true,
+      isSample: true,
       orderItems: { select: { qty: true } },
     },
   });
@@ -601,7 +605,7 @@ export async function cancelOrder(
   });
   if (res.count === 0) return false;
 
-  if (wasPaid && t.paidAt) {
+  if (wasPaid && t.paidAt && !t.isSample) {
     await applyToDailySummary(tx, {
       vendorId: args.vendorId,
       date: getIstTodayStart(t.paidAt),

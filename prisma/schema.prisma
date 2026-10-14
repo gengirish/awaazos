@@ -13,30 +13,35 @@ datasource db {
 // ─── VENDOR (Tenant) ────────────────────────────────────────────────
 
 model Vendor {
-  id             String    @id @default(cuid())
-  slug           String    @unique // URL-safe handle, e.g. "ravis-bhel"
-  name           String // Stall/shop name
-  ownerName      String
-  phone          String? // +91 format
-  email          String?
-  upiId          String? // e.g. vendor@okaxis
-  upiName        String? // Name shown on UPI screen
-  logoUrl        String? // Vercel Blob URL
-  bannerUrl      String? // Vercel Blob URL — wide cover photo on /s/[slug] (POST /api/vendor/banner)
-  plan           Plan      @default(FREE)
-  planExpiresAt  DateTime?
+  id              String    @id @default(cuid())
+  slug            String    @unique // URL-safe handle, e.g. "ravis-bhel"
+  name            String // Stall/shop name
+  ownerName       String
+  phone           String? // +91 format
+  email           String?
+  upiId           String? // e.g. vendor@okaxis
+  upiName         String? // Name shown on UPI screen
+  logoUrl         String? // Vercel Blob URL
+  bannerUrl       String? // Vercel Blob URL — wide cover photo on /s/[slug] (POST /api/vendor/banner)
+  plan            Plan      @default(FREE)
+  planExpiresAt   DateTime?
   // End of the 30-day free trial (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md). Set at
   // sign-up; null = grandfathered vendor on FREE, never locked. Evaluated
   // lazily by billingAccess() in lib/plan.ts — nothing runs at this instant.
-  trialEndsAt    DateTime?
-  stallType      StallType @default(GENERAL)
-  city           String?
-  state          String    @default("Telangana")
-  gstin          String? // 15-char GST identifier (optional)
-  isActive       Boolean   @default(true)
-  onboardingDone Boolean   @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  trialEndsAt     DateTime?
+  stallType       StallType @default(GENERAL)
+  city            String?
+  state           String    @default("Telangana")
+  gstin           String? // 15-char GST identifier (optional)
+  isActive        Boolean   @default(true)
+  onboardingDone  Boolean   @default(false)
+  // Internal demo store built for a prospect by POST /api/internal/demo-stores
+  // (lib/demo-store.ts). Owned by the internal demo account until the prospect
+  // claims it; excluded from platform metrics and subscriptions; noindex.
+  isDemo          Boolean   @default(false)
+  demoExternalRef String?   @unique // The outreach workflow's idempotency key; kept after claim
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
   menuItems          MenuItem[]
   transactions       Transaction[]
@@ -50,6 +55,7 @@ model Vendor {
   pushSubscriptions  PushSubscription[]
   subscriptionEvents SubscriptionEvent[]
   offers             Offer[]
+  demoHandovers      DemoHandover[]
 
   @@index([slug])
   @@map("vendors")
@@ -139,6 +145,7 @@ model MenuItem {
   isPopular    Boolean  @default(false)
   sortOrder    Int      @default(0)
   imageUrl     String?
+  unit         String? // Selling unit shown after the price ("kg", "piece"); null = none
   hsnCode      String? // HSN/SAC; falls back to VendorSettings.hsnDefault
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -348,6 +355,16 @@ model Transaction {
   // confirms with "Payment received" (markOrderPaid) or "Not received".
   paymentClaimedAt  DateTime?
   paymentRejectedAt DateTime? // Seller tapped "Not received"; a new claim then needs a UTR
+  // Paid up front against totalPaise, order still PENDING until the balance is
+  // in. 0 = no advance. Never above totalPaise; never credits DailySummary.
+  advancePaidPaise  Int           @default(0)
+  // When the buyer wants it (cake for a party): a menu order's own date. Drop
+  // orders use the drop's window instead. Null = as soon as ready.
+  fulfilAt          DateTime?
+  // Demo-store sample order (lib/demo-store.ts). On handover they are archived
+  // (archivedAt set, hidden from every list) or deleted.
+  isSample          Boolean       @default(false)
+  archivedAt        DateTime?
 
   // Storefront pre-orders (source = STOREFRONT). Null for counter sales.
   dropId           String?
@@ -576,6 +593,41 @@ model VoiceParseLog {
   @@index([vendorId, createdAt])
   @@index([modelUsed, escalated])
   @@map("voice_parse_logs")
+}
+
+// ─── DEMO STORES (internal founder outreach) ──────────────────────
+// A pending claim of a demo store by its prospect. Only the SHA-256 of the
+// one-time token is stored. Created by POST /api/internal/demo-stores/{ref}/handover,
+// burned by POST /api/demo-claim; a new invite voids earlier unused ones.
+
+model DemoHandover {
+  id        String    @id @default(cuid())
+  vendorId  String
+  vendor    Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([vendorId])
+  @@map("demo_handovers")
+}
+
+// Who did what to a demo store, for the internal API. No PII: the external
+// ref and ids only. Not tied to Vendor by FK so a delete is still on record.
+// Also the create rate limit ("create" rows per actor in the last 24 h).
+model DemoAuditLog {
+  id          String   @id @default(cuid())
+  action      String // create | delete | handover | claim
+  externalRef String
+  vendorId    String?
+  actor       String // "key:<16 hex of sha256(INTERNAL_API_KEY)>" or "claim"
+  createdAt   DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@index([externalRef])
+  @@map("demo_audit_logs")
 }
 
 // ─── ENUMS ──────────────────────────────────────────────────────────
