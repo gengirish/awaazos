@@ -681,7 +681,7 @@ stateDiagram-v2
     OPEN --> CLOSED: Close now
     OPEN --> FROZEN
     CLOSED --> OPEN: Reopen (cut-off moved forward)
-    CLOSED --> FROZEN: Freeze (final cook list)
+    CLOSED --> FROZEN: Lock orders (final cook list)
     FROZEN --> CLOSED: Unfreeze
     FROZEN --> FULFILLED
     FULFILLED --> [*]

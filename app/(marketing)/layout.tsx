@@ -1,5 +1,6 @@
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { MarketingHeader } from "@/components/marketing/MarketingHeader";
+import { PLAN_MARKETING } from "@/lib/plan-copy";
 
 export default function MarketingLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -10,7 +11,8 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       >
         Skip to main content
       </a>
-      <MarketingHeader />
+      {/* The label is passed down so the client header does not bundle the plan copy. */}
+      <MarketingHeader cta={PLAN_MARKETING.STARTER.cta} />
       <main id="main" className="flex-1">
         {children}
       </main>

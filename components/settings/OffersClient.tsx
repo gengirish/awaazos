@@ -655,7 +655,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit }: Offer
                       checked={form.onPos}
                       onChange={(e) => set("onPos", e.target.checked)}
                     />
-                    Counter (POS)
+                    Counter sales
                   </label>
                   {err("where")}
                 </fieldset>

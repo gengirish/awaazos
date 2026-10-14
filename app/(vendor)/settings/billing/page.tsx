@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
+import { lockReason } from "@/components/billing/BillingLockedCard";
 import { BillingManageClient } from "@/components/billing/BillingManageClient";
 import { SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { PLAN_LIMITS, TRIAL_DAYS } from "@/lib/constants";
@@ -62,7 +63,10 @@ export default async function BillingSettingsPage() {
               </p>
             ) : access.kind === "locked" ? (
               <p className="mt-1 text-sm font-medium text-destructive">
-                Your free trial or paid period ended on {formatIstDate(access.since)}. New bills and online orders
+                {lockReason(access.since, vendor.trialEndsAt) === "trial"
+                  ? `Your ${TRIAL_DAYS}-day free trial`
+                  : "Your paid plan"}{" "}
+                ended on {formatIstDate(access.since)}. New bills and online orders
                 are paused until you subscribe. Your records are still here.
               </p>
             ) : planExpired && vendor.planExpiresAt ? (

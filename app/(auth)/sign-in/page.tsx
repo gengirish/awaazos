@@ -17,6 +17,8 @@ function SignInForm() {
   // An explicit callbackUrl (a deep link, or the page middleware bounced) wins;
   // otherwise the landing resolver picks the screen (lib/home.ts).
   const callbackUrl = searchParams.get("callbackUrl") || HOME_PATH;
+  // ResetPasswordForm sends people here with ?reset=ok.
+  const passwordReset = searchParams.get("reset") === "ok";
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -27,14 +29,27 @@ function SignInForm() {
     e.preventDefault();
     setError(null);
     setSubmitting(true);
-    const res = await signIn("credentials", {
-      email: email.trim().toLowerCase(),
-      password,
-      redirect: false,
-      callbackUrl,
-    });
-    if (!res || res.error) {
-      setError("Invalid email or password.");
+    let res: Awaited<ReturnType<typeof signIn>> | undefined;
+    try {
+      res = await signIn("credentials", {
+        email: email.trim().toLowerCase(),
+        password,
+        redirect: false,
+        callbackUrl,
+      });
+    } catch {
+      res = undefined;
+    }
+    if (!res) {
+      setError("No connection. Try again.");
+      setSubmitting(false);
+      return;
+    }
+    if (res.error) {
+      // "Configuration" is Auth.js for "authorize() threw" (the database, not the password).
+      setError(
+        res.error === "Configuration" ? "Could not sign you in right now. Try again." : "Invalid email or password.",
+      );
       setSubmitting(false);
       return;
     }
@@ -47,10 +62,15 @@ function SignInForm() {
       <CardHeader>
         {/* <h1>, not CardTitle (an <h3>): this is the page's only heading. */}
         <h1 className="font-display text-2xl font-semibold leading-none tracking-tight">Sign in</h1>
-        <CardDescription>Welcome back to AwaazOS — Bol. Bill. Becho.</CardDescription>
+        <CardDescription>Welcome back.</CardDescription>
       </CardHeader>
       <form onSubmit={onSubmit}>
         <CardContent className="space-y-4">
+          {passwordReset && !error ? (
+            <p className="text-sm font-medium text-foreground" role="status">
+              Password updated. Sign in with your new password.
+            </p>
+          ) : null}
           {error ? (
             <p className="text-sm text-destructive" role="alert">
               {error}

@@ -4,11 +4,13 @@ import { redirect } from "next/navigation";
 import { BillingLockedCard } from "@/components/billing/BillingLockedCard";
 import { TrialNotice } from "@/components/billing/TrialNotice";
 import { PosShell } from "@/components/pos/PosShell";
+import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
 import { getIstTodayStart } from "@/lib/billing-period";
 import { loadResolvedOffers } from "@/lib/offers-server";
 import { prisma } from "@/lib/prisma";
 import type { BillingAccess } from "@/lib/plan";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { loadSetupChecklist } from "@/lib/setup-checklist-server";
 
 export const dynamic = "force-dynamic";
 
@@ -16,9 +18,11 @@ export default async function PosPage() {
   let vendorId: string;
   let staffRole: StaffRole;
   let access: BillingAccess;
+  let trialEndsAt: Date | null;
   try {
     const ctx = await requireVendorRole("CASHIER");
     vendorId = ctx.vendor.id;
+    trialEndsAt = ctx.vendor.trialEndsAt;
     staffRole = ctx.staff.role;
     access = ctx.access;
   } catch (e) {
@@ -34,7 +38,7 @@ export default async function PosPage() {
   if (access.kind === "locked") {
     return (
       <div data-pos-page="locked">
-        <BillingLockedCard since={access.since} staffRole={staffRole} />
+        <BillingLockedCard since={access.since} staffRole={staffRole} trialEndsAt={trialEndsAt} />
       </div>
     );
   }
@@ -72,6 +76,14 @@ export default async function PosPage() {
   }
 
   const s = vendorRecord.settings;
+
+  // What still stops online orders, for the people who can fix it (nothing for
+  // a cashier, nothing once done). Reuses the rows read above; adds one count.
+  const setup = await loadSetupChecklist({
+    vendor: vendorRecord,
+    role: staffRole,
+    known: { settings: s, availableItemCount: menuItems.length },
+  });
   const settings = {
     voiceLang: s?.voiceLang ?? "en-IN",
     taxEnabled: s?.taxEnabled ?? false,
@@ -100,6 +112,12 @@ export default async function PosPage() {
           now={new Date()}
           isOwner={staffRole === "OWNER"}
         />
+      ) : null}
+      {/* One closed row above the till, in PosShell's column. */}
+      {setup.items.length > 0 ? (
+        <div className="mx-auto max-w-lg px-4 pt-3 md:max-w-6xl">
+          <SetupChecklistCard {...setup} variant="compact" />
+        </div>
       ) : null}
       <PosShell
         vendor={{

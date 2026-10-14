@@ -5,51 +5,60 @@
       "/ (cookie banner)@390": {
         "overflow": false,
         "tapTargets": {
-          "button \"Accept\"": { "count": 1, "size": "68x44" },
-          "button \"Decline optional\"": { "count": 1, "size": "129x44" }
+          "button \"Accept\"": { "count": 1, "size": "175x44" },
+          "button \"Decline optional\"": { "count": 1, "size": "175x44" }
         }
       },
       "/@360": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "87x44" },
-          "link \"Get Started\"": { "count": 1, "size": "106x44" },
+          "button \"Install app\"": { "count": 1, "size": "89x44" },
+          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"How it works\"": { "count": 1, "size": "96x44" },
           "link \"Pricing\"": { "count": 1, "size": "61x44" },
           "link \"Privacy\"": { "count": 1, "size": "46x44" },
-          "link \"See pricing →\"": { "count": 1, "size": "133x44" },
+          "link \"Refunds\"": { "count": 1, "size": "52x44" },
+          "link \"See pricing\"": { "count": 1, "size": "135x44" },
           "link \"Sign in\"": { "count": 1, "size": "69x44" },
-          "link \"Start ## days free\"": { "count": 1, "size": "276x44" },
-          "link \"Terms\"": { "count": 1, "size": "44x44" }
+          "link \"Start ## days free\"": { "count": 2, "size": "147x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" },
+          "link \"contact@intelliforge.tech\"": { "count": 1, "size": "158x44" }
         }
       },
       "/@390": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "87x44" },
-          "link \"Get Started\"": { "count": 1, "size": "106x44" },
+          "button \"Install app\"": { "count": 1, "size": "89x44" },
+          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"How it works\"": { "count": 1, "size": "96x44" },
           "link \"Pricing\"": { "count": 1, "size": "61x44" },
           "link \"Privacy\"": { "count": 1, "size": "46x44" },
-          "link \"See pricing →\"": { "count": 1, "size": "133x44" },
+          "link \"Refunds\"": { "count": 1, "size": "52x44" },
+          "link \"See pricing\"": { "count": 1, "size": "135x44" },
           "link \"Sign in\"": { "count": 1, "size": "69x44" },
-          "link \"Start ## days free\"": { "count": 1, "size": "306x44" },
-          "link \"Terms\"": { "count": 1, "size": "44x44" }
+          "link \"Start ## days free\"": { "count": 2, "size": "147x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" },
+          "link \"contact@intelliforge.tech\"": { "count": 1, "size": "158x44" }
         }
       },
       "/@768": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "87x44" },
-          "link \"Get Started\"": { "count": 1, "size": "114x44" },
+          "button \"Install app\"": { "count": 1, "size": "89x44" },
+          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"Home\"": { "count": 1, "size": "62x44" },
           "link \"How it works\"": { "count": 1, "size": "108x44" },
           "link \"Pricing\"": { "count": 1, "size": "67x44" },
           "link \"Privacy\"": { "count": 1, "size": "46x44" },
-          "link \"See pricing →\"": { "count": 1, "size": "133x44" },
+          "link \"Refunds\"": { "count": 1, "size": "52x44" },
+          "link \"See pricing\"": { "count": 1, "size": "135x44" },
           "link \"Sign in\"": { "count": 1, "size": "67x44" },
-          "link \"Start ## days free\"": { "count": 1, "size": "396x44" },
-          "link \"Terms\"": { "count": 1, "size": "44x44" }
+          "link \"Start ## days free\"": { "count": 2, "size": "155x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" },
+          "link \"contact@intelliforge.tech\"": { "count": 1, "size": "158x44" }
         }
       },
       "/analytics@360": {
@@ -58,10 +67,10 @@
           "button \"Apply\"": { "count": 1, "size": "328x44" },
           "input[date] \"From\"": { "count": 1, "size": "160x44" },
           "input[date] \"To\"": { "count": 1, "size": "160x44" },
-          "tab \"##d\"": { "count": 2, "size": "61x44" },
-          "tab \"#d\"": { "count": 1, "size": "61x44" },
-          "tab \"Custom\"": { "count": 1, "size": "61x44" },
-          "tab \"Today\"": { "count": 1, "size": "61x44" }
+          "link \"##d\"": { "count": 2, "size": "61x44" },
+          "link \"#d\"": { "count": 1, "size": "61x44" },
+          "link \"Custom\"": { "count": 1, "size": "61x44" },
+          "link \"Today\"": { "count": 1, "size": "61x44" }
         }
       },
       "/analytics@390": {
@@ -70,10 +79,10 @@
           "button \"Apply\"": { "count": 1, "size": "358x44" },
           "input[date] \"From\"": { "count": 1, "size": "175x44" },
           "input[date] \"To\"": { "count": 1, "size": "175x44" },
-          "tab \"##d\"": { "count": 2, "size": "67x44" },
-          "tab \"#d\"": { "count": 1, "size": "67x44" },
-          "tab \"Custom\"": { "count": 1, "size": "67x44" },
-          "tab \"Today\"": { "count": 1, "size": "67x44" }
+          "link \"##d\"": { "count": 2, "size": "67x44" },
+          "link \"#d\"": { "count": 1, "size": "67x44" },
+          "link \"Custom\"": { "count": 1, "size": "67x44" },
+          "link \"Today\"": { "count": 1, "size": "67x44" }
         }
       },
       "/analytics@768": {
@@ -82,10 +91,10 @@
           "button \"Apply\"": { "count": 1, "size": "70x44" },
           "input[date] \"From\"": { "count": 1, "size": "154x44" },
           "input[date] \"To\"": { "count": 1, "size": "154x44" },
-          "tab \"##d\"": { "count": 2, "size": "57x44" },
-          "tab \"#d\"": { "count": 1, "size": "49x44" },
-          "tab \"Custom\"": { "count": 1, "size": "81x44" },
-          "tab \"Today\"": { "count": 1, "size": "70x44" }
+          "link \"##d\"": { "count": 2, "size": "57x44" },
+          "link \"#d\"": { "count": 1, "size": "49x44" },
+          "link \"Custom\"": { "count": 1, "size": "81x44" },
+          "link \"Today\"": { "count": 1, "size": "70x44" }
         }
       },
       "/drops/new@360": {
@@ -163,24 +172,27 @@
       "/drops@360": {
         "overflow": false,
         "tapTargets": {
-          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "211x44" },
-          "link \"Edit Weekend bakes\"": { "count": 1, "size": "75x44" },
+          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "177x44" },
+          "button \"Share this drop: Weekend bakes\"": { "count": 1, "size": "294x44" },
+          "link \"Edit Weekend bakes\"": { "count": 1, "size": "109x44" },
           "link \"New drop\"": { "count": 1, "size": "328x44" }
         }
       },
       "/drops@390": {
         "overflow": false,
         "tapTargets": {
-          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "241x44" },
-          "link \"Edit Weekend bakes\"": { "count": 1, "size": "75x44" },
+          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "177x44" },
+          "button \"Share this drop: Weekend bakes\"": { "count": 1, "size": "324x44" },
+          "link \"Edit Weekend bakes\"": { "count": 1, "size": "139x44" },
           "link \"New drop\"": { "count": 1, "size": "358x44" }
         }
       },
       "/drops@768": {
         "overflow": false,
         "tapTargets": {
-          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "499x44" },
-          "link \"Edit Weekend bakes\"": { "count": 1, "size": "75x44" },
+          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "291x44" },
+          "button \"Share this drop: Weekend bakes\"": { "count": 1, "size": "582x44" },
+          "link \"Edit Weekend bakes\"": { "count": 1, "size": "283x44" },
           "link \"New drop\"": { "count": 1, "size": "119x44" }
         }
       },
@@ -190,35 +202,14 @@
           "button \"Cancel\"": { "count": 1, "size": "176x44" },
           "button \"Close\"": { "count": 1, "size": "44x44" },
           "button \"Create\"": { "count": 1, "size": "174x44" },
-          "button \"Select emoji 🌭\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🌮\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🌯\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍔\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍕\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍛\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍜\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍞\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍲\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍳\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍽️\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥐\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥖\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥗\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥘\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥙\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥞\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥨\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥪\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🧀\"": { "count": 1, "size": "65x44" },
+          "button \"Save and add another\"": { "count": 1, "size": "358x44" },
           "button \"Take photo\"": { "count": 1, "size": "104x44" },
-          "combobox \"Category\"": { "count": 1, "size": "358x40" },
-          "input[checkbox] \"Available for sale\"": { "count": 1, "size": "44x44" },
-          "input[checkbox] \"Mark as popular\"": { "count": 1, "size": "44x44" },
+          "input[checkbox] \"Mark as popular\"": { "count": 1, "size": "358x44" },
+          "input[checkbox] \"Selling now (untick when sold out)\"": { "count": 1, "size": "358x44" },
           "input[file] \"Choose photo\"": { "count": 1, "size": "122x44" },
-          "input[text] \"HSN/SAC code (optional)\"": { "count": 1, "size": "358x40" },
+          "input[text] \"Category\"": { "count": 1, "size": "358x40" },
           "input[text] \"Name\"": { "count": 1, "size": "358x40" },
           "input[text] \"Price (₹)\"": { "count": 1, "size": "358x40" },
-          "input[text] \"Voice aliases\"": { "count": 1, "size": "358x40" },
           "switch \"Show online\"": { "count": 1, "size": "44x44" }
         }
       },
@@ -226,24 +217,28 @@
         "overflow": false,
         "tapTargets": {
           "button \"Add item\"": { "count": 1, "size": "90x44" },
-          "button \"Edit Filter Coffee\"": { "count": 1, "size": "144x44" },
-          "button \"Edit Mango Lassi\"": { "count": 1, "size": "144x44" },
-          "button \"Edit Masala Chai\"": { "count": 1, "size": "144x44" },
-          "button \"Edit Masala Dosa\"": { "count": 1, "size": "144x44" },
-          "button \"Edit Samosa\"": { "count": 1, "size": "144x44" },
-          "button \"Edit Vada Pav\"": { "count": 1, "size": "144x44" },
-          "button \"Remove Filter Coffee\"": { "count": 1, "size": "142x44" },
-          "button \"Remove Mango Lassi\"": { "count": 1, "size": "142x44" },
-          "button \"Remove Masala Chai\"": { "count": 1, "size": "142x44" },
-          "button \"Remove Masala Dosa\"": { "count": 1, "size": "142x44" },
-          "button \"Remove Samosa\"": { "count": 1, "size": "142x44" },
-          "button \"Remove Vada Pav\"": { "count": 1, "size": "142x44" },
-          "input[checkbox] \"Mark unavailable for Filter Coffee\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Mango Lassi\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Masala Chai\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Masala Dosa\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Samosa\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Vada Pav\"": { "count": 1, "size": "87x44" },
+          "button \"Edit Filter Coffee\"": { "count": 1, "size": "294x44" },
+          "button \"Edit Mango Lassi\"": { "count": 1, "size": "294x44" },
+          "button \"Edit Masala Chai\"": { "count": 1, "size": "294x44" },
+          "button \"Edit Masala Dosa\"": { "count": 1, "size": "294x44" },
+          "button \"Edit Samosa\"": { "count": 1, "size": "294x44" },
+          "button \"Edit Vada Pav\"": { "count": 1, "size": "294x44" },
+          "button \"Move Filter Coffee down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Filter Coffee up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Mango Lassi up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Chai down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Chai up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Dosa down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Dosa up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Samosa down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Vada Pav down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Vada Pav up\"": { "count": 1, "size": "44x44" },
+          "switch \"Selling Filter Coffee\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Mango Lassi\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Masala Chai\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Masala Dosa\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Samosa\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Vada Pav\"": { "count": 1, "size": "103x44" },
           "switch \"Show Filter Coffee online\"": { "count": 1, "size": "44x44" },
           "switch \"Show Mango Lassi online\"": { "count": 1, "size": "44x44" },
           "switch \"Show Masala Chai online\"": { "count": 1, "size": "44x44" },
@@ -256,24 +251,28 @@
         "overflow": false,
         "tapTargets": {
           "button \"Add item\"": { "count": 1, "size": "90x44" },
-          "button \"Edit Filter Coffee\"": { "count": 1, "size": "159x44" },
-          "button \"Edit Mango Lassi\"": { "count": 1, "size": "159x44" },
-          "button \"Edit Masala Chai\"": { "count": 1, "size": "159x44" },
-          "button \"Edit Masala Dosa\"": { "count": 1, "size": "159x44" },
-          "button \"Edit Samosa\"": { "count": 1, "size": "159x44" },
-          "button \"Edit Vada Pav\"": { "count": 1, "size": "159x44" },
-          "button \"Remove Filter Coffee\"": { "count": 1, "size": "157x44" },
-          "button \"Remove Mango Lassi\"": { "count": 1, "size": "157x44" },
-          "button \"Remove Masala Chai\"": { "count": 1, "size": "157x44" },
-          "button \"Remove Masala Dosa\"": { "count": 1, "size": "157x44" },
-          "button \"Remove Samosa\"": { "count": 1, "size": "157x44" },
-          "button \"Remove Vada Pav\"": { "count": 1, "size": "157x44" },
-          "input[checkbox] \"Mark unavailable for Filter Coffee\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Mango Lassi\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Masala Chai\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Masala Dosa\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Samosa\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Vada Pav\"": { "count": 1, "size": "87x44" },
+          "button \"Edit Filter Coffee\"": { "count": 1, "size": "324x44" },
+          "button \"Edit Mango Lassi\"": { "count": 1, "size": "324x44" },
+          "button \"Edit Masala Chai\"": { "count": 1, "size": "324x44" },
+          "button \"Edit Masala Dosa\"": { "count": 1, "size": "324x44" },
+          "button \"Edit Samosa\"": { "count": 1, "size": "324x44" },
+          "button \"Edit Vada Pav\"": { "count": 1, "size": "324x44" },
+          "button \"Move Filter Coffee down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Filter Coffee up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Mango Lassi up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Chai down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Chai up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Dosa down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Dosa up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Samosa down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Vada Pav down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Vada Pav up\"": { "count": 1, "size": "44x44" },
+          "switch \"Selling Filter Coffee\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Mango Lassi\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Masala Chai\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Masala Dosa\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Samosa\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Vada Pav\"": { "count": 1, "size": "103x44" },
           "switch \"Show Filter Coffee online\"": { "count": 1, "size": "44x44" },
           "switch \"Show Mango Lassi online\"": { "count": 1, "size": "44x44" },
           "switch \"Show Masala Chai online\"": { "count": 1, "size": "44x44" },
@@ -286,24 +285,28 @@
         "overflow": false,
         "tapTargets": {
           "button \"Add item\"": { "count": 1, "size": "90x44" },
-          "button \"Edit Filter Coffee\"": { "count": 1, "size": "130x44" },
-          "button \"Edit Mango Lassi\"": { "count": 1, "size": "130x44" },
-          "button \"Edit Masala Chai\"": { "count": 1, "size": "130x44" },
-          "button \"Edit Masala Dosa\"": { "count": 1, "size": "130x44" },
-          "button \"Edit Samosa\"": { "count": 1, "size": "130x44" },
-          "button \"Edit Vada Pav\"": { "count": 1, "size": "130x44" },
-          "button \"Remove Filter Coffee\"": { "count": 1, "size": "128x44" },
-          "button \"Remove Mango Lassi\"": { "count": 1, "size": "128x44" },
-          "button \"Remove Masala Chai\"": { "count": 1, "size": "128x44" },
-          "button \"Remove Masala Dosa\"": { "count": 1, "size": "128x44" },
-          "button \"Remove Samosa\"": { "count": 1, "size": "128x44" },
-          "button \"Remove Vada Pav\"": { "count": 1, "size": "128x44" },
-          "input[checkbox] \"Mark unavailable for Filter Coffee\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Mango Lassi\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Masala Chai\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Masala Dosa\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Samosa\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Vada Pav\"": { "count": 1, "size": "87x44" },
+          "button \"Edit Filter Coffee\"": { "count": 1, "size": "266x44" },
+          "button \"Edit Mango Lassi\"": { "count": 1, "size": "266x44" },
+          "button \"Edit Masala Chai\"": { "count": 1, "size": "266x44" },
+          "button \"Edit Masala Dosa\"": { "count": 1, "size": "266x44" },
+          "button \"Edit Samosa\"": { "count": 1, "size": "266x44" },
+          "button \"Edit Vada Pav\"": { "count": 1, "size": "266x44" },
+          "button \"Move Filter Coffee down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Filter Coffee up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Mango Lassi up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Chai down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Chai up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Dosa down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Dosa up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Samosa down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Vada Pav down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Vada Pav up\"": { "count": 1, "size": "44x44" },
+          "switch \"Selling Filter Coffee\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Mango Lassi\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Masala Chai\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Masala Dosa\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Samosa\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Vada Pav\"": { "count": 1, "size": "103x44" },
           "switch \"Show Filter Coffee online\"": { "count": 1, "size": "44x44" },
           "switch \"Show Mango Lassi online\"": { "count": 1, "size": "44x44" },
           "switch \"Show Masala Chai online\"": { "count": 1, "size": "44x44" },
@@ -317,12 +320,14 @@
         "tapTargets": {
           "button \"Cancel order\"": { "count": 1, "size": "120x44" },
           "button \"More actions\"": { "count": 1, "size": "90x44" },
+          "button \"Picked up · ₹##.## collected\"": { "count": 1, "size": "294x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "combobox \"Show orders from\"": { "count": 1, "size": "252x44" },
+          "button \"Share this drop\"": { "count": 1, "size": "95x40" },
+          "combobox \"Show orders from\"": { "count": 1, "size": "254x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 1, "size": "44x44" },
           "link \"Call Priya Buyer\"": { "count": 1, "size": "143x44" },
           "link \"WhatsApp Priya Buyer\"": { "count": 1, "size": "143x44" },
-          "tab \"All (#)\"": { "count": 1, "size": "45x60" }
+          "tab \"All (#)\"": { "count": 1, "size": "44x62" }
         }
       },
       "/orders?drop=[id]@390": {
@@ -330,22 +335,24 @@
         "tapTargets": {
           "button \"Cancel order\"": { "count": 1, "size": "120x44" },
           "button \"More actions\"": { "count": 1, "size": "90x44" },
+          "button \"Picked up · ₹##.## collected\"": { "count": 1, "size": "324x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "combobox \"Show orders from\"": { "count": 1, "size": "282x44" },
+          "button \"Share this drop\"": { "count": 1, "size": "95x40" },
+          "combobox \"Show orders from\"": { "count": 1, "size": "284x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 1, "size": "44x44" },
           "link \"Call Priya Buyer\"": { "count": 1, "size": "158x44" },
-          "link \"WhatsApp Priya Buyer\"": { "count": 1, "size": "158x44" }
+          "link \"WhatsApp Priya Buyer\"": { "count": 1, "size": "158x44" },
+          "tab \"All (#)\"": { "count": 1, "size": "44x62" }
         }
       },
       "/orders?drop=[id]@768": {
         "overflow": false,
         "tapTargets": {
           "button \"Cancel order\"": { "count": 1, "size": "120x44" },
-          "button \"Confirm\"": { "count": 1, "size": "287x44" },
-          "button \"Picked up · ₹##.## collected\"": { "count": 1, "size": "287x44" },
+          "button \"Picked up · ₹##.## collected\"": { "count": 1, "size": "582x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "button \"Share today's menu\"": { "count": 1, "size": "453x44" },
-          "button \"Sound off\"": { "count": 1, "size": "119x44" },
+          "button \"Share this drop\"": { "count": 1, "size": "453x44" },
+          "button \"Sound on — tap to enable\"": { "count": 1, "size": "223x44" },
           "combobox \"Show orders from\"": { "count": 1, "size": "236x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 1, "size": "44x44" },
           "link \"Call Priya Buyer\"": { "count": 1, "size": "287x44" },
@@ -364,13 +371,14 @@
         "tapTargets": {
           "button \"Cancel order\"": { "count": 2, "size": "120x44" },
           "button \"More actions\"": { "count": 1, "size": "90x44" },
+          "button \"Picked up · ₹##.## collected\"": { "count": 2, "size": "294x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "combobox \"Show orders from\"": { "count": 1, "size": "252x44" },
+          "combobox \"Show orders from\"": { "count": 1, "size": "254x44" },
           "input[checkbox] \"Select all (#)\"": { "count": 1, "size": "148x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 2, "size": "44x44" },
           "link \"Call Priya Buyer\"": { "count": 2, "size": "143x44" },
           "link \"WhatsApp Priya Buyer\"": { "count": 2, "size": "143x44" },
-          "tab \"All (#)\"": { "count": 1, "size": "45x60" }
+          "tab \"All (#)\"": { "count": 1, "size": "44x62" }
         }
       },
       "/orders@390": {
@@ -378,22 +386,23 @@
         "tapTargets": {
           "button \"Cancel order\"": { "count": 2, "size": "120x44" },
           "button \"More actions\"": { "count": 1, "size": "90x44" },
+          "button \"Picked up · ₹##.## collected\"": { "count": 2, "size": "324x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "combobox \"Show orders from\"": { "count": 1, "size": "282x44" },
+          "combobox \"Show orders from\"": { "count": 1, "size": "284x44" },
           "input[checkbox] \"Select all (#)\"": { "count": 1, "size": "148x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 2, "size": "44x44" },
           "link \"Call Priya Buyer\"": { "count": 2, "size": "158x44" },
-          "link \"WhatsApp Priya Buyer\"": { "count": 2, "size": "158x44" }
+          "link \"WhatsApp Priya Buyer\"": { "count": 2, "size": "158x44" },
+          "tab \"All (#)\"": { "count": 1, "size": "44x62" }
         }
       },
       "/orders@768": {
         "overflow": false,
         "tapTargets": {
           "button \"Cancel order\"": { "count": 2, "size": "120x44" },
-          "button \"Confirm\"": { "count": 2, "size": "287x44" },
-          "button \"Picked up · ₹##.## collected\"": { "count": 2, "size": "287x44" },
+          "button \"Picked up · ₹##.## collected\"": { "count": 2, "size": "582x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "button \"Sound off\"": { "count": 1, "size": "119x44" },
+          "button \"Sound on — tap to enable\"": { "count": 1, "size": "223x44" },
           "combobox \"Show orders from\"": { "count": 1, "size": "112x44" },
           "input[checkbox] \"Select all (#)\"": { "count": 1, "size": "148x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 2, "size": "44x44" },
@@ -441,41 +450,47 @@
       "/pricing@360": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "87x44" },
-          "link \"Get Started\"": { "count": 1, "size": "106x44" },
+          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"How it works\"": { "count": 1, "size": "96x44" },
           "link \"Pricing\"": { "count": 1, "size": "61x44" },
           "link \"Privacy\"": { "count": 1, "size": "46x44" },
+          "link \"Refunds\"": { "count": 1, "size": "52x44" },
           "link \"Sign in\"": { "count": 1, "size": "69x44" },
-          "link \"Start ## days free\"": { "count": 1, "size": "278x44" },
-          "link \"Terms\"": { "count": 1, "size": "44x44" }
+          "link \"Start ## days free\"": { "count": 2, "size": "147x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" },
+          "link \"contact@intelliforge.tech\"": { "count": 1, "size": "158x44" }
         }
       },
       "/pricing@390": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "87x44" },
-          "link \"Get Started\"": { "count": 1, "size": "106x44" },
+          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"How it works\"": { "count": 1, "size": "96x44" },
           "link \"Pricing\"": { "count": 1, "size": "61x44" },
           "link \"Privacy\"": { "count": 1, "size": "46x44" },
+          "link \"Refunds\"": { "count": 1, "size": "52x44" },
           "link \"Sign in\"": { "count": 1, "size": "69x44" },
-          "link \"Start ## days free\"": { "count": 1, "size": "308x44" },
-          "link \"Terms\"": { "count": 1, "size": "44x44" }
+          "link \"Start ## days free\"": { "count": 2, "size": "147x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" },
+          "link \"contact@intelliforge.tech\"": { "count": 1, "size": "158x44" }
         }
       },
       "/pricing@768": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "87x44" },
-          "link \"Get Started\"": { "count": 1, "size": "114x44" },
+          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"Home\"": { "count": 1, "size": "62x44" },
           "link \"How it works\"": { "count": 1, "size": "108x44" },
           "link \"Pricing\"": { "count": 1, "size": "67x44" },
           "link \"Privacy\"": { "count": 1, "size": "46x44" },
+          "link \"Refunds\"": { "count": 1, "size": "52x44" },
           "link \"Sign in\"": { "count": 1, "size": "67x44" },
-          "link \"Start ## days free\"": { "count": 1, "size": "398x44" },
-          "link \"Terms\"": { "count": 1, "size": "44x44" }
+          "link \"Start ## days free\"": { "count": 2, "size": "155x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" },
+          "link \"contact@intelliforge.tech\"": { "count": 1, "size": "158x44" }
         }
       },
       "/s/[slug]@360": {
@@ -488,12 +503,12 @@
           "button \"Add Samosa\"": { "count": 2, "size": "81x44" },
           "button \"Add Vada Pav\"": { "count": 1, "size": "81x44" },
           "button \"Share\"": { "count": 1, "size": "84x44" },
+          "link \"Billing by AwaazOS — Bol. Bill. Becho.\"": { "count": 1, "size": "247x44" },
           "link \"Drinks\"": { "count": 1, "size": "76x44" },
-          "link \"Pre-order now\"": { "count": 1, "size": "167x44" },
+          "link \"Pre-order · closes tomorrow #:## pm\"": { "count": 1, "size": "312x44" },
           "link \"Pre-order\"": { "count": 1, "size": "119x44" },
           "link \"Sign in\"": { "count": 1, "size": "89x44" },
-          "link \"Snacks\"": { "count": 1, "size": "80x44" },
-          "link \"🎙️Billing by AwaazOS — Bol. Bill. Becho.\"": { "count": 1, "size": "268x44" }
+          "link \"Snacks\"": { "count": 1, "size": "80x44" }
         }
       },
       "/s/[slug]@390": {
@@ -506,12 +521,12 @@
           "button \"Add Samosa\"": { "count": 2, "size": "81x44" },
           "button \"Add Vada Pav\"": { "count": 1, "size": "81x44" },
           "button \"Share\"": { "count": 1, "size": "84x44" },
+          "link \"Billing by AwaazOS — Bol. Bill. Becho.\"": { "count": 1, "size": "247x44" },
           "link \"Drinks\"": { "count": 1, "size": "76x44" },
-          "link \"Pre-order now\"": { "count": 1, "size": "167x44" },
+          "link \"Pre-order · closes tomorrow #:## pm\"": { "count": 1, "size": "312x44" },
           "link \"Pre-order\"": { "count": 1, "size": "119x44" },
           "link \"Sign in\"": { "count": 1, "size": "89x44" },
-          "link \"Snacks\"": { "count": 1, "size": "80x44" },
-          "link \"🎙️Billing by AwaazOS — Bol. Bill. Becho.\"": { "count": 1, "size": "268x44" }
+          "link \"Snacks\"": { "count": 1, "size": "80x44" }
         }
       },
       "/s/[slug]@768": {
@@ -524,12 +539,12 @@
           "button \"Add Samosa\"": { "count": 2, "size": "81x44" },
           "button \"Add Vada Pav\"": { "count": 1, "size": "81x44" },
           "button \"Share\"": { "count": 1, "size": "84x44" },
+          "link \"Billing by AwaazOS — Bol. Bill. Becho.\"": { "count": 1, "size": "247x44" },
           "link \"Drinks\"": { "count": 1, "size": "76x44" },
-          "link \"Pre-order now\"": { "count": 1, "size": "167x44" },
+          "link \"Pre-order · closes tomorrow #:## pm\"": { "count": 1, "size": "312x44" },
           "link \"Pre-order\"": { "count": 1, "size": "119x44" },
           "link \"Sign in\"": { "count": 1, "size": "89x44" },
-          "link \"Snacks\"": { "count": 1, "size": "80x44" },
-          "link \"🎙️Billing by AwaazOS — Bol. Bill. Becho.\"": { "count": 1, "size": "268x44" }
+          "link \"Snacks\"": { "count": 1, "size": "80x44" }
         }
       },
       "/settings/billing@360": {
@@ -551,6 +566,7 @@
         "tapTargets": {
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
@@ -563,20 +579,56 @@
       "/settings/notifications@360": {
         "overflow": false,
         "tapTargets": {
+          "button \"Play sample\"": { "count": 1, "size": "110x44" },
+          "button \"Voice alert on\"": { "count": 1, "size": "145x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" }
         }
       },
       "/settings/notifications@390": {
         "overflow": false,
         "tapTargets": {
+          "button \"Play sample\"": { "count": 1, "size": "110x44" },
+          "button \"Voice alert on\"": { "count": 1, "size": "145x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" }
         }
       },
       "/settings/notifications@768": {
         "overflow": false,
         "tapTargets": {
+          "button \"Play sample\"": { "count": 1, "size": "110x44" },
+          "button \"Voice alert on\"": { "count": 1, "size": "145x44" },
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
+          "link \"Online orders\"": { "count": 1, "size": "224x44" },
+          "link \"Online store\"": { "count": 1, "size": "224x44" },
+          "link \"Overview\"": { "count": 1, "size": "224x44" },
+          "link \"Payments\"": { "count": 1, "size": "224x44" },
+          "link \"Plan & billing\"": { "count": 1, "size": "224x44" },
+          "link \"Receipts\"": { "count": 1, "size": "224x44" }
+        }
+      },
+      "/settings/offers@360": {
+        "overflow": false,
+        "tapTargets": {
+          "button \"New offer\"": { "count": 1, "size": "123x44" },
+          "link \"Settings\"": { "count": 1, "size": "88x44" }
+        }
+      },
+      "/settings/offers@390": {
+        "overflow": false,
+        "tapTargets": {
+          "button \"New offer\"": { "count": 1, "size": "123x44" },
+          "link \"Settings\"": { "count": 1, "size": "88x44" }
+        }
+      },
+      "/settings/offers@768": {
+        "overflow": false,
+        "tapTargets": {
+          "button \"New offer\"": { "count": 1, "size": "123x44" },
+          "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
+          "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
@@ -596,6 +648,7 @@
           "radio \"Both\"": { "count": 1, "size": "64x44" },
           "radio \"Delivery\"": { "count": 1, "size": "87x44" },
           "radio \"Pickup\"": { "count": 1, "size": "76x44" },
+          "switch \"Show a WhatsApp button on your store page\"": { "count": 1, "size": "56x44" },
           "switch \"Turn off ordering from menu\"": { "count": 1, "size": "56x44" },
           "switch \"Turn on WhatsApp orders\"": { "count": 1, "size": "56x44" }
         }
@@ -611,6 +664,7 @@
           "radio \"Both\"": { "count": 1, "size": "64x44" },
           "radio \"Delivery\"": { "count": 1, "size": "87x44" },
           "radio \"Pickup\"": { "count": 1, "size": "76x44" },
+          "switch \"Show a WhatsApp button on your store page\"": { "count": 1, "size": "56x44" },
           "switch \"Turn off ordering from menu\"": { "count": 1, "size": "56x44" },
           "switch \"Turn on WhatsApp orders\"": { "count": 1, "size": "56x44" }
         }
@@ -622,6 +676,7 @@
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Go to Drops\"": { "count": 1, "size": "96x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Open my store\"": { "count": 1, "size": "143x44" },
@@ -633,6 +688,7 @@
           "radio \"Both\"": { "count": 1, "size": "64x44" },
           "radio \"Delivery\"": { "count": 1, "size": "87x44" },
           "radio \"Pickup\"": { "count": 1, "size": "76x44" },
+          "switch \"Show a WhatsApp button on your store page\"": { "count": 1, "size": "56x44" },
           "switch \"Turn off ordering from menu\"": { "count": 1, "size": "56x44" },
           "switch \"Turn on WhatsApp orders\"": { "count": 1, "size": "56x44" }
         }
@@ -643,7 +699,6 @@
           "input[text] \"Name shown on UPI apps (optional)\"": { "count": 1, "size": "294x44" },
           "input[text] \"UPI ID\"": { "count": 1, "size": "294x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" },
-          "link \"Upgrade to Pro\"": { "count": 1, "size": "260x44" },
           "switch \"Turn off pay on delivery\"": { "count": 1, "size": "56x44" }
         }
       },
@@ -653,7 +708,6 @@
           "input[text] \"Name shown on UPI apps (optional)\"": { "count": 1, "size": "324x44" },
           "input[text] \"UPI ID\"": { "count": 1, "size": "324x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" },
-          "link \"Upgrade to Pro\"": { "count": 1, "size": "290x44" },
           "switch \"Turn off pay on delivery\"": { "count": 1, "size": "56x44" }
         }
       },
@@ -664,13 +718,13 @@
           "input[text] \"UPI ID\"": { "count": 1, "size": "310x44" },
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
           "link \"Payments\"": { "count": 1, "size": "224x44" },
           "link \"Plan & billing\"": { "count": 1, "size": "224x44" },
           "link \"Receipts\"": { "count": 1, "size": "224x44" },
-          "link \"Upgrade to Pro\"": { "count": 1, "size": "95x44" },
           "switch \"Turn off pay on delivery\"": { "count": 1, "size": "56x44" }
         }
       },
@@ -702,6 +756,7 @@
           "input[text] \"GSTIN (optional)\"": { "count": 1, "size": "310x44" },
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
@@ -718,10 +773,11 @@
           "input[file] \"Upload banner\"": { "count": 1, "size": "150x44" },
           "input[file] \"Upload logo\"": { "count": 1, "size": "134x44" },
           "input[text] \"FSSAI number (optional)\"": { "count": 1, "size": "294x44" },
+          "input[text] \"Instagram username (optional)\"": { "count": 1, "size": "265x44" },
           "input[text] \"Store name\"": { "count": 1, "size": "294x44" },
           "link \"Preview\"": { "count": 1, "size": "101x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" },
-          "switch \"Unpublish storefront\"": { "count": 1, "size": "56x44" }
+          "switch \"Unpublish store\"": { "count": 1, "size": "56x44" }
         }
       },
       "/settings/store@390": {
@@ -731,10 +787,11 @@
           "input[file] \"Upload banner\"": { "count": 1, "size": "150x44" },
           "input[file] \"Upload logo\"": { "count": 1, "size": "134x44" },
           "input[text] \"FSSAI number (optional)\"": { "count": 1, "size": "324x44" },
+          "input[text] \"Instagram username (optional)\"": { "count": 1, "size": "295x44" },
           "input[text] \"Store name\"": { "count": 1, "size": "324x44" },
           "link \"Preview\"": { "count": 1, "size": "101x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" },
-          "switch \"Unpublish storefront\"": { "count": 1, "size": "56x44" }
+          "switch \"Unpublish store\"": { "count": 1, "size": "56x44" }
         }
       },
       "/settings/store@768": {
@@ -744,9 +801,11 @@
           "input[file] \"Upload banner\"": { "count": 1, "size": "150x44" },
           "input[file] \"Upload logo\"": { "count": 1, "size": "134x44" },
           "input[text] \"FSSAI number (optional)\"": { "count": 1, "size": "310x44" },
+          "input[text] \"Instagram username (optional)\"": { "count": 1, "size": "281x44" },
           "input[text] \"Store name\"": { "count": 1, "size": "310x44" },
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
@@ -754,7 +813,7 @@
           "link \"Plan & billing\"": { "count": 1, "size": "224x44" },
           "link \"Preview\"": { "count": 1, "size": "101x44" },
           "link \"Receipts\"": { "count": 1, "size": "224x44" },
-          "switch \"Unpublish storefront\"": { "count": 1, "size": "56x44" }
+          "switch \"Unpublish store\"": { "count": 1, "size": "56x44" }
         }
       },
       "/settings/voice@360": {
@@ -777,6 +836,7 @@
           "combobox \"English\"": { "count": 1, "size": "310x44" },
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
@@ -798,6 +858,7 @@
         "tapTargets": {
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
@@ -839,40 +900,49 @@
       "/sign-up@360": {
         "overflow": false,
         "tapTargets": {
-          "button \"Sign up\"": { "count": 1, "size": "278x40" },
-          "combobox \"Stall type\"": { "count": 1, "size": "298x40" },
-          "input[email] \"Email\"": { "count": 1, "size": "298x40" },
-          "input[password] \"Password (min # characters)\"": { "count": 1, "size": "298x40" },
-          "input[tel] \"Phone (optional, +##)\"": { "count": 1, "size": "298x40" },
-          "input[text] \"Stall / shop name\"": { "count": 1, "size": "298x40" },
-          "input[text] \"Your name\"": { "count": 1, "size": "298x40" },
-          "link \"Already have an account\"": { "count": 1, "size": "278x40" }
+          "button \"Show password\"": { "count": 1, "size": "44x44" },
+          "button \"Start ## days free\"": { "count": 1, "size": "278x40" },
+          "combobox \"General\"": { "count": 1, "size": "278x40" },
+          "input[email] \"Email\"": { "count": 1, "size": "278x40" },
+          "input[password] \"Password\"": { "count": 1, "size": "278x40" },
+          "input[tel] \"Phone (optional, +##)\"": { "count": 1, "size": "278x40" },
+          "input[text] \"Store name\"": { "count": 1, "size": "278x40" },
+          "input[text] \"Your name\"": { "count": 1, "size": "278x40" },
+          "link \"Privacy Policy\"": { "count": 1, "size": "83x44" },
+          "link \"Sign in\"": { "count": 1, "size": "51x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" }
         }
       },
       "/sign-up@390": {
         "overflow": false,
         "tapTargets": {
-          "button \"Sign up\"": { "count": 1, "size": "308x40" },
-          "combobox \"Stall type\"": { "count": 1, "size": "328x40" },
-          "input[email] \"Email\"": { "count": 1, "size": "328x40" },
-          "input[password] \"Password (min # characters)\"": { "count": 1, "size": "328x40" },
-          "input[tel] \"Phone (optional, +##)\"": { "count": 1, "size": "328x40" },
-          "input[text] \"Stall / shop name\"": { "count": 1, "size": "328x40" },
-          "input[text] \"Your name\"": { "count": 1, "size": "328x40" },
-          "link \"Already have an account\"": { "count": 1, "size": "308x40" }
+          "button \"Show password\"": { "count": 1, "size": "44x44" },
+          "button \"Start ## days free\"": { "count": 1, "size": "308x40" },
+          "combobox \"General\"": { "count": 1, "size": "308x40" },
+          "input[email] \"Email\"": { "count": 1, "size": "308x40" },
+          "input[password] \"Password\"": { "count": 1, "size": "308x40" },
+          "input[tel] \"Phone (optional, +##)\"": { "count": 1, "size": "308x40" },
+          "input[text] \"Store name\"": { "count": 1, "size": "308x40" },
+          "input[text] \"Your name\"": { "count": 1, "size": "308x40" },
+          "link \"Privacy Policy\"": { "count": 1, "size": "83x44" },
+          "link \"Sign in\"": { "count": 1, "size": "51x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" }
         }
       },
       "/sign-up@768": {
         "overflow": false,
         "tapTargets": {
-          "button \"Sign up\"": { "count": 1, "size": "80x40" },
-          "combobox \"Stall type\"": { "count": 1, "size": "418x40" },
-          "input[email] \"Email\"": { "count": 1, "size": "418x40" },
-          "input[password] \"Password (min # characters)\"": { "count": 1, "size": "418x40" },
-          "input[tel] \"Phone (optional, +##)\"": { "count": 1, "size": "418x40" },
-          "input[text] \"Stall / shop name\"": { "count": 1, "size": "418x40" },
-          "input[text] \"Your name\"": { "count": 1, "size": "418x40" },
-          "link \"Already have an account\"": { "count": 1, "size": "187x40" }
+          "button \"Show password\"": { "count": 1, "size": "44x44" },
+          "button \"Start ## days free\"": { "count": 1, "size": "398x40" },
+          "combobox \"General\"": { "count": 1, "size": "398x40" },
+          "input[email] \"Email\"": { "count": 1, "size": "398x40" },
+          "input[password] \"Password\"": { "count": 1, "size": "398x40" },
+          "input[tel] \"Phone (optional, +##)\"": { "count": 1, "size": "398x40" },
+          "input[text] \"Store name\"": { "count": 1, "size": "398x40" },
+          "input[text] \"Your name\"": { "count": 1, "size": "398x40" },
+          "link \"Privacy Policy\"": { "count": 1, "size": "83x44" },
+          "link \"Sign in\"": { "count": 1, "size": "51x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" }
         }
       },
       "/transactions@360": {
@@ -904,51 +974,60 @@
       "/ (cookie banner)@390": {
         "overflow": false,
         "tapTargets": {
-          "button \"Accept\"": { "count": 1, "size": "68x44" },
-          "button \"Decline optional\"": { "count": 1, "size": "129x44" }
+          "button \"Accept\"": { "count": 1, "size": "175x44" },
+          "button \"Decline optional\"": { "count": 1, "size": "175x44" }
         }
       },
       "/@360": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "87x44" },
-          "link \"Get Started\"": { "count": 1, "size": "106x44" },
+          "button \"Install app\"": { "count": 1, "size": "89x44" },
+          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"How it works\"": { "count": 1, "size": "96x44" },
           "link \"Pricing\"": { "count": 1, "size": "61x44" },
           "link \"Privacy\"": { "count": 1, "size": "46x44" },
-          "link \"See pricing →\"": { "count": 1, "size": "133x44" },
+          "link \"Refunds\"": { "count": 1, "size": "52x44" },
+          "link \"See pricing\"": { "count": 1, "size": "135x44" },
           "link \"Sign in\"": { "count": 1, "size": "69x44" },
-          "link \"Start ## days free\"": { "count": 1, "size": "276x44" },
-          "link \"Terms\"": { "count": 1, "size": "44x44" }
+          "link \"Start ## days free\"": { "count": 2, "size": "147x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" },
+          "link \"contact@intelliforge.tech\"": { "count": 1, "size": "158x44" }
         }
       },
       "/@390": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "87x44" },
-          "link \"Get Started\"": { "count": 1, "size": "106x44" },
+          "button \"Install app\"": { "count": 1, "size": "89x44" },
+          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"How it works\"": { "count": 1, "size": "96x44" },
           "link \"Pricing\"": { "count": 1, "size": "61x44" },
           "link \"Privacy\"": { "count": 1, "size": "46x44" },
-          "link \"See pricing →\"": { "count": 1, "size": "133x44" },
+          "link \"Refunds\"": { "count": 1, "size": "52x44" },
+          "link \"See pricing\"": { "count": 1, "size": "135x44" },
           "link \"Sign in\"": { "count": 1, "size": "69x44" },
-          "link \"Start ## days free\"": { "count": 1, "size": "306x44" },
-          "link \"Terms\"": { "count": 1, "size": "44x44" }
+          "link \"Start ## days free\"": { "count": 2, "size": "147x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" },
+          "link \"contact@intelliforge.tech\"": { "count": 1, "size": "158x44" }
         }
       },
       "/@768": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "87x44" },
-          "link \"Get Started\"": { "count": 1, "size": "114x44" },
+          "button \"Install app\"": { "count": 1, "size": "89x44" },
+          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"Home\"": { "count": 1, "size": "62x44" },
           "link \"How it works\"": { "count": 1, "size": "108x44" },
           "link \"Pricing\"": { "count": 1, "size": "67x44" },
           "link \"Privacy\"": { "count": 1, "size": "46x44" },
-          "link \"See pricing →\"": { "count": 1, "size": "133x44" },
+          "link \"Refunds\"": { "count": 1, "size": "52x44" },
+          "link \"See pricing\"": { "count": 1, "size": "135x44" },
           "link \"Sign in\"": { "count": 1, "size": "67x44" },
-          "link \"Start ## days free\"": { "count": 1, "size": "396x44" },
-          "link \"Terms\"": { "count": 1, "size": "44x44" }
+          "link \"Start ## days free\"": { "count": 2, "size": "155x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" },
+          "link \"contact@intelliforge.tech\"": { "count": 1, "size": "158x44" }
         }
       },
       "/analytics@360": {
@@ -957,10 +1036,10 @@
           "button \"Apply\"": { "count": 1, "size": "328x44" },
           "input[date] \"From\"": { "count": 1, "size": "160x44" },
           "input[date] \"To\"": { "count": 1, "size": "160x44" },
-          "tab \"##d\"": { "count": 2, "size": "61x44" },
-          "tab \"#d\"": { "count": 1, "size": "61x44" },
-          "tab \"Custom\"": { "count": 1, "size": "61x44" },
-          "tab \"Today\"": { "count": 1, "size": "61x44" }
+          "link \"##d\"": { "count": 2, "size": "61x44" },
+          "link \"#d\"": { "count": 1, "size": "61x44" },
+          "link \"Custom\"": { "count": 1, "size": "61x44" },
+          "link \"Today\"": { "count": 1, "size": "61x44" }
         }
       },
       "/analytics@390": {
@@ -969,10 +1048,10 @@
           "button \"Apply\"": { "count": 1, "size": "358x44" },
           "input[date] \"From\"": { "count": 1, "size": "175x44" },
           "input[date] \"To\"": { "count": 1, "size": "175x44" },
-          "tab \"##d\"": { "count": 2, "size": "67x44" },
-          "tab \"#d\"": { "count": 1, "size": "67x44" },
-          "tab \"Custom\"": { "count": 1, "size": "67x44" },
-          "tab \"Today\"": { "count": 1, "size": "67x44" }
+          "link \"##d\"": { "count": 2, "size": "67x44" },
+          "link \"#d\"": { "count": 1, "size": "67x44" },
+          "link \"Custom\"": { "count": 1, "size": "67x44" },
+          "link \"Today\"": { "count": 1, "size": "67x44" }
         }
       },
       "/analytics@768": {
@@ -981,10 +1060,10 @@
           "button \"Apply\"": { "count": 1, "size": "70x44" },
           "input[date] \"From\"": { "count": 1, "size": "163x44" },
           "input[date] \"To\"": { "count": 1, "size": "163x44" },
-          "tab \"##d\"": { "count": 2, "size": "57x44" },
-          "tab \"#d\"": { "count": 1, "size": "49x44" },
-          "tab \"Custom\"": { "count": 1, "size": "81x44" },
-          "tab \"Today\"": { "count": 1, "size": "70x44" }
+          "link \"##d\"": { "count": 2, "size": "57x44" },
+          "link \"#d\"": { "count": 1, "size": "49x44" },
+          "link \"Custom\"": { "count": 1, "size": "81x44" },
+          "link \"Today\"": { "count": 1, "size": "70x44" }
         }
       },
       "/drops/new@360": {
@@ -1062,24 +1141,27 @@
       "/drops@360": {
         "overflow": false,
         "tapTargets": {
-          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "211x44" },
-          "link \"Edit Weekend bakes\"": { "count": 1, "size": "75x44" },
+          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "177x44" },
+          "button \"Share this drop: Weekend bakes\"": { "count": 1, "size": "294x44" },
+          "link \"Edit Weekend bakes\"": { "count": 1, "size": "109x44" },
           "link \"New drop\"": { "count": 1, "size": "328x44" }
         }
       },
       "/drops@390": {
         "overflow": false,
         "tapTargets": {
-          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "241x44" },
-          "link \"Edit Weekend bakes\"": { "count": 1, "size": "75x44" },
+          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "177x44" },
+          "button \"Share this drop: Weekend bakes\"": { "count": 1, "size": "324x44" },
+          "link \"Edit Weekend bakes\"": { "count": 1, "size": "139x44" },
           "link \"New drop\"": { "count": 1, "size": "358x44" }
         }
       },
       "/drops@768": {
         "overflow": false,
         "tapTargets": {
-          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "499x44" },
-          "link \"Edit Weekend bakes\"": { "count": 1, "size": "75x44" },
+          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "291x44" },
+          "button \"Share this drop: Weekend bakes\"": { "count": 1, "size": "582x44" },
+          "link \"Edit Weekend bakes\"": { "count": 1, "size": "283x44" },
           "link \"New drop\"": { "count": 1, "size": "119x44" }
         }
       },
@@ -1089,35 +1171,14 @@
           "button \"Cancel\"": { "count": 1, "size": "176x44" },
           "button \"Close\"": { "count": 1, "size": "44x44" },
           "button \"Create\"": { "count": 1, "size": "174x44" },
-          "button \"Select emoji 🌭\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🌮\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🌯\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍔\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍕\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍛\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍜\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍞\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍲\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍳\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🍽️\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥐\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥖\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥗\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥘\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥙\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥞\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥨\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🥪\"": { "count": 1, "size": "65x44" },
-          "button \"Select emoji 🧀\"": { "count": 1, "size": "65x44" },
+          "button \"Save and add another\"": { "count": 1, "size": "358x44" },
           "button \"Take photo\"": { "count": 1, "size": "104x44" },
-          "combobox \"Category\"": { "count": 1, "size": "358x44" },
-          "input[checkbox] \"Available for sale\"": { "count": 1, "size": "44x44" },
-          "input[checkbox] \"Mark as popular\"": { "count": 1, "size": "44x44" },
+          "input[checkbox] \"Mark as popular\"": { "count": 1, "size": "358x44" },
+          "input[checkbox] \"Selling now (untick when sold out)\"": { "count": 1, "size": "358x44" },
           "input[file] \"Choose photo\"": { "count": 1, "size": "122x44" },
-          "input[text] \"HSN/SAC code (optional)\"": { "count": 1, "size": "358x44" },
+          "input[text] \"Category\"": { "count": 1, "size": "358x44" },
           "input[text] \"Name\"": { "count": 1, "size": "358x44" },
           "input[text] \"Price (₹)\"": { "count": 1, "size": "358x44" },
-          "input[text] \"Voice aliases\"": { "count": 1, "size": "358x44" },
           "switch \"Show online\"": { "count": 1, "size": "44x44" }
         }
       },
@@ -1125,24 +1186,28 @@
         "overflow": false,
         "tapTargets": {
           "button \"Add item\"": { "count": 1, "size": "90x44" },
-          "button \"Edit Filter Coffee\"": { "count": 1, "size": "144x44" },
-          "button \"Edit Mango Lassi\"": { "count": 1, "size": "144x44" },
-          "button \"Edit Masala Chai\"": { "count": 1, "size": "144x44" },
-          "button \"Edit Masala Dosa\"": { "count": 1, "size": "144x44" },
-          "button \"Edit Samosa\"": { "count": 1, "size": "144x44" },
-          "button \"Edit Vada Pav\"": { "count": 1, "size": "144x44" },
-          "button \"Remove Filter Coffee\"": { "count": 1, "size": "142x44" },
-          "button \"Remove Mango Lassi\"": { "count": 1, "size": "142x44" },
-          "button \"Remove Masala Chai\"": { "count": 1, "size": "142x44" },
-          "button \"Remove Masala Dosa\"": { "count": 1, "size": "142x44" },
-          "button \"Remove Samosa\"": { "count": 1, "size": "142x44" },
-          "button \"Remove Vada Pav\"": { "count": 1, "size": "142x44" },
-          "input[checkbox] \"Mark unavailable for Filter Coffee\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Mango Lassi\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Masala Chai\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Masala Dosa\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Samosa\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Vada Pav\"": { "count": 1, "size": "87x44" },
+          "button \"Edit Filter Coffee\"": { "count": 1, "size": "294x44" },
+          "button \"Edit Mango Lassi\"": { "count": 1, "size": "294x44" },
+          "button \"Edit Masala Chai\"": { "count": 1, "size": "294x44" },
+          "button \"Edit Masala Dosa\"": { "count": 1, "size": "294x44" },
+          "button \"Edit Samosa\"": { "count": 1, "size": "294x44" },
+          "button \"Edit Vada Pav\"": { "count": 1, "size": "294x44" },
+          "button \"Move Filter Coffee down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Filter Coffee up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Mango Lassi up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Chai down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Chai up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Dosa down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Dosa up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Samosa down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Vada Pav down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Vada Pav up\"": { "count": 1, "size": "44x44" },
+          "switch \"Selling Filter Coffee\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Mango Lassi\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Masala Chai\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Masala Dosa\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Samosa\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Vada Pav\"": { "count": 1, "size": "103x44" },
           "switch \"Show Filter Coffee online\"": { "count": 1, "size": "44x44" },
           "switch \"Show Mango Lassi online\"": { "count": 1, "size": "44x44" },
           "switch \"Show Masala Chai online\"": { "count": 1, "size": "44x44" },
@@ -1155,24 +1220,28 @@
         "overflow": false,
         "tapTargets": {
           "button \"Add item\"": { "count": 1, "size": "90x44" },
-          "button \"Edit Filter Coffee\"": { "count": 1, "size": "159x44" },
-          "button \"Edit Mango Lassi\"": { "count": 1, "size": "159x44" },
-          "button \"Edit Masala Chai\"": { "count": 1, "size": "159x44" },
-          "button \"Edit Masala Dosa\"": { "count": 1, "size": "159x44" },
-          "button \"Edit Samosa\"": { "count": 1, "size": "159x44" },
-          "button \"Edit Vada Pav\"": { "count": 1, "size": "159x44" },
-          "button \"Remove Filter Coffee\"": { "count": 1, "size": "157x44" },
-          "button \"Remove Mango Lassi\"": { "count": 1, "size": "157x44" },
-          "button \"Remove Masala Chai\"": { "count": 1, "size": "157x44" },
-          "button \"Remove Masala Dosa\"": { "count": 1, "size": "157x44" },
-          "button \"Remove Samosa\"": { "count": 1, "size": "157x44" },
-          "button \"Remove Vada Pav\"": { "count": 1, "size": "157x44" },
-          "input[checkbox] \"Mark unavailable for Filter Coffee\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Mango Lassi\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Masala Chai\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Masala Dosa\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Samosa\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Vada Pav\"": { "count": 1, "size": "87x44" },
+          "button \"Edit Filter Coffee\"": { "count": 1, "size": "324x44" },
+          "button \"Edit Mango Lassi\"": { "count": 1, "size": "324x44" },
+          "button \"Edit Masala Chai\"": { "count": 1, "size": "324x44" },
+          "button \"Edit Masala Dosa\"": { "count": 1, "size": "324x44" },
+          "button \"Edit Samosa\"": { "count": 1, "size": "324x44" },
+          "button \"Edit Vada Pav\"": { "count": 1, "size": "324x44" },
+          "button \"Move Filter Coffee down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Filter Coffee up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Mango Lassi up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Chai down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Chai up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Dosa down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Dosa up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Samosa down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Vada Pav down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Vada Pav up\"": { "count": 1, "size": "44x44" },
+          "switch \"Selling Filter Coffee\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Mango Lassi\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Masala Chai\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Masala Dosa\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Samosa\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Vada Pav\"": { "count": 1, "size": "103x44" },
           "switch \"Show Filter Coffee online\"": { "count": 1, "size": "44x44" },
           "switch \"Show Mango Lassi online\"": { "count": 1, "size": "44x44" },
           "switch \"Show Masala Chai online\"": { "count": 1, "size": "44x44" },
@@ -1185,24 +1254,28 @@
         "overflow": false,
         "tapTargets": {
           "button \"Add item\"": { "count": 1, "size": "90x44" },
-          "button \"Edit Filter Coffee\"": { "count": 1, "size": "130x44" },
-          "button \"Edit Mango Lassi\"": { "count": 1, "size": "130x44" },
-          "button \"Edit Masala Chai\"": { "count": 1, "size": "130x44" },
-          "button \"Edit Masala Dosa\"": { "count": 1, "size": "130x44" },
-          "button \"Edit Samosa\"": { "count": 1, "size": "130x44" },
-          "button \"Edit Vada Pav\"": { "count": 1, "size": "130x44" },
-          "button \"Remove Filter Coffee\"": { "count": 1, "size": "128x44" },
-          "button \"Remove Mango Lassi\"": { "count": 1, "size": "128x44" },
-          "button \"Remove Masala Chai\"": { "count": 1, "size": "128x44" },
-          "button \"Remove Masala Dosa\"": { "count": 1, "size": "128x44" },
-          "button \"Remove Samosa\"": { "count": 1, "size": "128x44" },
-          "button \"Remove Vada Pav\"": { "count": 1, "size": "128x44" },
-          "input[checkbox] \"Mark unavailable for Filter Coffee\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Mango Lassi\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Masala Chai\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Masala Dosa\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Samosa\"": { "count": 1, "size": "87x44" },
-          "input[checkbox] \"Mark unavailable for Vada Pav\"": { "count": 1, "size": "87x44" },
+          "button \"Edit Filter Coffee\"": { "count": 1, "size": "266x44" },
+          "button \"Edit Mango Lassi\"": { "count": 1, "size": "266x44" },
+          "button \"Edit Masala Chai\"": { "count": 1, "size": "266x44" },
+          "button \"Edit Masala Dosa\"": { "count": 1, "size": "266x44" },
+          "button \"Edit Samosa\"": { "count": 1, "size": "266x44" },
+          "button \"Edit Vada Pav\"": { "count": 1, "size": "266x44" },
+          "button \"Move Filter Coffee down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Filter Coffee up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Mango Lassi up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Chai down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Chai up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Dosa down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Masala Dosa up\"": { "count": 1, "size": "44x44" },
+          "button \"Move Samosa down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Vada Pav down\"": { "count": 1, "size": "44x44" },
+          "button \"Move Vada Pav up\"": { "count": 1, "size": "44x44" },
+          "switch \"Selling Filter Coffee\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Mango Lassi\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Masala Chai\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Masala Dosa\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Samosa\"": { "count": 1, "size": "103x44" },
+          "switch \"Selling Vada Pav\"": { "count": 1, "size": "103x44" },
           "switch \"Show Filter Coffee online\"": { "count": 1, "size": "44x44" },
           "switch \"Show Mango Lassi online\"": { "count": 1, "size": "44x44" },
           "switch \"Show Masala Chai online\"": { "count": 1, "size": "44x44" },
@@ -1216,12 +1289,14 @@
         "tapTargets": {
           "button \"Cancel order\"": { "count": 1, "size": "120x44" },
           "button \"More actions\"": { "count": 1, "size": "90x44" },
+          "button \"Picked up · ₹##.## collected\"": { "count": 1, "size": "294x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "combobox \"Show orders from\"": { "count": 1, "size": "252x44" },
+          "button \"Share this drop\"": { "count": 1, "size": "95x44" },
+          "combobox \"Show orders from\"": { "count": 1, "size": "254x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 1, "size": "44x44" },
           "link \"Call Priya Buyer\"": { "count": 1, "size": "143x44" },
           "link \"WhatsApp Priya Buyer\"": { "count": 1, "size": "143x44" },
-          "tab \"All (#)\"": { "count": 1, "size": "45x60" }
+          "tab \"All (#)\"": { "count": 1, "size": "44x62" }
         }
       },
       "/orders?drop=[id]@390": {
@@ -1229,22 +1304,24 @@
         "tapTargets": {
           "button \"Cancel order\"": { "count": 1, "size": "120x44" },
           "button \"More actions\"": { "count": 1, "size": "90x44" },
+          "button \"Picked up · ₹##.## collected\"": { "count": 1, "size": "324x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "combobox \"Show orders from\"": { "count": 1, "size": "282x44" },
+          "button \"Share this drop\"": { "count": 1, "size": "95x44" },
+          "combobox \"Show orders from\"": { "count": 1, "size": "284x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 1, "size": "44x44" },
           "link \"Call Priya Buyer\"": { "count": 1, "size": "158x44" },
-          "link \"WhatsApp Priya Buyer\"": { "count": 1, "size": "158x44" }
+          "link \"WhatsApp Priya Buyer\"": { "count": 1, "size": "158x44" },
+          "tab \"All (#)\"": { "count": 1, "size": "44x62" }
         }
       },
       "/orders?drop=[id]@768": {
         "overflow": false,
         "tapTargets": {
           "button \"Cancel order\"": { "count": 1, "size": "120x44" },
-          "button \"Confirm\"": { "count": 1, "size": "287x44" },
-          "button \"Picked up · ₹##.## collected\"": { "count": 1, "size": "287x44" },
+          "button \"Picked up · ₹##.## collected\"": { "count": 1, "size": "582x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "button \"Share today's menu\"": { "count": 1, "size": "453x44" },
-          "button \"Sound off\"": { "count": 1, "size": "119x44" },
+          "button \"Share this drop\"": { "count": 1, "size": "453x44" },
+          "button \"Sound on — tap to enable\"": { "count": 1, "size": "223x44" },
           "combobox \"Show orders from\"": { "count": 1, "size": "236x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 1, "size": "44x44" },
           "link \"Call Priya Buyer\"": { "count": 1, "size": "287x44" },
@@ -1263,13 +1340,14 @@
         "tapTargets": {
           "button \"Cancel order\"": { "count": 2, "size": "120x44" },
           "button \"More actions\"": { "count": 1, "size": "90x44" },
+          "button \"Picked up · ₹##.## collected\"": { "count": 2, "size": "294x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "combobox \"Show orders from\"": { "count": 1, "size": "252x44" },
+          "combobox \"Show orders from\"": { "count": 1, "size": "254x44" },
           "input[checkbox] \"Select all (#)\"": { "count": 1, "size": "148x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 2, "size": "44x44" },
           "link \"Call Priya Buyer\"": { "count": 2, "size": "143x44" },
           "link \"WhatsApp Priya Buyer\"": { "count": 2, "size": "143x44" },
-          "tab \"All (#)\"": { "count": 1, "size": "45x60" }
+          "tab \"All (#)\"": { "count": 1, "size": "44x62" }
         }
       },
       "/orders@390": {
@@ -1277,22 +1355,23 @@
         "tapTargets": {
           "button \"Cancel order\"": { "count": 2, "size": "120x44" },
           "button \"More actions\"": { "count": 1, "size": "90x44" },
+          "button \"Picked up · ₹##.## collected\"": { "count": 2, "size": "324x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "combobox \"Show orders from\"": { "count": 1, "size": "282x44" },
+          "combobox \"Show orders from\"": { "count": 1, "size": "284x44" },
           "input[checkbox] \"Select all (#)\"": { "count": 1, "size": "148x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 2, "size": "44x44" },
           "link \"Call Priya Buyer\"": { "count": 2, "size": "158x44" },
-          "link \"WhatsApp Priya Buyer\"": { "count": 2, "size": "158x44" }
+          "link \"WhatsApp Priya Buyer\"": { "count": 2, "size": "158x44" },
+          "tab \"All (#)\"": { "count": 1, "size": "44x62" }
         }
       },
       "/orders@768": {
         "overflow": false,
         "tapTargets": {
           "button \"Cancel order\"": { "count": 2, "size": "120x44" },
-          "button \"Confirm\"": { "count": 2, "size": "287x44" },
-          "button \"Picked up · ₹##.## collected\"": { "count": 2, "size": "287x44" },
+          "button \"Picked up · ₹##.## collected\"": { "count": 2, "size": "582x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "button \"Sound off\"": { "count": 1, "size": "119x44" },
+          "button \"Sound on — tap to enable\"": { "count": 1, "size": "223x44" },
           "combobox \"Show orders from\"": { "count": 1, "size": "112x44" },
           "input[checkbox] \"Select all (#)\"": { "count": 1, "size": "148x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 2, "size": "44x44" },
@@ -1340,41 +1419,47 @@
       "/pricing@360": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "87x44" },
-          "link \"Get Started\"": { "count": 1, "size": "106x44" },
+          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"How it works\"": { "count": 1, "size": "96x44" },
           "link \"Pricing\"": { "count": 1, "size": "61x44" },
           "link \"Privacy\"": { "count": 1, "size": "46x44" },
+          "link \"Refunds\"": { "count": 1, "size": "52x44" },
           "link \"Sign in\"": { "count": 1, "size": "69x44" },
-          "link \"Start ## days free\"": { "count": 1, "size": "278x44" },
-          "link \"Terms\"": { "count": 1, "size": "44x44" }
+          "link \"Start ## days free\"": { "count": 2, "size": "147x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" },
+          "link \"contact@intelliforge.tech\"": { "count": 1, "size": "158x44" }
         }
       },
       "/pricing@390": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "87x44" },
-          "link \"Get Started\"": { "count": 1, "size": "106x44" },
+          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"How it works\"": { "count": 1, "size": "96x44" },
           "link \"Pricing\"": { "count": 1, "size": "61x44" },
           "link \"Privacy\"": { "count": 1, "size": "46x44" },
+          "link \"Refunds\"": { "count": 1, "size": "52x44" },
           "link \"Sign in\"": { "count": 1, "size": "69x44" },
-          "link \"Start ## days free\"": { "count": 1, "size": "308x44" },
-          "link \"Terms\"": { "count": 1, "size": "44x44" }
+          "link \"Start ## days free\"": { "count": 2, "size": "147x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" },
+          "link \"contact@intelliforge.tech\"": { "count": 1, "size": "158x44" }
         }
       },
       "/pricing@768": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "87x44" },
-          "link \"Get Started\"": { "count": 1, "size": "114x44" },
+          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"Home\"": { "count": 1, "size": "62x44" },
           "link \"How it works\"": { "count": 1, "size": "108x44" },
           "link \"Pricing\"": { "count": 1, "size": "67x44" },
           "link \"Privacy\"": { "count": 1, "size": "46x44" },
+          "link \"Refunds\"": { "count": 1, "size": "52x44" },
           "link \"Sign in\"": { "count": 1, "size": "67x44" },
-          "link \"Start ## days free\"": { "count": 1, "size": "398x44" },
-          "link \"Terms\"": { "count": 1, "size": "44x44" }
+          "link \"Start ## days free\"": { "count": 2, "size": "155x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" },
+          "link \"contact@intelliforge.tech\"": { "count": 1, "size": "158x44" }
         }
       },
       "/s/[slug]@360": {
@@ -1387,12 +1472,12 @@
           "button \"Add Samosa\"": { "count": 2, "size": "81x44" },
           "button \"Add Vada Pav\"": { "count": 1, "size": "81x44" },
           "button \"Share\"": { "count": 1, "size": "84x44" },
+          "link \"Billing by AwaazOS — Bol. Bill. Becho.\"": { "count": 1, "size": "247x44" },
           "link \"Drinks\"": { "count": 1, "size": "76x44" },
-          "link \"Pre-order now\"": { "count": 1, "size": "167x44" },
+          "link \"Pre-order · closes tomorrow #:## pm\"": { "count": 1, "size": "312x44" },
           "link \"Pre-order\"": { "count": 1, "size": "119x44" },
           "link \"Sign in\"": { "count": 1, "size": "89x44" },
-          "link \"Snacks\"": { "count": 1, "size": "80x44" },
-          "link \"🎙️Billing by AwaazOS — Bol. Bill. Becho.\"": { "count": 1, "size": "268x44" }
+          "link \"Snacks\"": { "count": 1, "size": "80x44" }
         }
       },
       "/s/[slug]@390": {
@@ -1405,12 +1490,12 @@
           "button \"Add Samosa\"": { "count": 2, "size": "81x44" },
           "button \"Add Vada Pav\"": { "count": 1, "size": "81x44" },
           "button \"Share\"": { "count": 1, "size": "84x44" },
+          "link \"Billing by AwaazOS — Bol. Bill. Becho.\"": { "count": 1, "size": "247x44" },
           "link \"Drinks\"": { "count": 1, "size": "76x44" },
-          "link \"Pre-order now\"": { "count": 1, "size": "167x44" },
+          "link \"Pre-order · closes tomorrow #:## pm\"": { "count": 1, "size": "312x44" },
           "link \"Pre-order\"": { "count": 1, "size": "119x44" },
           "link \"Sign in\"": { "count": 1, "size": "89x44" },
-          "link \"Snacks\"": { "count": 1, "size": "80x44" },
-          "link \"🎙️Billing by AwaazOS — Bol. Bill. Becho.\"": { "count": 1, "size": "268x44" }
+          "link \"Snacks\"": { "count": 1, "size": "80x44" }
         }
       },
       "/s/[slug]@768": {
@@ -1423,12 +1508,12 @@
           "button \"Add Samosa\"": { "count": 2, "size": "81x44" },
           "button \"Add Vada Pav\"": { "count": 1, "size": "81x44" },
           "button \"Share\"": { "count": 1, "size": "84x44" },
+          "link \"Billing by AwaazOS — Bol. Bill. Becho.\"": { "count": 1, "size": "247x44" },
           "link \"Drinks\"": { "count": 1, "size": "76x44" },
-          "link \"Pre-order now\"": { "count": 1, "size": "167x44" },
+          "link \"Pre-order · closes tomorrow #:## pm\"": { "count": 1, "size": "312x44" },
           "link \"Pre-order\"": { "count": 1, "size": "119x44" },
           "link \"Sign in\"": { "count": 1, "size": "89x44" },
-          "link \"Snacks\"": { "count": 1, "size": "80x44" },
-          "link \"🎙️Billing by AwaazOS — Bol. Bill. Becho.\"": { "count": 1, "size": "268x44" }
+          "link \"Snacks\"": { "count": 1, "size": "80x44" }
         }
       },
       "/settings/billing@360": {
@@ -1450,6 +1535,7 @@
         "tapTargets": {
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
@@ -1462,20 +1548,56 @@
       "/settings/notifications@360": {
         "overflow": false,
         "tapTargets": {
+          "button \"Play sample\"": { "count": 1, "size": "110x44" },
+          "button \"Voice alert on\"": { "count": 1, "size": "145x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" }
         }
       },
       "/settings/notifications@390": {
         "overflow": false,
         "tapTargets": {
+          "button \"Play sample\"": { "count": 1, "size": "110x44" },
+          "button \"Voice alert on\"": { "count": 1, "size": "145x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" }
         }
       },
       "/settings/notifications@768": {
         "overflow": false,
         "tapTargets": {
+          "button \"Play sample\"": { "count": 1, "size": "110x44" },
+          "button \"Voice alert on\"": { "count": 1, "size": "145x44" },
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
+          "link \"Online orders\"": { "count": 1, "size": "224x44" },
+          "link \"Online store\"": { "count": 1, "size": "224x44" },
+          "link \"Overview\"": { "count": 1, "size": "224x44" },
+          "link \"Payments\"": { "count": 1, "size": "224x44" },
+          "link \"Plan & billing\"": { "count": 1, "size": "224x44" },
+          "link \"Receipts\"": { "count": 1, "size": "224x44" }
+        }
+      },
+      "/settings/offers@360": {
+        "overflow": false,
+        "tapTargets": {
+          "button \"New offer\"": { "count": 1, "size": "123x44" },
+          "link \"Settings\"": { "count": 1, "size": "88x44" }
+        }
+      },
+      "/settings/offers@390": {
+        "overflow": false,
+        "tapTargets": {
+          "button \"New offer\"": { "count": 1, "size": "123x44" },
+          "link \"Settings\"": { "count": 1, "size": "88x44" }
+        }
+      },
+      "/settings/offers@768": {
+        "overflow": false,
+        "tapTargets": {
+          "button \"New offer\"": { "count": 1, "size": "123x44" },
+          "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
+          "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
@@ -1495,6 +1617,7 @@
           "radio \"Both\"": { "count": 1, "size": "64x44" },
           "radio \"Delivery\"": { "count": 1, "size": "87x44" },
           "radio \"Pickup\"": { "count": 1, "size": "76x44" },
+          "switch \"Show a WhatsApp button on your store page\"": { "count": 1, "size": "56x44" },
           "switch \"Turn off ordering from menu\"": { "count": 1, "size": "56x44" },
           "switch \"Turn on WhatsApp orders\"": { "count": 1, "size": "56x44" }
         }
@@ -1510,6 +1633,7 @@
           "radio \"Both\"": { "count": 1, "size": "64x44" },
           "radio \"Delivery\"": { "count": 1, "size": "87x44" },
           "radio \"Pickup\"": { "count": 1, "size": "76x44" },
+          "switch \"Show a WhatsApp button on your store page\"": { "count": 1, "size": "56x44" },
           "switch \"Turn off ordering from menu\"": { "count": 1, "size": "56x44" },
           "switch \"Turn on WhatsApp orders\"": { "count": 1, "size": "56x44" }
         }
@@ -1521,6 +1645,7 @@
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Go to Drops\"": { "count": 1, "size": "96x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Open my store\"": { "count": 1, "size": "143x44" },
@@ -1532,6 +1657,7 @@
           "radio \"Both\"": { "count": 1, "size": "64x44" },
           "radio \"Delivery\"": { "count": 1, "size": "87x44" },
           "radio \"Pickup\"": { "count": 1, "size": "76x44" },
+          "switch \"Show a WhatsApp button on your store page\"": { "count": 1, "size": "56x44" },
           "switch \"Turn off ordering from menu\"": { "count": 1, "size": "56x44" },
           "switch \"Turn on WhatsApp orders\"": { "count": 1, "size": "56x44" }
         }
@@ -1542,7 +1668,6 @@
           "input[text] \"Name shown on UPI apps (optional)\"": { "count": 1, "size": "294x44" },
           "input[text] \"UPI ID\"": { "count": 1, "size": "294x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" },
-          "link \"Upgrade to Pro\"": { "count": 1, "size": "260x44" },
           "switch \"Turn off pay on delivery\"": { "count": 1, "size": "56x44" }
         }
       },
@@ -1552,7 +1677,6 @@
           "input[text] \"Name shown on UPI apps (optional)\"": { "count": 1, "size": "324x44" },
           "input[text] \"UPI ID\"": { "count": 1, "size": "324x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" },
-          "link \"Upgrade to Pro\"": { "count": 1, "size": "290x44" },
           "switch \"Turn off pay on delivery\"": { "count": 1, "size": "56x44" }
         }
       },
@@ -1563,13 +1687,13 @@
           "input[text] \"UPI ID\"": { "count": 1, "size": "310x44" },
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
           "link \"Payments\"": { "count": 1, "size": "224x44" },
           "link \"Plan & billing\"": { "count": 1, "size": "224x44" },
           "link \"Receipts\"": { "count": 1, "size": "224x44" },
-          "link \"Upgrade to Pro\"": { "count": 1, "size": "95x44" },
           "switch \"Turn off pay on delivery\"": { "count": 1, "size": "56x44" }
         }
       },
@@ -1601,6 +1725,7 @@
           "input[text] \"GSTIN (optional)\"": { "count": 1, "size": "310x44" },
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
@@ -1617,10 +1742,11 @@
           "input[file] \"Upload banner\"": { "count": 1, "size": "150x44" },
           "input[file] \"Upload logo\"": { "count": 1, "size": "134x44" },
           "input[text] \"FSSAI number (optional)\"": { "count": 1, "size": "294x44" },
+          "input[text] \"Instagram username (optional)\"": { "count": 1, "size": "265x44" },
           "input[text] \"Store name\"": { "count": 1, "size": "294x44" },
           "link \"Preview\"": { "count": 1, "size": "101x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" },
-          "switch \"Unpublish storefront\"": { "count": 1, "size": "56x44" }
+          "switch \"Unpublish store\"": { "count": 1, "size": "56x44" }
         }
       },
       "/settings/store@390": {
@@ -1630,10 +1756,11 @@
           "input[file] \"Upload banner\"": { "count": 1, "size": "150x44" },
           "input[file] \"Upload logo\"": { "count": 1, "size": "134x44" },
           "input[text] \"FSSAI number (optional)\"": { "count": 1, "size": "324x44" },
+          "input[text] \"Instagram username (optional)\"": { "count": 1, "size": "295x44" },
           "input[text] \"Store name\"": { "count": 1, "size": "324x44" },
           "link \"Preview\"": { "count": 1, "size": "101x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" },
-          "switch \"Unpublish storefront\"": { "count": 1, "size": "56x44" }
+          "switch \"Unpublish store\"": { "count": 1, "size": "56x44" }
         }
       },
       "/settings/store@768": {
@@ -1643,9 +1770,11 @@
           "input[file] \"Upload banner\"": { "count": 1, "size": "150x44" },
           "input[file] \"Upload logo\"": { "count": 1, "size": "134x44" },
           "input[text] \"FSSAI number (optional)\"": { "count": 1, "size": "310x44" },
+          "input[text] \"Instagram username (optional)\"": { "count": 1, "size": "281x44" },
           "input[text] \"Store name\"": { "count": 1, "size": "310x44" },
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
@@ -1653,7 +1782,7 @@
           "link \"Plan & billing\"": { "count": 1, "size": "224x44" },
           "link \"Preview\"": { "count": 1, "size": "101x44" },
           "link \"Receipts\"": { "count": 1, "size": "224x44" },
-          "switch \"Unpublish storefront\"": { "count": 1, "size": "56x44" }
+          "switch \"Unpublish store\"": { "count": 1, "size": "56x44" }
         }
       },
       "/settings/voice@360": {
@@ -1676,6 +1805,7 @@
           "combobox \"English\"": { "count": 1, "size": "310x44" },
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
@@ -1697,6 +1827,7 @@
         "tapTargets": {
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
+          "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },
           "link \"Online store\"": { "count": 1, "size": "224x44" },
           "link \"Overview\"": { "count": 1, "size": "224x44" },
@@ -1738,40 +1869,49 @@
       "/sign-up@360": {
         "overflow": false,
         "tapTargets": {
-          "button \"Sign up\"": { "count": 1, "size": "278x44" },
-          "combobox \"Stall type\"": { "count": 1, "size": "298x44" },
-          "input[email] \"Email\"": { "count": 1, "size": "298x44" },
-          "input[password] \"Password (min # characters)\"": { "count": 1, "size": "298x44" },
-          "input[tel] \"Phone (optional, +##)\"": { "count": 1, "size": "298x44" },
-          "input[text] \"Stall / shop name\"": { "count": 1, "size": "298x44" },
-          "input[text] \"Your name\"": { "count": 1, "size": "298x44" },
-          "link \"Already have an account\"": { "count": 1, "size": "278x44" }
+          "button \"Show password\"": { "count": 1, "size": "44x44" },
+          "button \"Start ## days free\"": { "count": 1, "size": "278x44" },
+          "combobox \"General\"": { "count": 1, "size": "278x44" },
+          "input[email] \"Email\"": { "count": 1, "size": "278x44" },
+          "input[password] \"Password\"": { "count": 1, "size": "278x44" },
+          "input[tel] \"Phone (optional, +##)\"": { "count": 1, "size": "278x44" },
+          "input[text] \"Store name\"": { "count": 1, "size": "278x44" },
+          "input[text] \"Your name\"": { "count": 1, "size": "278x44" },
+          "link \"Privacy Policy\"": { "count": 1, "size": "83x44" },
+          "link \"Sign in\"": { "count": 1, "size": "51x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" }
         }
       },
       "/sign-up@390": {
         "overflow": false,
         "tapTargets": {
-          "button \"Sign up\"": { "count": 1, "size": "308x44" },
-          "combobox \"Stall type\"": { "count": 1, "size": "328x44" },
-          "input[email] \"Email\"": { "count": 1, "size": "328x44" },
-          "input[password] \"Password (min # characters)\"": { "count": 1, "size": "328x44" },
-          "input[tel] \"Phone (optional, +##)\"": { "count": 1, "size": "328x44" },
-          "input[text] \"Stall / shop name\"": { "count": 1, "size": "328x44" },
-          "input[text] \"Your name\"": { "count": 1, "size": "328x44" },
-          "link \"Already have an account\"": { "count": 1, "size": "308x44" }
+          "button \"Show password\"": { "count": 1, "size": "44x44" },
+          "button \"Start ## days free\"": { "count": 1, "size": "308x44" },
+          "combobox \"General\"": { "count": 1, "size": "308x44" },
+          "input[email] \"Email\"": { "count": 1, "size": "308x44" },
+          "input[password] \"Password\"": { "count": 1, "size": "308x44" },
+          "input[tel] \"Phone (optional, +##)\"": { "count": 1, "size": "308x44" },
+          "input[text] \"Store name\"": { "count": 1, "size": "308x44" },
+          "input[text] \"Your name\"": { "count": 1, "size": "308x44" },
+          "link \"Privacy Policy\"": { "count": 1, "size": "83x44" },
+          "link \"Sign in\"": { "count": 1, "size": "51x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" }
         }
       },
       "/sign-up@768": {
         "overflow": false,
         "tapTargets": {
-          "button \"Sign up\"": { "count": 1, "size": "80x44" },
-          "combobox \"Stall type\"": { "count": 1, "size": "418x44" },
-          "input[email] \"Email\"": { "count": 1, "size": "418x44" },
-          "input[password] \"Password (min # characters)\"": { "count": 1, "size": "418x44" },
-          "input[tel] \"Phone (optional, +##)\"": { "count": 1, "size": "418x44" },
-          "input[text] \"Stall / shop name\"": { "count": 1, "size": "418x44" },
-          "input[text] \"Your name\"": { "count": 1, "size": "418x44" },
-          "link \"Already have an account\"": { "count": 1, "size": "187x44" }
+          "button \"Show password\"": { "count": 1, "size": "44x44" },
+          "button \"Start ## days free\"": { "count": 1, "size": "398x44" },
+          "combobox \"General\"": { "count": 1, "size": "398x44" },
+          "input[email] \"Email\"": { "count": 1, "size": "398x44" },
+          "input[password] \"Password\"": { "count": 1, "size": "398x44" },
+          "input[tel] \"Phone (optional, +##)\"": { "count": 1, "size": "398x44" },
+          "input[text] \"Store name\"": { "count": 1, "size": "398x44" },
+          "input[text] \"Your name\"": { "count": 1, "size": "398x44" },
+          "link \"Privacy Policy\"": { "count": 1, "size": "83x44" },
+          "link \"Sign in\"": { "count": 1, "size": "51x44" },
+          "link \"Terms\"": { "count": 1, "size": "44x44" }
         }
       },
       "/transactions@360": {

@@ -4,13 +4,14 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { StaffRole } from "@prisma/client";
-import { ChevronRight, ExternalLink, MoreHorizontal } from "lucide-react";
+import { ChevronRight, ExternalLink, MoreHorizontal, Share2 } from "lucide-react";
+import { toast } from "sonner";
 
 import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
 import { InstallRailButton, InstallSheetRow } from "@/components/pwa/InstallPrompt";
 import { APP_NAV_ICONS as ICONS } from "@/components/shell/nav-icons";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { appNavItemsForRole, isAppNavItemActive } from "@/lib/app-nav";
+import { appNavItemsForRole, appTabBarForRole, isAppNavItemActive } from "@/lib/app-nav";
 import { cn } from "@/lib/utils";
 
 export type AppNavProps = {
@@ -48,8 +49,34 @@ const SHEET_ROW =
 const NEW_TAB_NOTE = <span className="sr-only"> (opens in a new tab)</span>;
 
 /**
+ * "Share store link" in the More sheet. Same behaviour as the storefront's
+ * ShareStoreButton: the phone's share sheet first (WhatsApp, Instagram…), a
+ * copied link where there is none. Always the canonical `/s/<slug>` URL.
+ * A dismissed share sheet (AbortError) is not an error.
+ */
+async function shareStoreLink(storePath: string, vendorName: string): Promise<void> {
+  const url = `${window.location.origin}${storePath}`;
+  if (typeof navigator.share === "function") {
+    try {
+      await navigator.share({ title: vendorName, text: `Order from ${vendorName} online`, url });
+      return;
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
+      // Share API present but refused (permission policy): copy instead.
+    }
+  }
+  try {
+    await navigator.clipboard.writeText(url);
+    toast.success("Store link copied.");
+  } catch {
+    toast.error("Could not copy the link. Open Live store and copy it from the address bar.");
+  }
+}
+
+/**
  * Phone navigation (below md): a fixed bottom tab bar. The destinations that
- * don't fit live in a bottom sheet behind "More".
+ * don't fit live in a bottom sheet behind "More". Which ones get a tab depends
+ * on whether the store is published (`appTabBarForRole` in lib/app-nav.ts).
  *
  * The bar's height is `--app-tabbar-h` (app/globals.css, `.app-shell`); it
  * sits above the cookie banner while that is showing.
@@ -58,9 +85,8 @@ export function AppTabBar({ role, vendorId, vendorName, storePath }: AppNavProps
   const pathname = usePathname() ?? "";
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const items = appNavItemsForRole(role);
-  const tabs = items.filter((i) => i.placement === "tab");
-  const more = items.filter((i) => i.placement === "more");
+  // `storePath` is only set for a published store.
+  const { tabs, more } = appTabBarForRole(role, storePath !== null);
   const moreActive = more.some((i) => isAppNavItemActive(i.href, pathname));
 
   // A link in the sheet navigates: close it once the route has changed.
@@ -153,6 +179,21 @@ export function AppTabBar({ role, vendorId, vendorName, storePath }: AppNavProps
                         </span>
                         <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                       </a>
+                    </li>
+                  ) : null}
+                  {storePath ? (
+                    <li>
+                      {/* The sheet stays open until the share sheet or the copy has finished: it holds the tap gesture. */}
+                      <button
+                        type="button"
+                        className={SHEET_ROW}
+                        onClick={() => void shareStoreLink(storePath, vendorName).then(() => setMoreOpen(false))}
+                      >
+                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
+                          <Share2 className="h-5 w-5" aria-hidden="true" />
+                        </span>
+                        <span className="min-w-0 flex-1 font-semibold text-foreground">Share store link</span>
+                      </button>
                     </li>
                   ) : null}
                   {/* "Install app" where this browser can install; nothing otherwise. */}

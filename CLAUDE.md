@@ -226,6 +226,11 @@ Rules every one of them follows:
 - Order pages are keyed on `Transaction.orderToken` alone (192-bit random, `generateOrderToken()`),
   always looked up together with the slug's `vendorId`. Never expose or accept a transaction `id`.
 - Every write is IP rate-limited (`makeLimiter` in `lib/ratelimit.ts`; buyer login also per-email).
+- No `loading.tsx` under `app/s` or `app/r`: it streams the page, so `notFound()` would answer 200
+  instead of 404. `not-found.tsx` / `error.tsx` there read no data and say the same thing for every miss.
+- The buyer's device remembers recent orders in localStorage (`components/storefront/recent-orders.ts`:
+  token, bill number, date — never PII). The order page refreshes on tab-visible / `pageshow` and a
+  "Check for update" button, never on a timer.
 - No buyer PII (phone, name, address, UTR, email) in logs, Sentry or error bodies.
 - The order webhook can't verify HMAC before *any* DB read — the secret is per vendor — so it
   reads exactly one column (the encrypted webhook secret) first, and nothing else until verified.
@@ -419,6 +424,14 @@ till. Manifest `id` stays `"/"`. Install affordances (`components/pwa/InstallPro
 copy of the phone-alerts opt-in (`components/push/PushAlertsButton.tsx`) are views over module-level
 stores (`hooks/useInstallPrompt.ts`, `hooks/usePushAlerts.ts`) — add a copy, never a second detector.
 Both are event-driven: no timers, no polling.
+
+**Setup checklist and billing notices** follow the seller to where they land: `/orders`, `/drops` and
+(collapsed) `/pos` render `SetupChecklistCard` (`components/setup/`, rules in `setupChecklist()` /
+`checklistForRole()` in `lib/settings-overview.ts`, loaded by `lib/setup-checklist-server.ts` on page
+render only) and `BillingAccessNotice` (`components/billing/TrialNotice.tsx`). Steps are role-trimmed;
+a CASHIER sees none. The phone tab bar depends on the store too: `appTabBarForRole(role, published)`
+in `lib/app-nav.ts` moves Sell behind More and puts Settings on the bar once the store is published,
+and `/help` must use the same function (`helpTopicsForRole(role, published)`).
 
 **Order from menu** (`lib/menu-orders.ts`, opt-in `VendorSettings.acceptMenuOrders`): buyers order
 everyday `MenuItem`s with no drop — same STOREFRONT transaction with `dropId = null`, same payment

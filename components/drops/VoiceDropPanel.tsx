@@ -1,9 +1,10 @@
 "use client";
 
-import { AlertCircle, Loader2, Mic, Square, Undo2, X } from "lucide-react";
+import { AlertCircle, Loader2, Mic, Plus, Square, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { AddMenuItemDialog, type AddedMenuItem } from "@/components/drops/AddMenuItemDialog";
 import { Button } from "@/components/ui/button";
 import { useOnline } from "@/hooks/useOnline";
 import { useVoiceDictation, type DictationError } from "@/hooks/useVoiceDictation";
@@ -24,6 +25,10 @@ export type VoiceDropPanelProps = {
   /** Restore the form as it was before the last voice take. */
   onUndo: () => void;
   canUndo: boolean;
+  /** A spoken dish was added to the menu from here: tick it in the form with the spoken quantity. */
+  onMenuItemAdded: (item: AddedMenuItem, quantity: number | null) => void;
+  /** Owners get a link to billing when voice is paused by the billing lock. */
+  canManageBilling?: boolean;
 };
 
 const LANG_LABEL: Record<string, string> = {
@@ -48,6 +53,7 @@ const FORM_HINT = "fill the form below";
 const ERROR_MESSAGES: Record<string, string> = {
   voice_unavailable: `Voice isn't available right now — ${FORM_HINT}.`,
   ai_limit: `Voice limit reached for your plan — ${FORM_HINT}.`,
+  billing_locked: "Voice is paused until you subscribe. You can still fill in the form.",
   rate_limited: `Too many voice tries — wait a minute, or ${FORM_HINT}.`,
   not_allowed: `Voice isn't available for your account here — ${FORM_HINT}.`,
   mic_denied: `Microphone blocked — allow mic access, or ${FORM_HINT}.`,
@@ -69,7 +75,8 @@ function errorMessage(code: DictationError | null): string {
 /** parse-drop HTTP status → panel error code (shapes mirror /api/ai/parse-order). */
 function errorForStatus(status: number, body: { error?: string }): DictationError {
   if (status === 503 || body.error === "voice_unavailable") return "voice_unavailable";
-  if (status === 402) return "ai_limit";
+  // 402 is two different things: the billing lock, or a plan / usage cap.
+  if (status === 402) return body.error === "billing_locked" ? "billing_locked" : "ai_limit";
   if (status === 429) return "rate_limited";
   if (status === 401 || status === 403 || status === 404) return "not_allowed";
   return "parse_failed";
@@ -78,8 +85,17 @@ function errorForStatus(status: number, body: { error?: string }): DictationErro
 type Unmatched = { key: string; spokenName: string; quantity?: number | null };
 type Result = { summary: string; warnings: string[]; unmatched: Unmatched[] };
 
-export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, canUndo }: VoiceDropPanelProps) {
+export function VoiceDropPanel({
+  voiceLang,
+  isEdit = false,
+  onDraft,
+  onUndo,
+  canUndo,
+  onMenuItemAdded,
+  canManageBilling = false,
+}: VoiceDropPanelProps) {
   const [result, setResult] = useState<Result | null>(null);
+  const [adding, setAdding] = useState<Unmatched | null>(null);
   const [undone, setUndone] = useState(false);
   const summaryRef = useRef<HTMLParagraphElement>(null);
   const micRef = useRef<HTMLButtonElement>(null);
@@ -151,6 +167,16 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
     setResult(null);
     setUndone(false);
     start();
+  }
+
+  function menuItemAdded(item: AddedMenuItem) {
+    if (!adding) return;
+    onMenuItemAdded(item, adding.quantity ?? null);
+    const key = adding.key;
+    setAdding(null);
+    // The row (and the button that opened the dialog) goes away: review continues from the summary.
+    focusSummary.current = true;
+    setResult((r) => (r ? { ...r, unmatched: r.unmatched.filter((x) => x.key !== key) } : r));
   }
 
   function undo() {
@@ -248,7 +274,16 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
               <span>{statusText}</span>
             </p>
-          ) : (
+          ) : null}
+          {state === "error" && error === "billing_locked" && canManageBilling && !offline ? (
+            <Link
+              href="/settings/billing"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-2"
+            >
+              Choose a plan
+            </Link>
+          ) : null}
+          {state === "error" || offline ? null : (
             <p
               id="voice-drop-status"
               aria-live="polite"
@@ -305,15 +340,16 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
                       {u.spokenName}
                       {u.quantity ? <span className="text-muted-foreground"> · {u.quantity}</span> : null}
                     </span>
-                    <Link
-                      href={`/menu?add=${encodeURIComponent(u.spokenName)}`}
-                      target="_blank"
-                      rel="noopener"
-                      aria-label={`Add ${u.spokenName} to menu (opens in a new tab)`}
-                      className="inline-flex min-h-11 items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-11"
+                      aria-label={`Add ${u.spokenName} to menu`}
+                      onClick={() => setAdding(u)}
                     >
-                      Add to menu
-                    </Link>
+                      <Plus aria-hidden="true" />
+                      <span aria-hidden="true">Add to menu</span>
+                    </Button>
                     <Button
                       type="button"
                       variant="ghost"
@@ -330,11 +366,20 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
                 ))}
               </ul>
               <p className="mt-1 text-xs text-muted-foreground">
-                New menu dishes show up here after a page reload — save this drop first so nothing is lost.
+                Add to menu saves the dish and ticks it in the item list below, with the quantity you said.
               </p>
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {adding ? (
+        <AddMenuItemDialog
+          key={adding.key}
+          spokenName={adding.spokenName}
+          onClose={() => setAdding(null)}
+          onAdded={menuItemAdded}
+        />
       ) : null}
 
       {canUndo ? (

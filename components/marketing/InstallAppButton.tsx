@@ -3,7 +3,6 @@
 import { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Download } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { detectInstallGuide, type BeforeInstallPromptEvent, type InstallGuide } from "@/lib/install-app";
 import { isStandalone } from "@/lib/push-client";
 
@@ -11,7 +10,8 @@ import { isStandalone } from "@/lib/push-client";
 const InstallGuideDialog = dynamic(() => import("@/components/marketing/InstallGuideDialog"), { ssr: false });
 
 /**
- * Landing-page "Install app". Uses the browser's own install prompt when
+ * Landing-page "Install app", a quiet text link under the hero's one primary
+ * button. Uses the browser's own install prompt when
  * Chromium offers one (`beforeinstallprompt`); otherwise opens written steps
  * for this device. Hidden once the site is running as an installed app.
  */
@@ -62,16 +62,14 @@ export function InstallAppButton() {
 
   return (
     <>
-      <Button
+      <button
         type="button"
-        size="lg"
-        variant="outline"
         onClick={onClick}
-        className="min-h-12 min-w-[44px] border-awaaz-charcoal/25 bg-white px-6 text-base font-semibold text-awaaz-charcoal hover:bg-muted focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+        className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-medium text-awaaz-charcoal/80 underline-offset-4 outline-hidden hover:text-awaaz-orange hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
       >
-        <Download aria-hidden="true" />
+        <Download className="h-4 w-4" aria-hidden="true" />
         Install app
-      </Button>
+      </button>
       {guide ? <InstallGuideDialog guide={guide} open={open} onOpenChange={setOpen} /> : null}
     </>
   );

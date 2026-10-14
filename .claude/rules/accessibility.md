@@ -54,7 +54,7 @@ Every voice-only path MUST have a tap fallback (`QuickAddGrid`).
 | listening | red, pulsing | mic-on | "Listening" + transcript live | short tap |
 | transcribing | purple | loader | "Transcribing audio" | — |
 | parsing | purple, spinning | sparkles | "Understanding order" | — |
-| error | gray | alert | error text | double tap |
+| error | destructive outline | rotate-ccw (alert-circle when offline) | "Try voice order again" (message in the `role="alert"` row) | double tap |
 
 ## Live regions
 

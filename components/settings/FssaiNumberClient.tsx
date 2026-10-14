@@ -78,7 +78,7 @@ export function FssaiNumberClient({ initialFssaiNumber }: FssaiNumberClientProps
         className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 font-mono text-base tabular-nums ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       />
       <p id="fssai-hint" className={`text-xs ${fssaiError ? "text-destructive" : "text-muted-foreground"}`}>
-        {fssaiError ?? "14 digits. Shown on your storefront so customers know your kitchen is registered."}
+        {fssaiError ?? "14 digits. Shown on your store page so customers know your kitchen is registered."}
       </p>
       <button
         type="button"

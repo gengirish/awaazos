@@ -62,7 +62,7 @@ test.describe("landing screen", () => {
     const fresh = await signInWithNoCallback(browser, creds);
     try {
       await expect(fresh).toHaveURL(/\/onboarding$/);
-      await expect(fresh.getByRole("heading", { name: "Set up your stall" })).toBeVisible();
+      await expect(fresh.getByRole("heading", { name: "Set up your store" })).toBeVisible();
     } finally {
       await fresh.context().close();
     }

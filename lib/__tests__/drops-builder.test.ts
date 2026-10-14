@@ -6,6 +6,7 @@ import {
   daysBetweenYmd,
   dayOffset,
   defaultCutoffFor,
+  defaultDropTitle,
   dropToFormInput,
   duplicateDropFields,
   groupDropsByDay,
@@ -38,6 +39,18 @@ describe("IST day helpers", () => {
     expect(dayOffset(ymdToDbDate("2026-10-05"), "2026-10-06")).toBe(1);
     expect(dayOffset(ymdToDbDate("2026-10-05"), "2026-10-01")).toBe(-4);
     expect(() => dayOffset(ymdToDbDate("2026-10-05"), "06/10/2026")).toThrow();
+  });
+});
+
+describe("defaultDropTitle", () => {
+  it("names a new drop after its cooking day", () => {
+    expect(defaultDropTitle("2026-10-17")).toBe("Saturday menu");
+    expect(defaultDropTitle("2026-10-18")).toBe("Sunday menu");
+  });
+
+  it("is empty while the date input is cleared or invalid", () => {
+    expect(defaultDropTitle("")).toBe("");
+    expect(defaultDropTitle("2026-13-40")).toBe("");
   });
 });
 

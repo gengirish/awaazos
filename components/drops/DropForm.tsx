@@ -1,12 +1,13 @@
 "use client";
 
 import type { DropStatus } from "@prisma/client";
-import { AlertTriangle, Copy, Loader2, Mic, Trash2 } from "lucide-react";
+import { AlertTriangle, CircleCheck, Copy, Loader2, Lock, Mic, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useCallback, useMemo, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import type { AddedMenuItem } from "@/components/drops/AddMenuItemDialog";
 import { VoiceDropPanel, type VoiceApplyResult } from "@/components/drops/VoiceDropPanel";
 import { Button } from "@/components/ui/button";
 import { Notice } from "@/components/ui/notice";
@@ -22,9 +23,11 @@ import { formatINR, rupeesToPaise } from "@/lib/currency";
 import type { EffectiveDropStatus } from "@/lib/drops";
 import {
   DROP_CONFLICT_MESSAGE,
+  DROP_SHARE_ANCHOR,
   DROP_STATUS_LABEL,
   PER_ORDER_OVER_MAX,
   cutoffLeadDays,
+  defaultDropTitle,
   isValidYmd,
   istTomorrowYmd,
   shiftOrderWindowDates,
@@ -102,20 +105,26 @@ function conflictMessage(body: ApiError, fallback: string): string {
   return (body.error && DROP_CONFLICT_MESSAGE[body.error]) || body.error || fallback;
 }
 
+/** A text link that is still a 44px tap target. */
+const fixLinkCls = "inline-flex min-h-11 items-center font-semibold underline underline-offset-2";
+
+/** Publishing is the owner's call; a manager has nothing to tap, so say exactly what to ask for. */
+const ASK_OWNER_TO_PUBLISH =
+  "Only the owner can publish the store. Ask them to open orders on this drop, or to publish the store in Settings → Online store.";
+
 /** Link to the setting that fixes a given 409, if there is one. */
 function ConflictFix({ code, canPublishStore }: { code: string | null; canPublishStore: boolean }) {
   if (code === "storefront_not_published") {
-    // Publishing is the owner's call; a manager has nothing to tap here.
-    if (!canPublishStore) return <p className="font-semibold">Ask the owner to publish the store.</p>;
+    if (!canPublishStore) return <p className="font-semibold">{ASK_OWNER_TO_PUBLISH}</p>;
     return (
-      <Link href="/settings/store" className="font-semibold underline underline-offset-2">
+      <Link href="/settings/store" className={fixLinkCls}>
         Open Online store settings to publish it
       </Link>
     );
   }
   if (code === "no_payment_method") {
     return (
-      <Link href="/settings/payments" className="font-semibold underline underline-offset-2">
+      <Link href="/settings/payments" className={fixLinkCls}>
         Open payment settings
       </Link>
     );
@@ -157,15 +166,9 @@ function CutoffLeadHint({ id, days }: { id: string; days: number | null }) {
     );
   }
   return (
-    <p
-      id={id}
-      className="flex items-start gap-1.5 rounded-md border border-amber-500/50 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-    >
-      <AlertTriangle className="mt-px h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-      <span>
-        {text} Customers can&apos;t order after that — check this is what you meant.
-      </span>
-    </p>
+    <Notice id={id} tone="warning" icon className="p-2 text-xs">
+      {text} Customers can&apos;t order after that — check this is what you meant.
+    </Notice>
   );
 }
 
@@ -193,6 +196,10 @@ export type DropFormProps = {
   soldByMenuItem?: Record<string, number>;
   /** VendorSettings.voiceLang. Present = show the voice panel (hidden when locked). */
   voiceLang?: string;
+  /** Owners can publish the store while opening orders, and get the billing link when voice is paused. */
+  isOwner?: boolean;
+  /** Create only: what "Save and open orders" needs to ask an owner about a private store first. */
+  openFlow?: { storePublished: boolean; storePath: string };
 };
 
 const MODES: { value: FormState["fulfilmentMode"]; label: string }[] = [
@@ -208,6 +215,8 @@ export function DropForm({
   locked = false,
   soldByMenuItem = {},
   voiceLang,
+  isOwner = false,
+  openFlow,
 }: DropFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -215,9 +224,23 @@ export function DropForm({
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [itemErrors, setItemErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
+  // A failed save: show how many things need fixing and go to the first one.
+  const [showFixCount, setShowFixCount] = useState(false);
+  const [errorFocusTick, setErrorFocusTick] = useState(0);
+  const handledFocusTick = useRef(0);
+  const formRef = useRef<HTMLFormElement>(null);
+  // Create: the drop exists from here on, so the form must not create it again.
+  const [createdId, setCreatedId] = useState<string | null>(null);
+  const [askPublish, setAskPublish] = useState(false);
+
+  // The menu is state, not the prop: the voice panel can add a dish to it.
+  const [menu, setMenu] = useState(menuItems);
+
+  // A new drop is named after its cooking day until the cook types her own title.
+  const [titleAuto, setTitleAuto] = useState(() => !dropId && initial.title.trim() === "");
 
   const [form, setForm] = useState<FormState>(() => ({
-    title: initial.title,
+    title: !dropId && initial.title.trim() === "" ? defaultDropTitle(initial.date) : initial.title,
     note: initial.note ?? "",
     date: initial.date,
     fulfilmentMode: initial.fulfilmentMode,
@@ -241,7 +264,7 @@ export function DropForm({
     return [...inDrop, ...menuItems.map((m) => m.id).filter((id) => !seen.has(id))];
   });
 
-  const menuById = useMemo(() => new Map(menuItems.map((m) => [m.id, m])), [menuItems]);
+  const menuById = useMemo(() => new Map(menu.map((m) => [m.id, m])), [menu]);
 
   const [rows, setRows] = useState<Record<string, Row>>(() => {
     const out: Record<string, Row> = {};
@@ -265,6 +288,7 @@ export function DropForm({
     snapshot: DropFormSnapshot;
     marks: VoiceMarks;
     lastCookingDate: string;
+    titleAuto: boolean;
   } | null>(null);
   const fromVoice = (...keys: (keyof FormState)[]) => keys.some((k) => voiceMarks.fields.includes(k));
 
@@ -287,10 +311,15 @@ export function DropForm({
     const prev = lastCookingDate.current;
     if (isValidYmd(next)) lastCookingDate.current = next;
     const touched = { ...touchedDates.current };
-    setForm((f) => ({ ...shiftOrderWindowDates(f, prev, next, touched), date: next }));
+    const autoTitle = titleAuto ? defaultDropTitle(next) : "";
+    setForm((f) => ({
+      ...shiftOrderWindowDates(f, prev, next, touched),
+      date: next,
+      ...(autoTitle ? { title: autoTitle } : {}),
+    }));
     setFieldErrors((e) =>
-      e.date || e.closesAtDate || e.closesAtTime || e.opensAtDate
-        ? { ...e, date: "", closesAtDate: "", closesAtTime: "", opensAtDate: "" }
+      e.date || e.closesAtDate || e.closesAtTime || e.opensAtDate || (autoTitle && e.title)
+        ? { ...e, date: "", closesAtDate: "", closesAtTime: "", opensAtDate: "", ...(autoTitle ? { title: "" } : {}) }
         : e,
     );
     setVoiceMarks((m) => unmarkField(m, "date"));
@@ -302,49 +331,109 @@ export function DropForm({
     setVoiceMarks((m) => unmarkItem(m, id));
   };
 
+  // Ticking a dish moves its row into the selected group at the top. Keep the
+  // keyboard focus on its checkbox and the row on screen, so the price and
+  // quantity fields that just appeared are where the cook is looking.
+  const toggledId = useRef<string | null>(null);
+  const toggleRow = (id: string, selected: boolean) => {
+    toggledId.current = id;
+    setRow(id, { selected });
+    if (selected) setFieldErrors((e) => (e.items ? { ...e, items: "" } : e));
+  };
+  useEffect(() => {
+    const id = toggledId.current;
+    if (!id) return;
+    toggledId.current = null;
+    const box = document.getElementById(`pick-${id}`);
+    if (!box) return;
+    if (document.activeElement !== box) box.focus({ preventScroll: true });
+    box.closest("li")?.scrollIntoView({ block: "nearest" });
+  }, [rows]);
+
+  /** A dish added to the menu from the voice panel: list it, ticked, with the spoken quantity. */
+  const addMenuItem = useCallback((item: AddedMenuItem, quantity: number | null) => {
+    const maxQty = quantity !== null && Number.isInteger(quantity) && quantity > 0 && quantity <= 99_999;
+    setMenu((m) => (m.some((x) => x.id === item.id) ? m : [...m, item]));
+    setRows((r) => ({
+      ...r,
+      [item.id]: {
+        selected: true,
+        price: paiseToInput(item.priceInPaise),
+        maxQty: maxQty ? String(quantity) : "",
+        perOrderLimit: "",
+      },
+    }));
+    setOrder((o) => (o.includes(item.id) ? o : [...o, item.id]));
+    setVoiceMarks((m) => (m.items.includes(item.id) ? m : { ...m, items: [...m.items, item.id] }));
+    setFieldErrors((e) => (e.items ? { ...e, items: "" } : e));
+    toast.success(`${item.name} added to your menu and ticked for this drop.`);
+  }, []);
+
   /** Merge a parsed voice draft into the form. Never saves. */
   const applyVoiceDraft = useCallback(
     (draft: DropDraft): VoiceApplyResult => {
       const prev: DropFormSnapshot = { form, rows, order };
-      const result = mergeDropDraft(prev, draft, menuItems, touchedDates.current);
-      setBeforeVoice({ snapshot: prev, marks: voiceMarks, lastCookingDate: lastCookingDate.current });
+      const result = mergeDropDraft(prev, draft, menu, touchedDates.current);
+      setBeforeVoice({ snapshot: prev, marks: voiceMarks, lastCookingDate: lastCookingDate.current, titleAuto });
       if (isValidYmd(result.next.form.date)) lastCookingDate.current = result.next.form.date;
-      setForm(result.next.form);
+      // A spoken title replaces the day-based one for good; a spoken day alone renames it.
+      const spokeTitle = result.marks.fields.includes("title");
+      const dayTitle = titleAuto && !spokeTitle ? defaultDropTitle(result.next.form.date) : "";
+      if (spokeTitle) setTitleAuto(false);
+      setForm(dayTitle ? { ...result.next.form, title: dayTitle } : result.next.form);
       setRows(result.next.rows);
       setOrder(result.next.order);
       setVoiceMarks(result.marks);
       setFieldErrors({});
       setItemErrors({});
       setFormError(null);
+      setShowFixCount(false);
       setFilter("");
       return result;
     },
-    [form, rows, order, menuItems, voiceMarks],
+    [form, rows, order, menu, voiceMarks, titleAuto],
   );
 
   const undoVoice = useCallback(() => {
     if (!beforeVoice) return;
-    setForm(beforeVoice.snapshot.form);
-    setRows(beforeVoice.snapshot.rows);
-    setOrder(beforeVoice.snapshot.order);
+    const snap = beforeVoice.snapshot;
+    // Dishes added to the menu since that take stay in the list (they are saved), unticked.
+    const added = menu.filter((m) => !(m.id in snap.rows));
+    const addedRows: Record<string, Row> = {};
+    for (const m of added) {
+      addedRows[m.id] = { selected: false, price: paiseToInput(m.priceInPaise), maxQty: "", perOrderLimit: "" };
+    }
+    setForm(snap.form);
+    setRows({ ...snap.rows, ...addedRows });
+    setOrder([...snap.order, ...added.map((m) => m.id)]);
     setVoiceMarks(beforeVoice.marks);
+    setTitleAuto(beforeVoice.titleAuto);
     lastCookingDate.current = beforeVoice.lastCookingDate;
     setFieldErrors({});
     setItemErrors({});
     setFormError(null);
+    setShowFixCount(false);
     setBeforeVoice(null);
-  }, [beforeVoice]);
+  }, [beforeVoice, menu]);
 
+  // `order` decides `sortOrder`; the list shows the ticked dishes first, each
+  // group in that same order.
   const selectedIds = order.filter((id) => rows[id]?.selected && menuById.has(id));
-  const visibleIds = order.filter((id) => {
-    const m = menuById.get(id);
-    if (!m) return false;
-    return !filter.trim() || m.name.toLowerCase().includes(filter.trim().toLowerCase());
+  const needle = filter.trim().toLowerCase();
+  const matchingIds = order.filter((id) => {
+    const name = menuById.get(id)?.name;
+    return name !== undefined && (!needle || name.toLowerCase().includes(needle));
   });
+  const visibleIds = [
+    ...matchingIds.filter((id) => rows[id]?.selected),
+    ...matchingIds.filter((id) => !rows[id]?.selected),
+  ];
 
   function buildPayload(): DropUpsertInput | null {
     const fe: Record<string, string> = {};
     const ie: Record<string, string> = {};
+
+    if (!form.title.trim()) fe.title = "Give this drop a name, e.g. Saturday bakes";
 
     const deliveryFeePaise = form.fulfilmentMode === "PICKUP" ? 0 : rupeeInputToPaise(form.deliveryFee || "0");
     if (deliveryFeePaise === null) fe.deliveryFeePaise = "Enter the fee in rupees, e.g. 30";
@@ -402,13 +491,67 @@ export function DropForm({
     if (!Object.keys(fe).length && !Object.keys(ie).length) setFormError("Please check the form and try again.");
   }
 
-  function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (locked || pending) return;
+  /** After a failed save: count what is wrong and take the cook to the first field. */
+  function flagErrors() {
+    setShowFixCount(true);
+    setFilter("");
+    setErrorFocusTick((t) => t + 1);
+  }
+  // Runs once the fields are enabled again (they are disabled while saving).
+  useEffect(() => {
+    if (pending || errorFocusTick === handledFocusTick.current) return;
+    handledFocusTick.current = errorFocusTick;
+    const el = formRef.current?.querySelector<HTMLElement>('[aria-invalid="true"], [data-error-anchor]');
+    if (!el) return;
+    el.scrollIntoView({ block: "center" });
+    el.focus({ preventScroll: true });
+  }, [errorFocusTick, pending]);
+
+  const editHref = (id: string) => `/drops/${id}/edit`;
+
+  /**
+   * "Save and open orders", after the drop was created. Whatever happens the
+   * cook lands on the edit page: with orders open, or with the Status
+   * checklist showing what is still missing. The server decides (409).
+   */
+  async function openCreated(id: string, publishStore: boolean) {
+    try {
+      const res = await fetch(`/api/drops/${id}/status`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(publishStore ? { status: "OPEN", publishStorefront: true } : { status: "OPEN" }),
+      });
+      const body = (await res.json().catch(() => ({}))) as ApiError & {
+        data?: { effectiveStatus?: EffectiveDropStatus };
+      };
+      if (res.ok) {
+        toast.success(
+          publishStore ? "Your store is live and orders are open." : openedMessage(body.data?.effectiveStatus),
+        );
+        router.push(`${editHref(id)}?opened=1`);
+        return;
+      }
+      // The store turned out to be private: an owner is asked before it goes public.
+      if (body.error === "storefront_not_published" && isOwner && !publishStore) {
+        setAskPublish(true);
+        return;
+      }
+      toast.warning("Saved as a draft. Orders aren't open yet — see what's left under Status.");
+    } catch {
+      toast.warning("Saved as a draft. Couldn't open orders — try again from this page.");
+    }
+    setAskPublish(false);
+    router.push(editHref(id));
+  }
+
+  function save(openAfter: boolean) {
+    if (locked || pending || createdId) return;
     setFormError(null);
+    setShowFixCount(false);
     const payload = buildPayload();
     if (!payload) {
-      setFormError("Some fields need fixing — see the messages below.");
+      flagErrors();
       return;
     }
     startTransition(async () => {
@@ -422,7 +565,7 @@ export function DropForm({
         const body = (await res.json().catch(() => ({}))) as ApiError & { data?: { id: string } };
         if (res.status === 400 && body.issues) {
           applyIssues(body.issues, payload);
-          setFormError("Some fields need fixing — see the messages below.");
+          flagErrors();
           return;
         }
         if (res.status === 409 && body.error === "item_has_orders" && body.menuItemId) {
@@ -439,14 +582,44 @@ export function DropForm({
           toast.success("Drop saved.");
           router.refresh();
         } else if (body.data?.id) {
-          toast.success("Drop created. Open orders when you're ready.");
-          router.push(`/drops/${body.data.id}/edit`);
+          const id = body.data.id;
+          setCreatedId(id);
+          if (!openAfter) {
+            toast.success("Draft saved. It stays hidden until you open orders.");
+            router.push(editHref(id));
+          } else if (isOwner && openFlow && !openFlow.storePublished) {
+            setAskPublish(true);
+          } else {
+            await openCreated(id, false);
+          }
         }
       } catch {
         setFormError("Network error — please try again.");
       }
     });
   }
+
+  function submit(e: React.FormEvent) {
+    e.preventDefault();
+    save(false);
+  }
+
+  /** The owner backed out of publishing: the draft is kept, the store stays private. */
+  function declinePublish() {
+    if (!createdId || pending) return;
+    setAskPublish(false);
+    toast.warning("Saved as a draft. Your store is still private, so orders aren't open.");
+    router.push(editHref(createdId));
+  }
+
+  const errorCount =
+    Object.values(fieldErrors).filter(Boolean).length + Object.values(itemErrors).filter(Boolean).length;
+  const saveAlert =
+    formError ??
+    (showFixCount && errorCount > 0
+      ? `${errorCount} ${errorCount === 1 ? "thing" : "things"} to fix. We've taken you to the first one.`
+      : null);
+  const busy = pending || createdId !== null;
 
   const err = (key: string) =>
     fieldErrors[key] ? (
@@ -462,6 +635,7 @@ export function DropForm({
 
   return (
     <form
+      ref={formRef}
       onSubmit={submit}
       noValidate
       // A field scrolled into view (focus, keyboard, validation) stops clear of
@@ -471,7 +645,7 @@ export function DropForm({
     >
       {locked ? (
         <p role="status" className="rounded-md border border-border bg-muted/50 p-3 text-sm">
-          Orders are frozen, so this drop can&apos;t be edited any more.
+          Orders are locked, so this drop can&apos;t be edited any more.
         </p>
       ) : null}
 
@@ -482,6 +656,8 @@ export function DropForm({
           onDraft={applyVoiceDraft}
           onUndo={undoVoice}
           canUndo={beforeVoice !== null}
+          onMenuItemAdded={addMenuItem}
+          canManageBilling={isOwner}
         />
       ) : null}
 
@@ -490,7 +666,7 @@ export function DropForm({
         <section aria-labelledby="drop-basics" className="space-y-4 rounded-xl border border-border bg-card p-4">
           <div className={sectionHeadCls}>
             <h2 id="drop-basics" className="font-display text-lg font-semibold">
-              What are you cooking?
+              Name and day
             </h2>
           </div>
           <div className="space-y-1.5">
@@ -506,9 +682,18 @@ export function DropForm({
               maxLength={80}
               placeholder="Saturday bakes"
               value={form.title}
-              onChange={(e) => set("title", e.target.value)}
+              onChange={(e) => {
+                setTitleAuto(false);
+                set("title", e.target.value);
+              }}
               {...errProps("title")}
+              aria-describedby={describedBy("title", titleAuto ? "drop-title-hint" : null)}
             />
+            {titleAuto ? (
+              <p id="drop-title-hint" className="text-xs text-muted-foreground">
+                Named after the cooking day. Type your own name to change it.
+              </p>
+            ) : null}
             {err("title")}
           </div>
           <div className="space-y-1.5">
@@ -547,6 +732,150 @@ export function DropForm({
             <p className="text-xs text-muted-foreground">{ymdHint(form.date)}</p>
             {err("date")}
           </div>
+        </section>
+
+        {/* ── Items ── */}
+        <section aria-labelledby="drop-items" className="space-y-4 rounded-xl border border-border bg-card p-4">
+          <div className={sectionHeadCls}>
+            <h2 id="drop-items" className="font-display text-lg font-semibold">
+              What are you selling?
+            </h2>
+            <p className="text-sm text-muted-foreground" aria-live="polite">
+              {selectedIds.length} selected
+            </p>
+          </div>
+          {fieldErrors.items ? (
+            // No field to mark invalid here, so the message itself takes the focus after a failed save.
+            <p
+              id="items-error"
+              data-error-anchor
+              tabIndex={-1}
+              className="rounded-sm text-xs text-destructive focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              {fieldErrors.items}
+            </p>
+          ) : null}
+          {menu.length === 0 ? (
+            <p className="text-sm text-muted-foreground">
+              Your menu is empty.{" "}
+              <Link
+                href="/menu"
+                className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-2"
+              >
+                Add menu items
+              </Link>{" "}
+              first, then come back.
+            </p>
+          ) : (
+            <>
+              {menu.length > 10 ? (
+                <input
+                  type="search"
+                  aria-label="Search menu items"
+                  placeholder="Search your menu"
+                  className={inputCls}
+                  value={filter}
+                  onChange={(e) => setFilter(e.target.value)}
+                />
+              ) : null}
+              <ul className="space-y-3">
+                {visibleIds.map((id) => {
+                  const m = menuById.get(id)!;
+                  const r = rows[id];
+                  const sold = soldByMenuItem[id] ?? 0;
+                  const errorId = `item-${id}-error`;
+                  return (
+                    <li
+                      key={id}
+                      className={`scroll-mb-28 scroll-mt-16 rounded-lg border p-3 ${r.selected ? "border-primary/60 bg-primary/5" : "border-border"}`}
+                    >
+                      <label className="flex min-h-11 cursor-pointer items-center gap-3">
+                        <input
+                          id={`pick-${id}`}
+                          type="checkbox"
+                          className="h-5 w-5 shrink-0 accent-primary"
+                          checked={r.selected}
+                          onChange={(e) => toggleRow(id, e.target.checked)}
+                        />
+                        <span aria-hidden="true" className="text-xl">
+                          {m.emoji}
+                        </span>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate font-medium">{m.name}</span>
+                          <span className="block text-xs text-muted-foreground">
+                            Menu price {formatINR(m.priceInPaise)}
+                            {!m.isAvailable ? " · hidden on menu" : ""}
+                            {sold > 0 ? ` · ${sold} ordered` : ""}
+                          </span>
+                        </span>
+                      </label>
+                      {r.selected && voiceMarks.items.includes(id) ? (
+                        <div className="mt-2">
+                          <FromVoiceBadge show />
+                        </div>
+                      ) : null}
+                      {r.selected ? (
+                        // Phones: two per row (three 85px inputs cut off "No limit"
+                        // and wrap the labels unevenly). `justify-end` keeps the
+                        // inputs level if a label still wraps.
+                        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                          <div className="flex flex-col justify-end gap-1">
+                            <label htmlFor={`price-${id}`} className="text-xs font-medium">
+                              Price (₹)
+                            </label>
+                            <input
+                              id={`price-${id}`}
+                              inputMode="decimal"
+                              className={inputCls}
+                              value={r.price}
+                              onChange={(e) => setRow(id, { price: e.target.value })}
+                              aria-invalid={itemErrors[id] ? true : undefined}
+                              aria-describedby={itemErrors[id] ? errorId : undefined}
+                            />
+                          </div>
+                          <div className="flex flex-col justify-end gap-1">
+                            <label htmlFor={`max-${id}`} className="text-xs font-medium">
+                              How many can you make?
+                            </label>
+                            <input
+                              id={`max-${id}`}
+                              inputMode="numeric"
+                              placeholder="No limit"
+                              className={inputCls}
+                              value={r.maxQty}
+                              onChange={(e) => setRow(id, { maxQty: e.target.value })}
+                              aria-invalid={itemErrors[id] ? true : undefined}
+                              aria-describedby={itemErrors[id] ? errorId : undefined}
+                            />
+                          </div>
+                          <div className="flex flex-col justify-end gap-1">
+                            <label htmlFor={`limit-${id}`} className="text-xs font-medium">
+                              Max per order
+                            </label>
+                            <input
+                              id={`limit-${id}`}
+                              inputMode="numeric"
+                              placeholder="No limit"
+                              className={inputCls}
+                              value={r.perOrderLimit}
+                              onChange={(e) => setRow(id, { perOrderLimit: e.target.value })}
+                              aria-invalid={itemErrors[id] ? true : undefined}
+                              aria-describedby={itemErrors[id] ? errorId : undefined}
+                            />
+                          </div>
+                        </div>
+                      ) : null}
+                      {itemErrors[id] ? (
+                        <p id={errorId} className="mt-2 text-xs text-destructive">
+                          {itemErrors[id]}
+                        </p>
+                      ) : null}
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
+          )}
         </section>
 
         {/* ── Fulfilment ── */}
@@ -750,172 +1079,134 @@ export function DropForm({
             ) : null}
           </div>
         </section>
-
-        {/* ── Items ── */}
-        <section aria-labelledby="drop-items" className="space-y-4 rounded-xl border border-border bg-card p-4">
-          <div className={sectionHeadCls}>
-            <h2 id="drop-items" className="font-display text-lg font-semibold">
-              Items
-            </h2>
-            <p className="text-sm text-muted-foreground" aria-live="polite">
-              {selectedIds.length} selected
-            </p>
-          </div>
-          {err("items")}
-          {menuItems.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Your menu is empty.{" "}
-              <Link href="/menu" className="font-medium text-primary underline underline-offset-2">
-                Add menu items
-              </Link>{" "}
-              first, then come back.
-            </p>
-          ) : (
-            <>
-              {menuItems.length > 10 ? (
-                <input
-                  type="search"
-                  aria-label="Search menu items"
-                  placeholder="Search your menu"
-                  className={inputCls}
-                  value={filter}
-                  onChange={(e) => setFilter(e.target.value)}
-                />
-              ) : null}
-              <ul className="space-y-3">
-                {visibleIds.map((id) => {
-                  const m = menuById.get(id)!;
-                  const r = rows[id];
-                  const sold = soldByMenuItem[id] ?? 0;
-                  const errorId = `item-${id}-error`;
-                  return (
-                    <li
-                      key={id}
-                      className={`rounded-lg border p-3 ${r.selected ? "border-primary/60 bg-primary/5" : "border-border"}`}
-                    >
-                      <label className="flex min-h-11 cursor-pointer items-center gap-3">
-                        <input
-                          type="checkbox"
-                          className="h-5 w-5 shrink-0 accent-primary"
-                          checked={r.selected}
-                          onChange={(e) => setRow(id, { selected: e.target.checked })}
-                        />
-                        <span aria-hidden="true" className="text-xl">
-                          {m.emoji}
-                        </span>
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium">{m.name}</span>
-                          <span className="block text-xs text-muted-foreground">
-                            Menu price {formatINR(m.priceInPaise)}
-                            {!m.isAvailable ? " · hidden on menu" : ""}
-                            {sold > 0 ? ` · ${sold} ordered` : ""}
-                          </span>
-                        </span>
-                      </label>
-                      {r.selected && voiceMarks.items.includes(id) ? (
-                        <div className="mt-2">
-                          <FromVoiceBadge show />
-                        </div>
-                      ) : null}
-                      {r.selected ? (
-                        // Phones: two per row (three 85px inputs cut off "No limit"
-                        // and wrap the labels unevenly). `justify-end` keeps the
-                        // inputs level if a label still wraps.
-                        <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                          <div className="flex flex-col justify-end gap-1">
-                            <label htmlFor={`price-${id}`} className="text-xs font-medium">
-                              Price (₹)
-                            </label>
-                            <input
-                              id={`price-${id}`}
-                              inputMode="decimal"
-                              className={inputCls}
-                              value={r.price}
-                              onChange={(e) => setRow(id, { price: e.target.value })}
-                              aria-invalid={itemErrors[id] ? true : undefined}
-                              aria-describedby={itemErrors[id] ? errorId : undefined}
-                            />
-                          </div>
-                          <div className="flex flex-col justify-end gap-1">
-                            <label htmlFor={`max-${id}`} className="text-xs font-medium">
-                              How many can you make?
-                            </label>
-                            <input
-                              id={`max-${id}`}
-                              inputMode="numeric"
-                              placeholder="No limit"
-                              className={inputCls}
-                              value={r.maxQty}
-                              onChange={(e) => setRow(id, { maxQty: e.target.value })}
-                              aria-invalid={itemErrors[id] ? true : undefined}
-                              aria-describedby={itemErrors[id] ? errorId : undefined}
-                            />
-                          </div>
-                          <div className="flex flex-col justify-end gap-1">
-                            <label htmlFor={`limit-${id}`} className="text-xs font-medium">
-                              Max per order
-                            </label>
-                            <input
-                              id={`limit-${id}`}
-                              inputMode="numeric"
-                              placeholder="No limit"
-                              className={inputCls}
-                              value={r.perOrderLimit}
-                              onChange={(e) => setRow(id, { perOrderLimit: e.target.value })}
-                              aria-invalid={itemErrors[id] ? true : undefined}
-                              aria-describedby={itemErrors[id] ? errorId : undefined}
-                            />
-                          </div>
-                        </div>
-                      ) : null}
-                      {itemErrors[id] ? (
-                        <p id={errorId} className="mt-2 text-xs text-destructive">
-                          {itemErrors[id]}
-                        </p>
-                      ) : null}
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
-          )}
-        </section>
       </fieldset>
 
-      {formError ? (
-        <Notice role="alert" tone="danger">
-          {formError}
-        </Notice>
-      ) : null}
-
       {!locked ? (
-        <div className="sticky bottom-[var(--app-bottom-inset,0px)] z-20 -mx-4 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm">
-          <Button type="submit" size="lg" className="min-h-12 w-full text-base" disabled={pending}>
-            {pending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
-            {pending ? "Saving…" : dropId ? "Save changes" : "Create drop"}
-          </Button>
+        <div className="sticky bottom-[var(--app-bottom-inset,0px)] z-20 -mx-4 space-y-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm">
+          {saveAlert ? (
+            <Notice role="alert" tone="danger" icon>
+              {saveAlert}
+            </Notice>
+          ) : null}
+          {dropId ? (
+            <Button type="submit" size="lg" className="min-h-12 w-full text-base" disabled={busy}>
+              {pending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
+              {pending ? "Saving…" : "Save changes"}
+            </Button>
+          ) : (
+            // Enter in a field saves the draft; opening orders is always a deliberate tap.
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="submit" variant="outline" size="lg" className="min-h-12 px-2 text-base" disabled={busy}>
+                {busy ? "Saving…" : "Create drop"}
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                className="min-h-12 whitespace-normal px-2 text-base leading-tight"
+                disabled={busy}
+                onClick={() => save(true)}
+              >
+                {busy ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
+                Save and open orders
+              </Button>
+            </div>
+          )}
         </div>
       ) : null}
+
+      {/* Create + open, private store: the owner decides before anything goes public. */}
+      <ResponsiveDialog open={askPublish} onOpenChange={(o) => !o && declinePublish()}>
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>Publish your store too?</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>
+              Your drop is saved as a draft. Your store page is private, so customers can&apos;t order from it yet.
+              Publishing it lets anyone with the link see your item names and prices at{" "}
+              <span className="break-all font-mono text-foreground">{openFlow?.storePath}</span>. You can make it
+              private again in Settings → Online store.
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
+          <ResponsiveDialogFooter>
+            <Button type="button" variant="outline" className="min-h-11" disabled={pending} onClick={declinePublish}>
+              Keep as a draft
+            </Button>
+            <Button
+              type="button"
+              className="min-h-11"
+              disabled={pending}
+              onClick={() => {
+                if (createdId) startTransition(() => openCreated(createdId, true));
+              }}
+            >
+              Publish store and open orders
+            </Button>
+          </ResponsiveDialogFooter>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
     </form>
   );
 }
 
 // ─── Status controls (edit page) ────────────────────────────────────
 
-type Action = { to: DropStatus; label: string; variant: "default" | "outline" | "destructive" };
+type Action = {
+  to: DropStatus;
+  label: string;
+  variant: "default" | "outline" | "destructive";
+  /** One line under the button, for the actions whose name doesn't explain itself. */
+  help?: string;
+};
 
 function actionFor(from: EffectiveDropStatus, to: DropStatus): Action {
   switch (to) {
     case "OPEN":
       return { to, label: from === "DRAFT" ? "Open orders" : "Reopen orders", variant: "default" };
     case "CLOSED":
-      return { to, label: from === "FROZEN" ? "Unfreeze orders" : "Close orders now", variant: "outline" };
+      return from === "FROZEN"
+        ? {
+            to,
+            label: "Unlock orders",
+            variant: "outline",
+            help: "Lets you edit this drop again. Customers still can't order.",
+          }
+        : { to, label: "Close orders now", variant: "outline" };
     case "FROZEN":
-      return { to, label: "Freeze orders", variant: "default" };
+      return {
+        to,
+        label: "Lock orders",
+        variant: "default",
+        help: "Stops new orders and changes, so your cooking list is final.",
+      };
     case "FULFILLED":
-      return { to, label: "Mark fulfilled", variant: "default" };
+      return {
+        to,
+        label: "Mark done",
+        variant: "default",
+        help: "For when every order is handed over. This can't be undone.",
+      };
     case "DRAFT":
       return { to, label: "Back to draft", variant: "outline" };
+  }
+}
+
+/** Toast after orders open. With a later start time the drop is visible but not yet taking orders. */
+function openedMessage(effectiveAfter: EffectiveDropStatus | undefined): string {
+  return effectiveAfter === "SCHEDULED" ? "Drop is live. Ordering starts at the time you set." : "Orders are open";
+}
+
+/** Toast for each status change, in the seller's words (never built from a button label). */
+function changedMessage(from: EffectiveDropStatus, to: DropStatus, effectiveAfter?: EffectiveDropStatus): string {
+  switch (to) {
+    case "OPEN":
+      return openedMessage(effectiveAfter);
+    case "CLOSED":
+      return from === "FROZEN" ? "Orders unlocked. You can edit this drop again." : "Orders closed.";
+    case "FROZEN":
+      return "Orders locked.";
+    case "FULFILLED":
+      return "Drop marked done.";
+    case "DRAFT":
+      return "Back to draft. Customers can't see this drop.";
   }
 }
 
@@ -923,10 +1214,49 @@ const STATUS_HELP: Record<EffectiveDropStatus, string> = {
   DRAFT: "Only you can see this drop. Open orders when the menu is ready.",
   SCHEDULED: "Customers can see this drop. Ordering starts at the time you set.",
   OPEN: "Customers can order now, until the cut-off time.",
-  CLOSED: "No new orders. Freeze when you start cooking so nobody changes their order.",
-  FROZEN: "Orders are locked. Cook, deliver, then mark the drop fulfilled.",
+  CLOSED: "No new orders. Lock orders when you start cooking so nobody changes their order.",
+  FROZEN: "Orders are locked. Cook, deliver, then mark the drop done.",
   FULFILLED: "All done. Copy this drop to sell it again.",
 };
+
+type OpenCheck = {
+  key: string;
+  /** `ok` done, `todo` blocks opening, `ask` is settled in the tap that opens orders. */
+  state: "ok" | "todo" | "ask";
+  text: string;
+  fix?: { href: string; label: string };
+};
+
+const CHECK_PREFIX: Record<OpenCheck["state"], string> = { ok: "Done: ", todo: "To do: ", ask: "Note: " };
+
+/** One line of the "before you open orders" list: icon + words, never colour alone. */
+function OpenCheckLine({ check }: { check: OpenCheck }) {
+  const Icon = check.state === "ok" ? CircleCheck : check.state === "ask" ? Lock : AlertTriangle;
+  return (
+    <li className="flex flex-wrap items-center gap-x-3 px-3">
+      <Icon
+        className={`h-4 w-4 shrink-0 ${
+          check.state === "ok"
+            ? "text-green-700 dark:text-green-400"
+            : check.state === "todo"
+              ? "text-amber-700 dark:text-amber-300"
+              : "text-muted-foreground"
+        }`}
+        aria-hidden="true"
+      />
+      <span className={`min-w-0 flex-1 py-3 text-sm ${check.state === "todo" ? "font-medium" : ""}`}>
+        <span className="sr-only">{CHECK_PREFIX[check.state]}</span>
+        {check.text}
+      </span>
+      {check.fix ? (
+        // In-page anchors and settings pages alike; a plain <a> keeps the hash jump native.
+        <a href={check.fix.href} className={`${fixLinkCls} text-sm text-primary`}>
+          {check.fix.label}
+        </a>
+      ) : null}
+    </li>
+  );
+}
 
 export type DropStatusControlsProps = {
   dropId: string;
@@ -941,6 +1271,14 @@ export type DropStatusControlsProps = {
   canPublishStore: boolean;
   /** "/s/<slug>", shown in the publish confirmation. */
   storePath: string;
+  /** Saved items on this drop. Opening orders needs at least one. */
+  itemCount: number;
+  /** Was the cut-off still ahead when the page loaded? (Evaluated on the server render, never on a timer.) */
+  cutoffInFuture: boolean;
+  /** A UPI ID or pay on delivery is set up. */
+  hasPaymentMethod: boolean;
+  /** Arrived from "Save and open orders": take the seller to the share block. */
+  justOpened?: boolean;
 };
 
 export function DropStatusControls({
@@ -952,11 +1290,68 @@ export function DropStatusControls({
   storePublished,
   canPublishStore,
   storePath,
+  itemCount,
+  cutoffInFuture,
+  hasPaymentMethod,
+  justOpened = false,
 }: DropStatusControlsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<{ code: string | null; message: string } | null>(null);
   const [confirm, setConfirm] = useState<"FROZEN" | "DELETE" | "PUBLISH" | null>(null);
+
+  // Orders just opened (here, or on the create page): the next job is telling
+  // customers, so move to the share block once the refreshed page shows it.
+  const goToShare = useRef(justOpened);
+  useEffect(() => {
+    if (!goToShare.current) return;
+    if (effectiveStatus !== "OPEN" && effectiveStatus !== "SCHEDULED") return;
+    goToShare.current = false;
+    const share = document.getElementById(DROP_SHARE_ANCHOR);
+    share?.scrollIntoView({ block: "center" });
+    share?.focus({ preventScroll: true });
+    // Drop "?opened=1" so a reload doesn't jump again.
+    if (justOpened) window.history.replaceState(null, "", window.location.pathname);
+  }, [effectiveStatus, justOpened]);
+
+  // What opening orders needs, shown before the tap. The server's 409 still decides.
+  const canOpen = allowedTransitions.includes("OPEN");
+  const checks: OpenCheck[] = [
+    itemCount > 0
+      ? { key: "items", state: "ok", text: `${itemCount} ${itemCount === 1 ? "item" : "items"} added` }
+      : {
+          key: "items",
+          state: "todo",
+          text: "No items yet. Tick at least one and save.",
+          fix: { href: "#drop-items", label: "Add items" },
+        },
+    cutoffInFuture
+      ? { key: "cutoff", state: "ok", text: "The last time to order is still ahead" }
+      : {
+          key: "cutoff",
+          state: "todo",
+          text: "The last time to order has passed. Move it later and save.",
+          fix: { href: "#drop-window", label: "Change it" },
+        },
+    hasPaymentMethod
+      ? { key: "payment", state: "ok", text: "Customers have a way to pay" }
+      : {
+          key: "payment",
+          state: "todo",
+          text: "Customers have no way to pay yet. Add your UPI ID or allow pay on delivery.",
+          fix: { href: "/settings/payments", label: "Open payment settings" },
+        },
+    storePublished
+      ? { key: "store", state: "ok", text: "Your store is published" }
+      : canPublishStore
+        ? {
+            key: "store",
+            state: "ask",
+            text: "Your store is private. You'll be asked to publish it when you open orders.",
+          }
+        : { key: "store", state: "todo", text: `Your store is private. ${ASK_OWNER_TO_PUBLISH}` },
+  ];
+  const todoCount = checks.filter((c) => c.state === "todo").length;
 
   const actions = allowedTransitions.map((to) => actionFor(effectiveStatus, to));
   const publishLabel = `Publish store and ${actionFor(effectiveStatus, "OPEN").label.toLowerCase()}`;
@@ -981,11 +1376,17 @@ export function DropStatusControls({
           }
           setConfirm(null);
           setProblem({ code: body.error ?? null, message: conflictMessage(body, "Could not change the status.") });
+          // Something changed since this page loaded: bring the checklist up to date.
+          router.refresh();
           return;
         }
+        const body = (await res.json().catch(() => ({}))) as { data?: { effectiveStatus?: EffectiveDropStatus } };
         toast.success(
-          publishStore ? "Your store is live and orders are open." : `${actionFor(effectiveStatus, to).label} — done.`,
+          publishStore
+            ? "Your store is live and orders are open."
+            : changedMessage(effectiveStatus, to, body.data?.effectiveStatus),
         );
+        if (to === "OPEN") goToShare.current = true;
         setConfirm(null);
         router.refresh();
       } catch {
@@ -1027,23 +1428,54 @@ export function DropStatusControls({
         <p className="text-sm">While this drop is open, your everyday menu is hidden from your store.</p>
       ) : null}
 
+      {canOpen ? (
+        <div className="space-y-1.5">
+          <h3 id="drop-open-checks-title" className="text-sm font-medium">
+            {todoCount === 0
+              ? "Ready to open orders"
+              : `${todoCount} ${todoCount === 1 ? "thing" : "things"} to sort out before you open orders`}
+          </h3>
+          <ul
+            id="drop-open-checks"
+            aria-labelledby="drop-open-checks-title"
+            className="divide-y divide-border rounded-md border border-border"
+          >
+            {checks.map((c) => (
+              <OpenCheckLine key={c.key} check={c} />
+            ))}
+          </ul>
+          <p className="text-xs text-muted-foreground">This list is for the drop as last saved.</p>
+        </div>
+      ) : null}
+
       {actions.length ? (
-        <div className="grid gap-2 sm:grid-cols-2">
+        <div className="grid items-start gap-2 sm:grid-cols-2">
           {actions.map((a) => (
-            <Button
-              key={a.to}
-              type="button"
-              variant={a.variant}
-              className="min-h-11"
-              disabled={pending}
-              onClick={() => {
-                if (a.to === "FROZEN") setConfirm("FROZEN");
-                else if (a.to === "OPEN" && !storePublished && canPublishStore) setConfirm("PUBLISH");
-                else change(a.to);
-              }}
-            >
-              {a.label}
-            </Button>
+            <div key={a.to} className="space-y-1">
+              <Button
+                type="button"
+                variant={a.variant}
+                className="min-h-11 w-full"
+                disabled={pending}
+                aria-describedby={
+                  [a.to === "OPEN" ? "drop-open-checks-title" : null, a.help ? `drop-action-${a.to}-help` : null]
+                    .filter(Boolean)
+                    .join(" ") || undefined
+                }
+                onClick={() => {
+                  if (a.to === "FROZEN") setConfirm("FROZEN");
+                  else if (a.to === "OPEN" && !storePublished && canPublishStore) setConfirm("PUBLISH");
+                  else change(a.to);
+                }}
+              >
+                {a.label}
+              </Button>
+              {a.help ? (
+                <p id={`drop-action-${a.to}-help`} className="text-xs text-muted-foreground">
+                  {a.help}
+                </p>
+              ) : null}
+            </div>
           ))}
         </div>
       ) : null}
@@ -1076,7 +1508,7 @@ export function DropStatusControls({
                 ? "Delete this drop?"
                 : confirm === "PUBLISH"
                   ? "Publish your store too?"
-                  : "Freeze orders?"}
+                  : "Lock orders?"}
             </ResponsiveDialogTitle>
             <ResponsiveDialogDescription>
               {confirm === "DELETE" ? (
@@ -1108,7 +1540,7 @@ export function DropStatusControls({
                 else change("FROZEN");
               }}
             >
-              {confirm === "DELETE" ? "Delete" : confirm === "PUBLISH" ? publishLabel : "Freeze orders"}
+              {confirm === "DELETE" ? "Delete" : confirm === "PUBLISH" ? publishLabel : "Lock orders"}
             </Button>
           </ResponsiveDialogFooter>
         </ResponsiveDialogContent>
@@ -1139,8 +1571,19 @@ export function DropStatusBadge({ status }: { status: EffectiveDropStatus }) {
   );
 }
 
-/** "Copy for tomorrow" — duplicates a drop onto tomorrow's IST date and opens the copy. */
-export function CopyDropButton({ dropId, title }: { dropId: string; title: string }) {
+/**
+ * "Copy for tomorrow" — duplicates a drop onto tomorrow's IST date and opens the copy.
+ * `secondary`: the outline version, for cards whose main action is something else.
+ */
+export function CopyDropButton({
+  dropId,
+  title,
+  secondary = false,
+}: {
+  dropId: string;
+  title: string;
+  secondary?: boolean;
+}) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
 
@@ -1169,6 +1612,7 @@ export function CopyDropButton({ dropId, title }: { dropId: string; title: strin
   return (
     <Button
       type="button"
+      variant={secondary ? "outline" : "default"}
       className="min-h-11 flex-1"
       onClick={copy}
       disabled={pending}

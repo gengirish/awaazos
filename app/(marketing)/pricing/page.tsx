@@ -10,7 +10,7 @@ const starter = PLAN_MARKETING.STARTER;
 
 export const metadata: Metadata = {
   title: "Pricing — AwaazOS",
-  description: `${starter.trial}, then ${starter.price}. Speak the order. Print the bill. Take UPI. Done.`,
+  description: `${starter.trial}, then ${starter.price}. A store link for your Instagram bio, drops with a cut-off, and UPI orders on one board.`,
 };
 
 // One offer: a free trial, then Starter monthly or yearly. FREE (grandfathered
@@ -31,8 +31,8 @@ export default async function PricingPage() {
             {starter.trial}. Then {starter.price}.
           </h1>
           <p className="mt-3 text-muted-foreground">
-            Voice-first POS for Indian vendors. Try everything for {TRIAL_DAYS} days, no card needed. Subscribe
-            only if it earns its place on your counter.
+            Pre-orders for Instagram home kitchens. Try everything for {TRIAL_DAYS} days, no card needed. Subscribe
+            only if it earns its place in your kitchen.
           </p>
         </header>
 

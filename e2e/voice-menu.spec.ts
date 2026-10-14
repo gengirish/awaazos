@@ -331,21 +331,22 @@ test.describe("voice menu builder", () => {
     test.setTimeout(150_000);
     const creds = await registerVendor(request, "voicemenuonb");
     await signIn(page, creds, "/onboarding");
-    await expect(page.getByRole("heading", { name: "Set up your stall" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Set up your store" })).toBeVisible();
 
     await page.getByLabel("City").fill("Hyderabad");
+    await page.getByLabel("State").fill("Telangana");
     await page.getByRole("button", { name: "Next" }).click();
-    await page.getByLabel("UPI ID", { exact: true }).fill("e2evoice@okaxis");
+    await page.getByLabel("UPI ID (optional)").fill("e2evoice@okaxis");
     await page.getByLabel("Name shown on UPI screen").fill("E2E Voice Stall");
     await page.getByRole("button", { name: "Next" }).click();
 
-    await expect(page.getByText("First menu items")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "What you sell" })).toBeVisible();
     await page.getByRole("button", { name: "Speak your whole menu" }).click();
     await expect(page.getByText(/land on your Menu with the mic ready/)).toBeVisible();
     // No typed items needed in this mode.
     await page.getByRole("button", { name: "Next" }).click();
 
-    await page.getByLabel("WhatsApp number (+91)").fill("+919876543210");
+    await page.getByLabel("WhatsApp number (optional)").fill("+919876543210");
     await page.getByRole("button", { name: "Finish & speak your menu" }).click();
 
     await page.waitForURL(/\/menu\?voice=1$/, { timeout: 60_000 });

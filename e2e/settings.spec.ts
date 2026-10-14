@@ -88,7 +88,12 @@ test.describe("settings hub", () => {
 
     await page.goto("/settings");
     await expect(hubRow(page, "Online store")).toContainText("Live · /s/");
-    await expect(page.getByRole("region", { name: /setup checklist/i })).toHaveCount(0);
+    // Both are ticked off. What is left is something to order from: no drop yet,
+    // and "order from menu" is off. The live store link now sits in the card.
+    await expect(checklist.getByRole("link", { name: /publish your online store/i })).toHaveCount(0);
+    await expect(checklist.getByRole("link", { name: /UPI ID or allow pay on delivery/i })).toHaveCount(0);
+    await expect(checklist.getByRole("link", { name: /create your first drop/i })).toBeVisible();
+    await expect(checklist.getByRole("button", { name: "Copy link" })).toBeVisible();
   });
 
   test("old /settings#anchor links land on the matching section", async ({ page, request }) => {

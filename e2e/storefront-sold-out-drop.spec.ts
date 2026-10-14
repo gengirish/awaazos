@@ -4,7 +4,7 @@ import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/
 
 /**
  * A drop that is still open but fully sold out must not keep selling itself:
- * no "Pre-order now" CTA, no countdown, and an item that is also on the
+ * no "Pre-order · closes …" CTA, no countdown, and an item that is also on the
  * orderable everyday menu points the buyer there instead of dead-ending.
  * Along the way: a drop cart and a menu cart share one page-level cart bar
  * (two labelled checkouts), and the order page points back at the cart left
@@ -69,7 +69,7 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
     await buyer.goto(`/s/${slug}`);
 
     // Before selling out: the drop drives the CTA, and prices drop the ".00".
-    await expect(buyer.getByRole("link", { name: "Pre-order now" })).toBeVisible();
+    await expect(buyer.getByRole("link", { name: /^Pre-order · closes / })).toBeVisible();
     await expect(buyer.getByRole("navigation", { name: "Categories" }).getByRole("link", { name: "Pre-order" })).toBeVisible();
     const drop = buyer.getByRole("region", { name: dropTitle });
     await expect(drop.getByText("₹5", { exact: true })).toBeVisible();
@@ -102,7 +102,7 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
     const soldOutDrop = buyer.getByRole("region", { name: dropTitle });
     await expect(soldOutDrop.getByText("Sold out", { exact: true }).first()).toBeVisible();
     await expect(soldOutDrop.getByText(/^Order by/)).toHaveCount(0);
-    await expect(buyer.getByRole("link", { name: "Pre-order now" })).toHaveCount(0);
+    await expect(buyer.getByRole("link", { name: /^Pre-order · closes / })).toHaveCount(0);
     await expect(buyer.getByRole("link", { name: "Order now" })).toBeVisible();
     // The left-behind menu cart is restored as the only cart.
     await expect(buyer.getByRole("button", { name: "Checkout", exact: true })).toBeVisible();

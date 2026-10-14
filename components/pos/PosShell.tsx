@@ -127,9 +127,9 @@ export function PosShell({
       <InstallBanner className="mt-4" />
       <main
         id="main-pos"
-        className="mt-6 flex flex-col gap-8 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] md:items-start md:gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]"
+        className="mt-4 flex flex-col gap-8 md:mt-6 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] md:items-start md:gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]"
       >
-        <div className="flex min-w-0 flex-col gap-8">
+        <div className="flex min-w-0 flex-col gap-5 md:gap-8">
           <VoiceOrderButton voiceLang={settings.voiceLang} />
           <QuickAddGrid items={initialItems} />
         </div>

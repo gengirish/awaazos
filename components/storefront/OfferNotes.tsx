@@ -26,27 +26,35 @@ export function OfferChips({ offers }: { offers: readonly ResolvedOffer[] }) {
   );
 }
 
+/** "Weekly Plan applied. Add 1 more item to unlock 15% off (Family Plan)" — or null when there is nothing to say. */
+export function offerCartNoteText(appliedName: string | null, nudge: OfferNudge | null): string | null {
+  const parts = [appliedName ? `${appliedName} applied.` : null, nudge ? offerNudgeText(nudge) : null].filter(Boolean);
+  return parts.length > 0 ? parts.join(" ") : null;
+}
+
 /**
  * What the cart is getting, and what one more item would unlock. The region
  * stays mounted so a change is announced; it takes no space when empty.
+ *
+ * `inCartBar`: the page-level cart bar (CartHub) already shows this line where
+ * the buyer is looking, so here it is kept for screen readers only.
  */
 export function OfferCartNote({
   appliedName,
   nudge,
+  inCartBar = false,
 }: {
   appliedName: string | null;
   nudge: OfferNudge | null;
+  inCartBar?: boolean;
 }) {
+  const text = offerCartNoteText(appliedName, nudge);
   return (
-    <div aria-live="polite" aria-atomic="true">
-      {appliedName || nudge ? (
+    <div aria-live="polite" aria-atomic="true" className={inCartBar ? "sr-only" : undefined}>
+      {text ? (
         <p className="mt-3 flex items-start gap-2 rounded-xl bg-primary/10 px-3 py-2 text-sm font-medium text-foreground">
           <Tag className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-          <span>
-            {appliedName ? `${appliedName} applied.` : null}
-            {appliedName && nudge ? " " : null}
-            {nudge ? offerNudgeText(nudge) : null}
-          </span>
+          <span>{text}</span>
         </p>
       ) : null}
     </div>
