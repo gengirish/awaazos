@@ -169,6 +169,18 @@ function validate(f: FormState): { body: OfferUpsertBody } | { errors: FieldErro
   };
 }
 
+/** Errors that are about another field's value too, cleared along with it. */
+const ERROR_DEPENDENTS: Partial<Record<keyof FormState, (keyof FieldErrors)[]>> = {
+  eligibility: ["eligibleTag", "eligibleItemIds"],
+  minQty: ["requiredTagQty"],
+  requiredTag: ["requiredTagQty"],
+  requiredTagQty: ["requiredTag"],
+  onMenuOrders: ["where"],
+  onDrops: ["where"],
+  onPos: ["where"],
+  startsOn: ["endsOn"],
+};
+
 const API_ERRORS: Record<string, string> = {
   unknown_items: "One of the chosen items is no longer on your menu. Pick the items again.",
   unknown_drops: "One of the chosen drops no longer exists. Pick the drops again.",
@@ -234,12 +246,25 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit }: Offer
   const tagListId = `${ids}-tags`;
   const fid = (name: string) => `${ids}-${name}`;
 
+  // An edit answers the message under that field (and under any field judged
+  // against it), so those go at once instead of waiting for the next save.
+  function clearErrors(key: keyof FormState) {
+    const keys: (keyof FieldErrors)[] = [key, ...(ERROR_DEPENDENTS[key] ?? [])];
+    if (!keys.some((k) => errors[k])) return;
+    const next = { ...errors };
+    for (const k of keys) delete next[k];
+    setErrors(next);
+    if (Object.keys(next).length === 0) setFormError(null);
+  }
+
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     setForm((f) => ({ ...f, [key]: value }));
+    clearErrors(key);
   }
 
   function toggleIn(key: "eligibleItemIds" | "dropIds", id: string, on: boolean) {
     setForm((f) => ({ ...f, [key]: on ? [...f[key], id] : f[key].filter((x) => x !== id) }));
+    clearErrors(key);
   }
 
   function openCreate() {
