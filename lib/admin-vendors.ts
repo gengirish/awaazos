@@ -19,6 +19,7 @@ const ADMIN_VENDOR_SELECT = {
   planExpiresAt: true,
   trialEndsAt: true,
   isActive: true,
+  isDemo: true,
   createdAt: true,
 } satisfies Prisma.VendorSelect;
 

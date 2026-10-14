@@ -1,6 +1,6 @@
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { AdminNav } from "@/components/admin/AdminNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAdminMetrics } from "@/lib/admin-metrics";
 import { formatINR } from "@/lib/currency";
@@ -69,16 +69,7 @@ export default async function AdminMetricsPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Rolling 7-day windows, IST midnights · Generated {generatedAt}
         </p>
-        {canManageStores ? (
-          <nav aria-label="Admin" className="mt-2">
-            <Link
-              href="/admin/vendors"
-              className="inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
-            >
-              Stores and free access
-            </Link>
-          </nav>
-        ) : null}
+        <AdminNav current="/admin/metrics" superAdmin={canManageStores} />
       </header>
 
       <main className="mx-auto grid max-w-5xl grid-cols-1 gap-4 md:grid-cols-6">
