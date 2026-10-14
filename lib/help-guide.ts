@@ -104,6 +104,22 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     keywords: "complete done pickup bulk cash on delivery collected",
   },
   {
+    id: "rider-handoff",
+    group: "orders",
+    title: "Send a delivery to Porter, Rapido or your rider",
+    steps: "Tap Copy for rider on a delivery order and paste it into the booking app. It has the name, phone, address, items and any cash to collect. The drop's Prep sheet has the same button.",
+    nav: "orders",
+    keywords: "dunzo courier driver address booking cash collect handover",
+  },
+  {
+    id: "share-store",
+    group: "orders",
+    title: "Share your store on Instagram",
+    steps: "With Order from menu on, the Orders screen has Share store link and Instagram story, a ready-made image of your menu (on a phone, tap Share first).",
+    nav: "orders",
+    keywords: "post link promote story bio",
+  },
+  {
     id: "new-drop",
     group: "drops",
     title: "Create a drop",

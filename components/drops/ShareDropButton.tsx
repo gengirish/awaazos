@@ -153,7 +153,15 @@ export function ShareDropButton(props: ShareDropButtonProps) {
           <MessageCircle className="h-4 w-4" aria-hidden="true" />
           WhatsApp
         </button>
-        <InstagramStoryButton dropId={dropId} url={url} className={baseBtn} onStatus={setStatus} story={story} onStory={onStory} />
+        <InstagramStoryButton
+          src={`/api/drops/${encodeURIComponent(dropId)}/story-image`}
+          fileName="drop-story.png"
+          url={url}
+          className={baseBtn}
+          onStatus={setStatus}
+          story={story}
+          onStory={onStory}
+        />
       </div>
       <p aria-live="polite" role="status" className="min-h-5 text-xs text-muted-foreground">
         {status}

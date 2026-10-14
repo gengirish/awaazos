@@ -17,7 +17,7 @@ import { prisma } from "@/lib/prisma";
 
 export const STORY_SIZE = { width: 1080, height: 1920 };
 export const STORY_MAX_ITEMS = 6;
-const STORY_SAFE = { top: 260, bottom: 360, side: 80 };
+export const STORY_SAFE = { top: 260, bottom: 360, side: 80 };
 
 export async function loadDropStory(dropId: string, vendorId: string) {
   const drop = await prisma.drop.findFirst({

@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
+import { RiderHandoffButton } from "@/components/drops/orders/RiderHandoffButton";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
@@ -421,6 +422,10 @@ export function OrderCard({
           )}
         </p>
       </div>
+
+      {!isPickup && fs !== "CANCELLED" && fs !== "DELIVERED" && (
+        <RiderHandoffButton order={order} vendorName={vendorName} className="mt-2" />
+      )}
 
       {/* Next step first: one primary button, the other ways forward in outline under it. */}
       {ordered.length > 0 && <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">{ordered.map(btn)}</div>}
