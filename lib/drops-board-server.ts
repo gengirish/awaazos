@@ -44,6 +44,9 @@ export const boardOrderSelect = {
   offerName: true,
   deliveryFeePaise: true,
   totalPaise: true,
+  advancePaidPaise: true,
+  fulfilAt: true,
+  isSample: true,
   orderItems: {
     select: { id: true, dropItemId: true, name: true, qty: true, priceInPaise: true, totalPaise: true },
     orderBy: { id: "asc" },
@@ -73,6 +76,9 @@ export function toBoardOrder(row: BoardOrderRow, now: Date = new Date()): BoardO
     offerName: row.offerName,
     deliveryFeePaise: row.deliveryFeePaise,
     totalPaise: row.totalPaise,
+    advancePaidPaise: row.advancePaidPaise,
+    fulfilAt: row.fulfilAt?.toISOString() ?? null,
+    isSample: row.isSample,
     displayState,
     holdsStock: orderHoldsStock(row, now),
     bucket: boardBucket({ displayState, fulfilmentStatus: row.fulfilmentStatus }),
@@ -198,6 +204,7 @@ export function ordersBoardWhere(
   return {
     vendorId,
     source: "STOREFRONT",
+    archivedAt: null, // a claimed demo store's hidden sample orders
     OR: [
       { createdAt: { gte: menuBoardWindowStart(now) } },
       { AND: [{ fulfilmentStatus: { in: ["PLACED", "CONFIRMED"] } }, stockHoldingOrderWhere(now)] },

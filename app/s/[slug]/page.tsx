@@ -30,6 +30,7 @@ import { getIstTodayStart } from "@/lib/billing-period";
 import { STALL_TYPES } from "@/lib/constants";
 import { formatINRCompact } from "@/lib/currency";
 import { getCurrentCustomer } from "@/lib/customer-auth";
+import { displayStoreName } from "@/lib/demo-store-schema";
 import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
 import { formatDropDayLabel, formatFulfilmentWindow } from "@/lib/drops-time";
 import { instagramProfileUrl } from "@/lib/instagram";
@@ -140,6 +141,7 @@ const loadStorefront = cache(async (slug: string) => {
       id: true, // tenant key for server-side checks only; never rendered
       slug: true,
       name: true,
+      isDemo: true,
       city: true,
       state: true,
       stallType: true,
@@ -202,6 +204,7 @@ const loadStorefront = cache(async (slug: string) => {
           emoji: true,
           category: true,
           priceInPaise: true,
+          unit: true,
           isPopular: true,
           imageUrl: true,
         },
@@ -220,7 +223,7 @@ export async function generateMetadata(
   if (!vendor) return { title: "Not found — AwaazOS" };
 
   const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
-  const title = `${vendor.name} — Online store`;
+  const title = `${displayStoreName(vendor)} — Online store`;
   const where = place ? `${vendor.name}, ${place}` : vendor.name;
   const menuHidden = await everydayMenuHiddenByDrop(prisma, vendor.id);
   const ordering = !menuHidden && (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0;
@@ -234,6 +237,8 @@ export async function generateMetadata(
     title,
     description,
     openGraph: { title, description, type: "website" },
+    // Demo stores (lib/demo-store.ts) stay out of search results.
+    ...(vendor.isDemo ? { robots: { index: false, follow: false } } : {}),
   };
 }
 
@@ -575,6 +580,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
       emoji: item.emoji,
       imageUrl: item.imageUrl,
       priceInPaise: item.priceInPaise,
+      unit: item.unit,
       isPopular: item.isPopular,
     })),
   }));
@@ -650,8 +656,13 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             )}
 
             <h1 className="mt-3 font-display text-3xl font-bold leading-tight tracking-tight text-awaaz-charcoal sm:text-4xl sm:leading-10">
-              {vendor.name}
+              {displayStoreName(vendor)}
             </h1>
+            {vendor.isDemo ? (
+              <p className="mt-2 max-w-md rounded-md border border-border/70 bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                This is a demo store. Orders placed here are samples and no payment is taken.
+              </p>
+            ) : null}
 
             <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
               <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">

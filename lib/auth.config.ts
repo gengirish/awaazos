@@ -19,6 +19,9 @@ function isPublicPath(pathname: string): boolean {
   if (pathname === "/sign-up" || pathname.startsWith("/sign-up/")) return true;
   if (pathname === "/forgot-password" || pathname.startsWith("/forgot-password/")) return true;
   if (pathname === "/reset-password" || pathname.startsWith("/reset-password/")) return true;
+  // Demo-store claim links (/claim/<token>). The page shows nothing unless the
+  // token matches an unused, unexpired DemoHandover.
+  if (pathname.startsWith("/claim/")) return true;
   if (pathname === "/pricing" || pathname.startsWith("/pricing/")) return true;
   // Privacy, terms, refund, DPDP rights — linked from the public footer.
   if (pathname === "/legal" || pathname.startsWith("/legal/")) return true;

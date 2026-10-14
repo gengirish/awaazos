@@ -34,6 +34,7 @@ import {
 import { formatINR } from "@/lib/currency";
 import { discountLabel } from "@/lib/offers";
 import {
+  balanceDuePaise,
   DISPLAY_STATE_LABEL,
   availableOrderActions,
   firstName,
@@ -125,6 +126,8 @@ export function OrderCard({
   const titleId = `order-${order.id}-title`;
   const detailsId = `order-${order.id}-details`;
   const itemCount = order.items.reduce((sum, it) => sum + it.qty, 0);
+  const balanceDue = balanceDuePaise(order);
+  const fulfilAt = order.fulfilAt ? new Date(order.fulfilAt) : null;
 
   const actions = availableOrderActions(order, frozen);
   const canConfirm = actions.has("confirm");
@@ -227,6 +230,11 @@ export function OrderCard({
             {selected && (
               <span className="ml-2 rounded border border-primary px-1.5 py-0.5 align-middle text-xs font-bold">
                 Selected
+              </span>
+            )}
+            {order.isSample && (
+              <span className="ml-2 rounded border border-border px-1.5 py-0.5 align-middle text-xs font-bold text-muted-foreground">
+                Sample
               </span>
             )}
           </h3>
@@ -374,6 +382,14 @@ export function OrderCard({
             <span className="font-mono tabular-nums">{formatINR(order.deliveryFeePaise)}</span>
           </li>
         )}
+        {balanceDue > 0 && (
+          <li className="flex justify-between gap-2 py-1.5 font-semibold">
+            <span>
+              Advance paid {formatINR(order.advancePaidPaise ?? 0)} · Balance due
+            </span>
+            <span className="font-mono tabular-nums">{formatINR(balanceDue)}</span>
+          </li>
+        )}
       </ul>
 
       {order.notes && (
@@ -394,6 +410,12 @@ export function OrderCard({
         )}
         <p>
           <span className="font-semibold">{isPickup ? "Pickup" : "Delivery"}</span>
+          {fulfilAt && (
+            <span className="text-muted-foreground">
+              {" "}
+              · for {formatIstDate(fulfilAt)} {formatIstTime(fulfilAt)}
+            </span>
+          )}
           {!isPickup && order.deliveryAddress && (
             <span className="block whitespace-pre-wrap text-muted-foreground">{order.deliveryAddress}</span>
           )}

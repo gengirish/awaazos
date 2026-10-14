@@ -60,11 +60,24 @@ export type BoardOrder = {
   offerName?: string | null;
   deliveryFeePaise: number;
   totalPaise: number;
+  /** Paid up front while the order is still unpaid; absent or 0 when none. */
+  advancePaidPaise?: number;
+  /** When the buyer wants it (ISO), for a menu order that has a date; null = none. */
+  fulfilAt?: string | null;
+  /** A demo store's sample order (lib/demo-store.ts). */
+  isSample?: boolean;
   displayState: OrderDisplayState;
   holdsStock: boolean;
   bucket: BoardBucket;
   items: BoardOrderItem[];
 };
+
+/** What is still owed on an order with an advance; 0 once paid or without an advance. */
+export function balanceDuePaise(o: Pick<BoardOrder, "paymentStatus" | "totalPaise" | "advancePaidPaise">): number {
+  const advance = o.advancePaidPaise ?? 0;
+  if (o.paymentStatus === "PAID" || advance <= 0) return 0;
+  return Math.max(0, o.totalPaise - advance);
+}
 
 // ─── Filter buckets ─────────────────────────────────────────────────
 
