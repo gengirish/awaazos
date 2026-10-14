@@ -287,7 +287,7 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system diagrams, [`docs/OBSERVABI
 awaazos/
 ├── app/
 │   ├── (marketing)/         landing, pricing (public)
-│   ├── (auth)/              sign-in, sign-up, forgot / reset password
+│   ├── (auth)/              sign-in, sign-up, forgot / reset password, claim a demo store
 │   ├── (onboarding)/        first-run vendor setup
 │   ├── (vendor)/            pos, menu, transactions, analytics, orders, drops, help,
 │   │                        settings (hub + sections incl. offers, receipts)
@@ -300,7 +300,7 @@ awaazos/
 │   ├── legal/               terms, privacy, refund, DPDP rights
 │   └── api/                 ai/ (transcribe, parse-order, parse-drop, parse-menu), transactions,
 │                            menu, offers, receipts, drops, storefront-orders, s/ (buyer), push,
-│                            razorpay, vendor, me, admin,
+│                            razorpay, vendor, me, admin, internal/ (demo stores), demo-claim,
 │                            webhooks/ (razorpay, razorpay-orders), health, ready
 ├── components/              ui/ (shadcn) plus pos, menu, transactions, analytics, storefront,
 │                            drops (incl. the orders board), settings, setup, push, pwa, help,

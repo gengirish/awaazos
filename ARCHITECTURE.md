@@ -268,9 +268,12 @@ Models not drawn above:
 | `Drop`, `DropItem` | A home-kitchen pre-order batch and its per-item price / capacity. See §11. |
 | `Customer`, `CustomerSession`, `CustomerLoginToken` | Storefront buyers, kept apart from `User` / Auth.js. Passwordless email magic link; tokens and session ids stored as SHA-256 hashes. See §11. |
 | `Offer` | A vendor's quantity plan discount ("4+ quiches incl. 1 paneer → 10% off"): eligibility (all items, item ids or a `MenuItem.tags` tag), `minQty`, optional required tag count, `percentBps`, which channels it applies to (menu orders, drops, POS), optional date window. Rules in `lib/offers.ts`. See §11 "Offers". |
+| `DemoHandover`, `DemoAuditLog` | Internal demo stores for founder outreach (`lib/demo-store.ts`, `docs/INTERNAL_DEMO_STORES.md`): a demo store is an ordinary `Vendor` with `isDemo = true` owned by one internal account until the prospect claims it with a one-time token (SHA-256 stored). Every create, delete, handover and claim writes an audit row, and the "create" rows double as the 20-per-day limit. Sample orders carry `Transaction.isSample` and never credit `DailySummary`. |
 | `SubscriptionEvent` | Idempotency ledger for the platform subscription webhook (unique Razorpay event id). See §5 "Billing access". |
 | `PushSubscription` | One row per staff device opted in to Web Push new-order alerts (`lib/push.ts`). A 404/410 from the push service deletes the row; there is no cleanup job. |
 | `Account`, `Session`, `VerificationToken` | Standard Auth.js adapter tables. The session strategy is JWT (`lib/auth.ts`). |
+
+Added with demo stores but valid for real orders: `MenuItem.unit` ("₹1,200 / kg"), `Transaction.advancePaidPaise` (the order stays PENDING until the balance is in; never credits `DailySummary`) and `Transaction.fulfilAt` (when the buyer wants a menu order). Only the demo API writes them so far.
 
 `VendorSettings` also carries the storefront fields (`fssaiNumber`, `acceptPayOnDelivery`, `menuFulfilmentMode`, `menuDeliveryFeePaise`, `menuPickupNote`) and the vendor's own encrypted Razorpay keys (`razorpayKeyId`, `razorpayKeySecretEnc`, `razorpayWebhookSecretEnc`), plus `razorpayCustomerId` for the platform subscription.
 

@@ -10,6 +10,7 @@ Index of the operational and planning docs. Code wins wherever a doc disagrees w
 | [`../ARCHITECTURE.md`](../ARCHITECTURE.md) | System diagrams, data model, ADRs |
 | [`../TODO.md`](../TODO.md) | Open items, each with where the code is and how to verify it |
 | [`ICP.md`](ICP.md) | Who we build for (Instagram cloud kitchens), what fits them today, gaps in order |
+| [`INTERNAL_DEMO_STORES.md`](INTERNAL_DEMO_STORES.md) | Internal API that builds a demo store for a prospect and hands it over (founder outreach) |
 | [`RAZORPAY_SUBSCRIPTIONS_PLAN.md`](RAZORPAY_SUBSCRIPTIONS_PLAN.md) | The 30-day trial, the lock and Starter subscriptions: design and what shipped per phase |
 
 ## Operations
