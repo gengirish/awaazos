@@ -63,13 +63,13 @@ flowchart LR
     Customer -->|UPI scan| Vendor
 ```
 
-POS receipts go out through a `wa.me` link: the vendor's own WhatsApp opens with the receipt text pre-filled (`GET /api/receipts/message`) and the vendor taps send. No Business API, Redis or worker is involved, and it works on every plan. The Gupshup path (`POST /api/receipts/send`, the post-sale enqueue in `POST /api/transactions` when a `customerPhone` is sent, and `workers/receipt.worker.ts`) is still in the code, but the POS UI no longer calls it. Workers never call Anthropic; the only Claude caller is `/api/ai/parse-order`.
+POS receipts go out through a `wa.me` link: the vendor's own WhatsApp opens with the receipt text pre-filled (`GET /api/receipts/message`) and the vendor taps send. No Business API, Redis or worker is involved, and it works on every plan. The Gupshup path (`POST /api/receipts/send`, the post-sale enqueue in `POST /api/transactions` when a `customerPhone` is sent, and `workers/receipt.worker.ts`) is still in the code, but the POS UI no longer calls it. Workers never call Anthropic; the only Claude callers are the three draft-building routes `/api/ai/parse-order`, `/api/ai/parse-drop` and `/api/ai/parse-menu` (§3).
 
 ### Why this split
 
 - **Vercel** handles the user-facing surface — Next.js RSC, edge middleware (10ms cold start), serverless API routes for short-lived work
 - **Fly.io BOM** handles long-running BullMQ workers (Vercel functions are a poor fit for long-lived TCP + retry-heavy job consumers)
-- **Neon** is serverless Postgres — branchable per-PR previews, scales to zero, single-region today (us-east-1) to keep latency low for Vercel's serverless hop
+- **Neon** is serverless Postgres — branchable, scales to zero, single-region today (us-east-1) to keep latency low for Vercel's serverless hop
 - **Two Redis surfaces:** **`UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`** power `@upstash/redis` on Vercel (sliding-window rate limits, idempotency keys, monthly AI caps, `/api/ready` Redis probe). **`REDIS_URL`** (`rediss://` TCP) is for **BullMQ only** on Fly (and optionally on Vercel if you point at a **public** endpoint — never a Fly `*.internal` hostname).
 
 ### Latency budget (typical voice-to-bill flow)
@@ -108,9 +108,11 @@ erDiagram
     Vendor ||--o{ VoiceParseLog : "telemetry"
     Vendor ||--o{ Drop : "sells"
     Vendor ||--o{ PushSubscription : "alerts to"
+    Vendor ||--o{ Offer : "runs"
     Vendor ||--o| VendorSettings : "has"
     Transaction ||--o{ OrderItem : "contains"
     Transaction ||--o| Receipt : "produces"
+    Offer ||--o{ Transaction : "discounted (SetNull on delete)"
     MenuItem ||--o{ OrderItem : "snapshotted in"
 
     User {
@@ -136,7 +138,11 @@ erDiagram
         string upiName
         StallType stallType
         Plan plan "FREE | STARTER | PRO | ENTERPRISE"
-        string gstin "optional, not yet printed"
+        datetime planExpiresAt "from Razorpay current_end"
+        datetime trialEndsAt "set at sign-up; null = grandfathered FREE"
+        string gstin "optional, printed on receipts"
+        string logoUrl "Vercel Blob"
+        string bannerUrl "Vercel Blob, storefront cover"
     }
     StaffMember {
         string id PK
@@ -153,7 +159,12 @@ erDiagram
         decimal taxPercent "@db.Decimal(5,2)"
         string hsnDefault "schema only, unused"
         string whatsappNumber
+        boolean acceptWhatsappOrders "opt-in: buyers see the number"
+        boolean showWhatsappOnStore "opt-in: every store visitor sees it"
+        string instagramHandle "bare handle, linked on the store"
         string receiptFooter
+        ReceiptPaper receiptPaper "MM58 | MM80 | A4"
+        boolean autoPrintReceipt
         boolean publishStorefront "default false"
         boolean acceptMenuOrders "default false"
         string razorpaySubId "platform subscription"
@@ -184,9 +195,11 @@ erDiagram
         string vendorId FK
         string billNumber "AWZ-YYYYMMDD-NNNN, indexed not unique"
         int subtotalPaise
-        int discountPaise
+        int discountPaise "from one Offer, or 0"
+        string offerId FK "nullable"
+        string offerName "snapshot, survives offer delete"
         int taxPaise
-        int totalPaise
+        int totalPaise "subtotal - discount + delivery + tax"
         PaymentMethod paymentMethod "UPI | CASH | CARD | RAZORPAY_LINK"
         PaymentStatus paymentStatus "PENDING | PAID | FAILED | REFUNDED"
         OrderSource source "VOICE | MANUAL | WHATSAPP | STOREFRONT | API"
@@ -196,6 +209,9 @@ erDiagram
         string voiceTranscript
         string dropId FK "storefront only"
         string orderToken UK "storefront only"
+        datetime paymentClaimedAt "buyer tapped I've paid"
+        datetime paymentRejectedAt "seller tapped Not received"
+        string clientRef "POS outbox uuid, unique per vendor"
         datetime createdAt
         datetime paidAt
     }
@@ -208,12 +224,14 @@ erDiagram
         int priceInPaise
         int qty
         int totalPaise
+        int discountPaise "this line's share of the offer"
     }
     Receipt {
         string id PK
         string transactionId FK, UK
         string vendorId FK
         string receiptNumber "same as billNumber, not unique"
+        string publicToken UK "192-bit, /r/[token]"
         boolean whatsappSent
         datetime whatsappSentAt
         string deliveredTo "stored for resend"
@@ -249,8 +267,13 @@ Models not drawn above:
 | --- | --- |
 | `Drop`, `DropItem` | A home-kitchen pre-order batch and its per-item price / capacity. See §11. |
 | `Customer`, `CustomerSession`, `CustomerLoginToken` | Storefront buyers, kept apart from `User` / Auth.js. Passwordless email magic link; tokens and session ids stored as SHA-256 hashes. See §11. |
+| `Offer` | A vendor's quantity plan discount ("4+ quiches incl. 1 paneer → 10% off"): eligibility (all items, item ids or a `MenuItem.tags` tag), `minQty`, optional required tag count, `percentBps`, which channels it applies to (menu orders, drops, POS), optional date window. Rules in `lib/offers.ts`. See §11 "Offers". |
+| `DemoHandover`, `DemoAuditLog` | Internal demo stores for founder outreach (`lib/demo-store.ts`, `docs/INTERNAL_DEMO_STORES.md`): a demo store is an ordinary `Vendor` with `isDemo = true` owned by one internal account until the prospect claims it with a one-time token (SHA-256 stored). Every create, delete, handover and claim writes an audit row, and the "create" rows double as the 20-per-day limit. Sample orders carry `Transaction.isSample` and never credit `DailySummary`. |
+| `SubscriptionEvent` | Idempotency ledger for the platform subscription webhook (unique Razorpay event id). See §5 "Billing access". |
 | `PushSubscription` | One row per staff device opted in to Web Push new-order alerts (`lib/push.ts`). A 404/410 from the push service deletes the row; there is no cleanup job. |
 | `Account`, `Session`, `VerificationToken` | Standard Auth.js adapter tables. The session strategy is JWT (`lib/auth.ts`). |
+
+Added with demo stores but valid for real orders: `MenuItem.unit` ("₹1,200 / kg"), `Transaction.advancePaidPaise` (the order stays PENDING until the balance is in; never credits `DailySummary`) and `Transaction.fulfilAt` (when the buyer wants a menu order). Only the demo API writes them so far.
 
 `VendorSettings` also carries the storefront fields (`fssaiNumber`, `acceptPayOnDelivery`, `menuFulfilmentMode`, `menuDeliveryFeePaise`, `menuPickupNote`) and the vendor's own encrypted Razorpay keys (`razorpayKeyId`, `razorpayKeySecretEnc`, `razorpayWebhookSecretEnc`), plus `razorpayCustomerId` for the platform subscription.
 
@@ -328,6 +351,17 @@ Any Haiku exception also falls through to Sonnet. There is no numeric confidence
 - **Tool-use forces structured output** — no JSON parsing fragility. Claude returns an `add_items` tool call with a typed schema; we get `{ items: [{ menuItemId, name, priceInPaise, qty }], unmatched: [], confidence }` directly. Ids and prices are then re-anchored to real menu rows, so the model's numbers are never trusted.
 - **Telemetry is async** — `VoiceParseLog` writes via BullMQ on Fly. The cashier never waits.
 
+### Voice drop and menu builders
+
+Two more routes reuse the same shape (forced tool, Haiku → Sonnet, menu block from `stableMenuJson()` with `cache_control`, server post-processing that never trusts the model). Both return a **draft** for a form and save nothing:
+
+| Route | Role | Tool | Output | Escalates to Sonnet when |
+| --- | --- | --- | --- | --- |
+| `POST /api/ai/parse-drop` (`lib/parse-drop.ts`) | MANAGER | `build_drop` | `DropDraft`: items re-anchored to the menu, IST dates/times resolved on the server, problems as `warnings` | Haiku throws, no items on a >3-word transcript, or ≥ half the items lack a valid menu id |
+| `POST /api/ai/parse-menu` (`lib/parse-menu.ts`) | CASHIER | `add_menu_items` | `MenuDraft`: existing dishes matched by name/alias/fuzzy, new dishes otherwise, prices via `rupeesToPaise` | Haiku throws, no items on a >3-word transcript, or most dishes priceless although numbers were spoken |
+
+The menu builder's confirmed rows are saved by `POST /api/menu/bulk` in one `$transaction` (compound `{ id, vendorId }` updates; foreign ids are skipped). Neither route writes `VoiceParseLog`. Golden sets: `tests/golden/parse-drop/`, `tests/golden/parse-menu/`.
+
 ### Indic numeral normalization
 
 Vendors say _"ek"_, _"do"_, _"teen"_, _"sat"_ in Hindi; _"okati"_, _"rendu"_, _"moodu"_ in Telugu; _"ondu"_, _"eradu"_ in Kannada. The system prompt (`ORDER_PARSE_SYSTEM` in `lib/anthropic.ts`) carries a numeral table for hi/te/kn/ta, and the tool schema requires `qty` to be an integer ≥ 1. Fractions like _"adha samosa"_ cannot be expressed, so the vendor fixes those lines by tapping.
@@ -350,7 +384,7 @@ mic → STT (ASR) → transcript string → parse-order (LLM) → cart
 ```
 
 - **Never** send audio to Anthropic. Only `transcript` + `menu` enter the LLM prompt (`security-first.mdc`).
-- **Never** use Claude for transcription. Haiku/Sonnet run only in `/api/ai/parse-order`.
+- **Never** use Claude for transcription. Haiku/Sonnet run only in the transcript-to-draft routes (`parse-order`, `parse-drop`, `parse-menu`).
 - OpenAI `gpt-4o-mini-transcribe` is an **ASR API**, not the order parser — same slot as Groq Whisper or Sarvam.
 - Self-hosted Whisper (`lib/whisper-stt.ts` → `services/whisper-stt`) is an **optional last-resort STT tier** on Fly, gated by `WHISPER_STT_URL`. It does not replace Sarvam for te/kn/ta until golden STT pass rates match (see `tests/golden/stt/README.md`).
 
@@ -387,13 +421,14 @@ sequenceDiagram
 
     U->>POS: tap "Collect Payment"
     POS->>POS: build UPI deep link<br/>upi://pay?pa=&pn=&am=...
-    POS->>U: render QR image<br/>(via api.qrserver.com)
+    POS->>U: render QR on the device<br/>(lib/qr.ts, no third-party host)
 
     U->>POS: customer scans · pays<br/>vendor taps "Mark as Paid"
-    POS->>API: { items, subtotalPaise, taxPaise, totalPaise, paymentMethod, upiRef }
-    API->>API: requireVendorRole('CASHIER') · idempotency key
-    API->>API: server-side recompute<br/>subtotal + total
-    Note right of API: reject 400 on mismatch
+    POS->>POS: save to IndexedDB outbox<br/>(lib/pos-outbox.ts, clientRef uuid)
+    POS->>API: { items, subtotalPaise, discountPaise, offerId, taxPaise, totalPaise, paymentMethod, clientRef }
+    API->>API: requireVendorRole('CASHIER') · requireActiveBilling<br/>clientRef replay → original bill, 200
+    API->>API: server-side recompute subtotal + total<br/>re-price the offer (lib/pos-offers.ts)
+    Note right of API: reject 400 on mismatch<br/>(discount_mismatch unless 0 or the server's figure)
     API->>API: countBillableTxnThisMonth()<br/>vs PLAN_LIMITS[plan].monthlyTxnCap
 
     API->>Tx: prisma.$transaction
@@ -414,6 +449,10 @@ sequenceDiagram
 ```
 
 The receipt link is built by `receiptWhatsappUrl()` (`lib/whatsapp-message.ts`): a blank number opens WhatsApp's chat picker and a 10-digit number gets `+91`. The text is fetched when the modal opens so the button is a plain link (an `await` before `window.open` is popup-blocked on mobile). The transactions drawer has the same **Send / Resend on WhatsApp** button. This path costs nothing, needs no Redis or worker, and is available on every plan.
+
+**Receipt module.** One pure `ReceiptView` per bill (`lib/receipt.ts`, built by `lib/receipt-data.ts` from the `RECEIPT_TX_SELECT` allowlist, so no customer contact fields or UTR) is rendered three ways by one `<ReceiptDocument>` layout: the WhatsApp text above, the staff print page `/receipts/[bill]` (58 mm / 80 mm thermal or A4 via named `@page` rules; `?autoprint=1`, `?embed=1`), and the public customer page `/r/[token]`, keyed on the 192-bit `Receipt.publicToken`. `VendorSettings.autoPrintReceipt` loads the print page in a hidden iframe after a POS sale on desktop. GSTIN, footer, paper width and auto-print are edited in Settings → Receipts.
+
+**Offline counter sales** (`docs/PWA_OFFLINE_PLAN.md`). `/sw.js` caches `/pos` and its chunks and never intercepts `/api/**`, `/s/**` or non-GET requests. Every checkout is saved to the IndexedDB outbox first, then POSTed with its `clientRef`; `@@unique([vendorId, clientRef])` makes replays return the original bill. Queued sales show "Offline #N" and sync on page load, `online` and tab-visible, never on a timer. A `deferred` sale is billed to the IST day of its `clientCreatedAt` (at most 7 days old), keeps the discount it was rung up with, and still syncs if the vendor was locked after it was made.
 
 **Legacy Gupshup path (wired, unused by the UI).** If a caller sends `customerPhone` to `POST /api/transactions` and the plan has `whatsapp: true`, the route enqueues `send-receipt` after commit; `POST /api/receipts/send` does the same on demand. `workers/receipt.worker.ts` then loads the transaction scoped by `vendorId`, returns early if `receipt.whatsappSent` is already true, posts to Gupshup with an 8 s timeout, and marks the receipt sent. The POS no longer sends `customerPhone`, so in practice `whatsappQueued` is `false`.
 
@@ -467,18 +506,35 @@ requirePlan(vendor, Plan.STARTER);
 // so the UI can show an upgrade CTA to /settings/billing
 ```
 
-Current `requirePlan` call sites: STARTER for `/api/ai/transcribe`, `/api/receipts/send` and `/api/transactions/export` (CSV); PRO for saving the vendor's own Razorpay keys (`PUT /api/vendor/payments`).
+Current `requirePlan` call sites, all STARTER: `/api/ai/transcribe`, `/api/receipts/send`, `/api/transactions/export` (CSV; a locked vendor may still export) and saving the vendor's own Razorpay keys (`PUT /api/vendor/payments`). Trial vendors pass every STARTER gate.
 
 `PLAN_LIMITS` table lives in `lib/constants.ts`:
 
 | Plan | Price/mo | monthlyTxnCap | maxStaff | whatsapp | razorpayLinks | sarvamStt | analyticsDays | csvExport |
 | --- | ---: | ---: | ---: | --- | --- | --- | ---: | --- |
 | FREE | ₹0 | 50 | 1 | ❌ | ❌ | ❌ | 7 | ❌ |
-| STARTER | ₹299 | 500 | 3 | ✅ | ❌ | ✅ | 90 | ✅ |
+| STARTER | ₹299 (₹2,990/yr) | null (∞) | 3 | ✅ | ✅ | ✅ | 90 | ✅ |
 | PRO | ₹799 | null (∞) | null | ✅ | ✅ | ✅ | 365 | ✅ |
 | ENTERPRISE | custom | null | null | ✅ | ✅ | ✅ | 365 | ✅ |
 
-`txnPerMonth` and `whatsappReceipts` duplicate `monthlyTxnCap` and `whatsapp`. `whatsapp` gates only the dormant automated Gupshup send — wa.me receipts from the vendor's own WhatsApp work on every plan. `maxStaff` is not read anywhere (there is no staff invite flow). Marketing copy for the sold tiers is derived from this table in `lib/plan-copy.ts`. The marketing pricing page shows only FREE and STARTER (see the cut list in `PITCH.md`); PRO and ENTERPRISE stay in the code for the gates.
+Prices exclude 18% GST (`GST_BPS`); the Razorpay plan amount is base + GST (`subscriptionChargePaise`). `txnPerMonth` and `whatsappReceipts` duplicate `monthlyTxnCap` and `whatsapp`. `whatsapp` gates only the dormant automated Gupshup send — wa.me receipts from the vendor's own WhatsApp work on every plan. `razorpayLinks` gates the vendor's own Razorpay keys for storefront payments. `maxStaff` is not read anywhere (there is no staff invite flow). Marketing copy is derived from this table in `lib/plan-copy.ts`, and only STARTER is marketed (`MARKETED_PLANS`); FREE survives only for vendors who signed up before the trial, and PRO and ENTERPRISE stay in the code for the gates.
+
+### Billing access (trial, lock, paid)
+
+Full design in `docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md`. `billingAccess(vendor)` (`lib/plan.ts`) derives one of four states on every read; nothing is written when a date passes, so Neon can sleep.
+
+| State | When | Effect |
+| --- | --- | --- |
+| `paid` | paid plan, not past `planExpiresAt` + 3-day grace | that plan's limits |
+| `trial` | not paid, before `trialEndsAt` (sign-up + `TRIAL_DAYS`, 30) | STARTER limits |
+| `locked` | not paid, `trialEndsAt` passed | no new sales, storefront orders or AI calls |
+| `free` | not paid, `trialEndsAt` null (signed up before the trial) | FREE limits, never locked |
+
+`requireVendorRole` returns `access` and the effective plan. Routes that make a new sale, take a new order or spend on AI call `requireActiveBilling(ctx)` → 402 `{ error: "billing_locked" }`; reads, settings, billing, CSV export and finishing existing orders never do. Buyers of a locked vendor get `orders_paused` (409) at checkout.
+
+Subscribing happens in place on the billing page with Razorpay Checkout → `POST /api/razorpay/verify-subscription` (HMAC check, subscription must be the vendor's own). The verify route and the webhook (`/api/webhooks/razorpay`, idempotent through `SubscriptionEvent`) both write through `recordSubscriptionEvent` (`lib/subscription-store.ts`); `planExpiresAt` only moves forward and the webhook never downgrades a paying vendor.
+
+**Free access by hand.** A platform SUPER_ADMIN can pick a "free until" day for a store on `/admin/vendors` (`PATCH /api/admin/vendors/[id]/free-access`, `lib/admin-free-access.ts`). It moves only `trialEndsAt` (23:59 IST that day, up to 24 months out); `plan` and `planExpiresAt` are untouched. Anyone else gets 404.
 
 ---
 
@@ -543,6 +599,8 @@ The retention worker deletes `VoiceParseLog` rows older than 90 days and receipt
 
 New-order alerts for storefront and menu orders go straight from the API route to the browser push services via `web-push` (`lib/push.ts`). `notifyVendorInBackground()` hands the send to Vercel's `waitUntil`, so it never blocks the response and needs no worker. It is feature-gated on the VAPID env, sends to the vendor's active staff who opted in on a device, and carries no buyer PII (bill number, amount and item count only).
 
+`public/sw.js` also posts each push to open pages. `OrderVoiceAlerts` (`lib/order-voice.ts`) then says "New order received from <first name>" with an on-device voice when Sound is on for that device (on by default), reading the first name from `GET /api/storefront-orders/announce` rather than from the payload, and tells an open orders board to refetch at once. Listener only, no timer.
+
 ---
 
 ## 7. Money math discipline
@@ -584,12 +642,13 @@ flowchart LR
     Lint --> TC[npm run typecheck<br/>tsc --noEmit]
     TC --> Unit[npm test<br/>vitest]
     Unit --> Build[npm run build]
-    Build --> E2E[E2E job<br/>Postgres 15 service · prisma db push<br/>playwright chromium]
+    Build --> Budget[npm run perf:budget<br/>first-load JS vs perf-budget.json]
+    Push -.-> E2E[E2E job · switched off<br/>if: false since 2026-10-13]
     Push --> Sec[Security job<br/>gitleaks full history · npm audit --audit-level=high]
     Main[merge to main] --> Vercel[Vercel Git deploy to production<br/>vercel.json skips preview builds]
 ```
 
-Test counts drift with every change, so they are not recorded here; `npx vitest run` and `npx playwright test --list` print the current numbers. Live golden runs (`GOLDEN_*_LIVE=1`) cost money and are not part of CI. Never run the E2E suite against the production database: it creates vendors and sales.
+The Playwright job is still defined (Postgres 15 service, `prisma db push`, chromium) but disabled, so E2E runs locally against a throwaway Postgres before a merge (recipe in `CLAUDE.md`). Test counts drift with every change, so they are not recorded here; `npx vitest run` and `npx playwright test --list` print the current numbers. Live golden runs (`GOLDEN_*_LIVE=1`) cost money and are not part of CI. Never run the E2E suite against the production database: it creates vendors and sales.
 
 ---
 
@@ -601,8 +660,9 @@ Test counts drift with every change, so they are not recorded here; `npx vitest 
 - **Self-hosted BullMQ over Vercel Cron** — Cron is fine for scheduled work; for retry-with-backoff on a per-job basis (what Business-API WhatsApp delivery needed), BullMQ wins. POS receipts have since moved to `wa.me` links, so today the queues carry voice telemetry, admin-triggered retention, and the unused Gupshup path. Cost: one Fly machine ($0/mo on shared-cpu-1x free tier as of 2026) + Upstash Redis ($0 baseline + $0.20 per 100K commands).
 - **Server-side recompute of totals** — we throw 400 if `subtotalPaise + taxPaise - discountPaise !== totalPaise` from the client. Costs nothing, prevents an entire class of "client tampered with cart" bugs.
 - **Snapshotted `OrderItem.name` and `priceInPaise`** — denormalized, but historical bills don't break when a vendor renames or deletes a menu item.
-- **Minimal GST support** — most micro-merchants don't have a GSTIN. What has shipped: an optional HSN/SAC code per menu item (`MenuItem.hsnCode`) printed on the WhatsApp receipt text. `VendorSettings.hsnDefault` exists in the schema but nothing reads it yet, and one flat tax rate (`taxEnabled` + `taxPercent`, applied in basis points). Not built: a CGST/SGST/IGST split, GST-formatted invoices, or printing `Vendor.gstin`. Roadmapped for the kirana / restaurant tier.
-- **No offline support yet** — every Indian city has data; the bigger problem for our segment is voice quality, not connectivity. Offline PWA is a Phase 6 item.
+- **Minimal GST support** — most home kitchens and micro-merchants don't have a GSTIN. What has shipped: an optional `Vendor.gstin` (format-checked, Settings → Receipts) printed on every receipt, an optional HSN/SAC code per menu item (`MenuItem.hsnCode`) printed on the WhatsApp receipt text, and one flat tax rate (`taxEnabled` + `taxPercent`, applied in basis points). `VendorSettings.hsnDefault` exists in the schema but nothing reads it. Not built: a CGST/SGST/IGST split or GST-formatted invoices.
+- **Offline counter sales only** — the POS works offline through the IndexedDB outbox (§4); the storefront, orders board and every other screen need a connection.
+- **One offer per order, percent only** — the largest discount wins and offers never stack (`lib/offers.ts`). No coupon codes, per-customer limits, fixed-amount or bundle prices; it covers "weekly plan" pricing without a promotions engine.
 
 ---
 
@@ -715,6 +775,7 @@ sequenceDiagram
     API->>API: IP rate limit, Zod, publish gate (404)
     API->>DB: BEGIN; SELECT drop FOR UPDATE
     API->>DB: effective status, fulfilment, per-order limit, stock, plan cap
+    API->>API: applyOffers() — the server prices the order
     API->>DB: billSequence.upsert, transaction + orderItems + receipt
     API->>DB: COMMIT
     API--)KV: bump orders:{vendorId} (fire-and-forget)
@@ -725,11 +786,13 @@ sequenceDiagram
 
 Rejections are typed (`PlaceOrderError`): `sold_out` carries `remaining` so the buyer's cart is trimmed in place; `drop_not_open` covers a cut-off that passed while the buyer was filling the form.
 
+The buyer's order page has no timer either: it refreshes when the tab becomes visible again, on `pageshow`, and from a "Check for update" button. The buyer's device remembers recent orders in localStorage (`components/storefront/recent-orders.ts`: token, bill number and date, no PII).
+
 ### Payment paths
 
 | Path | How it gets paid | Who marks it paid |
 | --- | --- | --- |
-| **UPI intent + UTR** | Order page shows the vendor's UPI QR / `upi://` link for the exact amount; buyer pays in any app and submits the 12-digit UTR | Vendor matches the UTR in her UPI app and taps **Mark paid**. Nothing is auto-verified. |
+| **UPI intent + "I've paid"** | Order page shows the vendor's UPI QR / `upi://` link for the exact amount; buyer pays in any app and taps **I've paid** (`paymentClaimedAt`; UTR optional) | Vendor checks her UPI app and taps **Payment received**, or **Not received** (clears the claim, stamps `paymentRejectedAt`; the next claim then needs a UTR). Nothing is auto-verified, and a claim never marks an order paid. |
 | **Pay on delivery** | Cash or UPI at the door / pickup (`acceptPayOnDelivery`) | Vendor's **Delivered · ₹X collected** tap marks it paid in the same DB transaction |
 | **Vendor's Razorpay** | Razorpay Checkout using the **vendor's own** keys; order created on her account | Signature verify on return (`/razorpay/verify`) or her webhook `/api/webhooks/razorpay-orders/[vendorId]`, whichever lands first |
 
@@ -739,11 +802,26 @@ All three converge on `markOrderPaid()`: a conditional `updateMany` (`paymentSta
 
 A vendor who turns on `VendorSettings.acceptMenuOrders` lets buyers order everyday `MenuItem`s on `/s/[slug]` at any time (`lib/menu-orders.ts`, `POST /api/s/[slug]/menu-orders`). These are the same `STOREFRONT` transactions with `dropId = null`, the same three payment paths and the same plan-cap rule. Differences from a Drop: no cut-off and no stock caps (so no row lock), only `isAvailable` items can be ordered, prices are always re-read from `MenuItem`, and fulfilment mode, delivery fee and pickup note come from `menuFulfilmentMode` / `menuDeliveryFeePaise` / `menuPickupNote`. The vendor works them from `/orders`, which polls `/api/storefront-orders/signal` every 6 minutes. That interval is deliberately longer than Neon's idle timeout, because each tick still reads Postgres through `requireVendorRole`.
 
-Both kinds of storefront order fire a Web Push alert to opted-in staff devices when placed, and again when a buyer submits a UTR (§6).
+Both kinds of storefront order fire a Web Push alert to opted-in staff devices when placed, and again when a buyer submits a payment claim (§6).
+
+### One orders board
+
+`/orders` lists every storefront order, menu orders and all drops' orders, in one list (`loadOrdersBoard` in `lib/drops-board-server.ts`: the last 3 IST days, older orders still open, and every order of a drop whose handover window ended in those 3 days). A "Show orders from" picker narrows it to menu orders or one drop; `/orders?drop=<id>` opens it on a drop. Actions still go to each order's own route family (`orderActionBase`), so each keeps its compound scope. The board selects orders for bulk confirm / mark paid / deliver (one transaction per order, so one stale order never rolls back the rest), searches, filters by pickup or delivery, collapses handled orders, offers Undo after handover, and asks for confirmation before marking an order paid that has no buyer claim.
+
+### Offers
+
+An `Offer` is a vendor's quantity plan ("4+ quiches incl. 1 paneer → 10% off"), edited in Settings → Offers (`/api/offers`, MANAGER). All rules are in `lib/offers.ts` (pure, client-safe):
+
+- **Eligibility:** all items, chosen item ids, or a `MenuItem.tags` tag (trimmed, case-insensitive). The optional "at least N of tag X" counts eligible lines only.
+- **One offer per order.** The largest discount wins; ties go to the higher `minQty`, then the older offer. Delivery fees are never discounted.
+- **Rounding:** `floor(eligibleSubtotal × bps / 10 000)`, split across eligible lines by largest remainder into `OrderItem.discountPaise`.
+- **No timers:** `startsAt` / `endsAt` are compared on every read.
+- **The server prices.** `placeStorefrontOrder` and `placeMenuOrder` call `applyOffers` inside their transaction (buyers send ids and quantities only), so the Razorpay amount, UPI QR and `DailySummary` all use the server's total. The POS prices its own cart because it works offline; `POST /api/transactions` re-prices it (`lib/pos-offers.ts`).
+- Public pages receive resolved offers only (name, description, numbers, item ids on that page); raw tags stay on the server. `Transaction.offerName` is a snapshot, labelled on receipts, boards and the CSV by `discountLabel()`.
 
 ### Settings hub
 
-`/settings` is a hub with one-line status per area and a setup checklist for taking online orders (pure helpers in `lib/settings-overview.ts`). Sub-pages: `store` (storefront publish, FSSAI), `orders` (menu ordering), `payments` (UPI, pay on delivery, vendor Razorpay keys), `voice`, `notifications` (Web Push devices) and `billing`.
+`/settings` is a hub with one-line status per area (pure helpers in `lib/settings-overview.ts`). Sub-pages: `store` (Online store: name, banner and logo, publish, Instagram handle, FSSAI), `orders` (Online orders: order from menu, WhatsApp orders and the store-page WhatsApp link), `payments` (UPI, pay on delivery, vendor Razorpay keys), `offers`, `receipts` (GSTIN, footer, paper width, auto-print), `voice`, `notifications` (Web Push devices, Sound) and `billing`. The setup checklist and the trial/lock notice are shown where the seller lands (`/orders`, `/drops`, and collapsed on `/pos`), trimmed to the viewer's role.
 
 ### ADR: vendor-owned Razorpay keys vs platform collection
 

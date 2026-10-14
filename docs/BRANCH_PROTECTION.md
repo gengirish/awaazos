@@ -7,7 +7,9 @@ Apply these settings in GitHub repository settings for `main`.
 Require these checks before merge:
 
 - `Lint + Type + Unit + Build`
-- `E2E (Playwright)`
+- `E2E (Playwright)` — switched off in `ci.yml` (`if: false`, 2026-10-13). GitHub counts a skipped
+  job as passing a required check, so while it is off this check gates nothing; run the suite
+  locally before merging (see `CLAUDE.md`).
 - `Secret scan + npm audit`
 
 ## Pull request rules

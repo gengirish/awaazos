@@ -1,10 +1,10 @@
 # AwaazOS — Bol. Bill. Becho.
 
 > **Pre-orders and billing for India's Instagram cloud kitchens.**
-> Post a batch with a cut-off → buyers order from your link in bio → paid by UPI → cook list and delivery list on the day. Voice POS for counter sales. ₹0 to start.
+> Post a batch with a cut-off → buyers order from your link in bio → paid by UPI → cook list and delivery list on the day. Voice POS for counter sales. 30 days free.
 
 [![Live](https://img.shields.io/badge/live-awaazos.vercel.app-brightgreen)](https://awaazos.vercel.app)
-[![Stack](https://img.shields.io/badge/stack-Next.js%2014%20%C2%B7%20Auth.js%20%C2%B7%20Neon%20%C2%B7%20Claude%204.5-blueviolet)](#-tech-stack)
+[![Stack](https://img.shields.io/badge/stack-Next.js%2015%20%C2%B7%20Auth.js%20%C2%B7%20Neon%20%C2%B7%20Claude%204.5-blueviolet)](#-tech-stack)
 [![License](https://img.shields.io/badge/license-proprietary-lightgrey)](#-license)
 
 > **Status:** Production-deployed, with design-partner vendors in Hyderabad. Live counts are on the admin-only `/admin/metrics` page.
@@ -90,19 +90,26 @@ All of this on a phone, in <8 seconds per transaction. **Hindi + English at MVP.
 - 💳 **UPI deep links + QR** — vendor's own UPI ID, no MDR fees, scannable from any UPI app
 - 📊 **Analytics dashboard** — Recharts revenue trend, hourly heatmap, top sellers, voice adoption %, payment method breakdown — every chart has a `<details>` data table for accessibility
 - 🏢 **Multi-tenant** — `vendorId` scoping enforced on every query, two-layer RBAC (platform `UserRole` + per-tenant `StaffRole`)
-- 💸 **Razorpay subscriptions** — ₹299/mo per vendor, FREE up to 50 transactions a month, plan gates with `PlanGateError(402)` returning structured upgrade prompts
+- 💸 **Trial + Razorpay subscriptions** — 30-day free trial with Starter limits, then Starter at ₹299/month or ₹2,990/year (+ GST), paid in place with Razorpay Checkout. Trial, paid and locked states are derived on every read (`billingAccess()`), with no timers; a locked store keeps read access to its records. A super admin can extend a store's free access by date (`/admin/vendors`)
 - 🖼️ **Store banner & logo** — the owner uploads a cover photo and logo for `/s/[slug]` in Settings → Online store; photos are shrunk on the phone before upload
-- 🛍️ **Public storefront + Drops** — opt-in `/s/[slug]` page where buyers order from the everyday menu or from a pre-order "drop" (cut-off, capped stock, orders board, prep sheet). Payment by UPI + UTR, pay on delivery, or the vendor's own Razorpay keys
+- 🛍️ **Public storefront + Drops** — opt-in `/s/[slug]` page where buyers order from the everyday menu or from a pre-order "drop" (cut-off, capped stock, prep sheet). Payment by UPI + the buyer's "I've paid" claim (the seller confirms), pay on delivery, or the vendor's own Razorpay keys. Optional Instagram and WhatsApp links in the store header
+- 📋 **One orders board** — `/orders` holds menu orders and every drop's orders, with a source picker, search, pickup/delivery filter, bulk confirm / mark paid / deliver, and Undo after handover
+- 🏷️ **Offers** — quantity plan discounts ("4+ quiches incl. 1 paneer → 10% off") on the storefront, drops and POS; one offer per order, priced by the server (`lib/offers.ts`, Settings → Offers)
+- 🗣️ **Voice drop and menu builders** — say a batch plan or a dish list; Claude drafts the drop form or new menu rows for the seller to confirm (`/api/ai/parse-drop`, `/api/ai/parse-menu`)
+- 🧾 **Receipts** — one receipt layout rendered as WhatsApp text, a printable 58 mm / 80 mm / A4 page with optional auto-print, and a public customer page `/r/[token]`; GSTIN printed when set
+- 📴 **Offline counter sales** — the POS keeps selling without a connection: sales queue in IndexedDB and sync when the phone is back online, never billed twice (`clientRef`)
 - 📸 **Instagram story image** — one tap on a drop makes a 1080×1920 PNG (items, prices, cut-off, order link) inside Instagram's safe zones, and copies the storefront link for the Link sticker (`GET /api/drops/[id]/story-image`)
-- 🔔 **Web Push alerts** — new storefront orders and submitted UPI references push to the vendor's opted-in devices (`lib/push.ts`, `public/sw.js`)
+- 🔔 **Web Push alerts** — new storefront orders and payment claims push to the vendor's opted-in devices (`lib/push.ts`, `public/sw.js`); an open app also says "New order received from <first name>" aloud
+- ✅ **Setup checklist** — the steps to start taking orders follow the seller to `/orders`, `/drops` and `/pos`; in-app guide at `/help`
 - 🇮🇳 **India-first defaults** — IST timezone, DD/MM/YYYY dates, `+91` 10-digit phone validation, `Intl.NumberFormat('en-IN', { currency: 'INR' })`, `libphonenumber-js`
 - 🔐 **Auth.js v5 (NextAuth)** — Edge-split config, JWT sessions, Credentials provider with bcrypt, single `prisma.$transaction` for sign-up
-- 🎨 **Mobile-first UI** — Tailwind + shadcn/ui, saffron AwaazOS palette (`--awaaz-orange` AA-contrast), Baloo 2 + Nunito Indic-friendly fonts
+- 🎨 **Mobile-first UI** — Tailwind + shadcn/ui, saffron AwaazOS palette (primary tokens at 4.5:1 with white text), Baloo 2 headings + Nunito body, shared `EmptyState` / `Notice` / `ResponsiveDialog` primitives
 
 ### Roadmap
 
-Driven by [docs/ICP.md](./docs/ICP.md) "Gaps": checkout inside Instagram's in-app browser, DM
-quick replies, delivery hand-off from the prep sheet, then pricing copy for kitchens.
+Driven by [docs/ICP.md](./docs/ICP.md) "Plan, in order": validate with 5–10 kitchens running real
+drops, checkout inside Instagram's in-app browser, measuring Instagram demand, a store-level story
+image, and delivery hand-off from the prep sheet.
 
 _Also planned, not shipped:_ automated accessibility audits in CI (`@axe-core/playwright` is not installed today — a11y is hand-checked against the `aria-live`, contrast, and chart-data-table work listed above).
 
@@ -112,8 +119,8 @@ _Also planned, not shipped:_ automated accessibility audits in CI (`@axe-core/pl
 
 | Layer | Choice | Why |
 | --- | --- | --- |
-| **Frontend** | Next.js 14 App Router + TypeScript strict | RSC for server-side data fetch, no waterfall to API |
-| **UI** | Tailwind CSS + shadcn/ui (slate) | Fast iteration, accessible primitives, mobile-first |
+| **Frontend** | Next.js 15 App Router + React 19 + TypeScript strict | RSC for server-side data fetch, no waterfall to API |
+| **UI** | Tailwind CSS 4 + shadcn/ui (slate) | Fast iteration, accessible primitives, mobile-first |
 | **Charts** | Recharts ^2.15 | SSR-friendly, accessible (data tables sibling) |
 | **Auth** | Auth.js v5 (NextAuth) + `@auth/prisma-adapter` + bcryptjs | No vendor lock-in, edge-safe middleware, JWT sessions |
 | **Database** | Neon Serverless PostgreSQL | Branchable, scales to zero, Indian-region availability |
@@ -125,7 +132,7 @@ _Also planned, not shipped:_ automated accessibility audits in CI (`@axe-core/pl
 | **Payments** | Razorpay subscriptions (platform) · UPI deep link + QR (POS) · vendor's own Razorpay keys (storefront) | India-first; storefront money goes to the vendor, never through the platform |
 | **Messaging** | `wa.me` links from the vendor's own WhatsApp · Web Push (`web-push`, VAPID) · AgentMail (password-reset and buyer magic-link email) | No WhatsApp Business API or templates needed |
 | **Hosting** | Vercel (Next.js) + Fly.io BOM region (workers) | Edge for users, BOM for low-latency to Indian compute |
-| **Storage** | Vercel Blob | Menu item photos |
+| **Storage** | Vercel Blob | Menu item photos, store banner and logo |
 | **Testing** | Vitest (unit) + Playwright (E2E — chromium + Pixel 7 mobile, `en-IN` locale, `Asia/Kolkata` timezone) | Fast unit feedback, real-browser E2E on the exact locale and timezone vendors run in |
 
 ---
@@ -257,7 +264,7 @@ For every meaningful change:
 1. `npm test && npm run typecheck && npm run lint && npm run build` — must all pass
 2. Playwright against a throwaway Postgres (see [`CLAUDE.md`](./CLAUDE.md#e2e-writes-real-rows--never-point-it-at-production)), never against production
 3. `git commit -m "feat(scope): ..."` — conventional commits
-4. `git push origin main` — the GitHub integration builds and deploys production; CI runs lint, typecheck, unit, build, E2E (against a CI Postgres service), gitleaks and `npm audit`
+4. `git push origin main` — the GitHub integration builds and deploys production; CI runs lint, typecheck, unit, build, the bundle-size budget, gitleaks and `npm audit` (the Playwright job is switched off on CI, so step 2 is the only E2E run)
 
 See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system diagrams, [`docs/OBSERVABILITY.md`](./docs/OBSERVABILITY.md) for production monitoring/alerting setup, [`docs/README.md`](./docs/README.md) for the index of ops docs and production controls, [`docs/DEMO_GUIDE.md`](./docs/DEMO_GUIDE.md) for live demo walkthroughs, and [`PITCH.md`](./PITCH.md) for the YC pitch.
 
@@ -280,32 +287,41 @@ See [`ARCHITECTURE.md`](./ARCHITECTURE.md) for system diagrams, [`docs/OBSERVABI
 awaazos/
 ├── app/
 │   ├── (marketing)/         landing, pricing (public)
-│   ├── (auth)/              sign-in, sign-up, forgot / reset password
+│   ├── (auth)/              sign-in, sign-up, forgot / reset password, claim a demo store
 │   ├── (onboarding)/        first-run vendor setup
-│   ├── (vendor)/            pos, menu, transactions, analytics, orders, drops, settings (hub + sections)
+│   ├── (vendor)/            pos, menu, transactions, analytics, orders, drops, help,
+│   │                        settings (hub + sections incl. offers, receipts)
+│   ├── (print)/receipts/    staff receipt print page (58/80 mm thermal or A4)
 │   ├── admin/metrics/       platform KPIs (admin only; lib/admin-metrics.ts)
 │   ├── admin/vendors/       give a store free access until a date (super admin; lib/admin-free-access.ts)
+│   ├── home/                landing redirect: onboarding, /orders or /pos (lib/home.ts)
 │   ├── s/[slug]/            public storefront: menu, drops, checkout, buyer order + account pages
+│   ├── r/[token]/           public customer receipt page
 │   ├── legal/               terms, privacy, refund, DPDP rights
-│   └── api/                 ai/ (transcribe, parse-order), transactions, menu, receipts, drops,
-│                            storefront-orders, s/ (buyer), push, razorpay, vendor, me, admin,
+│   └── api/                 ai/ (transcribe, parse-order, parse-drop, parse-menu), transactions,
+│                            menu, offers, receipts, drops, storefront-orders, s/ (buyer), push,
+│                            razorpay, vendor, me, admin, internal/ (demo stores), demo-claim,
 │                            webhooks/ (razorpay, razorpay-orders), health, ready
 ├── components/              ui/ (shadcn) plus pos, menu, transactions, analytics, storefront,
-│                            drops, settings, push, receipts, billing, marketing, legal
-├── hooks/useVoiceOrder.ts   mic → Web Speech or recorder → transcribe → parse-order
+│                            drops (incl. the orders board), settings, setup, push, pwa, help,
+│                            receipts, billing, marketing, legal, admin, shell
+├── hooks/                   useVoiceOrder (mic → Web Speech or recorder → transcribe → parse-order),
+│                            POS outbox, voice dictation, install-prompt and push-alert stores
 ├── lib/                     domain + integration modules (currency, upi, rbac, anthropic, STT
-│                            clients, drops, push, kv, queues, datetime, phone, …) and __tests__/
+│                            clients, drops, offers, receipt, push, kv, queues, datetime, phone, …) and __tests__/
 ├── workers/                 BullMQ workers (voice-parse-log, receipt, retention) for Fly
 ├── prisma/schema.prisma     data model (applied with `prisma db push`; no migrations)
-├── public/                  push service worker (sw.js) and PWA icons
+├── public/                  service worker (sw.js: push + offline /pos), offline.html, PWA icons
 ├── services/whisper-stt/    optional self-hosted Whisper ASR (Python, own Fly app)
-├── scripts/                 STT provider smoke tests, PWA icon generator
-├── tests/golden/            LLM / ASR regression fixtures (parse-order, stt)
+├── scripts/                 STT smoke tests, bundle budget, agent-rule sync, Razorpay plan setup,
+│                            offer seed data, PWA icon generator
+├── tests/golden/            LLM / ASR regression fixtures (parse-order, parse-drop, parse-menu, stt)
 ├── e2e/                     Playwright specs + helpers
 ├── src/types/               next-auth type augmentation
 ├── docs/                    observability, demo guide, runbooks/, archive/ (frozen April 2026 material)
 ├── .cursor/                 rules/*.mdc (enforced conventions) and skills/
-├── .github/workflows/ci.yml lint, typecheck, unit, build, E2E, gitleaks, npm audit
+├── .github/workflows/ci.yml lint, typecheck, unit, build, bundle budget, gitleaks, npm audit
+│                            (E2E job defined but switched off)
 ├── middleware.ts            Auth.js edge middleware (imports lib/auth.config.ts only)
 ├── next.config.mjs          CSP + security headers, Sentry
 ├── vercel.json              production-only builds (no previews)
@@ -321,9 +337,12 @@ awaazos/
 
 ## 💸 Pricing
 
-**₹299/mo per vendor. FREE up to 50 transactions a month.**
+**30 days free, then Starter at ₹299/month or ₹2,990/year (+ 18% GST).** Unlimited bills.
 
-Higher tiers come back when ≥50 vendors are paying. Plan enforcement is server-side via `requirePlan(vendor, Plan.STARTER)` returning structured `402` responses.
+One plan is sold. Stores that signed up before the trial stay on the old FREE tier (50 bills a
+month) and are never locked. Plan enforcement is server-side: `requirePlan(vendor, Plan.STARTER)`
+returns a structured `402`, and `requireActiveBilling` returns `402 billing_locked` once a trial
+ends unpaid. Details in [`docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md`](./docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md).
 
 ---
 
