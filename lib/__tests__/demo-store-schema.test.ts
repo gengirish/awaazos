@@ -4,7 +4,9 @@ vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 vi.mock("@/lib/drops-signal", () => ({ bumpOrderSignal: vi.fn() }));
 
 import { samplePaymentFields } from "@/lib/demo-store";
+import { STALL_TYPES } from "@/lib/constants";
 import {
+  DEMO_CATEGORIES,
   demoHandoverSchema,
   demoStoreCreateSchema,
   demoVoiceLang,
@@ -62,6 +64,26 @@ describe("demoStoreCreateSchema", () => {
     expect(r.sample_orders).toEqual([]);
     expect(r.profile.languages).toEqual(["en"]);
     expect(r.profile.category).toBe("general");
+    expect(r.profile.fulfilment).toBe("pickup");
+    expect(r.profile.delivery_fee_paise).toBe(0);
+  });
+
+  it("maps each kitchen category to its own store type, not FOOD_BEVERAGE", () => {
+    expect(DEMO_CATEGORIES.home_bakery).toBe("HOME_BAKERY");
+    expect(Object.values(DEMO_CATEGORIES)).not.toContain("FOOD_BEVERAGE");
+    // Every mapped type has a label for the storefront chip.
+    for (const t of Object.values(DEMO_CATEGORIES)) {
+      expect(STALL_TYPES.some((s) => s.value === t)).toBe(true);
+    }
+  });
+
+  it("accepts delivery options and rejects a bad mode or fee", () => {
+    const ok = body();
+    Object.assign(ok.profile, { fulfilment: "both", delivery_fee_paise: 5000 });
+    expect(issuePaths(ok)).toEqual([]);
+    const bad = body();
+    Object.assign(bad.profile, { fulfilment: "courier", delivery_fee_paise: 12.5 });
+    expect(issuePaths(bad)).toEqual(expect.arrayContaining(["profile.fulfilment", "profile.delivery_fee_paise"]));
   });
 
   it.each(["9876543210", "+919876543210", "919999800001", "91999990000", "9199999000011", "+1 9199999000"])(

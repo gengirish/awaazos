@@ -34,6 +34,9 @@ one call, and later hand it over. Code: `lib/demo-store.ts` (server),
   `/s/<slug>` is `noindex` with a "demo store" note. The name shows as
   "<name> (DEMO)" in the store header and the app shell. There are no public
   store listings to exclude them from.
+- **UPI QR** on the store and order pages carries a "SAMPLE" badge while the
+  store is a demo (`UpiQrImage` `sample`). The badge is small on purpose so
+  the code still scans.
 - **Display phone** is saved as the store's WhatsApp number with both public
   opt-ins off, so it is not shown until the owner turns it on.
 
@@ -42,11 +45,14 @@ one call, and later hand it over. Code: `lib/demo-store.ts` (server),
 | Request | Stored as |
 | --- | --- |
 | `profile.name` | `Vendor.name` (stored clean; " (DEMO)" is added on display) |
-| `profile.category` | `Vendor.stallType` (`home_bakery`, `home_kitchen`, `cloud_kitchen`, `cafe`, `sweets`, `catering` → FOOD_BEVERAGE; `street_food`; `general`) |
+| `profile.category` | `Vendor.stallType`, shown as the store-type chip: `home_bakery` → HOME_BAKERY ("Home bakery"), likewise `home_kitchen`, `cloud_kitchen`, `cafe`, `sweets`, `catering`; `street_food`; `general` |
 | `profile.area` | `Vendor.city` |
 | `profile.instagram` | `VendorSettings.instagramHandle` (normalised; invalid → none) |
 | `profile.display_phone` | `VendorSettings.whatsappNumber`, not public |
 | `profile.languages` | `VendorSettings.voiceLang` = first of en/hi offered, else en (te/kn/ta are dormant) |
+| `profile.fulfilment` | `VendorSettings.menuFulfilmentMode`: `pickup` (default) / `delivery` / `both`. Sample orders are delivery orders (no address) only for `delivery` |
+| `profile.delivery_fee_paise` | `VendorSettings.menuDeliveryFeePaise` (0 … 100000, default 0) |
+| `items[].name` | `MenuItem.name`; the emoji is suggested from it (`suggestEmoji`: cake → 🎂, cupcake → 🧁, else 🍽️) |
 | `items[].unit` | `MenuItem.unit`, shown as "₹1,200 / kg" |
 | `sample_orders[]` | STOREFRONT `Transaction` with `isSample`, pickup, back-dated 47 min apart |
 | `…event_date` | `Transaction.fulfilAt` |
@@ -110,6 +116,8 @@ components:
               minItems: 1
               items: { type: string, enum: [en, hi, te, kn, ta] }
               default: [en]
+            fulfilment: { type: string, enum: [pickup, delivery, both], default: pickup }
+            delivery_fee_paise: { type: integer, minimum: 0, maximum: 100000, default: 0 }
         items:
           type: array
           minItems: 1
@@ -374,3 +382,18 @@ CREATE UNIQUE INDEX "vendors_demoExternalRef_key" ON "vendors"("demoExternalRef"
 -- AddForeignKey
 ALTER TABLE "demo_handovers" ADD CONSTRAINT "demo_handovers_vendorId_fkey" FOREIGN KEY ("vendorId") REFERENCES "vendors"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 ```
+
+## Schema change: store types (run before merging)
+
+`npx prisma db push`, or:
+
+```sql
+ALTER TYPE "StallType" ADD VALUE IF NOT EXISTS 'HOME_BAKERY';
+ALTER TYPE "StallType" ADD VALUE IF NOT EXISTS 'HOME_KITCHEN';
+ALTER TYPE "StallType" ADD VALUE IF NOT EXISTS 'CLOUD_KITCHEN';
+ALTER TYPE "StallType" ADD VALUE IF NOT EXISTS 'CAFE';
+ALTER TYPE "StallType" ADD VALUE IF NOT EXISTS 'SWEETS';
+ALTER TYPE "StallType" ADD VALUE IF NOT EXISTS 'CATERING';
+```
+
+Existing vendors keep their type. Sign-up and onboarding offer the new ones.

@@ -899,7 +899,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                 </h3>
                 <p className="text-sm text-muted-foreground">Any UPI app. Enter the amount the seller tells you.</p>
                 <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
-                  <UpiQrImage src={qrSmall} alt={`UPI QR code to pay ${payeeName}`} size={180} />
+                  <UpiQrImage src={qrSmall} alt={`UPI QR code to pay ${payeeName}`} size={180} sample={vendor.isDemo} />
                 </div>
                 <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   Paying {payeeName}
@@ -932,7 +932,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                 </p>
 
                 <div className="mx-auto mt-5 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
-                  <UpiQrImage src={qrLarge} alt={`UPI QR code to pay ${payeeName}`} size={220} />
+                  <UpiQrImage src={qrLarge} alt={`UPI QR code to pay ${payeeName}`} size={220} sample={vendor.isDemo} />
                 </div>
 
                 <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">

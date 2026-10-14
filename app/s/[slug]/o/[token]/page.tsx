@@ -13,7 +13,6 @@ import {
   ShoppingBag,
   XCircle,
 } from "lucide-react";
-import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
@@ -24,6 +23,7 @@ import { OtherCartsNotice } from "@/components/storefront/OtherCartsNotice";
 import { PaidClaimForm } from "@/components/storefront/PaidClaimForm";
 import { RazorpayPayButton } from "@/components/storefront/RazorpayPayButton";
 import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
+import { UpiQrImage } from "@/components/storefront/UpiQrImage";
 import { formatINR, paiseToRupees } from "@/lib/currency";
 import { orderDisplayState, PENDING_HOLD_MINUTES } from "@/lib/drops";
 import { formatFulfilmentWindow, formatIstDate, formatIstTime } from "@/lib/drops-time";
@@ -136,6 +136,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
         select: {
           name: true,
           slug: true,
+          isDemo: true,
           upiId: true,
           upiName: true,
           plan: true,
@@ -502,13 +503,11 @@ export default async function StorefrontOrderPage(props: {
                     </summary>
                     <div className="border-t border-border/50 px-3 py-4 text-center">
                       <div className="mx-auto w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
-                        <Image
+                        <UpiQrImage
                           src={qrSrc}
                           alt={`UPI QR code to pay ${formatINR(order.totalPaise)} to ${payeeName}`}
-                          width={220}
-                          height={220}
-                          unoptimized
-                          className="rounded-lg"
+                          size={220}
+                          sample={order.vendor.isDemo}
                         />
                       </div>
                       <p className="mt-3 text-xs text-muted-foreground">Scan it with the phone you pay from.</p>

@@ -8,7 +8,7 @@
  * details or payment keys is refused by name rather than as "unknown key".
  * A demo store's UPI id is always DEMO_UPI_ID.
  */
-import type { StallType } from "@prisma/client";
+import type { FulfilmentMode, StallType } from "@prisma/client";
 import { z } from "zod";
 
 import { STORE_NAME_MAX } from "@/lib/store-name";
@@ -27,19 +27,27 @@ const MAX_ITEMS = 100;
 const MAX_ORDERS = 50;
 const MAX_LINE_QTY = 99;
 
-/** Outreach category → StallType. Every kitchen kind maps to FOOD_BEVERAGE. */
+/** Outreach category → StallType, shown as the store-type chip on /s/<slug>. */
 export const DEMO_CATEGORIES = {
-  home_bakery: "FOOD_BEVERAGE",
-  home_kitchen: "FOOD_BEVERAGE",
-  cloud_kitchen: "FOOD_BEVERAGE",
-  cafe: "FOOD_BEVERAGE",
-  sweets: "FOOD_BEVERAGE",
-  catering: "FOOD_BEVERAGE",
+  home_bakery: "HOME_BAKERY",
+  home_kitchen: "HOME_KITCHEN",
+  cloud_kitchen: "CLOUD_KITCHEN",
+  cafe: "CAFE",
+  sweets: "SWEETS",
+  catering: "CATERING",
   street_food: "STREET_FOOD",
   general: "GENERAL",
 } as const satisfies Record<string, StallType>;
 
 type DemoCategory = keyof typeof DEMO_CATEGORIES;
+
+/** How buyers get "Order from menu" orders → VendorSettings.menuFulfilmentMode. */
+export const DEMO_FULFILMENT = { pickup: "PICKUP", delivery: "DELIVERY", both: "BOTH" } as const satisfies Record<
+  string,
+  FulfilmentMode
+>;
+
+type DemoFulfilment = keyof typeof DEMO_FULFILMENT;
 
 /** Voice languages the store may use; only en/hi are offered in the app today. */
 const LANGS = ["en", "hi", "te", "kn", "ta"] as const;
@@ -131,6 +139,10 @@ export const demoStoreCreateSchema = z
           .regex(/^\+?(91)?[6-9]\d{9}$/, "an Indian mobile number")
           .optional(),
         languages: z.array(z.enum(LANGS)).min(1).max(5).default(["en"]),
+        fulfilment: z
+          .enum(Object.keys(DEMO_FULFILMENT) as [DemoFulfilment, ...DemoFulfilment[]])
+          .default("pickup"),
+        delivery_fee_paise: paise(100_000).default(0),
       })
       .strict(),
     items: z.array(itemSchema).min(1).max(MAX_ITEMS),
