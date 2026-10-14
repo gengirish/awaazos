@@ -41,8 +41,8 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
 
   const showReview = voiceReview !== null && (voiceReview.lowConfidence || voiceReview.unmatched.length > 0);
 
-  // `lines` outlives `open` so the sheet's text holds still while it closes.
-  const [confirmClear, setConfirmClear] = useState({ open: false, lines: 0 });
+  // `count` outlives `open` so the sheet's text holds still while it closes.
+  const [confirmClear, setConfirmClear] = useState({ open: false, count: 0 });
 
   const clearNow = () => {
     toast.dismiss(UNDO_TOAST_ID);
@@ -51,7 +51,7 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
 
   const onClear = () => {
     if (items.length > CONFIRM_CLEAR_ABOVE_LINES) {
-      setConfirmClear({ open: true, lines: items.length });
+      setConfirmClear({ open: true, count: itemCount });
       return;
     }
     clearNow();
@@ -257,7 +257,7 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
         open={confirmClear.open}
         onOpenChange={(open) => setConfirmClear((c) => ({ ...c, open }))}
         title="Clear the cart?"
-        description={`All ${confirmClear.lines} items will be removed from this order.`}
+        description={`All ${confirmClear.count} items will be removed from this order.`}
         confirmLabel="Clear cart"
         onConfirm={clearNow}
       />
