@@ -622,12 +622,29 @@ model DemoAuditLog {
   action      String // create | delete | handover | claim
   externalRef String
   vendorId    String?
-  actor       String // "key:<16 hex of sha256(INTERNAL_API_KEY)>" or "claim"
+  actor       String // "key:<16 hex of sha256(INTERNAL_API_KEY)>", "admin:<User.id>" or "claim"
   createdAt   DateTime @default(now())
 
   @@index([action, createdAt])
   @@index([externalRef])
   @@map("demo_audit_logs")
+}
+
+// A one-time link that makes someone a platform ADMIN (outreach only), made by
+// a SUPER_ADMIN on /admin/admins (lib/admin-invites.ts). Only a SHA-256 of the
+// token is stored. Redeeming it creates the account (own password) or promotes
+// the signed-in account with the same email.
+model AdminInvite {
+  id          String    @id @default(cuid())
+  email       String
+  tokenHash   String    @unique
+  invitedById String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([email])
+  @@map("admin_invites")
 }
 
 // ─── ENUMS ──────────────────────────────────────────────────────────

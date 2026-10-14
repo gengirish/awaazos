@@ -22,6 +22,9 @@ function isPublicPath(pathname: string): boolean {
   // Demo-store claim links (/claim/<token>). The page shows nothing unless the
   // token matches an unused, unexpired DemoHandover.
   if (pathname.startsWith("/claim/")) return true;
+  // Platform-admin invite links (/admin-invite/<token>). Same rule: the page
+  // shows nothing unless the token matches an unused, unexpired AdminInvite.
+  if (pathname.startsWith("/admin-invite/")) return true;
   if (pathname === "/pricing" || pathname.startsWith("/pricing/")) return true;
   // Privacy, terms, refund, DPDP rights — linked from the public footer.
   if (pathname === "/legal" || pathname.startsWith("/legal/")) return true;

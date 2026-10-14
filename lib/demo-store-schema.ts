@@ -51,6 +51,8 @@ type DemoFulfilment = keyof typeof DEMO_FULFILMENT;
 
 /** Voice languages the store may use; only en/hi are offered in the app today. */
 const LANGS = ["en", "hi", "te", "kn", "ta"] as const;
+export const DEMO_LANGUAGES = LANGS;
+export type DemoLanguage = (typeof LANGS)[number];
 export const ACTIVE_VOICE_LANG: Partial<Record<(typeof LANGS)[number], string>> = { en: "en-IN", hi: "hi-IN" };
 
 // ─── Payment-credential guard ──────────────────────────────────────

@@ -501,6 +501,10 @@ only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts`
   prospect's User, moves OWNER, flips `isDemo`, clears `upiId`, starts the trial, and archives
   (`archivedAt`, hidden from board / transactions / CSV) or deletes the samples.
 - Every create, delete, handover and claim writes `DemoAuditLog`; its "create" rows are the 20/day limit.
+- **Admin GUI:** the same create / claim link / delete on `/admin/demo-stores` (+ `/new`), for any
+  platform ADMIN through `/api/admin/demo-stores/**` (`lib/admin-api.ts`; audit actor `admin:<User.id>`,
+  so the limit is per admin). SUPER_ADMIN invites admins on `/admin/admins` with one-time links
+  (`lib/admin-invites.ts`, `/admin-invite/[token]`); an ADMIN sees only the demo-store and metrics pages.
 
 Also added with it, for real orders too: `MenuItem.unit` ("₹1,200 / kg" on the storefront),
 `Transaction.advancePaidPaise` (order stays PENDING; the board shows "Advance paid · Balance due") and
