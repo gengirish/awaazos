@@ -1,8 +1,12 @@
 import { notFound } from "next/navigation";
 
+import Link from "next/link";
+
 import { AdminNav } from "@/components/admin/AdminNav";
+import { DemoStoreActions } from "@/components/admin/DemoStoreActions";
 import { StoreHealthLine } from "@/components/admin/StoreHealthLine";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
   DEMO_PIPELINE_LIMIT,
@@ -14,6 +18,7 @@ import {
   type DemoStage,
 } from "@/lib/admin-demo-stores";
 import { healthFor, loadStoreHealth } from "@/lib/admin-store-health";
+import { publicStoreUrl } from "@/lib/demo-store";
 import { formatIstDate } from "@/lib/datetime";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
 
@@ -34,9 +39,11 @@ function stageDetail(stage: DemoStage): string | null {
 }
 
 export default async function AdminDemoStoresPage() {
-  // Same rule as /admin/vendors: role read from the database, 404 rather than 403.
+  // Role read from the database, 404 rather than 403. Any platform ADMIN runs
+  // outreach here; SUPER_ADMIN additionally sees the store and admin pages.
+  let superAdmin: boolean;
   try {
-    await requirePlatformRole("SUPER_ADMIN");
+    superAdmin = (await requirePlatformRole("ADMIN")).user.role === "SUPER_ADMIN";
   } catch (err) {
     if (err instanceof AuthError) notFound();
     throw err;
@@ -62,7 +69,10 @@ export default async function AdminDemoStoresPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Every store built for a prospect, whether they claimed it, and whether they use it afterwards.
         </p>
-        <AdminNav current="/admin/demo-stores" superAdmin />
+        <AdminNav current="/admin/demo-stores" superAdmin={superAdmin} />
+        <Button asChild className="mt-4">
+          <Link href="/admin/demo-stores/new">Build a demo store</Link>
+        </Button>
       </header>
 
       <main id="main" className="mx-auto max-w-3xl">
@@ -87,7 +97,7 @@ export default async function AdminDemoStoresPage() {
           {rows.length === 0 ? (
             <EmptyState
               title="No demo stores yet"
-              description="Stores built with the internal demo-store API appear here."
+              description="Stores built here or with the internal demo-store API appear here."
             />
           ) : (
             <ul className="space-y-4">
@@ -100,7 +110,15 @@ export default async function AdminDemoStoresPage() {
                       <div className="min-w-0">
                         <h3 className="truncate font-semibold text-foreground">{row.name}</h3>
                         <p className="truncate font-mono text-xs text-muted-foreground">
-                          /s/{row.slug} · ref {row.demoExternalRef}
+                          <a
+                            href={publicStoreUrl(row.slug)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="underline underline-offset-2"
+                          >
+                            /s/{row.slug}
+                          </a>{" "}
+                          · ref {row.demoExternalRef}
                         </p>
                       </div>
                       <Badge variant={stage.kind === "claimed" ? "default" : "outline"}>
@@ -110,6 +128,9 @@ export default async function AdminDemoStoresPage() {
                     {detail ? <p className="mt-2 text-sm text-foreground">{detail}</p> : null}
                     <p className="text-xs text-muted-foreground">Built {formatIstDate(row.createdAt)}</p>
                     <StoreHealthLine health={healthFor(health, row.id)} now={now} />
+                    {row.isDemo && row.demoExternalRef ? (
+                      <DemoStoreActions externalRef={row.demoExternalRef} storeName={row.name} />
+                    ) : null}
                   </li>
                 );
               })}

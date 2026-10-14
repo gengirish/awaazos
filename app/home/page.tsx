@@ -2,7 +2,9 @@ import { redirect } from "next/navigation";
 
 import { resolveHomePath } from "@/lib/home";
 import { prisma } from "@/lib/prisma";
-import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { AuthError, requirePlatformRole, requireVendorRole } from "@/lib/rbac";
+
+const ADMIN_HOME_PATH = "/admin/demo-stores";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,7 +39,21 @@ export default async function HomePage() {
     });
   } catch (e) {
     if (!(e instanceof AuthError)) throw e;
-    destination = "/sign-in";
+    destination = (await isPlatformAdmin()) ? ADMIN_HOME_PATH : "/sign-in";
   }
   redirect(destination);
+}
+
+/**
+ * Outreach admins invited on /admin/admins have an account but no store of
+ * their own, so `requireVendorRole` refuses them; they land on their pipeline.
+ */
+async function isPlatformAdmin(): Promise<boolean> {
+  try {
+    await requirePlatformRole("ADMIN");
+    return true;
+  } catch (e) {
+    if (e instanceof AuthError) return false;
+    throw e;
+  }
 }

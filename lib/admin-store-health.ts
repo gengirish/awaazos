@@ -3,7 +3,8 @@
  * (`/admin/vendors`, `/admin/demo-stores`). Read-only.
  *
  * Deliberately cross-tenant, like lib/admin-vendors.ts: every caller must have
- * passed `requirePlatformRole("SUPER_ADMIN")` first. Counts and dates only — no
+ * passed `requirePlatformRole` first (SUPER_ADMIN for /admin/vendors, ADMIN for
+ * demo stores on /admin/demo-stores). Counts and dates only — no
  * buyer, owner or order details leave this file.
  *
  * Three reads for the whole page (not per store), each keyed on the vendor ids

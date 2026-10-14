@@ -5,6 +5,8 @@ one call, and later hand it over. Code: `lib/demo-store.ts` (server),
 `lib/demo-store-schema.ts` (validation), `app/api/internal/demo-stores/**`,
 `app/api/demo-claim`, `app/(auth)/claim/[token]`.
 
+The same actions have a GUI for the outreach team; see "Admin GUI" below.
+
 ## Rules
 
 - **Auth:** header `x-internal-api-key: $INTERNAL_API_KEY` (server env, ≥ 32
@@ -397,3 +399,47 @@ ALTER TYPE "StallType" ADD VALUE IF NOT EXISTS 'CATERING';
 ```
 
 Existing vendors keep their type. Sign-up and onboarding offer the new ones.
+
+## Admin GUI (outreach team)
+
+Signed-in platform admins can do everything above without the API key:
+
+| Page | Who | What |
+| --- | --- | --- |
+| `/admin/demo-stores` | ADMIN, SUPER_ADMIN | Pipeline; per demo store "Hand over to the seller" (claim link) and "Delete" |
+| `/admin/demo-stores/new` | ADMIN, SUPER_ADMIN | Build a store from a form (8 sample orders generated from the dishes, `lib/demo-store-form.ts`) or a pasted payload |
+| `/admin/admins` | SUPER_ADMIN | Invite admins by one-time link, void invites, remove admins |
+| `/admin-invite/[token]` | public | Invitee creates their account (own password), or signs in and accepts if the email already has one |
+
+- Routes: `POST /api/admin/demo-stores`, `DELETE /api/admin/demo-stores/{ref}`,
+  `POST /api/admin/demo-stores/{ref}/handover` (ADMIN); `POST /api/admin/admins/invites`,
+  `DELETE /api/admin/admins/invites/{id}`, `DELETE /api/admin/admins/{userId}` (SUPER_ADMIN);
+  `POST /api/admin-invite` and `/api/admin-invite/accept` (public / signed in). Same body and rules as the
+  internal API; anyone below the role gets 404. Wrapper: `lib/admin-api.ts`.
+- Audit rows record `actor = "admin:<User.id>"`, so the 20 creates a day are counted per admin.
+- An ADMIN sees `/admin/demo-stores` and `/admin/metrics` only. `/home` sends an admin with no store of
+  their own to `/admin/demo-stores`.
+- Admin invites (`lib/admin-invites.ts`): 192-bit token, SHA-256 stored, 7 days, one use, a new invite
+  voids the previous one for that email. Nothing is sent. Redeeming never demotes a SUPER_ADMIN, and a
+  link sent to another email answers like a dead link. Removing sets ADMIN → USER; never a SUPER_ADMIN
+  or yourself.
+
+## Schema change: admin invites (run before merging)
+
+`npx prisma db push`, or:
+
+```sql
+CREATE TABLE "admin_invites" (
+    "id" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "tokenHash" TEXT NOT NULL,
+    "invitedById" TEXT NOT NULL,
+    "expiresAt" TIMESTAMP(3) NOT NULL,
+    "usedAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "admin_invites_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX "admin_invites_tokenHash_key" ON "admin_invites"("tokenHash");
+CREATE INDEX "admin_invites_email_idx" ON "admin_invites"("email");
+```

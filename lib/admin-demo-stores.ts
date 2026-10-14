@@ -1,11 +1,11 @@
 /**
  * Founder-outreach pipeline for the platform admin page `/admin/demo-stores`:
- * every store the internal demo-store API built (lib/demo-store.ts) and how far
- * the prospect got. Read-only.
+ * every demo store (lib/demo-store.ts, built from /admin/demo-stores/new or the
+ * internal API) and how far the prospect got. Read-only.
  *
  * Cross-tenant, like lib/admin-vendors.ts: callers must have passed
- * `requirePlatformRole("SUPER_ADMIN")` first. The handover's prospect email is
- * never selected — the stage needs only its dates.
+ * `requirePlatformRole("ADMIN")` first — outreach admins work this page. The
+ * handover's prospect email is never selected — the stage needs only its dates.
  *
  * A store belongs here while `demoExternalRef` is set, which outlives the claim
  * (`isDemo` flips to false then). The stage is derived on every read.

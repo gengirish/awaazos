@@ -3,10 +3,11 @@ import Link from "next/link";
 const LINKS = [
   { href: "/admin/metrics", label: "Weekly metrics", superAdminOnly: false },
   { href: "/admin/vendors", label: "Stores and free access", superAdminOnly: true },
-  { href: "/admin/demo-stores", label: "Demo-store pipeline", superAdminOnly: true },
+  { href: "/admin/demo-stores", label: "Demo-store pipeline", superAdminOnly: false },
+  { href: "/admin/admins", label: "Admins", superAdminOnly: true },
 ] as const;
 
-/** The admin pages link to each other here. Store pages are SUPER_ADMIN only. */
+/** The admin pages link to each other here. Store and admin pages are SUPER_ADMIN only. */
 export function AdminNav({ current, superAdmin }: { current: (typeof LINKS)[number]["href"]; superAdmin: boolean }) {
   const links = LINKS.filter((l) => l.href !== current && (superAdmin || !l.superAdminOnly));
   if (links.length === 0) return null;
