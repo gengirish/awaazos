@@ -163,7 +163,7 @@ export function menuItemAnchor(menuItemId: string): string {
 /**
  * True while at least one item in a drop can still be ordered (`null` =
  * unlimited). An open drop whose every item is sold out must not drive the
- * "Pre-order now" CTA or a countdown: there is nothing left to pre-order.
+ * header "Pre-order · closes …" CTA or a countdown: there is nothing left to pre-order.
  */
 export function dropHasStock(items: readonly { remaining: number | null }[]): boolean {
   return items.some((i) => i.remaining === null || i.remaining > 0);
@@ -465,7 +465,7 @@ export function orderErrorMessage(err: OrderApiError, itemName?: string): string
         ? `${name} isn't available right now. We've removed it from your cart — please check and try again.`
         : `${name} is no longer available. Please refresh and try again.`;
     case "menu_orders_disabled":
-      return "This store has stopped taking online orders for now. Please order at the counter.";
+      return "This store has stopped taking online orders for now. Please check back later.";
     case "menu_paused_for_drop":
       return "Everyday items are paused while a pre-order is open. Order from the pre-order above.";
     case "address_required":
@@ -504,18 +504,21 @@ export type StatusTone = "success" | "warning" | "danger" | "neutral";
 /**
  * Text label (never colour alone) for the buyer's order page. `menuOrder`
  * (no drop) drops the stock wording — everyday-menu orders hold no stock.
+ * `fulfilmentType: "PICKUP"` swaps the delivery wording for pickup wording
+ * ("Collected", "Pay when you collect"); the states themselves are the same.
  */
 export function orderStatusLabel(
   state: OrderDisplayStateName,
   fulfilmentStatus: FulfilmentStatus | null,
-  opts: { menuOrder?: boolean } = {},
+  opts: { menuOrder?: boolean; fulfilmentType?: "DELIVERY" | "PICKUP" | null } = {},
 ): { label: string; hint: string | null; tone: StatusTone } {
   const confirmed = fulfilmentStatus === "CONFIRMED";
+  const payLater = payOnDeliveryLabel(opts.fulfilmentType);
   switch (state) {
     case "CANCELLED":
       return { label: "Cancelled", hint: null, tone: "danger" };
     case "DELIVERED":
-      return { label: "Delivered", hint: null, tone: "success" };
+      return { label: handedOverLabel(opts.fulfilmentType), hint: null, tone: "success" };
     case "EXPIRED":
       return {
         label: opts.menuOrder ? "Expired — please order again" : "Expired — items released, please order again",
@@ -542,9 +545,19 @@ export function orderStatusLabel(
         : { label: "Paid", hint: null, tone: "success" };
     case "PAY_ON_DELIVERY":
       return confirmed
-        ? { label: "Confirmed", hint: "Pay on delivery", tone: "success" }
-        : { label: "Pay on delivery", hint: null, tone: "neutral" };
+        ? { label: "Confirmed", hint: payLater, tone: "success" }
+        : { label: payLater, hint: null, tone: "neutral" };
   }
+}
+
+/** "Collected" for a pickup, "Delivered" otherwise — the word for a handed-over order. */
+export function handedOverLabel(fulfilmentType: "DELIVERY" | "PICKUP" | null | undefined): string {
+  return fulfilmentType === "PICKUP" ? "Collected" : "Delivered";
+}
+
+/** "Pay when you collect" for a pickup, "Pay on delivery" otherwise. */
+export function payOnDeliveryLabel(fulfilmentType: "DELIVERY" | "PICKUP" | null | undefined): string {
+  return fulfilmentType === "PICKUP" ? "Pay when you collect" : "Pay on delivery";
 }
 
 // ─── WhatsApp ───────────────────────────────────────────────────────

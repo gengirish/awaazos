@@ -37,7 +37,7 @@ test.describe("POS payment sheet", () => {
     await expect(markPaid).toBeFocused();
     const received = dialog.getByLabel(/Received/);
     await expect(received).toBeVisible();
-    await expect(received).toHaveAttribute("inputmode", "numeric");
+    await expect(received).toHaveAttribute("inputmode", "decimal");
 
     // None of the calculator buttons may collide with the "Cash" mode button.
     await expect(dialog.getByRole("button", { name: /cash/i })).toHaveCount(1);
@@ -71,7 +71,7 @@ test.describe("POS payment sheet", () => {
     await expect(page.getByText("Tap items or use voice to build an order.")).toBeVisible();
   });
 
-  test("no UPI ID: the UPI tab links to payment settings and resets to cash on close", async ({
+  test("no UPI ID: the UPI tab says to take cash, links to payment settings and resets to cash on close", async ({
     page,
     request,
   }) => {
@@ -79,7 +79,8 @@ test.describe("POS payment sheet", () => {
     const dialog = await ringUpForty(page);
 
     await dialog.getByRole("button", { name: "UPI QR" }).click();
-    const link = dialog.getByRole("link", { name: /Add a UPI ID/ });
+    await expect(dialog.getByText("Take cash now — add a UPI ID in Settings later.")).toBeVisible();
+    const link = dialog.getByRole("link", { name: "Payment settings" });
     await expect(link).toBeVisible();
     await expect(link).toHaveAttribute("href", "/settings/payments");
     await expect(dialog.getByRole("button", { name: /Mark as paid/ })).toBeDisabled();

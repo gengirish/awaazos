@@ -1,11 +1,12 @@
 "use client";
 
-import { Loader2 } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { cn } from "@/lib/utils";
 
 const UTR = /^[A-Za-z0-9]{10,22}$/;
 
@@ -17,6 +18,11 @@ const UTR = /^[A-Za-z0-9]{10,22}$/;
  *   default            "I've paid" button + optional reference
  *   requireReference   after a "Not received": the reference is mandatory
  *   claimed            already claimed without a reference: offer to add one
+ *
+ * "I've paid" is outlined: on the order page it is step 2, under the filled
+ * pay button, and must not look like a second way to pay. The reference field
+ * keeps `inputMode="text"` because the server accepts letters as well as digits
+ * (`utrSubmitSchema`: 10–22 alphanumerics — some banks issue such references).
  */
 export function PaidClaimForm({
   slug,
@@ -62,8 +68,11 @@ export function PaidClaimForm({
       }
       const data = (await res.json().catch(() => ({}))) as { error?: string };
       if (res.status === 429) setError("Too many attempts. Please wait a minute and try again.");
-      else if (res.status === 409)
-        setError("This order isn't waiting for payment any more. Refresh to see its status.");
+      else if (res.status === 409) {
+        // The order moved on (paid, cancelled, expired): show where it stands now.
+        setError("This order isn't waiting for payment any more. Tap “Check for update” above to see its status.");
+        router.refresh();
+      }
       else if (data.error === "reference_required")
         setError("Enter the 12-digit UPI reference (UTR) from your payment app.");
       else if (res.status === 400) setError("That doesn't look like a UPI reference. Check your payment app.");
@@ -79,9 +88,6 @@ export function PaidClaimForm({
 
   return (
     <form onSubmit={submit} className="space-y-3 text-left" noValidate>
-      {!needsRef ? (
-        <p className="text-center text-sm text-muted-foreground">Paid in your UPI app? Tell the store.</p>
-      ) : null}
       <div className="space-y-2">
         <Label htmlFor="utr">
           UPI reference (UTR){" "}
@@ -91,6 +97,9 @@ export function PaidClaimForm({
           id="utr"
           inputMode="text"
           autoComplete="off"
+          autoCapitalize="characters"
+          autoCorrect="off"
+          spellCheck={false}
           value={upiRef}
           onChange={(e) => {
             setUpiRef(e.target.value);
@@ -98,11 +107,17 @@ export function PaidClaimForm({
           }}
           maxLength={30}
           placeholder="12-digit UTR"
-          aria-describedby="utr-hint"
+          aria-describedby={error ? "utr-error utr-hint" : "utr-hint"}
           aria-invalid={error ? true : undefined}
           aria-required={needsRef || undefined}
-          className="h-11 font-mono"
+          className="h-11 font-mono aria-invalid:border-destructive"
         />
+        {error ? (
+          <p id="utr-error" role="alert" className="flex items-start gap-1.5 text-sm font-medium text-destructive">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>{error}</span>
+          </p>
+        ) : null}
         <p id="utr-hint" className="text-xs text-muted-foreground">
           {needsRef
             ? "Find it in your UPI app under the payment details."
@@ -113,7 +128,12 @@ export function PaidClaimForm({
         type="submit"
         disabled={submitting}
         aria-busy={submitting}
-        className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
+        className={cn(
+          "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-6 text-base font-bold focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60",
+          claimed
+            ? "bg-primary text-primary-foreground shadow-md"
+            : "border border-primary/40 bg-background text-primary hover:bg-primary/5",
+        )}
       >
         {submitting ? (
           <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
@@ -123,11 +143,6 @@ export function PaidClaimForm({
       {!claimed ? (
         <p className="text-center text-xs text-muted-foreground">
           The store checks its UPI app and confirms. Tapping this does not mark the order paid.
-        </p>
-      ) : null}
-      {error ? (
-        <p role="alert" className="text-sm font-medium text-destructive">
-          {error}
         </p>
       ) : null}
     </form>

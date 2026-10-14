@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("public surfaces", () => {
-  test("landing page renders hero + Bharat badge + pricing teaser", async ({ page }) => {
+  test("landing page renders hero + product badge + sign-up CTA", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveTitle(/AwaazOS/i);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText(/Bol\.\s*Bill\.\s*Becho/i);
-    await expect(page.getByText(/Bharat AI/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(/pre-orders/i);
+    await expect(page.getByText(/IntelliForge AI/i).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /sign in/i }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /(get started|sign up)/i }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /start 30 days free/i }).first()).toBeVisible();
   });
 
   test("landing page offers Install app, with written steps when the browser has no prompt", async ({ page }) => {
@@ -24,7 +24,11 @@ test.describe("public surfaces", () => {
     await expect(page.getByRole("heading", { level: 1 })).toContainText("30 days free");
     await expect(page.getByText("₹2,990/yr + GST")).toBeVisible();
     await expect(page.getByText(/2 months free/i).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /start 30 days free/i })).toHaveAttribute("href", "/sign-up");
+    // Scoped to <main>: the header carries the same call to action.
+    await expect(page.getByRole("main").getByRole("link", { name: /start 30 days free/i })).toHaveAttribute(
+      "href",
+      "/sign-up",
+    );
     // Copy comes from lib/plan-copy.ts: Starter sells CSV export, and nothing
     // promises staff logins (there is no invite flow — see TODO.md §2).
     await expect(page.getByText(/CSV export/i).first()).toBeVisible();
@@ -76,7 +80,8 @@ test.describe("public surfaces", () => {
   test("sign-up form renders required fields", async ({ page }) => {
     await page.goto("/sign-up");
     await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.getByLabel(/password/i)).toBeVisible();
+    // Exact: the show/hide toggle is labelled "Show password".
+    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
   });
 });
 

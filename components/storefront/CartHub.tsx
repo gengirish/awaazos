@@ -1,6 +1,6 @@
 "use client";
 
-import { ShoppingBag } from "lucide-react";
+import { ShoppingBag, Tag } from "lucide-react";
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from "react";
 
 import { formatINR } from "@/lib/currency";
@@ -27,6 +27,12 @@ export type CartHubEntry = {
   itemCount: number;
   subtotalPaise: number;
   canPay: boolean;
+  /**
+   * One line about this cart's offer: the one applied and/or what one more
+   * item would unlock (`offerCartNoteText`). Shown above the row, where the
+   * buyer is already looking; announced by the cart's own OfferCartNote.
+   */
+  note?: string | null;
   onCheckout: () => void;
 };
 
@@ -46,6 +52,7 @@ export function useCartHubEntry(entry: CartHubEntry & { enabled: boolean }): boo
   const onCheckoutRef = useRef(entry.onCheckout);
   onCheckoutRef.current = entry.onCheckout;
   const { key, label, itemCount, subtotalPaise, canPay, enabled } = entry;
+  const note = entry.note ?? null;
 
   useEffect(() => {
     if (!hub) return;
@@ -53,8 +60,8 @@ export function useCartHubEntry(entry: CartHubEntry & { enabled: boolean }): boo
       hub.remove(key);
       return;
     }
-    hub.set({ key, label, itemCount, subtotalPaise, canPay, onCheckout: () => onCheckoutRef.current() });
-  }, [hub, key, label, itemCount, subtotalPaise, canPay, enabled]);
+    hub.set({ key, label, itemCount, subtotalPaise, canPay, note, onCheckout: () => onCheckoutRef.current() });
+  }, [hub, key, label, itemCount, subtotalPaise, canPay, note, enabled]);
 
   useEffect(() => {
     if (!hub) return;
@@ -135,23 +142,31 @@ export function CartHubProvider({ children }: { children: React.ReactNode }) {
             ) : null}
             <ul className="space-y-2">
               {active.map((e) => (
-                <li key={e.key} className="flex items-center gap-3">
-                  <ShoppingBag className="h-5 w-5 shrink-0" aria-hidden="true" />
-                  <p className="min-w-0 flex-1 text-sm" aria-hidden="true">
-                    <span className="block truncate text-xs text-white/70">{e.label}</span>
-                    <span className="font-semibold">{itemsLabel(e.itemCount)}</span>
-                    <span className="mx-1.5 opacity-60">·</span>
-                    <span className="font-mono font-bold tabular-nums">{formatINR(e.subtotalPaise)}</span>
-                  </p>
-                  <button
-                    type="button"
-                    onClick={e.onCheckout}
-                    disabled={!e.canPay}
-                    aria-label={active.length > 1 ? `Checkout ${e.label}` : "Checkout"}
-                    className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-awaaz-charcoal disabled:opacity-50"
-                  >
-                    Checkout
-                  </button>
+                <li key={e.key}>
+                  {e.note ? (
+                    <p className="mb-1.5 flex items-start gap-1.5 text-xs font-semibold text-white/90" aria-hidden="true">
+                      <Tag className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                      <span className="line-clamp-2">{e.note}</span>
+                    </p>
+                  ) : null}
+                  <div className="flex items-center gap-3">
+                    <ShoppingBag className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    <p className="min-w-0 flex-1 text-sm" aria-hidden="true">
+                      <span className="block truncate text-xs text-white/70">{e.label}</span>
+                      <span className="font-semibold">{itemsLabel(e.itemCount)}</span>
+                      <span className="mx-1.5 opacity-60">·</span>
+                      <span className="font-mono font-bold tabular-nums">{formatINR(e.subtotalPaise)}</span>
+                    </p>
+                    <button
+                      type="button"
+                      onClick={e.onCheckout}
+                      disabled={!e.canPay}
+                      aria-label={active.length > 1 ? `Checkout ${e.label}` : "Checkout"}
+                      className="inline-flex min-h-11 shrink-0 items-center rounded-xl bg-primary px-5 text-sm font-bold text-primary-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-offset-2 focus-visible:ring-offset-awaaz-charcoal disabled:opacity-50"
+                    >
+                      Checkout
+                    </button>
+                  </div>
                 </li>
               ))}
             </ul>

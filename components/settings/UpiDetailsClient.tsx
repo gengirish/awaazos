@@ -181,7 +181,7 @@ export function UpiDetailsClient({
           className={INPUT}
         />
         <p id={upiNameHint} className={cn("text-xs", errors.upiName ? "text-destructive" : "text-muted-foreground")}>
-          {errors.upiName ?? "Customers see this name before they pay. Leave empty to use your stall name."}
+          {errors.upiName ?? "Customers see this name before they pay. Leave empty to use your store name."}
         </p>
       </div>
 

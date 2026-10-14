@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { HelpTopicList } from "@/components/help/HelpTopicList";
 import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
 import { APP_NAV_ICONS } from "@/components/shell/nav-icons";
-import { appNavItemsForRole } from "@/lib/app-nav";
+import { appNavItemsForRole, appTabBarForRole } from "@/lib/app-nav";
 import { HELP_SCREEN_SUMMARY, helpTopicsForRole } from "@/lib/help-guide";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
@@ -41,10 +41,11 @@ export default async function HelpPage() {
 
   const items = appNavItemsForRole(role);
   const screens = items.filter((item) => item.id !== "help");
-  const tabs = items.filter((item) => item.placement === "tab").map((item) => item.label);
+  const bar = appTabBarForRole(role, storePath !== null);
+  const tabs = bar.tabs.map((item) => item.label);
   const behindMore = [
-    ...items.filter((item) => item.placement === "more").map((item) => item.label),
-    ...(storePath ? ["Live store"] : []),
+    ...bar.more.map((item) => item.label),
+    ...(storePath ? ["Live store", "Share store link"] : []),
     "Sign out",
   ];
   const railFoot = storePath ? "Live store and Sign out are" : "Sign out is";
@@ -121,7 +122,7 @@ export default async function HelpPage() {
           <h2 id="help-how-heading" className="mb-2 font-display text-lg font-semibold text-foreground">
             How do I…
           </h2>
-          <HelpTopicList topics={helpTopicsForRole(role)} />
+          <HelpTopicList topics={helpTopicsForRole(role, storePath !== null)} />
         </section>
 
         <section aria-labelledby="help-contact-heading" className="text-sm text-muted-foreground">

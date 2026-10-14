@@ -15,7 +15,7 @@ import {
   type BuyerPrefill,
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
-import { OfferCartNote, OfferChips } from "@/components/storefront/OfferNotes";
+import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { formatINRCompact } from "@/lib/currency";
 import { applyOffers, type ResolvedOffer } from "@/lib/offers";
 import {
@@ -161,6 +161,7 @@ export function DropOrder(props: DropOrderProps) {
     itemCount,
     subtotalPaise: payablePaise,
     canPay,
+    note: offerCartNoteText(appliedOffer?.name ?? null, offered.nudge),
     onCheckout: () => setOpen(true),
     enabled: orderable,
   });
@@ -198,7 +199,10 @@ export function DropOrder(props: DropOrderProps) {
   return (
     <div>
       {orderable ? <OfferChips offers={offers} /> : null}
-      <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs">
+      {/* No box or side padding of its own: the drop's card (DropSection) already
+          pads the rows, and at 360 px a second inset leaves the name no room
+          beside the 72 px photo and the stepper. */}
+      <ul className="divide-y divide-border/50 border-y border-border/50">
         {items.map((item) => {
           const remaining = remainingFor(item);
           const max = maxOrderableQty(remaining, item.perOrderLimit);
@@ -206,15 +210,15 @@ export function DropOrder(props: DropOrderProps) {
           const soldOut = remaining !== null && remaining <= 0;
           const badge = stockLabel(remaining);
           return (
-            <li key={item.id} className="flex items-center gap-3 px-3 py-3 sm:gap-4 sm:px-4">
+            <li key={item.id} className="flex items-center gap-3 py-3 sm:gap-4">
               {item.imageUrl ? (
                 <Image
                   src={item.imageUrl}
                   alt=""
-                  width={48}
-                  height={48}
+                  width={72}
+                  height={72}
                   className={cn(
-                    "h-12 w-12 shrink-0 rounded-xl object-cover ring-1 ring-border/60",
+                    "h-18 w-18 shrink-0 rounded-xl object-cover ring-1 ring-border/60",
                     soldOut && "opacity-50",
                   )}
                 />
@@ -222,7 +226,7 @@ export function DropOrder(props: DropOrderProps) {
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-2xl",
+                    "flex h-18 w-18 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-3xl",
                     soldOut && "opacity-50",
                   )}
                 >
@@ -231,7 +235,7 @@ export function DropOrder(props: DropOrderProps) {
               )}
 
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-[15px] font-semibold text-foreground">{item.name}</span>
+                <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">{item.name}</span>
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
                   <span className="font-mono font-bold tabular-nums text-foreground">
                     {formatINRCompact(item.priceInPaise)}
@@ -273,7 +277,9 @@ export function DropOrder(props: DropOrderProps) {
 
       {orderable && !canPay ? <NoPaymentNotice /> : null}
 
-      {orderable ? <OfferCartNote appliedName={appliedOffer?.name ?? null} nudge={offered.nudge} /> : null}
+      {orderable ? (
+        <OfferCartNote appliedName={appliedOffer?.name ?? null} nudge={offered.nudge} inCartBar={inHub} />
+      ) : null}
 
       {orderable && !inHub ? (
         <CartBar

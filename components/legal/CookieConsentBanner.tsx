@@ -66,17 +66,19 @@ export function CookieConsentBanner() {
     <div
       ref={ref}
       data-cookie-banner=""
-      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/98 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] shadow-lg backdrop-blur-sm print:hidden"
-      role="dialog"
-      aria-live="polite"
+      className="fixed inset-x-0 bottom-0 z-50 border-t border-border bg-background/98 px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] shadow-lg backdrop-blur-sm print:hidden"
+      // A landmark, not a dialog: it takes no focus and blocks nothing.
+      role="region"
       aria-label="Cookie consent"
     >
-      <div className="mx-auto flex max-w-6xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="mx-auto flex max-w-6xl flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-3">
         <p className="text-sm text-muted-foreground">
-          We use essential cookies for authentication and security. Optional analytics/error monitoring cookies help us
-          improve reliability. See our <Link href="/legal/privacy" className="underline">Privacy Policy</Link>.
+          We use cookies to sign you in, and optional ones to find errors.{" "}
+          <Link href="/legal/privacy" className="underline">
+            Privacy
+          </Link>
         </p>
-        <div className="flex gap-2">
+        <div className="grid shrink-0 grid-cols-2 gap-2 sm:flex">
           <Button type="button" variant="outline" size="sm" className="min-h-11" onClick={() => setPref("declined")}>
             Decline optional
           </Button>

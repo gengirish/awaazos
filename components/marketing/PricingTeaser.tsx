@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { MARKETED_PLANS, PLAN_MARKETING } from "@/lib/plan-copy";
@@ -11,7 +12,7 @@ export function PricingTeaser() {
     <section aria-labelledby="pricing-teaser-heading" className="px-4 py-16 sm:px-6 sm:py-20">
       <div className="mx-auto max-w-6xl">
         <h2 id="pricing-teaser-heading" className="font-display text-3xl font-bold text-balance text-awaaz-charcoal sm:text-4xl">
-          One simple plan for every vendor
+          One simple plan
         </h2>
         <p className="mt-3 max-w-2xl text-muted-foreground">
           {PLAN_MARKETING.STARTER.trial}. Then {PLAN_MARKETING.STARTER.price}, or{" "}
@@ -49,7 +50,7 @@ export function PricingTeaser() {
                       : "min-h-11 w-full focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
                   }
                 >
-                  <Link href="/sign-up">Start {tier.trial}</Link>
+                  <Link href="/sign-up">{tier.cta}</Link>
                 </Button>
               </CardFooter>
             </Card>
@@ -58,9 +59,10 @@ export function PricingTeaser() {
         <div className="mt-10 text-center">
           <Link
             href="/pricing"
-            className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-base font-semibold text-awaaz-orange underline-offset-4 outline-hidden hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md px-4 text-base font-semibold text-awaaz-orange underline-offset-4 outline-hidden hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
           >
-            See pricing →
+            See pricing
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
       </div>

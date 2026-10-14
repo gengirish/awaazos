@@ -6,6 +6,8 @@ import {
   Bike,
   CalendarClock,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Clock,
   IndianRupee,
   Loader2,
@@ -19,6 +21,7 @@ import {
 import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   ResponsiveDialog,
   ResponsiveDialogBody,
@@ -34,6 +37,8 @@ import {
   DISPLAY_STATE_LABEL,
   availableOrderActions,
   firstName,
+  markPaidNeedsConfirm,
+  primaryOrderAction,
   whatsappHref,
   type BoardOrder,
   type OrderAction,
@@ -104,6 +109,13 @@ export function OrderCard({
   locked = false,
 }: Props) {
   const [confirmCancel, setConfirmCancel] = useState(false);
+  const [confirmPaid, setConfirmPaid] = useState(false);
+  // Orders that need nothing from the vendor right now are a two-line summary
+  // until she opens them, so a long Confirmed / Delivered list stays scannable.
+  // Per card and on this device only.
+  const [open, setOpen] = useState(false);
+  const collapsible = order.bucket !== "needs_action";
+  const expanded = !collapsible || open;
   const busy = pendingAction !== null || locked;
   const customerLabel = order.customerName?.trim() || "Customer";
   const fs = order.fulfilmentStatus;
@@ -111,6 +123,8 @@ export function OrderCard({
   const isPickup = order.fulfilmentType === "PICKUP";
   const created = new Date(order.createdAt);
   const titleId = `order-${order.id}-title`;
+  const detailsId = `order-${order.id}-details`;
+  const itemCount = order.items.reduce((sum, it) => sum + it.qty, 0);
 
   const actions = availableOrderActions(order, frozen);
   const canConfirm = actions.has("confirm");
@@ -127,20 +141,57 @@ export function OrderCard({
         ? "Picked up"
         : "Delivered";
 
-  // The next step for this order: full width, a little taller on phones.
-  const btn = (action: OrderAction, label: string, icon: ReactNode, variant: "default" | "outline" | "secondary" = "outline") => (
-    <Button
-      type="button"
-      variant={variant}
-      className="min-h-12 flex-1 basis-[45%] text-sm font-semibold md:min-h-11 md:font-medium"
-      disabled={busy}
-      aria-busy={pendingAction === action}
-      onClick={() => onAction(order.id, action)}
-    >
-      {pendingAction === action ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : icon}
-      {label}
-    </Button>
-  );
+  // Exactly one primary button per order (`primaryOrderAction`); the rest are outline.
+  const primary = primaryOrderAction(order, frozen);
+  // "Not received" answers the same question as "Payment received", so it sits beside it.
+  const pairedReject = primary === "mark_paid" && canRejectPayment;
+
+  const run = (action: OrderAction) => {
+    // Money: without a buyer's claim on the card there is nothing to check a stray tap against.
+    if (action === "mark_paid" && markPaidNeedsConfirm(order)) setConfirmPaid(true);
+    else onAction(order.id, action);
+  };
+
+  const BUTTONS: { action: OrderAction; show: boolean; label: string; icon: ReactNode }[] = [
+    { action: "confirm", show: canConfirm, label: "Confirm", icon: <CheckCircle2 aria-hidden /> },
+    { action: "mark_paid", show: canMarkPaid, label: "Payment received", icon: <IndianRupee aria-hidden /> },
+    { action: "reject_payment", show: canRejectPayment, label: "Not received", icon: <XCircle aria-hidden /> },
+    {
+      action: "deliver",
+      show: canDeliver,
+      label: deliverLabel,
+      icon: isPickup ? <ShoppingBag aria-hidden /> : <Bike aria-hidden />,
+    },
+  ];
+  const shown = BUTTONS.filter((b) => b.show);
+  // Primary first, its "Not received" partner next, then the others in their usual order.
+  const rank = (a: OrderAction) => (a === primary ? 0 : pairedReject && a === "reject_payment" ? 1 : 2);
+  const ordered = [...shown].sort((a, b) => rank(a.action) - rank(b.action));
+  const primaryButton = shown.find((b) => b.action === primary) ?? null;
+
+  const btn = ({ action, label, icon }: (typeof BUTTONS)[number]) => {
+    const isPrimary = action === primary;
+    return (
+      <Button
+        key={action}
+        type="button"
+        variant={isPrimary ? "default" : "outline"}
+        className={cn(
+          "flex-1 text-sm",
+          isPrimary ? "min-h-12 font-semibold" : "min-h-11 font-medium",
+          // The next step gets the full row, unless it shares it with "Not received".
+          isPrimary && !pairedReject ? "basis-full" : "basis-[45%]",
+          pairedReject && action === "reject_payment" && "min-h-12",
+        )}
+        disabled={busy}
+        aria-busy={pendingAction === action}
+        onClick={() => run(action)}
+      >
+        {pendingAction === action ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden /> : icon}
+        {label}
+      </Button>
+    );
+  };
 
   return (
     <article
@@ -180,13 +231,15 @@ export function OrderCard({
             )}
           </h3>
           {/* Two short lines on a phone (bill, then time) instead of one that wraps mid-number. */}
-          <p className="font-mono text-xs text-muted-foreground">
-            <span className="block sm:inline">{order.billNumber}</span>
-            <span className="hidden sm:inline"> · </span>
-            <span className="block sm:inline">
-              {formatIstDate(created)} {formatIstTime(created)}
-            </span>
-          </p>
+          {expanded && (
+            <p className="font-mono text-xs text-muted-foreground">
+              <span className="block sm:inline">{order.billNumber}</span>
+              <span className="hidden sm:inline"> · </span>
+              <span className="block sm:inline">
+                {formatIstDate(created)} {formatIstTime(created)}
+              </span>
+            </p>
+          )}
         </div>
         <div className="shrink-0 text-right">
           <p className="font-mono text-lg font-bold tabular-nums">{formatINR(order.totalPaise)}</p>
@@ -194,37 +247,102 @@ export function OrderCard({
         </div>
       </header>
 
-      <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <p
-          className={cn(
-            "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
-            STATE_STYLE[order.displayState],
-          )}
-        >
-          <StateIcon state={order.displayState} />
-          {DISPLAY_STATE_LABEL[order.displayState]}
-          {fs === "CONFIRMED" && order.displayState !== "DELIVERED" && " · Confirmed"}
-          {fs === "PLACED" && order.displayState !== "EXPIRED" && " · New"}
-        </p>
-        {source && (
-          <p className="inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground">
-            {source.kind === "drop" ? (
-              <CalendarClock className="h-4 w-4 shrink-0" aria-hidden />
+      {/*
+        The second line of a collapsed card, and its 44px open / close control:
+        status (icon + words), how many items, how it is handed over, and a flag
+        when the buyer left a note, so nothing important hides behind the fold.
+      */}
+      {collapsible && (
+        <div className="-mx-2 mt-1 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            aria-expanded={expanded}
+            aria-controls={detailsId}
+            onClick={() => setOpen((v) => !v)}
+            className="flex min-h-11 min-w-0 flex-1 basis-48 items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {expanded ? (
+              <span className="min-w-0 flex-1 text-muted-foreground">Hide details</span>
             ) : (
-              <UtensilsCrossed className="h-4 w-4 shrink-0" aria-hidden />
+              <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5">
+                <StateIcon state={order.displayState} />
+                <span className="font-semibold">{DISPLAY_STATE_LABEL[order.displayState]}</span>
+                <span className="text-muted-foreground">
+                  · {itemCount} {itemCount === 1 ? "item" : "items"} · {isPickup ? "Pickup" : "Delivery"}
+                </span>
+                {order.notes && (
+                  <span className="inline-flex items-center gap-1 font-semibold text-destructive">
+                    <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
+                    Has a note
+                  </span>
+                )}
+                <span className="sr-only">. Show details</span>
+              </span>
             )}
-            <span className="sr-only">From: </span>
-            <span className="truncate">{source.label}</span>
-          </p>
-        )}
-      </div>
+            {expanded ? (
+              <ChevronUp className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+            ) : (
+              <ChevronDown className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
+            )}
+          </button>
+          {/*
+            Handover day: the next step stays one tap away on a collapsed card. A
+            sibling of the toggle, never inside it; same handler (and the same
+            "mark paid?" check) as the full button.
+          */}
+          {!expanded && primaryButton && (
+            <Button
+              type="button"
+              className="mr-2 min-h-11 shrink-0 text-sm font-semibold"
+              disabled={busy}
+              aria-busy={pendingAction === primaryButton.action}
+              onClick={() => run(primaryButton.action)}
+            >
+              {pendingAction === primaryButton.action ? (
+                <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                primaryButton.icon
+              )}
+              {primaryButton.label}
+            </Button>
+          )}
+        </div>
+      )}
 
-      {order.displayState === "PAYMENT_SUBMITTED" && (
-        <div className="mt-3 rounded-md border border-amber-500/60 bg-amber-50 p-3 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
-          {order.upiRef ? (
-            <>
-              <p className="text-xs font-medium">Customer says they paid. Match this UTR in your UPI app:</p>
-              <p className="mt-1 select-all break-all font-mono text-lg font-bold tracking-wider">{order.upiRef}</p>
+      <div id={detailsId} hidden={!expanded}>
+        {expanded && (
+          <>
+            <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              <p
+                className={cn(
+                  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
+                  STATE_STYLE[order.displayState],
+                )}
+              >
+                <StateIcon state={order.displayState} />
+                {DISPLAY_STATE_LABEL[order.displayState]}
+                {fs === "CONFIRMED" && order.displayState !== "DELIVERED" && " · Confirmed"}
+                {fs === "PLACED" && order.displayState !== "EXPIRED" && " · Not confirmed yet"}
+              </p>
+              {source && (
+                <p className="inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground">
+                  {source.kind === "drop" ? (
+                    <CalendarClock className="h-4 w-4 shrink-0" aria-hidden />
+                  ) : (
+                    <UtensilsCrossed className="h-4 w-4 shrink-0" aria-hidden />
+                  )}
+                  <span className="sr-only">From: </span>
+                  <span className="truncate">{source.label}</span>
+                </p>
+              )}
+            </div>
+
+            {order.displayState === "PAYMENT_SUBMITTED" && (
+              <div className="mt-3 rounded-md border border-amber-500/60 bg-amber-50 p-3 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                {order.upiRef ? (
+                  <>
+                    <p className="text-xs font-medium">Customer says they paid. Match this UTR in your UPI app:</p>
+                    <p className="mt-1 select-all break-all font-mono text-lg font-bold tracking-wider">{order.upiRef}</p>
             </>
           ) : (
             <p className="text-xs font-medium">
@@ -282,21 +400,8 @@ export function OrderCard({
         </p>
       </div>
 
-      {/* Next step first: the buttons that move the order forward, full width. */}
-      {(canConfirm || canMarkPaid || canRejectPayment || canDeliver) && (
-        <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">
-          {canConfirm && btn("confirm", "Confirm", <CheckCircle2 aria-hidden />, "default")}
-          {canMarkPaid &&
-            btn(
-              "mark_paid",
-              "Payment received",
-              <IndianRupee aria-hidden />,
-              order.displayState === "PAYMENT_SUBMITTED" ? "default" : "outline",
-            )}
-          {canRejectPayment && btn("reject_payment", "Not received", <XCircle aria-hidden />)}
-          {canDeliver && btn("deliver", deliverLabel, isPickup ? <ShoppingBag aria-hidden /> : <Bike aria-hidden />, "secondary")}
-        </div>
-      )}
+      {/* Next step first: one primary button, the other ways forward in outline under it. */}
+      {ordered.length > 0 && <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">{ordered.map(btn)}</div>}
 
       {order.customerPhone && (
         <div className="mt-2 flex gap-2">
@@ -362,6 +467,24 @@ export function OrderCard({
           )}
         </div>
       )}
+          </>
+        )}
+      </div>
+
+      <ConfirmDialog
+        open={confirmPaid}
+        onOpenChange={setConfirmPaid}
+        title={order.customerName?.trim() ? `Mark ${customerLabel}\u2019s order paid?` : "Mark this order paid?"}
+        description={`${order.billNumber} · ${formatINR(order.totalPaise)}. ${
+          order.paymentMethod === "CASH"
+            ? "Only do this after you have the cash in hand."
+            : "Only do this after you have seen the money in your UPI app."
+        }`}
+        confirmLabel="Yes, mark paid"
+        cancelLabel="Go back"
+        destructive={false}
+        onConfirm={() => onAction(order.id, "mark_paid")}
+      />
 
       <ResponsiveDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
         <ResponsiveDialogContent>

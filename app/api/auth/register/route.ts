@@ -132,7 +132,11 @@ export async function POST(req: Request) {
           continue;
         }
         return NextResponse.json(
-          { error: "An account or stall with this email or URL slug already exists." },
+          {
+            error: slugCollision
+              ? "Could not create a store link from that name. Try a different store name."
+              : "An account with this email already exists.",
+          },
           { status: 409 },
         );
       }
@@ -141,5 +145,5 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ error: "Could not allocate a unique stall URL. Try a different stall name." }, { status: 409 });
+  return NextResponse.json({ error: "Could not create a store link from that name. Try a different store name." }, { status: 409 });
 }

@@ -6,7 +6,9 @@ import { MARKETED_PLANS, PLAN_MARKETING, YEARLY_MONTHS_FREE, type MarketedPlan }
 
 function allCopy(plan: MarketedPlan): string {
   const c = PLAN_MARKETING[plan];
-  return [c.label, c.price, c.yearlyPrice, c.yearlyNote, c.trial, c.teaser, c.summary, ...c.bullets].join("\n");
+  return [c.label, c.price, c.yearlyPrice, c.yearlyNote, c.trial, c.cta, c.ctaNote, c.teaser, c.summary, ...c.bullets].join(
+    "\n",
+  );
 }
 
 describe("plan marketing copy", () => {
@@ -24,9 +26,13 @@ describe("plan marketing copy", () => {
     expect(copy.price).toBe(`${formatINRCompact(PLAN_PRICES_PAISE[plan])}/mo + GST`);
     expect(copy.yearlyPrice).toBe(`${formatINRCompact(yearlyPaise)}/yr + GST`);
     expect(copy.trial).toBe(`${TRIAL_DAYS} days free`);
+    expect(copy.cta).toBe(`Start ${TRIAL_DAYS} days free`);
+    expect(copy.ctaNote).toBe(`No card needed. Then ${formatINRCompact(PLAN_PRICES_PAISE[plan])}/month + GST.`);
 
     expect(copy.bullets).toContain(
-      limits.monthlyTxnCap === null ? "Unlimited bills" : `${limits.monthlyTxnCap} bills a month`,
+      limits.monthlyTxnCap === null
+        ? "Unlimited orders and bills"
+        : `${limits.monthlyTxnCap} orders and bills a month`,
     );
     expect(copy.bullets).toContain(`${limits.analyticsDays} days of sales analytics`);
 
@@ -68,6 +74,13 @@ describe("plan marketing copy", () => {
 
   it.each(MARKETED_PLANS)("%s copy only offers the voice languages in the picker", (plan) => {
     expect(allCopy(plan)).not.toMatch(/telugu|kannada|tamil/i);
+  });
+
+  it("leads with pre-orders, not the counter (docs/ICP.md)", () => {
+    const copy = allCopy("STARTER");
+    expect(copy).toMatch(/store link/i);
+    expect(copy).toMatch(/drops/i);
+    expect(copy).not.toMatch(/stall|busy counter/i);
   });
 
   it("Starter mentions CSV iff PLAN_LIMITS.STARTER.csvExport", () => {

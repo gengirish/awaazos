@@ -1,15 +1,17 @@
-import { CheckCircle2, ChevronRight, CircleDashed, ListChecks, MinusCircle } from "lucide-react";
+import { CheckCircle2, ChevronRight, CircleDashed, MinusCircle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
 import { LegacyAnchorRedirect } from "@/components/settings/LegacyAnchorRedirect";
 import { SETTINGS_SECTIONS, type SettingsSectionId } from "@/components/settings/sections";
+import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
 import { trialDaysLeft } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { isPushConfigured } from "@/lib/push";
 import { countVendorPushDevices } from "@/lib/push-devices";
 import {
+  checklistForRole,
   notificationsStatus,
   ordersStatus,
   paymentsStatus,
@@ -66,10 +68,10 @@ function StatusLine({ status }: { status: SectionStatus }) {
 }
 
 export default async function SettingsHubPage() {
-  const { vendor, user, access } = await requireSettingsContext();
+  const { vendor, user, access, isOwner, canManage } = await requireSettingsContext();
 
   const pushConfigured = isPushConfigured();
-  const [settings, availableItemCount, pushDeviceCount, activeOfferCount] = await Promise.all([
+  const [settings, availableItemCount, pushDeviceCount, activeOfferCount, dropCount] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: vendor.id },
       select: {
@@ -89,6 +91,7 @@ export default async function SettingsHubPage() {
     prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
     pushConfigured ? countVendorPushDevices(vendor.id) : Promise.resolve(0),
     prisma.offer.count({ where: { vendorId: vendor.id, isActive: true } }),
+    prisma.drop.count({ where: { vendorId: vendor.id } }),
   ]);
 
   const snapshot: SettingsSnapshot = {
@@ -108,6 +111,7 @@ export default async function SettingsHubPage() {
           ? { kind: "locked" }
           : undefined,
     availableItemCount,
+    dropCount,
     pushConfigured,
     pushDeviceCount,
   };
@@ -126,44 +130,25 @@ export default async function SettingsHubPage() {
     voice: voiceStatus(snapshot),
     billing: planStatus(snapshot),
   };
-  const checklist = setupChecklist(snapshot);
+  // Same rule and card as /orders and /pos: only steps this role can act on.
+  const checklist = checklistForRole(
+    setupChecklist(snapshot),
+    isOwner ? "OWNER" : canManage ? "MANAGER" : "CASHIER",
+  );
 
   return (
     <>
       <LegacyAnchorRedirect />
       <header className="mb-4">
         <h1 className="font-display text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground">Manage your stall, online store and plan.</p>
+        <p className="text-sm text-muted-foreground">Manage your store, payments and plan.</p>
       </header>
 
-      {checklist.length > 0 ? (
-        <section
-          aria-labelledby="setup-checklist-heading"
-          className="mb-4 rounded-lg border border-amber-500/60 bg-amber-50 p-4 text-amber-950 dark:bg-amber-950/40 dark:text-amber-50"
-        >
-          <h2 id="setup-checklist-heading" className="flex items-center gap-2 font-display text-base font-semibold">
-            <ListChecks className="h-5 w-5" aria-hidden="true" />
-            Setup checklist: start taking online orders
-          </h2>
-          <ul className="mt-2 space-y-1">
-            {checklist.map((item) => (
-              <li key={item.id}>
-                <Link
-                  href={item.href}
-                  className="flex min-h-11 items-center justify-between gap-3 rounded-md px-2 text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <span className="flex items-center gap-2">
-                    <CircleDashed className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {item.text}
-                  </span>
-                  <span className="sr-only">{item.linkText}</span>
-                  <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <SetupChecklistCard
+        items={checklist}
+        store={snapshot.publishStorefront ? { slug: vendor.slug, name: vendor.name } : null}
+        className="mb-4"
+      />
 
       <nav aria-label="Settings sections">
         <ul className="divide-y divide-border overflow-hidden rounded-lg border bg-card">

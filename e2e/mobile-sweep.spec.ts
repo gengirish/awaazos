@@ -397,10 +397,10 @@ test.describe("mobile baseline sweep", () => {
     test("home — first visit, cookie banner showing", async ({ page }, testInfo) => {
       const s = await prepare(page, { signedIn: false, cookieBanner: true });
       await page.goto("/", { timeout: 120_000 });
-      await expect(page.getByRole("dialog", { name: "Cookie consent" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Cookie consent" })).toBeVisible();
       await settle(page);
       await judge(page, testInfo, s, "/ (cookie banner)", OVERLAY_VIEWPORT.width, {
-        rootSelector: '[role="dialog"]',
+        rootSelector: "[data-cookie-banner]",
         fullPage: false,
       });
     });

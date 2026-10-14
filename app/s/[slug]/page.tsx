@@ -19,9 +19,9 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { CartHubProvider } from "@/components/storefront/CartHub";
-import { CustomerSignOut } from "@/components/storefront/CustomerProfile";
 import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
 import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
+import { RecentOrderLink } from "@/components/storefront/RecentOrderLink";
 import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
@@ -100,16 +100,22 @@ export const runtime = "nodejs";
  * Optional buyer sign-in (lib/customer-auth.ts): the `awz_cust` session, when
  * present, only adds a header link and checkout prefill from the buyer's OWN
  * Customer row. It never widens the vendor `select` above. Guests see the
- * page exactly as before, plus a "Sign in" link.
+ * page exactly as before, plus a "Sign in" link. Signing out lives on the
+ * account page only, so the pill row fits a 360 px phone.
+ *
+ * `RecentOrderLink` (client, device-local) adds "Your recent order" to that
+ * pill row for a buyer who ordered from this device; nothing about it is read
+ * or rendered on the server.
  */
 
 type StorefrontVendor = NonNullable<Awaited<ReturnType<typeof loadStorefront>>>;
 
 /**
- * Top padding that drops the 88 px logo so it straddles the banner's bottom
- * edge: banner height (160 / 224 px) − pill row above (56 px) − half the logo.
+ * Top padding that drops the logo (64 px, 88 px from `sm`) so it straddles the
+ * banner's bottom edge: banner height (160 / 224 px) − pill row above (56 px)
+ * − half the logo.
  */
-const BANNER_LOGO_OFFSET = "pt-[60px] sm:pt-[124px]";
+const BANNER_LOGO_OFFSET = "pt-[72px] sm:pt-[124px]";
 
 /** Header contact pills (WhatsApp chat, Instagram profile). */
 const CONTACT_LINK =
@@ -237,7 +243,7 @@ function menuFulfilmentPhrase(mode: FulfilmentMode): string {
 }
 
 function stallTypeLabel(value: StorefrontVendor["stallType"]): string {
-  return STALL_TYPES.find((t) => t.value === value)?.label ?? "Stall";
+  return STALL_TYPES.find((t) => t.value === value)?.label ?? "Store";
 }
 
 type StorefrontItems = StorefrontVendor["menuItems"];
@@ -269,21 +275,23 @@ function MenuRow({ item }: { item: StorefrontItems[number] }) {
         <Image
           src={item.imageUrl}
           alt=""
-          width={48}
-          height={48}
-          className="h-12 w-12 shrink-0 rounded-xl object-cover ring-1 ring-border/60"
+          width={72}
+          height={72}
+          className="h-18 w-18 shrink-0 rounded-xl object-cover ring-1 ring-border/60"
         />
       ) : (
         <span
           aria-hidden="true"
-          className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-2xl"
+          className="flex h-18 w-18 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-3xl"
         >
           {item.emoji}
         </span>
       )}
 
       <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="truncate text-[15px] font-semibold text-foreground">{item.name}</span>
+        <span className="line-clamp-2 min-w-0 text-[15px] font-semibold leading-snug text-foreground">
+          {item.name}
+        </span>
         {item.isPopular ? (
           <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
             <Sparkles className="h-3 w-3" aria-hidden="true" />
@@ -390,7 +398,7 @@ function DropSection({
   return (
     <section
       aria-labelledby={headingId}
-      className="rounded-3xl border border-primary/25 bg-linear-to-b from-primary/8 to-background p-4 shadow-xs sm:p-5"
+      className="rounded-3xl border border-primary/25 bg-linear-to-b from-primary/8 to-background px-3 py-4 shadow-xs sm:p-5"
     >
       <p className="text-xs font-bold uppercase tracking-wide text-primary">
         Pre-order · {formatDropDayLabel(drop.date)}
@@ -514,7 +522,6 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
   const rawTheme = vendor.settings?.theme ?? "orange";
   const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
-  const itemCount = menuItems.length;
 
   const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
   // Everyday-menu rows only take orders (and carry row ids) with menu ordering on.
@@ -542,12 +549,15 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   const prefill: BuyerPrefill | null = customer
     ? { name: customer.name, phone: customer.phone, address: customer.savedAddress }
     : null;
-  const hasOpenDrop = dropViews.some((d) => d.visibility === "open" && !d.soldOut);
+  // The drop a buyer has least time left to order from drives the header CTA.
+  const nextClosing = dropViews
+    .filter((d) => d.visibility === "open" && !d.soldOut)
+    .reduce<Date | null>((min, d) => (!min || d.drop.closesAt < min ? d.drop.closesAt : min), null);
   const payment = {
     upi: !!vendor.upiId,
     cod: vendor.settings?.acceptPayOnDelivery ?? false,
   };
-  // Opted in with a usable number → checkout also offers "send on WhatsApp". Only the boolean reaches the client.
+  // Opted in with a usable number → checkout also offers "Also send my order to the store on WhatsApp". Only the boolean reaches the client.
   const whatsapp = buyerWhatsappNumber(vendor.settings) !== null;
   // Header contact links. WhatsApp has its own opt-in (every visitor sees it, not only buyers).
   const storeWhatsapp = storeWhatsappNumber(vendor.settings);
@@ -602,17 +612,18 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
         )}
 
         <div className="relative mx-auto flex max-w-2xl items-center justify-end gap-2 px-4 pt-3 sm:px-6">
+          {/* Appears after mount, left of the right-aligned pills: nothing else moves. */}
+          <RecentOrderLink slug={vendor.slug} />
           <ShareStoreButton vendorName={vendor.name} slug={vendor.slug} />
           <Link
             href={`/s/${vendor.slug}/account`}
-            className="inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
             <span className="truncate">
               {customer ? `Hi${customer.name ? `, ${customer.name.split(/\s+/)[0]}` : ""} · My orders` : "Sign in"}
             </span>
           </Link>
-          {customer ? <CustomerSignOut variant="pill" /> : null}
         </div>
 
         <div
@@ -627,18 +638,18 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                 alt=""
                 width={88}
                 height={88}
-                className="h-[88px] w-[88px] shrink-0 rounded-2xl bg-background object-cover shadow-lg ring-4 ring-background"
+                className="h-16 w-16 shrink-0 rounded-2xl bg-background object-cover shadow-lg ring-4 ring-background sm:h-[88px] sm:w-[88px]"
               />
             ) : (
               <div
                 aria-hidden="true"
-                className="flex h-[88px] w-[88px] shrink-0 items-center justify-center rounded-2xl bg-primary font-display text-4xl font-bold text-primary-foreground shadow-lg ring-4 ring-background"
+                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary font-display text-3xl font-bold text-primary-foreground shadow-lg ring-4 ring-background sm:h-[88px] sm:w-[88px] sm:text-4xl"
               >
                 {vendor.name.slice(0, 1).toUpperCase()}
               </div>
             )}
 
-            <h1 className="mt-4 font-display text-3xl font-bold leading-tight tracking-tight text-awaaz-charcoal sm:text-4xl sm:leading-10">
+            <h1 className="mt-3 font-display text-3xl font-bold leading-tight tracking-tight text-awaaz-charcoal sm:text-4xl sm:leading-10">
               {vendor.name}
             </h1>
 
@@ -677,20 +688,13 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
               </ul>
             ) : null}
 
-            {itemCount > 0 ? (
-              <p className="mt-3 text-sm text-muted-foreground">
-                {itemCount} {itemCount === 1 ? "item" : "items"} · {categories.length}{" "}
-                {categories.length === 1 ? "category" : "categories"}
-              </p>
-            ) : null}
-
-            {hasOpenDrop ? (
+            {nextClosing ? (
               <a
                 href="#drops"
-                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="mt-5 inline-flex min-h-11 max-w-full items-center gap-2 rounded-full bg-primary px-6 py-2 text-left text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 motion-reduce:transition-none"
               >
-                <ShoppingBag className="h-4 w-4" aria-hidden="true" />
-                Pre-order now
+                <ShoppingBag className="h-4 w-4 shrink-0" aria-hidden="true" />
+                Pre-order · closes {formatIstDeadline(nextClosing, now)}
               </a>
             ) : menuOrdering ? (
               <a
@@ -775,7 +779,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             dropViews.length > 0 ? null : (
               <EmptyState
                 className="rounded-2xl bg-background px-4 py-12"
-                description="This stall has not published any items yet. Please check back soon."
+                description="This store has not published any items yet. Please check back soon."
               />
             )
           ) : (
@@ -864,15 +868,15 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
           {upiLink && (menuOrdering || menuHidden) ? (
             /* Menu ordering on (or the menu handed over to an open drop): a cart
                gives the buyer an exact amount, so the open-amount QR is demoted
-               to a collapsed fallback for paying at the counter instead of
-               competing with checkout. */
+               to a collapsed fallback for paying the seller in person instead
+               of competing with checkout. */
             <details
               id="pay"
               className="group mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs"
             >
               <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
                 <QrCode className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                <span className="flex-1">Paying at the counter? Show the UPI QR</span>
+                <span className="flex-1">Paying the seller in person? Show the UPI QR</span>
                 <ChevronDown
                   className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
                   aria-hidden="true"
@@ -880,9 +884,9 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
               </summary>
               <div className="border-t border-border/50 px-4 py-5 text-center sm:px-6">
                 <h3 id="pay-heading" className="sr-only">
-                  Scan to pay at the counter
+                  Scan to pay the seller in person
                 </h3>
-                <p className="text-sm text-muted-foreground">Any UPI app. Enter the amount the vendor tells you.</p>
+                <p className="text-sm text-muted-foreground">Any UPI app. Enter the amount the seller tells you.</p>
                 <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
                   <UpiQrImage src={qrSmall} alt={`UPI QR code to pay ${payeeName}`} size={180} />
                 </div>
@@ -913,7 +917,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                   Scan to pay
                 </h3>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Any UPI app. Enter the amount the vendor tells you.
+                  Any UPI app. Enter the amount the seller tells you.
                 </p>
 
                 <div className="mx-auto mt-5 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
@@ -947,8 +951,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             className="group inline-flex min-h-11 items-center rounded-full"
           >
             {/* The link is the 44px tap target; the pill inside keeps its size. */}
-            <span className="inline-flex items-center gap-2 rounded-full border border-border/60 bg-background px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors group-hover:border-primary/40 group-hover:text-primary">
-              <span aria-hidden="true">🎙️</span>
+            <span className="inline-flex items-center rounded-full border border-border/60 bg-background px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors group-hover:border-primary/40 group-hover:text-primary">
               Billing by AwaazOS — Bol. Bill. Becho.
             </span>
           </Link>

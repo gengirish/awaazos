@@ -17,7 +17,8 @@ import { loadCheckout, type RazorpayOrderSuccess } from "@/lib/razorpay-checkout
  *                                with the vendor's secret) → router.refresh().
  *
  * The per-vendor webhook marks the order paid independently, so if step 3 fails
- * (flaky network) the buyer is told to refresh rather than pay again.
+ * (flaky network) the buyer is pointed at the order page's "Check for update"
+ * button (OrderRefresh) rather than told to pay again.
  *
  * `prefillName` / `prefillContact` are the buyer's own details on the buyer's
  * own order page; they go only to Razorpay Checkout, never to a log.
@@ -34,9 +35,9 @@ type StartPaymentData = {
 
 const START_ERRORS: Record<string, string> = {
   order_expired: "This order's hold has expired, so the items were released. Please place the order again.",
-  not_awaiting_payment: "This order isn't waiting for payment any more. Refresh to see its status.",
+  not_awaiting_payment: "This order isn't waiting for payment any more. Tap “Check for update” above to see its status.",
   online_payment_unavailable: "Online payment isn't available for this store right now. Please pay by UPI below.",
-  payment_processing: "Your payment went through — we're confirming it. Refresh in a minute.",
+  payment_processing: "Your payment went through — we're confirming it. Tap “Check for update” above in a minute.",
   razorpay_unavailable: "Couldn't reach the payment service. Please try again, or pay by UPI below.",
   rate_limited: "Too many attempts. Please wait a minute and try again.",
 };
@@ -81,13 +82,13 @@ export function RazorpayPayButton({
         });
       } else {
         setMessage({
-          text: "Your payment went through. We're still confirming it — refresh this page in a minute. Please don't pay again.",
+          text: "Your payment went through. We're still confirming it — tap “Check for update” above in a minute. Please don't pay again.",
           tone: "info",
         });
       }
     } catch {
       setMessage({
-        text: "Your payment went through. We're still confirming it — refresh this page in a minute. Please don't pay again.",
+        text: "Your payment went through. We're still confirming it — tap “Check for update” above in a minute. Please don't pay again.",
         tone: "info",
       });
     } finally {

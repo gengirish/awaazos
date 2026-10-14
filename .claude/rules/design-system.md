@@ -10,17 +10,42 @@ paths: ["**/*.tsx","**/*.css"]
 ## Brand
 
 - **Tagline:** "Bol. Bill. Becho." (always Latin script in UI; आवाज़ in logo only)
-- **Primary:** saffron orange `#FF6B00` → CSS var `--primary`
+- **Brand colour:** saffron orange `#FF6B00` — the logo and brand artwork only
+  (`brand-saffron`). White text on it is 2.9:1, so it is never a UI fill.
+- **Primary (UI fills, links, focus ring):** `--primary: 25 100% 37%` (`#BD4F00`),
+  the same hue darkened until white text passes AA (4.93:1). `--ring` and
+  `--awaaz-orange` carry the same value.
 - **Accent:** deep charcoal `#1A1A1A` (text)
 - **Surface:** white `#FFFFFF` / Slate-50 `#F8FAFC`
-- **Success:** green `#16A34A` (paid status)
-- **Warning:** amber `#F59E0B` (pending payment)
-- **Danger:** red `#DC2626` (failed)
+- **Success:** `--success: 142 72% 29%` → `bg-success` / `text-success` (paid status)
+- **Warning:** `--warning: 35 92% 33%` → `bg-warning` / `text-warning` (pending payment)
+- **Danger:** `--destructive` → `bg-destructive` / `text-destructive` (failed)
+
+Status tokens come with `-foreground` partners (`text-success-foreground` on
+`bg-success`) and `.dark` values. Both pass 4.5:1 as text on white and as a fill
+under their foreground (success 5.07:1, warning 4.95:1). Use them for new work
+instead of raw palette classes (`text-green-700`, `bg-amber-600`); existing
+screens still carry raw classes and move over as they are touched.
 
 ## Vendor theme override
 
-`VendorSettings.theme` ∈ `orange | green | blue | purple` swaps `--primary`
-via CSS variables — never hardcode hex in components.
+`VendorSettings.theme` swaps `--primary` and `--ring` through a `[data-theme]`
+block in `app/globals.css` — never hardcode hex in components. The values with
+a block are `green | amber | red | blue | purple`; `orange` (the column default)
+and anything unknown stay on the default primary. Only the storefront pages
+(`/s/[slug]` and below, `BRAND_THEMES`) apply it, and no API route or Settings
+screen writes the column yet.
+
+Every theme primary must keep white text at 4.5:1 or better:
+
+| Theme | `--primary` | White text |
+|---|---|---|
+| orange (default) | `25 100% 37%` | 4.93:1 |
+| green | `142 72% 29%` | 5.07:1 |
+| amber | `32 95% 33%` | 5.21:1 |
+| red | `0 72% 51%` | 4.80:1 |
+| blue | `221 83% 53%` | 5.20:1 |
+| purple | `262 83% 58%` | 5.67:1 |
 
 ## Typography
 

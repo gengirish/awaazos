@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ReceiptText, SlidersHorizontal } from "lucide-react";
 
+import { PaymentMethodBadge, PaymentStatusBadge } from "@/components/transactions/payment-badges";
 import { TransactionCardList } from "@/components/transactions/TransactionCardList";
 import { TransactionDetailDrawer, type TransactionDetailModel } from "@/components/transactions/TransactionDetailDrawer";
 import {
@@ -12,7 +13,6 @@ import {
   TransactionFilterFields,
   type TransactionFilterValues,
 } from "@/components/transactions/TransactionFilterFields";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
@@ -304,21 +304,12 @@ export function TransactionsTable({
                   <TableCell className="whitespace-nowrap text-sm">{formatIstDateTime(row.createdAt)}</TableCell>
                   <TableCell className="text-right tabular-nums">{itemQtySum(row)}</TableCell>
                   <TableCell className="text-right font-medium tabular-nums">{formatINR(row.totalPaise)}</TableCell>
+                  {/* Same badges as the phone list: words, not the stored enum. */}
                   <TableCell>
-                    <Badge variant="outline">{row.paymentMethod}</Badge>
+                    <PaymentMethodBadge method={row.paymentMethod} />
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={
-                        row.paymentStatus === "PAID"
-                          ? "default"
-                          : row.paymentStatus === "PENDING"
-                            ? "secondary"
-                            : "destructive"
-                      }
-                    >
-                      {row.paymentStatus}
-                    </Badge>
+                    <PaymentStatusBadge status={row.paymentStatus} />
                   </TableCell>
                 </TableRow>
               ))

@@ -1,11 +1,14 @@
 import { redirect } from "next/navigation";
 
+import { BillingAccessNotice } from "@/components/billing/TrialNotice";
 import { OrdersBoard } from "@/components/drops/orders/OrdersBoard";
 import { InstallBanner } from "@/components/pwa/InstallPrompt";
+import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
 import { loadOrdersBoard } from "@/lib/drops-board-server";
 import { getOrderSignal } from "@/lib/drops-signal";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { loadSetupChecklist } from "@/lib/setup-checklist-server";
 
 export const dynamic = "force-dynamic";
 
@@ -34,16 +37,33 @@ export default async function OrdersPage(props: Props) {
   const [settings, board] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: ctx.vendor.id },
-      select: { acceptMenuOrders: true, menuFulfilmentMode: true },
+      select: {
+        acceptMenuOrders: true,
+        menuFulfilmentMode: true,
+        publishStorefront: true,
+        acceptPayOnDelivery: true,
+      },
     }),
     loadOrdersBoard(ctx.vendor.id, { pinDropId: dropId }),
   ]);
+  // Why no orders arrive yet, for staff who can fix it. Nothing once set up.
+  const setup = await loadSetupChecklist({ vendor: ctx.vendor, role: ctx.staff.role, known: { settings } });
 
   return (
     <main id="main" className="bg-background p-4 pb-16 md:p-6">
       <a href="#orders-list" className="sr-only focus:not-sr-only">
         Skip to orders
       </a>
+      {/*
+        Trial countdown, or "customers can't order" once locked. The board below
+        stays usable either way: a locked vendor still works existing orders.
+      */}
+      <BillingAccessNotice
+        access={ctx.access}
+        isOwner={ctx.staff.role === "OWNER"}
+        className="mx-auto mb-3 max-w-3xl"
+      />
+      <SetupChecklistCard {...setup} titleAs="p" className="mx-auto mb-3 max-w-3xl" />
       {/* Same column as the board. Renders nothing once installed or dismissed. */}
       <InstallBanner className="mx-auto mb-3 max-w-3xl" />
       <OrdersBoard
@@ -55,6 +75,7 @@ export default async function OrdersPage(props: Props) {
         initialDrops={board.drops}
         initialDropId={dropId}
         initialSignal={signal}
+        staffRole={ctx.staff.role}
       />
     </main>
   );

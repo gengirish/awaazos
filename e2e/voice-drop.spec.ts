@@ -149,8 +149,8 @@ test.describe("voice drop builder", () => {
     await expect(panel.getByRole("listitem").filter({ hasText: "add pickup instructions" })).toBeVisible();
     const unmatched = panel.getByRole("list", { name: "Dishes not on your menu" });
     await expect(unmatched.getByText("masala chaas")).toBeVisible();
-    const addLink = unmatched.getByRole("link", { name: /Add masala chaas to menu/ });
-    await expect(addLink).toHaveAttribute("href", "/menu?add=masala%20chaas");
+    // Adds inline (a dialog on this page), not by sending the cook to /menu in a new tab.
+    await expect(unmatched.getByRole("button", { name: "Add masala chaas to menu" })).toBeVisible();
     await unmatched.getByRole("button", { name: "Remove masala chaas" }).click();
     await expect(panel.getByText("masala chaas")).toHaveCount(0);
 

@@ -121,9 +121,12 @@ export default async function DropPrepPage(props: Props) {
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <p>
-              <span className="font-semibold">Orders can still change</span> — freeze orders before you start cooking.{" "}
-              <Link href={`/drops/${drop.id}/edit`} className="font-semibold underline print:hidden">
-                Freeze on the edit page
+              <span className="font-semibold">Orders can still change</span> — lock orders before you start cooking.{" "}
+              <Link
+                href={`/drops/${drop.id}/edit`}
+                className="inline-flex min-h-11 items-center font-semibold underline print:hidden"
+              >
+                Lock orders on the edit page
               </Link>
             </p>
           </div>

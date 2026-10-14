@@ -38,7 +38,7 @@ export default async function NotificationsSettingsPage() {
           <VoiceAlertToggle />
         </SettingsCard>
 
-        <SettingsCard title="Your devices" description="Phones and browsers where you get alerts for this stall.">
+        <SettingsCard title="Your devices" description="Phones and browsers where you get alerts for this store.">
           <PushDevicesClient />
         </SettingsCard>
 

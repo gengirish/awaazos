@@ -15,7 +15,7 @@ const sectionPillClass =
 const navLinkClass =
   "inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-awaaz-charcoal/90 outline-hidden transition-colors hover:text-awaaz-orange focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2";
 
-export function MarketingHeader() {
+export function MarketingHeader({ cta }: { cta: string }) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -62,7 +62,7 @@ export function MarketingHeader() {
               asChild
               className="ml-2 min-h-11 bg-awaaz-orange px-5 font-semibold text-white hover:bg-awaaz-orange/90 focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
             >
-              <Link href="/sign-up">Get Started</Link>
+              <Link href="/sign-up">{cta}</Link>
             </Button>
           </nav>
           <div className="flex items-center gap-2 md:hidden">
@@ -76,7 +76,7 @@ export function MarketingHeader() {
               asChild
               className="min-h-11 shrink-0 bg-awaaz-orange px-4 font-semibold text-white hover:bg-awaaz-orange/90 focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
             >
-              <Link href="/sign-up">Get Started</Link>
+              <Link href="/sign-up">{cta}</Link>
             </Button>
           </div>
         </div>

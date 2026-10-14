@@ -115,7 +115,11 @@ test.describe("storefront order page: UPI pay options per platform", () => {
       expect(await buyer.evaluate(() => navigator.clipboard.readText())).toBe("120");
 
       await expect(buyer.getByText(/Open any UPI app → Pay to UPI ID → paste/)).toBeVisible();
-      await expect(buyer.getByText(/Paying from another phone\? Scan this QR/)).toBeVisible();
+      // The QR is for a second phone, so it waits behind a disclosure.
+      const qr = buyer.getByRole("img", { name: /UPI QR code to pay ₹120\.00/ });
+      await expect(qr).toBeHidden();
+      await buyer.getByText("Paying from another phone? Show QR").click();
+      await expect(qr).toBeVisible();
     } finally {
       await ios.close();
     }

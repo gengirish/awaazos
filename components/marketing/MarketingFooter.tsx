@@ -1,15 +1,16 @@
 import Link from "next/link";
 
+import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
+
 export function MarketingFooter() {
   return (
     <footer className="border-t border-border bg-awaaz-cream/50">
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-10 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex flex-col gap-1 text-sm text-awaaz-charcoal/80">
-          <p className="font-medium text-awaaz-charcoal">
-            IntelliForge AI · Bharat AI Mission Aligned{" "}
-            <span aria-hidden="true" className="ml-1">
-              🇮🇳
-            </span>
+          <p className="font-medium text-awaaz-charcoal">An IntelliForge AI product</p>
+          {/* The shared link is a bare <a>: the 44px hit area is added here. */}
+          <p className="[&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center [&_a]:font-medium [&_a]:text-awaaz-charcoal [&_a]:underline [&_a]:underline-offset-4 [&_a]:outline-hidden [&_a]:hover:text-awaaz-orange [&_a]:focus-visible:ring-2 [&_a]:focus-visible:ring-awaaz-orange [&_a]:focus-visible:ring-offset-2">
+            Need help? Email <SupportEmailLink />
           </p>
           <p className="text-xs text-muted-foreground">
             © {new Date().getFullYear()} AwaazOS. All rights reserved.

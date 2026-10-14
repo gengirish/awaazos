@@ -17,8 +17,8 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "AwaazOS — Bol. Bill. Becho.",
-  description: "Voice-first POS and UPI billing for Indian vendors.",
+  title: "AwaazOS — Pre-orders for Instagram kitchens",
+  description: "Pre-orders for Instagram home kitchens: a store link, drops with a cut-off, and UPI orders on one board.",
   // iPhone: Home Screen install is what unlocks web push (iOS 16.4+).
   appleWebApp: { capable: true, title: "AwaazOS", statusBarStyle: "default" },
   icons: { apple: "/apple-touch-icon.png" },

@@ -84,7 +84,7 @@ test.describe("menu orders: order straight from the everyday menu", () => {
 
       await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
       await expect(buyer.getByRole("heading", { name: "Your order" })).toBeVisible();
-      await expect(buyer.getByText("Pay on delivery").first()).toBeVisible();
+      await expect(buyer.getByText("Pay when you collect").first()).toBeVisible();
       await expect(buyer.getByText(bhel).first()).toBeVisible();
     } finally {
       await buyerCtx.close();
