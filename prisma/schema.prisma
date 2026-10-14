@@ -655,6 +655,13 @@ enum StallType {
   KIRANA
   CLOTHING
   SERVICES
+  // Kitchen kinds (docs/ICP.md); before these, all of them were FOOD_BEVERAGE.
+  HOME_BAKERY
+  HOME_KITCHEN
+  CLOUD_KITCHEN
+  CAFE
+  SWEETS
+  CATERING
 }
 
 enum OfferEligibility {

@@ -86,6 +86,12 @@ export const PLAN_LIMITS: Record<
 
 export const STALL_TYPES: { value: StallType; label: string }[] = [
   { value: "GENERAL", label: "General" },
+  { value: "HOME_BAKERY", label: "Home bakery" },
+  { value: "HOME_KITCHEN", label: "Home kitchen" },
+  { value: "CLOUD_KITCHEN", label: "Cloud kitchen" },
+  { value: "SWEETS", label: "Sweets & mithai" },
+  { value: "CAFE", label: "Café" },
+  { value: "CATERING", label: "Catering" },
   { value: "FOOD_BEVERAGE", label: "Food & beverage" },
   { value: "STREET_FOOD", label: "Street food" },
   { value: "CARNIVAL", label: "Carnival / mela" },

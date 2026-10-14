@@ -30,6 +30,7 @@ import {
   DEMO_CATEGORIES,
   DEMO_CLAIM_TTL_DAYS,
   DEMO_CREATES_PER_DAY,
+  DEMO_FULFILMENT,
   DEMO_UPI_ID,
   demoVoiceLang,
   itemKey,
@@ -39,6 +40,8 @@ import {
 import { computeOrderTotals, generateOrderToken, nextBillNumber } from "@/lib/drops";
 import { normaliseInstagramHandle } from "@/lib/instagram";
 import { loadMenuCreateContext, prepareMenuItemCreate } from "@/lib/menu-create";
+import { suggestEmoji } from "@/lib/menu-suggestions";
+import { DEFAULT_MENU_EMOJI } from "@/lib/menu-voice";
 import { hashPassword } from "@/lib/password";
 import { normaliseIndianMobile } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
@@ -170,6 +173,8 @@ async function writeDemoStore(
           publishStorefront: true,
           acceptMenuOrders: true,
           acceptPayOnDelivery: true,
+          menuFulfilmentMode: DEMO_FULFILMENT[profile.fulfilment],
+          menuDeliveryFeePaise: profile.delivery_fee_paise,
           instagramHandle: instagram,
           whatsappNumber: displayPhone,
           acceptWhatsappOrders: false,
@@ -190,7 +195,7 @@ async function writeDemoStore(
       priceInPaise: item.price_paise,
       aliases: [],
       tags: [],
-      emoji: "🍽️",
+      emoji: suggestEmoji(item.name) ?? DEFAULT_MENU_EMOJI,
       category: item.category ?? "General",
       hsnCode: null,
       isPopular: false,
@@ -205,10 +210,12 @@ async function writeDemoStore(
   }
 
   // Oldest first, so bill numbers rise with createdAt like real orders.
+  // Delivery-only stores get delivery samples (no address); otherwise pickup.
+  const fulfilmentType = profile.fulfilment === "delivery" ? "DELIVERY" : "PICKUP";
   const orders = input.sample_orders;
   for (let i = 0; i < orders.length; i++) {
     const createdAt = new Date(now.getTime() - (orders.length - i) * SAMPLE_ORDER_SPACING_MS);
-    await writeSampleOrder(tx, vendor.id, orders[i]!, menu, createdAt);
+    await writeSampleOrder(tx, vendor.id, orders[i]!, menu, createdAt, fulfilmentType);
   }
 
   await tx.demoAuditLog.create({
@@ -247,6 +254,7 @@ async function writeSampleOrder(
   order: DemoSampleOrderInput,
   menu: Map<string, { id: string; name: string; priceInPaise: number }>,
   createdAt: Date,
+  fulfilmentType: "PICKUP" | "DELIVERY",
 ): Promise<void> {
   const lines = order.lines.map((l) => {
     const item = menu.get(itemKey(l.item));
@@ -270,7 +278,7 @@ async function writeSampleOrder(
       customerName: order.customer_name,
       customerPhone: normaliseIndianMobile(order.customer_phone),
       source: "STOREFRONT",
-      fulfilmentType: "PICKUP",
+      fulfilmentType,
       fulfilAt: order.event_date ? new Date(order.event_date) : null,
       orderToken: generateOrderToken(),
       isSample: true,
