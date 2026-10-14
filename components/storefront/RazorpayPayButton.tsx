@@ -7,7 +7,7 @@ import { useState } from "react";
 import { loadCheckout, type RazorpayOrderSuccess } from "@/lib/razorpay-checkout";
 
 /**
- * "Pay online" for a storefront order, through the kitchen's OWN Razorpay
+ * "Pay online" for a storefront order, through the store's OWN Razorpay
  * account (Razorpay Standard Checkout). Flow:
  *
  *   1. POST …/razorpay        → server creates/reuses a Razorpay Order for the
@@ -35,7 +35,7 @@ type StartPaymentData = {
 const START_ERRORS: Record<string, string> = {
   order_expired: "This order's hold has expired, so the items were released. Please place the order again.",
   not_awaiting_payment: "This order isn't waiting for payment any more. Refresh to see its status.",
-  online_payment_unavailable: "Online payment isn't available for this kitchen right now. Please pay by UPI below.",
+  online_payment_unavailable: "Online payment isn't available for this store right now. Please pay by UPI below.",
   payment_processing: "Your payment went through — we're confirming it. Refresh in a minute.",
   razorpay_unavailable: "Couldn't reach the payment service. Please try again, or pay by UPI below.",
   rate_limited: "Too many attempts. Please wait a minute and try again.",
@@ -62,7 +62,7 @@ export function RazorpayPayButton({
 
   async function confirm(resp: RazorpayOrderSuccess) {
     setBusy(true);
-    setMessage({ text: "Payment received — confirming with the kitchen…", tone: "info" });
+    setMessage({ text: "Payment received — confirming with the store…", tone: "info" });
     try {
       const res = await fetch(`${base}/verify`, {
         method: "POST",
@@ -76,7 +76,7 @@ export function RazorpayPayButton({
       }
       if (res.status === 409) {
         setMessage({
-          text: "Your payment went through, but this order was closed in the meantime. Please message the kitchen — they'll refund or confirm it.",
+          text: "Your payment went through, but this order was closed in the meantime. Please message the store — they'll refund or confirm it.",
           tone: "error",
         });
       } else {
@@ -158,7 +158,7 @@ export function RazorpayPayButton({
       });
       rzp.open();
     } catch {
-      setMessage({ text: "Couldn't reach the kitchen — check your connection and try again.", tone: "error" });
+      setMessage({ text: "Couldn't reach the store — check your connection and try again.", tone: "error" });
       setBusy(false);
     }
   }

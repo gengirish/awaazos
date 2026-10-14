@@ -71,7 +71,7 @@ export type DropOrderProps = {
   /** Fulfilment window label ("Sat, 5 Oct · 5:00 pm – 8:00 pm"), shown with Pickup at checkout. */
   pickupWindow?: string | null;
   payment: { upi: boolean; cod: boolean };
-  /** The kitchen has a usable WhatsApp number (see CheckoutSheet). */
+  /** The store has a usable WhatsApp number (see CheckoutSheet). */
   whatsapp?: boolean;
   /**
    * Signed-in buyer's own saved details (lib/customer-auth.ts). Non-empty
@@ -260,9 +260,9 @@ export function DropOrder(props: DropOrderProps) {
                 <a
                   href={`#${item.menuAnchor}`}
                   className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-2 text-xs font-bold text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  aria-label={`${item.name} is on the everyday menu`}
+                  aria-label={`${item.name} is in everyday items`}
                 >
-                  On menu
+                  Order below
                   <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
               ) : null}

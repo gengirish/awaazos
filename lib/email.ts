@@ -190,15 +190,15 @@ export async function sendPasswordResetEmail(
 export type SendCustomerLoginEmailInput = {
   to: string;
   url: string;
-  kitchenName: string;
+  storeName: string;
   expiresAt: Date;
 };
 
-function buildCustomerLoginText(kitchenName: string, url: string): string {
+function buildCustomerLoginText(storeName: string, url: string): string {
   return [
     "Namaste,",
     "",
-    `Here is your sign-in link for ${kitchenName}.`,
+    `Here is your sign-in link for ${storeName}.`,
     "It works once and expires in 15 minutes:",
     "",
     url,
@@ -209,18 +209,18 @@ function buildCustomerLoginText(kitchenName: string, url: string): string {
   ].join("\n");
 }
 
-function buildCustomerLoginHtml(kitchenName: string, url: string): string {
-  const kitchen = escapeHtml(kitchenName);
+function buildCustomerLoginHtml(storeName: string, url: string): string {
+  const store = escapeHtml(storeName);
   const href = escapeHtml(url);
   return `<!doctype html>
 <html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:32px;">
   <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e2e8f0;">
-    <div style="font-weight:700;font-size:18px;color:#FF6B00;">${kitchen}</div>
+    <div style="font-weight:700;font-size:18px;color:#FF6B00;">${store}</div>
     <h1 style="font-size:22px;margin:24px 0 8px 0;color:#1a1a1a;">Sign in to order</h1>
     <p style="color:#334155;line-height:1.5;">
       Namaste,<br><br>
-      Tap the button to sign in at ${kitchen}. This link works once and expires in 15 minutes.
+      Tap the button to sign in at ${store}. This link works once and expires in 15 minutes.
     </p>
     <p style="margin:28px 0;">
       <a href="${href}" style="background:#FF6B00;color:#ffffff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
@@ -242,7 +242,7 @@ function buildCustomerLoginHtml(kitchenName: string, url: string): string {
 }
 
 /**
- * Best-effort send. Always resolves `{ ok: true }`. Kitchen name is
+ * Best-effort send. Always resolves `{ ok: true }`. Store name is
  * vendor-authored, so it is HTML-escaped and stripped of newlines in the subject.
  */
 export async function sendCustomerLoginEmail(
@@ -250,7 +250,7 @@ export async function sendCustomerLoginEmail(
 ): Promise<{ ok: true }> {
   try {
     const { to, url, expiresAt } = input;
-    const kitchenName = input.kitchenName.replace(/[\r\n]+/g, " ").trim().slice(0, 80) || "AwaazOS";
+    const storeName = input.storeName.replace(/[\r\n]+/g, " ").trim().slice(0, 80) || "AwaazOS";
     const config = getConfig();
 
     if (!config) {
@@ -267,9 +267,9 @@ export async function sendCustomerLoginEmail(
 
     const messageId = await deliver(config, {
       to: [to],
-      subject: `Your sign-in link for ${kitchenName}`,
-      text: buildCustomerLoginText(kitchenName, url),
-      html: buildCustomerLoginHtml(kitchenName, url),
+      subject: `Your sign-in link for ${storeName}`,
+      text: buildCustomerLoginText(storeName, url),
+      html: buildCustomerLoginHtml(storeName, url),
       labels: ["customer-login", "transactional"],
     }, "email.customer_login");
 

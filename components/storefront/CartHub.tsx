@@ -22,7 +22,7 @@ import { formatINR } from "@/lib/currency";
 export type CartHubEntry = {
   /** Stable per cart: "menu" or "drop:<dropId>". */
   key: string;
-  /** "Pre-order · Saturday bakes" / "Everyday menu". */
+  /** "Pre-order · Saturday bakes" / "Everyday items". */
   label: string;
   itemCount: number;
   subtotalPaise: number;

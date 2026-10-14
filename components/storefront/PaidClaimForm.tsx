@@ -69,7 +69,7 @@ export function PaidClaimForm({
       else if (res.status === 400) setError("That doesn't look like a UPI reference. Check your payment app.");
       else setError("Couldn't save that. Please try again.");
     } catch {
-      setError("Couldn't reach the kitchen — check your connection and try again.");
+      setError("Couldn't reach the store — check your connection and try again.");
     } finally {
       setSubmitting(false);
     }
@@ -80,7 +80,7 @@ export function PaidClaimForm({
   return (
     <form onSubmit={submit} className="space-y-3 text-left" noValidate>
       {!needsRef ? (
-        <p className="text-center text-sm text-muted-foreground">Paid in your UPI app? Tell the kitchen.</p>
+        <p className="text-center text-sm text-muted-foreground">Paid in your UPI app? Tell the store.</p>
       ) : null}
       <div className="space-y-2">
         <Label htmlFor="utr">
@@ -106,7 +106,7 @@ export function PaidClaimForm({
         <p id="utr-hint" className="text-xs text-muted-foreground">
           {needsRef
             ? "Find it in your UPI app under the payment details."
-            : "Find it in your UPI app under the payment details. It helps the kitchen spot your payment faster."}
+            : "Find it in your UPI app under the payment details. It helps the store spot your payment faster."}
         </p>
       </div>
       <button
@@ -122,7 +122,7 @@ export function PaidClaimForm({
       </button>
       {!claimed ? (
         <p className="text-center text-xs text-muted-foreground">
-          The kitchen checks their UPI app and confirms. Tapping this does not mark the order paid.
+          The store checks its UPI app and confirms. Tapping this does not mark the order paid.
         </p>
       ) : null}
       {error ? (

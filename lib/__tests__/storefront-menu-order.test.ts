@@ -56,7 +56,7 @@ describe("orderErrorMessage — menu orders", () => {
       "Masala chai isn't available right now. We've removed it from your cart — please check and try again.",
     );
     expect(orderErrorMessage({ error: "item_not_found", dropItemId: "d1" }, "Laddu")).toMatch(
-      /no longer on this menu/,
+      /no longer available/,
     );
     expect(orderErrorMessage({ error: "item_not_found", menuItemId: "m1" })).toMatch(/^One item isn't available/);
   });

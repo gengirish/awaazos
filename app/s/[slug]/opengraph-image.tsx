@@ -33,7 +33,7 @@ import { everydayMenuHiddenByDrops, STOREFRONT_MENU_ITEM_WHERE } from "@/lib/sto
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const alt = "Today's menu on AwaazOS";
+export const alt = "Order on AwaazOS";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -163,7 +163,7 @@ function GenericCard() {
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", fontSize: 72, fontWeight: 700 }}>Order on AwaazOS</div>
         <div style={{ display: "flex", fontSize: 36, color: C.muted, marginTop: 16 }}>
-          Fresh menus from local kitchens and stalls
+          Order online from local stores
         </div>
       </div>
       <Brand />
@@ -199,7 +199,7 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
             </div>
           ) : (
             <div style={{ display: "flex", fontSize: 64, fontWeight: 700, marginTop: 8 }}>
-              {menuOrdering ? "Order from the menu" : "See the menu"}
+              {menuOrdering ? "Order now" : "Browse the store"}
             </div>
           )}
         </div>

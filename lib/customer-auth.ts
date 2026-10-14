@@ -178,7 +178,7 @@ export type ConsumeResult =
 /**
  * Redeem a login token. Single use: the conditional update means exactly one
  * caller can flip `usedAt` from null. On failure still reports the stored
- * `returnTo` (when the row exists) so the buyer lands back on the kitchen.
+ * `returnTo` (when the row exists) so the buyer lands back on the store.
  */
 export async function consumeLoginToken(rawToken: string, now: Date = new Date()): Promise<ConsumeResult> {
   if (typeof rawToken !== "string" || rawToken.length < 20 || rawToken.length > 128) {

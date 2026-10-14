@@ -92,7 +92,7 @@ describe("storefront menu item filter", () => {
 describe("menu_paused_for_drop copy", () => {
   it("points the buyer at the drop", () => {
     expect(orderErrorMessage({ error: "menu_paused_for_drop" })).toBe(
-      "The everyday menu is paused while today's special menu is open. Order from the drop above.",
+      "Everyday items are paused while a pre-order is open. Order from the pre-order above.",
     );
   });
 });

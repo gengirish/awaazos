@@ -459,24 +459,24 @@ export function orderErrorMessage(err: OrderApiError, itemName?: string): string
       return `${name}: you can order at most ${err.limit ?? 1} per order.`;
     case "drop_not_open":
     case "drop_not_found":
-      return "Orders for this menu have closed. Refresh to see what's available.";
+      return "This pre-order has closed. Refresh to see what's available.";
     case "item_not_found":
       return err.menuItemId
         ? `${name} isn't available right now. We've removed it from your cart — please check and try again.`
-        : `${name} is no longer on this menu. Please refresh and try again.`;
+        : `${name} is no longer available. Please refresh and try again.`;
     case "menu_orders_disabled":
       return "This store has stopped taking online orders for now. Please order at the counter.";
     case "menu_paused_for_drop":
-      return "The everyday menu is paused while today's special menu is open. Order from the drop above.";
+      return "Everyday items are paused while a pre-order is open. Order from the pre-order above.";
     case "address_required":
       return "Please enter a delivery address.";
     case "fulfilment_unavailable":
-      return "That delivery option isn't available for this menu. Please pick another.";
+      return "That delivery option isn't available for this order. Please pick another.";
     case "pay_on_delivery_disabled":
       return "Pay on delivery isn't available. Please pay by UPI.";
     case "monthly_txn_cap_reached":
     case "orders_paused":
-      return "This kitchen can't take online orders right now — message them directly.";
+      return "This store can't take online orders right now — message them directly.";
     case "rate_limited":
       return "Too many attempts. Please wait a minute and try again.";
     case "in_progress":
@@ -528,11 +528,11 @@ export function orderStatusLabel(
       return confirmed
         ? {
             label: "Confirmed",
-            hint: "Payment submitted — the kitchen will confirm",
+            hint: "Payment submitted — the store will confirm",
             tone: "success",
           }
         : {
-            label: "Payment submitted — the kitchen will confirm",
+            label: "Payment submitted — the store will confirm",
             hint: null,
             tone: "warning",
           };
@@ -551,7 +551,7 @@ export function orderStatusLabel(
 
 /**
  * wa.me click-to-chat link. A customer-initiated message is what opens the
- * kitchen's 24h WhatsApp service window. Returns null for unusable numbers.
+ * store's 24h WhatsApp service window. Returns null for unusable numbers.
  */
 export function whatsappChatLink(number: string, text: string): string | null {
   let digits = number.replace(/\D/g, "");
@@ -608,9 +608,9 @@ export type WhatsAppOrderMessageInput = {
 };
 
 /**
- * The order as a message the buyer sends to the kitchen from their own
+ * The order as a message the buyer sends to the store from their own
  * WhatsApp (tap-to-compose, TODO 3.2). Every amount comes from the saved
- * order, so the text matches what the kitchen sees on its board; the bill
+ * order, so the text matches what the store sees on its board; the bill
  * number ties the chat to that order. The buyer is the sender, so their own
  * name, address and note are theirs to share — the phone is not repeated
  * (WhatsApp already shows it). Asterisks are WhatsApp bold; no emoji (some

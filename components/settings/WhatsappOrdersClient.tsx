@@ -10,7 +10,7 @@ import { buyerWhatsappNumber } from "@/lib/storefront-order";
  * The two opt-ins for showing the vendor's WhatsApp number publicly, both off
  * by default:
  * - `acceptWhatsappOrders`: buyers who placed an order get "send on WhatsApp"
- *   and "Message the kitchen".
+ *   and "Message the store".
  * - `showWhatsappOnStore`: every visitor of the store page gets a WhatsApp link.
  */
 export type WhatsappOrdersClientProps = {

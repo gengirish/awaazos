@@ -65,7 +65,7 @@ export type MenuOrderProps = {
   deliveryFeePaise: number;
   pickupNote: string | null;
   payment: { upi: boolean; cod: boolean };
-  /** The kitchen has a usable WhatsApp number (see CheckoutSheet). */
+  /** The store has a usable WhatsApp number (see CheckoutSheet). */
   whatsapp?: boolean;
   prefill?: BuyerPrefill | null;
   /** Offers live on menu orders (lib/offers.ts). Preview only; the server re-prices. */
@@ -133,7 +133,7 @@ export function MenuOrder(props: MenuOrderProps) {
   // The page-level cart bar (CartHub) shows this cart next to any drop's.
   const inHub = useCartHubEntry({
     key: "menu",
-    label: "Everyday menu",
+    label: "Everyday items",
     itemCount,
     subtotalPaise: payablePaise,
     canPay,
