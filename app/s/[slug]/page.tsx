@@ -207,15 +207,15 @@ export async function generateMetadata(
   if (!vendor) return { title: "Not found — AwaazOS" };
 
   const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
-  const title = `${vendor.name} — Menu`;
+  const title = `${vendor.name} — Online store`;
   const where = place ? `${vendor.name}, ${place}` : vendor.name;
   const menuHidden = await everydayMenuHiddenByDrop(prisma, vendor.id);
   const ordering = !menuHidden && (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0;
   const description = menuHidden
-    ? `Pre-order today's special menu from ${where}. Pay by UPI.`
+    ? `Pre-order today's special from ${where}. Pay by UPI.`
     : ordering
       ? `Order online from ${where}. ${menuFulfilmentPhrase(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}, pay by UPI.`
-      : `Menu and prices for ${where}. Pay by UPI.`;
+      : `Items and prices for ${where}. Pay by UPI.`;
 
   return {
     title,
@@ -442,7 +442,7 @@ function DropSection({
                 href="#menu-order"
                 className="font-semibold text-primary underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
-                Order from the everyday menu
+                Order from everyday items
               </a>
             </>
           ) : null}
@@ -539,7 +539,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
         href="#menu"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-primary-foreground"
       >
-        Skip to menu
+        Skip to items
       </a>
 
       {/* Brand band. The vendor's theme colour is the only thing that differs
@@ -680,7 +680,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
       {/* Category jump bar — a long mela menu on a phone is unusable without it. */}
       {categories.length + (dropViews.length > 0 ? 1 : 0) > 1 ? (
         <nav
-          aria-label="Menu categories"
+          aria-label="Categories"
           className="sticky top-0 z-20 border-b border-border/50 bg-background/85 backdrop-blur-sm supports-backdrop-filter:bg-background/70"
         >
           <ul className="mx-auto flex max-w-2xl gap-2 overflow-x-auto px-4 py-2 scrollbar-none sm:px-6 [&::-webkit-scrollbar]:hidden">
@@ -713,7 +713,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
         <main id="menu" className="mx-auto max-w-2xl px-4 py-7 sm:px-6 sm:py-9">
           {dropViews.length > 0 ? (
             <div id="drops" className="mb-10 scroll-mt-20 space-y-6">
-              <h2 className="sr-only">Pre-order menus</h2>
+              <h2 className="sr-only">Pre-orders</h2>
               {dropViews.map((view) => (
                 <DropSection
                   key={view.drop.id}
@@ -730,9 +730,9 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
           ) : null}
 
           {dropViews.length > 0 && categories.length > 0 ? (
-            <h2 className="mb-4 font-display text-lg font-bold text-awaaz-charcoal">Everyday menu</h2>
+            <h2 className="mb-4 font-display text-lg font-bold text-awaaz-charcoal">Everyday items</h2>
           ) : dropViews.length === 0 ? (
-            <h2 className="sr-only">Menu</h2>
+            <h2 className="sr-only">Items</h2>
           ) : null}
 
           {categories.length === 0 ? (

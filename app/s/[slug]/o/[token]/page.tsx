@@ -44,7 +44,7 @@ export const runtime = "nodejs";
  * `upi://` has no app chooser; plus copy-UPI-ID / copy-amount. The QR below is
  * for scanning from a second phone. Only the vendor VPA and total reach it.
  *
- * When the kitchen has connected her own Razorpay account (PRO plan), "Pay
+ * When the store has connected its own Razorpay account (PRO plan), "Pay
  * online" is offered above the UPI intent/QR. The buyer's own name and phone
  * are handed to that button only to prefill Razorpay Checkout. Razorpay
  * credentials are selected for presence checks only — never rendered or passed
@@ -54,7 +54,7 @@ export const runtime = "nodejs";
  * drop title or fulfilment window; a pickup shows the vendor's
  * `menuPickupNote` instead of the drop's.
  *
- * WhatsApp: the kitchen's opted-in number gets a wa.me link pre-filled with
+ * WhatsApp: the store's opted-in number gets a wa.me link pre-filled with
  * the whole order (`formatWhatsAppOrderMessage`). `?wa=1` — set when the buyer
  * chose "Place order & send on WhatsApp" at checkout — puts that link at the
  * top as the next step. The buyer sends it from their own WhatsApp; nothing is
@@ -275,14 +275,14 @@ export default async function StorefrontOrderPage(props: {
             ) : null}
             {paymentRejected ? (
               <p className="text-sm font-semibold">
-                The kitchen couldn&apos;t find your payment. Check your UPI app
+                The store couldn&apos;t find your payment. Check your UPI app
                 {awaitingUpi
                   ? ". If the money left your account, enter the UPI reference below."
-                  : ". If the money left your account, message the kitchen with the UPI reference."}
+                  : ". If the money left your account, message the store with the UPI reference."}
               </p>
             ) : null}
             {state === "EXPIRED" && order.paymentMethod === "UPI" && !paymentRejected ? (
-              <p className="text-sm">If you already paid, message the kitchen with your UPI reference.</p>
+              <p className="text-sm">If you already paid, message the store with your UPI reference.</p>
             ) : null}
           </div>
         </section>
@@ -363,7 +363,7 @@ export default async function StorefrontOrderPage(props: {
               </>
             ) : payOnline ? null : (
               <p className="text-sm text-muted-foreground">
-                The kitchen hasn&apos;t added a UPI ID yet — message them to pay.
+                The store hasn&apos;t added a UPI ID yet — message them to pay.
               </p>
             )}
             <PaidClaimForm slug={slug} token={params.token} requireReference={paymentRejected} />
@@ -376,7 +376,7 @@ export default async function StorefrontOrderPage(props: {
             className="space-y-3 rounded-2xl border border-border/60 bg-background p-4 shadow-xs sm:p-6"
           >
             <h2 id="add-ref-heading" className="text-base font-bold text-awaaz-charcoal">
-              Help the kitchen find your payment
+              Help the store find your payment
             </h2>
             <PaidClaimForm slug={slug} token={params.token} claimed />
           </section>
@@ -464,7 +464,7 @@ export default async function StorefrontOrderPage(props: {
             className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-green-600/40 bg-background px-6 text-sm font-bold text-green-800 shadow-xs hover:bg-green-600/5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
             <MessageCircle className="h-5 w-5" aria-hidden="true" />
-            Message the kitchen on WhatsApp
+            Message the store on WhatsApp
           </a>
         ) : null}
 

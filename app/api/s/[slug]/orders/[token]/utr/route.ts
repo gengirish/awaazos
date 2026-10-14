@@ -87,7 +87,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         // Only while the order still holds its stock (or already has a claim,
         // e.g. the buyer adding a UTR to it). A claim on a lapsed hold would
         // re-reserve items that may since have sold to someone else — the order
-        // page tells the buyer to message the kitchen instead.
+        // page tells the buyer to message the store instead.
         OR: [
           { createdAt: { gt: new Date(Date.now() - PENDING_HOLD_MINUTES * 60_000) } },
           { upiRef: { not: null } },

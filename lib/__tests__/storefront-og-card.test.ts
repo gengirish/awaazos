@@ -76,7 +76,7 @@ describe("storefront OG card", () => {
   it("no drop → menu variant with online items", async () => {
     findFirst.mockResolvedValue(vendor([]));
     const html = await card();
-    expect(html).toContain("Order from the menu");
+    expect(html).toContain("Order now");
     expect(html).toContain("Online Samosa");
   });
 
@@ -85,7 +85,7 @@ describe("storefront OG card", () => {
     const html = await card();
     expect(html).toContain("Diwali Sweets");
     expect(html).not.toContain("Online Samosa");
-    expect(html).not.toContain("Order from the menu");
+    expect(html).not.toContain("Order now");
   });
 
   it("open drop showing the menu → still the drop card (drops take priority)", async () => {
@@ -100,9 +100,9 @@ describe("storefront OG card", () => {
     expect(html).toContain("Diwali Sweets");
   });
 
-  it("menu ordering off, no drop → See the menu", async () => {
+  it("menu ordering off, no drop → Browse the store", async () => {
     findFirst.mockResolvedValue({ ...vendor([]), settings: { acceptMenuOrders: false, menuFulfilmentMode: "PICKUP" } });
     const html = await card();
-    expect(html).toContain("See the menu");
+    expect(html).toContain("Browse the store");
   });
 });

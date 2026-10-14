@@ -70,7 +70,7 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
 
     // Before selling out: the drop drives the CTA, and prices drop the ".00".
     await expect(buyer.getByRole("link", { name: "Pre-order now" })).toBeVisible();
-    await expect(buyer.getByRole("navigation", { name: "Menu categories" }).getByRole("link", { name: "Pre-order" })).toBeVisible();
+    await expect(buyer.getByRole("navigation", { name: "Categories" }).getByRole("link", { name: "Pre-order" })).toBeVisible();
     const drop = buyer.getByRole("region", { name: dropTitle });
     await expect(drop.getByText("₹5", { exact: true })).toBeVisible();
     // Empty cart takes no space and offers no Checkout button.
@@ -83,7 +83,7 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
     await menuRow.getByRole("button", { name: `Add ${bhel}` }).click();
     // Two carts → one page-level bar, one labelled row and Checkout per order.
     await expect(buyer.getByText("2 separate orders", { exact: true })).toBeVisible();
-    await expect(buyer.getByRole("button", { name: "Checkout Everyday menu" })).toBeVisible();
+    await expect(buyer.getByRole("button", { name: "Checkout Everyday items" })).toBeVisible();
 
     // Take the only pre-order one.
     await buyer.getByRole("button", { name: `Checkout Pre-order · ${dropTitle}` }).click();
@@ -108,7 +108,7 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
     await expect(buyer.getByRole("button", { name: "Checkout", exact: true })).toBeVisible();
 
     // The sold-out item points at its everyday-menu row (already 1 in the cart).
-    await soldOutDrop.getByRole("link", { name: `${bhel} is on the everyday menu` }).click();
+    await soldOutDrop.getByRole("link", { name: `${bhel} is in everyday items` }).click();
     await expect(buyer).toHaveURL(/#menu-item-/);
     await expect(buyer.locator(":target")).toContainText(bhel);
     await expect(buyer.locator(":target").getByRole("button", { name: `Add one more ${bhel}` })).toBeVisible();

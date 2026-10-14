@@ -20,7 +20,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * Storefront buyer account — sign in, edit details, "My orders at <kitchen>".
+ * Storefront buyer account — sign in, edit details, "My orders at <store>".
  *
  * Same gate as app/s/[slug]/page.tsx: vendor active + publishStorefront, else
  * 404. The vendor `select` is a hand-written allowlist — `Vendor.phone` and
@@ -143,7 +143,7 @@ export default async function StorefrontAccountPage(
               Optional — you can always order as a guest. Signing in fills in your details at checkout and
               keeps your orders here.
             </p>
-            <CustomerSignIn returnTo={accountPath} kitchenName={vendor.name} />
+            <CustomerSignIn returnTo={accountPath} storeName={vendor.name} />
           </section>
         ) : (
           <>

@@ -279,7 +279,7 @@ export function CartBar({
 export function NoPaymentNotice() {
   return (
     <p className="mt-3 rounded-xl border border-dashed border-border bg-background px-4 py-3 text-sm text-muted-foreground">
-      This kitchen hasn&apos;t set up online payment yet — message them to order.
+      This store hasn&apos;t set up online payment yet — message them to order.
     </p>
   );
 }
@@ -304,7 +304,7 @@ export type CheckoutSheetProps = {
   pickupWindow?: string | null;
   payment: { upi: boolean; cod: boolean };
   /**
-   * The kitchen has a WhatsApp number: also offer "Place order & send on
+   * The store has a WhatsApp number: also offer "Place order & send on
    * WhatsApp". Same order, same endpoint — the order page then leads with a
    * wa.me link carrying the whole order (`?wa=1`).
    */
@@ -563,7 +563,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
       });
     } catch {
       setSubmitting(false);
-      setFormError("Couldn't reach the kitchen — check your connection and try again.");
+      setFormError("Couldn't reach the store — check your connection and try again.");
       return;
     }
     idemKeyRef.current = null;
@@ -685,7 +685,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
             </div>
             <FieldError id={ids.error("phone")} message={fieldErrors.phone} />
             <p id={ids.phoneHint} className="text-xs text-muted-foreground">
-              The kitchen uses this to reach you about this order.
+              The store uses this to reach you about this order.
             </p>
           </div>
 
@@ -774,7 +774,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
           )}
 
           <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-notes`}>Notes for the kitchen (optional)</Label>
+            <Label htmlFor={`${idPrefix}-notes`}>Notes for the store (optional)</Label>
             <Input
               id={`${idPrefix}-notes`}
               value={notes}
