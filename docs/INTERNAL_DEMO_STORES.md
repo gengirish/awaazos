@@ -417,6 +417,11 @@ Signed-in platform admins can do everything above without the API key:
   `POST /api/admin-invite` and `/api/admin-invite/accept` (public / signed in). Same body and rules as the
   internal API; anyone below the role gets 404. Wrapper: `lib/admin-api.ts`.
 - Audit rows record `actor = "admin:<User.id>"`, so the 20 creates a day are counted per admin.
+- **WhatsApp outreach** (`lib/outreach-message.ts`, `components/admin/OutreachWhatsApp.tsx`): after a build,
+  on each unclaimed pipeline row, and next to a fresh claim link, the admin gets an editable message (owner's
+  first name, their own name, store name and link, or the claim link and its expiry) and a wa.me button to
+  the seller's saved business number. It opens the admin's own WhatsApp; nothing is sent from our side, and
+  the owner's name typed on `/new` is not saved.
 - An ADMIN sees `/admin/demo-stores` and `/admin/metrics` only. `/home` sends an admin with no store of
   their own to `/admin/demo-stores`.
 - Admin invites (`lib/admin-invites.ts`): 192-bit token, SHA-256 stored, 7 days, one use, a new invite

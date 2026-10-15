@@ -8,24 +8,36 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
+import { OutreachWhatsApp } from "@/components/admin/OutreachWhatsApp";
 import { formatIstDate } from "@/lib/datetime";
+import { outreachClaimMessage, outreachIntroMessage } from "@/lib/outreach-message";
 
 const ERROR_TEXT: Record<string, string> = {
   not_a_demo_store: "This store has been claimed, so it can't be changed here.",
   not_found: "This demo store no longer exists. Refresh the page.",
 };
 
-type Props = { externalRef: string; storeName: string };
+type Props = {
+  externalRef: string;
+  storeName: string;
+  storeUrl: string;
+  /** The seller's business number saved with the store, for wa.me. */
+  phone: string | null;
+  /** The signed-in admin, named in the WhatsApp message. */
+  senderName: string | null;
+};
 
 /**
- * A demo store's actions on /admin/demo-stores: make a claim link for the
- * seller's email (POST …/handover) or delete the store (DELETE). Claimed stores
- * don't get this component. Nothing is sent to anyone.
+ * A demo store's actions on /admin/demo-stores: message the seller on WhatsApp
+ * (wa.me from the admin's own phone), make a claim link for their email
+ * (POST …/handover) or delete the store (DELETE). Claimed stores don't get
+ * this component. Nothing is sent from our side.
  */
-export function DemoStoreActions({ externalRef, storeName }: Props) {
+export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, senderName }: Props) {
   const router = useRouter();
   const emailId = useId();
   const [open, setOpen] = useState(false);
+  const [messaging, setMessaging] = useState(false);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,9 +116,18 @@ export function DemoStoreActions({ externalRef, storeName }: Props) {
           <p className="text-xs text-muted-foreground">
             Send it to the seller yourself. Making another link voids this one.
           </p>
-          <Button type="button" size="sm" onClick={() => void copy(link.url)}>
+          <Button type="button" size="sm" variant="outline" onClick={() => void copy(link.url)}>
             {copied ? "Copied" : "Copy claim link"}
           </Button>
+          <OutreachWhatsApp
+            phone={phone}
+            message={outreachClaimMessage({
+              storeName,
+              claimUrl: link.url,
+              expiresOn: formatIstDate(new Date(link.expiresAt)),
+            })}
+            label="Send claim link on WhatsApp"
+          />
         </div>
       ) : open ? (
         <form onSubmit={makeLink} className="flex flex-wrap items-end gap-3" noValidate>
@@ -131,9 +152,23 @@ export function DemoStoreActions({ externalRef, storeName }: Props) {
             Cancel
           </Button>
         </form>
+      ) : messaging ? (
+        <div className="space-y-3">
+          <OutreachWhatsApp
+            phone={phone}
+            message={outreachIntroMessage({ senderName, storeName, storeUrl })}
+            label="Message on WhatsApp"
+          />
+          <Button type="button" size="sm" variant="outline" onClick={() => setMessaging(false)}>
+            Close
+          </Button>
+        </div>
       ) : (
         <div className="flex flex-wrap gap-3">
-          <Button type="button" size="sm" onClick={() => setOpen(true)}>
+          <Button type="button" size="sm" onClick={() => setMessaging(true)}>
+            Message on WhatsApp
+          </Button>
+          <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
             Hand over to the seller
           </Button>
           <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setConfirmDelete(true)}>

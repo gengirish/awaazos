@@ -505,6 +505,8 @@ only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts`
   platform ADMIN through `/api/admin/demo-stores/**` (`lib/admin-api.ts`; audit actor `admin:<User.id>`,
   so the limit is per admin). SUPER_ADMIN invites admins on `/admin/admins` with one-time links
   (`lib/admin-invites.ts`, `/admin-invite/[token]`); an ADMIN sees only the demo-store and metrics pages.
+  Each demo store and claim link has a "Message on WhatsApp" wa.me button with an editable pre-filled
+  message (`lib/outreach-message.ts`) to the seller's saved business number; nothing is sent server-side.
 
 Also added with it, for real orders too: `MenuItem.unit` ("₹1,200 / kg" on the storefront),
 `Transaction.advancePaidPaise` (order stays PENDING; the board shows "Advance paid · Balance due") and
