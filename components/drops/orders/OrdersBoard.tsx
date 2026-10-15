@@ -96,6 +96,11 @@ const BoardScopePicker = dynamic(() => import("@/components/drops/orders/BoardSc
   ssr: false,
   loading: () => <div aria-hidden className="h-11 w-40 rounded-md border border-input" />,
 });
+// Only sellers taking menu orders see the store's share controls; load them after the board.
+const ShareStoreControls = dynamic(
+  () => import("@/components/drops/ShareStoreControls").then((m) => m.ShareStoreControls),
+  { loading: () => <div aria-hidden className="h-11 rounded-full border border-input" /> },
+);
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 /** Coming back to the tab (e.g. tapping a push alert) refetches at most this often. */
@@ -132,6 +137,8 @@ const HANDOVER_FILTERS: { id: HandoverFilter; label: string }[] = [
 ];
 
 const ORDERS_URL = "/api/storefront-orders";
+/** `story` key for the whole store's Instagram image (drops use their id). */
+const STORE_STORY = "store";
 const SIGNAL_URL = "/api/storefront-orders/signal";
 
 const MENU_MODE_LABEL: Record<FulfilmentMode, string> = {
@@ -228,7 +235,8 @@ export function OrdersBoard({
   // Held here, not in the share button: on phones the button lives in the "More
   // actions" sheet, which unmounts on close. The Instagram flow is two taps
   // (fetch, then share), and the fetched image must outlive a closed sheet.
-  const [story, setStory] = useState<{ dropId: string; image: StoryImage } | null>(null);
+  // Keyed by drop id, or STORE_STORY for the whole store's image.
+  const [story, setStory] = useState<{ key: string; image: StoryImage } | null>(null);
 
   const signalRef = useRef<number | null>(initialSignal);
   const ordersRef = useRef(orders);
@@ -793,8 +801,16 @@ export function OrdersBoard({
         fulfilmentEndsAt={drop.fulfilmentEndsAt}
         fulfilmentMode={drop.fulfilmentMode}
         itemNames={drop.items.map((i) => i.name)}
-        story={drop && story?.dropId === drop.id ? story.image : null}
-        onStory={(image) => setStory({ dropId: drop.id, image })}
+        story={story?.key === drop.id ? story.image : null}
+        onStory={(image) => setStory({ key: drop.id, image })}
+      />
+    ) : !drop && acceptMenuOrders ? (
+      // Sellers who take orders from their everyday menu share the store itself.
+      <ShareStoreControls
+        vendorName={vendorName}
+        vendorSlug={vendorSlug}
+        story={story?.key === STORE_STORY ? story.image : null}
+        onStory={(image) => setStory({ key: STORE_STORY, image })}
       />
     ) : null;
 
@@ -1232,7 +1248,10 @@ function BoardHeader({
   vendorName: string;
   vendorSlug: string;
   tools: BoardTools;
-  /** The drop's share control while it is taking orders, else null. Built by the board. */
+  /**
+   * The drop's share control while it is taking orders; without a drop, the
+   * store's while menu orders are on; else null. Built by the board.
+   */
   share: ReactNode;
   onScope: (scope: BoardScope) => void;
 }) {
@@ -1360,6 +1379,12 @@ function BoardHeader({
           <Settings className="h-4 w-4 shrink-0" aria-hidden />
           Settings
         </Link>
+        {share ? (
+          <div className="rounded-md border border-input p-3">
+            <h3 className="mb-2 text-sm font-semibold">Share your store</h3>
+            {share}
+          </div>
+        ) : null}
       </>
     );
   }
@@ -1384,7 +1409,7 @@ function BoardHeader({
         <div className="min-w-0 max-md:flex-1 max-md:basis-0">{details}</div>
         <div className="hidden flex-wrap gap-2 md:flex">{links}</div>
         {/* Phones: sharing an open drop is the way to get orders, so it does not hide in "More". */}
-        {share ? <ShareSheetButton>{share}</ShareSheetButton> : null}
+        {share ? <ShareSheetButton what={drop ? "drop" : "store"}>{share}</ShareSheetButton> : null}
       </div>
       <ActionRow tools={tools} lead={share} sheetDescription={sheetDescription} sheetRows={sheetRows} />
       {tools.pollNote}
@@ -1434,19 +1459,20 @@ function ActionRow({
   );
 }
 
-/** Phones only: the drop's share control one tap from the header (from md it sits in the action row). */
-function ShareSheetButton({ children }: { children: ReactNode }) {
+/** Phones only: the share control one tap from the header (from md it sits in the action row). */
+function ShareSheetButton({ what, children }: { what: "drop" | "store"; children: ReactNode }) {
+  const title = what === "drop" ? "Share this drop" : "Share your store";
   return (
     <ResponsiveDialog>
       <ResponsiveDialogTrigger asChild>
-        <Button type="button" variant="outline" className="shrink-0 md:hidden" aria-label="Share this drop">
+        <Button type="button" variant="outline" className="shrink-0 md:hidden" aria-label={title}>
           <Share2 aria-hidden />
           Share
         </Button>
       </ResponsiveDialogTrigger>
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle>Share this drop</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle>{title}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription>Send it to your customers to get orders.</ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         <ResponsiveDialogBody>{children}</ResponsiveDialogBody>

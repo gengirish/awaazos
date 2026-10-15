@@ -3,6 +3,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { PrintButton } from "@/components/drops/orders/PrintButton";
+import { RiderHandoffButton } from "@/components/drops/orders/RiderHandoffButton";
 import { formatINR } from "@/lib/currency";
 import { dropOrdersHref, groupByFulfilment, handoverDue, ordersToPack, type BoardOrder } from "@/lib/drops-board";
 import { loadDropBoard } from "@/lib/drops-board-server";
@@ -32,7 +33,18 @@ function DueCell({ order }: { order: BoardOrder }) {
   );
 }
 
-function HandoverTable({ title, orders, showAddress }: { title: string; orders: BoardOrder[]; showAddress: boolean }) {
+function HandoverTable({
+  title,
+  orders,
+  showAddress,
+  vendorName,
+}: {
+  title: string;
+  orders: BoardOrder[];
+  /** Delivery list: show the address and the "Copy for rider" hand-off. */
+  showAddress: boolean;
+  vendorName: string;
+}) {
   return (
     <div className="mt-4 break-inside-avoid">
       <h3 className="text-base font-semibold">
@@ -62,6 +74,9 @@ function HandoverTable({ title, orders, showAddress }: { title: string; orders: 
                 <p className="mt-1 whitespace-pre-wrap text-muted-foreground print:text-foreground">{o.deliveryAddress}</p>
               )}
               <p className="mt-1 font-mono text-xs text-muted-foreground print:text-foreground">{o.billNumber}</p>
+              {showAddress && o.fulfilmentStatus !== "DELIVERED" && (
+                <RiderHandoffButton order={o} vendorName={vendorName} className="mt-2 max-w-xs" />
+              )}
             </li>
           ))}
         </ol>
@@ -224,7 +239,9 @@ export default async function DropPrepPage(props: Props) {
           <h2 id="handover-h" className="border-b pb-1 text-lg font-bold">
             3. Delivery / pickup list
           </h2>
-          {(drop.fulfilmentMode !== "PICKUP" || delivery.length > 0) && <HandoverTable title="Delivery" orders={delivery} showAddress />}
+          {(drop.fulfilmentMode !== "PICKUP" || delivery.length > 0) && (
+            <HandoverTable title="Delivery" orders={delivery} showAddress vendorName={ctx.vendor.name} />
+          )}
           {(drop.fulfilmentMode !== "DELIVERY" || pickup.length > 0) && (
             <>
               {drop.pickupNote && (
@@ -233,7 +250,7 @@ export default async function DropPrepPage(props: Props) {
                   {drop.pickupNote}
                 </p>
               )}
-              <HandoverTable title="Pickup" orders={pickup} showAddress={false} />
+              <HandoverTable title="Pickup" orders={pickup} showAddress={false} vendorName={ctx.vendor.name} />
             </>
           )}
         </section>

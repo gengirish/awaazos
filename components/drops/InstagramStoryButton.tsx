@@ -6,7 +6,10 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 
 type Props = {
-  dropId: string;
+  /** Same-origin PNG endpoint: a drop's or the whole store's story image. */
+  src: string;
+  /** Name of the downloaded / shared file. */
+  fileName: string;
   /** Storefront link, copied for the vendor to paste into Instagram's Link sticker. */
   url: string;
   className: string;
@@ -30,7 +33,7 @@ type Ready = StoryImage;
  * so calling navigator.share right after the download would throw
  * NotAllowedError. Browsers that can't share files get a plain download.
  */
-export function InstagramStoryButton({ dropId, url, className, onStatus, story, onStory }: Props) {
+export function InstagramStoryButton({ src, fileName, url, className, onStatus, story, onStory }: Props) {
   const [loading, setLoading] = useState(false);
   const [ownReady, setOwnReady] = useState<Ready | null>(null);
   const ready = ownReady ?? story ?? null;
@@ -61,10 +64,10 @@ export function InstagramStoryButton({ dropId, url, className, onStatus, story, 
     // Clipboard first, while the tap still counts as a user gesture.
     const copied = await copyLink();
     try {
-      const res = await fetch(`/api/drops/${encodeURIComponent(dropId)}/story-image`);
+      const res = await fetch(src);
       if (!res.ok) throw new Error(String(res.status));
       const blob = await res.blob();
-      const file = new File([blob], "drop-story.png", { type: "image/png" });
+      const file = new File([blob], fileName, { type: "image/png" });
       const r = { file, objectUrl: URL.createObjectURL(blob) };
       const linkNote = copied ? " Link copied — paste it into a Link sticker." : "";
       if (typeof navigator.canShare === "function" && navigator.canShare({ files: [file] })) {
