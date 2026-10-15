@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { FssaiNumberClient } from "@/components/settings/FssaiNumberClient";
 import { InstagramHandleClient } from "@/components/settings/InstagramHandleClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
+import { StoreHandleClient } from "@/components/settings/StoreHandleClient";
 import { StoreImagesClient } from "@/components/settings/StoreImagesClient";
 import { StoreNameClient } from "@/components/settings/StoreNameClient";
 import { StorefrontClient } from "@/components/settings/StorefrontClient";
@@ -34,6 +35,13 @@ export default async function StoreSettingsPage() {
       <div className="space-y-4">
         <SettingsCard title="Store name">
           <StoreNameClient initialName={vendor.name} isOwner={isOwner} />
+        </SettingsCard>
+        <SettingsCard title="Store link" description="The web address of your store page, for your Instagram bio.">
+          <StoreHandleClient
+            initialHandle={vendor.slug}
+            isOwner={isOwner}
+            published={settings?.publishStorefront ?? false}
+          />
         </SettingsCard>
         <SettingsCard title="Banner & logo" description="Shown at the top of your store page.">
           <StoreImagesClient

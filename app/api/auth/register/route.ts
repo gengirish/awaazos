@@ -7,6 +7,7 @@ import { hashPassword } from "@/lib/password";
 import { checkPasswordPolicy } from "@/lib/password-strength";
 import { prisma } from "@/lib/prisma";
 import { authRateLimit, getClientIp, tooManyRequests } from "@/lib/ratelimit";
+import { STORE_HANDLE_TAKEN_MESSAGE } from "@/lib/store-handle";
 import { newVendorSlug } from "@/lib/store-slug";
 import { signUpSchema } from "@/lib/zod-auth";
 
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
   const email = parsed.data.email.trim().toLowerCase();
   const name = parsed.data.name.trim();
   const stallName = parsed.data.stallName.trim();
-  const { stallType, password } = parsed.data;
+  const { stallType, password, storeHandle } = parsed.data;
 
   const policy = checkPasswordPolicy(password);
   if (!policy.ok) {
@@ -55,9 +56,11 @@ export async function POST(req: Request) {
     phoneE164 = p?.format("E.164");
   }
 
-  const maxAttempts = 8;
+  // An owner-chosen link is tried once: taken means taken, they pick another.
+  // The random-suffix fallback retries with a fresh suffix.
+  const maxAttempts = storeHandle ? 1 : 8;
   for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const slug = newVendorSlug(stallName);
+    const slug = storeHandle ?? newVendorSlug(stallName);
     try {
       const result = await prisma.$transaction(async (tx) => {
         const user = await tx.user.create({
@@ -112,12 +115,19 @@ export async function POST(req: Request) {
         if (slugCollision && attempt < maxAttempts - 1) {
           continue;
         }
+        if (slugCollision) {
+          return NextResponse.json(
+            storeHandle
+              ? { error: STORE_HANDLE_TAKEN_MESSAGE, field: "storeHandle" }
+              : {
+                  error: "Could not create a store link from that name. Try a different store name.",
+                  field: "stallName",
+                },
+            { status: 409 },
+          );
+        }
         return NextResponse.json(
-          {
-            error: slugCollision
-              ? "Could not create a store link from that name. Try a different store name."
-              : "An account with this email already exists.",
-          },
+          { error: "An account with this email already exists.", field: "email" },
           { status: 409 },
         );
       }
@@ -126,5 +136,8 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ error: "Could not create a store link from that name. Try a different store name." }, { status: 409 });
+  return NextResponse.json(
+    { error: "Could not create a store link from that name. Try a different store name.", field: "stallName" },
+    { status: 409 },
+  );
 }

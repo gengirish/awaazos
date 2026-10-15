@@ -2,6 +2,8 @@ import { StallType } from "@prisma/client";
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { z } from "zod";
 
+import { storeHandleSchema } from "@/lib/store-handle";
+
 export const signInSchema = z.object({
   email: z.string().email(),
   password: z.string().min(8),
@@ -12,6 +14,9 @@ export const signUpSchema = z.object({
   password: z.string().min(8).max(128),
   name: z.string().trim().min(1).max(120),
   stallName: z.string().trim().min(1).max(120),
+  // The store link (/s/<handle>), chosen by the owner. Omitted → a random
+  // suffix on the store name (lib/store-slug.ts), for older clients.
+  storeHandle: storeHandleSchema.optional(),
   stallType: z.nativeEnum(StallType),
   phone: z
     .string()
