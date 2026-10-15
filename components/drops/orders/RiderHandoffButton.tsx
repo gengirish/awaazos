@@ -71,17 +71,17 @@ export function RiderHandoffButton({
       {riders.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
           {riders.map((rider) => (
-              <a
-                key={rider.phone}
-                href={riderWhatsappUrl(rider, text())}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(btn, "flex-1")}
-                aria-label={`Send ${order.billNumber} to ${rider.name} on WhatsApp`}
-              >
-                <MessageCircle className="h-4 w-4" aria-hidden />
-                Send to {rider.name}
-              </a>
+            <a
+              key={rider.phone}
+              href={riderWhatsappUrl(rider, text())}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(btn, "flex-1")}
+              aria-label={`Send ${order.billNumber} to ${rider.name} on WhatsApp`}
+            >
+              <MessageCircle className="h-4 w-4" aria-hidden />
+              Send to {rider.name}
+            </a>
           ))}
         </div>
       )}
