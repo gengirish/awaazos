@@ -457,6 +457,8 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
           fulfilmentType: input.fulfilmentType,
           deliveryAddress: input.fulfilmentType === "DELIVERY" ? address : null,
           orderToken,
+          // The rider's "Delivered" link (app/d/[token]); deliveries only.
+          riderToken: input.fulfilmentType === "DELIVERY" ? generateOrderToken() : null,
           customerId: input.customerId ?? null,
           orderItems: {
             create: priced.map((p) => ({
