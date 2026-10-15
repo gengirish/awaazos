@@ -176,6 +176,49 @@ describe("checkOrderAction", () => {
     expect(checkOrderAction("mark_paid", status, o("CONFIRMED"))).toEqual({ ok: true });
     expect(checkOrderAction("deliver", status, o("CONFIRMED"))).toEqual({ ok: true });
     expect(checkOrderAction("undeliver", status, o("DELIVERED"))).toEqual({ ok: true });
+    expect(checkOrderAction("dispatch", status, { ...o("CONFIRMED"), fulfilmentType: "DELIVERY" })).toEqual({
+      ok: true,
+    });
+  });
+
+  it("dispatch is for live delivery orders only", () => {
+    const delivery = (fs: FulfilmentStatus) => ({ ...o(fs), fulfilmentType: "DELIVERY" as const });
+    const bad = { ok: false, error: "invalid_state" };
+    expect(checkOrderAction("dispatch", null, delivery("PLACED"))).toEqual({ ok: true });
+    expect(checkOrderAction("dispatch", null, delivery("CONFIRMED"))).toEqual({ ok: true });
+    expect(checkOrderAction("dispatch", null, delivery("DELIVERED"))).toEqual(bad);
+    expect(checkOrderAction("dispatch", null, delivery("CANCELLED"))).toEqual(bad);
+    expect(checkOrderAction("dispatch", null, { ...o("CONFIRMED"), fulfilmentType: "PICKUP" })).toEqual(bad);
+    expect(checkOrderAction("dispatch", null, o("CONFIRMED"))).toEqual(bad);
+  });
+});
+
+describe("availableOrderActions: out for delivery", () => {
+  const card = (over: Partial<Parameters<typeof availableOrderActions>[0]> = {}) => ({
+    fulfilmentStatus: "CONFIRMED" as FulfilmentStatus,
+    paymentStatus: "PENDING" as PaymentStatus,
+    paymentMethod: "CASH" as PaymentMethod,
+    fulfilmentType: "DELIVERY" as const,
+    outForDeliveryAt: null,
+    ...over,
+  });
+
+  it("offers it on a live delivery order that has not gone out", () => {
+    expect(availableOrderActions(card(), false).has("dispatch")).toBe(true);
+    expect(availableOrderActions(card({ fulfilmentStatus: "PLACED" }), true).has("dispatch")).toBe(true);
+  });
+
+  it("not once it has gone out, nor for pickups or finished orders", () => {
+    expect(availableOrderActions(card({ outForDeliveryAt: "2026-10-16T10:00:00.000Z" }), false).has("dispatch")).toBe(
+      false,
+    );
+    expect(availableOrderActions(card({ fulfilmentType: "PICKUP" }), false).has("dispatch")).toBe(false);
+    expect(availableOrderActions(card({ fulfilmentStatus: "DELIVERED" }), false).has("dispatch")).toBe(false);
+    expect(availableOrderActions(card({ fulfilmentStatus: "CANCELLED" }), false).has("dispatch")).toBe(false);
+  });
+
+  it("is never the card's primary step (Delivered stays primary)", () => {
+    expect(primaryOrderAction(card({ paymentMethod: "UPI", paymentStatus: "PAID" }), false)).toBe("deliver");
   });
 });
 

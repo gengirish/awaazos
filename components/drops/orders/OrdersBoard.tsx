@@ -159,6 +159,7 @@ const ACTION_DONE: Record<OrderAction, string> = {
   mark_paid: "Marked paid",
   reject_payment: "Marked not received",
   cancel: "Order cancelled",
+  dispatch: "Marked out for delivery",
   deliver: "Marked delivered",
   undeliver: "Moved back to confirmed",
 };
@@ -487,7 +488,7 @@ export function OrdersBoard({
     setAnnouncement("");
   };
 
-  const runAction = async (orderId: string, action: OrderAction) => {
+  const runAction = async (orderId: string, action: OrderAction, opts?: { riderName?: string }) => {
     const order = ordersRef.current.find((o) => o.id === orderId);
     if (!order) return;
     setPending({ orderId, action });
@@ -495,7 +496,7 @@ export function OrdersBoard({
       const res = await fetch(`${orderActionBase(order.dropId)}/${encodeURIComponent(orderId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(opts?.riderName ? { action, riderName: opts.riderName } : { action }),
       });
       const body = (await res.json().catch(() => ({}))) as { data?: BoardOrder; error?: string };
       if (res.ok && body.data) {
@@ -515,6 +516,8 @@ export function OrdersBoard({
             classNames: { actionButton: "min-h-11" },
             action: { label: "Undo", onClick: () => void runAction(updated.id, "undeliver") },
           });
+        } else if (action === "dispatch" && opts?.riderName) {
+          toast.success(`Out for delivery with ${opts.riderName}`);
         } else {
           toast.success(ACTION_DONE[action]);
         }
