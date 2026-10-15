@@ -21,7 +21,7 @@ export default async function ClaimStorePage(props: { params: Promise<{ token: s
   return (
     <main id="main" className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center gap-4 px-4 py-12">
       {claim ? (
-        <ClaimStoreForm token={token} email={claim.email} storeName={claim.storeName} />
+        <ClaimStoreForm token={token} email={claim.email} storeName={claim.storeName} hasAccount={claim.hasAccount} />
       ) : (
         <Card>
           <CardHeader>

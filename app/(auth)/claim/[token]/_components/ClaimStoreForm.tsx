@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -14,9 +15,27 @@ import { HOME_PATH } from "@/lib/home";
 const ERRORS: Record<string, string> = {
   invalid_or_expired: "This link has already been used or has expired. Ask for a new one.",
   email_in_use: "An AwaazOS account already uses this email. Ask for the link to be sent to another email.",
+  wrong_password: "That password doesn't match your AwaazOS account. Try again, or reset it.",
+  password_not_set: "Your account has no password yet. Set one with “Forgot password”, then open this link again.",
+  name_required: "Enter your name.",
 };
 
-export function ClaimStoreForm({ token, email, storeName }: { token: string; email: string; storeName: string }) {
+/**
+ * `hasAccount`: the invited email already signs in to AwaazOS, so the store is
+ * added to that account — the form asks for its current password instead of
+ * choosing a new one, and skips the name.
+ */
+export function ClaimStoreForm({
+  token,
+  email,
+  storeName,
+  hasAccount,
+}: {
+  token: string;
+  email: string;
+  storeName: string;
+  hasAccount: boolean;
+}) {
   const router = useRouter();
   const [name, setName] = useState("");
   const [password, setPassword] = useState("");
@@ -28,7 +47,7 @@ export function ClaimStoreForm({ token, email, storeName }: { token: string; ema
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
-    if (password !== confirm) {
+    if (!hasAccount && password !== confirm) {
       setError("Passwords don't match.");
       return;
     }
@@ -37,7 +56,7 @@ export function ClaimStoreForm({ token, email, storeName }: { token: string; ema
       const res = await fetch("/api/demo-claim", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token, name, password, sampleOrders }),
+        body: JSON.stringify(hasAccount ? { token, password, sampleOrders } : { token, name, password, sampleOrders }),
       });
       const json = (await res.json().catch(() => ({}))) as { error?: string; reason?: string };
       if (!res.ok) {
@@ -59,54 +78,79 @@ export function ClaimStoreForm({ token, email, storeName }: { token: string; ema
       <CardHeader>
         <h1 className="text-2xl font-semibold leading-none tracking-tight">Claim {storeName}</h1>
         <CardDescription>
-          This store was set up for you. Choose a password to make it yours. You&apos;ll sign in as{" "}
-          <span className="font-medium text-foreground">{email}</span>.
+          {hasAccount ? (
+            <>
+              This store was set up for you. You already have an AwaazOS account as{" "}
+              <span className="font-medium text-foreground">{email}</span> — enter its password to add this store
+              to it.
+            </>
+          ) : (
+            <>
+              This store was set up for you. Choose a password to make it yours. You&apos;ll sign in as{" "}
+              <span className="font-medium text-foreground">{email}</span>.
+            </>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
+          {hasAccount ? null : (
+            <div className="space-y-2">
+              <Label htmlFor="name">Your name</Label>
+              <Input
+                id="name"
+                autoComplete="name"
+                required
+                autoFocus
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                disabled={submitting}
+              />
+            </div>
+          )}
           <div className="space-y-2">
-            <Label htmlFor="name">Your name</Label>
-            <Input
-              id="name"
-              autoComplete="name"
-              required
-              autoFocus
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              disabled={submitting}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <Label htmlFor="password">{hasAccount ? "Your AwaazOS password" : "Password"}</Label>
             <Input
               id="password"
               type="password"
-              autoComplete="new-password"
-              minLength={8}
+              autoComplete={hasAccount ? "current-password" : "new-password"}
+              enterKeyHint={hasAccount ? "go" : undefined}
+              minLength={hasAccount ? undefined : 8}
               required
+              autoFocus={hasAccount}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={submitting}
             />
-            <p className="text-xs text-muted-foreground">
-              At least 8 characters, using two of: lowercase, uppercase, digits or symbols.
-            </p>
+            {hasAccount ? (
+              <Link
+                href="/forgot-password"
+                className="inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+              >
+                Forgot password?
+              </Link>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                At least 8 characters, using two of: lowercase, uppercase, digits or symbols.
+              </p>
+            )}
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="confirm">Confirm password</Label>
-            <Input
-              id="confirm"
-              type="password"
-              autoComplete="new-password"
-              enterKeyHint="go"
-              minLength={8}
-              required
-              value={confirm}
-              onChange={(e) => setConfirm(e.target.value)}
-              disabled={submitting}
-            />
-          </div>
+          {hasAccount ? null : (
+            <div className="space-y-2">
+              <Label htmlFor="confirm">Confirm password</Label>
+              <Input
+                id="confirm"
+                type="password"
+                autoComplete="new-password"
+                enterKeyHint="go"
+                minLength={8}
+                required
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                disabled={submitting}
+              />
+            </div>
+          )}
           <fieldset className="space-y-1">
             <legend className="text-sm font-medium">Sample orders</legend>
             <label className="flex min-h-11 items-center gap-3 text-sm">
@@ -141,7 +185,7 @@ export function ClaimStoreForm({ token, email, storeName }: { token: string; ema
             </Notice>
           ) : null}
 
-          <Button type="submit" className="w-full" disabled={submitting || !name.trim() || !password || !confirm}>
+          <Button type="submit" className="w-full" disabled={submitting || !password || (!hasAccount && (!name.trim() || !confirm))}>
             {submitting ? "Claiming…" : "Claim my store"}
           </Button>
         </form>
