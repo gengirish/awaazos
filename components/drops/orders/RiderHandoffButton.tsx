@@ -22,11 +22,14 @@ export function RiderHandoffButton({
   order,
   vendorName,
   riders = [],
+  onSendToRider,
   className,
 }: {
   order: RiderHandoffOrder;
   vendorName: string;
   riders?: DeliveryRider[];
+  /** Called as a "Send to" link opens WhatsApp (the board marks the order out for delivery). */
+  onSendToRider?: (rider: DeliveryRider) => void;
   className?: string;
 }) {
   const [canShare, setCanShare] = useState(false);
@@ -76,6 +79,7 @@ export function RiderHandoffButton({
               href={riderWhatsappUrl(rider, text())}
               target="_blank"
               rel="noopener noreferrer"
+              onClick={() => onSendToRider?.(rider)}
               className={cn(btn, "flex-1")}
               aria-label={`Send ${order.billNumber} to ${rider.name} on WhatsApp`}
             >
