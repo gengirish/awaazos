@@ -8,6 +8,7 @@ import {
   HELP_TOPICS,
   helpTopicsForRole,
   matchesHelpQuery,
+  ORDER_JOURNEY,
 } from "@/lib/help-guide";
 
 describe("help content", () => {
@@ -102,5 +103,21 @@ describe("matchesHelpQuery", () => {
   it("needs every word to match", () => {
     expect(ids("receipt whatsapp")).toEqual(expect.arrayContaining(["send-receipt", "resend-receipt"]));
     expect(ids("receipt zebra")).toEqual([]);
+  });
+});
+
+describe("ORDER_JOURNEY", () => {
+  it("runs from placing the order to finishing it, one step per id", () => {
+    const ids = ORDER_JOURNEY.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids[0]).toBe("place");
+    expect(ids[ids.length - 1]).toBe("finish");
+    for (const step of ORDER_JOURNEY) expect(step.text.length).toBeGreaterThan(20);
+  });
+
+  it("names the Settings section riders are saved in as Settings does", () => {
+    const send = ORDER_JOURNEY.find((s) => s.id === "send")!;
+    const section = SETTINGS_SECTIONS.find((s) => s.href === "/settings/orders")!;
+    expect(send.text).toContain(`Settings, ${section.title}`);
   });
 });
