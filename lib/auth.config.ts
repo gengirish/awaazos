@@ -35,6 +35,9 @@ function isPublicPath(pathname: string): boolean {
   // Customer receipt pages (/r/<token>). The route 404s unless the token
   // matches a Receipt.publicToken, so this allowlist exposes nothing on its own.
   if (pathname.startsWith("/r/")) return true;
+  // Rider "Delivered" links (/d/<token>). The route 404s unless the token
+  // matches a Transaction.riderToken, so this allowlist exposes nothing on its own.
+  if (pathname.startsWith("/d/")) return true;
   // Storefront write paths (place order, submit UTR). Same opt-in gate: every
   // handler under /api/s/ 404s unless the vendor has publishStorefront = true.
   if (pathname.startsWith("/api/s/")) return true;
