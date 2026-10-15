@@ -69,6 +69,10 @@ export type BoardOrder = {
   /** Handed to a rider (ISO), and who it went with; absent or null when not yet. */
   outForDeliveryAt?: string | null;
   riderName?: string | null;
+  /** The rider's "Delivered" link token (/d/<token>); staff-only, delivery orders only. */
+  riderToken?: string | null;
+  /** When the buyer tapped "I've received my order" (ISO); null = not yet. */
+  buyerReceivedAt?: string | null;
   displayState: OrderDisplayState;
   holdsStock: boolean;
   bucket: BoardBucket;

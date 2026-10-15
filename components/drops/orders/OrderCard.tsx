@@ -144,6 +144,9 @@ export function OrderCard({
   const canDeliver = actions.has("deliver");
   const outAt = order.outForDeliveryAt ? new Date(order.outForDeliveryAt) : null;
   const outForDelivery = outAt !== null && (fs === "PLACED" || fs === "CONFIRMED");
+  // The buyer tapped "I've received my order" and it still waits on the seller (unpaid).
+  const receivedAt = order.buyerReceivedAt ? new Date(order.buyerReceivedAt) : null;
+  const buyerSaysReceived = receivedAt !== null && (fs === "PLACED" || fs === "CONFIRMED");
   const canUndeliver = actions.has("undeliver");
   const canCancel = actions.has("cancel");
 
@@ -294,6 +297,7 @@ export function OrderCard({
                       ? `Out for delivery${order.riderName ? ` with ${order.riderName}` : ""}`
                       : "Delivery"}
                 </span>
+                {buyerSaysReceived && <span className="font-semibold">· Customer got it</span>}
                 {order.notes && (
                   <span className="inline-flex items-center gap-1 font-semibold text-destructive">
                     <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
@@ -437,6 +441,16 @@ export function OrderCard({
           )}
         </p>
       </div>
+
+      {buyerSaysReceived && receivedAt && (
+        <p className="mt-2 flex items-start gap-2 rounded-md border border-amber-500/60 bg-amber-50 px-3 py-2 text-sm text-amber-950 dark:bg-amber-950/40 dark:text-amber-50">
+          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+          <span>
+            <span className="font-semibold">Customer says they got it</span> · {formatIstTime(receivedAt)}
+            {unpaid && <span className="block">Collect the payment, then tap Delivered.</span>}
+          </span>
+        </p>
+      )}
 
       {outForDelivery && outAt && (
         <p className="mt-2 flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold">
