@@ -11,7 +11,7 @@ export function CtaBanner() {
             Run your next drop on AwaazOS
           </h2>
           <p className="mt-2 max-w-xl text-white/90">
-            Set up your store, share the link, and stop tracking orders in DMs. {PLAN_MARKETING.STARTER.ctaNote}
+            Set up your store, share the link, and stop tracking orders in DMs and WhatsApp chats. {PLAN_MARKETING.STARTER.ctaNote}
           </p>
         </div>
         <Button

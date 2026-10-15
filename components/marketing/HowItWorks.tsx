@@ -12,7 +12,7 @@ const steps = [
     icon: Share2,
     title: "Share the link",
     description:
-      "Put your store link in your Instagram bio and share the ready-made story image. Buyers order there, not in your DMs.",
+      "Put your store link in your Instagram bio, send it on WhatsApp and share the ready-made story image. Buyers order there, not in your chats.",
   },
   {
     icon: ClipboardList,

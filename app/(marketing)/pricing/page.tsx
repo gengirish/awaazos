@@ -31,8 +31,8 @@ export default async function PricingPage() {
             {starter.trial}. Then {starter.price}.
           </h1>
           <p className="mt-3 text-muted-foreground">
-            Pre-orders for Instagram home kitchens. Try everything for {TRIAL_DAYS} days, no card needed. Subscribe
-            only if it earns its place in your kitchen.
+            Orders, UPI billing and receipts for home kitchens that sell on Instagram and WhatsApp. Try everything
+            for {TRIAL_DAYS} days, no card needed. Subscribe only if it earns its place in your kitchen.
           </p>
         </header>
 

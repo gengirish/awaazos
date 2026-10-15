@@ -56,12 +56,12 @@ export function Hero() {
         <div>
           <p className="font-display text-sm font-bold tracking-wide text-awaaz-orange">Bol. Bill. Becho.</p>
           <h1 className="mt-2 font-display text-4xl font-bold leading-tight tracking-tight text-balance text-awaaz-charcoal sm:text-5xl">
-            Take pre-orders from Instagram without the DM chaos
+            Take orders from Instagram and WhatsApp without the chat chaos
           </h1>
           <p className="mt-4 max-w-xl text-lg text-awaaz-charcoal/85 sm:text-xl">
-            For home kitchens and bakers. Put one store link in your bio: buyers order before your cut-off and pay
-            by UPI, a limited batch never oversells, and every order lands on one board instead of in DMs and
-            payment screenshots.
+            For home kitchens and bakers. Put one store link in your bio or send it on WhatsApp: buyers order a drop
+            before your cut-off or from your everyday menu and pay by UPI, a limited batch never oversells, and
+            every order lands on one board instead of in chats and payment screenshots. Bills at the counter too.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
             <Button
