@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
@@ -17,14 +17,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useStoreHandleCheck } from "@/hooks/useStoreHandleCheck";
 import { STALL_TYPES } from "@/lib/constants";
 import { HOME_PATH } from "@/lib/home";
 import { checkPasswordPolicy } from "@/lib/password-strength";
+import {
+  normaliseStoreHandle,
+  STORE_HANDLE_MAX,
+  storeHandleProblem,
+  storeHandleWhileTyping,
+  storeLinkPrefix,
+} from "@/lib/store-handle";
 import type { StallType } from "@prisma/client";
 
 // In form order: the first one with an error takes focus. The ids are also the
 // keys of the register API's zod `details` (signUpSchema in lib/zod-auth.ts).
-const FIELDS = ["name", "email", "password", "stallName", "stallType", "phone"] as const;
+const FIELDS = ["name", "email", "password", "stallName", "storeHandle", "stallType", "phone"] as const;
 type Field = (typeof FIELDS)[number];
 type FieldErrors = Partial<Record<Field, string>>;
 
@@ -34,6 +42,7 @@ const SERVER_FIELD_MESSAGE: Record<Field, string> = {
   email: "Enter a valid email address.",
   password: "Password must be 8 to 128 characters.",
   stallName: "Enter your store name (up to 120 characters).",
+  storeHandle: "Choose a store link: 3 to 40 lowercase letters, numbers or hyphens.",
   stallType: "Choose what you sell.",
   phone: "Enter a valid +91 Indian mobile number.",
 };
@@ -42,18 +51,56 @@ const textLinkClass = "inline-flex min-h-11 min-w-11 items-center justify-center
 
 type RegisterResponse = {
   error?: string;
+  /** Which field a 409 is about (register route): email, stallName or storeHandle. */
+  field?: string;
   reason?: string;
   details?: Partial<Record<string, string[]>>;
 };
 
-function validate(values: { name: string; email: string; password: string; stallName: string }): FieldErrors {
+function validate(values: {
+  name: string;
+  email: string;
+  password: string;
+  stallName: string;
+  storeHandle: string;
+}): FieldErrors {
   const errors: FieldErrors = {};
   if (!values.name.trim()) errors.name = "Enter your name.";
   if (!/^\S+@\S+\.\S+$/.test(values.email.trim())) errors.email = "Enter a valid email address.";
   const policy = checkPasswordPolicy(values.password);
   if (!policy.ok) errors.password = policy.reason;
   if (!values.stallName.trim()) errors.stallName = "Enter your store name.";
+  const handleProblem = storeHandleProblem(values.storeHandle);
+  if (handleProblem) errors.storeHandle = handleProblem;
   return errors;
+}
+
+function isField(value: string | undefined): value is Field {
+  return (FIELDS as readonly string[]).includes(value ?? "");
+}
+
+type HandleCheck = ReturnType<typeof useStoreHandleCheck>;
+
+function handleHint(check: HandleCheck): string {
+  switch (check.state) {
+    case "checking":
+      return "Checking…";
+    case "available":
+      return "Available. This goes in your Instagram bio; you can change it later in Settings.";
+    case "taken":
+    case "invalid":
+      return check.reason;
+    case "unknown":
+      return "Couldn't check right now. You can still continue.";
+    default:
+      return "Your store's web address. Lowercase letters, numbers and hyphens.";
+  }
+}
+
+function handleHintClass(check: HandleCheck): string {
+  if (check.state === "available") return "text-success";
+  if (check.state === "taken" || check.state === "invalid") return "text-destructive";
+  return "text-muted-foreground";
 }
 
 export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: string }) {
@@ -68,12 +115,28 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [stallName, setStallName] = useState("");
+  // The store link (/s/<handle>) follows the store name until the owner edits
+  // it themselves; then it is theirs.
+  const [storeHandle, setStoreHandle] = useState("");
+  const [handleEdited, setHandleEdited] = useState(false);
+  const [host, setHost] = useState("");
   const [stallType, setStallType] = useState<StallType>("GENERAL");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [emailTaken, setEmailTaken] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setHost(window.location.host);
+  }, []);
+
+  const handleCheck = useStoreHandleCheck(storeHandle);
+
+  function onStallNameChange(value: string) {
+    setStallName(value);
+    if (!handleEdited) setStoreHandle(normaliseStoreHandle(value));
+  }
 
   function showFieldErrors(errors: FieldErrors) {
     setFieldErrors(errors);
@@ -108,7 +171,9 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
     setError(null);
     setEmailTaken(false);
 
-    const invalid = validate({ name, email, password, stallName });
+    const handle = normaliseStoreHandle(storeHandle);
+    setStoreHandle(handle);
+    const invalid = validate({ name, email, password, stallName, storeHandle: handle });
     if (Object.keys(invalid).length > 0) {
       showFieldErrors(invalid);
       return;
@@ -127,6 +192,7 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
           email: normalizedEmail,
           password,
           stallName,
+          storeHandle: handle,
           stallType,
           phone: phone.trim() || undefined,
         }),
@@ -141,14 +207,10 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
     if (!res.ok) {
       setSubmitting(false);
       if (res.status === 409) {
-        // The server retries the store link with a new suffix, so a 409 is the
-        // email unless it says the store name ran out of links.
-        if (data.error?.includes("store name")) {
-          showFieldErrors({ stallName: data.error });
-          return;
-        }
-        setEmailTaken(true);
-        showFieldErrors({ email: data.error || "An account with this email already exists." });
+        // The route says which field: the email is taken, or the store link is.
+        const field = isField(data.field) ? data.field : "email";
+        if (field === "email") setEmailTaken(true);
+        showFieldErrors({ [field]: data.error || SERVER_FIELD_MESSAGE[field] });
         return;
       }
       if (data.reason) {
@@ -278,9 +340,40 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
               aria-invalid={fieldErrors.stallName ? true : undefined}
               aria-describedby={describedBy("stallName")}
               value={stallName}
-              onChange={(e) => setStallName(e.target.value)}
+              onChange={(e) => onStallNameChange(e.target.value)}
             />
             {fieldError("stallName")}
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="storeHandle">Store link</Label>
+            <div className="flex items-center rounded-md border border-input bg-background ring-offset-background focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+              <span className="shrink-0 select-none pl-3 text-sm text-muted-foreground" aria-hidden="true">
+                {storeLinkPrefix(host || "awaazos")}
+              </span>
+              <Input
+                id="storeHandle"
+                name="storeHandle"
+                required
+                autoComplete="off"
+                autoCapitalize="none"
+                autoCorrect="off"
+                spellCheck={false}
+                maxLength={STORE_HANDLE_MAX}
+                className="border-0 pl-0 shadow-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                aria-invalid={fieldErrors.storeHandle ? true : undefined}
+                aria-describedby={describedBy("storeHandle", "storeHandle-hint")}
+                value={storeHandle}
+                onChange={(e) => {
+                  setHandleEdited(true);
+                  setStoreHandle(storeHandleWhileTyping(e.target.value));
+                }}
+                onBlur={() => setStoreHandle((v) => normaliseStoreHandle(v))}
+              />
+            </div>
+            <p id="storeHandle-hint" aria-live="polite" className={`text-xs ${handleHintClass(handleCheck)}`}>
+              {handleHint(handleCheck)}
+            </p>
+            {fieldError("storeHandle")}
           </div>
           <div className="space-y-2">
             <Label htmlFor="stallType">What do you sell?</Label>

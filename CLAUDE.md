@@ -207,6 +207,13 @@ storefront surface** — unauthenticated, and no longer read-only (buyers place 
 
 Rules every one of them follows:
 
+- The store link is `Vendor.slug`, chosen by the owner: the sign-up form's "Store link" field
+  (pre-filled from the store name, live availability from `GET /api/auth/store-handle`, public and
+  IP-limited) and Settings → Online store → Store link (`PATCH /api/vendor { slug }`, OWNER, 409
+  `store_handle_taken`). Rules in `lib/store-handle.ts` (3–40 chars, `[a-z0-9-]`, reserved words);
+  a register call without `storeHandle` still gets the random-suffix slug from `lib/store-slug.ts`
+  (demo stores, e2e helper). Changing the link retires the old one at once — nothing redirects — and
+  the `awz_vendor` cookie (it holds the slug) is re-set by the PATCH response.
 - Gated on `VendorSettings.publishStorefront` (default `false`); not opted in → **404, not 403**.
 - Prisma `select` is a hand-written allowlist. `Vendor.phone` / `Vendor.email` never appear.
 - Store banner and logo (`Vendor.bannerUrl` / `logoUrl`): OWNER-only `POST`/`DELETE /api/vendor/banner`

@@ -99,6 +99,17 @@ export const authRateLimit = makeLimiter({
   max: 5,
 });
 
+/**
+ * 30 store-link availability checks per IP per minute (GET /api/auth/store-handle).
+ * The forms debounce typing, so a person makes a handful; a scraper of taken
+ * handles gets the public /s/<handle> page's answer no faster than this.
+ */
+export const storeHandleRateLimit = makeLimiter({
+  name: "store-handle",
+  windowMs: 60_000,
+  max: 30,
+});
+
 const PLAN_AI_LIMITS: Record<Plan, { perMinute: number; burstPerSecond: number }> = {
   FREE: { perMinute: 10, burstPerSecond: 2 },
   STARTER: { perMinute: 30, burstPerSecond: 4 },

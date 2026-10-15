@@ -6,7 +6,7 @@ import { toast } from "sonner";
 
 import { STORE_NAME_MAX, storeNameSchema } from "@/lib/store-name";
 
-/** Rename the store (`Vendor.name`). The /s/[slug] link does not change. */
+/** Rename the store (`Vendor.name`). The /s/[slug] link does not change; that is `StoreHandleClient`. */
 export type StoreNameClientProps = {
   initialName: string;
   isOwner: boolean;
@@ -89,7 +89,7 @@ export function StoreNameClient({ initialName, isOwner }: StoreNameClientProps) 
         aria-live="polite"
         className={`text-xs ${error ? "text-destructive" : "text-muted-foreground"}`}
       >
-        {error ?? "Shown on your store page and receipts. Your store link and QR code stay the same."}
+        {error ?? "Shown on your store page and receipts. Your store link stays the same; change it below."}
       </p>
       <button
         type="submit"

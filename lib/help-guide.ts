@@ -224,6 +224,17 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     keywords: "storefront publish url share",
   },
   {
+    id: "store-link",
+    group: "setup",
+    title: "Choose or change your store link",
+    steps: "You picked the link (awaazos.in/s/your-name) at sign-up. To change it, edit Store link and save. The old link stops working, so update your Instagram bio and any QR code.",
+    nav: "settings",
+    href: "/settings/store",
+    trail: ["Online store"],
+    ownerOnly: true,
+    keywords: "url handle slug address rename bio",
+  },
+  {
     id: "store-look",
     group: "setup",
     title: "Change your store name, banner or logo",

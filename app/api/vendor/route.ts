@@ -16,6 +16,7 @@ import { normaliseIndianMobile } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { requireVendorRole } from "@/lib/rbac";
 import { GSTIN_FORMAT_MESSAGE, GSTIN_PATTERN, RECEIPT_FOOTER_MAX } from "@/lib/receipt";
+import { storeHandleSchema } from "@/lib/store-handle";
 import { storeNameSchema } from "@/lib/store-name";
 import { buyerWhatsappNumber } from "@/lib/storefront-order";
 import { UPI_ID_FORMAT_MESSAGE, UPI_ID_PATTERN } from "@/lib/upi";
@@ -25,10 +26,13 @@ import { UPI_ID_FORMAT_MESSAGE, UPI_ID_PATTERN } from "@/lib/upi";
 const SETTINGS_SECRET_OMIT = { razorpayKeySecretEnc: true, razorpayWebhookSecretEnc: true } as const;
 
 const patchSchema = z.object({
-  // Store display name (Settings → Online store). Only Vendor.name changes —
-  // Vendor.slug is never rewritten, because shared /s/[slug] links, printed QR
-  // codes and receipt links depend on it.
+  // Store display name (Settings → Online store). Renaming never touches the
+  // link; that is `slug` below, its own field with its own confirmation.
   name: storeNameSchema.optional(),
+  // The store link, /s/<slug> (Settings → Online store, OWNER). Changing it
+  // retires the old link at once: anything printed or posted with it stops
+  // working, which the UI says before it sends this. 409 store_handle_taken.
+  slug: storeHandleSchema.optional(),
   city: z.string().trim().min(1).max(80).optional(),
   state: z.string().trim().min(1).max(80).optional(),
   stallType: z.nativeEnum(StallType).optional(),
@@ -104,6 +108,12 @@ class SettingsConflict extends Error {
 class WhatsappNumberRequired extends Error {
   constructor() {
     super("whatsapp_number_required");
+  }
+}
+
+class StoreHandleTaken extends Error {
+  constructor() {
+    super("store_handle_taken");
   }
 }
 
@@ -230,6 +240,11 @@ export async function PATCH(req: NextRequest) {
 
       const data: Prisma.VendorUpdateInput = {};
       if (vendorFields.name !== undefined) data.name = vendorFields.name;
+      if (vendorFields.slug !== undefined && vendorFields.slug !== ctx.vendor.slug) {
+        const taken = await tx.vendor.findUnique({ where: { slug: vendorFields.slug }, select: { id: true } });
+        if (taken) throw new StoreHandleTaken();
+        data.slug = vendorFields.slug;
+      }
       if (vendorFields.city !== undefined) data.city = vendorFields.city;
       if (vendorFields.state !== undefined) data.state = vendorFields.state;
       if (vendorFields.stallType !== undefined) data.stallType = vendorFields.stallType;
@@ -326,8 +341,19 @@ export async function PATCH(req: NextRequest) {
     });
 
     const res = NextResponse.json({ vendor });
-    return withVendorCookie(res, ctx.setVendorCookie);
+    // The active-vendor cookie holds the slug (lib/rbac.ts); after a link
+    // change it must follow, or the next request falls back to the oldest
+    // membership.
+    const slugChanged = vendor && vendor.slug !== ctx.vendor.slug ? vendor.slug : null;
+    return withVendorCookie(res, slugChanged ?? ctx.setVendorCookie);
   } catch (e) {
+    if (e instanceof StoreHandleTaken) {
+      return NextResponse.json({ error: e.message }, { status: 409 });
+    }
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      // Two owners racing for the same link: the unique index decides.
+      return NextResponse.json({ error: "store_handle_taken" }, { status: 409 });
+    }
     if (e instanceof SettingsConflict) {
       return NextResponse.json({ error: e.code }, { status: 409 });
     }
