@@ -98,6 +98,30 @@ export function paymentSubmittedPayload(o: {
   };
 }
 
+/** The rider tapped Delivered on their /d/ link. */
+export function riderDeliveredPayload(o: { billNumber: string; dropId: string | null }): PushPayload {
+  return {
+    title: "✅ Delivered",
+    body: `${o.billNumber} — your rider marked it delivered`,
+    url: o.dropId ? dropOrdersHref(o.dropId) : "/orders",
+    tag: `delivered-${o.billNumber}`,
+  };
+}
+
+/** The buyer tapped "I've received my order". Unpaid: the seller still confirms the cash. */
+export function buyerReceivedPayload(o: {
+  billNumber: string;
+  dropId: string | null;
+  delivered: boolean;
+}): PushPayload {
+  return {
+    title: "📦 Customer got their order",
+    body: o.delivered ? `${o.billNumber} — marked delivered` : `${o.billNumber} — collect the payment, then tap Delivered`,
+    url: o.dropId ? dropOrdersHref(o.dropId) : "/orders",
+    tag: `received-${o.billNumber}`,
+  };
+}
+
 export type SendResult = { sent: number; removed: number; failed: number };
 
 /** Send to every opted-in device of the vendor's active staff (or only `userId`'s). */
