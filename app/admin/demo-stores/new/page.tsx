@@ -9,8 +9,9 @@ export const metadata = { title: "Build a demo store — AwaazOS" };
 
 /** /admin/demo-stores/new — any platform ADMIN builds a prospect's demo store (lib/demo-store-form.ts). */
 export default async function NewDemoStorePage() {
+  let senderName: string | null;
   try {
-    await requirePlatformRole("ADMIN");
+    senderName = (await requirePlatformRole("ADMIN")).user.name;
   } catch (err) {
     if (err instanceof AuthError) notFound();
     throw err;
@@ -38,7 +39,7 @@ export default async function NewDemoStorePage() {
         </nav>
       </header>
       <main id="main" className="mx-auto max-w-3xl">
-        <DemoStoreForm />
+        <DemoStoreForm senderName={senderName} />
       </main>
     </div>
   );

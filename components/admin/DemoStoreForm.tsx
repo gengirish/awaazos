@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
+import { OutreachWhatsApp } from "@/components/admin/OutreachWhatsApp";
 import {
   buildDemoStorePayload,
   suggestExternalRef,
@@ -15,6 +16,7 @@ import {
   type DemoStoreFormValues,
 } from "@/lib/demo-store-form";
 import { DEMO_CATEGORIES, DEMO_FULFILMENT, DEMO_LANGUAGES, type DemoLanguage } from "@/lib/demo-store-schema";
+import { outreachIntroMessage } from "@/lib/outreach-message";
 
 const FIELD =
   "flex min-h-11 w-full rounded-md border border-input bg-background px-3 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
@@ -67,7 +69,14 @@ const INITIAL: DemoStoreFormValues = {
   withSampleOrders: true,
 };
 
-type Created = { public_url: string; created: boolean; external_ref: string };
+type Created = {
+  public_url: string;
+  created: boolean;
+  external_ref: string;
+  storeName: string;
+  phone: string | null;
+  ownerName: string;
+};
 type Issue = { path?: (string | number)[]; message?: string };
 
 function describeIssues(issues: Issue[] | undefined): string | null {
@@ -78,17 +87,29 @@ function describeIssues(issues: Issue[] | undefined): string | null {
     .join(" · ");
 }
 
+/** A string field of the pasted payload's profile, or "". */
+function profileField(payload: unknown, key: string): string {
+  if (!payload || typeof payload !== "object" || !("profile" in payload)) return "";
+  const profile = (payload as { profile?: Record<string, unknown> }).profile;
+  const value = profile?.[key];
+  return typeof value === "string" ? value : "";
+}
+
 /**
  * /admin/demo-stores/new. Builds the internal-API payload in the browser
  * (lib/demo-store-form.ts) or takes a pasted one, then POSTs it to
- * /api/admin/demo-stores, which validates it in full again.
+ * /api/admin/demo-stores, which validates it in full again. Once built, it
+ * offers the first WhatsApp message to the seller (lib/outreach-message.ts).
+ * `senderName` is the signed-in admin's name, for that message.
  */
-export function DemoStoreForm() {
+export function DemoStoreForm({ senderName }: { senderName: string | null }) {
   const ids = useId();
   const [mode, setMode] = useState<"form" | "json">("form");
   const [form, setForm] = useState<DemoStoreFormValues>(INITIAL);
   const [refEdited, setRefEdited] = useState(false);
   const [json, setJson] = useState("");
+  // Only for the WhatsApp message; never sent to the server.
+  const [ownerName, setOwnerName] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [created, setCreated] = useState<Created | null>(null);
@@ -155,7 +176,14 @@ export function DemoStoreForm() {
       }
       const ref =
         payload && typeof payload === "object" && "external_ref" in payload ? String(payload.external_ref) : "";
-      setCreated({ public_url: body.public_url, created: body.created === true, external_ref: ref });
+      setCreated({
+        public_url: body.public_url,
+        created: body.created === true,
+        external_ref: ref,
+        storeName: profileField(payload, "name"),
+        phone: profileField(payload, "display_phone") || null,
+        ownerName,
+      });
     } catch {
       setError("No connection. Try again.");
     } finally {
@@ -179,8 +207,23 @@ export function DemoStoreForm() {
             {created.public_url}
           </a>
         </p>
-        <div className="flex flex-wrap gap-3">
-          <Button type="button" onClick={() => void navigator.clipboard?.writeText(created.public_url)}>
+        <section aria-labelledby="whatsapp-heading" className="space-y-2 border-t pt-4">
+          <h3 id="whatsapp-heading" className="font-semibold text-foreground">
+            Send it to the seller
+          </h3>
+          <OutreachWhatsApp
+            phone={created.phone}
+            message={outreachIntroMessage({
+              ownerName: created.ownerName,
+              senderName,
+              storeName: created.storeName,
+              storeUrl: created.public_url,
+            })}
+            label="Message on WhatsApp"
+          />
+        </section>
+        <div className="flex flex-wrap gap-3 border-t pt-4">
+          <Button type="button" variant="outline" onClick={() => void navigator.clipboard?.writeText(created.public_url)}>
             Copy link
           </Button>
           <Button asChild variant="outline">
@@ -194,6 +237,7 @@ export function DemoStoreForm() {
               setForm(INITIAL);
               setRefEdited(false);
               setJson("");
+              setOwnerName("");
             }}
           >
             Build another
@@ -450,6 +494,22 @@ export function DemoStoreForm() {
           </fieldset>
         </>
       )}
+
+      <div className="space-y-2">
+        <Label htmlFor={`${ids}-owner`}>Owner&apos;s first name (optional)</Label>
+        <Input
+          id={`${ids}-owner`}
+          className="sm:w-72"
+          autoComplete="off"
+          value={ownerName}
+          maxLength={40}
+          onChange={(e) => setOwnerName(e.target.value)}
+          placeholder="Lahari"
+        />
+        <p className="text-xs text-muted-foreground">
+          Only for the WhatsApp message you send after building. It isn&apos;t saved with the store.
+        </p>
+      </div>
 
       {error ? (
         <Notice role="alert" tone="danger">

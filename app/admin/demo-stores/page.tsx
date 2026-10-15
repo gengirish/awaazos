@@ -42,8 +42,11 @@ export default async function AdminDemoStoresPage() {
   // Role read from the database, 404 rather than 403. Any platform ADMIN runs
   // outreach here; SUPER_ADMIN additionally sees the store and admin pages.
   let superAdmin: boolean;
+  let senderName: string | null;
   try {
-    superAdmin = (await requirePlatformRole("ADMIN")).user.role === "SUPER_ADMIN";
+    const { user } = await requirePlatformRole("ADMIN");
+    superAdmin = user.role === "SUPER_ADMIN";
+    senderName = user.name;
   } catch (err) {
     if (err instanceof AuthError) notFound();
     throw err;
@@ -129,7 +132,13 @@ export default async function AdminDemoStoresPage() {
                     <p className="text-xs text-muted-foreground">Built {formatIstDate(row.createdAt)}</p>
                     <StoreHealthLine health={healthFor(health, row.id)} now={now} />
                     {row.isDemo && row.demoExternalRef ? (
-                      <DemoStoreActions externalRef={row.demoExternalRef} storeName={row.name} />
+                      <DemoStoreActions
+                        externalRef={row.demoExternalRef}
+                        storeName={row.name}
+                        storeUrl={publicStoreUrl(row.slug)}
+                        phone={row.settings?.whatsappNumber ?? null}
+                        senderName={senderName}
+                      />
                     ) : null}
                   </li>
                 );

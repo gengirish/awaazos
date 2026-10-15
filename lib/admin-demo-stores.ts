@@ -6,6 +6,7 @@
  * Cross-tenant, like lib/admin-vendors.ts: callers must have passed
  * `requirePlatformRole("ADMIN")` first — outreach admins work this page. The
  * handover's prospect email is never selected — the stage needs only its dates.
+ * The only contact detail read is the seller's public business number.
  *
  * A store belongs here while `demoExternalRef` is set, which outlives the claim
  * (`isDemo` flips to false then). The stage is derived on every read.
@@ -23,6 +24,9 @@ const DEMO_PIPELINE_SELECT = {
   isDemo: true,
   demoExternalRef: true,
   createdAt: true,
+  // The prospect's public business number (from the create payload), for the
+  // admin's wa.me message. Opt-ins are off, so it isn't on their storefront.
+  settings: { select: { whatsappNumber: true } },
   demoHandovers: {
     select: { createdAt: true, expiresAt: true, usedAt: true },
     orderBy: { createdAt: "desc" },
