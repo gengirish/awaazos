@@ -4,6 +4,7 @@ import { BillingAccessNotice } from "@/components/billing/TrialNotice";
 import { OrdersBoard } from "@/components/drops/orders/OrdersBoard";
 import { InstallBanner } from "@/components/pwa/InstallPrompt";
 import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
+import { parseDeliveryRiders } from "@/lib/delivery-riders";
 import { loadOrdersBoard } from "@/lib/drops-board-server";
 import { getOrderSignal } from "@/lib/drops-signal";
 import { prisma } from "@/lib/prisma";
@@ -42,6 +43,7 @@ export default async function OrdersPage(props: Props) {
         menuFulfilmentMode: true,
         publishStorefront: true,
         acceptPayOnDelivery: true,
+        deliveryRiders: true,
       },
     }),
     loadOrdersBoard(ctx.vendor.id, { pinDropId: dropId }),
@@ -76,6 +78,7 @@ export default async function OrdersPage(props: Props) {
         initialDropId={dropId}
         initialSignal={signal}
         staffRole={ctx.staff.role}
+        riders={parseDeliveryRiders(settings?.deliveryRiders)}
       />
     </main>
   );

@@ -40,6 +40,7 @@ import {
   ResponsiveDialogTrigger,
 } from "@/components/ui/responsive-dialog";
 import { usePushAlerts } from "@/hooks/usePushAlerts";
+import type { DeliveryRider } from "@/lib/delivery-riders";
 import { formatINR } from "@/lib/currency";
 import type { EffectiveDropStatus } from "@/lib/drops";
 import {
@@ -119,6 +120,8 @@ type Props = {
   initialSignal: number | null;
   /** The viewer's role here. Drops are MANAGER+, so a cashier is never sent to build one. */
   staffRole: StaffRole;
+  /** Saved delivery riders (Settings → Online orders): "Send to <name>" on delivery orders. */
+  riders?: DeliveryRider[];
 };
 
 type OrdersResponse = { data: BoardOrder[]; drops: BoardDrop[]; signal: number | null };
@@ -208,6 +211,7 @@ export function OrdersBoard({
   initialDropId,
   initialSignal,
   staffRole,
+  riders = [],
 }: Props) {
   const [orders, setOrders] = useState(initialOrders);
   const [drops, setDrops] = useState(initialDrops);
@@ -1185,6 +1189,7 @@ export function OrdersBoard({
                   <OrderCard
                     order={o}
                     vendorName={vendorName}
+                    riders={riders}
                     frozen={isFrozen(o)}
                     source={sourceOf(o)}
                     isNew={newIds.has(o.id)}

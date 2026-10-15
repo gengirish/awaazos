@@ -32,6 +32,7 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
+import type { DeliveryRider } from "@/lib/delivery-riders";
 import { formatINR } from "@/lib/currency";
 import { discountLabel } from "@/lib/offers";
 import {
@@ -54,6 +55,8 @@ export type OrderSource = { kind: "menu" | "drop"; label: string };
 type Props = {
   order: BoardOrder;
   vendorName: string;
+  /** Saved delivery riders: one "Send to <name>" link each on a delivery order. */
+  riders?: DeliveryRider[];
   /** Stored drop status is FROZEN / FULFILLED: confirm & cancel are locked. */
   frozen: boolean;
   /** Shown on the card while the list mixes menu and drop orders. */
@@ -100,6 +103,7 @@ function StateIcon({ state }: { state: BoardOrder["displayState"] }) {
 export function OrderCard({
   order,
   vendorName,
+  riders = [],
   frozen,
   source,
   isNew,
@@ -424,7 +428,7 @@ export function OrderCard({
       </div>
 
       {!isPickup && fs !== "CANCELLED" && fs !== "DELIVERED" && (
-        <RiderHandoffButton order={order} vendorName={vendorName} className="mt-2" />
+        <RiderHandoffButton order={order} vendorName={vendorName} riders={riders} className="mt-2" />
       )}
 
       {/* Next step first: one primary button, the other ways forward in outline under it. */}
