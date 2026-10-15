@@ -427,13 +427,72 @@ describe.skipIf(!ENABLED)("internal demo-store API — DB integration", () => {
     expect(v.trialEndsAt?.getTime()).toBe(granted.getTime());
   });
 
-  it("refuses to claim with an email that already has an account (409), link stays usable", async () => {
+  it("an account without a password can't claim (409), link stays usable", async () => {
     const r = ref("taken");
     await create(r);
     const email = `taken-${TAG}@example.test`;
     await prisma.user.create({ data: { email } });
     const url = await claimUrlFor(r, email);
-    expect(await redeem(tokenOf(url))).toMatchObject({ status: 409, json: { error: "email_in_use" } });
+    expect(await redeem(tokenOf(url))).toMatchObject({ status: 409, json: { error: "password_not_set" } });
     expect(await prisma.demoHandover.count({ where: { tokenHash: { not: "" }, usedAt: null, email } })).toBe(1);
+  });
+
+  it("an existing account claims with its own password: wrong one is 401, right one adds the store to it", async () => {
+    const r = ref("existing");
+    const { json } = await create(r);
+    const id = json.store_id as string;
+    const email = `existing-${TAG}@example.test`;
+    const { hashPassword } = await import("@/lib/password");
+    const user = await prisma.user.create({
+      data: { email, name: "Rakesh", passwordHash: await hashPassword("OldPass4Rakesh!") },
+    });
+    const url = await claimUrlFor(r, email);
+
+    const wrong = await claim.POST(
+      req("POST", "/api/demo-claim", { token: tokenOf(url), password: "NotMyPassword9!" }, null) as never,
+    );
+    expect(wrong.status).toBe(401);
+    expect(await wrong.json()).toEqual({ error: "wrong_password" });
+    expect((await prisma.vendor.findUniqueOrThrow({ where: { id } })).isDemo).toBe(true);
+
+    // No name: the account keeps its own.
+    const ok = await claim.POST(
+      req("POST", "/api/demo-claim", { token: tokenOf(url), password: "OldPass4Rakesh!" }, null) as never,
+    );
+    expect(ok.status).toBe(200);
+    expect(ok.headers.get("set-cookie")).toContain(`awz_vendor=${json.slug as string}`);
+
+    expect(await prisma.user.count({ where: { email } })).toBe(1);
+    const v = await prisma.vendor.findUniqueOrThrow({ where: { id }, include: { staff: true } });
+    expect(v.isDemo).toBe(false);
+    expect(v.ownerName).toBe("Rakesh");
+    expect(v.staff).toHaveLength(1);
+    expect(v.staff[0]).toMatchObject({ userId: user.id, role: "OWNER", name: "Rakesh" });
+    // The password was only checked, never replaced.
+    const after = await prisma.user.findUniqueOrThrow({ where: { id: user.id } });
+    expect(after.passwordHash).toBe(user.passwordHash);
+  });
+
+  it("a new account still needs a name and a policy-strength password", async () => {
+    const r = ref("newacct");
+    await create(r);
+    const url = await claimUrlFor(r, `newacct-${TAG}@example.test`);
+    const noName = await claim.POST(
+      req("POST", "/api/demo-claim", { token: tokenOf(url), password: "Cakes4Kondapur!" }, null) as never,
+    );
+    expect(await noName.json()).toEqual({ error: "name_required" });
+    const weak = await claim.POST(
+      req("POST", "/api/demo-claim", { token: tokenOf(url), name: "A", password: "short" }, null) as never,
+    );
+    expect(weak.status).toBe(400);
+    expect(await weak.json()).toMatchObject({ error: "weak_password" });
+    expect(await prisma.user.count({ where: { email: `newacct-${TAG}@example.test` } })).toBe(0);
+  });
+
+  it("the internal demo account can never claim a store", async () => {
+    const r = ref("demoowner");
+    await create(r);
+    const url = await claimUrlFor(r, process.env.DEMO_OWNER_EMAIL!);
+    expect(await redeem(tokenOf(url))).toMatchObject({ status: 409, json: { error: "email_in_use" } });
   });
 });
