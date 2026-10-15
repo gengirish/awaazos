@@ -3,8 +3,8 @@
 import { Bike, Check, MessageCircle, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { formatRiderHandoff, type RiderHandoffOrder } from "@/lib/delivery-handoff";
-import { riderWhatsappUrl, type DeliveryRider } from "@/lib/delivery-riders";
+import { formatRiderHandoff, riderWhatsappUrl, type RiderHandoffOrder } from "@/lib/delivery-handoff";
+import type { DeliveryRider } from "@/lib/delivery-riders";
 import { cn } from "@/lib/utils";
 
 const btn =
@@ -70,12 +70,10 @@ export function RiderHandoffButton({
     <div className={cn("print:hidden", className)}>
       {riders.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-2">
-          {riders.map((rider) => {
-            const href = riderWhatsappUrl(rider, text());
-            return href ? (
+          {riders.map((rider) => (
               <a
                 key={rider.phone}
-                href={href}
+                href={riderWhatsappUrl(rider, text())}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={cn(btn, "flex-1")}
@@ -84,8 +82,7 @@ export function RiderHandoffButton({
                 <MessageCircle className="h-4 w-4" aria-hidden />
                 Send to {rider.name}
               </a>
-            ) : null;
-          })}
+          ))}
         </div>
       )}
       <div className="flex gap-2">

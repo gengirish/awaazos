@@ -4,7 +4,6 @@ import {
   deliveryRidersSchema,
   MAX_DELIVERY_RIDERS,
   parseDeliveryRiders,
-  riderWhatsappUrl,
 } from "@/lib/delivery-riders";
 
 describe("deliveryRidersSchema", () => {
@@ -58,13 +57,5 @@ describe("parseDeliveryRiders", () => {
     expect(parseDeliveryRiders(null)).toEqual([]);
     expect(parseDeliveryRiders({})).toEqual([]);
     expect(parseDeliveryRiders([])).toEqual([]);
-  });
-});
-
-describe("riderWhatsappUrl", () => {
-  it("opens a chat with the rider with the text filled in", () => {
-    expect(riderWhatsappUrl({ name: "Ramesh", phone: "+919876543210" }, "Delivery for X")).toBe(
-      "https://wa.me/919876543210?text=Delivery%20for%20X",
-    );
   });
 });

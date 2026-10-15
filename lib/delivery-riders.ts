@@ -1,7 +1,6 @@
 import { z } from "zod";
 
 import { normaliseIndianMobile } from "@/lib/phone";
-import { receiptWhatsappUrl } from "@/lib/whatsapp-message";
 
 /**
  * The seller's own delivery people (Settings → Online orders → Delivery
@@ -9,8 +8,9 @@ import { receiptWhatsappUrl } from "@/lib/whatsapp-message";
  * client-safe.
  *
  * A rider gets an order through the seller's own WhatsApp: the board opens a
- * wa.me link to the rider with the handoff text (lib/delivery-handoff.ts)
- * filled in, and the seller taps send. Nothing is sent from the server.
+ * wa.me link to the rider with the handoff text filled in (`riderWhatsappUrl`
+ * in lib/delivery-handoff.ts, which stays zod-free for the board's bundle),
+ * and the seller taps send. Nothing is sent from the server.
  */
 
 export const MAX_DELIVERY_RIDERS = 5;
@@ -48,9 +48,4 @@ export function parseDeliveryRiders(json: unknown): DeliveryRider[] {
     if (out.length === MAX_DELIVERY_RIDERS) break;
   }
   return out;
-}
-
-/** wa.me link that opens a chat with the rider, `text` pre-filled. */
-export function riderWhatsappUrl(rider: DeliveryRider, text: string): string | null {
-  return receiptWhatsappUrl(text, rider.phone);
 }

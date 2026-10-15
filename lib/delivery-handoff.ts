@@ -1,5 +1,6 @@
 import { formatINR } from "@/lib/currency";
-import { balanceDuePaise, handoverDue, type BoardOrder } from "@/lib/drops-board";
+import type { DeliveryRider } from "@/lib/delivery-riders";
+import { balanceDuePaise, handoverDue, whatsappHref, type BoardOrder } from "@/lib/drops-board";
 import { formatIndianMobile } from "@/lib/phone";
 
 /**
@@ -47,4 +48,9 @@ export function formatRiderHandoff(o: RiderHandoffOrder, vendorName: string): st
   const notes = o.notes?.trim();
   if (notes) lines.push(`Note: ${notes}`);
   return lines.join("\n");
+}
+
+/** wa.me link that opens a chat with a saved rider (E.164 phone), `text` pre-filled. */
+export function riderWhatsappUrl(rider: DeliveryRider, text: string): string {
+  return whatsappHref(rider.phone, text);
 }
