@@ -13,16 +13,18 @@ describe("outreachIntroMessage", () => {
       storeName: "Tasty Treats by Lah",
       storeUrl: STORE_URL,
     });
-    expect(text.startsWith("Hi Lahari, I'm Girish from IntelliForge")).toBe(true);
-    expect(text).toContain("demo store for Tasty Treats by Lah");
-    expect(text).toContain(STORE_URL);
-    expect(text).toContain("nothing is live");
+    expect(text.startsWith("Hi Lahari, I'm Girish, founder of IntelliForge.")).toBe(true);
+    expect(text).toContain("Instagram and WhatsApp");
+    expect(text).toContain(`demo store for Tasty Treats by Lah with your menu on it: ${STORE_URL}`);
+    expect(text).toContain("advance and balance due on one board");
+    expect(text).toContain("Nothing is live and nothing is charged");
+    expect(text).toContain(`yours free for ${TRIAL_DAYS} days`);
     expect(text).toContain("15 minutes this week");
   });
 
   it("reads naturally with no owner or sender name", () => {
     const text = outreachIntroMessage({ storeName: "Frosted", storeUrl: STORE_URL });
-    expect(text.startsWith("Hi, I'm writing from IntelliForge")).toBe(true);
+    expect(text.startsWith("Hi, I'm writing from IntelliForge. We build AwaazOS")).toBe(true);
     expect(text).not.toContain("undefined");
     expect(text).not.toContain("null");
   });

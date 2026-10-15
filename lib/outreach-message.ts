@@ -24,10 +24,16 @@ function greeting(ownerName: string | null | undefined): string {
 
 function introduction(senderName: string | null | undefined): string {
   const first = firstName(senderName);
-  return first ? `I'm ${first} from IntelliForge, the team behind AwaazOS.` : "I'm writing from IntelliForge, the team behind AwaazOS.";
+  return first
+    ? `I'm ${first}, founder of IntelliForge. I build AwaazOS for home kitchens that take orders on Instagram and WhatsApp.`
+    : "I'm writing from IntelliForge. We build AwaazOS for home kitchens that take orders on Instagram and WhatsApp.";
 }
 
-/** First message: the demo store link and a 15-minute ask. */
+/**
+ * First message: who is writing and for whom, the demo store link with what
+ * the seller will see when they tap it (a store page with their menu), what
+ * it does for them, the trial, and a 15-minute ask.
+ */
 export function outreachIntroMessage(input: {
   ownerName?: string | null;
   senderName?: string | null;
@@ -36,9 +42,10 @@ export function outreachIntroMessage(input: {
 }): string {
   return [
     `${greeting(input.ownerName)} ${introduction(input.senderName)}`,
-    `I set up a demo store for ${input.storeName}. Every custom order, advance and balance due sits in one list: ${input.storeUrl}`,
-    "It's only a demo with sample orders, nothing is live and nothing is charged.",
-    "Could we do 15 minutes this week? If it doesn't fit, I'd like to hear why.",
+    `I made a demo store for ${input.storeName} with your menu on it: ${input.storeUrl}`,
+    "Customers order and pay by UPI there instead of in DMs, and you see every order, advance and balance due on one board.",
+    "It's a demo with made-up orders. Nothing is live and nothing is charged.",
+    `If it looks useful, the store is yours free for ${TRIAL_DAYS} days. Could we do 15 minutes this week? If it doesn't fit, I'd like to hear why.`,
   ].join("\n\n");
 }
 
