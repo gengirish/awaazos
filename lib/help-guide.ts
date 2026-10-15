@@ -107,9 +107,9 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "rider-handoff",
     group: "orders",
     title: "Send a delivery to Porter, Rapido or your rider",
-    steps: "Tap Copy for rider on a delivery order and paste it into the booking app. It has the name, phone, address, items and any cash to collect. The drop's Prep sheet has the same button. If you saved your own riders in Settings, tap Send to and the rider's name: WhatsApp opens to them with the order filled in.",
+    steps: "Tap Copy for rider on a delivery order and paste it into the booking app. It has the name, phone, address, items and any cash to collect. The drop's Prep sheet has the same button. If you saved your own riders in Settings, tap Send to and the rider's name: WhatsApp opens to them with the order filled in, and the order is marked Out for delivery. Your customer's order page then says On the way. No saved rider? Tap Out for delivery yourself once it leaves.",
     nav: "orders",
-    keywords: "dunzo courier driver address booking cash collect handover whatsapp send",
+    keywords: "dunzo courier driver address booking cash collect handover whatsapp send out for delivery on the way dispatch",
   },
   {
     id: "share-store",
