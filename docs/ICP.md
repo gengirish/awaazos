@@ -7,7 +7,7 @@ positioning; code still wins for behaviour.
 ## Who
 
 **Instagram-based cloud kitchens.** Home and small commercial kitchens that find customers on
-Instagram and sell directly, not through Swiggy or Zomato.
+Instagram, take orders there and on WhatsApp, and sell directly, not through Swiggy or Zomato.
 
 | | |
 |---|---|

@@ -1,7 +1,7 @@
 # AwaazOS — Bol. Bill. Becho.
 
-> **Pre-orders and billing for India's Instagram cloud kitchens.**
-> Post a batch with a cut-off → buyers order from your link in bio → paid by UPI → cook list and delivery list on the day. Voice POS for counter sales. 30 days free.
+> **Orders, UPI billing and receipts for India's home kitchens that sell on Instagram and WhatsApp.**
+> Post a batch with a cut-off or an everyday menu → buyers order from your link in bio or on WhatsApp → paid by UPI → cook list and delivery list on the day → receipt on WhatsApp. Voice POS for counter sales. 30 days free.
 
 [![Live](https://img.shields.io/badge/live-awaazos.vercel.app-brightgreen)](https://awaazos.vercel.app)
 [![Stack](https://img.shields.io/badge/stack-Next.js%2015%20%C2%B7%20Auth.js%20%C2%B7%20Neon%20%C2%B7%20Claude%204.5-blueviolet)](#-tech-stack)

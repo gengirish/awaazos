@@ -5,6 +5,7 @@ import {
   ClipboardList,
   ImageIcon,
   Link2,
+  MessageCircle,
   Mic,
   PackageCheck,
   Printer,
@@ -23,7 +24,7 @@ const features = [
     icon: Link2,
     title: "Store link for your bio",
     description:
-      "One link with your banner, logo, open drops and everyday menu, so you stop answering “Menu?” in every DM.",
+      "One link with your banner, logo, open drops and everyday menu. Put it in your bio or send it on WhatsApp, so you stop answering “Menu?” in every chat.",
   },
   {
     icon: PackageCheck,
@@ -59,6 +60,12 @@ const features = [
     description: "Turn on alerts and get a notification when a new order or a payment reference comes in.",
   },
   {
+    icon: MessageCircle,
+    title: "Receipts on WhatsApp",
+    description:
+      "Every bill has a receipt you send from your own WhatsApp number, with a link the buyer can open any time.",
+  },
+  {
     icon: Mic,
     title: "Also bills at the counter",
     description:
@@ -74,7 +81,7 @@ export function Features() {
           From the first order to the handover
         </h2>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          Built for kitchens that sell on Instagram: bakes, meal boxes, snacks and sweets.
+          Built for kitchens that sell on Instagram and WhatsApp: bakes, meal boxes, snacks and sweets.
         </p>
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((f) => {
