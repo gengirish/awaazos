@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
 import { OutreachWhatsApp } from "@/components/admin/OutreachWhatsApp";
+import { StoreImagesClient } from "@/components/settings/StoreImagesClient";
 import {
   buildDemoStorePayload,
   suggestExternalRef,
@@ -233,6 +234,26 @@ export function DemoStoreForm({ senderName }: { senderName: string | null }) {
             {created.public_url}
           </a>
         </p>
+        {created.created && created.external_ref ? (
+          // The demo account owns the store, so nobody could add these from
+          // Settings; a banner and logo from the seller's Instagram make the
+          // demo look like theirs (lib/demo-store-image.ts).
+          <section aria-labelledby="images-heading" className="space-y-3 border-t pt-4">
+            <h3 id="images-heading" className="font-semibold text-foreground">
+              Add the seller&apos;s banner and logo
+            </h3>
+            <p className="text-sm text-muted-foreground">
+              Optional. A cover photo and their profile picture from Instagram make the store look like theirs.
+            </p>
+            <StoreImagesClient
+              storeName={created.storeName}
+              initialBannerUrl={null}
+              initialLogoUrl={null}
+              isOwner
+              endpointBase={`/api/admin/demo-stores/${encodeURIComponent(created.external_ref)}`}
+            />
+          </section>
+        ) : null}
         <section aria-labelledby="whatsapp-heading" className="space-y-2 border-t pt-4">
           <h3 id="whatsapp-heading" className="font-semibold text-foreground">
             Send it to the seller
