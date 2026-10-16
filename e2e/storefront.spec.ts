@@ -105,6 +105,30 @@ test.describe("public storefront", () => {
     }
   });
 
+  test("the store's own staff get Dashboard, not the buyer Sign in", async ({ page, request, browser }) => {
+    await createVendorSession(page, request, "storefront-staff", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, { name: "Owner Chai", priceInRupees: 15 });
+    await setPublished(page, true);
+
+    // Signed in as the owner: one tap back to the app, no buyer sign-in.
+    await page.goto(`/s/${slug}`);
+    const dashboard = page.getByRole("link", { name: "Dashboard", exact: true });
+    await expect(dashboard).toHaveAttribute("href", "/home");
+    await expect(page.getByRole("link", { name: "Sign in", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /back to the top of/i })).toHaveAttribute("href", "#store-top");
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const anonPage = await anon.newPage();
+    try {
+      await anonPage.goto(`/s/${slug}`);
+      await expect(anonPage.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
+      await expect(anonPage.getByRole("link", { name: "Dashboard", exact: true })).toHaveCount(0);
+    } finally {
+      await anon.close();
+    }
+  });
+
   test("an unknown slug 404s", async ({ page }) => {
     const res = await page.goto("/s/no-such-stall-abcxyz");
     expect(res?.status()).toBe(404);

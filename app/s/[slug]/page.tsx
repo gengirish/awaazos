@@ -1,16 +1,21 @@
 import type { FulfilmentMode } from "@prisma/client";
 import type { Metadata } from "next";
 import {
+  ArrowUp,
+  BadgeCheck,
   CalendarClock,
   Instagram,
+  LayoutDashboard,
   MapPin,
   MessageCircle,
   QrCode,
   ShoppingBag,
+  Store,
   Sparkles,
   Truck,
   UserRound,
   UtensilsCrossed,
+  Wallet,
 } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
@@ -22,6 +27,8 @@ import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/s
 import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
 import { RecentOrderLink } from "@/components/storefront/RecentOrderLink";
 import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
+import { StoreBackButton } from "@/components/storefront/StoreBackButton";
+import { StorePageRefresh } from "@/components/storefront/StorePageRefresh";
 import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -50,6 +57,8 @@ import {
   type StorefrontDropVisibility,
 } from "@/lib/storefront-order";
 import { qrSvgDataUrl } from "@/lib/qr";
+import { storeInfoFacts, type StoreFactKind } from "@/lib/store-info";
+import { viewerIsStoreStaff } from "@/lib/storefront-viewer";
 import { buildUpiCollectLink } from "@/lib/upi";
 
 export const dynamic = "force-dynamic";
@@ -108,7 +117,17 @@ export const runtime = "nodejs";
  *
  * `RecentOrderLink` (client, device-local) adds "Your recent order" to that
  * pill row for a buyer who ordered from this device; nothing about it is read
- * or rendered on the server.
+ * or rendered on the server. `StoreBackButton` adds Back when the tab has
+ * history.
+ *
+ * Staff viewing their own store (lib/storefront-viewer.ts): a signed-in
+ * AwaazOS user who is active staff of this vendor gets "Dashboard" (→ /home)
+ * in place of the buyer pill. Only a boolean comes back; nothing else about
+ * the user reaches the page.
+ *
+ * Header order: name → type · place → "About this store" facts (handover for
+ * the everyday menu, payment, FSSAI licence; lib/store-info.ts) → contact
+ * links → one call to action. The sticky bar under it starts with "Top".
  */
 
 type StorefrontVendor = NonNullable<Awaited<ReturnType<typeof loadStorefront>>>;
@@ -123,6 +142,17 @@ const BANNER_LOGO_OFFSET = "pt-[72px] sm:pt-[124px]";
 /** Header contact pills (WhatsApp chat, Instagram profile). */
 const CONTACT_LINK =
   "inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background px-4 text-sm font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
+
+/** Header pill-row pills (Back, Share, Sign in / My orders / Dashboard). */
+const PILL =
+  "inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
+
+const FACT_ICON: Record<StoreFactKind, typeof Store> = {
+  pickup: Store,
+  delivery: Truck,
+  payment: Wallet,
+  fssai: BadgeCheck,
+};
 
 /** Themes with a `[data-theme=…]` block in globals.css; anything else stays saffron. */
 const BRAND_THEMES = new Set(["green", "amber", "red", "blue", "purple"]);
@@ -543,7 +573,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
         orderableMenuIds,
       )
     : [];
-  const [dropViews, customer] = await Promise.all([
+  const [dropViews, customer, isStaff] = await Promise.all([
     buildDropViews(
       vendor.drops,
       now,
@@ -551,6 +581,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
       offerSource,
     ),
     getCurrentCustomer(),
+    viewerIsStoreStaff(vendor.id),
   ]);
   const prefill: BuyerPrefill | null = customer
     ? { name: customer.name, phone: customer.phone, address: customer.savedAddress }
@@ -570,6 +601,15 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   const whatsappLink = storeWhatsapp
     ? whatsappChatLink(storeWhatsapp, `Hi ${vendor.name}, I saw your store and have a question.`)
     : null;
+  const facts = storeInfoFacts({
+    menuOrdering,
+    fulfilmentMode: vendor.settings?.menuFulfilmentMode ?? "PICKUP",
+    deliveryFeePaise: vendor.settings?.menuDeliveryFeePaise ?? 0,
+    hasDrops: dropViews.length > 0,
+    upi: payment.upi,
+    cod: payment.cod,
+    fssaiNumber: vendor.settings?.fssaiNumber ?? null,
+  });
   const instagramHandle = vendor.settings?.instagramHandle ?? null;
   const instagramLink = instagramProfileUrl(instagramHandle);
   const menuCategories: MenuOrderCategory[] = categories.map(([category, items], i) => ({
@@ -587,13 +627,20 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   }));
 
   return (
-    <div data-theme={theme} className="min-h-screen bg-awaaz-cream/40">
+    <div id="store-top" data-theme={theme} className="min-h-screen bg-awaaz-cream/40">
+      <StorePageRefresh />
       <a
         href="#menu"
         className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-primary-foreground"
       >
         Skip to items
       </a>
+
+      {vendor.isDemo ? (
+        <p className="relative z-10 bg-awaaz-charcoal px-4 py-2 text-center text-xs font-medium text-white">
+          This is a demo store. Orders placed here are samples and no payment is taken.
+        </p>
+      ) : null}
 
       {/* Brand band. The vendor's theme colour is the only thing that differs
           between one storefront and the next, so it carries the whole identity. */}
@@ -619,18 +666,26 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
         )}
 
         <div className="relative mx-auto flex max-w-2xl items-center justify-end gap-2 px-4 pt-3 sm:px-6">
-          {/* Appears after mount, left of the right-aligned pills: nothing else moves. */}
+          {/* Back and the recent-order pill appear after mount, left of the
+              right-aligned pills: nothing else moves. */}
+          <StoreBackButton />
           <RecentOrderLink slug={vendor.slug} />
           <ShareStoreButton vendorName={vendor.name} slug={vendor.slug} />
-          <Link
-            href={`/s/${vendor.slug}/account`}
-            className="inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          >
-            <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span className="truncate">
-              {customer ? `Hi${customer.name ? `, ${customer.name.split(/\s+/)[0]}` : ""} · My orders` : "Sign in"}
-            </span>
-          </Link>
+          {isStaff ? (
+            // The seller (or their staff) looking at their own store: they are
+            // signed in to AwaazOS, not as a buyer, so offer the way back in.
+            <Link href="/home" className={PILL}>
+              <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">Dashboard</span>
+            </Link>
+          ) : (
+            <Link href={`/s/${vendor.slug}/account`} className={PILL}>
+              <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">
+                {customer ? `Hi${customer.name ? `, ${customer.name.split(/\s+/)[0]}` : ""} · My orders` : "Sign in"}
+              </span>
+            </Link>
+          )}
         </div>
 
         <div
@@ -659,24 +714,41 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             <h1 className="mt-3 font-display text-3xl font-bold leading-tight tracking-tight text-awaaz-charcoal sm:text-4xl sm:leading-10">
               {displayStoreName(vendor)}
             </h1>
-            {vendor.isDemo ? (
-              <p className="mt-2 max-w-md rounded-md border border-border/70 bg-background px-3 py-1.5 text-xs font-medium text-muted-foreground">
-                This is a demo store. Orders placed here are samples and no payment is taken.
-              </p>
-            ) : null}
 
-            <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                <UtensilsCrossed className="h-3.5 w-3.5" aria-hidden="true" />
+            {/* What and where, as one quiet line under the name. */}
+            <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-semibold text-muted-foreground">
+              <span className="inline-flex items-center gap-1.5">
+                <UtensilsCrossed className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                 {stallTypeLabel(vendor.stallType)}
               </span>
               {place ? (
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-3 py-1 text-xs font-semibold text-muted-foreground">
-                  <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                   {place}
                 </span>
               ) : null}
-            </div>
+            </p>
+
+            {/* How the store works: handover, payment, licence (lib/store-info.ts). */}
+            {facts.length > 0 ? (
+              <ul
+                aria-label="About this store"
+                className="mt-4 flex max-w-md flex-wrap items-center justify-center gap-2"
+              >
+                {facts.map((fact) => {
+                  const Icon = FACT_ICON[fact.kind];
+                  return (
+                    <li
+                      key={fact.kind}
+                      className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-semibold text-foreground"
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                      {fact.text}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
 
             {whatsappLink || instagramLink ? (
               <ul aria-label="Contact" className="mt-3 flex flex-wrap items-center justify-center gap-2">
@@ -734,12 +806,23 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
       </header>
 
       {/* Category jump bar — a long mela menu on a phone is unusable without it. */}
-      {categories.length + (dropViews.length > 0 ? 1 : 0) > 1 ? (
+      {categories.length + dropViews.length > 0 ? (
         <nav
           aria-label="Categories"
           className="sticky top-0 z-20 border-b border-border/50 bg-background/85 backdrop-blur-sm supports-backdrop-filter:bg-background/70"
         >
           <ul className="mx-auto flex max-w-2xl gap-2 overflow-x-auto px-4 py-2 scrollbar-none sm:px-6 [&::-webkit-scrollbar]:hidden">
+            {/* "Home": back to the store's header from anywhere down the menu. */}
+            <li className="shrink-0">
+              <a
+                href="#store-top"
+                aria-label={`Back to the top of ${vendor.name}`}
+                className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-border/70 px-3 text-sm font-bold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
+                <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Top</span>
+              </a>
+            </li>
             {dropViews.length > 0 ? (
               <li className="shrink-0">
                 <a
@@ -918,9 +1001,6 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
         </main>
 
         <footer className="px-4 pb-10 pt-2 text-center">
-          {vendor.settings?.fssaiNumber ? (
-            <p className="mb-3 text-xs text-muted-foreground">FSSAI Lic. No. {vendor.settings.fssaiNumber}</p>
-          ) : null}
           <Link
             href="/"
             className="group inline-flex min-h-11 items-center rounded-full"
