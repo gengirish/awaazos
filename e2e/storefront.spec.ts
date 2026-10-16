@@ -213,6 +213,36 @@ test.describe("public storefront", () => {
     }
   });
 
+  test("items without a photo show a drawing of the dish, served without a session", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    await createVendorSession(page, request, "storefront-food-img", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, { name: "Chocolate Truffle Cake", priceInRupees: 650, category: "Cakes" });
+    await createMenuItem(page, { name: "Grandma's Special", priceInRupees: 90, category: "Specials" });
+    await setPublished(page, true);
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const buyer = await anon.newPage();
+    try {
+      await buyer.goto(`/s/${slug}`);
+      const cakeRow = buyer.getByRole("listitem").filter({ hasText: "Chocolate Truffle Cake" });
+      await expect(cakeRow.locator('img[src*="food%2Fcake.webp"], img[src*="/food/cake.webp"]')).toHaveCount(1);
+      // No drawing matches: the emoji stays.
+      const specialRow = buyer.getByRole("listitem").filter({ hasText: "Grandma's Special" });
+      await expect(specialRow.locator("img")).toHaveCount(0);
+
+      // Public file: no redirect to sign-in for a buyer with no session.
+      const file = await anon.request.get("/food/cake.webp", { maxRedirects: 0 });
+      expect(file.status()).toBe(200);
+      expect(file.headers()["content-type"]).toContain("image/webp");
+    } finally {
+      await anon.close();
+    }
+  });
+
   test("an unknown slug 404s", async ({ page }) => {
     const res = await page.goto("/s/no-such-stall-abcxyz");
     expect(res?.status()).toBe(404);

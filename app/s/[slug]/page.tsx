@@ -41,6 +41,7 @@ import { UpiQrImage } from "@/components/storefront/UpiQrImage";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getIstTodayStart } from "@/lib/billing-period";
 import { formatINRCompact } from "@/lib/currency";
+import { foodImageFor } from "@/lib/food-images";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { displayStoreName } from "@/lib/demo-store-schema";
 import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
@@ -404,7 +405,8 @@ async function buildDropViews(
         menuItemId: i.menuItemId,
         name: i.menuItem.name,
         emoji: i.menuItem.emoji,
-        imageUrl: i.menuItem.imageUrl,
+        // The seller's photo, else a drawing of the dish (lib/food-images.ts), else the emoji.
+        imageUrl: i.menuItem.imageUrl ?? foodImageFor(i.menuItem.name),
         priceInPaise: i.priceInPaise,
         remaining: remainingQty(i.maxQty, sold.get(i.id) ?? 0),
         perOrderLimit: i.perOrderLimit,
@@ -559,7 +561,12 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   // pills, counts, "Order now" or menu cart — exactly as if the menu were empty.
   // Same server check placeMenuOrder uses, so the page and checkout always agree.
   const menuHidden = await everydayMenuHiddenByDrop(prisma, vendor.id, now);
-  const menuItems = menuHidden ? [] : vendor.menuItems;
+  // Items without a photo get a drawing of the dish when one matches
+  // (lib/food-images.ts); display only, nothing is stored.
+  const menuItems = (menuHidden ? [] : vendor.menuItems).map((item) => ({
+    ...item,
+    imageUrl: item.imageUrl ?? foodImageFor(item.name, item.category),
+  }));
   const categories = groupByCategory(menuItems);
   const popular = menuItems.filter((i) => i.isPopular).slice(0, 6);
   const payeeName = vendor.upiName ?? vendor.name;
