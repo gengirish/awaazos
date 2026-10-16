@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { formatRiderHandoff, riderCollectLine, riderWhatsappUrl, type RiderHandoffOrder } from "@/lib/delivery-handoff";
+import {
+  formatRiderHandoff,
+  riderCollectLine,
+  riderDeliveredUrl,
+  riderWhatsappUrl,
+  type RiderHandoffOrder,
+} from "@/lib/delivery-handoff";
 
 function order(over: Partial<RiderHandoffOrder> = {}): RiderHandoffOrder {
   return {
@@ -44,6 +50,16 @@ describe("formatRiderHandoff", () => {
 
   it("leaves out the phone line when there is none", () => {
     expect(formatRiderHandoff(order({ customerPhone: null }), "K")).not.toContain("Phone:");
+  });
+
+  it("ends with the rider's Delivered link when there is one", () => {
+    const url = riderDeliveredUrl(order({ riderToken: "tok" }), "https://awaazos.example/");
+    expect(url).toBe("https://awaazos.example/d/tok");
+    expect(formatRiderHandoff(order(), "K", url).endsWith("When delivered, tap: https://awaazos.example/d/tok")).toBe(
+      true,
+    );
+    expect(riderDeliveredUrl(order({ riderToken: null }), "https://x.example")).toBeNull();
+    expect(formatRiderHandoff(order(), "K", null)).not.toContain("When delivered");
   });
 });
 

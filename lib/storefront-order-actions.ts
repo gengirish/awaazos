@@ -26,7 +26,7 @@
 
 import type { DropStatus, Prisma } from "@prisma/client";
 
-import { cancelOrder, markOrderPaid } from "@/lib/drops";
+import { cancelOrder, generateOrderToken, markOrderPaid } from "@/lib/drops";
 import { checkOrderAction, type OrderAction } from "@/lib/drops-board";
 import { boardOrderSelect, type BoardOrderRow } from "@/lib/drops-board-server";
 
@@ -88,7 +88,7 @@ export async function applyStorefrontOrderAction(
 
   const order = await tx.transaction.findFirst({
     where: scope,
-    select: { fulfilmentStatus: true, paymentStatus: true, paymentMethod: true, fulfilmentType: true },
+    select: { fulfilmentStatus: true, paymentStatus: true, paymentMethod: true, fulfilmentType: true, riderToken: true },
   });
   if (!order) throw new OrderActionError(404, "Not found");
 
@@ -162,6 +162,12 @@ export async function applyStorefrontOrderAction(
     }
   }
   if (!applied) throw new OrderActionError(409, "invalid_state");
+
+  // A delivery placed before rider links existed gets one when it is confirmed
+  // or sent out. `riderToken: null` in the where keeps the first one minted.
+  if ((action === "confirm" || action === "dispatch") && order.fulfilmentType === "DELIVERY" && !order.riderToken) {
+    await tx.transaction.updateMany({ where: { ...scope, riderToken: null }, data: { riderToken: generateOrderToken() } });
+  }
 
   return tx.transaction.findFirstOrThrow({ where: scope, select: boardOrderSelect });
 }

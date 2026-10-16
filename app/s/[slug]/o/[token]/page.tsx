@@ -17,6 +17,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
+import { BuyerReceivedButton } from "@/components/storefront/BuyerReceivedButton";
 import { OrderLinkActions } from "@/components/storefront/OrderLinkActions";
 import { OrderRefresh } from "@/components/storefront/OrderRefresh";
 import { OtherCartsNotice } from "@/components/storefront/OtherCartsNotice";
@@ -118,6 +119,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
       fulfilmentStatus: true,
       fulfilmentType: true,
       outForDeliveryAt: true,
+      buyerReceivedAt: true,
       deliveryAddress: true,
       notes: true,
       customerName: true,
@@ -343,6 +345,11 @@ export default async function StorefrontOrderPage(props: {
           { key: "handed", label: payOnDelivery ? `${lastStep} · pay then` : lastStep, done: handedOver },
         ];
   const storeHref = `/s/${slug}`;
+  // "I've received my order": a confirmed delivery that isn't waiting on an
+  // upfront payment. Pickups are handed over in person.
+  const liveDelivery = order.fulfilmentType === "DELIVERY" && confirmed;
+  const canSayReceived = liveDelivery && !order.buyerReceivedAt && state !== "AWAITING_PAYMENT";
+  const saidReceived = liveDelivery && order.buyerReceivedAt !== null;
 
   return (
     <div data-theme={theme} className="min-h-screen bg-awaaz-cream/40">
@@ -436,6 +443,14 @@ export default async function StorefrontOrderPage(props: {
             />
           </div>
         </section>
+
+        {canSayReceived ? (
+          <BuyerReceivedButton slug={slug} token={params.token} />
+        ) : saidReceived ? (
+          <p role="status" className="text-center text-sm font-semibold">
+            Thanks — the store knows you got it.
+          </p>
+        ) : null}
 
         {steps ? <OrderProgress steps={steps} /> : null}
 
