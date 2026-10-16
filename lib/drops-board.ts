@@ -66,6 +66,9 @@ export type BoardOrder = {
   fulfilAt?: string | null;
   /** A demo store's sample order (lib/demo-store.ts). */
   isSample?: boolean;
+  /** Handed to a rider (ISO), and who it went with; absent or null when not yet. */
+  outForDeliveryAt?: string | null;
+  riderName?: string | null;
   displayState: OrderDisplayState;
   holdsStock: boolean;
   bucket: BoardBucket;
@@ -288,13 +291,22 @@ export function groupByFulfilment<T extends { fulfilmentType: FulfilmentType | n
 
 // ─── Order actions ──────────────────────────────────────────────────
 
-export const ORDER_ACTIONS = ["confirm", "mark_paid", "reject_payment", "cancel", "deliver", "undeliver"] as const;
+export const ORDER_ACTIONS = [
+  "confirm",
+  "mark_paid",
+  "reject_payment",
+  "cancel",
+  "dispatch",
+  "deliver",
+  "undeliver",
+] as const;
 export type OrderAction = (typeof ORDER_ACTIONS)[number];
 
 /** Once orders are frozen the list is locked; only payment / handover bookkeeping remains. */
 const FROZEN_ALLOWED: ReadonlySet<OrderAction> = new Set<OrderAction>([
   "mark_paid",
   "reject_payment",
+  "dispatch",
   "deliver",
   "undeliver",
 ]);
@@ -312,7 +324,11 @@ export type ActionCheck = { ok: true } | { ok: false; error: "drop_frozen" | "in
 export function checkOrderAction(
   action: OrderAction,
   dropStatus: DropStatus | null,
-  o: { fulfilmentStatus: FulfilmentStatus | null; paymentStatus: PaymentStatus },
+  o: {
+    fulfilmentStatus: FulfilmentStatus | null;
+    paymentStatus: PaymentStatus;
+    fulfilmentType?: FulfilmentType | null;
+  },
 ): ActionCheck {
   if ((dropStatus === "FROZEN" || dropStatus === "FULFILLED") && !FROZEN_ALLOWED.has(action)) {
     return { ok: false, error: "drop_frozen" };
@@ -329,6 +345,9 @@ export function checkOrderAction(
         return fs !== "CANCELLED" && o.paymentStatus === "PENDING";
       case "cancel":
         return fs === "PLACED" || fs === "CONFIRMED";
+      case "dispatch":
+        // Handing a delivery to a rider; sending it again (another rider) restamps it.
+        return o.fulfilmentType === "DELIVERY" && (fs === "PLACED" || fs === "CONFIRMED");
       case "deliver":
         return fs === "PLACED" || fs === "CONFIRMED";
       case "undeliver":
@@ -353,6 +372,8 @@ export function availableOrderActions(
     paymentStatus: PaymentStatus;
     paymentMethod: PaymentMethod;
     displayState?: OrderDisplayState;
+    fulfilmentType?: FulfilmentType | null;
+    outForDeliveryAt?: string | null;
   },
   frozen: boolean,
 ): Set<OrderAction> {
@@ -364,6 +385,7 @@ export function availableOrderActions(
     out.add("mark_paid");
   }
   if (o.displayState === "PAYMENT_SUBMITTED") out.add("reject_payment");
+  if (live && o.fulfilmentType === "DELIVERY" && !o.outForDeliveryAt) out.add("dispatch");
   if (live) out.add("deliver");
   if (fs === "DELIVERED") out.add("undeliver");
   if (live && !frozen) out.add("cancel");

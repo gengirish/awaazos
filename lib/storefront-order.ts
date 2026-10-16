@@ -506,14 +506,28 @@ export type StatusTone = "success" | "warning" | "danger" | "neutral";
  * (no drop) drops the stock wording — everyday-menu orders hold no stock.
  * `fulfilmentType: "PICKUP"` swaps the delivery wording for pickup wording
  * ("Collected", "Pay when you collect"); the states themselves are the same.
+ * `outForDelivery`: the seller handed it to a rider, so a confirmed order
+ * reads "On the way" (the payment line moves to the hint).
  */
 export function orderStatusLabel(
   state: OrderDisplayStateName,
   fulfilmentStatus: FulfilmentStatus | null,
-  opts: { menuOrder?: boolean; fulfilmentType?: "DELIVERY" | "PICKUP" | null } = {},
+  opts: { menuOrder?: boolean; fulfilmentType?: "DELIVERY" | "PICKUP" | null; outForDelivery?: boolean } = {},
 ): { label: string; hint: string | null; tone: StatusTone } {
   const confirmed = fulfilmentStatus === "CONFIRMED";
   const payLater = payOnDeliveryLabel(opts.fulfilmentType);
+  if (confirmed && opts.outForDelivery) {
+    switch (state) {
+      case "PAID":
+        return { label: "On the way", hint: "Paid", tone: "success" };
+      case "PAY_ON_DELIVERY":
+        return { label: "On the way", hint: payLater, tone: "success" };
+      case "PAYMENT_SUBMITTED":
+        return { label: "On the way", hint: "Payment submitted — the store will confirm", tone: "success" };
+      default:
+        break;
+    }
+  }
   switch (state) {
     case "CANCELLED":
       return { label: "Cancelled", hint: null, tone: "danger" };

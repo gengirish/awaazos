@@ -117,6 +117,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
       paymentRejectedAt: true,
       fulfilmentStatus: true,
       fulfilmentType: true,
+      outForDeliveryAt: true,
       deliveryAddress: true,
       notes: true,
       customerName: true,
@@ -191,8 +192,8 @@ function ToneIcon({ tone }: { tone: StatusTone }) {
 type ProgressStep = { key: string; label: string; done: boolean };
 
 /**
- * Placed → Paid → Confirmed → Collected / Delivered (pay on delivery: no Paid
- * step, payment happens at the last one). Static: each step is an icon plus
+ * Placed → Paid → Confirmed → (On the way, deliveries only) → Collected /
+ * Delivered (pay on delivery: no Paid step, payment happens at the last one). Static: each step is an icon plus
  * words ("Done" / "Now"), and the step the order is waiting on carries
  * `aria-current`. Colour only repeats what the words say.
  */
@@ -260,9 +261,12 @@ export default async function StorefrontOrderPage(props: {
     now,
   );
   const { vendor, drop } = order;
+  // Handed to a rider and not yet delivered. Who the rider is stays with the seller.
+  const onTheWay = order.fulfilmentType === "DELIVERY" && order.outForDeliveryAt !== null;
   const status = orderStatusLabel(state, order.fulfilmentStatus, {
     menuOrder: !drop,
     fulfilmentType: order.fulfilmentType,
+    outForDelivery: onTheWay,
   });
   const pickupNote = drop ? drop.pickupNote : (vendor.settings?.menuPickupNote ?? null);
   const slug = vendor.slug;
@@ -335,6 +339,7 @@ export default async function StorefrontOrderPage(props: {
           { key: "placed", label: "Placed", done: true },
           ...(payOnDelivery ? [] : [{ key: "paid", label: "Paid", done: order.paymentStatus === "PAID" }]),
           { key: "confirmed", label: "Confirmed", done: confirmed || handedOver },
+          ...(order.fulfilmentType !== "DELIVERY" ? [] : [{ key: "on-the-way", label: "On the way", done: onTheWay || handedOver }]),
           { key: "handed", label: payOnDelivery ? `${lastStep} · pay then` : lastStep, done: handedOver },
         ];
   const storeHref = `/s/${slug}`;

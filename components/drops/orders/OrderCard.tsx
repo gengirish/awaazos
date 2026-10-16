@@ -13,6 +13,7 @@ import {
   Loader2,
   MessageCircle,
   Phone,
+  Send,
   ShoppingBag,
   Undo2,
   UtensilsCrossed,
@@ -32,6 +33,7 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
+import type { DeliveryRider } from "@/lib/delivery-riders";
 import { formatINR } from "@/lib/currency";
 import { discountLabel } from "@/lib/offers";
 import {
@@ -54,13 +56,16 @@ export type OrderSource = { kind: "menu" | "drop"; label: string };
 type Props = {
   order: BoardOrder;
   vendorName: string;
+  /** Saved delivery riders: one "Send to <name>" link each on a delivery order. */
+  riders?: DeliveryRider[];
   /** Stored drop status is FROZEN / FULFILLED: confirm & cancel are locked. */
   frozen: boolean;
   /** Shown on the card while the list mixes menu and drop orders. */
   source?: OrderSource;
   isNew: boolean;
   pendingAction: OrderAction | null;
-  onAction: (orderId: string, action: OrderAction) => void;
+  /** `riderName` goes with "dispatch" when the order was sent to a saved rider. */
+  onAction: (orderId: string, action: OrderAction, opts?: { riderName?: string }) => void;
   /** Offer a selection checkbox (the order has at least one bulk action). */
   selectable?: boolean;
   selected?: boolean;
@@ -100,6 +105,7 @@ function StateIcon({ state }: { state: BoardOrder["displayState"] }) {
 export function OrderCard({
   order,
   vendorName,
+  riders = [],
   frozen,
   source,
   isNew,
@@ -134,7 +140,10 @@ export function OrderCard({
   const canConfirm = actions.has("confirm");
   const canMarkPaid = actions.has("mark_paid");
   const canRejectPayment = actions.has("reject_payment");
+  const canDispatch = actions.has("dispatch");
   const canDeliver = actions.has("deliver");
+  const outAt = order.outForDeliveryAt ? new Date(order.outForDeliveryAt) : null;
+  const outForDelivery = outAt !== null && (fs === "PLACED" || fs === "CONFIRMED");
   const canUndeliver = actions.has("undeliver");
   const canCancel = actions.has("cancel");
 
@@ -160,6 +169,7 @@ export function OrderCard({
     { action: "confirm", show: canConfirm, label: "Confirm", icon: <CheckCircle2 aria-hidden /> },
     { action: "mark_paid", show: canMarkPaid, label: "Payment received", icon: <IndianRupee aria-hidden /> },
     { action: "reject_payment", show: canRejectPayment, label: "Not received", icon: <XCircle aria-hidden /> },
+    { action: "dispatch", show: canDispatch, label: "Out for delivery", icon: <Send aria-hidden /> },
     {
       action: "deliver",
       show: canDeliver,
@@ -277,7 +287,12 @@ export function OrderCard({
                 <StateIcon state={order.displayState} />
                 <span className="font-semibold">{DISPLAY_STATE_LABEL[order.displayState]}</span>
                 <span className="text-muted-foreground">
-                  · {itemCount} {itemCount === 1 ? "item" : "items"} · {isPickup ? "Pickup" : "Delivery"}
+                  · {itemCount} {itemCount === 1 ? "item" : "items"} ·{" "}
+                  {isPickup
+                    ? "Pickup"
+                    : outForDelivery
+                      ? `Out for delivery${order.riderName ? ` with ${order.riderName}` : ""}`
+                      : "Delivery"}
                 </span>
                 {order.notes && (
                   <span className="inline-flex items-center gap-1 font-semibold text-destructive">
@@ -423,8 +438,29 @@ export function OrderCard({
         </p>
       </div>
 
+      {outForDelivery && outAt && (
+        <p className="mt-2 flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold">
+          <Send className="h-4 w-4 shrink-0" aria-hidden />
+          <span>
+            Out for delivery
+            <span className="font-normal text-muted-foreground">
+              {" "}
+              · {formatIstTime(outAt)}
+              {order.riderName ? ` · with ${order.riderName}` : ""}
+            </span>
+          </span>
+        </p>
+      )}
+
       {!isPickup && fs !== "CANCELLED" && fs !== "DELIVERED" && (
-        <RiderHandoffButton order={order} vendorName={vendorName} className="mt-2" />
+        <RiderHandoffButton
+          order={order}
+          vendorName={vendorName}
+          riders={riders}
+          // Sending it to a rider is handing it over: the order goes out for delivery.
+          onSendToRider={busy ? undefined : (rider) => onAction(order.id, "dispatch", { riderName: rider.name })}
+          className="mt-2"
+        />
       )}
 
       {/* Next step first: one primary button, the other ways forward in outline under it. */}

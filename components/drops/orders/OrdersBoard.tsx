@@ -40,6 +40,7 @@ import {
   ResponsiveDialogTrigger,
 } from "@/components/ui/responsive-dialog";
 import { usePushAlerts } from "@/hooks/usePushAlerts";
+import type { DeliveryRider } from "@/lib/delivery-riders";
 import { formatINR } from "@/lib/currency";
 import type { EffectiveDropStatus } from "@/lib/drops";
 import {
@@ -119,6 +120,8 @@ type Props = {
   initialSignal: number | null;
   /** The viewer's role here. Drops are MANAGER+, so a cashier is never sent to build one. */
   staffRole: StaffRole;
+  /** Saved delivery riders (Settings → Online orders): "Send to <name>" on delivery orders. */
+  riders?: DeliveryRider[];
 };
 
 type OrdersResponse = { data: BoardOrder[]; drops: BoardDrop[]; signal: number | null };
@@ -156,6 +159,7 @@ const ACTION_DONE: Record<OrderAction, string> = {
   mark_paid: "Marked paid",
   reject_payment: "Marked not received",
   cancel: "Order cancelled",
+  dispatch: "Marked out for delivery",
   deliver: "Marked delivered",
   undeliver: "Moved back to confirmed",
 };
@@ -208,6 +212,7 @@ export function OrdersBoard({
   initialDropId,
   initialSignal,
   staffRole,
+  riders = [],
 }: Props) {
   const [orders, setOrders] = useState(initialOrders);
   const [drops, setDrops] = useState(initialDrops);
@@ -483,7 +488,7 @@ export function OrdersBoard({
     setAnnouncement("");
   };
 
-  const runAction = async (orderId: string, action: OrderAction) => {
+  const runAction = async (orderId: string, action: OrderAction, opts?: { riderName?: string }) => {
     const order = ordersRef.current.find((o) => o.id === orderId);
     if (!order) return;
     setPending({ orderId, action });
@@ -491,7 +496,7 @@ export function OrdersBoard({
       const res = await fetch(`${orderActionBase(order.dropId)}/${encodeURIComponent(orderId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(opts?.riderName ? { action, riderName: opts.riderName } : { action }),
       });
       const body = (await res.json().catch(() => ({}))) as { data?: BoardOrder; error?: string };
       if (res.ok && body.data) {
@@ -511,6 +516,8 @@ export function OrdersBoard({
             classNames: { actionButton: "min-h-11" },
             action: { label: "Undo", onClick: () => void runAction(updated.id, "undeliver") },
           });
+        } else if (action === "dispatch" && opts?.riderName) {
+          toast.success(`Out for delivery with ${opts.riderName}`);
         } else {
           toast.success(ACTION_DONE[action]);
         }
@@ -1185,6 +1192,7 @@ export function OrdersBoard({
                   <OrderCard
                     order={o}
                     vendorName={vendorName}
+                    riders={riders}
                     frozen={isFrozen(o)}
                     source={sourceOf(o)}
                     isNew={newIds.has(o.id)}

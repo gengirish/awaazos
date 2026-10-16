@@ -90,6 +90,9 @@ model VendorSettings {
   menuFulfilmentMode       FulfilmentMode @default(PICKUP)
   menuDeliveryFeePaise     Int            @default(0)
   menuPickupNote           String?
+  // The seller's own delivery people: [{ name, phone (E.164) }], at most
+  // MAX_DELIVERY_RIDERS. Read only through parseDeliveryRiders (lib/delivery-riders.ts).
+  deliveryRiders           Json           @default("[]")
   // Vendor-owned Razorpay account for storefront payments (money goes to the
   // vendor, never through the platform). Secrets are AES-256-GCM encrypted with
   // PAYMENT_KEYS_ENCRYPTION_KEY (lib/secret-box.ts) — never stored or logged raw.
@@ -374,6 +377,10 @@ model Transaction {
   deliveryAddress  String? // PII — never logged, never sent to an LLM
   deliveryFeePaise Int               @default(0)
   orderToken       String?           @unique // Unguessable handle for the buyer's order page
+  // A delivery order handed to a rider ("Out for delivery"). A stamp, not a
+  // FulfilmentStatus: the order stays CONFIRMED for stock, payment and lists.
+  outForDeliveryAt DateTime?
+  riderName        String? // Snapshot of the rider it went with, when one was named
   customerId       String?
   customer         Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   cancelledAt      DateTime?

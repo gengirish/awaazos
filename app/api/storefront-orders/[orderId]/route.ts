@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { toBoardOrder } from "@/lib/drops-board-server";
 import { bumpOrderSignal } from "@/lib/drops-signal";
+import { RIDER_NAME_MAX } from "@/lib/delivery-riders";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import {
@@ -15,7 +16,8 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const bodySchema = z.object({ action: z.enum(ORDER_ACTIONS) });
+// `riderName` goes with dispatch only: the saved rider it was sent to.
+const bodySchema = z.object({ action: z.enum(ORDER_ACTIONS), riderName: z.string().trim().max(RIDER_NAME_MAX).optional() });
 
 function withVendorCookie(res: NextResponse, slug: string | null) {
   if (slug) {
@@ -31,7 +33,7 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
 
 /**
  * PATCH /api/storefront-orders/[orderId] — `{ action }` on an "order from
- * menu" order (confirm | mark_paid | cancel | deliver | undeliver; see
+ * menu" order (confirm | mark_paid | cancel | dispatch | deliver | undeliver; see
  * lib/storefront-order-actions.ts). Scoped to `{ id, vendorId, source:
  * STOREFRONT, dropId: null }`: a drop order, a counter sale or another
  * vendor's order is a 404. No frozen rule — there is no drop.
@@ -40,11 +42,11 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ orderId
   const params = await props.params;
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
-    const { action } = bodySchema.parse(await req.json());
+    const { action, riderName } = bodySchema.parse(await req.json());
     const scope = storefrontOrderScope({ orderId: params.orderId, vendorId: ctx.vendor.id, dropId: null });
 
     const updated = await prisma.$transaction((tx) =>
-      applyStorefrontOrderAction(tx, { scope, action, dropStatus: null }),
+      applyStorefrontOrderAction(tx, { scope, action, riderName, dropStatus: null }),
     );
 
     // Let the vendor's other phones notice the change. Fire-and-forget.

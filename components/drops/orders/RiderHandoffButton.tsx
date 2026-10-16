@@ -1,9 +1,10 @@
 "use client";
 
-import { Bike, Check, Share2 } from "lucide-react";
+import { Bike, Check, MessageCircle, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { formatRiderHandoff, type RiderHandoffOrder } from "@/lib/delivery-handoff";
+import { formatRiderHandoff, riderWhatsappUrl, type RiderHandoffOrder } from "@/lib/delivery-handoff";
+import type { DeliveryRider } from "@/lib/delivery-riders";
 import { cn } from "@/lib/utils";
 
 const btn =
@@ -12,16 +13,23 @@ const btn =
 /**
  * "Copy for rider": one delivery order's name, phone, address, items and what
  * to collect, for Porter / Rapido or the seller's own rider. Phones that can
- * share also get a Share button (WhatsApp the rider directly). The text holds
- * buyer PII, so it goes only to the clipboard or the share sheet — never logged.
+ * share also get a Share button (WhatsApp the rider directly), and each saved
+ * rider (Settings → Online orders) gets "Send to <name>", a wa.me link to that
+ * rider with the text filled in. The text holds buyer PII, so it goes only to
+ * the clipboard, the share sheet or the seller's own WhatsApp — never logged.
  */
 export function RiderHandoffButton({
   order,
   vendorName,
+  riders = [],
+  onSendToRider,
   className,
 }: {
   order: RiderHandoffOrder;
   vendorName: string;
+  riders?: DeliveryRider[];
+  /** Called as a "Send to" link opens WhatsApp (the board marks the order out for delivery). */
+  onSendToRider?: (rider: DeliveryRider) => void;
   className?: string;
 }) {
   const [canShare, setCanShare] = useState(false);
@@ -63,6 +71,24 @@ export function RiderHandoffButton({
 
   return (
     <div className={cn("print:hidden", className)}>
+      {riders.length > 0 && (
+        <div className="mb-2 flex flex-wrap gap-2">
+          {riders.map((rider) => (
+            <a
+              key={rider.phone}
+              href={riderWhatsappUrl(rider, text())}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => onSendToRider?.(rider)}
+              className={cn(btn, "flex-1")}
+              aria-label={`Send ${order.billNumber} to ${rider.name} on WhatsApp`}
+            >
+              <MessageCircle className="h-4 w-4" aria-hidden />
+              Send to {rider.name}
+            </a>
+          ))}
+        </div>
+      )}
       <div className="flex gap-2">
         <button type="button" onClick={() => void copy()} className={cn(btn, "flex-1")}>
           {copied ? <Check className="h-4 w-4 text-primary" aria-hidden /> : <Bike className="h-4 w-4" aria-hidden />}

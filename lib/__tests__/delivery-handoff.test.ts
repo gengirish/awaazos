@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { formatRiderHandoff, riderCollectLine, type RiderHandoffOrder } from "@/lib/delivery-handoff";
+import { formatRiderHandoff, riderCollectLine, riderWhatsappUrl, type RiderHandoffOrder } from "@/lib/delivery-handoff";
 
 function order(over: Partial<RiderHandoffOrder> = {}): RiderHandoffOrder {
   return {
@@ -58,5 +58,13 @@ describe("riderCollectLine", () => {
 
   it("collects only the balance after an advance", () => {
     expect(riderCollectLine(order({ advancePaidPaise: 20000 }))).toBe("Collect ₹250.00 cash");
+  });
+});
+
+describe("riderWhatsappUrl", () => {
+  it("opens a chat with the rider with the text filled in", () => {
+    expect(riderWhatsappUrl({ name: "Ramesh", phone: "+919876543210" }, "Delivery for X")).toBe(
+      "https://wa.me/919876543210?text=Delivery%20for%20X",
+    );
   });
 });

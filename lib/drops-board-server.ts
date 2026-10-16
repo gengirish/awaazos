@@ -47,6 +47,8 @@ export const boardOrderSelect = {
   advancePaidPaise: true,
   fulfilAt: true,
   isSample: true,
+  outForDeliveryAt: true,
+  riderName: true,
   orderItems: {
     select: { id: true, dropItemId: true, name: true, qty: true, priceInPaise: true, totalPaise: true },
     orderBy: { id: "asc" },
@@ -79,6 +81,8 @@ export function toBoardOrder(row: BoardOrderRow, now: Date = new Date()): BoardO
     advancePaidPaise: row.advancePaidPaise,
     fulfilAt: row.fulfilAt?.toISOString() ?? null,
     isSample: row.isSample,
+    outForDeliveryAt: row.outForDeliveryAt?.toISOString() ?? null,
+    riderName: row.riderName,
     displayState,
     holdsStock: orderHoldsStock(row, now),
     bucket: boardBucket({ displayState, fulfilmentStatus: row.fulfilmentStatus }),

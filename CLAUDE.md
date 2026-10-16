@@ -450,6 +450,15 @@ menu orders only), sharing order actions with drops via `lib/storefront-order-ac
 Menu ordering has no cut-off to stop the board polling, so it polls every 6 min — keep it above
 Neon's idle timeout.
 
+**Delivery handoff** (`lib/delivery-handoff.ts`, `lib/delivery-riders.ts`): a delivery order's card has
+"Copy for rider" and, for each rider saved in Settings → Online orders (`VendorSettings.deliveryRiders`,
+≤ 5 `{ name, phone }`, OWNER via `PATCH /api/vendor`), "Send to <name>" — a `wa.me` link to the rider
+with the handoff text (buyer name, phone, address, items, cash to collect). The seller's tap sends it;
+nothing goes through the server. Opening it also runs the `dispatch` action, as does the "Out for
+delivery" button: `outForDeliveryAt` (+ `riderName` snapshot) is a **stamp, not a `FulfilmentStatus`**
+— the order stays `CONFIRMED`, so stock, payment, buckets and bulk actions are untouched. The buyer's
+page reads "On the way" and never shows the rider's name.
+
 **Bulk order actions** (`lib/order-bulk.ts` client-safe, `lib/storefront-order-bulk.ts` server): the
 board selects orders and applies confirm / mark_paid / deliver via `POST /api/drops/[id]/orders/bulk`
 and `POST /api/storefront-orders/bulk` (`{ orderIds: 1..50 unique, action }`, CASHIER); a selection

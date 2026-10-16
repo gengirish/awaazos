@@ -2,9 +2,11 @@ import { CalendarClock, ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { DeliveryRidersClient } from "@/components/settings/DeliveryRidersClient";
 import { MenuOrdersClient } from "@/components/settings/MenuOrdersClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { WhatsappOrdersClient } from "@/components/settings/WhatsappOrdersClient";
+import { parseDeliveryRiders } from "@/lib/delivery-riders";
 import { prisma } from "@/lib/prisma";
 
 import { requireSettingsContext } from "../_context";
@@ -26,6 +28,7 @@ export default async function OrdersSettingsPage() {
       whatsappNumber: true,
       acceptWhatsappOrders: true,
       showWhatsappOnStore: true,
+      deliveryRiders: true,
     },
   });
 
@@ -52,6 +55,16 @@ export default async function OrdersSettingsPage() {
             initialWhatsappNumber={settings?.whatsappNumber ?? null}
             initialAcceptWhatsappOrders={settings?.acceptWhatsappOrders ?? false}
             initialShowOnStore={settings?.showWhatsappOnStore ?? false}
+            isOwner={isOwner}
+          />
+        </SettingsCard>
+
+        <SettingsCard
+          title="Delivery riders"
+          description="Save the people who deliver for you. Delivery orders then get a “Send to” button that opens WhatsApp to the rider with the address, items and amount to collect."
+        >
+          <DeliveryRidersClient
+            initialRiders={parseDeliveryRiders(settings?.deliveryRiders)}
             isOwner={isOwner}
           />
         </SettingsCard>

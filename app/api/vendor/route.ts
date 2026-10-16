@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { SUPPORTED_VOICE_LANGS } from "@/lib/constants";
+import { deliveryRidersSchema } from "@/lib/delivery-riders";
 import { INSTAGRAM_HANDLE_MESSAGE, normaliseInstagramHandle } from "@/lib/instagram";
 import { menuOrdersEnableBlocker, type MenuOrdersBlocker } from "@/lib/menu-orders-board";
 import {
@@ -85,6 +86,9 @@ const patchSchema = z.object({
   menuDeliveryFeePaise: z.number().int().min(0).max(100_000).optional(),
   // "" or null clears it.
   menuPickupNote: z.string().trim().max(200).optional().nullable(),
+  // The seller's own delivery people (Settings → Online orders). The whole
+  // list is replaced; [] removes every rider.
+  deliveryRiders: deliveryRidersSchema.optional(),
   menuItems: z
     .array(
       z.object({
@@ -305,6 +309,9 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.menuPickupNote !== undefined) {
         settingsUpdate.menuPickupNote = vendorFields.menuPickupNote || null;
+      }
+      if (vendorFields.deliveryRiders !== undefined) {
+        settingsUpdate.deliveryRiders = vendorFields.deliveryRiders;
       }
       if (vendorFields.onboardingDone === true && vendorFields.whatsappNumber) {
         settingsUpdate.sendWhatsappReceipt = true;
