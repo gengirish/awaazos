@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { toBoardOrder } from "@/lib/drops-board-server";
 import { bumpOrderSignal } from "@/lib/drops-signal";
+import { RIDER_NAME_MAX } from "@/lib/delivery-riders";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import {
@@ -15,7 +16,8 @@ import {
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const bodySchema = z.object({ action: z.enum(ORDER_ACTIONS) });
+// `riderName` goes with dispatch only: the saved rider it was sent to.
+const bodySchema = z.object({ action: z.enum(ORDER_ACTIONS), riderName: z.string().trim().max(RIDER_NAME_MAX).optional() });
 
 function withVendorCookie(res: NextResponse, slug: string | null) {
   if (slug) {
@@ -35,6 +37,7 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
  *   confirm    PLACED → CONFIRMED
  *   mark_paid  markOrderPaid (credits DailySummary once)
  *   cancel     cancelOrder (reverses revenue if it was paid; vendor refunds via UPI)
+ *   dispatch   delivery order handed to a rider: stamps outForDeliveryAt (+ `riderName`)
  *   deliver    PLACED|CONFIRMED → DELIVERED; unpaid CASH is marked paid in the same txn
  *   undeliver  DELIVERED → CONFIRMED (mistake fix; payment untouched)
  *
@@ -48,7 +51,7 @@ export async function PATCH(
   const params = await props.params;
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
-    const { action } = bodySchema.parse(await req.json());
+    const { action, riderName } = bodySchema.parse(await req.json());
     const vendorId = ctx.vendor.id;
     const dropId = params.id;
     const orderId = params.orderId;
@@ -57,7 +60,7 @@ export async function PATCH(
     const updated = await prisma.$transaction(async (tx) => {
       const drop = await tx.drop.findFirst({ where: { id: dropId, vendorId }, select: { status: true } });
       if (!drop) throw new OrderActionError(404, "Not found");
-      return applyStorefrontOrderAction(tx, { scope, action, dropStatus: drop.status });
+      return applyStorefrontOrderAction(tx, { scope, action, riderName, dropStatus: drop.status });
     });
 
     // Let the vendor's other phones notice the change. Fire-and-forget.

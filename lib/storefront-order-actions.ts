@@ -9,6 +9,8 @@
  *              UTR), stamps paymentRejectedAt. The order stops holding stock once
  *              its 15-minute window has passed; a new claim then needs a UTR.
  *   cancel     cancelOrder (reverses revenue if it was paid; vendor refunds via UPI)
+ *   dispatch   a DELIVERY order handed to a rider: PLACED|CONFIRMED → CONFIRMED,
+ *              stamps outForDeliveryAt (+ riderName). Sending it again restamps.
  *   deliver    PLACED|CONFIRMED → DELIVERED; unpaid CASH is marked paid in the same txn
  *   undeliver  DELIVERED → CONFIRMED (mistake fix; payment untouched)
  *
@@ -76,6 +78,8 @@ export async function applyStorefrontOrderAction(
     scope: StorefrontOrderScope;
     action: OrderAction;
     dropStatus: DropStatus | null;
+    /** dispatch only: the saved rider it went with ("Send to Ramesh"); omitted = unnamed. */
+    riderName?: string | null;
     now?: Date;
   },
 ): Promise<BoardOrderRow> {
@@ -84,7 +88,7 @@ export async function applyStorefrontOrderAction(
 
   const order = await tx.transaction.findFirst({
     where: scope,
-    select: { fulfilmentStatus: true, paymentStatus: true, paymentMethod: true },
+    select: { fulfilmentStatus: true, paymentStatus: true, paymentMethod: true, fulfilmentType: true },
   });
   if (!order) throw new OrderActionError(404, "Not found");
 
@@ -121,6 +125,18 @@ export async function applyStorefrontOrderAction(
     }
     case "cancel": {
       applied = await cancelOrder(tx, { vendorId, transactionId, now: args.now });
+      break;
+    }
+    case "dispatch": {
+      const r = await tx.transaction.updateMany({
+        where: { ...scope, fulfilmentType: "DELIVERY", fulfilmentStatus: { in: ["PLACED", "CONFIRMED"] } },
+        data: {
+          fulfilmentStatus: "CONFIRMED",
+          outForDeliveryAt: args.now ?? new Date(),
+          riderName: args.riderName?.trim() || null,
+        },
+      });
+      applied = r.count === 1;
       break;
     }
     case "deliver": {

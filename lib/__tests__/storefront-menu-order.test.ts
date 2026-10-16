@@ -62,6 +62,26 @@ describe("orderErrorMessage — menu orders", () => {
   });
 });
 
+describe("orderStatusLabel — out for delivery", () => {
+  it("reads On the way once a confirmed order has gone out, keeping the payment line", () => {
+    const out = { fulfilmentType: "DELIVERY" as const, outForDelivery: true };
+    expect(orderStatusLabel("PAY_ON_DELIVERY", "CONFIRMED", out)).toEqual({
+      label: "On the way",
+      hint: "Pay on delivery",
+      tone: "success",
+    });
+    expect(orderStatusLabel("PAID", "CONFIRMED", out).label).toBe("On the way");
+    expect(orderStatusLabel("PAYMENT_SUBMITTED", "CONFIRMED", out).label).toBe("On the way");
+  });
+
+  it("delivered, cancelled and unpaid UPI orders keep their own words", () => {
+    const out = { fulfilmentType: "DELIVERY" as const, outForDelivery: true };
+    expect(orderStatusLabel("DELIVERED", "DELIVERED", out).label).toBe("Delivered");
+    expect(orderStatusLabel("CANCELLED", "CANCELLED", out).label).toBe("Cancelled");
+    expect(orderStatusLabel("AWAITING_PAYMENT", "CONFIRMED", out).label).toBe("Waiting for payment");
+  });
+});
+
 describe("orderStatusLabel — menu orders", () => {
   it("drops the stock wording on an expired menu order", () => {
     expect(orderStatusLabel("EXPIRED", "PLACED", { menuOrder: true }).label).toBe("Expired — please order again");

@@ -377,6 +377,10 @@ model Transaction {
   deliveryAddress  String? // PII — never logged, never sent to an LLM
   deliveryFeePaise Int               @default(0)
   orderToken       String?           @unique // Unguessable handle for the buyer's order page
+  // A delivery order handed to a rider ("Out for delivery"). A stamp, not a
+  // FulfilmentStatus: the order stays CONFIRMED for stock, payment and lists.
+  outForDeliveryAt DateTime?
+  riderName        String? // Snapshot of the rider it went with, when one was named
   customerId       String?
   customer         Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   cancelledAt      DateTime?
