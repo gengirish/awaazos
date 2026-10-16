@@ -16,6 +16,7 @@ import {
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
+import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
 import { formatINRCompact } from "@/lib/currency";
 import { applyOffers, type ResolvedOffer } from "@/lib/offers";
 import {
@@ -109,6 +110,12 @@ export function DropOrder(props: DropOrderProps) {
   const checkoutRef = useRef<HTMLButtonElement>(null);
 
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  // The store page's search hides rows; the cart keeps what was added.
+  const matchesSearch = useStoreSearchMatch();
+  const visibleItems = useMemo(
+    () => items.filter((i) => matchesSearch(`${i.name} ${dropTitle}`)),
+    [items, dropTitle, matchesSearch],
+  );
 
   // Saved per drop; discarded once the drop stops taking orders, clamped to
   // current stock and per-order limits on restore.
@@ -203,7 +210,7 @@ export function DropOrder(props: DropOrderProps) {
           pads the rows, and at 360 px a second inset leaves the name no room
           beside the 72 px photo and the stepper. */}
       <ul className="divide-y divide-border/50 border-y border-border/50">
-        {items.map((item) => {
+        {visibleItems.map((item) => {
           const remaining = remainingFor(item);
           const max = maxOrderableQty(remaining, item.perOrderLimit);
           const qty = cart[item.id] ?? 0;
