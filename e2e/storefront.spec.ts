@@ -176,6 +176,43 @@ test.describe("public storefront", () => {
     }
   });
 
+  test("Settings sets an 'Other' store type and a corrected place on the store page", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    await createVendorSession(page, request, "storefront-details", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, { name: "Mango Pickle", priceInRupees: 180 });
+    await setPublished(page, true);
+
+    // OTHER without the seller's words is refused.
+    const bare = await page.request.patch("/api/vendor", {
+      data: { stallType: "OTHER" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(bare.status()).toBe(400);
+
+    await page.goto("/settings/store");
+    await page.getByLabel("What do you sell?").selectOption("OTHER");
+    await page.getByLabel("Describe your business").fill("Pickles & podis");
+    await page.getByLabel("Area and city").fill("Sahakar Nagar, Bengaluru");
+    await page.getByLabel("State", { exact: true }).fill("");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Saved", exact: true }).first()).toBeVisible();
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const buyer = await anon.newPage();
+    try {
+      await buyer.goto(`/s/${slug}`);
+      await expect(buyer.getByText("Pickles & podis", { exact: true })).toBeVisible();
+      await expect(buyer.getByText("Sahakar Nagar, Bengaluru", { exact: true })).toBeVisible();
+      await expect(buyer.getByText(/Telangana/)).toHaveCount(0);
+    } finally {
+      await anon.close();
+    }
+  });
+
   test("an unknown slug 404s", async ({ page }) => {
     const res = await page.goto("/s/no-such-stall-abcxyz");
     expect(res?.status()).toBe(404);

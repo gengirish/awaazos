@@ -15,6 +15,7 @@ import {
 } from "@/lib/payment-guard";
 import { normaliseIndianMobile } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
+import { resolveStallTypeOther } from "@/lib/stall-type";
 import { requireVendorRole } from "@/lib/rbac";
 import { GSTIN_FORMAT_MESSAGE, GSTIN_PATTERN, RECEIPT_FOOTER_MAX } from "@/lib/receipt";
 import { storeHandleSchema } from "@/lib/store-handle";
@@ -34,9 +35,13 @@ const patchSchema = z.object({
   // retires the old link at once: anything printed or posted with it stops
   // working, which the UI says before it sends this. 409 store_handle_taken.
   slug: storeHandleSchema.optional(),
-  city: z.string().trim().min(1).max(80).optional(),
-  state: z.string().trim().min(1).max(80).optional(),
+  // "" or null clears them: a store's place is optional (Settings → Online store).
+  city: z.string().trim().max(80).nullable().optional(),
+  state: z.string().trim().max(80).nullable().optional(),
   stallType: z.nativeEnum(StallType).optional(),
+  // The seller's words for stallType OTHER (lib/stall-type.ts). Read only
+  // together with stallType: required for OTHER, cleared for any other type.
+  stallTypeOther: z.string().max(200).nullable().optional(),
   // "" or null clears it; otherwise it must look like name@bank (lib/upi.ts).
   upiId: z
     .string()
@@ -182,6 +187,18 @@ export async function PATCH(req: NextRequest) {
 
     const { menuItems, ...vendorFields } = parsed.data;
 
+    let stallTypeOther: string | null | undefined;
+    if (vendorFields.stallType !== undefined) {
+      const other = resolveStallTypeOther(vendorFields.stallType, vendorFields.stallTypeOther);
+      if (!other.ok) {
+        return NextResponse.json(
+          { error: "Validation failed.", details: { stallTypeOther: [other.error] } },
+          { status: 400 },
+        );
+      }
+      stallTypeOther = other.value;
+    }
+
     // One stored format (E.164 for Indian mobiles) so wa.me links don't depend on how it was typed.
     if (vendorFields.whatsappNumber) {
       vendorFields.whatsappNumber = normaliseIndianMobile(vendorFields.whatsappNumber);
@@ -249,9 +266,12 @@ export async function PATCH(req: NextRequest) {
         if (taken) throw new StoreHandleTaken();
         data.slug = vendorFields.slug;
       }
-      if (vendorFields.city !== undefined) data.city = vendorFields.city;
-      if (vendorFields.state !== undefined) data.state = vendorFields.state;
-      if (vendorFields.stallType !== undefined) data.stallType = vendorFields.stallType;
+      if (vendorFields.city !== undefined) data.city = vendorFields.city || null;
+      if (vendorFields.state !== undefined) data.state = vendorFields.state || null;
+      if (vendorFields.stallType !== undefined) {
+        data.stallType = vendorFields.stallType;
+        data.stallTypeOther = stallTypeOther ?? null;
+      }
       if (vendorFields.upiId !== undefined) data.upiId = vendorFields.upiId || null;
       if (vendorFields.upiName !== undefined) data.upiName = vendorFields.upiName || null;
       if (vendorFields.onboardingDone !== undefined) data.onboardingDone = vendorFields.onboardingDone;

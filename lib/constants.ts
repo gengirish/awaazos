@@ -100,6 +100,8 @@ export const STALL_TYPES: { value: StallType; label: string }[] = [
   { value: "KIRANA", label: "Kirana / grocery" },
   { value: "CLOTHING", label: "Clothing" },
   { value: "SERVICES", label: "Services" },
+  // Last on purpose: the seller then describes it (lib/stall-type.ts).
+  { value: "OTHER", label: "Other (describe it)" },
 ];
 
 /**

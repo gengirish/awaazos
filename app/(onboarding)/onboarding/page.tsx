@@ -24,6 +24,7 @@ import { useQrDataUrl } from "@/hooks/useQrDataUrl";
 import { STALL_TYPES } from "@/lib/constants";
 import { formatINR } from "@/lib/currency";
 import { HOME_PATH } from "@/lib/home";
+import { STALL_TYPE_OTHER_MAX, STALL_TYPE_OTHER_MESSAGE, stallTypeOtherSchema } from "@/lib/stall-type";
 import { buildUpiDeepLink, isValidUpiId, UPI_ID_FORMAT_MESSAGE } from "@/lib/upi";
 import { cn } from "@/lib/utils";
 import type { StallType, Vendor, VendorSettings } from "@prisma/client";
@@ -173,6 +174,7 @@ export default function OnboardingPage() {
   const [city, setCity] = useState("");
   const [stateName, setStateName] = useState("");
   const [stallType, setStallType] = useState<StallType>("GENERAL");
+  const [stallTypeOther, setStallTypeOther] = useState("");
 
   const [upiId, setUpiId] = useState("");
   const [upiName, setUpiName] = useState("");
@@ -220,6 +222,7 @@ export default function OnboardingPage() {
         setCity(v.city ?? "");
         setStateName(initialStateName(v.city, v.state));
         setStallType(v.stallType);
+        setStallTypeOther(v.stallTypeOther ?? "");
         setUpiId(v.upiId ?? "");
         setSavedUpiId(v.upiId ?? "");
         setUpiName(v.upiName ?? v.name);
@@ -313,11 +316,19 @@ export default function OnboardingPage() {
     const found: FieldErrors = {};
     if (!city.trim()) found.city = "Enter your city.";
     if (!stateName.trim()) found.state = "Enter your state.";
+    if (stallType === "OTHER" && !stallTypeOtherSchema.safeParse(stallTypeOther).success) {
+      found.stallTypeOther = STALL_TYPE_OTHER_MESSAGE;
+    }
     if (Object.keys(found).length) {
       reject(found);
       return false;
     }
-    return patchVendor({ city: city.trim(), state: stateName.trim(), stallType });
+    return patchVendor({
+      city: city.trim(),
+      state: stateName.trim(),
+      stallType,
+      ...(stallType === "OTHER" ? { stallTypeOther } : {}),
+    });
   }
 
   async function savePayment(): Promise<boolean> {
@@ -580,6 +591,23 @@ export default function OnboardingPage() {
                   </SelectContent>
                 </Select>
               </div>
+              {stallType === "OTHER" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="stallTypeOther">Describe your business</Label>
+                  <Input
+                    id="stallTypeOther"
+                    maxLength={STALL_TYPE_OTHER_MAX}
+                    placeholder="Pickles & podis"
+                    value={stallTypeOther}
+                    onChange={(e) => {
+                      setStallTypeOther(e.target.value);
+                      clearError("stallTypeOther");
+                    }}
+                    {...fieldAria("stallTypeOther", errors)}
+                  />
+                  <FieldError id="stallTypeOther" message={errors.stallTypeOther} />
+                </div>
+              ) : null}
             </>
           )}
 

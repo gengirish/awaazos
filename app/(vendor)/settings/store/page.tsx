@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { FssaiNumberClient } from "@/components/settings/FssaiNumberClient";
 import { InstagramHandleClient } from "@/components/settings/InstagramHandleClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
+import { StoreDetailsClient } from "@/components/settings/StoreDetailsClient";
 import { StoreHandleClient } from "@/components/settings/StoreHandleClient";
 import { StoreImagesClient } from "@/components/settings/StoreImagesClient";
 import { StoreNameClient } from "@/components/settings/StoreNameClient";
@@ -41,6 +42,15 @@ export default async function StoreSettingsPage() {
             initialHandle={vendor.slug}
             isOwner={isOwner}
             published={settings?.publishStorefront ?? false}
+          />
+        </SettingsCard>
+        <SettingsCard title="Store type & location" description="The line under your store name on your store page.">
+          <StoreDetailsClient
+            initialStallType={vendor.stallType}
+            initialStallTypeOther={vendor.stallTypeOther}
+            initialCity={vendor.city}
+            initialState={vendor.state}
+            isOwner={isOwner}
           />
         </SettingsCard>
         <SettingsCard title="Banner & logo" description="Shown at the top of your store page.">

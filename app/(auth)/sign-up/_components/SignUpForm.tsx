@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/select";
 import { useStoreHandleCheck } from "@/hooks/useStoreHandleCheck";
 import { STALL_TYPES } from "@/lib/constants";
+import { STALL_TYPE_OTHER_MAX, STALL_TYPE_OTHER_MESSAGE, stallTypeOtherSchema } from "@/lib/stall-type";
 import { HOME_PATH } from "@/lib/home";
 import { checkPasswordPolicy } from "@/lib/password-strength";
 import {
@@ -32,7 +33,7 @@ import type { StallType } from "@prisma/client";
 
 // In form order: the first one with an error takes focus. The ids are also the
 // keys of the register API's zod `details` (signUpSchema in lib/zod-auth.ts).
-const FIELDS = ["name", "email", "password", "stallName", "storeHandle", "stallType", "phone"] as const;
+const FIELDS = ["name", "email", "password", "stallName", "storeHandle", "stallType", "stallTypeOther", "phone"] as const;
 type Field = (typeof FIELDS)[number];
 type FieldErrors = Partial<Record<Field, string>>;
 
@@ -44,6 +45,7 @@ const SERVER_FIELD_MESSAGE: Record<Field, string> = {
   stallName: "Enter your store name (up to 120 characters).",
   storeHandle: "Choose a store link: 3 to 40 lowercase letters, numbers or hyphens.",
   stallType: "Choose what you sell.",
+  stallTypeOther: STALL_TYPE_OTHER_MESSAGE,
   phone: "Enter a valid +91 Indian mobile number.",
 };
 
@@ -63,6 +65,8 @@ function validate(values: {
   password: string;
   stallName: string;
   storeHandle: string;
+  stallType: StallType;
+  stallTypeOther: string;
 }): FieldErrors {
   const errors: FieldErrors = {};
   if (!values.name.trim()) errors.name = "Enter your name.";
@@ -72,6 +76,9 @@ function validate(values: {
   if (!values.stallName.trim()) errors.stallName = "Enter your store name.";
   const handleProblem = storeHandleProblem(values.storeHandle);
   if (handleProblem) errors.storeHandle = handleProblem;
+  if (values.stallType === "OTHER" && !stallTypeOtherSchema.safeParse(values.stallTypeOther).success) {
+    errors.stallTypeOther = STALL_TYPE_OTHER_MESSAGE;
+  }
   return errors;
 }
 
@@ -120,6 +127,7 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
   const [handleEdited, setHandleEdited] = useState(false);
   const [host, setHost] = useState("");
   const [stallType, setStallType] = useState<StallType>("GENERAL");
+  const [stallTypeOther, setStallTypeOther] = useState("");
   const [phone, setPhone] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
@@ -172,7 +180,7 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
 
     const handle = normaliseStoreHandle(storeHandle);
     setStoreHandle(handle);
-    const invalid = validate({ name, email, password, stallName, storeHandle: handle });
+    const invalid = validate({ name, email, password, stallName, storeHandle: handle, stallType, stallTypeOther });
     if (Object.keys(invalid).length > 0) {
       showFieldErrors(invalid);
       return;
@@ -193,6 +201,7 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
           stallName,
           storeHandle: handle,
           stallType,
+          ...(stallType === "OTHER" ? { stallTypeOther } : {}),
           phone: phone.trim() || undefined,
         }),
       });
@@ -374,6 +383,27 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
             </Select>
             {fieldError("stallType")}
           </div>
+          {stallType === "OTHER" ? (
+            <div className="space-y-2">
+              <Label htmlFor="stallTypeOther">Describe your business</Label>
+              <Input
+                id="stallTypeOther"
+                name="stallTypeOther"
+                required
+                maxLength={STALL_TYPE_OTHER_MAX}
+                autoCapitalize="sentences"
+                placeholder="Pickles & podis"
+                aria-invalid={fieldErrors.stallTypeOther ? true : undefined}
+                aria-describedby={describedBy("stallTypeOther", "stallTypeOther-hint")}
+                value={stallTypeOther}
+                onChange={(e) => setStallTypeOther(e.target.value)}
+              />
+              <p id="stallTypeOther-hint" className="text-xs text-muted-foreground">
+                Shown on your store page in place of a type, in up to {STALL_TYPE_OTHER_MAX} characters.
+              </p>
+              {fieldError("stallTypeOther")}
+            </div>
+          ) : null}
           <div className="space-y-2">
             <Label htmlFor="phone">Phone (optional, +91)</Label>
             <Input
