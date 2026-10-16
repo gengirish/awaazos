@@ -47,7 +47,7 @@
     "@radix-ui/react-slot": "^1.1.1",
     "@sentry/nextjs": "^10.50.0",
     "@sentry/node": "^10.50.0",
-    "@upstash/redis": "^1.37.0",
+    "@upstash/redis": "^1.39.0",
     "@vercel/blob": "^2.8.1",
     "@vercel/functions": "^3.9.11",
     "bcryptjs": "^2.4.3",
