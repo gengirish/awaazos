@@ -310,6 +310,17 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     keywords: "photo picture brand rename",
   },
   {
+    id: "store-details",
+    group: "setup",
+    title: "Change what you sell or where you are",
+    steps: "Under Store type & location, pick what you sell (or Other, and describe it) and type your area, city and state. Leave one blank to hide it.",
+    nav: "settings",
+    href: "/settings/store",
+    trail: ["Online store"],
+    ownerOnly: true,
+    keywords: "type category business other city state location address place",
+  },
+  {
     id: "menu-orders",
     group: "setup",
     title: "Let customers order from your everyday menu",

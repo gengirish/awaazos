@@ -335,16 +335,16 @@ test.describe("voice menu builder", () => {
 
     await page.getByLabel("City").fill("Hyderabad");
     await page.getByLabel("State").fill("Telangana");
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
     await page.getByLabel("UPI ID (optional)").fill("e2evoice@okaxis");
     await page.getByLabel("Name shown on UPI screen").fill("E2E Voice Stall");
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
 
     await expect(page.getByRole("heading", { name: "What you sell" })).toBeVisible();
     await page.getByRole("button", { name: "Speak your whole menu" }).click();
     await expect(page.getByText(/land on your Menu with the mic ready/)).toBeVisible();
     // No typed items needed in this mode.
-    await page.getByRole("button", { name: "Next" }).click();
+    await page.getByRole("button", { name: "Next", exact: true }).click();
 
     await page.getByLabel("WhatsApp number (optional)").fill("+919876543210");
     await page.getByRole("button", { name: "Finish & speak your menu" }).click();

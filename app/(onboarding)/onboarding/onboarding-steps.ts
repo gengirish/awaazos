@@ -47,9 +47,9 @@ export function resumeStep({ city, upiId, itemCount, storedStep }: OnboardingRes
 }
 
 /**
- * `Vendor.state` has a database default ("Telangana"), so a new store carries
- * it before anyone chose it. Until step 1 is saved (no city yet) the field
- * starts empty; afterwards the saved value is the seller's own.
+ * Stores made before 2026-10 carry a database default for `Vendor.state`
+ * ("Telangana") they never chose. Until step 1 is saved (no city yet) the
+ * field starts empty; afterwards the saved value is the seller's own.
  */
 export function initialStateName(city: string | null, state: string | null): string {
   return city?.trim() ? (state ?? "") : "";

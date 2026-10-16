@@ -30,8 +30,12 @@ model Vendor {
   // lazily by billingAccess() in lib/plan.ts — nothing runs at this instant.
   trialEndsAt     DateTime?
   stallType       StallType @default(GENERAL)
+  // The seller's own words when stallType is OTHER ("Pickles & podis"); null otherwise.
+  stallTypeOther  String?   @db.VarChar(40)
   city            String?
-  state           String    @default("Telangana")
+  // No default: a default ("Telangana" until 2026-10) put every store that had
+  // not chosen one in Telangana on its public page. Null = not given.
+  state           String?
   gstin           String? // 15-char GST identifier (optional)
   isActive        Boolean   @default(true)
   onboardingDone  Boolean   @default(false)
@@ -692,6 +696,8 @@ enum StallType {
   CAFE
   SWEETS
   CATERING
+  // Not in the list: the seller describes it in Vendor.stallTypeOther.
+  OTHER
 }
 
 enum OfferEligibility {

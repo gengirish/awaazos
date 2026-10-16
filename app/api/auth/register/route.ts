@@ -6,6 +6,7 @@ import { TRIAL_DAYS } from "@/lib/constants";
 import { hashPassword } from "@/lib/password";
 import { checkPasswordPolicy } from "@/lib/password-strength";
 import { prisma } from "@/lib/prisma";
+import { resolveStallTypeOther } from "@/lib/stall-type";
 import { authRateLimit, getClientIp, tooManyRequests } from "@/lib/ratelimit";
 import { STORE_HANDLE_TAKEN_MESSAGE } from "@/lib/store-handle";
 import { newVendorSlug } from "@/lib/store-slug";
@@ -39,6 +40,9 @@ export async function POST(req: Request) {
   const name = parsed.data.name.trim();
   const stallName = parsed.data.stallName.trim();
   const { stallType, password, storeHandle } = parsed.data;
+  // Valid whenever the schema passed (it requires a description for OTHER).
+  const other = resolveStallTypeOther(stallType, parsed.data.stallTypeOther);
+  const stallTypeOther = other.ok ? other.value : null;
 
   const policy = checkPasswordPolicy(password);
   if (!policy.ok) {
@@ -77,6 +81,7 @@ export async function POST(req: Request) {
             name: stallName,
             ownerName: name,
             stallType,
+            stallTypeOther,
             phone: phoneE164,
             email,
             // Free trial with STARTER limits; billingAccess() (lib/plan.ts)

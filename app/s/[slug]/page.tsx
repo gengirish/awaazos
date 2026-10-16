@@ -40,7 +40,6 @@ import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
 import { EmptyState } from "@/components/ui/empty-state";
 import { getIstTodayStart } from "@/lib/billing-period";
-import { STALL_TYPES } from "@/lib/constants";
 import { formatINRCompact } from "@/lib/currency";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { displayStoreName } from "@/lib/demo-store-schema";
@@ -64,6 +63,7 @@ import {
   type StorefrontDropVisibility,
 } from "@/lib/storefront-order";
 import { qrSvgDataUrl } from "@/lib/qr";
+import { stallTypeLabel } from "@/lib/stall-type";
 import { storeInfoFacts, type StoreFactKind } from "@/lib/store-info";
 import { viewerIsStoreStaff } from "@/lib/storefront-viewer";
 import { buildUpiCollectLink } from "@/lib/upi";
@@ -184,6 +184,7 @@ const loadStorefront = cache(async (slug: string) => {
       city: true,
       state: true,
       stallType: true,
+      stallTypeOther: true, // the seller's own words for "Other"; shown as the store type
       logoUrl: true,
       bannerUrl: true,
       upiId: true,
@@ -286,9 +287,6 @@ function menuFulfilmentPhrase(mode: FulfilmentMode): string {
   return mode === "BOTH" ? "Pickup or delivery" : mode === "DELIVERY" ? "Delivery" : "Pickup";
 }
 
-function stallTypeLabel(value: StorefrontVendor["stallType"]): string {
-  return STALL_TYPES.find((t) => t.value === value)?.label ?? "Store";
-}
 
 type StorefrontItems = StorefrontVendor["menuItems"];
 
@@ -303,7 +301,6 @@ function groupByCategory(items: StorefrontItems): [string, StorefrontItems][] {
   return Array.from(groups.entries());
 }
 
-/** Category names are vendor-authored free text; anchors must survive spaces and `&`. */
 /** What the search bar matches for an everyday-menu row: name and category. */
 function menuItemSearchText(item: { name: string }, category: string): string {
   return `${item.name} ${category}`;
@@ -314,6 +311,7 @@ function dropItemSearchText(item: { name: string }, dropTitle: string): string {
   return `${item.name} ${dropTitle}`;
 }
 
+/** Category names are vendor-authored free text; anchors must survive spaces and `&`. */
 function categoryAnchor(category: string, index: number): string {
   const slug = category
     .toLowerCase()
@@ -741,7 +739,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-semibold text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
                 <UtensilsCrossed className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                {stallTypeLabel(vendor.stallType)}
+                {stallTypeLabel(vendor.stallType, vendor.stallTypeOther)}
               </span>
               {place ? (
                 <span className="inline-flex items-center gap-1.5">
