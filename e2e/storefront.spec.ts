@@ -129,6 +129,53 @@ test.describe("public storefront", () => {
     }
   });
 
+  test("search filters the menu as the buyer types, read-only and orderable", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    await createVendorSession(page, request, "storefront-search", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, { name: "Chocolate Truffle Cake", priceInRupees: 650, category: "Cakes" });
+    await createMenuItem(page, { name: "Ragi Laddu", priceInRupees: 25, category: "Sweets" });
+    await setPublished(page, true);
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const buyer = await anon.newPage();
+    const search = async (query: string) => {
+      await buyer.getByRole("button", { name: "Search items" }).click();
+      await buyer.getByRole("searchbox", { name: "Search items" }).fill(query);
+    };
+    try {
+      // Read-only menu.
+      await buyer.goto(`/s/${slug}`);
+      await search("choc cake");
+      await expect(buyer.getByText("Chocolate Truffle Cake")).toBeVisible();
+      await expect(buyer.getByText("Ragi Laddu")).toHaveCount(0);
+      await buyer.getByRole("searchbox", { name: "Search items" }).fill("biryani");
+      await expect(buyer.getByText(/No items match/)).toBeVisible();
+      await buyer.getByRole("button", { name: "Clear search" }).click();
+      await expect(buyer.getByText("Ragi Laddu").first()).toBeVisible();
+
+      // Orderable menu: rows hide, the cart keeps what was added.
+      const on = await page.request.patch("/api/vendor", {
+        data: { acceptMenuOrders: true, acceptPayOnDelivery: true },
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(on.ok(), "turning on menu orders").toBe(true);
+      await buyer.goto(`/s/${slug}`);
+      await buyer.getByRole("button", { name: "Add Ragi Laddu", exact: true }).click();
+      await search("sweets");
+      await expect(buyer.getByText("Ragi Laddu").first()).toBeVisible();
+      await expect(buyer.getByText("Chocolate Truffle Cake")).toHaveCount(0);
+      await buyer.getByRole("button", { name: "Close search" }).click();
+      await expect(buyer.getByText("Chocolate Truffle Cake")).toBeVisible();
+      await expect(buyer.getByRole("button", { name: "Checkout", exact: true })).toBeVisible();
+    } finally {
+      await anon.close();
+    }
+  });
+
   test("an unknown slug 404s", async ({ page }) => {
     const res = await page.goto("/s/no-such-stall-abcxyz");
     expect(res?.status()).toBe(404);

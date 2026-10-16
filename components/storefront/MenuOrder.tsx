@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
 import { useCartHubEntry } from "@/components/storefront/CartHub";
+import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
 import {
   CartBar,
   CheckoutSheet,
@@ -100,6 +101,17 @@ export function MenuOrder(props: MenuOrderProps) {
     for (const c of categories) for (const i of c.items) m.set(i.id, i);
     return m;
   }, [categories]);
+
+  // The store page's search hides rows (and emptied categories); the cart keeps
+  // whatever was added, so hidden rows still check out.
+  const matchesSearch = useStoreSearchMatch();
+  const visibleCategories = useMemo(
+    () =>
+      categories
+        .map((c) => ({ ...c, items: c.items.filter((i) => matchesSearch(`${i.name} ${c.category}`)) }))
+        .filter((c) => c.items.length > 0),
+    [categories, matchesSearch],
+  );
 
   // Saved per store; items no longer on the (available + online) menu are dropped on restore.
   const max = maxOrderableQty(null, null);
@@ -205,7 +217,7 @@ export function MenuOrder(props: MenuOrderProps) {
       <OfferChips offers={offers} />
 
       <div className="space-y-8">
-        {categories.map(({ category, anchor, items }) => (
+        {visibleCategories.map(({ category, anchor, items }) => (
           <section key={anchor} aria-labelledby={anchor}>
             <div className="mb-3 flex items-baseline gap-3">
               <h3 id={anchor} className="scroll-mt-20 font-display text-base font-bold text-awaaz-charcoal">
