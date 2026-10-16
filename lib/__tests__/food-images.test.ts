@@ -23,6 +23,16 @@ describe("foodImageFor", () => {
     ["Veg Momos", "momos"],
     ["Vada Pav", "burger"],
     ["Café Crème Brûlée Cheesecake", "pastry"],
+    ["Veg Thali", "thali"],
+    ["Mini Meal with 2 Roti", "thali"],
+    ["Paneer Butter Masala", "curry"],
+    ["Dal Makhani", "curry"],
+    ["Paneer Paratha", "paratha"],
+    ["Paneer Biryani", "biryani"],
+    ["Veg Hakka Noodles", "noodles"],
+    ["White Sauce Pasta", "pasta"],
+    ["Masala Chai", "chai"],
+    ["Masala Soda", "juice"],
   ])("%s → %s", (name, slug) => {
     expect(foodImageFor(name)).toBe(`/food/${slug}.webp`);
   });
@@ -30,7 +40,6 @@ describe("foodImageFor", () => {
   it("keeps dishes we have no drawing for away from a word inside them", () => {
     expect(foodImageFor("Pani Puri")).toBeNull();
     expect(foodImageFor("Pav Bhaji")).toBeNull();
-    expect(foodImageFor("Veg Thali", "Meals")).toBeNull();
   });
 
   it("falls back to the category, then to nothing", () => {
