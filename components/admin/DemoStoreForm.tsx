@@ -12,6 +12,7 @@ import { OutreachWhatsApp } from "@/components/admin/OutreachWhatsApp";
 import {
   buildDemoStorePayload,
   suggestExternalRef,
+  type DemoFormField,
   type DemoStoreFormItem,
   type DemoStoreFormValues,
 } from "@/lib/demo-store-form";
@@ -48,7 +49,8 @@ const LANGUAGE_LABEL: Record<DemoLanguage, string> = {
 
 const ERROR_TEXT: Record<string, string> = {
   rate_limited: "You have built 20 demo stores in the last 24 hours. Try again tomorrow.",
-  payment_details_not_allowed: "Remove the UPI id, bank details or payment keys. Demo stores always use demo@upi.",
+  payment_details_not_allowed:
+    "A field looks like a UPI id, bank detail, payment key or email. Remove it: demo stores always use demo@upi.",
   demo_owner_not_configured: "DEMO_OWNER_EMAIL is not set on the server, so demo stores can't be built.",
 };
 
@@ -78,6 +80,24 @@ type Created = {
   ownerName: string;
 };
 type Issue = { path?: (string | number)[]; message?: string };
+
+/** The input id (under the form's `useId()` prefix) an error is about. */
+function fieldInputId(ids: string, field: DemoFormField): string {
+  switch (field.kind) {
+    case "name":
+      return `${ids}-name`;
+    case "area":
+      return `${ids}-area`;
+    case "instagram":
+      return `${ids}-instagram`;
+    case "displayPhone":
+      return `${ids}-phone`;
+    case "externalRef":
+      return `${ids}-ref`;
+    case "item":
+      return `${ids}-item-${field.row}-${field.part}`;
+  }
+}
 
 function describeIssues(issues: Issue[] | undefined): string | null {
   if (!issues?.length) return null;
@@ -144,7 +164,11 @@ export function DemoStoreForm({ senderName }: { senderName: string | null }) {
       if (!form.name.trim()) return setError("Enter the store name.");
       if (!form.externalRef.trim()) return setError("Enter a reference (lowercase letters, digits and dashes).");
       const built = buildDemoStorePayload(form);
-      if (!built.ok) return setError(built.error);
+      if (!built.ok) {
+        setError(built.error);
+        if (built.field) document.getElementById(fieldInputId(ids, built.field))?.focus();
+        return;
+      }
       payload = built.payload;
     } else {
       try {
@@ -169,9 +193,11 @@ export function DemoStoreForm({ senderName }: { senderName: string | null }) {
         created?: boolean;
       };
       if (!res.ok || !body.public_url) {
-        setError(
-          ERROR_TEXT[body.error ?? ""] ?? describeIssues(body.issues) ?? "Could not build the store. Try again.",
-        );
+        const text =
+          ERROR_TEXT[body.error ?? ""] ?? describeIssues(body.issues) ?? "Could not build the store. Try again.";
+        // The form checks payment-like text itself, so this is mostly pasted
+        // JSON: name the payload path the server refused.
+        setError(body.error === "payment_details_not_allowed" && body.field ? `${text} Found in: ${body.field}.` : text);
         return;
       }
       const ref =
@@ -281,6 +307,10 @@ export function DemoStoreForm({ senderName }: { senderName: string | null }) {
         <>
           <fieldset className="space-y-4 rounded-lg border bg-card p-4 shadow-xs sm:p-5">
             <legend className="px-1 text-base font-semibold">Seller</legend>
+            <p className="text-sm text-muted-foreground">
+              There are no payment details to fill in: every demo store takes its sample payments to demo@upi. Leave
+              out UPI ids, bank details and emails.
+            </p>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2 sm:col-span-2">
                 <Label htmlFor={`${ids}-name`}>Store name</Label>

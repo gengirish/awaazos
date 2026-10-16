@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Notice } from "@/components/ui/notice";
 import { HOME_PATH } from "@/lib/home";
 
@@ -110,9 +111,8 @@ export function ClaimStoreForm({
           )}
           <div className="space-y-2">
             <Label htmlFor="password">{hasAccount ? "Your AwaazOS password" : "Password"}</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               autoComplete={hasAccount ? "current-password" : "new-password"}
               enterKeyHint={hasAccount ? "go" : undefined}
               minLength={hasAccount ? undefined : 8}
@@ -138,9 +138,8 @@ export function ClaimStoreForm({
           {hasAccount ? null : (
             <div className="space-y-2">
               <Label htmlFor="confirm">Confirm password</Label>
-              <Input
+              <PasswordInput
                 id="confirm"
-                type="password"
                 autoComplete="new-password"
                 enterKeyHint="go"
                 minLength={8}

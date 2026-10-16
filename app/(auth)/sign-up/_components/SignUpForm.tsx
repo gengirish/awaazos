@@ -4,12 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { Eye, EyeOff } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
   Select,
   SelectContent,
@@ -113,7 +113,6 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showPassword, setShowPassword] = useState(false);
   const [stallName, setStallName] = useState("");
   // The store link (/s/<handle>) follows the store name until the owner edits
   // it themselves; then it is theirs.
@@ -293,37 +292,17 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
           </div>
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <div className="relative">
-              <Input
-                id="password"
-                name="password"
-                type={showPassword ? "text" : "password"}
-                required
-                minLength={8}
-                autoComplete="new-password"
-                autoCapitalize="none"
-                autoCorrect="off"
-                spellCheck={false}
-                className="pr-12"
-                aria-invalid={fieldErrors.password ? true : undefined}
-                aria-describedby={describedBy("password", "password-hint")}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-              />
-              <button
-                type="button"
-                aria-label="Show password"
-                aria-pressed={showPassword}
-                onClick={() => setShowPassword((v) => !v)}
-                className="absolute right-0 top-1/2 inline-flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground outline-hidden hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" aria-hidden="true" />
-                ) : (
-                  <Eye className="h-4 w-4" aria-hidden="true" />
-                )}
-              </button>
-            </div>
+            <PasswordInput
+              id="password"
+              name="password"
+              required
+              minLength={8}
+              autoComplete="new-password"
+              aria-invalid={fieldErrors.password ? true : undefined}
+              aria-describedby={describedBy("password", "password-hint")}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
             <p id="password-hint" className="text-xs text-muted-foreground">
               At least 8 characters, using two of: lowercase, uppercase, digits or symbols.
             </p>

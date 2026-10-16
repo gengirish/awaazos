@@ -29,7 +29,7 @@ export async function registerOwnerAndSignIn(page: Page, request: APIRequestCont
 
   await page.goto("/sign-in?callbackUrl=/settings/billing");
   await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(E2E_PASSWORD);
+  await page.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL((u) => !u.pathname.includes("/sign-in"), { timeout: 45_000 });
   await expect(page).toHaveURL(/\/settings\/billing/);

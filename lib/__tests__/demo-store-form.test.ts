@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildDemoStorePayload,
   buildSampleOrders,
+  findPaymentLikeFormField,
   suggestExternalRef,
   type DemoStoreFormValues,
 } from "@/lib/demo-store-form";
@@ -135,5 +136,51 @@ describe("buildDemoStorePayload", () => {
     expect(delivers.ok && delivers.payload.profile.delivery_fee_paise).toBe(4_000);
     const pickup = buildDemoStorePayload(form({ fulfilment: "pickup", deliveryFeeRupees: "40" }), NOW);
     expect(pickup.ok && pickup.payload.profile.delivery_fee_paise).toBe(0);
+  });
+});
+
+describe("payment-like text in the form", () => {
+  it("names the dish row (blank rows counted) and the part that looks like a UPI id", () => {
+    const f = form();
+    f.items.splice(1, 0, { name: "", unit: "", priceRupees: "", category: "" });
+    f.items[3] = { ...f.items[3], category: "pay prankie@okaxis" };
+    const built = buildDemoStorePayload(f, NOW);
+    expect(built.ok).toBe(false);
+    if (built.ok) return;
+    expect(built.field).toEqual({ kind: "item", row: 3, part: "category" });
+    expect(built.error).toMatch(/^Dish 4 category looks like a UPI id/);
+    expect(built.error).toContain("demo@upi");
+  });
+
+  it("names a seller field holding an email", () => {
+    expect(findPaymentLikeFormField(form({ area: "bakes@gmail.com" }))?.field).toEqual({ kind: "area" });
+    expect(findPaymentLikeFormField(form({ name: "Riya@Home Bakes" }))?.error).toMatch(/^Store name /);
+  });
+
+  it("passes the ordinary form", () => {
+    expect(findPaymentLikeFormField(form())).toBeNull();
+  });
+});
+
+describe("Instagram field", () => {
+  it.each([
+    ["@QueensSaga", "queenssaga"],
+    ["queenssaga", "queenssaga"],
+    ["https://www.instagram.com/queens.saga/?hl=en", "queens.saga"],
+  ])("%s → %s", (raw, handle) => {
+    const built = buildDemoStorePayload(form({ instagram: raw }), NOW);
+    expect(built.ok && built.payload.profile.instagram).toBe(handle);
+    expect(built.ok && findForbiddenPaymentField(built.payload)).toBeNull();
+  });
+
+  it("leaves it out when blank", () => {
+    const built = buildDemoStorePayload(form({ instagram: "  " }), NOW);
+    expect(built.ok && "instagram" in built.payload.profile).toBe(false);
+  });
+
+  it("refuses an email instead of sending it to the payment guard", () => {
+    const built = buildDemoStorePayload(form({ instagram: "queenssaga@gmail.com" }), NOW);
+    expect(built.ok).toBe(false);
+    if (!built.ok) expect(built.field).toEqual({ kind: "instagram" });
   });
 });

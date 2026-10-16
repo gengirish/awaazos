@@ -10,7 +10,13 @@
  * reserved 9199999000xx range.
  */
 import { rupeesToPaise } from "@/lib/currency";
-import type { DemoLanguage, DemoSampleOrderInput, DemoStoreCreateInput } from "@/lib/demo-store-schema";
+import {
+  findForbiddenPaymentField,
+  type DemoLanguage,
+  type DemoSampleOrderInput,
+  type DemoStoreCreateInput,
+} from "@/lib/demo-store-schema";
+import { normaliseInstagramHandle } from "@/lib/instagram";
 
 const IST_OFFSET_MS = 330 * 60 * 1000;
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -98,7 +104,46 @@ export type DemoStoreFormValues = {
   withSampleOrders: boolean;
 };
 
-export type BuildResult = { ok: true; payload: DemoStoreCreateInput } | { ok: false; error: string };
+/**
+ * A form input an error is about, so the form can focus it: a seller field, or
+ * the given dish row's field (the row's index in `form.items`, blank rows included).
+ */
+export type DemoFormField =
+  | { kind: "name" | "area" | "instagram" | "displayPhone" | "externalRef" }
+  | { kind: "item"; row: number; part: "name" | "unit" | "category" };
+
+export type BuildResult =
+  | { ok: true; payload: DemoStoreCreateInput }
+  | { ok: false; error: string; field?: DemoFormField };
+
+const PAYMENT_LIKE =
+  "looks like a UPI id or an email address. Demo stores take no payment details or contact emails: payments always go to demo@upi.";
+
+/**
+ * The first form input whose text the server's payment-credential guard
+ * (`findForbiddenPaymentField`) would refuse, with a message naming it. The
+ * server answers only "payment_details_not_allowed", and the form has no
+ * payment fields, so without this the admin can't tell what to change.
+ */
+export function findPaymentLikeFormField(form: DemoStoreFormValues): { error: string; field: DemoFormField } | null {
+  const seller: [Exclude<DemoFormField, { kind: "item" }>["kind"], string, string][] = [
+    ["name", "Store name", form.name],
+    ["area", "Area", form.area],
+    ["displayPhone", "Business phone", form.displayPhone],
+    ["externalRef", "Reference", form.externalRef],
+  ];
+  for (const [kind, label, value] of seller) {
+    if (findForbiddenPaymentField(value)) return { error: `${label} ${PAYMENT_LIKE}`, field: { kind } };
+  }
+  for (const [row, item] of form.items.entries()) {
+    for (const part of ["name", "unit", "category"] as const) {
+      if (findForbiddenPaymentField(item[part])) {
+        return { error: `Dish ${row + 1} ${part === "name" ? "" : `${part} `}${PAYMENT_LIKE}`, field: { kind: "item", row, part } };
+      }
+    }
+  }
+  return null;
+}
 
 function rupees(value: string, label: string): number | string {
   const n = Number(value.trim());
@@ -112,6 +157,20 @@ function rupees(value: string, label: string): number | string {
 
 /** Form → API payload. Blank dish rows are skipped; the server re-validates everything. */
 export function buildDemoStorePayload(form: DemoStoreFormValues, now: Date = new Date()): BuildResult {
+  const paymentLike = findPaymentLikeFormField(form);
+  if (paymentLike) return { ok: false, ...paymentLike };
+
+  // "@Handle", a profile URL or a bare handle all become the bare handle the
+  // store keeps; anything else (an email, a phone number) is refused here.
+  const instagram = normaliseInstagramHandle(form.instagram);
+  if (instagram === null) {
+    return {
+      ok: false,
+      error: "Instagram: enter just the username, like @queenssaga or instagram.com/queenssaga.",
+      field: { kind: "instagram" },
+    };
+  }
+
   const items: DemoStoreCreateInput["items"] = [];
   for (const row of form.items) {
     if (!row.name.trim() && !row.priceRupees.trim()) continue;
@@ -143,7 +202,7 @@ export function buildDemoStorePayload(form: DemoStoreFormValues, now: Date = new
         name: form.name.trim(),
         category: form.category,
         ...(form.area.trim() ? { area: form.area.trim() } : {}),
-        ...(form.instagram.trim() ? { instagram: form.instagram.trim() } : {}),
+        ...(instagram ? { instagram } : {}),
         ...(form.displayPhone.trim() ? { display_phone: form.displayPhone.replace(/[\s-]/g, "") } : {}),
         languages: form.languages.length > 0 ? form.languages : ["en"],
         fulfilment: form.fulfilment,

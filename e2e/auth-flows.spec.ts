@@ -81,7 +81,7 @@ test.describe("sign-in", () => {
 
     await page.goto("/sign-in");
     await page.getByLabel(/email/i).fill(creds.email);
-    await page.getByLabel(/password/i).fill("Definitely-Not-The-Password-9!");
+    await page.getByLabel("Password", { exact: true }).fill("Definitely-Not-The-Password-9!");
     await page.getByRole("button", { name: /sign in/i }).click();
 
     // Scoped by text: Next renders its own role="alert" route announcer, so a
