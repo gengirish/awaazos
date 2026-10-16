@@ -381,6 +381,12 @@ model Transaction {
   // FulfilmentStatus: the order stays CONFIRMED for stock, payment and lists.
   outForDeliveryAt DateTime?
   riderName        String? // Snapshot of the rider it went with, when one was named
+  // The rider's "Delivered" link (/d/<riderToken>): 192-bit, minted for every
+  // DELIVERY order (at placement, or on confirm / dispatch for older ones).
+  // Separate from orderToken so the buyer's link can't mark it delivered.
+  riderToken       String?           @unique
+  // The buyer tapped "I've received my order" on their order page.
+  buyerReceivedAt  DateTime?
   customerId       String?
   customer         Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   cancelledAt      DateTime?

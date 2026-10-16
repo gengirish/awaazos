@@ -7,7 +7,7 @@ import { HelpTopicList } from "@/components/help/HelpTopicList";
 import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
 import { APP_NAV_ICONS } from "@/components/shell/nav-icons";
 import { appNavItemsForRole, appTabBarForRole } from "@/lib/app-nav";
-import { HELP_SCREEN_SUMMARY, helpTopicsForRole } from "@/lib/help-guide";
+import { HELP_SCREEN_SUMMARY, helpTopicsForRole, ORDER_JOURNEY, type OrderJourneyStep } from "@/lib/help-guide";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 import { getShellContext } from "../_shell-context";
@@ -20,6 +20,12 @@ export const metadata: Metadata = { title: "Help · AwaazOS" };
 function listOf(labels: string[]): string {
   if (labels.length <= 1) return labels.join("");
   return `${labels.slice(0, -1).join(", ")} and ${labels[labels.length - 1]}`;
+}
+
+/** "Confirm" for the seller's own steps, "Rider delivers and taps Delivered" for the others. */
+function journeyHeading(step: OrderJourneyStep): string {
+  if (step.who === "You") return step.title;
+  return `${step.who} ${step.title.charAt(0).toLowerCase()}${step.title.slice(1)}`;
 }
 
 /**
@@ -116,6 +122,39 @@ export default async function HelpPage() {
               );
             })}
           </ul>
+        </section>
+
+        <section aria-labelledby="help-journey-heading">
+          <h2 id="help-journey-heading" className="font-display text-lg font-semibold text-foreground">
+            An online order, start to finish
+          </h2>
+          <p className="mb-2 text-sm text-muted-foreground">
+            What happens to one order from your store page, and who taps what. Pickups skip the rider.
+          </p>
+          <ol className="divide-y divide-border overflow-hidden rounded-lg border bg-card">
+            {ORDER_JOURNEY.map((step, i) => (
+              <li key={step.id} className="flex gap-3 px-4 py-3">
+                <span
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 font-mono text-sm font-bold text-primary"
+                  aria-hidden="true"
+                >
+                  {i + 1}
+                </span>
+                <div className="min-w-0 flex-1 text-sm">
+                  <p className="font-semibold text-foreground">
+                    <span className="sr-only">Step {i + 1}: </span>
+                    {journeyHeading(step)}
+                    {step.when ? (
+                      <span className="ml-2 rounded border border-border px-1.5 py-0.5 align-middle text-xs font-medium text-muted-foreground">
+                        {step.when}
+                      </span>
+                    ) : null}
+                  </p>
+                  <p className="mt-0.5 text-muted-foreground">{step.text}</p>
+                </div>
+              </li>
+            ))}
+          </ol>
         </section>
 
         <section aria-labelledby="help-how-heading">

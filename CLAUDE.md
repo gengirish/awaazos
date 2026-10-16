@@ -202,7 +202,8 @@ storefront surface** — unauthenticated, and no longer read-only (buyers place 
 | `/s/[slug]/o/[token]` | Buyer's order page (status, UPI pay, "I've paid" claim) |
 | `/s/[slug]/account` | Signed-in buyer's own orders/profile |
 | `/r/[token]` | Customer receipt page (see "Receipt module"; not gated on `publishStorefront`) |
-| `/api/s/**` | Order placement, UTR submit, vendor-Razorpay start/verify, buyer magic-link auth |
+| `/d/[token]` + `POST /api/d/[token]` | Rider's "Delivered" link (see "Delivery handoff"; not gated on `publishStorefront`) |
+| `/api/s/**` | Order placement, UTR submit, "I've received my order", vendor-Razorpay start/verify, buyer magic-link auth |
 | `/api/webhooks/razorpay-orders/[vendorId]` | Per-vendor Razorpay webhook (vendor's own secret) |
 
 Rules every one of them follows:
@@ -458,6 +459,15 @@ nothing goes through the server. Opening it also runs the `dispatch` action, as 
 delivery" button: `outForDeliveryAt` (+ `riderName` snapshot) is a **stamp, not a `FulfilmentStatus`**
 — the order stays `CONFIRMED`, so stock, payment, buckets and bulk actions are untouched. The buyer's
 page reads "On the way" and never shows the rider's name.
+The handoff text ends with the rider's own link, `/d/<Transaction.riderToken>` (`lib/rider-delivery.ts`):
+192-bit, minted for every DELIVERY order at placement (or on confirm / dispatch for older ones), and
+**separate from `orderToken`**, so the buyer's link can't mark an order delivered. The page shows the
+door details (name, phone, address, items, cash to collect) only while the order is live, and one
+"Delivered" button that runs the board's own `deliver` action (cash → paid, DailySummary once); once
+delivered or cancelled it shows no buyer details. The buyer's "I've received my order"
+(`POST /api/s/[slug]/orders/[token]/received`) stamps `buyerReceivedAt`; a paid order is also marked
+delivered, an unpaid one waits for the seller — a buyer's tap never books cash. Both push to the
+seller (bill number only) and bump the board signal.
 
 **Bulk order actions** (`lib/order-bulk.ts` client-safe, `lib/storefront-order-bulk.ts` server): the
 board selects orders and applies confirm / mark_paid / deliver via `POST /api/drops/[id]/orders/bulk`

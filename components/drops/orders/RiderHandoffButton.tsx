@@ -3,7 +3,12 @@
 import { Bike, Check, MessageCircle, Share2 } from "lucide-react";
 import { useEffect, useState } from "react";
 
-import { formatRiderHandoff, riderWhatsappUrl, type RiderHandoffOrder } from "@/lib/delivery-handoff";
+import {
+  formatRiderHandoff,
+  riderDeliveredUrl,
+  riderWhatsappUrl,
+  type RiderHandoffOrder,
+} from "@/lib/delivery-handoff";
 import type { DeliveryRider } from "@/lib/delivery-riders";
 import { cn } from "@/lib/utils";
 
@@ -35,10 +40,13 @@ export function RiderHandoffButton({
   const [canShare, setCanShare] = useState(false);
   const [copied, setCopied] = useState(false);
   const [status, setStatus] = useState("");
+  // The app's own origin (custom domain or not) for the rider's "Delivered" link.
+  const [origin, setOrigin] = useState("");
 
-  // navigator is unavailable during SSR; decide after mount.
+  // navigator / location are unavailable during SSR; decide after mount.
   useEffect(() => {
     setCanShare(typeof navigator.share === "function");
+    setOrigin(window.location.origin);
   }, []);
 
   useEffect(() => {
@@ -47,7 +55,7 @@ export function RiderHandoffButton({
     return () => clearTimeout(t);
   }, [copied]);
 
-  const text = () => formatRiderHandoff(order, vendorName);
+  const text = () => formatRiderHandoff(order, vendorName, origin ? riderDeliveredUrl(order, origin) : null);
 
   async function copy() {
     try {

@@ -24,6 +24,70 @@ export const HELP_SCREEN_SUMMARY: Record<AppNavId, string> = {
   help: "This guide.",
 };
 
+/**
+ * "An online order, start to finish": the whole life of one storefront order
+ * as the Help page tells it, in order. Every role sees it (the Orders screen
+ * is everyone's); button names are quoted exactly as the screens show them.
+ */
+export type OrderJourneyStep = {
+  id: string;
+  /** Who does this step. */
+  who: "Customer" | "You" | "Rider";
+  title: string;
+  text: string;
+  /** When the step only applies to some orders. */
+  when?: string;
+};
+
+export const ORDER_JOURNEY: readonly OrderJourneyStep[] = [
+  {
+    id: "place",
+    who: "Customer",
+    title: "Places the order",
+    text: "On your store page they pick dishes, choose delivery or pickup, and pay by UPI now or on delivery. Your phone gets an alert and the order appears on Orders under Needs action.",
+  },
+  {
+    id: "pay",
+    who: "Customer",
+    title: "Pays and taps I've paid",
+    when: "UPI orders",
+    text: "They pay from their UPI app, then tap I've paid, with the UPI reference if they have it. Check your UPI app and tap Payment received, or Not received if it isn't there. Their tap never marks the order paid by itself.",
+  },
+  {
+    id: "confirm",
+    who: "You",
+    title: "Confirm",
+    text: "Tap Confirm so the customer knows you have it. Their order page says Confirmed.",
+  },
+  {
+    id: "send",
+    who: "You",
+    title: "Hand it to your rider",
+    when: "Deliveries",
+    text: "Tap Send to and your rider's name (save riders in Settings, Online orders). WhatsApp opens to the rider with the name, phone, address, items and cash to collect, and the order is marked Out for delivery: the customer's page says On the way. Using Porter or Rapido? Tap Copy for rider and paste it there, then Out for delivery.",
+  },
+  {
+    id: "door",
+    who: "Rider",
+    title: "Delivers and taps Delivered",
+    when: "Deliveries",
+    text: "At the door the rider collects any cash due, then opens the link at the end of their message and taps Delivered. Your Orders screen updates by itself.",
+  },
+  {
+    id: "received",
+    who: "Customer",
+    title: "Can tap I've received my order",
+    when: "Deliveries",
+    text: "If it is already paid, the order is finished for you. If it is pay on delivery, the card says Customer got it so you can make sure the cash reached you.",
+  },
+  {
+    id: "finish",
+    who: "You",
+    title: "Finish the order",
+    text: "If nobody tapped Delivered, tap Delivered or Picked up yourself. For a pay-on-delivery order the button says Delivered · and the amount collected, and marks it paid. Tapped it by mistake? Use Undo.",
+  },
+];
+
 export type HelpGroupId = "counter" | "orders" | "drops" | "menu" | "records" | "setup";
 
 export const HELP_GROUPS: readonly { id: HelpGroupId; title: string }[] = [
@@ -99,15 +163,15 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "deliver-order",
     group: "orders",
     title: "Mark an order as delivered",
-    steps: "Tap Delivered on the order. To finish several at once, select them and use the bar that appears under the list.",
+    steps: "Tap Delivered on the order. To finish several at once, select them and use the bar that appears under the list. Your rider can also tap Delivered on the link in their message, and a customer can tap I've received my order: a paid order is then finished for you, and an unpaid one shows Customer got it so you can collect the payment.",
     nav: "orders",
-    keywords: "complete done pickup bulk cash on delivery collected",
+    keywords: "complete done pickup bulk cash on delivery collected rider link received customer got it",
   },
   {
     id: "rider-handoff",
     group: "orders",
     title: "Send a delivery to Porter, Rapido or your rider",
-    steps: "Tap Copy for rider on a delivery order and paste it into the booking app. It has the name, phone, address, items and any cash to collect. The drop's Prep sheet has the same button. If you saved your own riders in Settings, tap Send to and the rider's name: WhatsApp opens to them with the order filled in, and the order is marked Out for delivery. Your customer's order page then says On the way. No saved rider? Tap Out for delivery yourself once it leaves.",
+    steps: "Tap Copy for rider on a delivery order and paste it into the booking app. It has the name, phone, address, items and any cash to collect. The drop's Prep sheet has the same button. If you saved your own riders in Settings, tap Send to and the rider's name: WhatsApp opens to them with the order filled in, and the order is marked Out for delivery. Your customer's order page then says On the way. No saved rider? Tap Out for delivery yourself once it leaves. The message ends with a link for the rider: they tap Delivered on it at the door and your board updates.",
     nav: "orders",
     keywords: "dunzo courier driver address booking cash collect handover whatsapp send out for delivery on the way dispatch",
   },
