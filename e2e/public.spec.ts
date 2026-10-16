@@ -73,7 +73,7 @@ test.describe("public surfaces", () => {
   test("sign-in form renders email + password + submit", async ({ page }) => {
     await page.goto("/sign-in");
     await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.getByLabel(/password/i)).toBeVisible();
+    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
   });
 

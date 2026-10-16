@@ -2,7 +2,6 @@ import type { FulfilmentMode } from "@prisma/client";
 import type { Metadata } from "next";
 import {
   CalendarClock,
-  ChevronDown,
   Instagram,
   MapPin,
   MessageCircle,
@@ -90,8 +89,11 @@ export const runtime = "nodejs";
  * taking orders with `showEverydayMenu = false`, the whole everyday menu —
  * rows, category pills, "Order now", the menu cart — is left out and only the
  * drop(s) show (`everydayMenuHiddenByDrop` in lib/menu-orders.ts — the same check
- * placeMenuOrder uses to refuse with `menu_paused_for_drop`). The counter UPI
- * QR stays, collapsed, since the stall may still sell at the counter.
+ * placeMenuOrder uses to refuse with `menu_paused_for_drop`).
+ *
+ * The open-amount "Scan to pay" QR shows only with a read-only menu. With a
+ * cart (menu ordering) or a drop holding the page, checkout gives the buyer an
+ * exact UPI amount and no second, open-amount QR is shown.
  *
  * Offers (lib/offers.ts): each orderable section gets the offers live on it,
  * resolved on the server to the item ids that section already shows plus the
@@ -519,16 +521,15 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   const upiLink = vendor.upiId
     ? buildUpiCollectLink({ upiId: vendor.upiId, name: payeeName })
     : null;
-  // Rendered here, not by a third-party image URL: no network hop for the buyer,
-  // and the payee VPA never leaves our server.
-  const [qrSmall, qrLarge] = upiLink
-    ? await Promise.all([qrSvgDataUrl(upiLink, 180), qrSvgDataUrl(upiLink, 220)])
-    : ["", ""];
   const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
   const rawTheme = vendor.settings?.theme ?? "orange";
   const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
 
   const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
+  // The open-amount "Scan to pay" QR, only for a read-only menu (see #pay below).
+  // Rendered here, not by a third-party image URL: no network hop for the buyer,
+  // and the payee VPA never leaves our server.
+  const qrLarge = upiLink && !menuOrdering && !menuHidden ? await qrSvgDataUrl(upiLink, 220) : "";
   // Everyday-menu rows only take orders (and carry row ids) with menu ordering on.
   const orderableMenuIds = new Set(menuOrdering ? menuItems.map((i) => i.id) : []);
   // One read covers both channels; a store with nothing orderable skips it.
@@ -708,14 +709,18 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                 Pre-order · closes {formatIstDeadline(nextClosing, now)}
               </a>
             ) : menuOrdering ? (
-              <a
-                href="#menu-order"
-                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-              >
-                <ShoppingBag className="h-4 w-4" aria-hidden="true" />
-                Order now
-              </a>
-            ) : upiLink ? (
+              // With no drop above it the menu starts right under this header,
+              // so a jump link would go nowhere; the cart bar is the next step.
+              dropViews.length > 0 ? (
+                <a
+                  href="#menu-order"
+                  className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+                  Order now
+                </a>
+              ) : null
+            ) : upiLink && !menuHidden ? (
               <a
                 href="#pay"
                 className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
@@ -876,48 +881,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             </div>
           )}
 
-          {upiLink && (menuOrdering || menuHidden) ? (
-            /* Menu ordering on (or the menu handed over to an open drop): a cart
-               gives the buyer an exact amount, so the open-amount QR is demoted
-               to a collapsed fallback for paying the seller in person instead
-               of competing with checkout. */
-            <details
-              id="pay"
-              className="group mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs"
-            >
-              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
-                <QrCode className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                <span className="flex-1">Paying the seller in person? Show the UPI QR</span>
-                <ChevronDown
-                  className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
-                  aria-hidden="true"
-                />
-              </summary>
-              <div className="border-t border-border/50 px-4 py-5 text-center sm:px-6">
-                <h3 id="pay-heading" className="sr-only">
-                  Scan to pay the seller in person
-                </h3>
-                <p className="text-sm text-muted-foreground">Any UPI app. Enter the amount the seller tells you.</p>
-                <div className="mx-auto mt-4 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
-                  <UpiQrImage src={qrSmall} alt={`UPI QR code to pay ${payeeName}`} size={180} sample={vendor.isDemo} />
-                </div>
-                <p className="mt-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Paying {payeeName}
-                </p>
-                <p className="mt-1 text-xs text-muted-foreground">Scan from another phone, or open your UPI app below.</p>
-                {vendor.upiId ? (
-                  <UpiPayOptions
-                    upiLink={upiLink}
-                    upiId={vendor.upiId}
-                    genericLabel="Open UPI app"
-                    emphasis="secondary"
-                    linksMobileOnly
-                    className="mt-4"
-                  />
-                ) : null}
-              </div>
-            </details>
-          ) : upiLink ? (
+          {upiLink && !menuOrdering && !menuHidden ? (
             <section
               id="pay"
               aria-labelledby="pay-heading"

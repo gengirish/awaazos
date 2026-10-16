@@ -92,7 +92,7 @@ test.describe("keyboard access on public pages", () => {
     // Labels, not placeholders — getByLabel failing here means a screen reader
     // announces an unnamed field.
     await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.getByLabel(/password/i)).toBeVisible();
+    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
   });
 
   // KNOWN FAILURE, deliberately not deleted.

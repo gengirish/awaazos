@@ -35,7 +35,7 @@ async function signInWithNoCallback(browser: Browser, creds: VendorCreds, path =
   });
   await page.goto(path);
   await page.getByLabel(/email/i).fill(creds.email);
-  await page.getByLabel(/password/i).fill(creds.password);
+  await page.getByLabel("Password", { exact: true }).fill(creds.password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL((u) => u.pathname !== "/sign-in" && u.pathname !== "/home", { timeout: 60_000 });
   return page;
