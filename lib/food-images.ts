@@ -22,7 +22,9 @@ export const FOOD_IMAGE_DIR = "/food";
 
 const FOOD_IMAGE_RULES: ReadonlyArray<readonly [slug: string | null, terms: readonly string[]]> = [
   // Dishes we have no drawing for yet: stop here rather than match a word inside them.
-  [null, ["pani puri", "panipuri", "golgappa", "gol gappa", "puchka", "sev puri", "dahi puri", "bhel", "bhelpuri", "chaat", "pav bhaji", "pao bhaji", "misal", "thali", "fries"]],
+  [null, ["pani puri", "panipuri", "golgappa", "gol gappa", "puchka", "sev puri", "dahi puri", "bhel", "bhelpuri", "chaat", "pav bhaji", "pao bhaji", "misal", "fries"]],
+  // A whole meal: before its parts, so "Thali with 2 Roti" is a thali.
+  ["thali", ["thali", "meal", "tiffin", "combo"]],
   // Frozen and bakery — product nouns before flavours.
   ["ice-cream", ["ice cream", "icecream", "gelato", "sundae", "kulfi", "softy", "falooda", "faluda"]],
   ["cupcake", ["cupcake", "cup cake", "muffin"]],
@@ -47,6 +49,10 @@ const FOOD_IMAGE_RULES: ReadonlyArray<readonly [slug: string | null, terms: read
   ["idli", ["idli", "idly"]],
   ["paratha", ["paratha", "parantha", "parotta", "roti", "chapati", "phulka", "naan", "kulcha", "thepla", "puri", "poori"]],
   ["biryani", ["biryani", "biriyani", "pulao", "pulav", "mandi"]],
+  ["noodles", ["noodle", "chowmein", "chow mein", "hakka", "maggi", "ramen", "thukpa"]],
+  ["pasta", ["pasta", "penne", "spaghetti", "macaroni", "lasagna", "lasagne"]],
+  // After breads, rice and snacks: "Paneer Paratha" is a paratha, "Paneer Biryani" a biryani.
+  ["curry", ["curry", "paneer", "dal", "daal", "makhani", "chole", "rajma", "korma", "kadhi", "sabzi", "sabji"]],
   // Drinks — "Mango Lassi" is a lassi, "Lemon Tea" a chai.
   ["lassi", ["lassi", "milkshake", "shake", "smoothie", "chaas", "chhach", "buttermilk", "thandai"]],
   ["coffee", ["coffee", "kaapi", "cappuccino", "latte", "espresso", "mocha"]],
