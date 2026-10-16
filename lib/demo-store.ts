@@ -16,8 +16,10 @@
  * - UPI is always DEMO_UPI_ID. The prospect's phone is kept as the WhatsApp
  *   number with both public opt-ins off, so it is not shown until they claim.
  * - Handover stores only a SHA-256 of the claim token; claiming creates the
- *   prospect's User with their own password, moves ownership, flips `isDemo`,
- *   starts the trial and archives (or deletes) the sample orders.
+ *   prospect's User with their own password (or, when the invited email already
+ *   has an account, adds the store to it once that account's password checks
+ *   out), moves ownership, flips `isDemo`, starts the trial and archives (or
+ *   deletes) the sample orders.
  * - Every create, delete, handover and claim writes a DemoAuditLog row (no PII).
  *   "create" rows double as the 20-per-day rate limit, so it fails closed.
  */
@@ -42,7 +44,8 @@ import { normaliseInstagramHandle } from "@/lib/instagram";
 import { loadMenuCreateContext, prepareMenuItemCreate } from "@/lib/menu-create";
 import { suggestEmoji } from "@/lib/menu-suggestions";
 import { DEFAULT_MENU_EMOJI } from "@/lib/menu-voice";
-import { hashPassword } from "@/lib/password";
+import { hashPassword, verifyPassword } from "@/lib/password";
+import { checkPasswordPolicy } from "@/lib/password-strength";
 import { normaliseIndianMobile } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
 import { generateReceiptToken } from "@/lib/receipt-data";
@@ -57,6 +60,8 @@ export class DemoStoreError extends Error {
   constructor(
     public readonly status: number,
     public readonly code: string,
+    /** Words for the person, when the code alone doesn't say what to fix. */
+    public readonly reason?: string,
   ) {
     super(code);
   }
@@ -92,9 +97,13 @@ function isUniqueViolation(err: unknown, field: string): boolean {
   return (Array.isArray(target) ? target.join(" ") : String(target ?? "")).includes(field);
 }
 
+function demoOwnerEmail(): string {
+  return (process.env.DEMO_OWNER_EMAIL ?? "").trim().toLowerCase();
+}
+
 /** The internal account that owns every demo store. Created on first use, with no password. */
 async function demoOwnerId(tx: Prisma.TransactionClient): Promise<string> {
-  const email = (process.env.DEMO_OWNER_EMAIL ?? "").trim().toLowerCase();
+  const email = demoOwnerEmail();
   if (!email) throw new DemoStoreError(503, "demo_owner_not_configured");
   const user = await tx.user.upsert({
     where: { email },
@@ -391,29 +400,38 @@ export async function createHandover(externalRef: string, email: string, actor: 
   return { claim_url: claimUrl(token), expires_at: expiresAt.toISOString() };
 }
 
-/** What the claim page shows before the prospect sets a password. null = no usable invite. */
+/**
+ * What the claim page shows before the prospect sets a password. null = no
+ * usable invite. `hasAccount`: the invited email already signs in to AwaazOS,
+ * so the page asks for that password instead of a new one. Only the token
+ * holder learns it, and the token was sent to that email.
+ */
 export async function loadClaim(token: string, now: Date = new Date()) {
   const h = await prisma.demoHandover.findUnique({
     where: { tokenHash: hashClaimToken(token) },
     select: { email: true, usedAt: true, expiresAt: true, vendor: { select: { name: true, isDemo: true } } },
   });
   if (!h || h.usedAt || h.expiresAt <= now || !h.vendor.isDemo) return null;
-  return { email: h.email, storeName: h.vendor.name };
+  const account = await prisma.user.findUnique({ where: { email: h.email }, select: { id: true } });
+  return { email: h.email, storeName: h.vendor.name, hasAccount: account !== null };
 }
 
 export type ClaimInput = {
   token: string;
-  name: string;
+  /** Required for a new account; an existing account keeps its own name when omitted. */
+  name?: string;
+  /** A new account's password, or the existing account's current one. */
   password: string;
   /** What happens to the sample orders: hidden from every list, or removed. */
   sampleOrders: "archive" | "delete";
 };
 
 /**
- * The prospect takes the store: their User is created with their own password,
- * they become its OWNER, the demo account leaves, `isDemo` flips, the trial
- * starts and the sample orders are archived or deleted — one transaction, the
- * token burned first so a second use fails.
+ * The prospect takes the store: their User is created with their own password
+ * (or, if the invited email already has an account, that account is used once
+ * `password` matches it), they become its OWNER, the demo account leaves,
+ * `isDemo` flips, the trial starts and the sample orders are archived or
+ * deleted — one transaction, the token burned first so a second use fails.
  */
 export async function claimDemoStore(input: ClaimInput, now: Date = new Date()): Promise<{ slug: string; email: string }> {
   const h = await prisma.demoHandover.findUnique({
@@ -433,11 +451,27 @@ export async function claimDemoStore(input: ClaimInput, now: Date = new Date()):
     throw new DemoStoreError(400, "invalid_or_expired");
   }
 
-  if (await prisma.user.findUnique({ where: { email: h.email }, select: { id: true } })) {
-    throw new DemoStoreError(409, "email_in_use");
+  const existing = await prisma.user.findUnique({
+    where: { email: h.email },
+    select: { id: true, name: true, passwordHash: true },
+  });
+  if (!existing && !input.name?.trim()) throw new DemoStoreError(400, "name_required");
+  let passwordHash: string | null = null;
+  if (existing) {
+    // The internal demo account must never end up owning a claimed store.
+    if (h.email === demoOwnerEmail()) throw new DemoStoreError(409, "email_in_use");
+    // No password (an account that never set one): nothing to prove ownership with.
+    if (!existing.passwordHash) throw new DemoStoreError(409, "password_not_set");
+    if (!(await verifyPassword(input.password, existing.passwordHash))) {
+      throw new DemoStoreError(401, "wrong_password");
+    }
+  } else {
+    // Only a new password must meet the policy; an existing one is just checked.
+    const policy = checkPasswordPolicy(input.password);
+    if (!policy.ok) throw new DemoStoreError(400, "weak_password", policy.reason);
+    passwordHash = await hashPassword(input.password);
   }
-  const passwordHash = await hashPassword(input.password);
-  const name = input.name.trim();
+  const name = input.name?.trim() || existing?.name?.trim() || h.email.split("@")[0]!;
 
   try {
     return await prisma.$transaction(async (tx) => {
@@ -447,7 +481,7 @@ export async function claimDemoStore(input: ClaimInput, now: Date = new Date()):
       });
       if (burned.count !== 1) throw new DemoStoreError(400, "invalid_or_expired");
 
-      const user = await tx.user.create({ data: { email: h.email, name, passwordHash, role: "USER" } });
+      const user = existing ?? (await tx.user.create({ data: { email: h.email, name, passwordHash, role: "USER" } }));
       const demoOwner = await demoOwnerId(tx);
 
       // Leave nothing of the demo account behind on this store.
