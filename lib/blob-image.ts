@@ -1,5 +1,4 @@
 import { del } from "@vercel/blob";
-import type { NextRequest } from "next/server";
 
 /**
  * Shared checks for image uploads to Vercel Blob (menu item photos, store
@@ -26,7 +25,7 @@ export class ImageUploadError extends Error {
  * Reads the multipart `file` field and validates it — never pay for an upload
  * we reject. Throws `ImageUploadError` (400) on anything unusable.
  */
-export async function readImageUpload(req: NextRequest): Promise<{ file: Blob; ext: string }> {
+export async function readImageUpload(req: Request): Promise<{ file: Blob; ext: string }> {
   // Cheap pre-check: formData() buffers the whole body in memory, so reject
   // an oversized upload from the header before paying for that.
   const declaredLength = Number(req.headers.get("content-length") ?? "0");

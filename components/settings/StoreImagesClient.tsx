@@ -13,12 +13,15 @@ import { cn } from "@/lib/utils";
  * Banner and logo for the store page (`Vendor.bannerUrl` / `logoUrl`), via
  * POST/DELETE /api/vendor/banner and /api/vendor/logo. Photos are shrunk in
  * the browser first (lib/image-downscale.ts); the server re-validates.
+ * `endpointBase` points the same controls at another store's routes: the admin
+ * demo-store screen uses /api/admin/demo-stores/<ref>.
  */
 export type StoreImagesClientProps = {
   storeName: string;
   initialBannerUrl: string | null;
   initialLogoUrl: string | null;
   isOwner: boolean;
+  endpointBase?: string;
 };
 
 type Kind = "banner" | "logo";
@@ -47,11 +50,13 @@ function ImageField({
   storeName,
   initialUrl,
   isOwner,
+  endpointBase,
 }: {
   kind: Kind;
   storeName: string;
   initialUrl: string | null;
   isOwner: boolean;
+  endpointBase: string;
 }) {
   const router = useRouter();
   const spec = SPEC[kind];
@@ -69,7 +74,7 @@ function ImageField({
       const file = await downscaleImage(picked, spec.downscale);
       const body = new FormData();
       body.append("file", file);
-      const res = await fetch(`/api/vendor/${kind}`, { method: "POST", body, credentials: "include" });
+      const res = await fetch(`${endpointBase}/${kind}`, { method: "POST", body, credentials: "include" });
       const data = (await res.json().catch(() => ({}))) as { data?: { url: string }; error?: string };
       if (!res.ok || !data.data) {
         const msg = data.error ?? "Could not upload.";
@@ -94,7 +99,7 @@ function ImageField({
     setBusy("remove");
     setStatus("");
     try {
-      const res = await fetch(`/api/vendor/${kind}`, { method: "DELETE", credentials: "include" });
+      const res = await fetch(`${endpointBase}/${kind}`, { method: "DELETE", credentials: "include" });
       if (!res.ok) {
         const data = (await res.json().catch(() => ({}))) as { error?: string };
         const msg = data.error ?? "Could not remove.";
@@ -203,12 +208,18 @@ function ImageField({
   );
 }
 
-export function StoreImagesClient({ storeName, initialBannerUrl, initialLogoUrl, isOwner }: StoreImagesClientProps) {
+export function StoreImagesClient({
+  storeName,
+  initialBannerUrl,
+  initialLogoUrl,
+  isOwner,
+  endpointBase = "/api/vendor",
+}: StoreImagesClientProps) {
   return (
     <div className="space-y-6">
       {!isOwner && <p className="text-sm text-muted-foreground">Only the owner can change these.</p>}
-      <ImageField kind="banner" storeName={storeName} initialUrl={initialBannerUrl} isOwner={isOwner} />
-      <ImageField kind="logo" storeName={storeName} initialUrl={initialLogoUrl} isOwner={isOwner} />
+      <ImageField kind="banner" storeName={storeName} initialUrl={initialBannerUrl} isOwner={isOwner} endpointBase={endpointBase} />
+      <ImageField kind="logo" storeName={storeName} initialUrl={initialLogoUrl} isOwner={isOwner} endpointBase={endpointBase} />
     </div>
   );
 }
