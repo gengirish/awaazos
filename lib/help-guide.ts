@@ -321,6 +321,17 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     keywords: "type category business other city state location address place",
   },
   {
+    id: "community-page",
+    group: "setup",
+    title: "Join your society's community page",
+    steps: "When your housing society has a page that lists its home kitchens, the invite shows under Community pages. Tap Join to be listed, or Leave later. Customers still order on your own store.",
+    nav: "settings",
+    href: "/settings/store",
+    trail: ["Online store"],
+    ownerOnly: true,
+    keywords: "society apartment rwa community neighbours directory list",
+  },
+  {
     id: "menu-orders",
     group: "setup",
     title: "Let customers order from your everyday menu",

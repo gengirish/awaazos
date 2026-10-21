@@ -32,6 +32,9 @@ function isPublicPath(pathname: string): boolean {
   // VendorSettings.publishStorefront is true, so this allowlist exposes nothing
   // on its own.
   if (pathname.startsWith("/s/")) return true;
+  // Community pages (/c/<slug>): links to stores that accepted a listing.
+  // They list only published stores, so this exposes nothing on its own.
+  if (pathname.startsWith("/c/")) return true;
   // Customer receipt pages (/r/<token>). The route 404s unless the token
   // matches a Receipt.publicToken, so this allowlist exposes nothing on its own.
   if (pathname.startsWith("/r/")) return true;
