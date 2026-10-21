@@ -22,7 +22,10 @@ export const FOOD_IMAGE_DIR = "/food";
 
 const FOOD_IMAGE_RULES: ReadonlyArray<readonly [slug: string | null, terms: readonly string[]]> = [
   // Dishes we have no drawing for yet: stop here rather than match a word inside them.
-  [null, ["pani puri", "panipuri", "golgappa", "gol gappa", "puchka", "sev puri", "dahi puri", "bhel", "bhelpuri", "chaat", "pav bhaji", "pao bhaji", "misal", "fries"]],
+  // Candies keep their 🍬: "Lemonade Candy" is not a glass of lemonade.
+  [null, ["pav bhaji", "pao bhaji", "misal", "candy", "candies", "toffee", "lollipop", "lolly", "gummy", "gummies", "chikki"]],
+  // Before breads: "Pani Puri" is chaat, not a puri.
+  ["chaat", ["chaat", "chat", "pani puri", "panipuri", "golgappa", "gol gappa", "puchka", "phuchka", "sev puri", "dahi puri", "papdi", "bhel", "bhelpuri", "ragda"]],
   // A whole meal: before its parts, so "Thali with 2 Roti" is a thali.
   ["thali", ["thali", "meal", "tiffin", "combo"]],
   // Frozen and bakery — product nouns before flavours.
@@ -51,13 +54,19 @@ const FOOD_IMAGE_RULES: ReadonlyArray<readonly [slug: string | null, terms: read
   ["biryani", ["biryani", "biriyani", "pulao", "pulav", "mandi"]],
   ["noodles", ["noodle", "chowmein", "chow mein", "hakka", "maggi", "ramen", "thukpa"]],
   ["pasta", ["pasta", "penne", "spaghetti", "macaroni", "lasagna", "lasagne"]],
+  ["fries", ["fries", "french fry", "finger chips", "wedges"]],
+  ["chicken", ["chicken", "murgh", "tandoori", "wings", "drumstick"]],
   // After breads, rice and snacks: "Paneer Paratha" is a paratha, "Paneer Biryani" a biryani.
   ["curry", ["curry", "paneer", "dal", "daal", "makhani", "chole", "rajma", "korma", "kadhi", "sabzi", "sabji"]],
+  ["egg", ["egg", "anda", "omelette", "omelet", "bhurji"]],
+  ["pickle", ["pickle", "achaar", "achar", "aachar", "thokku"]],
   // Drinks — "Mango Lassi" is a lassi, "Lemon Tea" a chai.
   ["lassi", ["lassi", "milkshake", "shake", "smoothie", "chaas", "chhach", "buttermilk", "thandai"]],
   ["coffee", ["coffee", "kaapi", "cappuccino", "latte", "espresso", "mocha"]],
   ["chai", ["chai", "tea", "kahwa"]],
   ["juice", ["juice", "sharbat", "sherbet", "lemonade", "nimbu pani", "shikanji", "soda", "mojito", "cooler", "jaljeera", "panna"]],
+  // A flavour, so last: "Chocolate Truffle Cake" is a cake, "Chocolate Shake" a lassi.
+  ["chocolate", ["chocolate", "choco", "truffle", "praline"]],
 ];
 
 const FOOD_IMAGE_MATCHERS: ReadonlyArray<readonly [string | null, RegExp]> = FOOD_IMAGE_RULES.map(([slug, terms]) => [

@@ -33,13 +33,24 @@ describe("foodImageFor", () => {
     ["White Sauce Pasta", "pasta"],
     ["Masala Chai", "chai"],
     ["Masala Soda", "juice"],
+    ["Butter Chicken", "chicken"],
+    ["Chicken Biryani", "biryani"],
+    ["Egg Bhurji", "egg"],
+    ["Eggless Chocolate Cake", "cake"],
+    ["Pani Puri", "chaat"],
+    ["Sev Puri (6 pcs)", "chaat"],
+    ["Mango Pickle 500g", "pickle"],
+    ["Dark Chocolate Truffles", "chocolate"],
+    ["Chocolate Shake", "lassi"],
+    ["Peri Peri Fries", "fries"],
   ])("%s → %s", (name, slug) => {
     expect(foodImageFor(name)).toBe(`/food/${slug}.webp`);
   });
 
   it("keeps dishes we have no drawing for away from a word inside them", () => {
-    expect(foodImageFor("Pani Puri")).toBeNull();
     expect(foodImageFor("Pav Bhaji")).toBeNull();
+    expect(foodImageFor("Lemonade Candy")).toBeNull();
+    expect(foodImageFor("Pulpy Mango Candy")).toBeNull();
   });
 
   it("falls back to the category, then to nothing", () => {
