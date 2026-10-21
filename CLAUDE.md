@@ -19,7 +19,9 @@ npm run build          # next build
 npm run e2e            # playwright (auto-starts dev server unless BASE_URL is set)
 npm run perf:budget    # after a build: first-load JS per route vs perf-budget.json (CI gate)
 
-npx prisma db push     # apply schema to Neon (no migration files and no seed script in this repo)
+npx prisma migrate dev --name <change>   # schema change → new prisma/migrations/<ts>_<change>/migration.sql (local DB)
+npx prisma migrate deploy                # apply pending migrations to Neon (DIRECT_URL), BEFORE merging
+npx prisma db push     # throwaway/e2e databases only (no seed script in this repo)
 npm run db:studio
 
 # Single test / single case
@@ -81,7 +83,7 @@ round-trips against a live STT provider, for checking credentials/connectivity.
 | --- | --- |
 | **Vercel** | Next.js App Router, all `/api/*` (Node runtime), edge middleware |
 | **Fly.io (BOM)** | BullMQ workers — `workers/` — plus `services/whisper-stt` (optional Python ASR) |
-| **Neon** | Postgres. `DATABASE_URL` = pooled, `DIRECT_URL` = direct (`prisma db push`) |
+| **Neon** | Postgres. `DATABASE_URL` = pooled, `DIRECT_URL` = direct (`prisma migrate deploy`) |
 
 Vercel deploys through the Git integration: `vercel.json`'s `ignoreCommand` skips every non-production
 build, so preview deployments are off and a push to `main` is a production deploy. The Fly worker app
@@ -100,6 +102,16 @@ BullMQ queues in production.
   On Vercel it must be a **public** endpoint — Fly `*.internal` hostnames are unreachable from Vercel.
 
 `.vercelignore` excludes `workers/` from the Vercel build.
+
+### Schema changes ship as migrations
+
+Every `schema.prisma` change comes with its SQL in `prisma/migrations/` (Prisma Migrate). `0_init`
+is a baseline of the schema as of 2026-10-21 and was never run on Neon — it is marked applied there
+(`prisma migrate resolve --applied 0_init`). Merging is a production deploy and nothing runs
+migrations on deploy, so `prisma migrate deploy` against Neon must finish **before** the PR merges;
+otherwise every query that selects a missing column or table 500s. Don't edit a migration that has
+been applied; add a new one. Check a branch: `prisma migrate diff --from-migrations prisma/migrations
+--to-schema-datamodel prisma/schema.prisma --shadow-database-url <throwaway> --exit-code` (0 = in sync).
 
 ## Architecture
 
