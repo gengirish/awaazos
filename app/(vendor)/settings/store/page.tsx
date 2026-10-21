@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { CommunitiesClient } from "@/components/settings/CommunitiesClient";
 import { FssaiNumberClient } from "@/components/settings/FssaiNumberClient";
 import { InstagramHandleClient } from "@/components/settings/InstagramHandleClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
@@ -8,6 +9,7 @@ import { StoreHandleClient } from "@/components/settings/StoreHandleClient";
 import { StoreImagesClient } from "@/components/settings/StoreImagesClient";
 import { StoreNameClient } from "@/components/settings/StoreNameClient";
 import { StorefrontClient } from "@/components/settings/StorefrontClient";
+import { listVendorCommunities } from "@/lib/community-server";
 import { prisma } from "@/lib/prisma";
 
 import { requireSettingsContext } from "../_context";
@@ -19,12 +21,13 @@ export const metadata: Metadata = { title: "Online store · Settings · AwaazOS"
 export default async function StoreSettingsPage() {
   const { vendor, isOwner } = await requireSettingsContext();
 
-  const [settings, availableItemCount] = await Promise.all([
+  const [settings, availableItemCount, communities] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: vendor.id },
       select: { publishStorefront: true, fssaiNumber: true, instagramHandle: true },
     }),
     prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
+    listVendorCommunities(vendor.id),
   ]);
 
   return (
@@ -69,6 +72,18 @@ export default async function StoreSettingsPage() {
             availableItemCount={availableItemCount}
           />
         </SettingsCard>
+        {communities.length > 0 ? (
+          <SettingsCard
+            title="Community pages"
+            description="Pages for your housing society that link to the home kitchens living there."
+          >
+            <CommunitiesClient
+              initial={communities}
+              isOwner={isOwner}
+              published={settings?.publishStorefront ?? false}
+            />
+          </SettingsCard>
+        ) : null}
         <SettingsCard title="Instagram" description="Shown on your store page as a link to your profile.">
           <InstagramHandleClient initialHandle={settings?.instagramHandle ?? null} isOwner={isOwner} />
         </SettingsCard>

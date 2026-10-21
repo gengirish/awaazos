@@ -10,7 +10,18 @@ import { useEffect, useState } from "react";
  * current location, which may carry a hash or query. Best-effort throughout: a
  * dismissed sheet (AbortError) or a blocked clipboard is not an error.
  */
-export function ShareStoreButton({ vendorName, slug }: { vendorName: string; slug: string }) {
+export function ShareStoreButton({
+  vendorName,
+  slug,
+  path = `/s/${encodeURIComponent(slug)}`,
+  text = `Order from ${vendorName} online`,
+}: {
+  vendorName: string;
+  slug: string;
+  /** The page to share; a community page passes `/c/<slug>`. */
+  path?: string;
+  text?: string;
+}) {
   const [status, setStatus] = useState<"" | "copied" | "failed">("");
 
   useEffect(() => {
@@ -20,10 +31,10 @@ export function ShareStoreButton({ vendorName, slug }: { vendorName: string; slu
   }, [status]);
 
   async function share() {
-    const url = `${window.location.origin}/s/${encodeURIComponent(slug)}`;
+    const url = `${window.location.origin}${path}`;
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: vendorName, text: `Order from ${vendorName} online`, url });
+        await navigator.share({ title: vendorName, text, url });
         return;
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
@@ -53,7 +64,7 @@ export function ShareStoreButton({ vendorName, slug }: { vendorName: string; slu
         {status === "copied" ? "Link copied" : status === "failed" ? "Couldn't copy" : "Share"}
       </button>
       <span role="status" aria-live="polite" className="sr-only">
-        {status === "copied" ? "Store link copied" : status === "failed" ? "Couldn't copy the link" : ""}
+        {status === "copied" ? "Link copied" : status === "failed" ? "Couldn't copy the link" : ""}
       </span>
     </>
   );

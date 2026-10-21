@@ -60,6 +60,7 @@ model Vendor {
   subscriptionEvents SubscriptionEvent[]
   offers             Offer[]
   demoHandovers      DemoHandover[]
+  communities        CommunityMember[]
 
   @@index([slug])
   @@map("vendors")
@@ -662,6 +663,42 @@ model AdminInvite {
 
   @@index([email])
   @@map("admin_invites")
+}
+
+// ─── COMMUNITY PAGES ────────────────────────────────────────────────
+// One public page per housing society ("SDG Home Kitchens") at /c/<slug> that
+// links to the stores of the home kitchens living there (lib/community.ts).
+// Made by a platform ADMIN on /admin/communities. A store is listed only after
+// its OWNER accepts the invite in Settings → Online store.
+
+model Community {
+  id          String            @id @default(cuid())
+  slug        String            @unique // /c/<slug>; same rules as a store link
+  name        String            @db.VarChar(80)
+  area        String?           @db.VarChar(80) // "Yelahanka, Bengaluru"
+  description String?           @db.VarChar(280)
+  createdById String // platform admin User.id; no FK so the page outlives the admin
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  members     CommunityMember[]
+
+  @@map("communities")
+}
+
+model CommunityMember {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  vendorId    String
+  vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  // Null = invited by an admin, waiting for the store's OWNER. Only accepted
+  // rows are listed on the public page.
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([communityId, vendorId])
+  @@index([vendorId])
+  @@map("community_members")
 }
 
 // ─── ENUMS ──────────────────────────────────────────────────────────

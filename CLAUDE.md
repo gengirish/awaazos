@@ -203,6 +203,7 @@ storefront surface** — unauthenticated, and no longer read-only (buyers place 
 | `/s/[slug]/account` | Signed-in buyer's own orders/profile |
 | `/r/[token]` | Customer receipt page (see "Receipt module"; not gated on `publishStorefront`) |
 | `/d/[token]` + `POST /api/d/[token]` | Rider's "Delivered" link (see "Delivery handoff"; not gated on `publishStorefront`) |
+| `/c/[slug]` | Community page: links to the listed stores of one housing society (see "Community pages") |
 | `/api/s/**` | Order placement, UTR submit, "I've received my order", vendor-Razorpay start/verify, buyer magic-link auth |
 | `/api/webhooks/razorpay-orders/[vendorId]` | Per-vendor Razorpay webhook (vendor's own secret) |
 
@@ -538,6 +539,18 @@ only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts`
 Also added with it, for real orders too: `MenuItem.unit` ("₹1,200 / kg" on the storefront),
 `Transaction.advancePaidPaise` (order stays PENDING; the board shows "Advance paid · Balance due") and
 `Transaction.fulfilAt` (shown on the board card). Nothing but the demo API writes them yet.
+
+### Community pages (`/c/[slug]`)
+
+One public page per housing society ("SDG Home Kitchens") linking to the stores of the home kitchens
+living there. Rules in `lib/community.ts` (read its header), queries in `lib/community-server.ts`.
+A directory, not a marketplace: no cross-store cart, search, ranking or reviews; every card links to
+`/s/<slug>`. A platform ADMIN creates the page and invites stores on `/admin/communities`
+(`/api/admin/communities/**`); an invite lists nothing until the store's OWNER taps Join in
+Settings → Online store (`POST` / `DELETE /api/vendor/communities/[id]`, own row only, else 404).
+The page shows a store only while it is accepted, active, `publishStorefront` and not `isDemo`, with
+the storefront header allowlist (name, type, city, logo, slug). Pre-order state comes from the drops'
+times on each render — no timers. `noindex`: it names a residential society.
 
 ### In-app Help (`/help`)
 

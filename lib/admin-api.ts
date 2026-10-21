@@ -3,6 +3,7 @@ import type { UserRole } from "@prisma/client";
 import { z } from "zod";
 
 import { AdminInviteError } from "@/lib/admin-invites";
+import { CommunityError } from "@/lib/community-server";
 import { DemoStoreError } from "@/lib/demo-store";
 import { logger } from "@/lib/logger";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
@@ -31,7 +32,7 @@ export function adminRoute<P>(
     try {
       return await handler(req, { params: await routeCtx.params, user, actor: `admin:${user.id}` });
     } catch (err) {
-      if (err instanceof DemoStoreError || err instanceof AdminInviteError) {
+      if (err instanceof DemoStoreError || err instanceof AdminInviteError || err instanceof CommunityError) {
         return NextResponse.json({ error: err.code }, { status: err.status });
       }
       if (err instanceof z.ZodError) {
