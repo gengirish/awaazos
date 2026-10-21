@@ -1,0 +1,2 @@
+# Prisma checksums migration files: keep them byte-identical on every checkout.
+prisma/migrations/** text eol=lf
