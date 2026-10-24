@@ -5,6 +5,7 @@ const LINKS = [
   { href: "/admin/vendors", label: "Stores and free access", superAdminOnly: true },
   { href: "/admin/demo-stores", label: "Demo-store pipeline", superAdminOnly: false },
   { href: "/admin/communities", label: "Community pages", superAdminOnly: false },
+  { href: "/admin/pricing", label: "Pricing calculator", superAdminOnly: false },
   { href: "/admin/admins", label: "Admins", superAdminOnly: true },
 ] as const;
 
