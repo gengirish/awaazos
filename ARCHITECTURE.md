@@ -780,7 +780,7 @@ sequenceDiagram
     API->>DB: COMMIT
     API--)KV: bump orders:{vendorId} (fire-and-forget)
     API-->>B: 201 { orderToken }, redirect to /s/[slug]/o/[token]
-    V->>KV: GET /api/storefront-orders/signal every 6 min (visible + accepting only; Web Push is the instant path)
+    V->>KV: GET /api/storefront-orders/signal + board pass, every 30 s, no Postgres (visible + accepting only; Web Push is the instant path)
     V->>DB: refetch orders only when the counter moved
 ```
 
@@ -800,7 +800,7 @@ All three converge on `markOrderPaid()`: a conditional `updateMany` (`paymentSta
 
 ### Order from menu (no Drop)
 
-A vendor who turns on `VendorSettings.acceptMenuOrders` lets buyers order everyday `MenuItem`s on `/s/[slug]` at any time (`lib/menu-orders.ts`, `POST /api/s/[slug]/menu-orders`). These are the same `STOREFRONT` transactions with `dropId = null`, the same three payment paths and the same plan-cap rule. Differences from a Drop: no cut-off and no stock caps (so no row lock), only `isAvailable` items can be ordered, prices are always re-read from `MenuItem`, and fulfilment mode, delivery fee and pickup note come from `menuFulfilmentMode` / `menuDeliveryFeePaise` / `menuPickupNote`. The vendor works them from `/orders`, which polls `/api/storefront-orders/signal` every 6 minutes. That interval is deliberately longer than Neon's idle timeout, because each tick still reads Postgres through `requireVendorRole`.
+A vendor who turns on `VendorSettings.acceptMenuOrders` lets buyers order everyday `MenuItem`s on `/s/[slug]` at any time (`lib/menu-orders.ts`, `POST /api/s/[slug]/menu-orders`). These are the same `STOREFRONT` transactions with `dropId = null`, the same three payment paths and the same plan-cap rule. Differences from a Drop: no cut-off and no stock caps (so no row lock), only `isAvailable` items can be ordered, prices are always re-read from `MenuItem`, and fulfilment mode, delivery fee and pickup note come from `menuFulfilmentMode` / `menuDeliveryFeePaise` / `menuPickupNote`. The vendor works them from `/orders`, which polls `/api/storefront-orders/signal` every 30 seconds. Those ticks never read Postgres: the board sends a board pass (`lib/board-pass.ts`, minted on each role-checked board load) that the route checks against the JWT session before reading the Upstash counter. Without a valid pass, or without KV, the board falls back to every 6 minutes, longer than Neon's idle timeout, because those checks read Postgres.
 
 Both kinds of storefront order fire a Web Push alert to opted-in staff devices when placed, and again when a buyer submits a payment claim (§6).
 

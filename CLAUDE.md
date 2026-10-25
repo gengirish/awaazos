@@ -401,10 +401,14 @@ compound scope; the frozen rule is per order (`isDropFrozen` on its drop).
 
 Orders board freshness: order placement and board actions bump one per-vendor Upstash counter
 (`bumpOrderSignal` in `lib/drops-signal.ts`, fire-and-forget). Instant alerts come from Web Push;
-board polling is only a fallback, so the board polls every **6 min** (`BOARD_POLL_MS`), only while
-visible and only while a buyer could order (`boardPollKind`: "order from menu" on, or a drop open
-or about to open), refetching from Postgres only when the counter moves. Keep it above Neon's
-idle timeout — each tick's session check reads Postgres.
+board polling is only a fallback, only while visible and only while a buyer could order
+(`boardPollKind`: "order from menu" on, or a drop open or about to open), refetching from Postgres
+only when the counter moves. It checks every **30 s** (`BOARD_SIGNAL_POLL_MS`) because that check
+never touches Postgres: the board sends a **board pass** (`lib/board-pass.ts`, `x-board-pass`
+header — HMAC of vendorId/userId/expiry off `AUTH_SECRET`, 12 h, minted by every Postgres-checked
+board load) and the signal route checks it against the JWT session (no DB) and reads one KV key.
+Without a valid pass, or without KV, it falls back to every **6 min** (`BOARD_POLL_MS`) — keep that
+above Neon's idle timeout, since those checks read Postgres. Never let a fast tick reach Postgres.
 
 **Web Push alerts** (`lib/push.ts`): new storefront orders and submitted UPI references push to the
 vendor's opted-in staff devices (`PushSubscription`, one row per device). Event-driven only — never
@@ -461,8 +465,8 @@ Fulfilment/fee/pickup note come from `menuFulfilmentMode` / `menuDeliveryFeePais
 `menuPickupNote`. Buyer route `POST /api/s/[slug]/menu-orders`; the vendor sees them on `/orders`
 beside drop orders (`GET /api/storefront-orders` returns both; `PATCH` / `bulk` under it act on
 menu orders only), sharing order actions with drops via `lib/storefront-order-actions.ts`.
-Menu ordering has no cut-off to stop the board polling, so it polls every 6 min — keep it above
-Neon's idle timeout.
+Menu ordering has no cut-off to stop the board polling, so the board may poll all day — which is
+why the fast check must stay Postgres-free (board pass above).
 
 **Delivery handoff** (`lib/delivery-handoff.ts`, `lib/delivery-riders.ts`): a delivery order's card has
 "Copy for rider" and, for each rider saved in Settings → Online orders (`VendorSettings.deliveryRiders`,

@@ -71,7 +71,7 @@ import {
 import type { BoardDrop } from "@/lib/drops-board-server";
 import { buildWhatsAppShareUrl } from "@/lib/drops-share";
 import { formatIstDate, formatIstTime } from "@/lib/drops-time";
-import { BOARD_POLL_MS, toMakeFromOrders } from "@/lib/menu-orders-board";
+import { BOARD_POLL_MS, BOARD_SIGNAL_POLL_MS, toMakeFromOrders } from "@/lib/menu-orders-board";
 import {
   BULK_ORDER_MAX,
   bulkActionCounts,
@@ -118,13 +118,15 @@ type Props = {
   /** From `?drop=`: open the board narrowed to this drop (ignored if it is not on the board). */
   initialDropId: string | null;
   initialSignal: number | null;
+  /** Board pass for the Postgres-free signal check (lib/board-pass.ts). */
+  initialPass: string | null;
   /** The viewer's role here. Drops are MANAGER+, so a cashier is never sent to build one. */
   staffRole: StaffRole;
   /** Saved delivery riders (Settings → Online orders): "Send to <name>" on delivery orders. */
   riders?: DeliveryRider[];
 };
 
-type OrdersResponse = { data: BoardOrder[]; drops: BoardDrop[]; signal: number | null };
+type OrdersResponse = { data: BoardOrder[]; drops: BoardDrop[]; signal: number | null; pass?: string };
 type BulkResponse = { data?: BulkOrderResult & { orders: BoardOrder[] }; error?: string };
 
 const EMPTY_SELECTION: ReadonlySet<string> = new Set();
@@ -143,6 +145,8 @@ const ORDERS_URL = "/api/storefront-orders";
 /** `story` key for the whole store's Instagram image (drops use their id). */
 const STORE_STORY = "store";
 const SIGNAL_URL = "/api/storefront-orders/signal";
+/** Mirrors BOARD_PASS_HEADER in lib/board-pass.ts (server-only module). */
+const BOARD_PASS_HEADER = "x-board-pass";
 
 const MENU_MODE_LABEL: Record<FulfilmentMode, string> = {
   PICKUP: "Pickup only",
@@ -211,6 +215,7 @@ export function OrdersBoard({
   initialDrops,
   initialDropId,
   initialSignal,
+  initialPass,
   staffRole,
   riders = [],
 }: Props) {
@@ -244,6 +249,15 @@ export function OrdersBoard({
   const [story, setStory] = useState<{ key: string; image: StoryImage } | null>(null);
 
   const signalRef = useRef<number | null>(initialSignal);
+  // The pass lets the signal check skip Postgres, so the board may check often.
+  // Without one (rejected, or an old page) it is back to the slow interval.
+  const passRef = useRef<string | null>(initialPass);
+  const [hasPass, setHasPass] = useState(initialPass !== null);
+  // Two rejections within one slow interval mean fresh passes aren't working
+  // (e.g. a secret mismatch): stop using them on this page rather than turn
+  // every fast tick into a full Postgres refresh.
+  const passRejectedAt = useRef(0);
+  const passDisabled = useRef(false);
   const ordersRef = useRef(orders);
   ordersRef.current = orders;
   const audioRef = useRef<AudioContext | null>(null);
@@ -312,6 +326,10 @@ export function OrdersBoard({
         }
       }
       signalRef.current = body.signal;
+      if (body.pass && !passDisabled.current) {
+        passRef.current = body.pass;
+        setHasPass(true);
+      }
       setSignalMode(body.signal === null ? "fallback" : "kv");
       setOrders(body.data);
       setDrops(body.drops);
@@ -346,12 +364,16 @@ export function OrdersBoard({
   }, [nextEdgeAt]);
 
   // New-order detection without pinning Neon awake. Instant alerts come from Web
-  // Push (lib/push.ts); polling is only a fallback, so the board ticks every
-  // 6 min — above Neon's 5-min idle timeout, since each tick's session check
-  // reads Postgres.
-  //  - KV available: read the Upstash counter, refetch only when it moves.
-  //  - No KV: refetch directly, only while something is taking orders.
-  //  - Only while the tab is visible; returning to the tab refetches once.
+  // Push (lib/push.ts); this check is the fallback for devices without them.
+  //  - KV + board pass: every 30 s (BOARD_SIGNAL_POLL_MS). The signal route
+  //    checks the pass against the JWT session and reads only the Upstash
+  //    counter — no Postgres — and the board refetches only when it moves.
+  //  - KV, no valid pass: every 6 min (BOARD_POLL_MS), above Neon's 5-min idle
+  //    timeout, since that check's session lookup reads Postgres. A rejected
+  //    pass triggers one full refresh, which hands out a new one.
+  //  - No KV: refetch directly every 6 min, only while something takes orders.
+  //  - Only while the tab is visible; returning to the tab or coming back
+  //    online checks at once.
   //  - Nothing at all unless a buyer could order right now: "order from menu"
   //    is on, or a drop is open (or about to open). See `boardPollKind`.
   const pollKind = boardPollKind({
@@ -359,6 +381,8 @@ export function OrdersBoard({
     dropStatuses: drops.map((d) => liveEffectiveStatus(d, now)),
     signalMode,
   });
+  const pollMs = pollKind === "signal" && hasPass ? BOARD_SIGNAL_POLL_MS : BOARD_POLL_MS;
+  const pollCadence = pollMs === BOARD_SIGNAL_POLL_MS ? "Checks every 30 seconds" : "Checks every few minutes";
 
   useEffect(() => {
     if (!pollKind) return;
@@ -371,8 +395,23 @@ export function OrdersBoard({
         return;
       }
       try {
-        const res = await fetch(SIGNAL_URL, { cache: "no-store" });
-        if (!res.ok || cancelled) return;
+        const pass = passRef.current;
+        const res = await fetch(SIGNAL_URL, {
+          cache: "no-store",
+          headers: pass ? { [BOARD_PASS_HEADER]: pass } : undefined,
+        });
+        if (cancelled) return;
+        if (res.status === 401 && pass) {
+          // Expired or no longer this session's: one full refresh brings a new one.
+          passRef.current = null;
+          setHasPass(false);
+          const t = Date.now();
+          if (t - passRejectedAt.current < BOARD_POLL_MS) passDisabled.current = true;
+          passRejectedAt.current = t;
+          await refresh();
+          return;
+        }
+        if (!res.ok) return;
         const { signal } = (await res.json()) as { signal: number | null };
         if (signal === null) {
           setSignalMode("fallback");
@@ -385,17 +424,20 @@ export function OrdersBoard({
       }
     };
 
-    const id = window.setInterval(tick, BOARD_POLL_MS);
+    const id = window.setInterval(tick, pollMs);
     const onVisible = () => {
       if (document.visibilityState === "visible") void tick();
     };
+    const onOnline = () => void tick();
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("online", onOnline);
     return () => {
       cancelled = true;
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("online", onOnline);
     };
-  }, [pollKind, refresh]);
+  }, [pollKind, pollMs, refresh]);
 
   // The server-rendered orders were just fetched; start the clock on mount
   // (not during render) so server and client markup match.
@@ -777,8 +819,8 @@ export function OrdersBoard({
           : push.view === "subscribed"
             ? "New orders appear automatically while this screen is open."
             : push.view === "default" || push.view === "denied" || push.view === "ios-needs-install"
-              ? "Checks every few minutes. Turn on phone alerts to see orders instantly."
-              : "Checks every few minutes. Tap Refresh to check now."}
+              ? `${pollCadence}. Turn on phone alerts to see orders instantly.`
+              : `${pollCadence}. Tap Refresh to check now.`}
       </p>
     ),
   };
