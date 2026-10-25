@@ -4,6 +4,7 @@ import { BillingAccessNotice } from "@/components/billing/TrialNotice";
 import { OrdersBoard } from "@/components/drops/orders/OrdersBoard";
 import { InstallBanner } from "@/components/pwa/InstallPrompt";
 import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
+import { mintBoardPass } from "@/lib/board-pass";
 import { parseDeliveryRiders } from "@/lib/delivery-riders";
 import { loadOrdersBoard } from "@/lib/drops-board-server";
 import { getOrderSignal } from "@/lib/drops-signal";
@@ -77,6 +78,7 @@ export default async function OrdersPage(props: Props) {
         initialDrops={board.drops}
         initialDropId={dropId}
         initialSignal={signal}
+        initialPass={mintBoardPass({ vendorId: ctx.vendor.id, userId: ctx.user.id })}
         staffRole={ctx.staff.role}
         riders={parseDeliveryRiders(settings?.deliveryRiders)}
       />

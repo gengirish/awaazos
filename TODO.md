@@ -174,9 +174,9 @@ STARTER, so trial vendors have it too.
 
 ### 3.5 Drops: open items found while building it
 
-- ~~**Orders board keeps Neon awake during order windows.**~~ **Resolved:** with Web Push carrying
-  instant alerts, the orders board polls every 6 min (`BOARD_POLL_MS`), above Neon's idle timeout.
-  A JWT-only session check on the signal route would allow faster polling again if ever needed.
+- ~~**Orders board keeps Neon awake during order windows.**~~ **Resolved:** the board's signal
+  check sends a board pass (`lib/board-pass.ts`) checked against the JWT session, so it reads no
+  Postgres and runs every 30 s; without a pass or KV it falls back to every 6 min (`BOARD_POLL_MS`).
 - **Marking an EXPIRED order paid can oversell.** After the 15-minute hold lapses its stock is
   released and may be resold; the board still lets the vendor tap Mark paid (e.g. a late UTR), which
   re-counts that stock. Either re-check remaining stock under the drop lock in `mark_paid`, or warn
@@ -199,9 +199,6 @@ STARTER, so trial vendors have it too.
   `paymentMethod`, which stays `UPI` when a buyer pays by card through Checkout.
 - **Paid after cancel.** A buyer can pay through Checkout after the vendor cancelled; money moves but
   the order is not marked paid (logged as `storefront_rzp_paid_unapplied`). Vendor refunds by hand.
-- **Menu orders board refreshes every 6 minutes.** "Order from menu" has no cut-off, so its board
-  can stay open all day; polling faster would keep Neon awake (each tick runs `requireVendorRole`).
-  Faster alerts need the same Postgres-free session check as the drops board item above.
 - **Menu ordering can be left without a way to pay.** `acceptMenuOrders` is guarded only when it is
   switched on. If the vendor later clears the UPI ID or turns off pay-on-delivery, buyers reach a
   checkout with no payment option (the sheet shows a "message the kitchen" note). Unpublishing is

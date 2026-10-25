@@ -69,11 +69,20 @@ export function toMakeFromOrders(orders: ToMakeOrderInput[]): ToMakeRow[] {
  * phone all day. Every tick hits Postgres (requireVendorRole reads the user and
  * its memberships), so the interval stays ABOVE Neon's 5-minute idle timeout —
  * anything shorter pins the database awake for as long as the tab is open
- * (global scale-to-zero rule). Faster alerts need a Postgres-free session
- * check on the signal route first; see TODO.md §3.5. Whether the board polls
- * at all is `boardPollKind` in lib/drops-board.ts.
+ * (global scale-to-zero rule). This is the interval for checks that touch
+ * Postgres; whether the board polls at all is `boardPollKind` in
+ * lib/drops-board.ts.
  */
 export const BOARD_POLL_MS = 6 * 60_000;
+
+/**
+ * The faster interval, used only when the check never reaches Postgres: the
+ * signal route with a board pass (lib/board-pass.ts) decodes the JWT and reads
+ * one Upstash key. Each tick costs a function call and one KV read, nothing
+ * that keeps Neon awake; the board refetches from Postgres only when the
+ * counter moves.
+ */
+export const BOARD_SIGNAL_POLL_MS = 30_000;
 
 // ─── Settings guard ─────────────────────────────────────────────────
 
