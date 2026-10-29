@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { toBoardOrder } from "@/lib/drops-board-server";
 import { bumpOrderSignal } from "@/lib/drops-signal";
-import { bulkOrderActionSchema } from "@/lib/order-bulk";
+import { bulkOrderActionSchema } from "@/lib/order-bulk-schema";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { runBulkStorefrontOrderAction } from "@/lib/storefront-order-bulk";
