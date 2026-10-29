@@ -45,7 +45,7 @@ const menuItemCreateFields = {
   priceInRupees: z.preprocess(
     preprocessRupeesInput,
     z
-      .number({ required_error: "Price is required", invalid_type_error: "Price is required" })
+      .number({ error: "Price is required" })
       .refine((n) => Number.isFinite(n) && n > 0, "Price must be greater than 0"),
   ),
   aliasesCsv: z.string().optional(),
