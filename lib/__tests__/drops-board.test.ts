@@ -383,6 +383,16 @@ describe("primaryOrderAction", () => {
     if (primary) expect(availableOrderActions(order, frozen).has(primary)).toBe(true);
   });
 
+  it("a buyer's claim gets one answer: no separate Confirm beside Payment received", () => {
+    const claimed = o("PAYMENT_SUBMITTED", "PLACED", "PENDING", "UPI");
+    const actions = availableOrderActions(claimed, false);
+    expect(actions.has("mark_paid")).toBe(true);
+    expect(actions.has("reject_payment")).toBe(true);
+    expect(actions.has("confirm")).toBe(false);
+    // Without a claim the seller may still accept an order before the money arrives.
+    expect(availableOrderActions(o("AWAITING_PAYMENT", "PLACED", "PENDING", "UPI"), false).has("confirm")).toBe(true);
+  });
+
   it("markPaidNeedsConfirm: only a buyer's claim lets one tap mark an order paid", () => {
     expect(markPaidNeedsConfirm({ displayState: "PAYMENT_SUBMITTED" })).toBe(false);
     for (const s of ["AWAITING_PAYMENT", "PAY_ON_DELIVERY", "DELIVERED"] as const) {

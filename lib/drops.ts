@@ -522,6 +522,11 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
  * The conditional `updateMany` is the idempotency guard: a webhook retry and a
  * vendor tap racing each other credit revenue once. Returns false if the order
  * was already paid, cancelled, or not this vendor's.
+ *
+ * Paid means accepted: a PLACED order is CONFIRMED in the same step, so the
+ * seller never answers "Payment received" and then "Confirm" for one order.
+ * Every payment path (seller tap, bulk, Razorpay webhook / verify, cash at
+ * the door) comes through here. A DELIVERED order is left as it is.
  */
 export async function markOrderPaid(
   tx: Prisma.TransactionClient,
@@ -551,6 +556,11 @@ export async function markOrderPaid(
     },
   });
   if (res.count === 0) return false;
+
+  await tx.transaction.updateMany({
+    where: { id: args.transactionId, vendorId: args.vendorId, fulfilmentStatus: "PLACED" },
+    data: { fulfilmentStatus: "CONFIRMED" },
+  });
 
   const t = await tx.transaction.findFirstOrThrow({
     where: { id: args.transactionId, vendorId: args.vendorId },

@@ -354,6 +354,20 @@ describe.skipIf(!ENABLED)("storefront (menu) orders — vendor side, DB integrat
     expect((await patchMenu(other.order.id, "dispatch")).status).toBe(404);
   });
 
+  it("mark_paid on a new order confirms it too, and credits revenue once", async () => {
+    const a = await seedVendor();
+    const o = await menuOrder(a, "UPI");
+    if (!o.ok) throw new Error("seed failed");
+    as(a);
+
+    const res = await patchMenu(o.order.id, "mark_paid");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { data: { fulfilmentStatus: string; paymentStatus: string } };
+    expect(body.data).toMatchObject({ fulfilmentStatus: "CONFIRMED", paymentStatus: "PAID" });
+    expect((await patchMenu(o.order.id, "confirm")).status).toBe(409);
+    expect(await summary(a.id)).toMatchObject({ totalRevenuePaise: 5500, totalTransactions: 1 });
+  });
+
   it("cancel on a paid UPI order reverses revenue and marks it REFUNDED", async () => {
     const a = await seedVendor();
     const o = await menuOrder(a, "UPI");

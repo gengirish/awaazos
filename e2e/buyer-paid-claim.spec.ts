@@ -76,7 +76,7 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
       expect((await notReceived.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
 
       // Another vendor cannot answer this order's claim (404, no existence leak).
-      type Board = { data: { id: string; paymentStatus: string }[] };
+      type Board = { data: { id: string; paymentStatus: string; fulfilmentStatus: string }[] };
       const board = (await (await page.request.get("/api/storefront-orders")).json()) as Board;
       const orderId = board.data[0].id;
       const other = await otherCtx.newPage();
@@ -110,10 +110,12 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
       await page.reload();
       const card2 = page.getByRole("article", { name: /Claim Buyer/ });
       await expect(card2.getByText("412345678901")).toBeVisible();
-      await card2.getByRole("button", { name: "Payment received" }).click();
-      await expect(card2.getByRole("button", { name: "Payment received" })).toHaveCount(0);
+      // One answer: no separate Confirm beside it, and paying confirms the order.
+      await expect(card2.getByRole("button", { name: "Confirm", exact: true })).toHaveCount(0);
+      await card2.getByRole("button", { name: "Payment received · Confirm" }).click();
+      await expect(card2.getByRole("button", { name: /Payment received/ })).toHaveCount(0);
       const after = (await (await page.request.get("/api/storefront-orders")).json()) as Board;
-      expect(after.data.find((o) => o.id === orderId)?.paymentStatus).toBe("PAID");
+      expect(after.data.find((o) => o.id === orderId)).toMatchObject({ paymentStatus: "PAID", fulfilmentStatus: "CONFIRMED" });
 
       // A late "Not received" on a paid order is refused.
       const late = await page.request.patch(`/api/storefront-orders/${orderId}`, {
