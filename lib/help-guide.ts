@@ -57,7 +57,7 @@ export const ORDER_JOURNEY: readonly OrderJourneyStep[] = [
     id: "confirm",
     who: "You",
     title: "Confirm",
-    text: "Tap Confirm so the customer knows you have it. Their order page says Confirmed.",
+    text: "Tap Confirm so the customer knows you have it. Their order page says Confirmed. A paid order is confirmed for you: Payment received does both.",
   },
   {
     id: "send",

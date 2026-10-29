@@ -4,7 +4,7 @@
  * (`/api/storefront-orders/[orderId]`).
  *
  *   confirm    PLACED → CONFIRMED
- *   mark_paid  markOrderPaid (credits DailySummary once) — "Payment received"
+ *   mark_paid  markOrderPaid (credits DailySummary once; PLACED → CONFIRMED) — "Payment received"
  *   reject_payment  "Not received": clears the buyer's "I've paid" claim (and any
  *              UTR), stamps paymentRejectedAt. The order stops holding stock once
  *              its 15-minute window has passed; a new claim then needs a UTR.
@@ -164,8 +164,9 @@ export async function applyStorefrontOrderAction(
   if (!applied) throw new OrderActionError(409, "invalid_state");
 
   // A delivery placed before rider links existed gets one when it is confirmed
-  // or sent out. `riderToken: null` in the where keeps the first one minted.
-  if ((action === "confirm" || action === "dispatch") && order.fulfilmentType === "DELIVERY" && !order.riderToken) {
+  // (incl. by being paid) or sent out. `riderToken: null` in the where keeps the first one minted.
+  const confirms = action === "confirm" || action === "mark_paid" || action === "dispatch";
+  if (confirms && order.fulfilmentType === "DELIVERY" && !order.riderToken) {
     await tx.transaction.updateMany({ where: { ...scope, riderToken: null }, data: { riderToken: generateOrderToken() } });
   }
 

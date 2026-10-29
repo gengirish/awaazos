@@ -366,7 +366,9 @@ export function checkOrderAction(
  * in one place: an unpaid pay-on-delivery order is "marked paid" by the
  * "Delivered · ₹X collected" tap, so plain "Mark paid" only shows for it once
  * delivered. "Not received" (`reject_payment`) is only offered while the buyer's
- * "I've paid" claim is waiting for an answer. Bulk selection (lib/order-bulk.ts)
+ * "I've paid" claim is waiting for an answer, and then "Confirm" is not: being
+ * marked paid confirms the order too (`markOrderPaid`), so "Payment received"
+ * is the one answer. Bulk selection (lib/order-bulk.ts)
  * builds on the same list, so the card and the bulk bar never disagree about
  * what an order can do.
  */
@@ -384,7 +386,7 @@ export function availableOrderActions(
   const fs = o.fulfilmentStatus;
   const live = fs === "PLACED" || fs === "CONFIRMED";
   const out = new Set<OrderAction>();
-  if (fs === "PLACED" && !frozen) out.add("confirm");
+  if (fs === "PLACED" && !frozen && o.displayState !== "PAYMENT_SUBMITTED") out.add("confirm");
   if (fs !== "CANCELLED" && o.paymentStatus !== "PAID" && (o.paymentMethod !== "CASH" || fs === "DELIVERED")) {
     out.add("mark_paid");
   }
@@ -402,7 +404,8 @@ type CardOrder = Parameters<typeof availableOrderActions>[0];
  * The one button a card draws as its next step; every other action is outline.
  * Always one of `availableOrderActions`, so it can never offer something the
  * card (or the bulk bar) would not:
- *   - a buyer's "I've paid" claim is waiting → answer it ("Payment received");
+ *   - a buyer's "I've paid" claim is waiting → answer it ("Payment received",
+ *     which also confirms a new order);
  *   - a new order → "Confirm";
  *   - a confirmed order → hand it over ("Delivered" / "… collected");
  *   - handed over but still unpaid → "Payment received".

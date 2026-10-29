@@ -170,7 +170,13 @@ export function OrderCard({
 
   const BUTTONS: { action: OrderAction; show: boolean; label: string; icon: ReactNode }[] = [
     { action: "confirm", show: canConfirm, label: "Confirm", icon: <CheckCircle2 aria-hidden /> },
-    { action: "mark_paid", show: canMarkPaid, label: "Payment received", icon: <IndianRupee aria-hidden /> },
+    {
+      action: "mark_paid",
+      show: canMarkPaid,
+      // Being paid confirms a new order too (`markOrderPaid`); say so on the button.
+      label: fs === "PLACED" ? "Payment received · Confirm" : "Payment received",
+      icon: <IndianRupee aria-hidden />,
+    },
     { action: "reject_payment", show: canRejectPayment, label: "Not received", icon: <XCircle aria-hidden /> },
     { action: "dispatch", show: canDispatch, label: "Out for delivery", icon: <Send aria-hidden /> },
     {
@@ -556,7 +562,7 @@ export function OrderCard({
           order.paymentMethod === "CASH"
             ? "Only do this after you have the cash in hand."
             : "Only do this after you have seen the money in your UPI app."
-        }`}
+        }${fs === "PLACED" ? " This also confirms the order." : ""}`}
         confirmLabel="Yes, mark paid"
         cancelLabel="Go back"
         destructive={false}

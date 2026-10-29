@@ -384,6 +384,10 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   on the board: "Payment received" (`mark_paid` → `markOrderPaid`) or "Not received"
   (`reject_payment`: clears the claim and UTR, stamps `paymentRejectedAt`, per-order only). After a
   rejection the next claim needs a UTR (400 `reference_required`), so a hold can't be renewed by tapping.
+- **Paid means confirmed.** `markOrderPaid` also moves a `PLACED` order to `CONFIRMED` (same txn), on
+  every path — seller tap, bulk, Razorpay webhook / verify, cash at the door. So a claimed order's
+  card offers "Payment received · Confirm" / "Not received" and no separate Confirm
+  (`availableOrderActions`); an unclaimed one keeps Confirm for accepting before the money arrives.
 
 Buyer accounts are **not** NextAuth: `Customer` + passwordless email magic link
 (`lib/customer-auth.ts`), tokens and sessions stored as SHA-256 hashes only, session in the

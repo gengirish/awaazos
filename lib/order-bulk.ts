@@ -137,7 +137,7 @@ export function bulkNeedsConfirm(
 
 const DONE_VERB: Record<BulkOrderAction, string> = {
   confirm: "confirmed",
-  mark_paid: "marked paid",
+  mark_paid: "marked paid", // new ones are confirmed too (markOrderPaid)
   deliver: "marked delivered",
 };
 
