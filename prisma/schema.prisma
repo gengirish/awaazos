@@ -104,6 +104,16 @@ model VendorSettings {
   razorpayKeyId            String?
   razorpayKeySecretEnc     String?
   razorpayWebhookSecretEnc String?
+  // The same, connected by Razorpay OAuth ("Connect Razorpay", lib/razorpay-oauth.ts)
+  // instead of pasted keys. Set together or not at all; when set they win over the
+  // keys above. Tokens are encrypted like the key secret. Not unique: one Razorpay
+  // account may run several stores (orders are matched by razorpayOrderId first).
+  razorpayAccountId        String?
+  razorpayAccessTokenEnc   String?
+  razorpayRefreshTokenEnc  String?
+  razorpayPublicToken      String? // Checkout key, rzp_(live|test)_oauth_… — public
+  razorpayTokenExpiresAt   DateTime? // access token
+  razorpayRefreshExpiresAt DateTime? // refresh token; past it the seller must reconnect
   // Platform SaaS subscription (AwaazOS's own Razorpay account, not the
   // vendor's). Written by the subscription webhook / verify route only.
   razorpaySubId            String?
@@ -112,6 +122,7 @@ model VendorSettings {
   billingInterval          String? // monthly | yearly
   razorpayCustomerId       String?
 
+  @@index([razorpayAccountId])
   @@map("vendor_settings")
 }
 

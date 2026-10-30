@@ -12,7 +12,10 @@ vi.mock("@/lib/env", () => ({
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
 
 import {
+  accessTokenNeedsRefresh,
+  checkoutKey,
   createRazorpayOrder,
+  fetchRazorpayOrder,
   hasStoredRazorpayCreds,
   isOnlinePaymentEnabled,
   RAZORPAY_KEY_ID_PATTERN,
@@ -83,7 +86,7 @@ describe("helpers", () => {
 });
 
 describe("HTTP (mocked fetch)", () => {
-  const creds = { keyId: "rzp_test_abcdefgh12", keySecret: "sek" };
+  const creds = { kind: "keys" as const, keyId: "rzp_test_abcdefgh12", keySecret: "sek" };
   afterEach(() => {
     vi.unstubAllGlobals();
   });
@@ -157,5 +160,62 @@ describe("isOnlinePaymentEnabled", () => {
     expect(isOnlinePaymentEnabled(starter, null, NOW)).toBe(false);
     vi.stubEnv("PAYMENT_KEYS_ENCRYPTION_KEY", "");
     expect(isOnlinePaymentEnabled(starter, creds, NOW)).toBe(false);
+  });
+});
+
+describe("Connect Razorpay (OAuth) creds", () => {
+  const NOW = new Date("2026-10-30T06:00:00.000Z");
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const oauth = {
+    razorpayAccountId: "acc_Dhk2qDbmu6FwZH",
+    razorpayAccessTokenEnc: "v1:a",
+    razorpayRefreshTokenEnc: "v1:r",
+    razorpayPublicToken: "rzp_test_oauth_9xu1rkZqoXlClS",
+    razorpayTokenExpiresAt: new Date(NOW.getTime() + 60 * DAY_MS),
+    razorpayRefreshExpiresAt: new Date(NOW.getTime() + 150 * DAY_MS),
+  };
+  const starter = { plan: "STARTER" as const, planExpiresAt: null };
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("counts as stored while the refresh token is alive", () => {
+    expect(hasStoredRazorpayCreds(oauth, NOW)).toBe(true);
+    expect(hasStoredRazorpayCreds({ ...oauth, razorpayRefreshExpiresAt: new Date(NOW.getTime() - DAY_MS) }, NOW)).toBe(false);
+    expect(hasStoredRazorpayCreds({ ...oauth, razorpayAccessTokenEnc: null }, NOW)).toBe(false);
+  });
+
+  it("online pay needs the partner app configured on this deploy", () => {
+    vi.stubEnv("PAYMENT_KEYS_ENCRYPTION_KEY", crypto.randomBytes(32).toString("base64"));
+    vi.stubEnv("RAZORPAY_OAUTH_CLIENT_ID", "");
+    vi.stubEnv("RAZORPAY_OAUTH_CLIENT_SECRET", "");
+    expect(isOnlinePaymentEnabled(starter, oauth, NOW)).toBe(false);
+    vi.stubEnv("RAZORPAY_OAUTH_CLIENT_ID", "cid");
+    vi.stubEnv("RAZORPAY_OAUTH_CLIENT_SECRET", "csec");
+    expect(isOnlinePaymentEnabled(starter, oauth, NOW)).toBe(true);
+    expect(isOnlinePaymentEnabled({ plan: "FREE", planExpiresAt: null, trialEndsAt: null }, oauth, NOW)).toBe(false);
+  });
+
+  it("refreshes inside the last 7 days of the access token", () => {
+    expect(accessTokenNeedsRefresh(new Date(NOW.getTime() + 8 * DAY_MS), NOW)).toBe(false);
+    expect(accessTokenNeedsRefresh(new Date(NOW.getTime() + 6 * DAY_MS), NOW)).toBe(true);
+    expect(accessTokenNeedsRefresh(null, NOW)).toBe(true);
+  });
+
+  it("calls Razorpay with a Bearer token and gives Checkout the public token", async () => {
+    const creds = { kind: "oauth" as const, accessToken: "tok_abc", publicToken: oauth.razorpayPublicToken, accountId: oauth.razorpayAccountId };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ id: "order_TEST123456", amount: 100, status: "paid", amount_paid: 100 }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    const o = await fetchRazorpayOrder(creds, "order_TEST123456");
+    expect(o.status).toBe("paid");
+    expect(((fetchMock.mock.calls[0] as [string, RequestInit])[1].headers as Record<string, string>).Authorization).toBe(
+      "Bearer tok_abc",
+    );
+    expect(checkoutKey(creds)).toBe("rzp_test_oauth_9xu1rkZqoXlClS");
+    expect(checkoutKey({ kind: "keys", keyId: "rzp_test_abcdefgh12", keySecret: "s" })).toBe("rzp_test_abcdefgh12");
   });
 });

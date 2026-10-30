@@ -5,6 +5,7 @@ import { markOrderPaid } from "@/lib/drops";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
 import {
+  fetchRazorpayOrder,
   findStorefrontOrderForPayment,
   getVendorRazorpayCreds,
   verifyCheckoutSignature,
@@ -17,14 +18,17 @@ export const runtime = "nodejs";
  * Razorpay Checkout success callback for a storefront order.
  *
  * The buyer's browser relays `{ razorpay_order_id, razorpay_payment_id,
- * razorpay_signature }`. The signature is HMAC-SHA256(order|payment) with the
- * VENDOR's key secret, so only Razorpay could have produced it. It is verified
- * before any write, and the order id must be the one we created for this
- * transaction — a valid signature for some other order of the same vendor is
- * rejected. Then `markOrderPaid` (idempotent; credits DailySummary once).
+ * razorpay_signature }`. The order id must be the one we created for this
+ * transaction. With pasted keys the signature is HMAC-SHA256(order|payment) with
+ * the VENDOR's key secret, so only Razorpay could have produced it. With "Connect
+ * Razorpay" (OAuth) we hold no secret that signs it, so instead the order is
+ * fetched from Razorpay as the vendor and must be `paid` for the full amount.
+ * Both checks run before any write. Then `markOrderPaid` (idempotent; credits
+ * DailySummary once).
  *
- * The per-vendor webhook (app/api/webhooks/razorpay-orders/[vendorId]) does the
- * same independently, so a buyer closing the tab mid-redirect still gets paid.
+ * The webhooks (per-vendor app/api/webhooks/razorpay-orders/[vendorId], or the
+ * partner app/api/webhooks/razorpay-partner for connected stores) do the same
+ * independently, so a buyer closing the tab mid-redirect still gets paid.
  * Signatures and ids are never logged.
  */
 
@@ -70,11 +74,25 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     const creds = await getVendorRazorpayCreds(order.vendorId);
     if (!creds) return err("online_payment_unavailable", 409);
 
-    if (!verifyCheckoutSignature(orderId, paymentId, signature, creds.keySecret)) {
-      return err("invalid_signature", 400);
-    }
     if (!order.razorpayOrderId || order.razorpayOrderId !== orderId) {
       return err("order_mismatch", 400);
+    }
+    if (creds.kind === "keys") {
+      if (!verifyCheckoutSignature(orderId, paymentId, signature, creds.keySecret)) {
+        return err("invalid_signature", 400);
+      }
+    } else {
+      // "Connect Razorpay": no key secret of ours signs Checkout, so Razorpay's own
+      // record is the proof — the order must be paid in full, as the seller.
+      let rz;
+      try {
+        rz = await fetchRazorpayOrder(creds, orderId);
+      } catch {
+        return err("razorpay_unavailable", 502);
+      }
+      if (rz.status !== "paid" || rz.amount_paid !== order.totalPaise || rz.currency !== "INR") {
+        return err("not_paid_yet", 409);
+      }
     }
 
     if (order.paymentStatus === "PAID") {

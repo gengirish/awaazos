@@ -24,7 +24,7 @@ import {
   type SectionStatus,
   type SettingsSnapshot,
 } from "@/lib/settings-overview";
-import { hasStoredRazorpayCreds } from "@/lib/storefront-razorpay";
+import { hasStoredRazorpayCreds, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 
 import { requireSettingsContext } from "./_context";
 
@@ -83,9 +83,7 @@ export default async function SettingsHubPage() {
         receiptPaper: true,
         autoPrintReceipt: true,
         // Presence only — the encrypted secrets never leave this server component.
-        razorpayKeyId: true,
-        razorpayKeySecretEnc: true,
-        razorpayWebhookSecretEnc: true,
+        ...RAZORPAY_CRED_SELECT,
       },
     }),
     prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),

@@ -14,9 +14,10 @@ import { loadCheckout, type RazorpayOrderSuccess } from "@/lib/razorpay-checkout
  *                                exact order total; returns the public key id.
  *   2. Load checkout.js on click (not on page load — most buyers never need it).
  *   3. Checkout success       → POST …/razorpay/verify (server checks the HMAC
- *                                with the vendor's secret) → router.refresh().
+ *                                with the vendor's secret, or asks Razorpay for a
+ *                                "Connect Razorpay" store) → router.refresh().
  *
- * The per-vendor webhook marks the order paid independently, so if step 3 fails
+ * The webhooks mark the order paid independently, so if step 3 fails
  * (flaky network) the buyer is pointed at the order page's "Check for update"
  * button (OrderRefresh) rather than told to pay again.
  *
@@ -75,7 +76,9 @@ export function RazorpayPayButton({
         router.refresh();
         return;
       }
-      if (res.status === 409) {
+      const verifyError = ((await res.json().catch(() => ({}))) as { error?: string }).error;
+      // not_paid_yet: Razorpay hasn't captured it yet (OAuth stores) — the webhook will.
+      if (res.status === 409 && verifyError !== "not_paid_yet") {
         setMessage({
           text: "Your payment went through, but this order was closed in the meantime. Please message the store — they'll refund or confirm it.",
           tone: "error",

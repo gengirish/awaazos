@@ -40,7 +40,7 @@ import {
 } from "@/lib/storefront-order";
 import { discountLabel } from "@/lib/offers";
 import { prisma } from "@/lib/prisma";
-import { appBaseUrl, isOnlinePaymentEnabled } from "@/lib/storefront-razorpay";
+import { appBaseUrl, isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { qrSvgDataUrl } from "@/lib/qr";
 import { buildUpiDeepLink } from "@/lib/upi";
 import { cn } from "@/lib/utils";
@@ -152,9 +152,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
               acceptWhatsappOrders: true,
               fssaiNumber: true,
               menuPickupNote: true,
-              razorpayKeyId: true,
-              razorpayKeySecretEnc: true,
-              razorpayWebhookSecretEnc: true,
+              ...RAZORPAY_CRED_SELECT,
             },
           },
         },

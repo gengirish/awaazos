@@ -6,9 +6,13 @@ import { tooManyRequests, writeRateLimit } from "@/lib/ratelimit";
 import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
 import { encryptSecret, isSecretBoxConfigured } from "@/lib/secret-box";
 import {
-  hasStoredRazorpayCreds,
+  CLEARED_KEY_COLUMNS,
+  CLEARED_OAUTH_COLUMNS,
+  hasOauthConnection,
+  hasStoredRazorpayKeys,
   keySecretAad,
   RAZORPAY_KEY_ID_PATTERN,
+  revokeVendorOauth,
   validateKeys,
   vendorWebhookUrl,
   webhookSecretAad,
@@ -25,6 +29,10 @@ export const runtime = "nodejs";
  * and the last 4 of the (public) key id. Saving is STARTER-gated
  * (`PLAN_LIMITS.razorpayLinks`); removing is not, so a downgraded vendor can
  * still clear her keys.
+ *
+ * The other way in is "Connect Razorpay" (OAuth, ./razorpay/connect). A store has
+ * one at a time: saving keys disconnects OAuth, connecting clears the keys, and
+ * DELETE removes whichever is there (revoking our OAuth access with Razorpay).
  *
  * Request bodies here contain secrets: never log them.
  */
@@ -79,13 +87,24 @@ export async function GET(req: NextRequest) {
     const ctx = await requireVendorRole("OWNER", undefined, req);
     const s = await prisma.vendorSettings.findUnique({
       where: { vendorId: ctx.vendor.id },
-      select: { razorpayKeyId: true, razorpayKeySecretEnc: true, razorpayWebhookSecretEnc: true },
+      select: {
+        razorpayKeyId: true,
+        razorpayKeySecretEnc: true,
+        razorpayWebhookSecretEnc: true,
+        razorpayAccountId: true,
+        razorpayAccessTokenEnc: true,
+        razorpayRefreshTokenEnc: true,
+        razorpayPublicToken: true,
+      },
     });
-    const configured = hasStoredRazorpayCreds(s);
+    const keysSaved = hasStoredRazorpayKeys(s);
+    const oauth = hasOauthConnection(s);
     const res = NextResponse.json({
       data: {
-        configured,
-        keyIdLast4: configured && s?.razorpayKeyId ? s.razorpayKeyId.slice(-4) : null,
+        configured: keysSaved || oauth,
+        method: oauth ? "oauth" : keysSaved ? "keys" : null,
+        accountId: oauth ? s?.razorpayAccountId ?? null : null,
+        keyIdLast4: keysSaved && s?.razorpayKeyId ? s.razorpayKeyId.slice(-4) : null,
         webhookUrl: vendorWebhookUrl(ctx.vendor.id),
       },
     });
@@ -129,7 +148,9 @@ export async function PUT(req: NextRequest) {
     if (!valid) return NextResponse.json({ error: "invalid_razorpay_keys" }, { status: 400 });
 
     const vendorId = ctx.vendor.id;
+    await revokeVendorOauth(vendorId);
     const data = {
+      ...CLEARED_OAUTH_COLUMNS,
       razorpayKeyId: keyId,
       razorpayKeySecretEnc: encryptSecret(keySecret, keySecretAad(vendorId)),
       razorpayWebhookSecretEnc: encryptSecret(webhookSecret, webhookSecretAad(vendorId)),
@@ -142,7 +163,13 @@ export async function PUT(req: NextRequest) {
 
     console.info(JSON.stringify({ event: "vendor_payments_keys_saved", vendorId, mode: keyId.startsWith("rzp_live_") ? "live" : "test" }));
     const res = NextResponse.json({
-      data: { configured: true, keyIdLast4: keyId.slice(-4), webhookUrl: vendorWebhookUrl(vendorId) },
+      data: {
+        configured: true,
+        method: "keys",
+        accountId: null,
+        keyIdLast4: keyId.slice(-4),
+        webhookUrl: vendorWebhookUrl(vendorId),
+      },
     });
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {
@@ -153,9 +180,10 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("OWNER", undefined, req);
+    await revokeVendorOauth(ctx.vendor.id);
     await prisma.vendorSettings.updateMany({
       where: { vendorId: ctx.vendor.id },
-      data: { razorpayKeyId: null, razorpayKeySecretEnc: null, razorpayWebhookSecretEnc: null },
+      data: { ...CLEARED_KEY_COLUMNS, ...CLEARED_OAUTH_COLUMNS },
     });
     console.info(JSON.stringify({ event: "vendor_payments_keys_removed", vendorId: ctx.vendor.id }));
     return withVendorCookie(NextResponse.json({ success: true }), ctx.setVendorCookie);

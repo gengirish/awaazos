@@ -218,6 +218,7 @@ storefront surface** — unauthenticated, and no longer read-only (buyers place 
 | `/c/[slug]` | Community page: links to the listed stores of one housing society (see "Community pages") |
 | `/api/s/**` | Order placement, UTR submit, "I've received my order", vendor-Razorpay start/verify, buyer magic-link auth |
 | `/api/webhooks/razorpay-orders/[vendorId]` | Per-vendor Razorpay webhook (vendor's own secret) |
+| `/api/webhooks/razorpay-partner` | Partner-app webhook for "Connect Razorpay" stores (platform secret) |
 
 Rules every one of them follows:
 
@@ -379,6 +380,14 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   AES-256-GCM-encrypted with `PAYMENT_KEYS_ENCRYPTION_KEY` (`lib/secret-box.ts`). Never the platform
   `RAZORPAY_*` account — collecting on a vendor's behalf makes us an RBI payment aggregator.
   The other paths are UPI intent + the buyer's "I've paid" claim (vendor verifies) and pay on delivery.
+- **Connect Razorpay** (`lib/razorpay-oauth.ts`, plan in `docs/RAZORPAY_PARTNER_PLAN.md`): the same
+  vendor-owned account reached by our Razorpay Technology Partner OAuth app instead of pasted keys
+  (`RAZORPAY_OAUTH_CLIENT_ID` / `_SECRET` / `_MODE`). One method per store: connecting clears the keys,
+  saving keys revokes OAuth. Tokens are encrypted beside the keys; `getVendorRazorpayCreds` returns
+  either kind and renews the access token **on demand** under a `FOR UPDATE` row lock (refresh tokens
+  rotate) — no timer. Verify trusts Razorpay's order record, not the Checkout signature, for OAuth
+  stores. `/api/webhooks/razorpay-partner` (one app-level secret, HMAC before any DB read) matches
+  orders within the body's `account_id`; both webhooks share `lib/storefront-razorpay-webhook.ts`.
 - **"I've paid" never marks an order paid.** `POST /api/s/[slug]/orders/[token]/utr` records
   `Transaction.paymentClaimedAt` (UTR optional) → display state `PAYMENT_SUBMITTED`. The vendor answers
   on the board: "Payment received" (`mark_paid` → `markOrderPaid`) or "Not received"
