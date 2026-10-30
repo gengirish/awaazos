@@ -164,7 +164,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
 
       await page.getByRole("tab", { name: /^Delivered/ }).click();
       const delivered = page.getByRole("article", { name: /Priya Buyer/ });
-      await expect(delivered.getByText("Delivered", { exact: true })).toBeVisible();
+      await expect(delivered.getByText("Picked up", { exact: true })).toBeVisible();
       // Cash collected at handover marks it paid.
       await expect(page.getByRole("listitem").filter({ hasText: /^Paid/ })).toContainText("₹240.00");
 

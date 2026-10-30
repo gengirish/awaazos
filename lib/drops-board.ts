@@ -177,7 +177,7 @@ export function filterByHandover<T extends { fulfilmentType: FulfilmentType | nu
 
 export type BoardSummary = {
   counts: Record<OrderDisplayState, number>;
-  /** Orders that are live (not cancelled / expired). */
+  /** Orders still to finish: not delivered / picked up, cancelled or expired (the Needs action + Confirmed tabs). */
   activeOrders: number;
   /** Sum of totals already paid (excludes refunded / cancelled). */
   paidPaise: number;
@@ -202,7 +202,7 @@ export function summarizeOrders(orders: SummaryInput[]): BoardSummary {
   for (const o of orders) {
     counts[o.displayState] += 1;
     if (o.displayState === "CANCELLED" || o.displayState === "EXPIRED") continue;
-    activeOrders += 1;
+    if (o.displayState !== "DELIVERED") activeOrders += 1;
     if (o.paymentStatus === "PAID") paidPaise += o.totalPaise;
     else pendingPaise += o.totalPaise;
   }
@@ -547,3 +547,12 @@ export const DISPLAY_STATE_LABEL: Record<OrderDisplayState, string> = {
   CANCELLED: "Cancelled",
   EXPIRED: "Expired (unpaid)",
 };
+
+/** `DISPLAY_STATE_LABEL`, except a handed-over pickup order reads "Picked up". */
+export function orderStateLabel(o: {
+  displayState: OrderDisplayState;
+  fulfilmentType: FulfilmentType | null;
+}): string {
+  if (o.displayState === "DELIVERED" && o.fulfilmentType === "PICKUP") return "Picked up";
+  return DISPLAY_STATE_LABEL[o.displayState];
+}

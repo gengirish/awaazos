@@ -24,6 +24,7 @@ import {
   primaryOrderAction,
   searchOrders,
   shouldPollForOrders,
+  orderStateLabel,
   summarizeOrders,
   whatsappHref,
 } from "@/lib/drops-board";
@@ -62,7 +63,7 @@ describe("boardBucket", () => {
 });
 
 describe("summarizeOrders", () => {
-  it("splits paid vs pending and ignores cancelled / expired", () => {
+  it("splits paid vs pending, ignores cancelled / expired, and counts only unfinished orders as live", () => {
     const s = summarizeOrders([
       { displayState: "PAID", paymentStatus: "PAID", totalPaise: 25_000 },
       { displayState: "DELIVERED", paymentStatus: "PAID", totalPaise: 10_000 },
@@ -73,11 +74,20 @@ describe("summarizeOrders", () => {
     ]);
     expect(s.paidPaise).toBe(35_000);
     expect(s.pendingPaise).toBe(20_000);
-    expect(s.activeOrders).toBe(4);
+    expect(s.activeOrders).toBe(3); // the delivered one is done
     expect(s.counts.CANCELLED).toBe(1);
     expect(s.counts.EXPIRED).toBe(1);
     expect(s.counts.AWAITING_PAYMENT).toBe(0);
     expect(Number.isInteger(s.paidPaise) && Number.isInteger(s.pendingPaise)).toBe(true);
+  });
+});
+
+describe("orderStateLabel", () => {
+  it("says Picked up for a handed-over pickup order, Delivered otherwise", () => {
+    expect(orderStateLabel({ displayState: "DELIVERED", fulfilmentType: "PICKUP" })).toBe("Picked up");
+    expect(orderStateLabel({ displayState: "DELIVERED", fulfilmentType: "DELIVERY" })).toBe("Delivered");
+    expect(orderStateLabel({ displayState: "DELIVERED", fulfilmentType: null })).toBe("Delivered");
+    expect(orderStateLabel({ displayState: "PAID", fulfilmentType: "PICKUP" })).toBe("Paid");
   });
 });
 
