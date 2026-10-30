@@ -38,16 +38,16 @@ import { formatINR } from "@/lib/currency";
 import { discountLabel } from "@/lib/offers";
 import {
   balanceDuePaise,
-  DISPLAY_STATE_LABEL,
   availableOrderActions,
   firstName,
   markPaidNeedsConfirm,
+  orderStateLabel,
   primaryOrderAction,
   whatsappHref,
   type BoardOrder,
   type OrderAction,
 } from "@/lib/drops-board";
-import { formatIstDate, formatIstTime } from "@/lib/drops-time";
+import { formatIstDate, formatIstDayLabel, formatIstTime, utcToIstParts } from "@/lib/drops-time";
 import { cn } from "@/lib/utils";
 
 /** Where an order came from: the everyday menu, or a drop (label = its title). */
@@ -83,6 +83,12 @@ const STATE_STYLE: Record<BoardOrder["displayState"], string> = {
   CANCELLED: "border-destructive/40 bg-destructive/10 text-foreground",
   EXPIRED: "border-border bg-muted text-muted-foreground",
 };
+
+/** "7:58 pm" for an order from today (IST), "Wed, 28 Oct · 7:58 pm" for an older one. */
+function placedLabel(d: Date): string {
+  const today = utcToIstParts(new Date()).ymd === utcToIstParts(d).ymd;
+  return today ? formatIstTime(d) : `${formatIstDayLabel(d)} · ${formatIstTime(d)}`;
+}
 
 function StateIcon({ state }: { state: BoardOrder["displayState"] }) {
   const cls = "h-4 w-4 shrink-0";
@@ -135,6 +141,8 @@ export function OrderCard({
   const itemCount = order.items.reduce((sum, it) => sum + it.qty, 0);
   const balanceDue = balanceDuePaise(order);
   const fulfilAt = order.fulfilAt ? new Date(order.fulfilAt) : null;
+  const firstItem = order.items[0];
+  const stateLabel = orderStateLabel(order);
 
   const actions = availableOrderActions(order, frozen);
   const canConfirm = actions.has("confirm");
@@ -258,6 +266,22 @@ export function OrderCard({
               </span>
             )}
           </h3>
+          {/*
+            Collapsed: when it came in and what it is, so two orders from one
+            buyer can be told apart without opening either.
+          */}
+          {!expanded && (
+            <p className="truncate text-sm text-muted-foreground">
+              {placedLabel(created)}
+              {firstItem && (
+                <>
+                  {" · "}
+                  {firstItem.qty}× {firstItem.name}
+                  {order.items.length > 1 && ` +${order.items.length - 1} more`}
+                </>
+              )}
+            </p>
+          )}
           {/* Two short lines on a phone (bill, then time) instead of one that wraps mid-number. */}
           {expanded && (
             <p className="font-mono text-xs text-muted-foreground">
@@ -294,7 +318,7 @@ export function OrderCard({
             ) : (
               <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5">
                 <StateIcon state={order.displayState} />
-                <span className="font-semibold">{DISPLAY_STATE_LABEL[order.displayState]}</span>
+                <span className="font-semibold">{stateLabel}</span>
                 <span className="text-muted-foreground">
                   · {itemCount} {itemCount === 1 ? "item" : "items"} ·{" "}
                   {isPickup
@@ -354,7 +378,7 @@ export function OrderCard({
                 )}
               >
                 <StateIcon state={order.displayState} />
-                {DISPLAY_STATE_LABEL[order.displayState]}
+                {stateLabel}
                 {fs === "CONFIRMED" && order.displayState !== "DELIVERED" && " · Confirmed"}
                 {fs === "PLACED" && order.displayState !== "EXPIRED" && " · Not confirmed yet"}
               </p>
@@ -533,7 +557,7 @@ export function OrderCard({
               ) : (
                 <Undo2 aria-hidden />
               )}
-              Undo delivered
+              {isPickup ? "Undo picked up" : "Undo delivered"}
             </Button>
           )}
           {canCancel && (

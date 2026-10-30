@@ -122,7 +122,7 @@ test.describe("menu orders: order straight from the everyday menu", () => {
 
     await page.getByRole("tab", { name: /^Delivered/ }).click();
     const delivered = page.getByRole("article", { name: /Ravi Buyer/ });
-    await expect(delivered.getByText("Delivered", { exact: true })).toBeVisible();
+    await expect(delivered.getByText("Picked up", { exact: true })).toBeVisible();
     // Cash collected at handover marks it paid.
     await expect(page.getByRole("listitem").filter({ hasText: /^Paid/ })).toContainText("₹200.00");
   });
