@@ -68,9 +68,15 @@ Differences from the list below: there is no `razorpayConnectMode` / `razorpayOa
 column. The method is "OAuth columns set" and the mode comes from the public token's
 prefix. `razorpayAccountId` is indexed, not unique, because one Razorpay account may run
 several stores. `razorpayRefreshExpiresAt` was added so Settings can show "Reconnect".
-Step 6 took the webhook branch, since the app webhook offers payment events. Not built:
-the step 3 referral link (needs the link from the partner dashboard) and a KYC-specific
-error message.
+Step 6 took the webhook branch, since the app webhook offers payment events. Went live
+30/10/2026 with the Production credentials.
+
+Follow-up (`feat/razorpay-connect-polish`): Razorpay refusals are surfaced in Settings
+(`lib/razorpay-issue.ts`), and buyers are sent to UPI instead of "try again". There is
+**no referral link**. A platform partner's dashboard has none; a seller without an account
+signs up inside the Connect flow, which is Razorpay's co-branded onboarding (Applications →
+AwaazOS → Onboarding UI Configurator: colour, logo, name). The 400/403 → "finish KYC"
+reading is an assumption that still needs checking against a real unactivated account.
 
 One PR, behind the env gate, so it can merge before any seller sees it.
 

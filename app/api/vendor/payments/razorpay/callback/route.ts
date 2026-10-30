@@ -1,6 +1,7 @@
 import { NextRequest } from "next/server";
 
 import { prisma } from "@/lib/prisma";
+import { clearRazorpayIssue } from "@/lib/razorpay-issue";
 import {
   exchangeCode,
   OAUTH_STATE_COOKIE,
@@ -52,6 +53,7 @@ export async function GET(req: NextRequest) {
     const tokens = await exchangeCode(cfg, code, oauthRedirectUri(appBaseUrl()));
     const data = { ...oauthColumnsFromTokens(vendorId, tokens), ...CLEARED_KEY_COLUMNS };
     await prisma.vendorSettings.upsert({ where: { vendorId }, create: { vendorId, ...data }, update: data });
+    await clearRazorpayIssue(vendorId);
 
     console.info(
       JSON.stringify({ event: "razorpay_connected", vendorId, mode: publicTokenMode(tokens.publicToken) }),

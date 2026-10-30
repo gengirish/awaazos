@@ -32,6 +32,8 @@ export type RazorpayKeysClientProps = {
   oauthAvailable: boolean;
   /** `?razorpay=` from the Connect flow's redirect back. */
   outcome: string | null;
+  /** Razorpay refused to start a buyer's payment (lib/razorpay-issue.ts); `at` is display text. */
+  issue: { kind: "auth" | "account"; at: string } | null;
   webhookUrl: string;
   planEligible: boolean;
   encryptionConfigured: boolean;
@@ -72,6 +74,7 @@ export function RazorpayKeysClient({
   needsReconnect,
   oauthAvailable,
   outcome,
+  issue,
   webhookUrl,
   planEligible,
   encryptionConfigured,
@@ -92,6 +95,15 @@ export function RazorpayKeysClient({
   const [pending, startTransition] = useTransition();
 
   const configured = method !== null;
+  // Hidden once she changes the connection in this visit; the server clears it on the next accepted payment.
+  const issueText =
+    issue && method === initialMethod && outcomeShown !== "connected"
+      ? issue.kind === "account"
+        ? `Razorpay refused a customer's online payment on ${issue.at}. This usually means your Razorpay account isn't activated yet — finish KYC in the Razorpay Dashboard (Account & Settings → Activation). Customers are offered UPI meanwhile.`
+        : method === "oauth"
+          ? `Razorpay stopped accepting AwaazOS's access to your account on ${issue.at}. Tap Reconnect Razorpay.`
+          : `Razorpay rejected your saved keys on ${issue.at}. They may have been regenerated — tap Replace keys and paste the new ones.`
+      : null;
   const outcomeMsg = outcomeShown ? OUTCOMES[outcomeShown] ?? OUTCOMES.error : null;
 
   async function copyWebhook() {
@@ -262,6 +274,11 @@ export function RazorpayKeysClient({
         ) : (
           <p className="text-sm font-medium">Not connected. Customers pay by UPI QR and you confirm by hand.</p>
         )}
+        {issueText ? (
+          <p role="alert" className="text-sm font-medium text-destructive">
+            {issueText}
+          </p>
+        ) : null}
         {method === "oauth" && needsReconnect ? (
           <p role="alert" className="text-sm font-medium text-destructive">
             Your Razorpay connection has expired, so customers can&apos;t pay online. Tap Reconnect Razorpay.
@@ -271,7 +288,7 @@ export function RazorpayKeysClient({
 
       {method === "oauth" ? (
         <div className="flex flex-wrap gap-2">
-          {needsReconnect ? connectButton("Reconnect Razorpay", true) : null}
+          {needsReconnect || issue?.kind === "auth" ? connectButton("Reconnect Razorpay", true) : null}
           {confirmRemove ? (
             <>
               <button
@@ -298,8 +315,12 @@ export function RazorpayKeysClient({
         <div className="space-y-3">
           {connectButton("Connect Razorpay", true)}
           <p className="text-xs text-muted-foreground">
-            You&apos;ll sign in to Razorpay and approve AwaazOS. Nothing to copy or paste. You need a Razorpay account
-            with KYC done to take real payments.
+            You&apos;ll sign in to Razorpay and approve AwaazOS. Nothing to copy or paste.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            <strong className="font-semibold text-foreground">No Razorpay account yet?</strong> Tap Connect Razorpay
+            anyway and choose to create one on the next screen. Razorpay checks your KYC (PAN, bank account) before you
+            can take real payments; until then customers pay you by UPI.
           </p>
           <button type="button" onClick={() => setEditing(true)} className={linkBtn}>
             Use API keys instead
