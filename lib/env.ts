@@ -30,6 +30,14 @@ const envSchema = z.object({
   // AES-256-GCM key for vendors' own Razorpay credentials (lib/secret-box.ts).
   // Length is validated lazily there, so a bad value can't block boot.
   PAYMENT_KEYS_ENCRYPTION_KEY: z.string().optional(),
+  // Razorpay Technology Partner OAuth app ("Connect Razorpay", lib/razorpay-oauth.ts).
+  // Use the app's Development credentials with mode "test", Production with "live".
+  RAZORPAY_OAUTH_CLIENT_ID: z.string().optional(),
+  RAZORPAY_OAUTH_CLIENT_SECRET: z.string().optional(),
+  // "test" | "live", checked lazily in lib/razorpay-oauth.ts so a typo can't block boot.
+  RAZORPAY_OAUTH_MODE: z.string().optional(),
+  // Secret of the app-level webhook (/api/webhooks/razorpay-partner).
+  RAZORPAY_PARTNER_WEBHOOK_SECRET: z.string().optional(),
   // Web Push (lib/push.ts). Generate once: `npx web-push generate-vapid-keys`.
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),

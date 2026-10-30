@@ -368,7 +368,8 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "payment-setup",
     group: "setup",
     title: "Set your UPI ID and how customers pay",
-    steps: "Enter the UPI ID that money should go to. You can also allow pay on delivery or connect your own Razorpay account.",
+    steps:
+      "Enter the UPI ID that money should go to. You can also allow pay on delivery, or tap Connect Razorpay to take card and netbanking payments into your own Razorpay account.",
     nav: "settings",
     href: "/settings/payments",
     trail: ["Payments"],

@@ -4,6 +4,7 @@ import { orderHoldsStock } from "@/lib/drops";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
 import {
+  checkoutKey,
   createRazorpayOrder,
   fetchRazorpayOrder,
   findStorefrontOrderForPayment,
@@ -141,7 +142,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
 
     return NextResponse.json({
       data: {
-        keyId: creds.keyId, // public by design — Checkout needs it in the browser
+        keyId: checkoutKey(creds), // public by design — Checkout needs it in the browser
         razorpayOrderId,
         amountPaise: order.totalPaise,
         currency: "INR",
