@@ -4,7 +4,9 @@ import { PaymentMethodsClient } from "@/components/settings/PaymentMethodsClient
 import { RazorpayKeysClient } from "@/components/settings/RazorpayKeysClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { PLAN_LIMITS } from "@/lib/constants";
+import { formatIstDateTime } from "@/lib/datetime";
 import { prisma } from "@/lib/prisma";
+import { getRazorpayIssue } from "@/lib/razorpay-issue";
 import { isRazorpayOauthConfigured, publicTokenMode } from "@/lib/razorpay-oauth";
 import { isSecretBoxConfigured } from "@/lib/secret-box";
 import {
@@ -41,6 +43,8 @@ export default async function PaymentsSettingsPage(props: { searchParams: Promis
   const oauth = hasOauthConnection(settings);
   const keys = hasStoredRazorpayKeys(settings);
   const method = oauth ? "oauth" : keys ? "keys" : null;
+  // Only worth a KV read when there is a connection Razorpay could have refused.
+  const issue = method ? await getRazorpayIssue(vendor.id) : null;
   const razorpayKeyIdLast4 = method === "keys" && settings?.razorpayKeyId ? settings.razorpayKeyId.slice(-4) : null;
 
   return (
@@ -65,6 +69,7 @@ export default async function PaymentsSettingsPage(props: { searchParams: Promis
             needsReconnect={oauth && !hasLiveOauthConnection(settings)}
             oauthAvailable={isRazorpayOauthConfigured()}
             outcome={outcome}
+            issue={issue ? { kind: issue.kind, at: formatIstDateTime(issue.at) } : null}
             webhookUrl={isOwner ? vendorWebhookUrl(vendor.id) : ""}
             planEligible={PLAN_LIMITS[vendor.plan].razorpayLinks}
             encryptionConfigured={isSecretBoxConfigured()}

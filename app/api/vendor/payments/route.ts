@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
 import { tooManyRequests, writeRateLimit } from "@/lib/ratelimit";
+import { clearRazorpayIssue } from "@/lib/razorpay-issue";
 import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/rbac";
 import { encryptSecret, isSecretBoxConfigured } from "@/lib/secret-box";
 import {
@@ -160,6 +161,7 @@ export async function PUT(req: NextRequest) {
       create: { vendorId, ...data },
       update: data,
     });
+    await clearRazorpayIssue(vendorId);
 
     console.info(JSON.stringify({ event: "vendor_payments_keys_saved", vendorId, mode: keyId.startsWith("rzp_live_") ? "live" : "test" }));
     const res = NextResponse.json({
@@ -185,6 +187,7 @@ export async function DELETE(req: NextRequest) {
       where: { vendorId: ctx.vendor.id },
       data: { ...CLEARED_KEY_COLUMNS, ...CLEARED_OAUTH_COLUMNS },
     });
+    await clearRazorpayIssue(ctx.vendor.id);
     console.info(JSON.stringify({ event: "vendor_payments_keys_removed", vendorId: ctx.vendor.id }));
     return withVendorCookie(NextResponse.json({ success: true }), ctx.setVendorCookie);
   } catch (err) {

@@ -388,6 +388,11 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   rotate) — no timer. Verify trusts Razorpay's order record, not the Checkout signature, for OAuth
   stores. `/api/webhooks/razorpay-partner` (one app-level secret, HMAC before any DB read) matches
   orders within the body's `account_id`; both webhooks share `lib/storefront-razorpay-webhook.ts`.
+  When Razorpay refuses to create a buyer's order (401 → access/keys, 400/403 → usually KYC not
+  finished), the buyer gets `online_payment_unavailable` (pay by UPI) and `lib/razorpay-issue.ts`
+  keeps the reason in Upstash (30-day TTL, fail-open) for Settings → Payments; the next accepted order,
+  a reconnect, new keys or a disconnect clears it. Sellers without a Razorpay account sign up inside the
+  Connect flow (Razorpay's co-branded onboarding), so there is no separate referral link.
 - **"I've paid" never marks an order paid.** `POST /api/s/[slug]/orders/[token]/utr` records
   `Transaction.paymentClaimedAt` (UTR optional) → display state `PAYMENT_SUBMITTED`. The vendor answers
   on the board: "Payment received" (`mark_paid` → `markOrderPaid`) or "Not received"
