@@ -7,13 +7,13 @@ import {
   bulkActionCounts,
   bulkActionsFor,
   bulkNeedsConfirm,
-  bulkOrderActionSchema,
   bulkResultMessage,
   bulkTargets,
   cashToCollectPaise,
   isBulkSelectable,
   pruneSelection,
 } from "@/lib/order-bulk";
+import { bulkOrderActionSchema } from "@/lib/order-bulk-schema";
 
 type O = {
   id: string;

@@ -12,25 +12,13 @@
  */
 
 import type { FulfilmentStatus, PaymentMethod, PaymentStatus } from "@prisma/client";
-import { z } from "zod";
-
 import { availableOrderActions, type OrderAction } from "@/lib/drops-board";
 
 export const BULK_ORDER_ACTIONS = ["confirm", "mark_paid", "deliver"] as const satisfies readonly OrderAction[];
 export type BulkOrderAction = (typeof BULK_ORDER_ACTIONS)[number];
 
 export const BULK_ORDER_MAX = 50;
-
-export const bulkOrderActionSchema = z.object({
-  orderIds: z
-    .array(z.string().trim().min(1).max(64))
-    .min(1)
-    .max(BULK_ORDER_MAX)
-    .refine((ids) => new Set(ids).size === ids.length, { message: "orderIds must be unique" }),
-  action: z.enum(BULK_ORDER_ACTIONS),
-});
-
-export type BulkOrderActionInput = z.infer<typeof bulkOrderActionSchema>;
+// The routes' body schema is lib/order-bulk-schema.ts (zod stays off the board's bundle).
 
 /** Per-order failure codes. Unknown and cross-tenant ids are both `not_found`. */
 export type BulkFailureCode = "not_found" | "drop_frozen" | "invalid_state" | "error";
