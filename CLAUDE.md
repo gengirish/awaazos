@@ -398,6 +398,14 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   on the board: "Payment received" (`mark_paid` → `markOrderPaid`) or "Not received"
   (`reject_payment`: clears the claim and UTR, stamps `paymentRejectedAt`, per-order only). After a
   rejection the next claim needs a UTR (400 `reference_required`), so a hold can't be renewed by tapping.
+- **Payment screenshot** (`lib/payment-proof.ts`): with the claim, the buyer may attach a screenshot
+  (`POST /api/s/[slug]/orders/[token]/payment-proof`, multipart, only on an order that already has a
+  claim, so it never creates or renews a hold). It is PII (name, UPI ID, UTR): a **separate private**
+  Blob store (`PAYMENT_PROOF_BLOB_READ_WRITE_TOKEN`; unset → no field), never the public one. Staff
+  view it through `GET /api/storefront-orders/[orderId]/payment-proof` (CASHIER, compound scope,
+  `private, no-store`); boards and pages get `hasPaymentProof` only, never the URL. mark_paid,
+  reject_payment and cancel clear `Transaction.paymentProofUrl` and delete the blob. Evidence, not proof:
+  it never marks an order paid.
 - **Paid means confirmed.** `markOrderPaid` also moves a `PLACED` order to `CONFIRMED` (same txn), on
   every path — seller tap, bulk, Razorpay webhook / verify, cash at the door. So a claimed order's
   card offers "Payment received · Confirm" / "Not received" and no separate Confirm

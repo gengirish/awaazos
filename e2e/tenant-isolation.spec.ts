@@ -244,6 +244,12 @@ test.describe("tenant isolation", () => {
     const nameB = await pageB.request.get(`/api/storefront-orders/announce?bill=${bill}`);
     expect(nameB.status(), "cross-tenant name lookup must 404").toBe(404);
 
+    // The payment-screenshot viewer: B gets the same 404 as "no screenshot" does for A.
+    const proofB = await pageB.request.get(`/api/storefront-orders/${orderId}/payment-proof`);
+    expect(proofB.status(), "cross-tenant payment screenshot must 404").toBe(404);
+    const proofA = await pageA.request.get(`/api/storefront-orders/${orderId}/payment-proof`);
+    expect(proofA.status()).toBe(404);
+
     // B forges a bulk confirm with A's order id: no existence leak, nothing changes.
     const bulkB = await pageB.request.post("/api/storefront-orders/bulk", {
       data: { orderIds: [orderId], action: "confirm" },

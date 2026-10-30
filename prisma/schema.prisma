@@ -374,6 +374,10 @@ model Transaction {
   // confirms with "Payment received" (markOrderPaid) or "Not received".
   paymentClaimedAt  DateTime?
   paymentRejectedAt DateTime? // Seller tapped "Not received"; a new claim then needs a UTR
+  // Buyer's payment screenshot (lib/payment-proof.ts): a PRIVATE Vercel Blob URL,
+  // only ever streamed to the seller's staff. Cleared (and the blob deleted) when
+  // the seller answers the claim or cancels. Never sent to a public page.
+  paymentProofUrl   String?
   // Paid up front against totalPaise, order still PENDING until the balance is
   // in. 0 = no advance. Never above totalPaise; never credits DailySummary.
   advancePaidPaise  Int           @default(0)

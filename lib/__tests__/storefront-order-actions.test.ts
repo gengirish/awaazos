@@ -9,8 +9,10 @@ vi.mock("@/lib/drops", async (importOriginal) => ({
   markOrderPaid: vi.fn(),
   cancelOrder: vi.fn(),
 }));
+vi.mock("@/lib/payment-proof", () => ({ deletePaymentProofInBackground: vi.fn() }));
 
 import { cancelOrder, markOrderPaid } from "@/lib/drops";
+import { deletePaymentProofInBackground } from "@/lib/payment-proof";
 import {
   OrderActionError,
   applyStorefrontOrderAction,
@@ -23,6 +25,7 @@ type OrderState = {
   fulfilmentStatus: FulfilmentStatus | null;
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
+  paymentProofUrl?: string | null;
 };
 
 /** Minimal fake of the bits of Prisma.TransactionClient the module touches. */
@@ -56,6 +59,7 @@ async function expectActionError(p: Promise<unknown>, status: number, code: stri
 beforeEach(() => {
   vi.mocked(markOrderPaid).mockReset().mockResolvedValue(true);
   vi.mocked(cancelOrder).mockReset().mockResolvedValue(true);
+  vi.mocked(deletePaymentProofInBackground).mockReset();
 });
 
 describe("storefrontOrderScope", () => {
@@ -252,5 +256,52 @@ describe("applyStorefrontOrderAction", () => {
     const { tx, asTx } = fakeTx(placedUpi);
     await applyStorefrontOrderAction(asTx, { scope: scopeDrop, action: "reject_payment", dropStatus: "FROZEN" });
     expect(tx.transaction.updateMany).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("applyStorefrontOrderAction — payment screenshot", () => {
+  const proofUrl = "https://store.private.blob.vercel-storage.com/payment-proof/v1/proof-abc.jpg";
+  const claimedWithProof = { ...placedUpi, paymentProofUrl: proofUrl };
+  const clearsProof = (tx: ReturnType<typeof fakeTx>["tx"]) =>
+    tx.transaction.updateMany.mock.calls.some(
+      ([arg]) => (arg as { data?: { paymentProofUrl?: unknown } }).data?.paymentProofUrl === null,
+    );
+
+  it.each(["mark_paid", "reject_payment", "cancel"] as const)(
+    "%s clears the column within scope and deletes the blob",
+    async (action) => {
+      const { tx, asTx } = fakeTx(claimedWithProof);
+      await applyStorefrontOrderAction(asTx, { scope: scopeMenu, action, dropStatus: null });
+      expect(tx.transaction.updateMany).toHaveBeenCalledWith({
+        where: { ...scopeMenu, paymentProofUrl: { not: null } },
+        data: { paymentProofUrl: null },
+      });
+      expect(deletePaymentProofInBackground).toHaveBeenCalledWith(proofUrl);
+    },
+  );
+
+  it("confirm keeps the screenshot: the claim is still open", async () => {
+    const { tx, asTx } = fakeTx(claimedWithProof);
+    await applyStorefrontOrderAction(asTx, { scope: scopeMenu, action: "confirm", dropStatus: null });
+    expect(clearsProof(tx)).toBe(false);
+    expect(deletePaymentProofInBackground).not.toHaveBeenCalled();
+  });
+
+  it("an action that loses its race leaves the screenshot alone", async () => {
+    const { tx, asTx } = fakeTx(claimedWithProof, 0);
+    await expectActionError(
+      applyStorefrontOrderAction(asTx, { scope: scopeMenu, action: "reject_payment", dropStatus: null }),
+      409,
+      "invalid_state",
+    );
+    expect(clearsProof(tx)).toBe(false);
+    expect(deletePaymentProofInBackground).not.toHaveBeenCalled();
+  });
+
+  it("no screenshot → no extra write", async () => {
+    const { tx, asTx } = fakeTx({ ...placedUpi, paymentProofUrl: null });
+    await applyStorefrontOrderAction(asTx, { scope: scopeMenu, action: "mark_paid", dropStatus: null });
+    expect(clearsProof(tx)).toBe(false);
+    expect(deletePaymentProofInBackground).not.toHaveBeenCalled();
   });
 });
