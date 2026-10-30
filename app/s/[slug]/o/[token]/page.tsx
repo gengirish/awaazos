@@ -39,6 +39,7 @@ import {
   type StatusTone,
 } from "@/lib/storefront-order";
 import { discountLabel } from "@/lib/offers";
+import { paymentProofEnabled } from "@/lib/payment-proof";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl, isOnlinePaymentEnabled } from "@/lib/storefront-razorpay";
 import { qrSvgDataUrl } from "@/lib/qr";
@@ -116,6 +117,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
       upiRef: true,
       paymentClaimedAt: true,
       paymentRejectedAt: true,
+      paymentProofUrl: true,
       fulfilmentStatus: true,
       fulfilmentType: true,
       outForDeliveryAt: true,
@@ -281,8 +283,14 @@ export default async function StorefrontOrderPage(props: {
     order.paymentRejectedAt !== null &&
     order.paymentMethod === "UPI" &&
     (state === "AWAITING_PAYMENT" || state === "EXPIRED");
-  // Claimed with a bare tap: the buyer can still add the reference to help the seller.
-  const canAddReference = state === "PAYMENT_SUBMITTED" && order.paymentMethod === "UPI" && !order.upiRef;
+  // Payment screenshots need the private Blob store (lib/payment-proof.ts). Only
+  // whether one exists reaches the page — never its URL.
+  const proofUploads = paymentProofEnabled();
+  const hasProof = order.paymentProofUrl !== null;
+  // Claimed: the buyer can still add the reference or a screenshot to help the seller.
+  const claimedUpi = state === "PAYMENT_SUBMITTED" && order.paymentMethod === "UPI";
+  const canAddReference = claimedUpi && !order.upiRef;
+  const canAddScreenshot = claimedUpi && proofUploads && !hasProof;
   const payeeName = vendor.upiName ?? vendor.name;
   const upiLink =
     awaitingUpi && vendor.upiId
@@ -388,7 +396,10 @@ export default async function StorefrontOrderPage(props: {
             </h2>
             {status.hint ? <p className="text-sm">{status.hint}</p> : null}
             {state === "PAYMENT_SUBMITTED" ? (
-              <p className="text-sm">The store checks its UPI app, then confirms here.</p>
+              <p className="text-sm">
+                The store checks its UPI app, then confirms here.
+                {hasProof ? " Your screenshot is with the store." : ""}
+              </p>
             ) : null}
             {awaitingUpi && minsLeft > 0 ? (
               <p className="text-sm font-semibold">
@@ -546,12 +557,17 @@ export default async function StorefrontOrderPage(props: {
               <h2 id="claim-heading" className="font-display text-lg font-bold text-awaaz-charcoal">
                 2 · Tell the store you&apos;ve paid
               </h2>
-              <PaidClaimForm slug={slug} token={params.token} requireReference={paymentRejected} />
+              <PaidClaimForm
+                slug={slug}
+                token={params.token}
+                requireReference={paymentRejected}
+                askScreenshot={proofUploads}
+              />
             </section>
           </div>
         ) : null}
 
-        {canAddReference ? (
+        {canAddReference || canAddScreenshot ? (
           <section
             aria-labelledby="add-ref-heading"
             className="space-y-3 rounded-2xl border border-border/60 bg-background p-4 shadow-xs sm:p-6"
@@ -559,7 +575,13 @@ export default async function StorefrontOrderPage(props: {
             <h2 id="add-ref-heading" className="text-base font-bold text-awaaz-charcoal">
               Help the store find your payment
             </h2>
-            <PaidClaimForm slug={slug} token={params.token} claimed />
+            <PaidClaimForm
+              slug={slug}
+              token={params.token}
+              claimed
+              askReference={canAddReference}
+              askScreenshot={canAddScreenshot}
+            />
           </section>
         ) : null}
 

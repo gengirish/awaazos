@@ -40,6 +40,9 @@ const envSchema = z.object({
   GUPSHUP_APP_NAME: z.string().optional(),
   GUPSHUP_SOURCE_NUMBER: z.string().optional(),
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
+  // Read-write token of a separate PRIVATE Blob store for buyers' payment
+  // screenshots (lib/payment-proof.ts). Absent → the upload field is hidden.
+  PAYMENT_PROOF_BLOB_READ_WRITE_TOKEN: z.string().optional(),
   REDIS_URL: z.string().optional(),
   // Internal demo-store API (lib/internal-auth.ts). Absent or < 32 chars →
   // every /api/internal/* call is 401. Server-side only; never NEXT_PUBLIC_.

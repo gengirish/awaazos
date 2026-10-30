@@ -9,6 +9,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  ImageIcon,
   IndianRupee,
   Loader2,
   MessageCircle,
@@ -383,6 +384,21 @@ export function OrderCard({
               Customer says they paid {formatINR(order.totalPaise)}. Check your UPI app for that amount, then
               answer below.
             </p>
+          )}
+          {order.hasPaymentProof && (
+            <a
+              href={`/api/storefront-orders/${encodeURIComponent(order.id)}/payment-proof`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex min-h-11 items-center gap-2 rounded-md border border-amber-600/50 bg-background px-3 text-sm font-semibold text-foreground hover:bg-amber-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary dark:hover:bg-amber-900/40"
+            >
+              <ImageIcon className="h-4 w-4 shrink-0" aria-hidden />
+              View payment screenshot
+              <span className="sr-only"> (opens in a new tab)</span>
+            </a>
+          )}
+          {order.hasPaymentProof && (
+            <p className="mt-1 text-xs">A screenshot can be edited. Check your UPI app before you tap Payment received.</p>
           )}
         </div>
       )}

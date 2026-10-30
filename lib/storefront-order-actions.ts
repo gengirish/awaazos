@@ -6,7 +6,8 @@
  *   confirm    PLACED → CONFIRMED
  *   mark_paid  markOrderPaid (credits DailySummary once; PLACED → CONFIRMED) — "Payment received"
  *   reject_payment  "Not received": clears the buyer's "I've paid" claim (and any
- *              UTR), stamps paymentRejectedAt. The order stops holding stock once
+ *              UTR), stamps paymentRejectedAt. mark_paid, reject_payment and cancel
+ *              also drop the buyer's payment screenshot (lib/payment-proof.ts). The order stops holding stock once
  *              its 15-minute window has passed; a new claim then needs a UTR.
  *   cancel     cancelOrder (reverses revenue if it was paid; vendor refunds via UPI)
  *   dispatch   a DELIVERY order handed to a rider: PLACED|CONFIRMED → CONFIRMED,
@@ -29,6 +30,7 @@ import type { DropStatus, Prisma } from "@prisma/client";
 import { cancelOrder, generateOrderToken, markOrderPaid } from "@/lib/drops";
 import { checkOrderAction, type OrderAction } from "@/lib/drops-board";
 import { boardOrderSelect, type BoardOrderRow } from "@/lib/drops-board-server";
+import { deletePaymentProofInBackground } from "@/lib/payment-proof";
 
 export { ORDER_ACTIONS, checkOrderAction, type OrderAction } from "@/lib/drops-board";
 
@@ -88,7 +90,14 @@ export async function applyStorefrontOrderAction(
 
   const order = await tx.transaction.findFirst({
     where: scope,
-    select: { fulfilmentStatus: true, paymentStatus: true, paymentMethod: true, fulfilmentType: true, riderToken: true },
+    select: {
+      fulfilmentStatus: true,
+      paymentStatus: true,
+      paymentMethod: true,
+      fulfilmentType: true,
+      riderToken: true,
+      paymentProofUrl: true,
+    },
   });
   if (!order) throw new OrderActionError(404, "Not found");
 
@@ -168,6 +177,14 @@ export async function applyStorefrontOrderAction(
   const confirms = action === "confirm" || action === "mark_paid" || action === "dispatch";
   if (confirms && order.fulfilmentType === "DELIVERY" && !order.riderToken) {
     await tx.transaction.updateMany({ where: { ...scope, riderToken: null }, data: { riderToken: generateOrderToken() } });
+  }
+
+  // The seller has answered the buyer's claim (or dropped the order): the
+  // payment screenshot has done its job and is PII, so it goes (lib/payment-proof.ts).
+  const answersClaim = action === "mark_paid" || action === "reject_payment" || action === "cancel";
+  if (answersClaim && order.paymentProofUrl) {
+    await tx.transaction.updateMany({ where: { ...scope, paymentProofUrl: { not: null } }, data: { paymentProofUrl: null } });
+    deletePaymentProofInBackground(order.paymentProofUrl);
   }
 
   return tx.transaction.findFirstOrThrow({ where: scope, select: boardOrderSelect });

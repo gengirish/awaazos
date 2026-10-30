@@ -54,6 +54,8 @@ export type BoardOrder = {
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
   upiRef: string | null;
+  /** Buyer attached a payment screenshot (lib/payment-proof.ts); absent = no. */
+  hasPaymentProof?: boolean;
   subtotalPaise: number;
   /** Offer discount on this order (lib/offers.ts); absent or 0 when none. */
   discountPaise?: number;

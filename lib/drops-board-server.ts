@@ -39,6 +39,7 @@ export const boardOrderSelect = {
   paymentStatus: true,
   upiRef: true,
   paymentClaimedAt: true,
+  paymentProofUrl: true,
   subtotalPaise: true,
   discountPaise: true,
   offerName: true,
@@ -75,6 +76,8 @@ export function toBoardOrder(row: BoardOrderRow, now: Date = new Date()): BoardO
     paymentMethod: row.paymentMethod,
     paymentStatus: row.paymentStatus,
     upiRef: row.upiRef,
+    // The URL stays on the server; staff open it via /api/storefront-orders/[id]/payment-proof.
+    hasPaymentProof: row.paymentProofUrl !== null,
     subtotalPaise: row.subtotalPaise,
     discountPaise: row.discountPaise,
     offerName: row.offerName,
