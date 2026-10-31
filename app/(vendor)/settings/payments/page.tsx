@@ -27,7 +27,7 @@ export const metadata: Metadata = { title: "Payments · Settings · AwaazOS" };
 const OUTCOME_RE = /^[a-z_]{1,24}$/;
 
 export default async function PaymentsSettingsPage(props: { searchParams: Promise<{ razorpay?: string | string[] }> }) {
-  const { vendor, isOwner } = await requireSettingsContext();
+  const { vendor, isOwner, storeKind } = await requireSettingsContext();
   const rawOutcome = (await props.searchParams).razorpay;
   const outcome = typeof rawOutcome === "string" && OUTCOME_RE.test(rawOutcome) ? rawOutcome : null;
 
@@ -56,6 +56,7 @@ export default async function PaymentsSettingsPage(props: { searchParams: Promis
           initialUpiName={vendor.upiName}
           initialAcceptPayOnDelivery={settings?.acceptPayOnDelivery ?? true}
           isOwner={isOwner}
+          storeKind={storeKind}
         />
         <SettingsCard
           title="Online payments (Razorpay)"

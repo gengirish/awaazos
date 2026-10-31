@@ -1,5 +1,7 @@
 /**
- * Voice menu builder: transcript → DRAFT list of dishes (nothing is saved here).
+ * Voice menu builder: transcript → DRAFT list of dishes or products, each with an
+ * optional pack size (nothing is saved here). One prompt serves kitchens and
+ * product sellers alike, so the cached prefix is the same for every store.
  *
  * Same shape as the order and drop paths (lib/anthropic.ts, lib/parse-drop.ts):
  *   - STT already happened; only the transcript + this vendor's menu reach Claude.
@@ -9,7 +11,8 @@
  *   - Model output is never trusted: names are cleaned, existing items are matched
  *     here (a model-supplied id is only accepted when it is THIS vendor's and the
  *     names agree), rupees → paise go through `rupeesToPaise`, absurd prices are
- *     dropped, repeats are merged, categories snap to existing spellings.
+ *     dropped, repeats are merged, categories snap to existing spellings, and
+ *     a spoken pack size is kept only when lib/menu-unit.ts accepts it.
  *
  * The vendor confirms the draft and the UI saves it with POST /api/menu/bulk.
  */
@@ -28,7 +31,9 @@ import {
 import { formatINRCompact, rupeesToPaise } from "@/lib/currency";
 import { suggestAliases, suggestEmoji } from "@/lib/menu-suggestions";
 import { levenshtein, normalizeForMatch } from "@/lib/parse-order-align";
+import { isValidMenuUnit, normaliseMenuUnit } from "@/lib/menu-unit";
 import type { MenuDraft, MenuDraftItem } from "@/lib/parse-menu-types";
+import { vocabularyForKind, type StoreVocabulary } from "@/lib/store-vocabulary";
 import { MENU_BULK_MAX_ITEMS, MENU_MAX_PRICE_PAISE, MENU_NAME_MAX } from "@/lib/zod-menu";
 
 export type { MenuDraft, MenuDraftAction, MenuDraftItem } from "@/lib/parse-menu-types";
@@ -55,37 +60,44 @@ const SONNET_REQUEST = { timeout: 25_000, maxRetries: 0 } as const;
 
 // ─── Prompt + tool ───────────────────────────────────────────────────────────
 
-const MENU_BUILD_SYSTEM = `You turn an Indian street-food stall or home-kitchen owner's spoken list of dishes into draft menu rows they will review before saving.
-Use the add_menu_items tool exactly once, with one entry per dish, in the order spoken. Never invent dishes or prices.
+const MENU_BUILD_SYSTEM = `You turn an Indian home seller's spoken list of what they sell into draft catalogue rows they will review before saving. The seller may run a kitchen or food stall (dishes, sweets, bakes) or sell products (herbal powders, oils, teas, soaps, pickles, crafts, clothes).
+Use the add_menu_items tool exactly once, with one entry per item, in the order spoken. Never invent items, prices or pack sizes.
 
-Speech is Hinglish, English or Hindi (sometimes Telugu/Kannada/Tamil transliterated) and comes from speech-to-text, so words may be misheard. Fix obvious mishearings of common dish names (e.g. "masla chai" → "Masala Chai", "wada pav" → "Vada Pav").
+Speech is Hinglish, English or Hindi (sometimes Telugu/Kannada/Tamil transliterated) and comes from speech-to-text, so words may be misheard. Fix obvious mishearings of common dish and product names (e.g. "masla chai" → "Masala Chai", "wada pav" → "Vada Pav", "ashwagandha powdar" → "Ashwagandha Powder").
 
-Dishes:
-- name = the dish as a menu would print it, in Latin script, Title Case. Leave out prices, quantities and filler words ("aur", "and", "phir", "hai", "wala" when it is not part of the name).
-- If the dish is already on the existing menu (same dish, even if said differently or by an alias), set existingMenuItemId to that item's "id" from the menu JSON. Never invent ids, never use "slug". Different variants are different dishes ("Cutting Chai" is not "Masala Chai").
-- spokenAliases = other names the owner used for the same dish in this list (e.g. "bun maska ya maska pav" → name "Bun Maska", spokenAliases ["maska pav"]). Usually empty.
+Items:
+- name = the item as a menu or price list would print it, in Latin script, Title Case. Leave out prices, pack sizes, quantities and filler words ("aur", "and", "phir", "hai", "wala" when it is not part of the name).
+- If the item is already on the existing menu (same item, even if said differently or by an alias), set existingMenuItemId to that item's "id" from the menu JSON. Never invent ids, never use "slug". Different variants are different items ("Cutting Chai" is not "Masala Chai", "Neem Soap" is not "Tulsi Soap").
+- spokenAliases = other names the owner used for the same item in this list (e.g. "bun maska ya maska pav" → name "Bun Maska", spokenAliases ["maska pav"]). Usually empty.
+
+Pack size (unit):
+- unit = the pack or selling size said with the item, short and in Latin script: "250 g", "1 kg", "500 ml", "60 capsules", "pack of 6", "kg", "dozen". Write grams as "g", millilitres as "ml", kilos as "kg", litres as "l" ("dhai sau gram" → "250 g", "aadha kilo" → "500 g", "ek litre" → "1 l"). null when no size was said. Never guess one.
+- "ashwagandha powder 250 gram 399" → name "Ashwagandha Powder", unit "250 g", priceRupees 399. "ghee 1 kg 650" → unit "1 kg", price 650. "kaju katli 900 rupaye kilo" → unit "kg", price 900.
+- A number followed by g, gram, kg, kilo, ml, litre, capsules, tablets, pieces or pack is a size, never the price. The price is the other number.
+- If one item is given in two or more sizes, make one row per size and put the size in the name too ("tulsi tea 100 gram 199, 250 gram 449" → "Tulsi Tea (100 g)" unit "100 g" price 199, "Tulsi Tea (250 g)" unit "250 g" price 449).
+- For dishes, "ek plate", "do plate", "half" and "full" are portions, not a unit: leave unit null.
 
 Prices:
-- priceRupees = the selling price in rupees for one portion, or null when no price was said for that dish. Never guess a price.
-- A number right after a dish is its price ("samosa 20" → 20). "rupaye", "rupees", "rs", "₹", "ka", "wala" mark money.
+- priceRupees = the selling price in rupees for one portion or one pack, or null when no price was said for that item. Never guess a price.
+- A number right after an item is its price ("samosa 20" → 20), unless it is a pack size (above). "rupaye", "rupees", "rs", "₹", "ka", "wala" mark money.
 - "ek plate", "do plate", "half", "full", "piece" describe the portion, not the price ("pav bhaji do plate 80" → 80). If half and full prices are given, make two dishes ("Pav Bhaji (Half)", "Pav Bhaji (Full)").
 - Hindi numbers: ek 1, do 2, teen 3, char 4, paanch 5, chhe 6, saat 7, aath 8, nau 9, das 10, gyarah 11, barah 12, terah 13, chaudah 14, pandrah 15, solah 16, satrah 17, atharah 18, unnees 19, bees 20, pachees 25, tees 30, paintees 35, chalees 40, pachaas 50, saath 60, sattar 70, assi 80, nabbe 90, sau 100, hazaar 1000.
 - dedh = 1.5 (dedh sau = 150), dhai = 2.5 (dhai sau = 250), saade X = X + 0.5 (saade teen sau = 350, saade das = 10.5), sava X = X + 0.25 (sava sau = 125), paune X = X − 0.25 (paune do sau = 175). "X sau Y" = X×100 + Y (do sau pachaas = 250).
 - te: okati 1, rendu 2, moodu 3, padi 10, iravai 20, vanda 100 · kn: ondu 1, eradu 2, hattu 10, ippattu 20, nooru 100 · ta: onnu 1, rendu 2, pathu 10, irupathu 20, nooru 100.
 
 Categories:
-- "X mein", "X wale", "X wala section", "under X", "in X" name the category X for the run of dishes said just before it, back to the previous category phrase (or the start). Example: "chai 10, coffee 20 — drinks mein; samosa 15, kachori 20, snacks mein" → chai and coffee are Drinks, samosa and kachori are Snacks.
-- A category said BEFORE a list ("snacks mein: samosa, kachori") applies to the dishes that follow, until the next category phrase.
+- "X mein", "X wale", "X wala section", "under X", "in X" name the category X for the run of items said just before it, back to the previous category phrase (or the start). Example: "chai 10, coffee 20 — drinks mein; samosa 15, kachori 20, snacks mein" → chai and coffee are Drinks, samosa and kachori are Snacks.
+- A category said BEFORE a list ("snacks mein: samosa, kachori") applies to the items that follow, until the next category phrase.
 - When the owner names a category that matches one in "Existing categories" (ignoring case or plural), use the existing spelling.
-- When no category was said for a dish, infer a short one from the dish type, preferring an existing category (Chai/Drinks for beverages, Snacks for fried snacks, Meals, Sweets, …); use null if unsure.
+- When no category was said for an item, infer a short one from its type, preferring an existing category (Chai/Drinks for beverages, Snacks for fried snacks, Meals, Sweets, Herbal Powders, Oils, Teas, Soaps, …); use null if unsure.
 
-Put any fragment you could not turn into a dish (instructions, chit-chat, unclear words) into unparsed.
+Put any fragment you could not turn into an item (instructions, chit-chat, unclear words) into unparsed.
 
 The authoritative existing menu JSON and category list are provided in a separate user message block (cached).`;
 
 export const ADD_MENU_ITEMS_TOOL: Anthropic.Tool = {
   name: "add_menu_items",
-  description: "Add the dishes the owner listed as draft menu rows. One entry per dish, in spoken order.",
+  description: "Add the items the owner listed as draft menu rows. One entry per item, in spoken order.",
   input_schema: {
     type: "object",
     properties: {
@@ -94,13 +106,14 @@ export const ADD_MENU_ITEMS_TOOL: Anthropic.Tool = {
         items: {
           type: "object",
           properties: {
-            name: { type: "string", description: "Dish name, Title Case, Latin script" },
+            name: { type: "string", description: "Item name, Title Case, Latin script, without the pack size" },
             priceRupees: { type: ["number", "null"], description: "Price in rupees, null if not said" },
+            unit: { type: ["string", "null"], description: "Pack size said with the item (\"250 g\"), null if not said" },
             category: { type: ["string", "null"], description: "Spoken or inferred category, null if unsure" },
             spokenAliases: { type: "array", items: { type: "string" } },
             existingMenuItemId: {
               type: ["string", "null"],
-              description: "id from the existing menu JSON when this dish is already on it",
+              description: "id from the existing menu JSON when this item is already on it",
             },
           },
           required: ["name", "priceRupees", "category"],
@@ -127,6 +140,7 @@ export const addMenuItemsInputSchema = z.object({
       z.object({
         name: z.preprocess((v) => (v === null ? "" : v), z.string().default("")),
         priceRupees: optNum,
+        unit: optStr,
         category: optStr,
         spokenAliases: z.preprocess(
           (v) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []),
@@ -195,7 +209,7 @@ export async function buildMenuWithClaude(
           role: "user",
           content: [
             { type: "text", text: menuBuilderCachedText(menuItems), cache_control: { type: "ephemeral" } },
-            { type: "text", text: `Owner's dish list (${lang}):\n${transcript}` },
+            { type: "text", text: `Owner's list (${lang}):\n${transcript}` },
           ],
         },
       ],
@@ -240,6 +254,8 @@ export async function parseMenuFromTranscript(opts: {
   menuItems: ExistingMenuItem[];
   transcript: string;
   lang: string;
+  /** The store's words, for the draft's warnings (lib/store-vocabulary.ts). Kitchen when absent. */
+  vocab?: StoreVocabulary;
   clients?: { haiku: Anthropic; sonnet: Anthropic };
 }): Promise<ParseMenuOutcome> {
   const haiku = opts.clients?.haiku ?? anthropicHaiku;
@@ -265,7 +281,7 @@ export async function parseMenuFromTranscript(opts: {
   }
 
   return {
-    draft: postProcessMenuDraft(raw, opts.menuItems, tier),
+    draft: postProcessMenuDraft(raw, opts.menuItems, tier, opts.vocab),
     modelUsed: tier === "sonnet" ? ANTHROPIC_FALLBACK_MODEL : ANTHROPIC_PRIMARY_MODEL,
     escalated: tier === "sonnet",
   };
@@ -391,6 +407,12 @@ export function spokenPriceToPaise(rupees: number | undefined): number | null {
   return paise;
 }
 
+/** Spoken pack size → stored form, or null when none was said or it isn't a usable size. */
+export function spokenUnit(raw: string | undefined): string | null {
+  const unit = normaliseMenuUnit(raw);
+  return unit !== null && isValidMenuUnit(unit) ? unit : null;
+}
+
 function cleanAlias(a: string): string {
   return a.normalize("NFC").toLowerCase().replace(/\s+/g, " ").trim().slice(0, MENU_NAME_MAX);
 }
@@ -398,12 +420,14 @@ function cleanAlias(a: string): string {
 /**
  * Model tool input → MenuDraft. Pure: cleans names, matches existing items of
  * THIS vendor, converts money to paise, guards prices, merges repeats, snaps
- * categories to existing spellings and collects warnings.
+ * categories to existing spellings and collects warnings (worded for the
+ * store: "dish" for a kitchen, "product" for any other store).
  */
 export function postProcessMenuDraft(
   raw: AddMenuItemsToolInput,
   menuItems: ExistingMenuItem[],
   model: "haiku" | "sonnet",
+  vocab: StoreVocabulary = vocabularyForKind("food"),
 ): MenuDraft {
   const warnings: string[] = [];
   const warn = (msg: string) => {
@@ -459,6 +483,7 @@ export function postProcessMenuDraft(
         priceInPaise: price,
         category: m.category?.trim() || DEFAULT_CATEGORY,
         emoji: m.emoji || DEFAULT_EMOJI,
+        unit: null,
         aliases: [...m.aliases],
         action: spoken && price !== m.priceInPaise ? "update_price" : "unchanged",
         existingMenuItemId: m.id,
@@ -466,11 +491,11 @@ export function postProcessMenuDraft(
         priceSpoken: spoken,
         ...(match.how !== "exact" ? { matchedFuzzy: true } : {}),
       };
-      if (match.how !== "exact") warn(`"${name}" matched to ${m.name} on your menu — please check`);
+      if (match.how !== "exact") warn(`"${name}" matched to ${m.name} on your ${vocab.catalogue} — please check`);
     } else {
       if (match && "ambiguous" in match) {
         const names = match.ambiguous.slice(0, 3).map((m) => m.name).join(" or ");
-        warn(`"${name}" could be ${names} — added as a new dish, please check`);
+        warn(`"${name}" could be ${names} — added as a new ${vocab.item}, please check`);
       }
       const spokenAliases = line.spokenAliases.map(cleanAlias).filter(Boolean).slice(0, MAX_SPOKEN_ALIASES);
       row = {
@@ -479,6 +504,7 @@ export function postProcessMenuDraft(
         priceInPaise: priceInPaise ?? 0,
         category: resolveCategory(line.category),
         emoji: suggestEmoji(name) ?? DEFAULT_EMOJI,
+        unit: spokenUnit(line.unit),
         aliases: Array.from(new Set([...suggestAliases(name), ...spokenAliases])),
         action: "create",
         existingMenuItemId: null,
@@ -499,6 +525,7 @@ export function postProcessMenuDraft(
         }
       }
       if (row.action === "create" && !line.category) row.category = prev.category;
+      if (row.action === "create" && row.unit === null) row.unit = prev.unit;
       rows[at] = row;
       warn(
         row.priceSpoken
@@ -508,7 +535,7 @@ export function postProcessMenuDraft(
       continue;
     }
     if (rows.length >= MENU_DRAFT_MAX_ITEMS) {
-      warn(`Only the first ${MENU_DRAFT_MAX_ITEMS} dishes were kept — add the rest in another go`);
+      warn(`Only the first ${MENU_DRAFT_MAX_ITEMS} ${vocab.items} were kept — add the rest in another go`);
       break;
     }
     indexByKey.set(row.key, rows.length);
@@ -519,7 +546,7 @@ export function postProcessMenuDraft(
     if (!row.priceSpoken && row.action === "create") warn(`No price heard for ${row.name} — please enter it`);
   }
   for (const u of raw.unparsed) addUnparsed(u);
-  if (rows.length === 0) warn("No dishes recognised — please try again or add them by hand");
+  if (rows.length === 0) warn(`No ${vocab.items} recognised — please try again or add them by hand`);
 
   return { items: rows, warnings, unparsed, model };
 }

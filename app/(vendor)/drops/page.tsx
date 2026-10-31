@@ -27,6 +27,7 @@ import {
 } from "@/lib/drops-time";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { storeVocabulary } from "@/lib/store-vocabulary";
 import { loadSetupChecklist } from "@/lib/setup-checklist-server";
 
 export const dynamic = "force-dynamic";
@@ -68,6 +69,7 @@ export default async function DropsPage() {
       redirect(e.status === 403 ? "/pos" : "/sign-in");
     throw e;
   }
+  const vocab = storeVocabulary(ctx.vendor.stallType);
 
   const now = new Date();
   const [drops, setup] = await Promise.all([
@@ -112,7 +114,9 @@ export default async function DropsPage() {
             Drops
           </h1>
           <p className="text-sm text-muted-foreground">
-            Daily pre-order menus. Customers order ahead, you cook once.
+            {vocab.kind === "food"
+              ? "Daily pre-order menus. Customers order ahead, you cook once."
+              : "Pre-order batches. Customers order ahead, you pack once."}
           </p>
         </div>
         <div className="flex gap-2">
@@ -143,7 +147,7 @@ export default async function DropsPage() {
             className="rounded-xl"
             icon={Package}
             title="No drops yet"
-            description="Create one for tomorrow's cooking, share the link on WhatsApp, and collect orders before the cut-off. You can fill it in by voice."
+            description={`Create one for ${vocab.nextBatch}, share the link on WhatsApp, and collect orders before the cut-off. You can fill it in by voice.`}
             action={
               <Link href="/drops/new" className={primaryLinkBtn}>
                 <Plus className="h-4 w-4" aria-hidden="true" />

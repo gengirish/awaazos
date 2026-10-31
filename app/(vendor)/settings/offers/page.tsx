@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Offers · Settings · AwaazOS" };
 
 export default async function OffersSettingsPage() {
-  const { vendor, canManage } = await requireSettingsContext();
+  const { vendor, canManage, storeKind } = await requireSettingsContext();
 
   const [offers, menuItems, drops] = await Promise.all([
     prisma.offer.findMany({
@@ -50,6 +50,7 @@ export default async function OffersSettingsPage() {
           menuItems={menuItems}
           drops={drops.map((d) => ({ id: d.id, title: d.title, dayLabel: formatDropDayLabel(d.date) }))}
           canEdit={canManage}
+          storeKind={storeKind}
         />
       </SettingsCard>
     </>

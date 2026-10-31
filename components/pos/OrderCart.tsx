@@ -10,12 +10,15 @@ import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
 import { discountLabel, offerNudgeText } from "@/lib/offers";
 import { computeCartTotals, toPayTotals, type PayTotals, type PosTaxSettings } from "@/lib/pos-totals";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
 export type PosSettings = PosTaxSettings;
 
 export type OrderCartProps = {
   settings: PosSettings;
+  /** The store's words; names the catalogue in the voice "not on menu" line. */
+  vocab: StoreVocabulary;
   onCollectPayment: (totals: PayTotals) => void;
 };
 
@@ -25,7 +28,7 @@ const CONFIRM_CLEAR_ABOVE_LINES = 2;
 /** One shared id: each remove replaces the previous Undo toast (the store keeps one `lastRemoved`). */
 export const UNDO_TOAST_ID = "cart-undo";
 
-export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
+export function OrderCart({ settings, vocab, onCollectPayment }: OrderCartProps) {
   const items = useCartStore((s) => s.items);
   const incQty = useCartStore((s) => s.incQty);
   const decQty = useCartStore((s) => s.decQty);
@@ -112,7 +115,7 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
             ) : null}
             {voiceReview.unmatched.length > 0 ? (
               <p className={cn(!voiceReview.lowConfidence && "font-medium")}>
-                Not on menu: {voiceReview.unmatched.join(", ")}
+                Not on {vocab.catalogue}: {voiceReview.unmatched.join(", ")}
               </p>
             ) : null}
           </div>

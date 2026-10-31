@@ -2,8 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-AwaazOS is multi-tenant pre-ordering and billing for Instagram-based cloud kitchens (ICP in
-`docs/ICP.md`): storefront link in bio → Drops with a cut-off → UPI → orders board and prep sheet.
+AwaazOS is multi-tenant pre-ordering and billing for Instagram and WhatsApp home sellers: cloud
+kitchens first (ICP in `docs/ICP.md`), other home businesses too (the first, from 2026-10-31, sells
+holistic wellness products): storefront link in bio → Drops with a cut-off → UPI → orders board
+and prep sheet.
 It began as a voice-first counter POS (vendor speaks "do samosa aur ek chai" → Claude parses it
 against the menu → UPI QR → WhatsApp receipt); that path still ships.
 
@@ -114,6 +116,21 @@ been applied; add a new one. Check a branch: `prisma migrate diff --from-migrati
 --to-schema-datamodel prisma/schema.prisma --shadow-database-url <throwaway> --exit-code` (0 = in sync).
 
 ## Architecture
+
+### Store wording: kitchens and everyone else (`lib/store-vocabulary.ts`)
+
+The app's words for the catalogue follow `Vendor.stallType`. `storeKind()` sorts every type into
+`food` (kitchens, bakeries, cafés, sweets, catering, street food, carnival, school canteen, and
+`GENERAL`, the sign-up default most existing kitchens carry) or `goods` (Other, Kirana, Clothing,
+Services, Event pop-up), and `storeVocabulary()` returns that kind's words: "Menu" / "Products",
+"dish" / "product", "Prep sheet" / "Packing list", "Order from menu" / "Order any time". **Wording
+only**: routes (`/menu`), models (`MenuItem`), API fields and settings (`acceptMenuOrders`) keep
+their names. The shell gets `storeKind` from `getShellContext()`, Settings pages from
+`requireSettingsContext()`; client components take a `storeKind` prop. Fixed copy (the Help guide,
+the setup checklist, Settings section blurbs) holds `{token}`s filled by `fillVocabulary()`; read
+the guide only through `helpTopicsForRole(role, published, kind)` / `helpGroupsFor` /
+`orderJourneyFor` / `helpScreenSummary`. A kitchen must read exactly as before; new copy that names
+the catalogue goes through the vocabulary, not a literal "menu" or "dish".
 
 ### Voice pipeline: STT and NLU are deliberately separate (see ARCHITECTURE.md §3 ADR)
 

@@ -1,7 +1,8 @@
-import type { StaffRole } from "@prisma/client";
+import type { StaffRole, StallType } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
 import { checklistForRole, setupChecklist, type ChecklistItem } from "@/lib/settings-overview";
+import { storeKind } from "@/lib/store-vocabulary";
 
 // Server only (Prisma): import it from server components and route handlers.
 
@@ -21,7 +22,7 @@ type KnownSettings = {
 
 export type SetupChecklistInput = {
   /** `ctx.vendor` from `requireVendorRole`. */
-  vendor: { id: string; slug: string; name: string; upiId: string | null };
+  vendor: { id: string; slug: string; name: string; upiId: string | null; stallType: StallType };
   /** `ctx.staff.role`. */
   role: StaffRole;
   /** Values the page has already read, so they are not read twice. */
@@ -66,7 +67,7 @@ export async function loadSetupChecklist({ vendor, role, known }: SetupChecklist
       acceptPayOnDelivery: settings?.acceptPayOnDelivery ?? true,
       acceptMenuOrders: settings?.acceptMenuOrders ?? false,
       dropCount,
-    }),
+    }, storeKind(vendor.stallType)),
     role,
   );
 

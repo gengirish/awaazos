@@ -25,6 +25,7 @@ import { STALL_TYPES } from "@/lib/constants";
 import { formatINR } from "@/lib/currency";
 import { HOME_PATH } from "@/lib/home";
 import { STALL_TYPE_OTHER_MAX, STALL_TYPE_OTHER_MESSAGE, stallTypeOtherSchema } from "@/lib/stall-type";
+import { storeVocabulary } from "@/lib/store-vocabulary";
 import { buildUpiDeepLink, isValidUpiId, UPI_ID_FORMAT_MESSAGE } from "@/lib/upi";
 import { cn } from "@/lib/utils";
 import type { StallType, Vendor, VendorSettings } from "@prisma/client";
@@ -37,6 +38,7 @@ import {
   ONBOARDING_STEPS,
   resumeStep,
   STEP_COUNT,
+  stepDescription,
   validateItemDraft,
   type ItemDraft,
 } from "./onboarding-steps";
@@ -526,6 +528,8 @@ export default function OnboardingPage() {
 
   const current = ONBOARDING_STEPS[step - 1]!;
   const lastStep = step === STEP_COUNT;
+  // Follows the "What do you sell?" pick on step 1, so changing it there re-words the rest.
+  const vocab = storeVocabulary(stallType);
 
   return (
     <main id="main" className="mx-auto flex min-h-screen max-w-lg flex-col gap-6 p-4 pb-12 pt-8">
@@ -543,7 +547,7 @@ export default function OnboardingPage() {
           >
             {current.title}
           </h2>
-          <CardDescription>{current.description}</CardDescription>
+          <CardDescription>{stepDescription(current, vocab.kind)}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {step === 1 && (
@@ -664,8 +668,8 @@ export default function OnboardingPage() {
               <p className="flex items-start gap-2 text-sm font-medium">
                 <Mic className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                 <span>
-                  After the last step you&apos;ll land on your Menu with the mic ready. Say each item and its price,
-                  check the list, then save.
+                  After the last step you&apos;ll land on your {vocab.catalogueTitle} with the mic ready. Say each
+                  item and its price, check the list, then save.
                 </span>
               </p>
               <Button type="button" variant="outline" onClick={() => chooseSpeakMenu(false)}>
@@ -680,7 +684,7 @@ export default function OnboardingPage() {
                 <p className="text-sm text-muted-foreground">Got a long list? Say it all at once instead of typing.</p>
                 <Button type="button" variant="outline" className="shrink-0" onClick={() => chooseSpeakMenu(true)}>
                   <Mic aria-hidden="true" />
-                  Speak your whole menu
+                  Speak your whole {vocab.catalogue}
                 </Button>
               </div>
 
@@ -688,7 +692,7 @@ export default function OnboardingPage() {
                 <div className="rounded-lg border bg-muted/40 p-3">
                   <p className="flex items-center gap-2 text-sm font-medium">
                     <Check className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    Saved to your menu
+                    Saved to your {vocab.catalogue}
                   </p>
                   <ul className="mt-2 space-y-1 text-sm">
                     {savedItems.map((it) => (
@@ -698,7 +702,9 @@ export default function OnboardingPage() {
                       </li>
                     ))}
                   </ul>
-                  <p className="mt-2 text-xs text-muted-foreground">You can edit these later in Menu.</p>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    You can edit these later in {vocab.catalogueTitle}.
+                  </p>
                 </div>
               ) : null}
 

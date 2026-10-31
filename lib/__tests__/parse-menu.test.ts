@@ -22,6 +22,7 @@ import {
   spokenPriceToPaise,
   type ExistingMenuItem,
 } from "@/lib/parse-menu";
+import { storeVocabulary } from "@/lib/store-vocabulary";
 
 const MENU: ExistingMenuItem[] = [
   { id: "mi_chai", name: "Masala Chai", aliases: ["masala chai", "chai"], priceInPaise: 1_500, category: "Chai", emoji: "☕" },
@@ -369,5 +370,26 @@ describe("parseMenuFromTranscript (Haiku → Sonnet)", () => {
         clients: clients(vi.fn().mockRejectedValue(new Error("a")), vi.fn().mockRejectedValue(new Error("b"))),
       }),
     ).rejects.toThrow("b");
+  });
+});
+
+describe("pack size (unit)", () => {
+  it("keeps a usable spoken unit on new rows, drops a bad one, and never sets one on existing items", () => {
+    const d = post([
+      { name: "Ashwagandha Powder", priceRupees: 399, unit: " 250  g ", category: "Herbal" },
+      { name: "Neem Soap", priceRupees: 120, unit: "<b>", category: null },
+      { name: "Samosa", priceRupees: 25, unit: "piece", category: null },
+    ]);
+    expect(d.items.map((i) => [i.name, i.unit])).toEqual([
+      ["Ashwagandha Powder", "250 g"],
+      ["Neem Soap", null],
+      ["Samosa", null],
+    ]);
+  });
+
+  it("words warnings for a product store", () => {
+    const d = postProcessMenuDraft(input([]), MENU, "haiku", storeVocabulary("OTHER"));
+    expect(d.warnings).toEqual(["No products recognised — please try again or add them by hand"]);
+    expect(post([]).warnings).toEqual(["No dishes recognised — please try again or add them by hand"]);
   });
 });

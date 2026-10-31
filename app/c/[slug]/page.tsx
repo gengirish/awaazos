@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { CalendarClock, ChevronRight, ShoppingBag, Store, UtensilsCrossed } from "lucide-react";
+import { CalendarClock, ChevronRight, Package, ShoppingBag, Store, UtensilsCrossed } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import type { CommunityStoreOrdering } from "@/lib/community";
 import { loadCommunityPage, type CommunityPageStore } from "@/lib/community-server";
 import { stallTypeLabel } from "@/lib/stall-type";
+import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
 import { formatIstDeadline } from "@/lib/storefront-order";
 
 export const dynamic = "force-dynamic";
@@ -41,16 +42,24 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   const page = await loadPage(slug);
   if (!page) return { title: "Not found — AwaazOS" };
   const where = page.area ? ` in ${page.area}` : "";
-  const description = `Home kitchens${where}. Order ahead from your neighbours and pay by UPI.`;
+  const description = `Home businesses${where}. Order ahead from your neighbours and pay by UPI.`;
   return {
-    title: `${page.name} — Home kitchens`,
+    title: `${page.name} — Home businesses`,
     description,
     openGraph: { title: page.name, description, type: "website" },
     robots: { index: false, follow: false },
   };
 }
 
-function OrderingLine({ ordering, now }: { ordering: CommunityStoreOrdering; now: Date }) {
+function OrderingLine({
+  ordering,
+  now,
+  vocab,
+}: {
+  ordering: CommunityStoreOrdering;
+  now: Date;
+  vocab: StoreVocabulary;
+}) {
   switch (ordering.kind) {
     case "drop_open":
       return (
@@ -74,14 +83,18 @@ function OrderingLine({ ordering, now }: { ordering: CommunityStoreOrdering; now
       return (
         <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground">
           <ShoppingBag className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
-          Order from the menu
+          Order from the {vocab.catalogue}
         </span>
       );
     case "browse":
       return (
         <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
-          <UtensilsCrossed className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
-          See the menu
+          {vocab.foodArt ? (
+            <UtensilsCrossed className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          ) : (
+            <Package className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          )}
+          See the {vocab.catalogue}
         </span>
       );
   }
@@ -116,7 +129,7 @@ function StoreCard({ store, now }: { store: CommunityPageStore; now: Date }) {
           <span className="truncate text-xs text-muted-foreground">
             {store.city ? `${kind} · ${store.city}` : kind}
           </span>
-          <OrderingLine ordering={store.ordering} now={now} />
+          <OrderingLine ordering={store.ordering} now={now} vocab={storeVocabulary(store.stallType)} />
         </span>
         <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
       </Link>
@@ -139,7 +152,7 @@ export default async function CommunityPageRoute(props: { params: Promise<{ slug
       </a>
       <header className="bg-linear-to-b from-primary/10 to-background px-4 pb-6 pt-8">
         <div className="mx-auto max-w-2xl">
-          <p className="text-xs font-bold uppercase tracking-wide text-primary">Home kitchens near you</p>
+          <p className="text-xs font-bold uppercase tracking-wide text-primary">Home businesses near you</p>
           <h1 className="mt-1 font-display text-3xl font-bold leading-tight text-awaaz-charcoal">{page.name}</h1>
           {page.area ? <p className="mt-1 text-sm text-muted-foreground">{page.area}</p> : null}
           {page.description ? <p className="mt-3 text-sm text-foreground">{page.description}</p> : null}
@@ -148,7 +161,7 @@ export default async function CommunityPageRoute(props: { params: Promise<{ slug
               vendorName={page.name}
               slug={page.slug}
               path={`/c/${encodeURIComponent(page.slug)}`}
-              text={`Home kitchens at ${page.name}`}
+              text={`Home businesses at ${page.name}`}
             />
             <p className="text-sm text-muted-foreground">
               {page.stores.length} {page.stores.length === 1 ? "store" : "stores"}
@@ -164,7 +177,7 @@ export default async function CommunityPageRoute(props: { params: Promise<{ slug
           <EmptyState
             icon={Store}
             title="No stores listed yet"
-            description="Stores appear here once the home kitchens in this community join."
+            description="Stores appear here once the home businesses in this community join."
           />
         ) : (
           <ul className="space-y-3">
@@ -177,7 +190,7 @@ export default async function CommunityPageRoute(props: { params: Promise<{ slug
 
       <footer className="mx-auto max-w-2xl px-4 pb-10 text-center text-sm text-muted-foreground">
         <p>
-          Run a home kitchen here?{" "}
+          Sell from home here?{" "}
           <Link
             href="/sign-up"
             className="inline-flex min-h-11 items-center font-semibold text-primary underline underline-offset-4"

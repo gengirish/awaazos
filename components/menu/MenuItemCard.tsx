@@ -74,7 +74,7 @@ export function MenuItemCard({ item, onEdit, onChanged, onMove, canMoveUp = fals
     <Card className="group/card border">
       <CardContent className="flex flex-col gap-3 p-4">
         <div className="flex items-start justify-between gap-2">
-          {/* Only the dish itself is dimmed when sold out; the controls stay at full contrast. */}
+          {/* Only the item itself is dimmed when sold out; the controls stay at full contrast. */}
           <div className={cn("flex min-w-0 flex-1 items-start gap-2", !item.isAvailable && "opacity-60")}>
             {/*
               Decorative: the item name is already rendered as text right next
@@ -97,7 +97,10 @@ export function MenuItemCard({ item, onEdit, onChanged, onMove, canMoveUp = fals
             )}
             <div className="min-w-0">
               <p className="truncate font-semibold leading-tight text-foreground">{item.name}</p>
-              <p className="text-sm text-muted-foreground">{formatINR(item.priceInPaise)}</p>
+              <p className="text-sm text-muted-foreground">
+                {formatINR(item.priceInPaise)}
+                {item.unit ? ` / ${item.unit}` : null}
+              </p>
               <p className="text-xs text-muted-foreground">{item.category}</p>
               {item.hsnCode ? <p className="text-xs text-muted-foreground">HSN/SAC: {item.hsnCode}</p> : null}
             </div>

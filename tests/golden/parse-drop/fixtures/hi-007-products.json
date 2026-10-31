@@ -1,0 +1,28 @@
+{
+  "id": "hi-007-products",
+  "lang": "hi-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "kal ke liye 15 ashwagandha powder ke jar 399 rupaye, pickup dopahar 2 se 5, order aaj raat 10 baje tak",
+  "expected": {
+    "date": "2026-10-09",
+    "fulfilmentMode": "PICKUP",
+    "fulfilmentStart": "14:00",
+    "fulfilmentEnd": "17:00",
+    "closesAtDate": "2026-10-08",
+    "closesAtTime": "22:00",
+    "items": [
+      {
+        "menuItemId": "ashwagandha-powder",
+        "maxQty": 15,
+        "priceInPaise": 39900
+      }
+    ]
+  },
+  "tags": [
+    "hinglish",
+    "products",
+    "part-of-day",
+    "pack-words"
+  ],
+  "notes": "Wellness seller; \"jar\" is the pack, not an item."
+}

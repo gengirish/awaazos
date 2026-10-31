@@ -1,5 +1,7 @@
 import type { StaffRole } from "@prisma/client";
 
+import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
+
 /**
  * Destinations of the signed-in app shell (components/shell). Pure and
  * client-safe: the bottom tab bar, the "More" sheet and the md+ rail are all
@@ -13,6 +15,9 @@ import type { StaffRole } from "@prisma/client";
  *
  * The phone tab bar depends on whether the store is published (`appTabBarForRole`):
  * a seller who takes orders online gets Settings on the bar and Sell behind More.
+ *
+ * Labels follow what the store sells (lib/store-vocabulary.ts): `/menu` is
+ * "Menu" for a kitchen and "Products" for any other store.
  */
 
 export type AppNavId = "orders" | "drops" | "sell" | "menu" | "transactions" | "analytics" | "settings" | "help";
@@ -42,10 +47,13 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
   { id: "help", href: "/help", label: "Help", placement: "more", managerOnly: false },
 ];
 
-/** The destinations a staff member of this role is shown, in display order. */
-export function appNavItemsForRole(role: StaffRole): AppNavItem[] {
+/** The destinations a staff member of this role is shown, in display order, labelled for the store's kind. */
+export function appNavItemsForRole(role: StaffRole, kind: StoreKind = "food"): AppNavItem[] {
   const isCashier = role === "CASHIER";
-  return APP_NAV_ITEMS.filter((item) => !(isCashier && item.managerOnly));
+  const catalogueTitle = vocabularyForKind(kind).catalogueTitle;
+  return APP_NAV_ITEMS.filter((item) => !(isCashier && item.managerOnly)).map((item) =>
+    item.id === "menu" ? { ...item, label: catalogueTitle } : item,
+  );
 }
 
 /** The phone tab bar holds this many destinations; "More" is the fifth tab. */
@@ -70,8 +78,9 @@ const PUBLISHED_TAB_PRIORITY: readonly AppNavId[] = ["orders", "drops", "menu", 
 export function appTabBarForRole(
   role: StaffRole,
   storePublished: boolean,
+  kind: StoreKind = "food",
 ): { tabs: AppNavItem[]; more: AppNavItem[] } {
-  const items = appNavItemsForRole(role);
+  const items = appNavItemsForRole(role, kind);
   const onBar = storePublished
     ? new Set(
         PUBLISHED_TAB_PRIORITY.filter((id) => items.some((item) => item.id === id)).slice(0, APP_TAB_BAR_SLOTS),

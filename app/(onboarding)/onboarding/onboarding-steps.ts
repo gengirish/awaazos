@@ -1,4 +1,5 @@
 import { rupeesToPaise } from "@/lib/currency";
+import type { StoreKind } from "@/lib/store-vocabulary";
 
 /**
  * Pure rules of the first-run setup (page.tsx), kept out of the page so they
@@ -11,12 +12,29 @@ import { rupeesToPaise } from "@/lib/currency";
  * the steps a seller may skip.
  */
 
-export const ONBOARDING_STEPS = [
-  { title: "Your store", description: "Where you cook and sell from. You can change this later." },
+/**
+ * `goodsDescription` replaces `description` for a store that doesn't sell food
+ * (lib/store-vocabulary.ts); see `stepDescription`.
+ */
+export const ONBOARDING_STEPS: readonly { title: string; description: string; goodsDescription?: string }[] = [
+  {
+    title: "Your store",
+    description: "Where you cook and sell from. You can change this later.",
+    goodsDescription: "Where you sell from. You can change this later.",
+  },
   { title: "Getting paid", description: "Customers pay straight to your UPI ID. AwaazOS never holds your money." },
-  { title: "What you sell", description: "One item with a price is enough to start. Add the rest later in Menu." },
+  {
+    title: "What you sell",
+    description: "One item with a price is enough to start. Add the rest later in Menu.",
+    goodsDescription: "One product with a price is enough to start. Add the rest later in Products.",
+  },
   { title: "Order alerts", description: "Hear about a new order the moment it comes in." },
-] as const;
+];
+
+/** The line under a step's title, in the words of this kind of store. */
+export function stepDescription(step: { description: string; goodsDescription?: string }, kind: StoreKind): string {
+  return kind === "goods" && step.goodsDescription ? step.goodsDescription : step.description;
+}
 
 export const STEP_COUNT = ONBOARDING_STEPS.length;
 

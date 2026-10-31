@@ -1,0 +1,27 @@
+{
+  "id": "hi-009-two-pack-sizes",
+  "lang": "hi-IN",
+  "transcript": "tulsi chai patti sau gram ek sau nabbe rupaye, dhai sau gram chaar sau pachaas",
+  "expected": {
+    "items": [
+      {
+        "name": "Tulsi Chai Patti (100 g)",
+        "action": "create",
+        "priceInPaise": 19000,
+        "unit": "100 g"
+      },
+      {
+        "name": "Tulsi Chai Patti (250 g)",
+        "action": "create",
+        "priceInPaise": 45000,
+        "unit": "250 g"
+      }
+    ]
+  },
+  "tags": [
+    "products",
+    "pack-size",
+    "indic-numerals"
+  ],
+  "notes": "Two sizes of one product are two rows, the size in each name."
+}

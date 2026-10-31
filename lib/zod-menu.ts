@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { rupeesToPaise } from "@/lib/currency";
+import { menuUnitSchema } from "@/lib/menu-unit";
 
 /** Split a comma-separated string into a deduplicated, trimmed array. */
 function parseCsvToArray(csv: string | undefined): string[] {
@@ -60,6 +61,8 @@ const menuItemCreateFields = {
   isPopular: z.boolean().optional(),
   isAvailable: z.boolean().optional(),
   showOnline: z.boolean().optional(),
+  /** Pack / selling size printed after the price ("100 g"); blank = none (lib/menu-unit.ts). */
+  unit: menuUnitSchema.optional(),
 };
 
 /** Client / RHF input validation (no paise transform). */
@@ -76,6 +79,7 @@ export const menuItemCreateSchema = menuItemCreateInputSchema.transform((data) =
   isPopular: data.isPopular ?? false,
   isAvailable: data.isAvailable ?? true,
   showOnline: data.showOnline ?? true,
+  unit: data.unit ?? null,
 }));
 
 export const menuItemUpdateSchema = z
@@ -93,6 +97,8 @@ export const menuItemUpdateSchema = z
     isPopular: z.boolean().optional(),
     isAvailable: z.boolean().optional(),
     showOnline: z.boolean().optional(),
+    // `null` or "" clears it.
+    unit: menuUnitSchema.optional(),
     sortOrder: z.coerce.number().int().optional(),
     // `null` clears the photo; the upload route sets it, the form can unset it.
     imageUrl: z
@@ -116,6 +122,7 @@ export const menuItemUpdateSchema = z
       d.isPopular !== undefined ||
       d.isAvailable !== undefined ||
       d.showOnline !== undefined ||
+      d.unit !== undefined ||
       d.sortOrder !== undefined ||
       d.imageUrl !== undefined,
     { message: "At least one field is required", path: ["_root"] },
@@ -151,6 +158,8 @@ const bulkItemSchema = z.object({
     .optional()
     .transform((e) => (e?.trim() ? e : "🍽️")),
   aliases: z.array(z.string().trim().min(1).max(MENU_NAME_MAX)).max(30).default([]),
+  /** Spoken pack size ("250 g") for a new row; null / absent = none. Ignored on a price update. */
+  unit: menuUnitSchema.optional(),
   existingMenuItemId: z.string().trim().min(1).max(64).nullish(),
 });
 

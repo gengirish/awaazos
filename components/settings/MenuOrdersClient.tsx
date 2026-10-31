@@ -9,11 +9,13 @@ import { toast } from "sonner";
 import { Notice } from "@/components/ui/notice";
 import { paiseToRupees, rupeesToPaise } from "@/lib/currency";
 import type { MenuOrdersBlocker } from "@/lib/menu-orders-board";
+import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
 /**
- * "Order from menu": lets storefront buyers order the everyday menu at any
- * time (no Drop, no cut-off, no stock caps). Orders land on /orders.
+ * "Order from menu" ("Order any time" outside kitchens): lets storefront
+ * buyers order the everyday menu at any time (no Drop, no cut-off, no stock
+ * caps). Orders land on /orders.
  */
 export type MenuOrdersClientProps = {
   slug: string;
@@ -22,6 +24,8 @@ export type MenuOrdersClientProps = {
   initialDeliveryFeePaise: number;
   initialPickupNote: string | null;
   isOwner: boolean;
+  /** Words for the catalogue (lib/store-vocabulary.ts). */
+  storeKind: StoreKind;
 };
 
 const MODES: { id: FulfilmentMode; label: string }[] = [
@@ -70,7 +74,12 @@ export function MenuOrdersClient({
   initialDeliveryFeePaise,
   initialPickupNote,
   isOwner,
+  storeKind,
 }: MenuOrdersClientProps) {
+  const vocab = vocabularyForKind(storeKind);
+  // "Menu ordering" / "Everyday ordering".
+  const ordering = vocab.catalogueOrders.replace(/ orders$/, " ordering");
+  const catalogueItems = vocab.kind === "food" ? "menu items" : vocab.items;
   const [enabled, setEnabled] = useState(initialAcceptMenuOrders);
   const [blocker, setBlocker] = useState<MenuOrdersBlocker | null>(null);
   const [mode, setMode] = useState<FulfilmentMode>(initialFulfilmentMode);
@@ -119,7 +128,7 @@ export function MenuOrdersClient({
       if (await patch({ acceptMenuOrders: next })) {
         setEnabled(next);
         setBlocker(null);
-        toast.success(next ? "Customers can now order from your menu." : "Menu ordering is off.");
+        toast.success(next ? `Customers can now order from your ${vocab.catalogue}.` : `${ordering} is off.`);
       }
     });
   }
@@ -137,7 +146,7 @@ export function MenuOrdersClient({
       if (await patch(body)) {
         setSaved({ mode, fee: showFee && feePaise !== null ? paiseToInput(feePaise) : saved.fee, note: note.trim() });
         if (showFee && feePaise !== null) setFee(paiseToInput(feePaise));
-        toast.success("Menu ordering details saved.");
+        toast.success(`${ordering} details saved.`);
       }
     });
   }
@@ -149,16 +158,16 @@ export function MenuOrdersClient({
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <label htmlFor="menu-orders-toggle" className="text-sm font-medium">
-            Let customers order from your menu anytime
+            Let customers order from your {vocab.catalogue} anytime
           </label>
           <p className="text-xs text-muted-foreground">
             {enabled
-              ? "Customers can order available menu items from your store page. New orders show under Orders."
-              : "Off. Customers can only see your menu (and order from open Drops)."}
+              ? `Customers can order available ${catalogueItems} from your store page. New orders show under Orders.`
+              : `Off. Customers can only see your ${vocab.catalogue} (and order from open Drops).`}
           </p>
           <p className="text-xs text-muted-foreground">
-            Hide single items from your store with &ldquo;Show online&rdquo; on the Menu page. Drops hide the
-            everyday menu unless you tick &ldquo;Also show my everyday menu&rdquo;.
+            Hide single items from your store with &ldquo;Show online&rdquo; on the {vocab.catalogueTitle} page. Drops
+            hide the everyday {vocab.catalogue} unless you tick &ldquo;Also show my everyday {vocab.catalogue}&rdquo;.
           </p>
           {!isOwner && <p className="text-xs text-muted-foreground">Only the owner can change this.</p>}
         </div>
@@ -172,7 +181,7 @@ export function MenuOrdersClient({
           disabled={pending || !isOwner}
           className="group inline-flex min-h-11 min-w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          <span className="sr-only">{enabled ? "Turn off ordering from menu" : "Turn on ordering from menu"}</span>
+          <span className="sr-only">{enabled ? `Turn off ordering from ${vocab.catalogue}` : `Turn on ordering from ${vocab.catalogue}`}</span>
           <span
             aria-hidden="true"
             className={cn(

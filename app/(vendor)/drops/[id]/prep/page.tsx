@@ -9,10 +9,19 @@ import { dropOrdersHref, groupByFulfilment, handoverDue, ordersToPack, type Boar
 import { loadDropBoard } from "@/lib/drops-board-server";
 import { formatIstDate, formatIstTime } from "@/lib/drops-time";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { storeVocabulary } from "@/lib/store-vocabulary";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Prep sheet · AwaazOS" };
+/** "Prep sheet" for a kitchen, "Packing list" for any other store; the membership read is request-cached. */
+export async function generateMetadata() {
+  try {
+    const ctx = await requireVendorRole("CASHIER");
+    return { title: `${storeVocabulary(ctx.vendor.stallType).prepSheet} · AwaazOS` };
+  } catch {
+    return { title: "Prep sheet · AwaazOS" };
+  }
+}
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -99,6 +108,8 @@ export default async function DropPrepPage(props: Props) {
   if (!board) notFound();
 
   const { drop, prep } = board;
+  const vocab = storeVocabulary(ctx.vendor.stallType);
+  const food = vocab.kind === "food";
   // Oldest first for packing — first come, first packed.
   const packing = ordersToPack(board.orders).slice().reverse();
   const { delivery, pickup } = groupByFulfilment(packing);
@@ -122,7 +133,9 @@ export default async function DropPrepPage(props: Props) {
         </nav>
 
         <header className="mb-4">
-          <h1 className="font-display text-2xl font-bold">Prep sheet · {drop.title}</h1>
+          <h1 className="font-display text-2xl font-bold">
+            {vocab.prepSheet} · {drop.title}
+          </h1>
           <p className="text-sm text-muted-foreground print:text-foreground">
             {ctx.vendor.name} · {formatIstDate(fStart)}, {formatIstTime(fStart)} – {formatIstTime(fEnd)} ·{" "}
             {packing.length} orders · printed {formatIstDate(new Date())} {formatIstTime(new Date())}
@@ -136,7 +149,7 @@ export default async function DropPrepPage(props: Props) {
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <p>
-              <span className="font-semibold">Orders can still change</span> — lock orders before you start cooking.{" "}
+              <span className="font-semibold">Orders can still change</span> — lock orders before you start {vocab.making}.{" "}
               <Link
                 href={`/drops/${drop.id}/edit`}
                 className="inline-flex min-h-11 items-center font-semibold underline print:hidden"
@@ -149,10 +162,12 @@ export default async function DropPrepPage(props: Props) {
 
         <section aria-labelledby="cook-h" className="mb-6 break-inside-avoid">
           <h2 id="cook-h" className="border-b pb-1 text-lg font-bold">
-            1. Cook list
+            1. {food ? "Cook list" : "Item totals"}
           </h2>
           {cook.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">No orders to cook yet.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {food ? "No orders to cook yet." : "No orders yet."}
+            </p>
           ) : (
             <table className="mt-2 w-full text-sm">
               <thead>
@@ -197,7 +212,7 @@ export default async function DropPrepPage(props: Props) {
 
         <section aria-labelledby="pack-h" className="mb-6 print:break-before-page">
           <h2 id="pack-h" className="border-b pb-1 text-lg font-bold">
-            2. Packing list
+            2. {food ? "Packing list" : "Order by order"}
           </h2>
           {packing.length === 0 ? (
             <p className="mt-2 text-sm text-muted-foreground">No orders to pack.</p>

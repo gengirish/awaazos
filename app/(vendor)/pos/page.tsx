@@ -10,6 +10,7 @@ import { loadResolvedOffers } from "@/lib/offers-server";
 import { prisma } from "@/lib/prisma";
 import type { BillingAccess } from "@/lib/plan";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
 import { loadSetupChecklist } from "@/lib/setup-checklist-server";
 
 export const dynamic = "force-dynamic";
@@ -19,10 +20,12 @@ export default async function PosPage() {
   let staffRole: StaffRole;
   let access: BillingAccess;
   let trialEndsAt: Date | null;
+  let vocab: StoreVocabulary;
   try {
     const ctx = await requireVendorRole("CASHIER");
     vendorId = ctx.vendor.id;
     trialEndsAt = ctx.vendor.trialEndsAt;
+    vocab = storeVocabulary(ctx.vendor.stallType);
     staffRole = ctx.staff.role;
     access = ctx.access;
   } catch (e) {
@@ -130,6 +133,7 @@ export default async function PosPage() {
         settings={settings}
         todaysRevenuePaise={todaysRevenuePaise}
         renderedAt={new Date().toISOString()}
+        vocab={vocab}
       />
     </>
   );

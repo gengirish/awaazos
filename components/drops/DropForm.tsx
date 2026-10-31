@@ -45,6 +45,7 @@ import {
   type VoiceMarks,
 } from "@/lib/drop-voice";
 import type { DropDraft } from "@/lib/parse-drop-types";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import type { DropUpsertInput } from "@/lib/zod-drops";
 
 // ─── Shared bits ────────────────────────────────────────────────────
@@ -148,16 +149,17 @@ function FromVoiceBadge({ show }: { show: boolean }) {
  * but unusual (often a cooking day moved without its cut-off), so it gets a
  * soft warning — icon + text, not colour alone. Never blocks saving.
  */
-function CutoffLeadHint({ id, days }: { id: string; days: number | null }) {
+function CutoffLeadHint({ id, days, makeDay }: { id: string; days: number | null; makeDay: string }) {
   if (days === null || days < 0) return null;
+  const day = makeDay.toLowerCase();
   if (days === 0) {
     return (
       <p id={id} className="text-xs text-muted-foreground">
-        Orders close on the cooking day.
+        Orders close on the {day}.
       </p>
     );
   }
-  const text = `Orders close ${days} ${days === 1 ? "day" : "days"} before cooking day.`;
+  const text = `Orders close ${days} ${days === 1 ? "day" : "days"} before ${day}.`;
   if (days === 1) {
     return (
       <p id={id} className="text-xs text-muted-foreground">
@@ -200,6 +202,8 @@ export type DropFormProps = {
   isOwner?: boolean;
   /** Create only: what "Save and open orders" needs to ask an owner about a private store first. */
   openFlow?: { storePublished: boolean; storePath: string };
+  /** The store's words for its catalogue (lib/store-vocabulary.ts). */
+  vocab: StoreVocabulary;
 };
 
 const MODES: { value: FormState["fulfilmentMode"]; label: string }[] = [
@@ -217,6 +221,7 @@ export function DropForm({
   voiceLang,
   isOwner = false,
   openFlow,
+  vocab,
 }: DropFormProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -235,12 +240,13 @@ export function DropForm({
 
   // The menu is state, not the prop: the voice panel can add a dish to it.
   const [menu, setMenu] = useState(menuItems);
+  const menuItemsWord = vocab.kind === "food" ? "menu items" : vocab.items;
 
   // A new drop is named after its cooking day until the cook types her own title.
   const [titleAuto, setTitleAuto] = useState(() => !dropId && initial.title.trim() === "");
 
   const [form, setForm] = useState<FormState>(() => ({
-    title: !dropId && initial.title.trim() === "" ? defaultDropTitle(initial.date) : initial.title,
+    title: !dropId && initial.title.trim() === "" ? defaultDropTitle(initial.date, vocab.kind) : initial.title,
     note: initial.note ?? "",
     date: initial.date,
     fulfilmentMode: initial.fulfilmentMode,
@@ -311,7 +317,7 @@ export function DropForm({
     const prev = lastCookingDate.current;
     if (isValidYmd(next)) lastCookingDate.current = next;
     const touched = { ...touchedDates.current };
-    const autoTitle = titleAuto ? defaultDropTitle(next) : "";
+    const autoTitle = titleAuto ? defaultDropTitle(next, vocab.kind) : "";
     setForm((f) => ({
       ...shiftOrderWindowDates(f, prev, next, touched),
       date: next,
@@ -366,8 +372,8 @@ export function DropForm({
     setOrder((o) => (o.includes(item.id) ? o : [...o, item.id]));
     setVoiceMarks((m) => (m.items.includes(item.id) ? m : { ...m, items: [...m.items, item.id] }));
     setFieldErrors((e) => (e.items ? { ...e, items: "" } : e));
-    toast.success(`${item.name} added to your menu and ticked for this drop.`);
-  }, []);
+    toast.success(`${item.name} added to your ${vocab.catalogue} and ticked for this drop.`);
+  }, [vocab.catalogue]);
 
   /** Merge a parsed voice draft into the form. Never saves. */
   const applyVoiceDraft = useCallback(
@@ -378,7 +384,7 @@ export function DropForm({
       if (isValidYmd(result.next.form.date)) lastCookingDate.current = result.next.form.date;
       // A spoken title replaces the day-based one for good; a spoken day alone renames it.
       const spokeTitle = result.marks.fields.includes("title");
-      const dayTitle = titleAuto && !spokeTitle ? defaultDropTitle(result.next.form.date) : "";
+      const dayTitle = titleAuto && !spokeTitle ? defaultDropTitle(result.next.form.date, vocab.kind) : "";
       if (spokeTitle) setTitleAuto(false);
       setForm(dayTitle ? { ...result.next.form, title: dayTitle } : result.next.form);
       setRows(result.next.rows);
@@ -391,7 +397,7 @@ export function DropForm({
       setFilter("");
       return result;
     },
-    [form, rows, order, menu, voiceMarks, titleAuto],
+    [form, rows, order, menu, voiceMarks, titleAuto, vocab.kind],
   );
 
   const undoVoice = useCallback(() => {
@@ -433,7 +439,7 @@ export function DropForm({
     const fe: Record<string, string> = {};
     const ie: Record<string, string> = {};
 
-    if (!form.title.trim()) fe.title = "Give this drop a name, e.g. Saturday bakes";
+    if (!form.title.trim()) fe.title = `Give this drop a name, e.g. ${vocab.dropExample}`;
 
     const deliveryFeePaise = form.fulfilmentMode === "PICKUP" ? 0 : rupeeInputToPaise(form.deliveryFee || "0");
     if (deliveryFeePaise === null) fe.deliveryFeePaise = "Enter the fee in rupees, e.g. 30";
@@ -658,6 +664,7 @@ export function DropForm({
           canUndo={beforeVoice !== null}
           onMenuItemAdded={addMenuItem}
           canManageBilling={isOwner}
+          vocab={vocab}
         />
       ) : null}
 
@@ -680,7 +687,7 @@ export function DropForm({
               id="drop-title"
               className={inputCls}
               maxLength={80}
-              placeholder="Saturday bakes"
+              placeholder={vocab.dropExample}
               value={form.title}
               onChange={(e) => {
                 setTitleAuto(false);
@@ -691,7 +698,7 @@ export function DropForm({
             />
             {titleAuto ? (
               <p id="drop-title-hint" className="text-xs text-muted-foreground">
-                Named after the cooking day. Type your own name to change it.
+                Named after the {vocab.makeDay.toLowerCase()}. Type your own name to change it.
               </p>
             ) : null}
             {err("title")}
@@ -717,7 +724,7 @@ export function DropForm({
           <div className="space-y-1.5">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <label htmlFor="drop-date" className="text-sm font-medium">
-                Cooking day
+                {vocab.makeDay}
               </label>
               <FromVoiceBadge show={fromVoice("date")} />
             </div>
@@ -757,12 +764,12 @@ export function DropForm({
           ) : null}
           {menu.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Your menu is empty.{" "}
+              Your {vocab.catalogue} is empty.{" "}
               <Link
                 href="/menu"
                 className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-2"
               >
-                Add menu items
+                Add {menuItemsWord}
               </Link>{" "}
               first, then come back.
             </p>
@@ -771,8 +778,8 @@ export function DropForm({
               {menu.length > 10 ? (
                 <input
                   type="search"
-                  aria-label="Search menu items"
-                  placeholder="Search your menu"
+                  aria-label={`Search ${menuItemsWord}`}
+                  placeholder={`Search your ${vocab.catalogue}`}
                   className={inputCls}
                   value={filter}
                   onChange={(e) => setFilter(e.target.value)}
@@ -803,8 +810,8 @@ export function DropForm({
                         <span className="min-w-0 flex-1">
                           <span className="block truncate font-medium">{m.name}</span>
                           <span className="block text-xs text-muted-foreground">
-                            Menu price {formatINR(m.priceInPaise)}
-                            {!m.isAvailable ? " · hidden on menu" : ""}
+                            {vocab.kind === "food" ? "Menu price" : "Usual price"} {formatINR(m.priceInPaise)}
+                            {!m.isAvailable ? (vocab.kind === "food" ? " · hidden on menu" : " · hidden in store") : ""}
                             {sold > 0 ? ` · ${sold} ordered` : ""}
                           </span>
                         </span>
@@ -886,7 +893,7 @@ export function DropForm({
             </h2>
             <FromVoiceBadge show={fromVoice("fulfilmentMode")} />
           </div>
-          <div role="radiogroup" aria-label="How customers get their food" className="grid grid-cols-3 gap-2">
+          <div role="radiogroup" aria-label={`How customers get their ${vocab.goods}`} className="grid grid-cols-3 gap-2">
             {MODES.map((m) => {
               const active = form.fulfilmentMode === m.value;
               return (
@@ -1016,7 +1023,7 @@ export function DropForm({
               />
             </div>
             <p className="text-xs text-muted-foreground">{ymdHint(form.closesAtDate)} (IST)</p>
-            <CutoffLeadHint id="cutoff-lead" days={leadDays} />
+            <CutoffLeadHint id="cutoff-lead" days={leadDays} makeDay={vocab.makeDay} />
             {err("closesAtDate")}
             {err("closesAtTime")}
           </fieldset>
@@ -1067,10 +1074,10 @@ export function DropForm({
                 onChange={(e) => set("showEverydayMenu", e.target.checked)}
                 aria-describedby="drop-everyday-help"
               />
-              Also show my everyday menu while this drop is open
+              Also show my everyday {vocab.catalogue} while this drop is open
             </label>
             <p id="drop-everyday-help" className="pl-8 text-xs text-muted-foreground">
-              Off: customers see only this drop. On: your regular menu appears below it.
+              Off: customers see only this drop. On: your regular {vocab.catalogue} appears below it.
             </p>
             {fromVoice("showEverydayMenu") ? (
               <div className="pl-8">
@@ -1157,7 +1164,7 @@ type Action = {
   help?: string;
 };
 
-function actionFor(from: EffectiveDropStatus, to: DropStatus): Action {
+function actionFor(from: EffectiveDropStatus, to: DropStatus, vocab: StoreVocabulary): Action {
   switch (to) {
     case "OPEN":
       return { to, label: from === "DRAFT" ? "Open orders" : "Reopen orders", variant: "default" };
@@ -1175,7 +1182,7 @@ function actionFor(from: EffectiveDropStatus, to: DropStatus): Action {
         to,
         label: "Lock orders",
         variant: "default",
-        help: "Stops new orders and changes, so your cooking list is final.",
+        help: `Stops new orders and changes, so your ${vocab.making} list is final.`,
       };
     case "FULFILLED":
       return {
@@ -1210,14 +1217,23 @@ function changedMessage(from: EffectiveDropStatus, to: DropStatus, effectiveAfte
   }
 }
 
-const STATUS_HELP: Record<EffectiveDropStatus, string> = {
-  DRAFT: "Only you can see this drop. Open orders when the menu is ready.",
-  SCHEDULED: "Customers can see this drop. Ordering starts at the time you set.",
-  OPEN: "Customers can order now, until the cut-off time.",
-  CLOSED: "No new orders. Lock orders when you start cooking so nobody changes their order.",
-  FROZEN: "Orders are locked. Cook, deliver, then mark the drop done.",
-  FULFILLED: "All done. Copy this drop to sell it again.",
-};
+function statusHelp(status: EffectiveDropStatus, vocab: StoreVocabulary): string {
+  const food = vocab.kind === "food";
+  switch (status) {
+    case "DRAFT":
+      return `Only you can see this drop. Open orders when the ${food ? "menu" : "list"} is ready.`;
+    case "SCHEDULED":
+      return "Customers can see this drop. Ordering starts at the time you set.";
+    case "OPEN":
+      return "Customers can order now, until the cut-off time.";
+    case "CLOSED":
+      return `No new orders. Lock orders when you start ${vocab.making} so nobody changes their order.`;
+    case "FROZEN":
+      return `Orders are locked. ${food ? "Cook" : "Pack"}, deliver, then mark the drop done.`;
+    case "FULFILLED":
+      return "All done. Copy this drop to sell it again.";
+  }
+}
 
 type OpenCheck = {
   key: string;
@@ -1279,6 +1295,8 @@ export type DropStatusControlsProps = {
   hasPaymentMethod: boolean;
   /** Arrived from "Save and open orders": take the seller to the share block. */
   justOpened?: boolean;
+  /** The store's words for its catalogue (lib/store-vocabulary.ts). */
+  vocab: StoreVocabulary;
 };
 
 export function DropStatusControls({
@@ -1294,6 +1312,7 @@ export function DropStatusControls({
   cutoffInFuture,
   hasPaymentMethod,
   justOpened = false,
+  vocab,
 }: DropStatusControlsProps) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -1353,8 +1372,8 @@ export function DropStatusControls({
   ];
   const todoCount = checks.filter((c) => c.state === "todo").length;
 
-  const actions = allowedTransitions.map((to) => actionFor(effectiveStatus, to));
-  const publishLabel = `Publish store and ${actionFor(effectiveStatus, "OPEN").label.toLowerCase()}`;
+  const actions = allowedTransitions.map((to) => actionFor(effectiveStatus, to, vocab));
+  const publishLabel = `Publish store and ${actionFor(effectiveStatus, "OPEN", vocab).label.toLowerCase()}`;
 
   /** `publishStore`: the owner confirmed making the store public along with opening orders. */
   function change(to: DropStatus, publishStore = false) {
@@ -1423,9 +1442,9 @@ export function DropStatusControls({
         </h2>
         <DropStatusBadge status={effectiveStatus} />
       </div>
-      <p className="text-sm text-muted-foreground">{STATUS_HELP[effectiveStatus]}</p>
+      <p className="text-sm text-muted-foreground">{statusHelp(effectiveStatus, vocab)}</p>
       {effectiveStatus === "OPEN" && hidesEverydayMenu ? (
-        <p className="text-sm">While this drop is open, your everyday menu is hidden from your store.</p>
+        <p className="text-sm">While this drop is open, your everyday {vocab.catalogue} is hidden from your store.</p>
       ) : null}
 
       {canOpen ? (
@@ -1521,7 +1540,7 @@ export function DropStatusControls({
                   again in Settings → Online store.
                 </>
               ) : (
-                "Customers can no longer change orders. New orders stop too. You'll get the final cooking and delivery list."
+                `Customers can no longer change orders. New orders stop too. You'll get the final ${vocab.making} and delivery list.`
               )}
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>

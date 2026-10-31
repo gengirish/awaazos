@@ -5,9 +5,15 @@ import { redirect } from "next/navigation";
 
 import { HelpTopicList } from "@/components/help/HelpTopicList";
 import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
-import { APP_NAV_ICONS } from "@/components/shell/nav-icons";
+import { appNavIcon } from "@/components/shell/nav-icons";
 import { appNavItemsForRole, appTabBarForRole } from "@/lib/app-nav";
-import { HELP_SCREEN_SUMMARY, helpTopicsForRole, ORDER_JOURNEY, type OrderJourneyStep } from "@/lib/help-guide";
+import {
+  helpGroupsFor,
+  helpScreenSummary,
+  helpTopicsForRole,
+  orderJourneyFor,
+  type OrderJourneyStep,
+} from "@/lib/help-guide";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 import { getShellContext } from "../_shell-context";
@@ -43,11 +49,11 @@ export default async function HelpPage() {
     throw e;
   }
   const role = ctx.staff.role;
-  const { storePath } = await getShellContext();
+  const { storePath, storeKind } = await getShellContext();
 
-  const items = appNavItemsForRole(role);
+  const items = appNavItemsForRole(role, storeKind);
   const screens = items.filter((item) => item.id !== "help");
-  const bar = appTabBarForRole(role, storePath !== null);
+  const bar = appTabBarForRole(role, storePath !== null, storeKind);
   const tabs = bar.tabs.map((item) => item.label);
   const behindMore = [
     ...bar.more.map((item) => item.label),
@@ -100,7 +106,7 @@ export default async function HelpPage() {
           </h2>
           <ul className="divide-y divide-border overflow-hidden rounded-lg border bg-card">
             {screens.map((item) => {
-              const Icon = APP_NAV_ICONS[item.id];
+              const Icon = appNavIcon(item.id, storeKind);
               return (
                 <li key={item.id}>
                   <Link
@@ -113,7 +119,7 @@ export default async function HelpPage() {
                     <span className="min-w-0 flex-1">
                       <span className="block font-semibold text-foreground">{item.label}</span>
                       <span className="mt-0.5 block text-sm text-muted-foreground">
-                        {HELP_SCREEN_SUMMARY[item.id]}
+                        {helpScreenSummary(item.id, storeKind)}
                       </span>
                     </span>
                     <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
@@ -132,7 +138,7 @@ export default async function HelpPage() {
             What happens to one order from your store page, and who taps what. Pickups skip the rider.
           </p>
           <ol className="divide-y divide-border overflow-hidden rounded-lg border bg-card">
-            {ORDER_JOURNEY.map((step, i) => (
+            {orderJourneyFor(storeKind).map((step, i) => (
               <li key={step.id} className="flex gap-3 px-4 py-3">
                 <span
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 font-mono text-sm font-bold text-primary"
@@ -161,7 +167,10 @@ export default async function HelpPage() {
           <h2 id="help-how-heading" className="mb-2 font-display text-lg font-semibold text-foreground">
             How do I…
           </h2>
-          <HelpTopicList topics={helpTopicsForRole(role, storePath !== null)} />
+          <HelpTopicList
+            topics={helpTopicsForRole(role, storePath !== null, storeKind)}
+            groups={helpGroupsFor(storeKind)}
+          />
         </section>
 
         <section aria-labelledby="help-contact-heading" className="text-sm text-muted-foreground">

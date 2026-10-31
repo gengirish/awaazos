@@ -19,6 +19,8 @@ export type StorefrontClientProps = {
   initialPublished: boolean;
   hasUpiId: boolean;
   availableItemCount: number;
+  /** "Menu" / "Products": the screen the empty-store notice links to (lib/store-vocabulary.ts). */
+  catalogueTitle: string;
 };
 
 export function StorefrontClient({
@@ -26,6 +28,7 @@ export function StorefrontClient({
   initialPublished,
   hasUpiId,
   availableItemCount,
+  catalogueTitle,
 }: StorefrontClientProps) {
   const [published, setPublished] = useState(initialPublished);
   const [copied, setCopied] = useState(false);
@@ -141,7 +144,7 @@ export function StorefrontClient({
         <Notice tone="warning" icon>
           Your store is live but has nothing on sale. Add items so customers see something.{" "}
           <Link href="/menu" className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
-            Go to Menu
+            Go to {catalogueTitle}
           </Link>
         </Notice>
       ) : null}

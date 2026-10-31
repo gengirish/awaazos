@@ -16,7 +16,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Online orders · Settings · AwaazOS" };
 
 export default async function OrdersSettingsPage() {
-  const { vendor, isOwner } = await requireSettingsContext();
+  const { vendor, isOwner, storeKind, vocab } = await requireSettingsContext();
 
   const settings = await prisma.vendorSettings.findUnique({
     where: { vendorId: vendor.id },
@@ -36,10 +36,10 @@ export default async function OrdersSettingsPage() {
     <>
       <SettingsPageHeader
         title="Online orders"
-        description="Let customers order your everyday menu from your store page, any time. No Drop needed."
+        description={`Let customers order your everyday ${vocab.catalogue} from your store page, any time. No Drop needed.`}
       />
       <div className="space-y-4">
-        <SettingsCard title="Order from menu">
+        <SettingsCard title={vocab.catalogueOrdersTitle}>
           <MenuOrdersClient
             slug={vendor.slug}
             initialAcceptMenuOrders={settings?.acceptMenuOrders ?? false}
@@ -47,6 +47,7 @@ export default async function OrdersSettingsPage() {
             initialDeliveryFeePaise={settings?.menuDeliveryFeePaise ?? 0}
             initialPickupNote={settings?.menuPickupNote ?? null}
             isOwner={isOwner}
+            storeKind={storeKind}
           />
         </SettingsCard>
 

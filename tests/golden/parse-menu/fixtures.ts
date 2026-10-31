@@ -11,6 +11,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
 
+import { isValidMenuUnit } from "@/lib/menu-unit";
 import type { ExistingMenuItem } from "@/lib/parse-menu";
 import type { MenuDraft, MenuDraftItem } from "@/lib/parse-menu-types";
 import { MENU_BULK_MAX_ITEMS, MENU_MAX_PRICE_PAISE } from "@/lib/zod-menu";
@@ -26,6 +27,8 @@ const expectedItemSchema = z
     priceInPaise: z.number().int().positive().max(MENU_MAX_PRICE_PAISE).optional(),
     priceSpoken: z.boolean().optional(),
     category: z.string().min(1).max(80).optional(),
+    /** Pack size the draft row must carry ("250 g"); null = none. New items only. */
+    unit: z.string().min(1).nullable().optional(),
   })
   .strict();
 
@@ -132,6 +135,7 @@ export function validateFixtures(fixtures: MenuFixture[], menu: GoldenMenuItem[]
         if (item.category !== undefined && item.category !== m.category) {
           errors.push(`${fx.id}: "${item.name}" existing items keep their category (${m.category})`);
         }
+        if (item.unit) errors.push(`${fx.id}: "${item.name}" existing items never get a spoken unit`);
       } else {
         if (item.action && item.action !== "create") {
           errors.push(`${fx.id}: "${item.name}" is ${item.action} without an existingMenuItemId`);
@@ -141,6 +145,9 @@ export function validateFixtures(fixtures: MenuFixture[], menu: GoldenMenuItem[]
         }
         if (item.priceSpoken === false && item.priceInPaise !== undefined) {
           errors.push(`${fx.id}: "${item.name}" new dish without a spoken price can't expect a price`);
+        }
+        if (item.unit && !isValidMenuUnit(item.unit)) {
+          errors.push(`${fx.id}: "${item.name}" unit "${item.unit}" isn't one lib/menu-unit.ts accepts`);
         }
       }
       if (item.priceSpoken === false && item.action === "update_price") {
@@ -172,7 +179,7 @@ export function compareMenuDraft(expected: MenuFixture["expected"], draft: MenuD
       continue;
     }
     used.add(row);
-    for (const k of ["action", "existingMenuItemId", "priceInPaise", "priceSpoken", "category"] as const) {
+    for (const k of ["action", "existingMenuItemId", "priceInPaise", "priceSpoken", "category", "unit"] as const) {
       if (want[k] !== undefined && row[k] !== want[k]) {
         problems.push(`items[${want.name}].${k}: expected ${JSON.stringify(want[k])}, got ${JSON.stringify(row[k])}`);
       }

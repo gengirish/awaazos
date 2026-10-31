@@ -46,6 +46,7 @@ describe("defaultDropTitle", () => {
   it("names a new drop after its cooking day", () => {
     expect(defaultDropTitle("2026-10-17")).toBe("Saturday menu");
     expect(defaultDropTitle("2026-10-18")).toBe("Sunday menu");
+    expect(defaultDropTitle("2026-10-17", "goods")).toBe("Saturday batch");
   });
 
   it("is empty while the date input is cleared or invalid", () => {

@@ -4,9 +4,13 @@ import Link from "next/link";
 
 import { Notice } from "@/components/ui/notice";
 import { LAST_PAYMENT_METHOD_ERROR, type PaymentGuardBlocker } from "@/lib/payment-guard";
+import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
 
-export const LAST_PAYMENT_METHOD_MESSAGE =
-  "Customers can order online right now (Order from menu / an open drop), so keep at least one way to pay. Turn off Order from menu in Settings → Online orders or close the drop first.";
+/** Why the last way to pay can't go, naming the setting as this store's Settings does. */
+export function lastPaymentMethodMessage(kind: StoreKind = "food"): string {
+  const setting = vocabularyForKind(kind).catalogueOrdersTitle;
+  return `Customers can order online right now (${setting} / an open drop), so keep at least one way to pay. Turn off ${setting} in Settings → Online orders or close the drop first.`;
+}
 
 const LINKS: Record<PaymentGuardBlocker, { href: string; text: string }> = {
   menu_orders: { href: "/settings/orders", text: "Go to Online orders" },
@@ -26,12 +30,20 @@ export function lastPaymentMethodBlockersFrom(status: number, body: unknown): Pa
 }
 
 /** The server's refusal, shown inline under a payment control (e.g. from a stale tab). */
-export function LastPaymentMethodNotice({ id, blockers }: { id?: string; blockers: PaymentGuardBlocker[] }) {
+export function LastPaymentMethodNotice({
+  id,
+  blockers,
+  storeKind,
+}: {
+  id?: string;
+  blockers: PaymentGuardBlocker[];
+  storeKind: StoreKind;
+}) {
   // No blockers listed: show both ways out.
   const shown: PaymentGuardBlocker[] = blockers.length ? blockers : ["menu_orders", "open_drop"];
   return (
     <Notice id={id} role="alert" icon>
-      <p>{LAST_PAYMENT_METHOD_MESSAGE}</p>
+      <p>{lastPaymentMethodMessage(storeKind)}</p>
       <div className="flex flex-wrap gap-x-4">
         {shown.map((b) => (
           <Link

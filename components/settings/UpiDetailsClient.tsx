@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import { LastPaymentMethodNotice, lastPaymentMethodBlockersFrom } from "@/components/settings/LastPaymentMethodNotice";
 import { Notice } from "@/components/ui/notice";
 import type { PaymentGuardBlocker } from "@/lib/payment-guard";
+import type { StoreKind } from "@/lib/store-vocabulary";
 import { isValidUpiId, normalizeUpiId, UPI_ID_FORMAT_MESSAGE } from "@/lib/upi";
 import { cn } from "@/lib/utils";
 
@@ -20,6 +21,8 @@ export type UpiDetailsClientProps = {
   /** Current pay-on-delivery setting: decides whether removing the UPI ID needs a warning. */
   acceptPayOnDelivery: boolean;
   isOwner: boolean;
+  /** Names the everyday-orders setting in the "last way to pay" notice. */
+  storeKind: StoreKind;
   /** Told after a successful save with the stored UPI ID (null when removed). */
   onSaved?: (upiId: string | null) => void;
 };
@@ -34,6 +37,7 @@ export function UpiDetailsClient({
   initialUpiName,
   acceptPayOnDelivery,
   isOwner,
+  storeKind,
   onSaved,
 }: UpiDetailsClientProps) {
   const ids = useId();
@@ -194,7 +198,7 @@ export function UpiDetailsClient({
         </Notice>
       ) : null}
 
-      {serverBlock ? <LastPaymentMethodNotice blockers={serverBlock} /> : null}
+      {serverBlock ? <LastPaymentMethodNotice blockers={serverBlock} storeKind={storeKind} /> : null}
 
       {isOwner && (
         <div className="flex flex-wrap items-center gap-3">

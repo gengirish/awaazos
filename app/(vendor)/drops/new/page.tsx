@@ -5,6 +5,7 @@ import { DropForm } from "@/components/drops/DropForm";
 import { defaultCutoffFor, istTomorrowYmd } from "@/lib/drops-builder";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
 import type { DropUpsertInput } from "@/lib/zod-drops";
 
 export const dynamic = "force-dynamic";
@@ -13,11 +14,13 @@ export default async function NewDropPage() {
   let vendorId: string;
   let vendorSlug: string;
   let isOwner: boolean;
+  let vocab: StoreVocabulary;
   try {
     const ctx = await requireVendorRole("MANAGER");
     vendorId = ctx.vendor.id;
     vendorSlug = ctx.vendor.slug;
     isOwner = ctx.staff.role === "OWNER";
+    vocab = storeVocabulary(ctx.vendor.stallType);
   } catch (e) {
     if (e instanceof AuthError) redirect(e.status === 403 ? "/pos" : "/sign-in");
     throw e;
@@ -61,7 +64,9 @@ export default async function NewDropPage() {
       <header className="mx-auto mb-6 flex max-w-2xl items-center justify-between gap-3">
         <div>
           <h1 className="font-display text-2xl font-semibold text-foreground">New drop</h1>
-          <p className="text-sm text-muted-foreground">Pick what you&apos;re cooking and when customers can order.</p>
+          <p className="text-sm text-muted-foreground">
+            Pick what you&apos;re {vocab.kind === "food" ? "cooking" : "selling"} and when customers can order.
+          </p>
         </div>
         <Link
           href="/drops"
@@ -76,6 +81,7 @@ export default async function NewDropPage() {
           initial={initial}
           voiceLang={settings?.voiceLang ?? "en-IN"}
           isOwner={isOwner}
+          vocab={vocab}
           openFlow={{ storePublished: settings?.publishStorefront ?? false, storePath: `/s/${vendorSlug}` }}
         />
       </main>

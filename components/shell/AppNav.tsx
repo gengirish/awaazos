@@ -9,9 +9,10 @@ import { toast } from "sonner";
 
 import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
 import { InstallRailButton, InstallSheetRow } from "@/components/pwa/InstallPrompt";
-import { APP_NAV_ICONS as ICONS } from "@/components/shell/nav-icons";
+import { appNavIcon } from "@/components/shell/nav-icons";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { appNavItemsForRole, appTabBarForRole, isAppNavItemActive } from "@/lib/app-nav";
+import type { StoreKind } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
 export type AppNavProps = {
@@ -22,6 +23,8 @@ export type AppNavProps = {
   vendorName: string;
   /** Public storefront path (`/s/<slug>`); null when the store isn't published. */
   storePath: string | null;
+  /** What the store sells; names the `/menu` destination (lib/store-vocabulary.ts). */
+  storeKind: StoreKind;
 };
 
 const FOCUS_RING =
@@ -81,12 +84,12 @@ async function shareStoreLink(storePath: string, vendorName: string): Promise<vo
  * The bar's height is `--app-tabbar-h` (app/globals.css, `.app-shell`); it
  * sits above the cookie banner while that is showing.
  */
-export function AppTabBar({ role, vendorId, vendorName, storePath }: AppNavProps) {
+export function AppTabBar({ role, vendorId, vendorName, storePath, storeKind }: AppNavProps) {
   const pathname = usePathname() ?? "";
   const [moreOpen, setMoreOpen] = useState(false);
 
   // `storePath` is only set for a published store.
-  const { tabs, more } = appTabBarForRole(role, storePath !== null);
+  const { tabs, more } = appTabBarForRole(role, storePath !== null, storeKind);
   const moreActive = more.some((i) => isAppNavItemActive(i.href, pathname));
 
   // A link in the sheet navigates: close it once the route has changed.
@@ -103,7 +106,7 @@ export function AppTabBar({ role, vendorId, vendorName, storePath }: AppNavProps
       <ul className="mx-auto flex h-full max-w-lg items-stretch">
         {tabs.map((item) => {
           const active = isAppNavItemActive(item.href, pathname);
-          const Icon = ICONS[item.id];
+          const Icon = appNavIcon(item.id, storeKind);
           return (
             <li key={item.id} className="min-w-0 flex-1">
               <Link
@@ -141,7 +144,7 @@ export function AppTabBar({ role, vendorId, vendorName, storePath }: AppNavProps
                 <ul>
                   {more.map((item) => {
                     const active = isAppNavItemActive(item.href, pathname);
-                    const Icon = ICONS[item.id];
+                    const Icon = appNavIcon(item.id, storeKind);
                     return (
                       <li key={item.id}>
                         <Link
@@ -222,9 +225,9 @@ export function AppTabBar({ role, vendorId, vendorName, storePath }: AppNavProps
  * "More" here), with Live store and Sign out at the foot. Width is
  * `--app-rail-w` (app/globals.css, `.app-shell`).
  */
-export function AppRail({ role, vendorId, vendorName, storePath }: AppNavProps) {
+export function AppRail({ role, vendorId, vendorName, storePath, storeKind }: AppNavProps) {
   const pathname = usePathname() ?? "";
-  const items = appNavItemsForRole(role);
+  const items = appNavItemsForRole(role, storeKind);
 
   return (
     <nav
@@ -236,7 +239,7 @@ export function AppRail({ role, vendorId, vendorName, storePath }: AppNavProps) 
       <ul className="flex-1 space-y-1 overflow-y-auto px-1.5 py-2">
         {items.map((item) => {
           const active = isAppNavItemActive(item.href, pathname);
-          const Icon = ICONS[item.id];
+          const Icon = appNavIcon(item.id, storeKind);
           return (
             <li key={item.id}>
               <Link

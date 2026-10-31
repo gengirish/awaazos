@@ -18,13 +18,13 @@ const features = [
     icon: CalendarClock,
     title: "Drops with a cut-off",
     description:
-      "Sell a batch ahead of time: Saturday bakes, order by Friday 9 pm. Ordering closes by itself at the cut-off.",
+      "Sell a batch ahead of time: Saturday bakes or festive gift boxes, order by Friday 9 pm. Ordering closes by itself at the cut-off.",
   },
   {
     icon: Link2,
     title: "Store link for your bio",
     description:
-      "One link with your banner, logo, open drops and everyday menu. Put it in your bio or send it on WhatsApp, so you stop answering “Menu?” in every chat.",
+      "One link with your banner, logo, open drops and everyday menu or product list. Put it in your bio or send it on WhatsApp, so you stop answering “Price?” in every chat.",
   },
   {
     icon: PackageCheck,
@@ -42,12 +42,12 @@ const features = [
     icon: ClipboardList,
     title: "One orders board",
     description:
-      "Every order from every drop and your menu in one list. Confirm, mark paid and mark delivered, one by one or several at once.",
+      "Every order from every drop and your everyday list in one place. Confirm, mark paid and mark delivered, one by one or several at once.",
   },
   {
     icon: Printer,
-    title: "Prep sheet",
-    description: "A cook list and a delivery list for each drop, ready to print before you start cooking.",
+    title: "Prep sheet or packing list",
+    description: "What to make or pack and a delivery list for each drop, ready to print before you start.",
   },
   {
     icon: ImageIcon,
@@ -81,7 +81,7 @@ export function Features() {
           From the first order to the handover
         </h2>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          Built for kitchens that sell on Instagram and WhatsApp: bakes, meal boxes, snacks and sweets.
+          Built for home sellers on Instagram and WhatsApp: bakes, meal boxes and sweets, and herbal teas, wellness products, candles and crafts too.
         </p>
         <div className="mt-10 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
           {features.map((f) => {

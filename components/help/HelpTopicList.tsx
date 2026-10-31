@@ -6,7 +6,7 @@ import { ChevronRight, Lock, Search } from "lucide-react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { HELP_GROUPS, matchesHelpQuery, type ResolvedHelpTopic } from "@/lib/help-guide";
+import { matchesHelpQuery, type HelpGroupId, type ResolvedHelpTopic } from "@/lib/help-guide";
 
 /** "More › Settings › Payments" on a phone, "Settings › Payments" from md up (the rail has no More). */
 function WherePath({ topic }: { topic: ResolvedHelpTopic }) {
@@ -21,19 +21,26 @@ function WherePath({ topic }: { topic: ResolvedHelpTopic }) {
 
 /**
  * The "How do I…" list of the Help page, with a search box that filters it in
- * the browser. The topics arrive already trimmed to the viewer's role.
+ * the browser. The topics arrive already trimmed to the viewer's role, and
+ * topics and group titles already in the store's words (`helpGroupsFor`).
  */
-export function HelpTopicList({ topics }: { topics: ResolvedHelpTopic[] }) {
+export function HelpTopicList({
+  topics,
+  groups: groupList,
+}: {
+  topics: ResolvedHelpTopic[];
+  groups: { id: HelpGroupId; title: string }[];
+}) {
   const [query, setQuery] = useState("");
   const inputId = useId();
 
   const groups = useMemo(() => {
     const matching = topics.filter((topic) => matchesHelpQuery(topic, query));
-    return HELP_GROUPS.map((group) => ({
+    return groupList.map((group) => ({
       ...group,
       topics: matching.filter((topic) => topic.group === group.id),
     })).filter((group) => group.topics.length > 0);
-  }, [topics, query]);
+  }, [topics, groupList, query]);
 
   const count = groups.reduce((n, group) => n + group.topics.length, 0);
   const searching = query.trim().length > 0;

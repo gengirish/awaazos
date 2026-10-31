@@ -293,6 +293,24 @@ describe("postProcessDropDraft", () => {
       ]),
     );
   });
+
+  it("words the warnings for a product store", () => {
+    const d = postProcessDropDraft(
+      input({ day: { kind: "date", date: "2026-10-01" }, items: [{ menuItemId: "mi_thepla", spokenName: "x", priceRupees: -5 }] }),
+      MENU,
+      NOW,
+      "haiku",
+      "goods",
+    );
+    expect(d.warnings).toEqual(
+      expect.arrayContaining([
+        "The day is in the past — please pick a date",
+        "Couldn't understand the price for Methi Thepla — used the usual price",
+      ]),
+    );
+    const empty = postProcessDropDraft(input({ items: [] }), MENU, NOW, "haiku", "goods");
+    expect(empty.warnings).toContain("No products recognised — please pick items below");
+  });
 });
 
 describe("shouldEscalateDrop", () => {

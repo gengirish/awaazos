@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { LastPaymentMethodNotice, lastPaymentMethodBlockersFrom } from "@/components/settings/LastPaymentMethodNotice";
 import type { PaymentGuardBlocker } from "@/lib/payment-guard";
+import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
 
 /** Whether storefront buyers may pay on delivery instead of upfront by UPI. */
 export type PayOnDeliveryClientProps = {
@@ -12,9 +13,15 @@ export type PayOnDeliveryClientProps = {
   hasUpiId: boolean;
   /** Told after a successful save, so sibling payment controls stay in step. */
   onChange?: (next: boolean) => void;
+  storeKind: StoreKind;
 };
 
-export function PayOnDeliveryClient({ initialAcceptPayOnDelivery, hasUpiId, onChange }: PayOnDeliveryClientProps) {
+export function PayOnDeliveryClient({
+  initialAcceptPayOnDelivery,
+  hasUpiId,
+  onChange,
+  storeKind,
+}: PayOnDeliveryClientProps) {
   const [payOnDelivery, setPayOnDelivery] = useState(initialAcceptPayOnDelivery);
   const [pending, startTransition] = useTransition();
   // Server refused to turn off the last payment method (409 last_payment_method).
@@ -68,7 +75,7 @@ export function PayOnDeliveryClient({ initialAcceptPayOnDelivery, hasUpiId, onCh
           </label>
           <p className="text-xs text-muted-foreground">
             {payOnDelivery
-              ? "Customers can order now and pay cash or UPI when the food arrives."
+              ? `Customers can order now and pay cash or UPI when the ${vocabularyForKind(storeKind).goods} arrives.`
               : "Customers must pay by UPI when they place an order."}
           </p>
           {!payOnDelivery && !hasUpiId ? (
@@ -102,7 +109,7 @@ export function PayOnDeliveryClient({ initialAcceptPayOnDelivery, hasUpiId, onCh
           </span>
         </button>
       </div>
-      {serverBlock ? <LastPaymentMethodNotice id="pay-on-delivery-blocker" blockers={serverBlock} /> : null}
+      {serverBlock ? <LastPaymentMethodNotice id="pay-on-delivery-blocker" blockers={serverBlock} storeKind={storeKind} /> : null}
     </div>
   );
 }

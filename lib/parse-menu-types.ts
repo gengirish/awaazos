@@ -6,7 +6,7 @@
  *
  * Nothing in a draft is saved. The vendor reviews it and sends the rows they
  * keep to `POST /api/menu/bulk` as `{ name, priceInPaise, category, emoji,
- * aliases, existingMenuItemId }`. Money is integer paise.
+ * aliases, unit, existingMenuItemId }`. Money is integer paise.
  */
 
 /**
@@ -36,6 +36,12 @@ export type MenuDraftItem = {
   category: string;
   /** Existing item: its current emoji. New item: suggestEmoji(name) ?? "🍽️". */
   emoji: string;
+  /**
+   * New item: the pack size said with it ("250 g", "60 capsules"), checked by
+   * lib/menu-unit.ts; null when none was said or it wasn't a usable size.
+   * Existing item: always null (a voice price update never changes the unit).
+   */
+  unit: string | null;
   /** Existing item: its current aliases. New item: suggestAliases(name) + spoken variants. */
   aliases: string[];
   action: MenuDraftAction;

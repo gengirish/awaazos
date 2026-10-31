@@ -32,7 +32,9 @@ import {
 } from "@/components/ui/responsive-dialog";
 import { paiseToRupees } from "@/lib/currency";
 import { suggestEmoji } from "@/lib/menu-suggestions";
+import { isValidMenuUnit, MENU_UNIT_MAX, MENU_UNIT_MESSAGE, normaliseMenuUnit } from "@/lib/menu-unit";
 import { categoryOptions, paiseToRupeeInput, parseRupeeInput } from "@/lib/menu-voice";
+import { vocabularyForKind, type StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 import { menuItemCreateInputSchema, menuItemUpdateSchema } from "@/lib/zod-menu";
 
@@ -60,7 +62,42 @@ export const FOOD_EMOJIS = [
   "🥞",
 ] as const;
 
+/** The starter grid for a store that doesn't sell food (lib/store-vocabulary.ts). */
+export const GOODS_EMOJIS = [
+  "🛍️",
+  "📦",
+  "🎁",
+  "🌿",
+  "🍃",
+  "🌸",
+  "🫙",
+  "🍯",
+  "🫖",
+  "🧴",
+  "🧼",
+  "💊",
+  "🕯️",
+  "🪔",
+  "🧘",
+  "💆",
+  "👕",
+  "👜",
+  "💍",
+  "✨",
+] as const;
+
 const DEFAULT_EMOJI = "🍽️";
+const DEFAULT_GOODS_EMOJI = "🛍️";
+
+/** The emoji grid this store is offered. */
+export function emojiChoices(vocab: StoreVocabulary): readonly string[] {
+  return vocab.foodArt ? FOOD_EMOJIS : GOODS_EMOJIS;
+}
+
+/** The emoji a new row gets when nothing suggests one. */
+export function defaultEmoji(vocab: StoreVocabulary): string {
+  return vocab.foodArt ? DEFAULT_EMOJI : DEFAULT_GOODS_EMOJI;
+}
 
 /** Mirrors the server-side allowlist in app/api/menu/[id]/image/route.ts. */
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
@@ -76,6 +113,14 @@ const menuItemFormSchema = menuItemCreateInputSchema.extend({
     const parsed = parseRupeeInput(value);
     if ("error" in parsed) ctx.addIssue({ code: z.ZodIssueCode.custom, message: parsed.error });
   }),
+  // The typed text; normalised (blank → null) on submit, same rule as the API.
+  unit: z
+    .string()
+    .optional()
+    .refine((value) => {
+      const unit = normaliseMenuUnit(value);
+      return unit === null || isValidMenuUnit(unit);
+    }, MENU_UNIT_MESSAGE),
 });
 
 export type MenuItemFormValues = z.infer<typeof menuItemFormSchema>;
@@ -92,6 +137,7 @@ const defaultCreateValues: MenuItemFormValues = {
   isPopular: false,
   isAvailable: true,
   showOnline: true,
+  unit: "",
 };
 
 type MenuItemFormProps = {
@@ -103,7 +149,11 @@ type MenuItemFormProps = {
   defaultName?: string;
   /** Categories already on this vendor's menu, offered as suggestions. */
   categories?: readonly string[];
+  /** The store's words (lib/store-vocabulary.ts); a kitchen when not given. */
+  vocab?: StoreVocabulary;
 };
+
+const FOOD_VOCAB = vocabularyForKind("food");
 
 const NO_CATEGORIES: readonly string[] = [];
 
@@ -114,7 +164,11 @@ export function MenuItemForm({
   onSaved,
   defaultName = "",
   categories = NO_CATEGORIES,
+  vocab = FOOD_VOCAB,
 }: MenuItemFormProps) {
+  const baseEmoji = defaultEmoji(vocab);
+  const starterEmojis = emojiChoices(vocab);
+  const itemNoun = vocab.kind === "food" ? "Menu item" : vocab.Item;
   const isEdit = Boolean(item);
   const uid = useId();
   const categoryListId = `${uid}-categories`;
@@ -166,17 +220,18 @@ export function MenuItemForm({
         isPopular: item.isPopular,
         isAvailable: item.isAvailable,
         showOnline: item.showOnline,
+        unit: item.unit ?? "",
       });
     } else {
       const suggestion = defaultName ? suggestEmoji(defaultName) : null;
       form.reset({
         ...defaultCreateValues,
         name: defaultName,
-        emoji: suggestion ?? DEFAULT_EMOJI,
+        emoji: suggestion ?? baseEmoji,
       });
       setEmojiSuggested(suggestion !== null);
     }
-  }, [open, item, form, defaultName]);
+  }, [open, item, form, defaultName, baseEmoji]);
 
   function validateImage(file: File): string | null {
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return "Use a JPEG, PNG or WebP photo";
@@ -266,6 +321,7 @@ export function MenuItemForm({
       isPopular: values.isPopular,
       isAvailable: values.isAvailable,
       showOnline: values.showOnline,
+      unit: normaliseMenuUnit(values.unit),
     };
     try {
       if (isEdit && item) {
@@ -280,7 +336,7 @@ export function MenuItemForm({
           toast.error(typeof json.error === "string" ? json.error : "Could not update item");
           return;
         }
-        toast.success("Menu item updated");
+        toast.success(`${itemNoun} updated`);
       } else {
         const res = await fetch("/api/menu", {
           method: "POST",
@@ -292,7 +348,7 @@ export function MenuItemForm({
           toast.error(typeof json.error === "string" ? json.error : "Could not create item");
           return;
         }
-        toast.success(addAnother ? `${values.name} added. Add the next one.` : "Menu item created");
+        toast.success(addAnother ? `${values.name} added. Add the next one.` : `${itemNoun} created`);
         // The item exists now, so the held photo finally has an id to attach to.
         // A failed upload has already toasted; the item itself is still saved.
         if (pendingFile && typeof json?.data?.id === "string") {
@@ -300,7 +356,7 @@ export function MenuItemForm({
         }
         if (addAnother) {
           // Same category again: sellers add a whole section in one go.
-          form.reset({ ...defaultCreateValues, category: values.category?.trim() ?? "" });
+          form.reset({ ...defaultCreateValues, emoji: baseEmoji, category: values.category?.trim() ?? "" });
           setPendingFile(null);
           setEmojiPicked(false);
           setEmojiSuggested(false);
@@ -325,7 +381,7 @@ export function MenuItemForm({
         aria-describedby="menu-item-form-desc"
       >
         <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle id="menu-item-form-title">{isEdit ? "Edit item" : "Add menu item"}</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle id="menu-item-form-title">{isEdit ? "Edit item" : `Add ${itemNoun.toLowerCase()}`}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription id="menu-item-form-desc">
             Enter the price in rupees.
           </ResponsiveDialogDescription>
@@ -343,13 +399,13 @@ export function MenuItemForm({
                     <FormControl>
                       <Input
                         autoComplete="off"
-                        placeholder="e.g. Bhel puri"
+                        placeholder={vocab.kind === "food" ? "e.g. Bhel puri" : "e.g. Ashwagandha powder"}
                         {...field}
                         onChange={(e) => {
                           field.onChange(e);
                           if (isEdit || emojiPicked) return;
                           const suggestion = suggestEmoji(e.target.value);
-                          form.setValue("emoji", suggestion ?? DEFAULT_EMOJI);
+                          form.setValue("emoji", suggestion ?? baseEmoji);
                           setEmojiSuggested(suggestion !== null);
                         }}
                       />
@@ -368,6 +424,28 @@ export function MenuItemForm({
                       {/* The typed text is kept as it is ("19." must survive); it becomes paise on submit. */}
                       <Input inputMode="decimal" autoComplete="off" placeholder="e.g. 40 or 19.50" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="unit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{vocab.kind === "food" ? "Unit (optional)" : "Pack size (optional)"}</FormLabel>
+                    <FormControl>
+                      <Input
+                        autoComplete="off"
+                        maxLength={MENU_UNIT_MAX}
+                        placeholder={vocab.kind === "food" ? "e.g. kg, piece, box" : "e.g. 100 g, 60 capsules, 500 ml"}
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Shown after the price on your store page, like {vocab.kind === "food" ? "₹1,200 / kg" : "₹399 / 100 g"}.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -472,7 +550,9 @@ export function MenuItemForm({
                         <option key={c} value={c} />
                       ))}
                     </datalist>
-                    <FormDescription>Pick one or type your own, like Cakes or Thalis.</FormDescription>
+                    <FormDescription>
+                      Pick one or type your own, like {vocab.kind === "food" ? "Cakes or Thalis" : "Herbal teas or Oils"}.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -510,7 +590,7 @@ export function MenuItemForm({
                         <FormControl>
                           <Input
                             autoComplete="off"
-                            placeholder="bhel, spicy bhel"
+                            placeholder={vocab.kind === "food" ? "bhel, spicy bhel" : "ashwagandha, ashwa powder"}
                             {...field}
                             value={field.value ?? ""}
                           />
@@ -531,14 +611,14 @@ export function MenuItemForm({
                             autoComplete="off"
                             autoCapitalize="none"
                             className="h-11"
-                            placeholder="quiche, paneer"
+                            placeholder={vocab.kind === "food" ? "quiche, paneer" : "herbal, gift"}
                             {...field}
                             value={field.value ?? ""}
                           />
                         </FormControl>
                         <FormDescription>
                           Comma-separated labels of your own. Offers use them to pick items, for example
-                          10% off 4 or more items tagged quiche.
+                          10% off 4 or more items tagged {vocab.kind === "food" ? "quiche" : "herbal"}.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>
@@ -565,9 +645,9 @@ export function MenuItemForm({
                       // A suggested (or previously saved) emoji outside the starter
                       // grid still needs a visible, selected button.
                       const options: string[] =
-                        field.value && !(FOOD_EMOJIS as readonly string[]).includes(field.value)
-                          ? [field.value, ...FOOD_EMOJIS]
-                          : [...FOOD_EMOJIS];
+                        field.value && !starterEmojis.includes(field.value)
+                          ? [field.value, ...starterEmojis]
+                          : [...starterEmojis];
                       return (
                         <FormItem>
                           <FormLabel>Emoji</FormLabel>
@@ -575,7 +655,7 @@ export function MenuItemForm({
                             <div
                               className="grid grid-cols-5 gap-2 sm:grid-cols-10"
                               role="group"
-                              aria-label="Pick a food emoji"
+                              aria-label={vocab.foodArt ? "Pick a food emoji" : "Pick an emoji"}
                             >
                               {options.map((emo) => (
                                 <button

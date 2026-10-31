@@ -15,6 +15,7 @@
 import { paiseToRupees } from "@/lib/currency";
 import { isValidYmd, shiftOrderWindowDates } from "@/lib/drops-builder";
 import type { DropDraft } from "@/lib/parse-drop-types";
+import { countItems, vocabularyForKind, type StoreVocabulary } from "@/lib/store-vocabulary";
 import type { DropUpsertInput } from "@/lib/zod-drops";
 
 // ─── Form state (owned by components/drops/DropForm.tsx) ────────────
@@ -278,10 +279,14 @@ export function mergeDropDraft(
 }
 
 /** "Filled 6 fields and 3 dishes — check and save". */
-export function voiceSummary(fieldCount: number, dishCount: number): string {
+export function voiceSummary(
+  fieldCount: number,
+  dishCount: number,
+  vocab: StoreVocabulary = vocabularyForKind("food"),
+): string {
   const parts: string[] = [];
   if (fieldCount > 0) parts.push(`${fieldCount} ${fieldCount === 1 ? "field" : "fields"}`);
-  if (dishCount > 0) parts.push(`${dishCount} ${dishCount === 1 ? "dish" : "dishes"}`);
+  if (dishCount > 0) parts.push(countItems(vocab, dishCount));
   if (parts.length === 0) return "Nothing to fill from that — try again or fill the form below";
   return `Filled ${parts.join(" and ")} — check and save`;
 }

@@ -17,6 +17,7 @@ import { useOnline } from "@/hooks/useOnline";
 import { usePosOutbox } from "@/hooks/usePosOutbox";
 import { useCartStore } from "@/lib/cartStore";
 import type { PayTotals } from "@/lib/pos-totals";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { registerAppServiceWorker } from "@/lib/sw-client";
 
 export type PosShellProps = {
@@ -31,6 +32,8 @@ export type PosShellProps = {
   todaysRevenuePaise: number;
   /** ISO time the server rendered this page; shown as "menu as of" when offline. */
   renderedAt: string;
+  /** The store's words (lib/store-vocabulary.ts). */
+  vocab: StoreVocabulary;
 };
 
 export function PosShell({
@@ -39,6 +42,7 @@ export function PosShell({
   settings,
   todaysRevenuePaise,
   renderedAt,
+  vocab,
 }: PosShellProps) {
   const items = useCartStore((s) => s.items);
   const online = useOnline();
@@ -117,6 +121,7 @@ export function PosShell({
       <PosSyncStatus
         online={online}
         renderedAt={renderedAt}
+        vocab={vocab}
         pending={outbox.pending}
         failed={outbox.failed}
         needsSignIn={outbox.needsSignIn}
@@ -131,14 +136,14 @@ export function PosShell({
       >
         <div className="flex min-w-0 flex-col gap-5 md:gap-8">
           <VoiceOrderButton voiceLang={settings.voiceLang} />
-          <QuickAddGrid items={initialItems} />
+          <QuickAddGrid items={initialItems} vocab={vocab} />
         </div>
         <div
           id={POS_CART_ANCHOR_ID}
           tabIndex={-1}
           className="min-w-0 scroll-mt-4 focus:outline-hidden md:sticky md:top-6 md:max-h-[calc(100dvh-3rem)] md:overflow-y-auto"
         >
-          <OrderCart settings={cartSettings} onCollectPayment={onCollectPayment} />
+          <OrderCart settings={cartSettings} vocab={vocab} onCollectPayment={onCollectPayment} />
         </div>
       </main>
 
