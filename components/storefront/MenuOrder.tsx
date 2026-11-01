@@ -1,11 +1,11 @@
 "use client";
 
 import { MapPin, ShoppingBag, Sparkles, Truck } from "lucide-react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
 import { useCartHubEntry } from "@/components/storefront/CartHub";
+import { ItemPhoto } from "@/components/storefront/ItemPhoto";
 import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
 import {
   CartBar,
@@ -52,6 +52,8 @@ export type MenuOrderItem = {
   /** Selling unit ("kg", "piece"), shown after the price; null = none. */
   unit?: string | null;
   isPopular: boolean;
+  /** One line under the name; null = none. */
+  description?: string | null;
 };
 
 export type MenuOrderCategory = {
@@ -74,6 +76,8 @@ export type MenuOrderProps = {
   prefill?: BuyerPrefill | null;
   /** Offers live on menu orders (lib/offers.ts). Preview only; the server re-prices. */
   offers?: readonly ResolvedOffer[];
+  /** Rows for a kitchen's menu; a photo gallery (two columns, tap to enlarge) for goods. */
+  layout?: "list" | "gallery";
 };
 
 const NO_OFFERS: readonly ResolvedOffer[] = [];
@@ -90,6 +94,7 @@ export function MenuOrder(props: MenuOrderProps) {
     whatsapp,
     prefill,
     offers = NO_OFFERS,
+    layout = "list",
   } = props;
   const router = useRouter();
 
@@ -189,6 +194,19 @@ export function MenuOrder(props: MenuOrderProps) {
     }
   }
 
+  // Price (sale-aware, lib/offers.ts), unit and the Popular badge: the same line in both layouts.
+  const priceLine = (item: MenuOrderItem) => (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+      <ItemPrice priceInPaise={item.priceInPaise} sale={salePriceFor(offers, item.id, item.priceInPaise)} unit={item.unit} />
+      {item.isPopular ? (
+        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
+          <Sparkles className="h-3 w-3" aria-hidden="true" />
+          Popular
+        </span>
+      ) : null}
+    </span>
+  );
+
   return (
     <div id="menu-order" className="scroll-mt-16">
       <div className="mb-6 rounded-2xl border border-primary/25 bg-linear-to-b from-primary/8 to-background px-4 py-3 text-sm">
@@ -227,57 +245,64 @@ export function MenuOrder(props: MenuOrderProps) {
               <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
               <span className="text-xs font-semibold text-muted-foreground">{items.length}</span>
             </div>
-            <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs">
-              {items.map((item) => (
-                <li
-                  key={item.id}
-                  id={menuItemAnchor(item.id)}
-                  className="flex scroll-mt-20 items-center gap-3 px-3 py-3 target:bg-primary/8 sm:gap-4 sm:px-4"
-                >
-                  {item.imageUrl ? (
-                    <Image
-                      src={item.imageUrl}
-                      alt=""
-                      width={72}
-                      height={72}
-                      className="h-18 w-18 shrink-0 rounded-xl object-cover ring-1 ring-border/60"
-                    />
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      className="flex h-18 w-18 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-3xl"
-                    >
-                      {item.emoji}
-                    </span>
-                  )}
-
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">
-                      {item.name}
-                    </span>
-                    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                      <ItemPrice
-                        priceInPaise={item.priceInPaise}
-                        sale={salePriceFor(offers, item.id, item.priceInPaise)}
-                        unit={item.unit}
-                      />
-                      {item.isPopular ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
-                          <Sparkles className="h-3 w-3" aria-hidden="true" />
-                          Popular
-                        </span>
+            <ul
+              className={
+                layout === "gallery"
+                  ? "grid grid-cols-2 gap-3 sm:grid-cols-3"
+                  : "divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs"
+              }
+            >
+              {items.map((item) =>
+                layout === "gallery" ? (
+                  <li
+                    key={item.id}
+                    id={menuItemAnchor(item.id)}
+                    className="flex scroll-mt-20 flex-col gap-2 rounded-2xl border border-border/60 bg-background p-2.5 shadow-xs target:bg-primary/8"
+                  >
+                    <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="tile" enlarge />
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">
+                        {item.name}
+                      </span>
+                      {item.description ? (
+                        <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
                       ) : null}
+                      {priceLine(item)}
                     </span>
-                  </span>
+                    <QtyStepper
+                      itemName={item.name}
+                      qty={cart[item.id] ?? 0}
+                      max={max}
+                      onChange={(q) => setQty(item.id, q)}
+                    />
+                  </li>
+                ) : (
+                  <li
+                    key={item.id}
+                    id={menuItemAnchor(item.id)}
+                    className="flex scroll-mt-20 items-center gap-3 px-3 py-3 target:bg-primary/8 sm:gap-4 sm:px-4"
+                  >
+                    <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="row" />
 
-                  <QtyStepper
-                    itemName={item.name}
-                    qty={cart[item.id] ?? 0}
-                    max={max}
-                    onChange={(q) => setQty(item.id, q)}
-                  />
-                </li>
-              ))}
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">
+                        {item.name}
+                      </span>
+                      {item.description ? (
+                        <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
+                      ) : null}
+                      {priceLine(item)}
+                    </span>
+
+                    <QtyStepper
+                      itemName={item.name}
+                      qty={cart[item.id] ?? 0}
+                      max={max}
+                      onChange={(q) => setQty(item.id, q)}
+                    />
+                  </li>
+                ),
+              )}
             </ul>
           </section>
         ))}

@@ -16,6 +16,10 @@ import { everydayMenuHiddenByDrops, STOREFRONT_MENU_ITEM_WHERE } from "@/lib/sto
  * URL shouldn't 404, but it must not confirm the stall exists either — the
  * generic card carries nothing derived from the slug).
  *
+ * The store logo (`Vendor.logoUrl`) sits top-right when it loads in time, and the
+ * tagline (`VendorSettings.tagline`) goes under the headline of the menu and
+ * browse variants.
+ *
  * Variants, in priority order: an open (or scheduled) drop with its items and
  * cut-off; else, with "Order from menu" on, up to four menu items offered
  * online (`isAvailable && showOnline`, popular first) and "Order online ·
@@ -46,8 +50,9 @@ async function loadCard(slug: string, now: Date) {
       id: true,
       name: true,
       city: true,
+      logoUrl: true,
       // "Order from menu" variant: only what the card draws.
-      settings: { select: { acceptMenuOrders: true, menuFulfilmentMode: true } },
+      settings: { select: { acceptMenuOrders: true, menuFulfilmentMode: true, tagline: true } },
       menuItems: {
         where: STOREFRONT_MENU_ITEM_WHERE,
         orderBy: [{ isPopular: "desc" }, { category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
@@ -87,7 +92,36 @@ async function loadCard(slug: string, now: Date) {
     !drop && !menuHidden && (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0
       ? { mode: vendor.settings?.menuFulfilmentMode ?? "PICKUP", items: vendor.menuItems }
       : null;
-  return { name: vendor.name, city: vendor.city, drop, menuOrdering };
+  return {
+    name: vendor.name,
+    city: vendor.city,
+    tagline: vendor.settings?.tagline ?? null,
+    logo: await logoDataUrl(vendor.logoUrl),
+    drop,
+    menuOrdering,
+  };
+}
+
+const LOGO_MAX_BYTES = 1_500_000;
+
+/**
+ * The store logo as a data URL for Satori, or null. Fetched here, inside the
+ * card's try/catch, so a slow or missing blob degrades to "no logo" rather than
+ * a broken image or a 500 half-way through the render. PNG / JPEG only.
+ */
+async function logoDataUrl(url: string | null): Promise<string | null> {
+  if (!url) return null;
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(2500) });
+    if (!res.ok) return null;
+    const type = (res.headers.get("content-type") ?? "").split(";")[0].trim();
+    if (type !== "image/png" && type !== "image/jpeg") return null;
+    const bytes = Buffer.from(await res.arrayBuffer());
+    if (bytes.byteLength === 0 || bytes.byteLength > LOGO_MAX_BYTES) return null;
+    return `data:${type};base64,${bytes.toString("base64")}`;
+  } catch {
+    return null;
+  }
 }
 
 function Brand() {
@@ -188,20 +222,37 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
   return new ImageResponse(
     (
       <Frame>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", fontSize: 30, color: C.primary, fontWeight: 700 }}>
-            {truncate(card.name, 48)}
-            {card.city ? ` · ${truncate(card.city, 24)}` : ""}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+            <div style={{ display: "flex", fontSize: 30, color: C.primary, fontWeight: 700 }}>
+              {truncate(card.name, 48)}
+              {card.city ? ` · ${truncate(card.city, 24)}` : ""}
+            </div>
+            {drop ? (
+              <div style={{ display: "flex", fontSize: 64, fontWeight: 700, marginTop: 8 }}>
+                {truncate(drop.title, 36)}
+              </div>
+            ) : (
+              <div style={{ display: "flex", fontSize: 64, fontWeight: 700, marginTop: 8 }}>
+                {menuOrdering ? "Order now" : "Browse the store"}
+              </div>
+            )}
+            {card.tagline && !drop ? (
+              <div style={{ display: "flex", fontSize: 30, color: C.muted, marginTop: 8 }}>
+                {truncate(card.tagline, 64)}
+              </div>
+            ) : null}
           </div>
-          {drop ? (
-            <div style={{ display: "flex", fontSize: 64, fontWeight: 700, marginTop: 8 }}>
-              {truncate(drop.title, 36)}
-            </div>
-          ) : (
-            <div style={{ display: "flex", fontSize: 64, fontWeight: 700, marginTop: 8 }}>
-              {menuOrdering ? "Order now" : "Browse the store"}
-            </div>
-          )}
+          {card.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Satori draws a plain <img>
+            <img
+              src={card.logo}
+              alt=""
+              width={128}
+              height={128}
+              style={{ width: 128, height: 128, borderRadius: 24, objectFit: "cover", marginLeft: 32 }}
+            />
+          ) : null}
         </div>
 
         {drop ? (

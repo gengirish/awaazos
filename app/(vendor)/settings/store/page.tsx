@@ -8,6 +8,7 @@ import { StoreDetailsClient } from "@/components/settings/StoreDetailsClient";
 import { StoreHandleClient } from "@/components/settings/StoreHandleClient";
 import { StoreImagesClient } from "@/components/settings/StoreImagesClient";
 import { StoreNameClient } from "@/components/settings/StoreNameClient";
+import { StoreTaglineClient } from "@/components/settings/StoreTaglineClient";
 import { StoreThemeClient } from "@/components/settings/StoreThemeClient";
 import { StorefrontClient } from "@/components/settings/StorefrontClient";
 import { listVendorCommunities } from "@/lib/community-server";
@@ -25,7 +26,7 @@ export default async function StoreSettingsPage() {
   const [settings, availableItemCount, communities] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: vendor.id },
-      select: { publishStorefront: true, fssaiNumber: true, instagramHandle: true, theme: true },
+      select: { publishStorefront: true, fssaiNumber: true, instagramHandle: true, theme: true, tagline: true },
     }),
     prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
     listVendorCommunities(vendor.id),
@@ -55,6 +56,17 @@ export default async function StoreSettingsPage() {
             initialCity={vendor.city}
             initialState={vendor.state}
             isOwner={isOwner}
+          />
+        </SettingsCard>
+        <SettingsCard title="Tagline" description="One line under your store name on your store page, and under your link when it is shared.">
+          <StoreTaglineClient
+            initialTagline={settings?.tagline ?? null}
+            isOwner={isOwner}
+            example={
+              storeKind === "food"
+                ? "e.g. Home-style Andhra meals, cooked fresh every morning"
+                : "e.g. Energised crystals and malas, made in Hyderabad"
+            }
           />
         </SettingsCard>
         <SettingsCard title="Banner & logo" description="Shown at the top of your store page.">

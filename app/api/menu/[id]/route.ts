@@ -6,7 +6,7 @@ import { rupeesToPaise } from "@/lib/currency";
 import { deduplicateSlug, generateSlug } from "@/lib/menu-suggestions";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
-import { menuItemUpdateSchema, parseAliasesCsv, parseTagsCsv } from "@/lib/zod-menu";
+import { menuItemUpdateSchema, normaliseMenuDescription, parseAliasesCsv, parseTagsCsv } from "@/lib/zod-menu";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -58,6 +58,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     // Storefront visibility only — the counter POS ignores it.
     if (body.showOnline !== undefined) data.showOnline = body.showOnline;
     if (body.unit !== undefined) data.unit = body.unit;
+    if (body.description !== undefined) data.description = normaliseMenuDescription(body.description);
     if (body.sortOrder !== undefined) data.sortOrder = body.sortOrder;
     // `null` clears the photo. The blob itself is removed by
     // DELETE /api/menu/[id]/image, which is the path the UI uses.

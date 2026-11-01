@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import { rupeesToPaise } from "@/lib/currency";
 import {
+  MENU_DESCRIPTION_MAX,
   menuItemCreateInputSchema,
   menuItemCreateSchema,
   menuItemUpdateSchema,
+  normaliseMenuDescription,
   parseAliasesCsv,
 } from "@/lib/zod-menu";
 
@@ -87,5 +89,31 @@ describe("menuItemUpdateSchema — showOnline", () => {
 
   it("defaults showOnline to true on create", () => {
     expect(menuItemCreateSchema.parse({ name: "Chai", priceInRupees: 10 }).showOnline).toBe(true);
+  });
+});
+
+describe("menu item description", () => {
+  it("normalises whitespace and newlines, blank is none", () => {
+    expect(normaliseMenuDescription("  8 mm Karungali beads,\n108 count  ")).toBe("8 mm Karungali beads, 108 count");
+    expect(normaliseMenuDescription("   ")).toBeNull();
+    expect(normaliseMenuDescription(undefined)).toBeNull();
+    expect(normaliseMenuDescription(null)).toBeNull();
+  });
+
+  it("create: optional, normalised, capped", () => {
+    expect(menuItemCreateSchema.parse({ name: "Mala", priceInRupees: 799 }).description).toBeNull();
+    expect(
+      menuItemCreateSchema.parse({ name: "Mala", priceInRupees: 799, description: " 108 beads " }).description,
+    ).toBe("108 beads");
+    expect(() =>
+      menuItemCreateSchema.parse({ name: "Mala", priceInRupees: 799, description: "x".repeat(MENU_DESCRIPTION_MAX + 1) }),
+    ).toThrow();
+  });
+
+  it("update: on its own is a change; null and blank both reach the route to clear it", () => {
+    expect(menuItemUpdateSchema.parse({ description: "108 beads" }).description).toBe("108 beads");
+    expect(menuItemUpdateSchema.parse({ description: null }).description).toBeNull();
+    expect(menuItemUpdateSchema.parse({ description: "" }).description).toBe("");
+    expect(() => menuItemUpdateSchema.parse({ description: "x".repeat(MENU_DESCRIPTION_MAX + 1) })).toThrow();
   });
 });
