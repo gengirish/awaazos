@@ -479,7 +479,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
             <ResponsiveDialogHeader>
               <ResponsiveDialogTitle>{editing ? "Edit offer" : "New offer"}</ResponsiveDialogTitle>
               <ResponsiveDialogDescription>
-                A percentage off when one order has enough of the right items. Only one offer applies to an order.
+                A percentage off. With a minimum of 1 it is a sale on each item; with more, a plan for orders with enough of the right items.
               </ResponsiveDialogDescription>
             </ResponsiveDialogHeader>
             <ResponsiveDialogBody>

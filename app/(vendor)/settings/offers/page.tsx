@@ -39,11 +39,11 @@ export default async function OffersSettingsPage() {
     <>
       <SettingsPageHeader
         title="Offers"
-        description="Give a percentage off when one order has enough of the right items, like a weekly plan."
+        description="Run a sale on some or all items, or give a percentage off when one order has enough of the right items, like a weekly plan."
       />
       <SettingsCard
         title="Your offers"
-        description="If an order fits more than one offer, the customer gets the bigger discount, never both."
+        description="Each item gets its best sale, so one order can use several sales. A plan is never added on top: the customer gets the sale prices or the plan, whichever saves more."
       >
         <OffersClient
           initialOffers={offers.map(offerToDto)}
