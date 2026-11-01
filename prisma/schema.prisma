@@ -81,6 +81,7 @@ model VendorSettings {
   // Opt-in: every visitor of /s/<slug> sees a WhatsApp chat link to whatsappNumber.
   showWhatsappOnStore      Boolean        @default(false)
   instagramHandle          String? // bare, lower-case (lib/instagram.ts); linked on the storefront
+  tagline                  String?        @db.VarChar(120) // One line under the store name on /s/[slug] (lib/store-tagline.ts)
   voiceLang                String         @default("en-IN") // hi-IN, te-IN, kn-IN, ta-IN
   receiptFooter            String? // "Thanks for visiting!"
   receiptPaper             ReceiptPaper   @default(MM80) // Width of the printed receipt (/receipts/[bill])
@@ -165,6 +166,7 @@ model MenuItem {
   sortOrder    Int      @default(0)
   imageUrl     String?
   unit         String? // Selling unit shown after the price ("kg", "piece"); null = none
+  description  String?  @db.VarChar(200) // One line for buyers under the name on /s/[slug]; never in the voice prompt
   hsnCode      String? // HSN/SAC; falls back to VendorSettings.hsnDefault
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt

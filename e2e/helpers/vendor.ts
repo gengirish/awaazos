@@ -107,6 +107,7 @@ export async function createMenuItem(
     aliasesCsv?: string;
     tagsCsv?: string;
     category?: string;
+    description?: string;
   },
 ): Promise<MenuItemRow> {
   const res = await page.request.post("/api/menu", {

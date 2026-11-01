@@ -36,7 +36,7 @@ import { isValidMenuUnit, MENU_UNIT_MAX, MENU_UNIT_MESSAGE, normaliseMenuUnit } 
 import { categoryOptions, paiseToRupeeInput, parseRupeeInput } from "@/lib/menu-voice";
 import { vocabularyForKind, type StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
-import { menuItemCreateInputSchema, menuItemUpdateSchema } from "@/lib/zod-menu";
+import { MENU_DESCRIPTION_MAX, menuItemCreateInputSchema, menuItemUpdateSchema } from "@/lib/zod-menu";
 
 /** Starter emoji grid, shared with the voice menu builder's review rows. */
 export const FOOD_EMOJIS = [
@@ -138,6 +138,7 @@ const defaultCreateValues: MenuItemFormValues = {
   isAvailable: true,
   showOnline: true,
   unit: "",
+  description: "",
 };
 
 type MenuItemFormProps = {
@@ -221,6 +222,7 @@ export function MenuItemForm({
         isAvailable: item.isAvailable,
         showOnline: item.showOnline,
         unit: item.unit ?? "",
+        description: item.description ?? "",
       });
     } else {
       const suggestion = defaultName ? suggestEmoji(defaultName) : null;
@@ -322,6 +324,7 @@ export function MenuItemForm({
       isAvailable: values.isAvailable,
       showOnline: values.showOnline,
       unit: normaliseMenuUnit(values.unit),
+      description: values.description ?? "",
     };
     try {
       if (isEdit && item) {
@@ -410,6 +413,33 @@ export function MenuItemForm({
                         }}
                       />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description (optional)</FormLabel>
+                    <FormControl>
+                      <textarea
+                        rows={2}
+                        maxLength={MENU_DESCRIPTION_MAX}
+                        placeholder={
+                          vocab.kind === "food"
+                            ? "e.g. Soft idlis with coconut chutney, 4 per plate"
+                            : "e.g. 8 mm Karungali beads, 108 count"
+                        }
+                        className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      One line under the name on your store page. {(field.value ?? "").length}/{MENU_DESCRIPTION_MAX}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

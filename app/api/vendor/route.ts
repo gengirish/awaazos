@@ -19,6 +19,7 @@ import { resolveStallTypeOther } from "@/lib/stall-type";
 import { requireVendorRole } from "@/lib/rbac";
 import { GSTIN_FORMAT_MESSAGE, GSTIN_PATTERN, RECEIPT_FOOTER_MAX } from "@/lib/receipt";
 import { storeHandleSchema } from "@/lib/store-handle";
+import { isValidStoreTagline, normaliseStoreTagline, STORE_TAGLINE_MAX, STORE_TAGLINE_MESSAGE } from "@/lib/store-tagline";
 import { STORE_THEMES } from "@/lib/store-theme";
 import { storeNameSchema } from "@/lib/store-name";
 import { buyerWhatsappNumber } from "@/lib/storefront-order";
@@ -60,6 +61,8 @@ const patchSchema = z.object({
   showWhatsappOnStore: z.boolean().optional(),
   // The store colour (lib/store-theme.ts); the storefront pages read it as data-theme.
   theme: z.enum(STORE_THEMES).optional(),
+  // One line under the store name (lib/store-tagline.ts); "" or null clears it.
+  tagline: z.string().max(STORE_TAGLINE_MAX * 2).nullable().optional(),
   // "@handle" or a profile URL; stored bare. "" or null clears it.
   instagramHandle: z
     .string()
@@ -202,6 +205,17 @@ export async function PATCH(req: NextRequest) {
       stallTypeOther = other.value;
     }
 
+    let tagline: string | null | undefined;
+    if (vendorFields.tagline !== undefined) {
+      tagline = normaliseStoreTagline(vendorFields.tagline);
+      if (!isValidStoreTagline(tagline)) {
+        return NextResponse.json(
+          { error: "Validation failed.", details: { tagline: [STORE_TAGLINE_MESSAGE] } },
+          { status: 400 },
+        );
+      }
+    }
+
     // One stored format (E.164 for Indian mobiles) so wa.me links don't depend on how it was typed.
     if (vendorFields.whatsappNumber) {
       vendorFields.whatsappNumber = normaliseIndianMobile(vendorFields.whatsappNumber);
@@ -302,6 +316,9 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.theme !== undefined) {
         settingsUpdate.theme = vendorFields.theme;
+      }
+      if (tagline !== undefined) {
+        settingsUpdate.tagline = tagline;
       }
       if (vendorFields.voiceLang !== undefined) {
         settingsUpdate.voiceLang = vendorFields.voiceLang;

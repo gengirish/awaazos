@@ -242,9 +242,9 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "edit-menu",
     group: "menu",
     title: "Add a {item} or change a price",
-    steps: "Tap Add item for a new {item}, or Edit on a {item} to change its name, price, photo and category.",
+    steps: "Tap Add item for a new {item}, or Edit on a {item} to change its name, price, photo, description and category.",
     nav: "menu",
-    keywords: "item rate cost picture image dish product pack size unit",
+    keywords: "item rate cost picture image dish product pack size unit description",
   },
   {
     id: "voice-menu",
@@ -319,13 +319,13 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
   {
     id: "store-look",
     group: "setup",
-    title: "Change your store name, banner, logo or colour",
-    steps: "Edit the name, upload a banner and logo, and pick a store colour. Customers see them at the top of your store; the colour tints its buttons and links.",
+    title: "Change your store name, tagline, banner, logo or colour",
+    steps: "Edit the name and tagline, upload a banner and logo, and pick a store colour. Customers see them at the top of your store; the colour tints its buttons and links.",
     nav: "settings",
     href: "/settings/store",
     trail: ["Online store"],
     ownerOnly: true,
-    keywords: "photo picture brand rename colour color theme",
+    keywords: "photo picture brand rename colour color theme tagline",
   },
   {
     id: "store-details",

@@ -22,6 +22,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
+import { ItemPhoto } from "@/components/storefront/ItemPhoto";
 import { CartHubProvider } from "@/components/storefront/CartHub";
 import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
 import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
@@ -65,7 +66,7 @@ import {
 } from "@/lib/storefront-order";
 import { qrSvgDataUrl } from "@/lib/qr";
 import { stallTypeLabel } from "@/lib/stall-type";
-import { storeVocabulary } from "@/lib/store-vocabulary";
+import { storeKind, storeVocabulary } from "@/lib/store-vocabulary";
 import { storeInfoFacts, type StoreFactKind } from "@/lib/store-info";
 import { viewerIsStoreStaff } from "@/lib/storefront-viewer";
 import { buildUpiCollectLink } from "@/lib/upi";
@@ -192,6 +193,7 @@ const loadStorefront = cache(async (slug: string) => {
       settings: {
         select: {
           theme: true,
+          tagline: true,
           fssaiNumber: true,
           acceptPayOnDelivery: true,
           acceptMenuOrders: true,
@@ -230,7 +232,7 @@ const loadStorefront = cache(async (slug: string) => {
               maxQty: true,
               perOrderLimit: true,
               menuItemId: true,
-              menuItem: { select: { name: true, emoji: true, imageUrl: true } },
+              menuItem: { select: { name: true, emoji: true, imageUrl: true, description: true } },
             },
           },
         },
@@ -247,6 +249,7 @@ const loadStorefront = cache(async (slug: string) => {
           unit: true,
           isPopular: true,
           imageUrl: true,
+          description: true,
         },
       },
     },
@@ -267,7 +270,10 @@ export async function generateMetadata(
   const where = place ? `${vendor.name}, ${place}` : vendor.name;
   const menuHidden = await everydayMenuHiddenByDrop(prisma, vendor.id);
   const ordering = !menuHidden && (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0;
-  const description = menuHidden
+  const tagline = vendor.settings?.tagline ?? null;
+  const description = tagline
+    ? `${tagline} · ${where}`
+    : menuHidden
     ? `Pre-order today's special from ${where}. Pay by UPI.`
     : ordering
       ? `Order online from ${where}. ${menuFulfilmentPhrase(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}, pay by UPI.`
@@ -320,35 +326,59 @@ function categoryAnchor(category: string, index: number): string {
   return `cat-${slug || "items"}-${index}`;
 }
 
-function MenuRow({ item }: { item: StorefrontItems[number] }) {
+/** How a store lists its items: rows for a kitchen, a photo gallery for goods. */
+type CatalogueLayout = "list" | "gallery";
+
+/** The `<ul>` of one category, per layout. */
+const CATEGORY_LIST_CLASS: Record<CatalogueLayout, string> = {
+  list: "divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs",
+  gallery: "grid grid-cols-2 gap-3 sm:grid-cols-3",
+};
+
+function MenuRow({ item, layout }: { item: StorefrontItems[number]; layout: CatalogueLayout }) {
+  if (layout === "gallery") {
+    return (
+      <li className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-background p-2.5 shadow-xs">
+        <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="tile" enlarge />
+        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">{item.name}</span>
+          {item.description ? (
+            <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
+          ) : null}
+          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+            <span className="font-mono font-bold tabular-nums text-foreground">
+              {formatINRCompact(item.priceInPaise)}
+              {item.unit ? <span className="font-sans font-medium text-muted-foreground"> / {item.unit}</span> : null}
+            </span>
+            {item.isPopular ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
+                <Sparkles className="h-3 w-3" aria-hidden="true" />
+                Popular
+              </span>
+            ) : null}
+          </span>
+        </span>
+      </li>
+    );
+  }
   return (
     <li className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-primary/4 sm:gap-4 sm:px-4">
-      {item.imageUrl ? (
-        <Image
-          src={item.imageUrl}
-          alt=""
-          width={72}
-          height={72}
-          className="h-18 w-18 shrink-0 rounded-xl object-cover ring-1 ring-border/60"
-        />
-      ) : (
-        <span
-          aria-hidden="true"
-          className="flex h-18 w-18 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-3xl"
-        >
-          {item.emoji}
-        </span>
-      )}
+      <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="row" />
 
-      <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
-        <span className="line-clamp-2 min-w-0 text-[15px] font-semibold leading-snug text-foreground">
-          {item.name}
-        </span>
-        {item.isPopular ? (
-          <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
-            <Sparkles className="h-3 w-3" aria-hidden="true" />
-            Popular
+      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="line-clamp-2 min-w-0 text-[15px] font-semibold leading-snug text-foreground">
+            {item.name}
           </span>
+          {item.isPopular ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
+              <Sparkles className="h-3 w-3" aria-hidden="true" />
+              Popular
+            </span>
+          ) : null}
+        </span>
+        {item.description ? (
+          <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
         ) : null}
       </span>
 
@@ -409,6 +439,7 @@ async function buildDropViews(
         emoji: i.menuItem.emoji,
         // The seller's photo, else (food stores) a drawing of the dish (lib/food-images.ts), else the emoji.
         imageUrl: i.menuItem.imageUrl ?? (foodArt ? foodImageFor(i.menuItem.name) : null),
+        description: i.menuItem.description,
         priceInPaise: i.priceInPaise,
         remaining: remainingQty(i.maxQty, sold.get(i.id) ?? 0),
         perOrderLimit: i.perOrderLimit,
@@ -579,6 +610,9 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
     : null;
   const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
   const theme = storeThemeAttribute(vendor.settings?.theme);
+  const tagline = vendor.settings?.tagline ?? null;
+  // A kitchen reads as a menu (rows); anything else as a gallery of its products.
+  const layout: CatalogueLayout = storeKind(vendor.stallType) === "goods" ? "gallery" : "list";
 
   const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
   // The open-amount "Scan to pay" QR, only for a read-only menu (see #pay below).
@@ -654,6 +688,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
       priceInPaise: item.priceInPaise,
       unit: item.unit,
       isPopular: item.isPopular,
+      description: item.description,
     })),
   }));
 
@@ -745,6 +780,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             <h1 className="mt-3 font-display text-3xl font-bold leading-tight tracking-tight text-awaaz-charcoal sm:text-4xl sm:leading-10">
               {displayStoreName(vendor)}
             </h1>
+            {tagline ? <p className="mt-2 max-w-md text-base leading-snug text-muted-foreground">{tagline}</p> : null}
 
             {/* What and where, as one quiet line under the name. */}
             <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-semibold text-muted-foreground">
@@ -971,6 +1007,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                     slug={vendor.slug}
                     vendorName={vendor.name}
                     categories={menuCategories}
+                    layout={layout}
                     fulfilmentTypes={allowedFulfilmentTypes(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}
                     deliveryFeePaise={vendor.settings?.menuDeliveryFeePaise ?? 0}
                     pickupNote={vendor.settings?.menuPickupNote ?? null}
@@ -996,10 +1033,10 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                           {items.length}
                         </span>
                       </div>
-                      <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs">
+                      <ul className={CATEGORY_LIST_CLASS[layout]}>
                         {items.map((item) => (
                           <Searchable key={item.id} texts={[menuItemSearchText(item, category)]}>
-                            <MenuRow item={item} />
+                            <MenuRow item={item} layout={layout} />
                           </Searchable>
                         ))}
                       </ul>

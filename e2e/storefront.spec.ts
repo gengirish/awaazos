@@ -243,6 +243,88 @@ test.describe("public storefront", () => {
     }
   });
 
+  test("a goods store gets a tagline, product descriptions and a photo gallery; a kitchen keeps rows", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    test.setTimeout(120_000);
+    await createVendorSession(page, request, "storefront-goods", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, {
+      name: "Karungali Mala",
+      priceInRupees: 799,
+      category: "Malas",
+      description: "  8 mm Karungali beads,\n108 count  ",
+    });
+    await setPublished(page, true);
+
+    // A kitchen (the sign-up default type) lists rows: no gallery grid, description under the name.
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const buyer = await anon.newPage();
+    try {
+      await buyer.goto(`/s/${slug}`);
+      await expect(buyer.getByText("8 mm Karungali beads, 108 count", { exact: true })).toBeVisible();
+      await expect(buyer.locator("ul.grid")).toHaveCount(0);
+    } finally {
+      await anon.close();
+    }
+
+    // The owner describes the store as goods and adds a tagline in Settings → Online store.
+    const typed = await page.request.patch("/api/vendor", {
+      data: { stallType: "OTHER", stallTypeOther: "Holistic wellness products" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(typed.status()).toBe(200);
+    await page.goto("/settings/store");
+    const card = page.getByRole("region", { name: "Tagline" });
+    const input = card.getByRole("textbox", { name: /tagline/i });
+    await input.fill("  Energised crystals and malas,  made in Hyderabad ");
+    await card.getByRole("button", { name: "Save" }).click();
+    await expect(card.getByRole("button", { name: "Saved" })).toBeVisible();
+
+    // One character is refused by the API with a field message; too long too.
+    const short = await page.request.patch("/api/vendor", {
+      data: { tagline: "x" },
+      headers: { "Content-Type": "application/json" },
+      failOnStatusCode: false,
+    });
+    expect(short.status()).toBe(400);
+    const long = await page.request.patch("/api/vendor", {
+      data: { tagline: "x".repeat(121) },
+      headers: { "Content-Type": "application/json" },
+      failOnStatusCode: false,
+    });
+    expect(long.status()).toBe(400);
+
+    const anon2 = await browser.newContext(CONTEXT_OPTIONS);
+    const buyer2 = await anon2.newPage();
+    try {
+      await buyer2.goto(`/s/${slug}`);
+      await expect(buyer2.getByText("Energised crystals and malas, made in Hyderabad", { exact: true })).toBeVisible();
+      await expect(buyer2.getByText("8 mm Karungali beads, 108 count", { exact: true })).toBeVisible();
+      // Goods: the category is a two-column gallery grid; without a photo there is nothing to enlarge.
+      await expect(buyer2.locator("ul.grid")).toHaveCount(1);
+      await expect(buyer2.getByRole("button", { name: /see the photo of/i })).toHaveCount(0);
+      // The link preview carries the tagline.
+      await expect(buyer2.locator('meta[name="description"]')).toHaveAttribute(
+        "content",
+        /^Energised crystals and malas, made in Hyderabad · /,
+      );
+    } finally {
+      await anon2.close();
+    }
+
+    // Clearing the tagline removes the line.
+    const cleared = await page.request.patch("/api/vendor", {
+      data: { tagline: "" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(cleared.status()).toBe(200);
+    const me = (await (await page.request.get("/api/vendor")).json()) as { vendor: { settings: { tagline: string | null } } };
+    expect(me.vendor.settings.tagline).toBeNull();
+  });
+
   test("an unknown slug 404s", async ({ page }) => {
     const res = await page.goto("/s/no-such-stall-abcxyz");
     expect(res?.status()).toBe(404);
