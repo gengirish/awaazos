@@ -253,6 +253,13 @@ Rules every one of them follows:
   JPEG/PNG/WebP, validate before Blob) are shared with menu photos in `lib/blob-image.ts`; the browser
   shrinks photos first (`lib/image-downscale.ts`). No Blob token → 503. The banner is decorative
   (`alt=""`); without one the header keeps its theme gradient.
+- Store colour (`VendorSettings.theme`, `lib/store-theme.ts`) and tagline (`VendorSettings.tagline`,
+  `lib/store-tagline.ts`) are OWNER settings in Settings → Online store via `PATCH /api/vendor`. The
+  tagline is one line under the store name, the link-preview description and a line on the share
+  image. `MenuItem.description` (≤ 200 chars, item form) is one line under the item's name. Neither
+  reaches the voice prompt (`stableMenuJson()` selects its fields). A goods store (`storeKind() ===
+  "goods"`) lists items as a photo gallery (two columns, tap to enlarge,
+  `components/storefront/ItemPhoto.tsx`); a kitchen keeps the rows.
 - The vendor's WhatsApp number reaches a public page only through `buyerWhatsappNumber()`
   (`lib/storefront-order.ts`): `VendorSettings.whatsappNumber`, and only once the vendor opts in
   with `acceptWhatsappOrders` (default `false`; Settings → Online orders). A saved number is not

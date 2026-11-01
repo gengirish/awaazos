@@ -97,6 +97,9 @@ export function MenuItemCard({ item, onEdit, onChanged, onMove, canMoveUp = fals
             )}
             <div className="min-w-0">
               <p className="truncate font-semibold leading-tight text-foreground">{item.name}</p>
+              {item.description ? (
+                <p className="line-clamp-2 text-xs text-muted-foreground">{item.description}</p>
+              ) : null}
               <p className="text-sm text-muted-foreground">
                 {formatINR(item.priceInPaise)}
                 {item.unit ? ` / ${item.unit}` : null}

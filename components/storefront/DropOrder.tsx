@@ -48,6 +48,8 @@ export type DropOrderItem = {
   name: string;
   emoji: string;
   imageUrl: string | null;
+  /** One line under the name; null = none. */
+  description?: string | null;
   priceInPaise: number;
   /** null = unlimited */
   remaining: number | null;
@@ -243,6 +245,9 @@ export function DropOrder(props: DropOrderProps) {
 
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">{item.name}</span>
+                {item.description ? (
+                  <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
+                ) : null}
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
                   <span className="font-mono font-bold tabular-nums text-foreground">
                     {formatINRCompact(item.priceInPaise)}
