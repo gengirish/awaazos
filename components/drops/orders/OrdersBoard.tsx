@@ -6,6 +6,7 @@ import {
   ChefHat,
   ExternalLink,
   Loader2,
+  PackageCheck,
   Pencil,
   Plus,
   RefreshCw,
@@ -89,6 +90,7 @@ import {
   writeOrderSoundPref,
   type PushArrivedDetail,
 } from "@/lib/order-voice";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
 // The select primitives are heavy and only a vendor with two or more sources
@@ -122,6 +124,8 @@ type Props = {
   staffRole: StaffRole;
   /** Saved delivery riders (Settings → Online orders): "Send to <name>" on delivery orders. */
   riders?: DeliveryRider[];
+  /** The store's words for its catalogue (lib/store-vocabulary.ts). */
+  vocab: StoreVocabulary;
 };
 
 type OrdersResponse = { data: BoardOrder[]; drops: BoardDrop[]; signal: number | null };
@@ -150,9 +154,13 @@ const MENU_MODE_LABEL: Record<FulfilmentMode, string> = {
   BOTH: "Delivery or pickup",
 };
 
-const ALL_BOARD_SCOPE =
-  "Every online order, from your menu and from your drops: the last 3 days, plus older ones still open.";
-const MENU_BOARD_SCOPE = "Orders customers placed from your menu in the last 3 days, plus older ones still open.";
+function allBoardScope(vocab: StoreVocabulary): string {
+  return `Every online order, from your ${vocab.catalogue} and from your drops: the last 3 days, plus older ones still open.`;
+}
+
+function catalogueBoardScope(vocab: StoreVocabulary): string {
+  return `Orders customers placed from your ${vocab.catalogue} in the last 3 days, plus older ones still open.`;
+}
 
 const ACTION_DONE: Record<OrderAction, string> = {
   confirm: "Order confirmed",
@@ -213,6 +221,7 @@ export function OrdersBoard({
   initialSignal,
   staffRole,
   riders = [],
+  vocab,
 }: Props) {
   const [orders, setOrders] = useState(initialOrders);
   const [drops, setDrops] = useState(initialDrops);
@@ -789,7 +798,7 @@ export function OrdersBoard({
     activeScope !== "all"
       ? undefined
       : o.dropId === null
-        ? { kind: "menu", label: "Menu order" }
+        ? { kind: "menu", label: vocab.catalogueOrder }
         : { kind: "drop", label: dropTitles.get(o.dropId) ?? "Drop" };
 
   const storeIsLive = acceptMenuOrders || drops.some((d) => liveEffectiveStatus(d, now) === "OPEN");
@@ -908,13 +917,13 @@ export function OrdersBoard({
   } else if (sources.length === 0) {
     empty = {
       title: "No orders yet",
-      description: "Turn on “Order from menu” in Settings → Online orders, or create a drop, to start taking them.",
+      description: `Turn on “${vocab.catalogueOrdersTitle}” in Settings → Online orders, or create a drop, to start taking them.`,
       action: newDropAction,
     };
   } else if (activeScope === "menu" && !acceptMenuOrders) {
     empty = {
-      title: "No menu orders",
-      description: "Turn on “Order from menu” in Settings → Online orders to start taking them.",
+      title: `No ${vocab.catalogueOrders.toLowerCase()}`,
+      description: `Turn on “${vocab.catalogueOrdersTitle}” in Settings → Online orders to start taking them.`,
       action: (
         <Button asChild>
           <Link href="/settings/orders">
@@ -959,6 +968,7 @@ export function OrdersBoard({
         tools={tools}
         share={share}
         onScope={changeScope}
+        vocab={vocab}
       />
 
       {/* Phones, until this device has alerts on: the opt-in must not hide in the sheet. */}
@@ -999,7 +1009,7 @@ export function OrdersBoard({
         </ul>
         {toCook.length > 0 && (
           <p className="mt-2 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">To cook: </span>
+            <span className="font-medium text-foreground">{vocab.toPrepare}: </span>
             {toCook
               .map((p) => `${p.name} ${p.qtyOrdered}${p.maxQty !== null ? `/${p.maxQty}` : ""}`)
               .join(" · ")}
@@ -1012,12 +1022,19 @@ export function OrdersBoard({
             aria-live="polite"
           >
             <h3 className="shrink-0 text-sm font-semibold leading-7 sm:leading-normal">
-              {activeScope === "all" ? "To make (menu)" : "To make"}
+              {vocab.kind === "food"
+                ? activeScope === "all"
+                  ? "To make (menu)"
+                  : "To make"
+                : activeScope === "all"
+                  ? "To pack (everyday)"
+                  : "To pack"}
             </h3>
             {toMake.length === 0 ? (
-              <p className="text-sm leading-7 text-muted-foreground sm:mt-1 sm:leading-normal">Nothing to make right now.</p>
+              <p className="text-sm leading-7 text-muted-foreground sm:mt-1 sm:leading-normal">{vocab.kind === "food" ? "Nothing to make right now." : "Nothing to pack right now."}
+              </p>
             ) : (
-              <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5 sm:mt-2 sm:gap-2" aria-label="Items to make">
+              <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5 sm:mt-2 sm:gap-2" aria-label={vocab.kind === "food" ? "Items to make" : "Items to pack"}>
                 {toMake.map((r) => (
                   <li
                     key={r.name}
@@ -1244,6 +1261,7 @@ function BoardHeader({
   tools,
   share,
   onScope,
+  vocab,
 }: {
   scope: BoardScope;
   sources: BoardScope[];
@@ -1262,7 +1280,9 @@ function BoardHeader({
    */
   share: ReactNode;
   onScope: (scope: BoardScope) => void;
+  vocab: StoreVocabulary;
 }) {
+  const PrepIcon = vocab.kind === "food" ? ChefHat : PackageCheck;
   const hasPicker = sources.length > 1;
   const storeHref = `/s/${vendorSlug}`;
 
@@ -1314,8 +1334,8 @@ function BoardHeader({
           Edit
         </Link>
         <Link href={prepHref} className={LINK_BTN}>
-          <ChefHat className="h-4 w-4" aria-hidden />
-          Prep sheet
+          <PrepIcon className="h-4 w-4" aria-hidden />
+          {vocab.prepSheet}
         </Link>
       </>
     );
@@ -1327,8 +1347,8 @@ function BoardHeader({
           Edit
         </Link>
         <Link href={prepHref} className={MORE_ACTION_ROW}>
-          <ChefHat className="h-4 w-4 shrink-0" aria-hidden />
-          Prep sheet
+          <PrepIcon className="h-4 w-4 shrink-0" aria-hidden />
+          {vocab.prepSheet}
         </Link>
         {share ? (
           <div className="rounded-md border border-input p-3">
@@ -1340,7 +1360,7 @@ function BoardHeader({
     );
   } else {
     const isMenu = scope === "menu";
-    const scopeNote = isMenu ? MENU_BOARD_SCOPE : ALL_BOARD_SCOPE;
+    const scopeNote = isMenu ? catalogueBoardScope(vocab) : allBoardScope(vocab);
 
     details = (
       <>
@@ -1405,7 +1425,13 @@ function BoardHeader({
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <h1 className="font-display text-xl font-bold text-foreground md:text-2xl">Orders</h1>
         {hasPicker && (
-          <BoardScopePicker scope={scope} showMenu={sources.includes("menu")} drops={drops} onScope={onScope} />
+          <BoardScopePicker
+            scope={scope}
+            showMenu={sources.includes("menu")}
+            drops={drops}
+            onScope={onScope}
+            catalogueOrders={vocab.catalogueOrders}
+          />
         )}
       </div>
       <div

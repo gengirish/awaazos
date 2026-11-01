@@ -14,10 +14,18 @@
  *   unchecked and never sent.
  * - "Speak again" appends: a dish heard again (same name) updates the earlier
  *   row in place (see `mergeRepeat`), so the latest take wins without duplicating rows.
+ * - A pack size ("250 g") is kept on new rows only; a price update never changes
+ *   a saved item's unit (POST /api/menu/bulk ignores it there).
+ * - Labels take the store's vocabulary (lib/store-vocabulary.ts): "Add 5 dishes"
+ *   for a kitchen, "Add 5 products" for any other store. Kitchen when not given.
  */
 import { paiseToRupees, rupeesToPaise } from "@/lib/currency";
+import { isValidMenuUnit, MENU_UNIT_MESSAGE, normaliseMenuUnit } from "@/lib/menu-unit";
 import type { MenuDraft, MenuDraftAction, MenuDraftItem } from "@/lib/parse-menu-types";
+import { countItems, vocabularyForKind, type StoreVocabulary } from "@/lib/store-vocabulary";
 import { MENU_BULK_MAX_ITEMS, MENU_MAX_PRICE_PAISE, MENU_NAME_MAX } from "@/lib/zod-menu";
+
+const FOOD_VOCAB = vocabularyForKind("food");
 
 export const DEFAULT_MENU_EMOJI = "🍽️";
 export const DEFAULT_MENU_CATEGORY = "General";
@@ -38,6 +46,8 @@ export type MenuVoiceRow = {
   price: string;
   category: string;
   emoji: string;
+  /** Pack size as typed ("250 g"); empty = none. Sent for new rows only. */
+  unit: string;
   aliases: string[];
   action: MenuDraftAction;
   existingMenuItemId: string | null;
@@ -47,7 +57,7 @@ export type MenuVoiceRow = {
   matchedFuzzy: boolean;
 };
 
-export type RowErrors = { name?: string; price?: string; category?: string };
+export type RowErrors = { name?: string; price?: string; category?: string; unit?: string };
 
 export type BulkItem = {
   name: string;
@@ -55,6 +65,7 @@ export type BulkItem = {
   category: string;
   emoji: string;
   aliases: string[];
+  unit?: string;
   existingMenuItemId?: string;
 };
 
@@ -82,6 +93,7 @@ function rowFromItem(item: MenuDraftItem, take: number, index: number): MenuVoic
     price: hasPrice ? paiseToRupeeInput(item.priceInPaise) : "",
     category: item.category?.trim() || DEFAULT_MENU_CATEGORY,
     emoji: item.emoji?.trim() || DEFAULT_MENU_EMOJI,
+    unit: item.unit?.trim() ?? "",
     aliases: [...(item.aliases ?? [])],
     action: item.action,
     existingMenuItemId: item.existingMenuItemId,
@@ -98,7 +110,8 @@ function rowFromItem(item: MenuDraftItem, take: number, index: number): MenuVoic
  */
 function mergeRepeat(prev: MenuVoiceRow, row: MenuVoiceRow): MenuVoiceRow {
   const price = row.price || prev.price;
-  return { ...row, key: prev.key, name: prev.name, price, priceSpoken: row.priceSpoken || prev.priceSpoken };
+  const unit = row.unit || prev.unit;
+  return { ...row, key: prev.key, name: prev.name, price, unit, priceSpoken: row.priceSpoken || prev.priceSpoken };
 }
 
 /** A parsed draft → review rows. `take` keeps keys unique across "Speak again". */
@@ -187,9 +200,15 @@ export function validateRows(rows: readonly MenuVoiceRow[]): Record<string, RowE
     const price = parseRupeeInput(row.price);
     if ("error" in price) e.price = price.error;
     if (row.category.trim().length > CATEGORY_MAX) e.category = `Keep the category under ${CATEGORY_MAX} characters`;
-    if (e.name || e.price || e.category) errors[row.key] = e;
+    const unit = normaliseMenuUnit(row.unit);
+    if (unit !== null && !isValidMenuUnit(unit) && !isPriceUpdate(row)) e.unit = MENU_UNIT_MESSAGE;
+    if (e.name || e.price || e.category || e.unit) errors[row.key] = e;
   }
   return errors;
+}
+
+function isPriceUpdate(row: MenuVoiceRow): boolean {
+  return row.action === "update_price" && Boolean(row.existingMenuItemId);
 }
 
 export function rowCounts(rows: readonly MenuVoiceRow[]): { create: number; update: number } {
@@ -203,19 +222,18 @@ export function rowCounts(rows: readonly MenuVoiceRow[]): { create: number; upda
   return { create, update };
 }
 
-function dishes(n: number): string {
-  return `${n} ${n === 1 ? "dish" : "dishes"}`;
-}
-
 function prices(n: number): string {
   return `${n} ${n === 1 ? "price" : "prices"}`;
 }
 
 /** "Add 5 dishes" / "Add 5, update 1" / "Update 1 price". */
-export function primaryLabel({ create, update }: { create: number; update: number }): string {
+export function primaryLabel(
+  { create, update }: { create: number; update: number },
+  vocab: StoreVocabulary = FOOD_VOCAB,
+): string {
   if (create > 0 && update > 0) return `Add ${create}, update ${update}`;
   if (update > 0) return `Update ${prices(update)}`;
-  return `Add ${dishes(create)}`;
+  return `Add ${countItems(vocab, create)}`;
 }
 
 /** Checked rows → POST /api/menu/bulk body, or the field errors blocking it. */
@@ -236,33 +254,41 @@ export function buildBulkBody(
       emoji: row.emoji.trim() || DEFAULT_MENU_EMOJI,
       aliases: row.aliases,
     };
-    if (row.action === "update_price" && row.existingMenuItemId) item.existingMenuItemId = row.existingMenuItemId;
+    if (isPriceUpdate(row) && row.existingMenuItemId) item.existingMenuItemId = row.existingMenuItemId;
+    else {
+      const unit = normaliseMenuUnit(row.unit);
+      if (unit !== null) item.unit = unit;
+    }
     items.push(item);
   }
   return { ok: true, body: { items } };
 }
 
 /** Bulk `skipped[].reason` codes → words for the vendor. */
-export function skippedReasonText(reason: string): string {
-  if (reason === "not_found") return "no longer on your menu";
+export function skippedReasonText(reason: string, vocab: StoreVocabulary = FOOD_VOCAB): string {
+  if (reason === "not_found") return `no longer on your ${vocab.catalogue}`;
   if (reason === "duplicate") return "said twice, saved once";
   return reason;
 }
 
 /** "Added 5 dishes, updated 1 price". */
-export function saveSummary(created: number, updated: number): string {
+export function saveSummary(created: number, updated: number, vocab: StoreVocabulary = FOOD_VOCAB): string {
   const parts: string[] = [];
-  if (created > 0) parts.push(`Added ${dishes(created)}`);
+  if (created > 0) parts.push(`Added ${countItems(vocab, created)}`);
   if (updated > 0) parts.push(`${created > 0 ? "updated" : "Updated"} ${prices(updated)}`);
   if (parts.length === 0) return "Nothing new was saved";
   return parts.join(", ");
 }
 
+const FOOD_CATEGORIES = ["Snacks", "Beverages", "Meals", "Desserts"] as const;
+const GOODS_CATEGORIES = ["Herbal powders", "Oils", "Teas", "Gift boxes"] as const;
+
 /** Existing categories plus the defaults, de-duplicated case-insensitively, for the datalist. */
-export function categoryOptions(existing: readonly string[]): string[] {
+export function categoryOptions(existing: readonly string[], vocab: StoreVocabulary = FOOD_VOCAB): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
-  for (const c of [...existing, DEFAULT_MENU_CATEGORY, "Snacks", "Beverages", "Meals", "Desserts"]) {
+  const defaults = vocab.kind === "food" ? FOOD_CATEGORIES : GOODS_CATEGORIES;
+  for (const c of [...existing, DEFAULT_MENU_CATEGORY, ...defaults]) {
     const t = c?.trim();
     if (!t || seen.has(t.toLowerCase())) continue;
     seen.add(t.toLowerCase());

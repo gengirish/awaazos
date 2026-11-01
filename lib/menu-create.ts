@@ -35,6 +35,8 @@ export type MenuItemCreateFields = {
   isPopular: boolean;
   isAvailable: boolean;
   showOnline: boolean;
+  /** Pack / selling size, already normalised (lib/menu-unit.ts); null or absent = none. */
+  unit?: string | null;
 };
 
 /** Every slug the vendor uses, and the sortOrder after the current last item. */
@@ -77,6 +79,7 @@ export function prepareMenuItemCreate(
     isPopular: input.isPopular,
     isAvailable: input.isAvailable,
     showOnline: input.showOnline,
+    unit: input.unit ?? null,
     sortOrder,
   };
 }

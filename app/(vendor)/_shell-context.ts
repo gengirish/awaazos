@@ -5,6 +5,7 @@ import { cache } from "react";
 import { displayStoreName } from "@/lib/demo-store-schema";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { storeKind, type StoreKind } from "@/lib/store-vocabulary";
 
 export type ShellContext = {
   vendor: { id: string; name: string };
@@ -12,6 +13,8 @@ export type ShellContext = {
   role: StaffRole;
   /** Public storefront path (`/s/<slug>`), or null while the store isn't published. */
   storePath: string | null;
+  /** Kitchen or any other store: picks the words for the catalogue (lib/store-vocabulary.ts). */
+  storeKind: StoreKind;
 };
 
 /**
@@ -36,6 +39,7 @@ export const getShellContext = cache(async (): Promise<ShellContext> => {
       vendor: { id: ctx.vendor.id, name: displayStoreName(ctx.vendor) },
       role: ctx.staff.role,
       storePath: settings?.publishStorefront ? `/s/${encodeURIComponent(ctx.vendor.slug)}` : null,
+      storeKind: storeKind(ctx.vendor.stallType),
     };
   } catch (e) {
     if (e instanceof AuthError) redirect("/sign-in");

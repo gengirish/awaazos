@@ -65,6 +65,7 @@ import {
 } from "@/lib/storefront-order";
 import { qrSvgDataUrl } from "@/lib/qr";
 import { stallTypeLabel } from "@/lib/stall-type";
+import { storeVocabulary } from "@/lib/store-vocabulary";
 import { storeInfoFacts, type StoreFactKind } from "@/lib/store-info";
 import { viewerIsStoreStaff } from "@/lib/storefront-viewer";
 import { buildUpiCollectLink } from "@/lib/upi";
@@ -355,6 +356,7 @@ function MenuRow({ item }: { item: StorefrontItems[number] }) {
 
       <span className="shrink-0 rounded-lg bg-muted/70 px-2.5 py-1 font-mono text-sm font-bold tabular-nums text-foreground">
         {formatINRCompact(item.priceInPaise)}
+        {item.unit ? <span className="font-sans font-medium text-muted-foreground"> / {item.unit}</span> : null}
       </span>
     </li>
   );
@@ -386,6 +388,8 @@ async function buildDropViews(
   now: Date,
   menuAnchorFor: (menuItemId: string) => string | null,
   offerSource: OfferSource,
+  /** Dish drawings only for a food store (lib/store-vocabulary.ts `foodArt`). */
+  foodArt: boolean,
 ): Promise<DropView[]> {
   const visible = drops
     .map((drop) => ({
@@ -405,8 +409,8 @@ async function buildDropViews(
         menuItemId: i.menuItemId,
         name: i.menuItem.name,
         emoji: i.menuItem.emoji,
-        // The seller's photo, else a drawing of the dish (lib/food-images.ts), else the emoji.
-        imageUrl: i.menuItem.imageUrl ?? foodImageFor(i.menuItem.name),
+        // The seller's photo, else (food stores) a drawing of the dish (lib/food-images.ts), else the emoji.
+        imageUrl: i.menuItem.imageUrl ?? (foodArt ? foodImageFor(i.menuItem.name) : null),
         priceInPaise: i.priceInPaise,
         remaining: remainingQty(i.maxQty, sold.get(i.id) ?? 0),
         perOrderLimit: i.perOrderLimit,
@@ -561,11 +565,13 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   // pills, counts, "Order now" or menu cart — exactly as if the menu were empty.
   // Same server check placeMenuOrder uses, so the page and checkout always agree.
   const menuHidden = await everydayMenuHiddenByDrop(prisma, vendor.id, now);
-  // Items without a photo get a drawing of the dish when one matches
-  // (lib/food-images.ts); display only, nothing is stored.
+  // In a food store, items without a photo get a drawing of the dish when one
+  // matches (lib/food-images.ts); display only, nothing is stored. Any other
+  // store keeps the emoji: "Tulsi Tea" is a product, not a cup of chai.
+  const { foodArt } = storeVocabulary(vendor.stallType);
   const menuItems = (menuHidden ? [] : vendor.menuItems).map((item) => ({
     ...item,
-    imageUrl: item.imageUrl ?? foodImageFor(item.name, item.category),
+    imageUrl: item.imageUrl ?? (foodArt ? foodImageFor(item.name, item.category) : null),
   }));
   const categories = groupByCategory(menuItems);
   const popular = menuItems.filter((i) => i.isPopular).slice(0, 6);
@@ -601,6 +607,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
       now,
       (id) => (orderableMenuIds.has(id) ? menuItemAnchor(id) : null),
       offerSource,
+      foodArt,
     ),
     getCurrentCustomer(),
     viewerIsStoreStaff(vendor.id),

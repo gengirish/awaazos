@@ -16,12 +16,14 @@ import {
   type MenuVoiceRow,
 } from "@/lib/menu-voice";
 import type { MenuDraftItem } from "@/lib/parse-menu-types";
+import { storeVocabulary } from "@/lib/store-vocabulary";
 
 function item(over: Partial<MenuDraftItem> & Pick<MenuDraftItem, "key" | "name">): MenuDraftItem {
   return {
     priceInPaise: 1_500,
     category: "Snacks",
     emoji: "🍽️",
+    unit: null,
     aliases: [],
     action: "create",
     existingMenuItemId: null,
@@ -278,5 +280,56 @@ describe("fuzzy matches (alias / spelling)", () => {
     const created = convertToNew(row);
     expect(created).toMatchObject({ action: "create", selected: true, price: "" });
     expect(validateRows([created])).toEqual({ [created.key]: { price: "Price needed" } });
+  });
+});
+
+describe("pack size and product wording", () => {
+  const goods = storeVocabulary("OTHER");
+
+  it("carries a spoken unit to new rows and the bulk body, never to a price update", () => {
+    const rows = draftToRows({
+      items: [
+        item({ key: "n", name: "Ashwagandha Powder", priceInPaise: 39_900, unit: "250 g" }),
+        item({
+          key: "u",
+          name: "Samosa",
+          action: "update_price",
+          existingMenuItemId: "mi_s",
+          existingPriceInPaise: 1_500,
+          priceInPaise: 2_000,
+          unit: "piece",
+        }),
+      ],
+    });
+    expect(rows.map((r) => r.unit)).toEqual(["250 g", "piece"]);
+    const res = buildBulkBody(rows);
+    expect(res.ok && res.body.items).toEqual([
+      { name: "Ashwagandha Powder", priceInPaise: 39_900, category: "Snacks", emoji: "🍽️", aliases: [], unit: "250 g" },
+      { name: "Samosa", priceInPaise: 2_000, category: "Snacks", emoji: "🍽️", aliases: [], existingMenuItemId: "mi_s" },
+    ]);
+  });
+
+  it("flags a bad unit typed on a new row", () => {
+    const [row] = draftToRows({ items: [item({ key: "n", name: "Neem Soap" })] });
+    expect(validateRows([{ ...row, unit: "<b>" }])[row.key]?.unit).toBeDefined();
+    expect(buildBulkBody([{ ...row, unit: "  " }])).toMatchObject({ ok: true });
+  });
+
+  it("a repeat without a unit keeps the earlier one", () => {
+    const rows = draftToRows({
+      items: [
+        item({ key: "a", name: "Tulsi Tea", unit: "100 g" }),
+        item({ key: "b", name: "Tulsi Tea", priceInPaise: 19_900 }),
+      ],
+    });
+    expect(rows).toHaveLength(1);
+    expect(rows[0]!.unit).toBe("100 g");
+  });
+
+  it("labels count products for a non-food store", () => {
+    expect(primaryLabel({ create: 3, update: 0 }, goods)).toBe("Add 3 products");
+    expect(saveSummary(1, 0, goods)).toBe("Added 1 product");
+    expect(skippedReasonText("not_found", goods)).toBe("no longer on your product list");
+    expect(categoryOptions([], goods)).toEqual(["General", "Herbal powders", "Oils", "Teas", "Gift boxes"]);
   });
 });

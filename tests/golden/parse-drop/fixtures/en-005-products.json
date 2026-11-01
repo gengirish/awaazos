@@ -1,0 +1,34 @@
+{
+  "id": "en-005-products",
+  "lang": "en-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "This Saturday, 20 herbal tea packs at 299 rupees and 10 gift boxes, delivery 4 to 7 in the evening, orders till Friday 9 pm",
+  "expected": {
+    "date": "2026-10-10",
+    "fulfilmentMode": "DELIVERY",
+    "fulfilmentStart": "16:00",
+    "fulfilmentEnd": "19:00",
+    "closesAtDate": "2026-10-09",
+    "closesAtTime": "21:00",
+    "items": [
+      {
+        "menuItemId": "herbal-tea",
+        "maxQty": 20,
+        "priceInPaise": 29900
+      },
+      {
+        "menuItemId": "festive-gift-box",
+        "maxQty": 10,
+        "priceInPaise": 89900
+      }
+    ]
+  },
+  "tags": [
+    "english",
+    "products",
+    "weekday",
+    "pack-words",
+    "price-override"
+  ],
+  "notes": "A product seller, not a kitchen: \"packs\" is a pack word, but \"gift box\" is the product itself."
+}

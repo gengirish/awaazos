@@ -96,7 +96,7 @@ export const PLAN_MARKETING: Record<MarketedPlan, PlanMarketing> = {
     cta: `Start ${trial}`,
     ctaNote: `No card needed. Then ${starterAmount}/month + GST.`,
     teaser: `${trial}, no card needed. Your store link, drops with a cut-off, UPI orders on one board, receipts on WhatsApp, and ${billsPerMonth("STARTER").toLowerCase()}.`,
-    summary: "Everything a home kitchen needs to take orders and get paid, on one plan.",
+    summary: "Everything a home business needs to take orders and get paid, on one plan.",
     bullets: [
       `${trial} — no card needed`,
       "Your own store link for your Instagram bio and WhatsApp",

@@ -18,7 +18,7 @@ const steps = [
     icon: ClipboardList,
     title: "Orders on one board",
     description:
-      "Orders and UPI payments arrive on one board. Confirm each payment, print the prep sheet and hand over.",
+      "Orders and UPI payments arrive on one board. Confirm each payment, print the prep sheet or packing list and hand over.",
   },
 ] as const;
 

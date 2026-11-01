@@ -9,11 +9,14 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatINR } from "@/lib/currency";
 import { formatIstDateTime } from "@/lib/datetime";
 import type { OutboxSale } from "@/lib/pos-outbox";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 
 export type PosSyncStatusProps = {
   online: boolean;
   /** When the server rendered this page: the menu and prices are as of then. */
   renderedAt: string;
+  /** Names the catalogue in "Menu as of …" / "Products as of …". */
+  vocab: StoreVocabulary;
   pending: OutboxSale[];
   failed: OutboxSale[];
   needsSignIn: boolean;
@@ -35,6 +38,7 @@ const FAIL_REASONS: Record<string, string> = {
 export function PosSyncStatus({
   online,
   renderedAt,
+  vocab,
   pending,
   failed,
   needsSignIn,
@@ -61,7 +65,7 @@ export function PosSyncStatus({
           <CloudOff className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <p>
             <span className="font-semibold">Offline.</span> Sales are saved on this phone and sync when you&apos;re
-            back online. Menu as of {formatIstDateTime(renderedAt)}.
+            back online. {vocab.catalogueTitle} as of {formatIstDateTime(renderedAt)}.
           </p>
         </div>
       ) : null}

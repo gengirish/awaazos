@@ -11,6 +11,7 @@ import { effectiveDropStatus, soldQtyByDropItem } from "@/lib/drops";
 import { hasPaymentMethod } from "@/lib/payment-guard";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
 
 export const dynamic = "force-dynamic";
 
@@ -23,10 +24,12 @@ export default async function EditDropPage(props: {
   const justOpened = (await props.searchParams).opened === "1";
   let vendor: { id: string; name: string; slug: string; upiId: string | null };
   let isOwner: boolean;
+  let vocab: StoreVocabulary;
   try {
     const ctx = await requireVendorRole("MANAGER");
     vendor = { id: ctx.vendor.id, name: ctx.vendor.name, slug: ctx.vendor.slug, upiId: ctx.vendor.upiId };
     isOwner = ctx.staff.role === "OWNER";
+    vocab = storeVocabulary(ctx.vendor.stallType);
   } catch (e) {
     if (e instanceof AuthError) redirect(e.status === 403 ? "/pos" : "/sign-in");
     throw e;
@@ -101,6 +104,7 @@ export default async function EditDropPage(props: {
             acceptPayOnDelivery: settings?.acceptPayOnDelivery ?? false,
           })}
           justOpened={justOpened}
+          vocab={vocab}
         />
 
         {effectiveStatus === "OPEN" || effectiveStatus === "SCHEDULED" ? (
@@ -142,6 +146,7 @@ export default async function EditDropPage(props: {
           soldByMenuItem={soldByMenuItem}
           voiceLang={settings?.voiceLang ?? "en-IN"}
           isOwner={isOwner}
+          vocab={vocab}
         />
       </main>
     </div>

@@ -4,17 +4,19 @@ import { AlertCircle, CheckCircle2, HelpCircle, Loader2, Mic, Plus, RotateCcw, S
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
-import { FOOD_EMOJIS } from "@/components/menu/MenuItemForm";
+import { defaultEmoji, emojiChoices } from "@/components/menu/MenuItemForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useOnline } from "@/hooks/useOnline";
 import { useVoiceDictation, type DictationError } from "@/hooks/useVoiceDictation";
 import { formatINRCompact } from "@/lib/currency";
+import { MENU_UNIT_MAX } from "@/lib/menu-unit";
 import {
   appendRows,
   buildBulkBody,
   categoryOptions,
   convertToNew,
+  DEFAULT_MENU_EMOJI,
   draftToRows,
   isActive,
   MAX_ROWS_PER_SAVE,
@@ -28,6 +30,7 @@ import {
   type RowErrors,
 } from "@/lib/menu-voice";
 import type { MenuDraft } from "@/lib/parse-menu-types";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
 export type VoiceMenuPanelProps = {
@@ -38,6 +41,8 @@ export type VoiceMenuPanelProps = {
   itemCount: number;
   /** Start expanded even when the menu has items (`/menu?voice=1`). */
   defaultOpen?: boolean;
+  /** The store's words (lib/store-vocabulary.ts): dishes or products. */
+  vocab: StoreVocabulary;
 };
 
 const LANG_LABEL: Record<string, string> = {
@@ -49,12 +54,18 @@ const LANG_LABEL: Record<string, string> = {
 };
 
 /** How a stall owner would rattle off a few dishes in that language (romanised). */
-const EXAMPLE: Record<string, string> = {
+const FOOD_EXAMPLE: Record<string, string> = {
   "en-IN": "Masala chai 15 rupees, cutting chai 10, samosa 20, vada pav 25 in snacks. Mango lassi 60, drinks.",
   "hi-IN": "Masala chai 15 rupaye, cutting chai 10, samosa 20, vada pav 25 — snacks mein. Mango lassi 60, drinks.",
   "te-IN": "Masala chai 15 rupayalu, samosa 20, vada pav 25 snacks lo. Mango lassi 60, drinks.",
   "kn-IN": "Masala chai 15 rupayi, samosa 20, vada pav 25 snacks alli. Mango lassi 60, drinks.",
   "ta-IN": "Masala chai 15 roobai, samosa 20, vada pav 25 snacks-la. Mango lassi 60, drinks.",
+};
+
+/** The same for a product seller: name, pack size, price. Dormant languages fall back to English. */
+const GOODS_EXAMPLE: Record<string, string> = {
+  "en-IN": "Ashwagandha powder 250 grams 399, tulsi green tea 100 grams 199, in herbal. Cold-pressed coconut oil 500 ml 350.",
+  "hi-IN": "Ashwagandha powder 250 gram 399, tulsi green tea 100 gram 199 — herbal mein. Coconut oil 500 ml 350.",
 };
 
 const FORM_HINT = "use “Add item” below";
@@ -72,11 +83,11 @@ const ERROR_MESSAGES: Record<string, string> = {
   network_error: `No internet for voice — check your connection, or ${FORM_HINT}.`,
   empty_transcript: `Didn't hear anything — tap the mic and speak, or ${FORM_HINT}.`,
   no_speech_detected: `Didn't hear anything — tap the mic and speak, or ${FORM_HINT}.`,
-  nothing_found: `Couldn't find any dishes in that — try again, or ${FORM_HINT}.`,
 };
 const DEFAULT_ERROR = `Couldn't understand — try again, or ${FORM_HINT}.`;
 
-function errorMessage(code: DictationError | null): string {
+function errorMessage(code: DictationError | null, vocab: StoreVocabulary): string {
+  if (code === "nothing_found") return `Couldn't find any ${vocab.items} in that — try again, or ${FORM_HINT}.`;
   return (code && ERROR_MESSAGES[code]) || DEFAULT_ERROR;
 }
 
@@ -111,13 +122,14 @@ function issuesToRowErrors(rows: readonly MenuVoiceRow[], issues: BulkResponse["
     if (root !== "items" || typeof idx !== "number" || !sent[idx]) continue;
     const key = sent[idx].key;
     const msg = issue.message || "Check this";
-    const target: keyof RowErrors = field === "priceInPaise" ? "price" : field === "category" ? "category" : "name";
+    const target: keyof RowErrors =
+      field === "priceInPaise" ? "price" : field === "category" ? "category" : field === "unit" ? "unit" : "name";
     out[key] = { ...out[key], [target]: msg };
   }
   return out;
 }
 
-export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen = false }: VoiceMenuPanelProps) {
+export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen = false, vocab }: VoiceMenuPanelProps) {
   const router = useRouter();
   const uid = useId().replace(/:/g, "");
   const [expanded, setExpanded] = useState(itemCount === 0 || defaultOpen);
@@ -168,7 +180,11 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
       if (!res.ok || !body.data) return errorForStatus(res.status, body);
 
       const draft = body.data;
-      const incoming = draftToRows(draft, takeRef.current++);
+      // The server's fallback emoji is a plate; a product store gets its own.
+      const fallbackEmoji = defaultEmoji(vocab);
+      const incoming = draftToRows(draft, takeRef.current++).map((row) =>
+        row.action === "create" && row.emoji === DEFAULT_MENU_EMOJI ? { ...row, emoji: fallbackEmoji } : row,
+      );
       const newUnparsed = (draft.unparsed ?? []).filter((u) => typeof u === "string" && u.trim());
       if (incoming.length === 0 && newUnparsed.length === 0) return "nothing_found";
 
@@ -179,7 +195,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
       setUnparsed((prev) => [...new Set([...prev, ...newUnparsed])]);
       focusReview.current = true;
     },
-    [voiceLang],
+    [voiceLang, vocab],
   );
 
   const { state, transcript, error, start, stop, reset } = useVoiceDictation({ voiceLang, onTranscript: parse });
@@ -202,7 +218,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
   const busy = state === "transcribing" || state === "parsing";
   const offline = !online && !busy && state !== "listening";
   const counts = useMemo(() => rowCounts(rows), [rows]);
-  const options = useMemo(() => categoryOptions(categories), [categories]);
+  const options = useMemo(() => categoryOptions(categories, vocab), [categories, vocab]);
   const missingPrices = rows.filter((r) => isActive(r) && "error" in parseRupeeInput(r.price)).length;
   const reviewing = rows.length > 0;
 
@@ -261,7 +277,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
     const first = rows.find((r) => errs[r.key]);
     if (!first) return;
     const e = errs[first.key];
-    const field = e.name ? "name" : e.price ? "price" : "category";
+    const field = e.name ? "name" : e.price ? "price" : e.unit ? "unit" : "category";
     document.getElementById(`${uid}-${first.key}-${field}`)?.focus();
   }
 
@@ -275,11 +291,11 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
       return;
     }
     if (built.body.items.length === 0) {
-      setSaveError("Tick at least one dish to save.");
+      setSaveError(`Tick at least one ${vocab.item} to save.`);
       return;
     }
     if (built.body.items.length > MAX_ROWS_PER_SAVE) {
-      setSaveError(`Save up to ${MAX_ROWS_PER_SAVE} dishes at a time — untick some and save the rest after.`);
+      setSaveError(`Save up to ${MAX_ROWS_PER_SAVE} ${vocab.items} at a time — untick some and save the rest after.`);
       return;
     }
     setSaving(true);
@@ -293,7 +309,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
       });
     } catch {
       setSaving(false);
-      setSaveError("No internet — your dishes are still here. Try saving again.");
+      setSaveError(`No internet — your ${vocab.items} are still here. Try saving again.`);
       return;
     }
     const body = (await res.json().catch(() => ({}))) as BulkResponse;
@@ -316,22 +332,22 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
         setErrors(rowErrs);
         focusFirstError(rowErrs);
       }
-      setSaveError("Some dishes couldn't be saved — check the highlighted fields.");
+      setSaveError(`Some ${vocab.items} couldn't be saved — check the highlighted fields.`);
       return;
     }
     if (res.status === 402) {
       setSaveError(
         typeof body.error === "string" && body.error
           ? body.error
-          : "Your plan's menu limit is reached — upgrade to add more dishes.",
+          : `Your plan's limit is reached — upgrade to add more ${vocab.items}.`,
       );
       return;
     }
     if (res.status === 409) {
       setSaveError(
         body.error === "request_in_flight"
-          ? "Still saving your last try — wait a moment, then check your menu below."
-          : "Your menu changed while saving — nothing was saved. Try again.",
+          ? `Still saving your last try — wait a moment, then check your ${vocab.catalogue} below.`
+          : `Your ${vocab.catalogue} changed while saving — nothing was saved. Try again.`,
       );
       return;
     }
@@ -340,10 +356,10 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
       return;
     }
     if (res.status === 401 || res.status === 403) {
-      setSaveError("Your account can't change the menu here.");
+      setSaveError(`Your account can't change the ${vocab.catalogue} here.`);
       return;
     }
-    setSaveError("Couldn't save — your dishes are still here. Try again.");
+    setSaveError(`Couldn't save — your ${vocab.items} are still here. Try again.`);
   }
 
   // ── Collapsed: the menu already has dishes ──
@@ -361,7 +377,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
         }}
       >
         <Mic className="h-5 w-5" aria-hidden="true" />
-        Add dishes by voice
+        Add {vocab.items} by voice
       </Button>
     );
   }
@@ -373,13 +389,16 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
       : busy
         ? "Working it out…"
         : state === "error"
-          ? errorMessage(error)
+          ? errorMessage(error, vocab)
           : reviewing
-            ? "Check the dishes below, then save."
-            : "Tap the mic and say each dish with its price. Add the category if you like.";
+            ? `Check the ${vocab.items} below, then save.`
+            : vocab.foodArt
+              ? "Tap the mic and say each dish with its price. Add the category if you like."
+              : "Tap the mic and say each product with its pack size and price. Add the category if you like.";
 
   const langLabel = LANG_LABEL[voiceLang] ?? voiceLang;
-  const example = EXAMPLE[voiceLang] ?? EXAMPLE["en-IN"];
+  const examples = vocab.foodArt ? FOOD_EXAMPLE : GOODS_EXAMPLE;
+  const example = examples[voiceLang] ?? examples["en-IN"];
   const datalistId = `${uid}-categories`;
 
   return (
@@ -390,7 +409,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 id={`${uid}-heading`} className="font-display text-lg font-semibold">
-          Add dishes by voice
+          Add {vocab.items} by voice
         </h2>
         <span className="inline-flex items-center gap-1.5 rounded-full border border-border bg-background px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
           <Mic className="h-3 w-3" aria-hidden="true" />
@@ -407,7 +426,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
           type="button"
           onClick={toggleMic}
           disabled={busy || offline || saving}
-          aria-label="Speak your dishes"
+          aria-label={`Speak your ${vocab.items}`}
           aria-pressed={state === "listening"}
           aria-describedby={`${uid}-status`}
           className={cn(
@@ -476,7 +495,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
               <ul className="mt-1 list-disc space-y-1 pl-5 text-sm">
                 {saved.skipped.map((s, i) => (
                   <li key={`${i}-${s.name}`}>
-                    {s.name} — {skippedReasonText(s.reason)}
+                    {s.name} — {skippedReasonText(s.reason, vocab)}
                   </li>
                 ))}
               </ul>
@@ -493,7 +512,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
               tabIndex={-1}
               className="font-display text-base font-semibold focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Check your dishes
+              Check your {vocab.items}
             </h3>
             <p className="text-xs text-muted-foreground">Prices in rupees. Nothing is saved until you press Add.</p>
           </div>
@@ -510,13 +529,13 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
             className="hidden gap-3 border-b border-border pb-1 text-xs font-medium text-muted-foreground md:grid md:grid-cols-[2.75rem_minmax(0,1fr)_8rem_11rem_2.75rem]"
           >
             <span />
-            <span>Dish</span>
+            <span>{vocab.Item}</span>
             <span>Price (₹)</span>
             <span>Category</span>
             <span>Emoji</span>
           </div>
 
-          <ul className="space-y-3 md:space-y-2" aria-label="Dishes heard">
+          <ul className="space-y-3 md:space-y-2" aria-label={`${vocab.Items} heard`}>
             {rows.map((row, i) => (
               <ReviewRow
                 key={row.key}
@@ -524,13 +543,14 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
                 index={i}
                 idBase={`${uid}-${row.key}`}
                 datalistId={datalistId}
+                vocab={vocab}
                 errors={errors[row.key]}
                 emojiOpen={emojiOpenFor === row.key}
                 onEmojiOpen={(open) => setEmojiOpenFor(open ? row.key : null)}
                 onChange={(patch) => patchRow(row.key, patch)}
                 onConvertToNew={() => {
                   setRows((prev) => prev.map((r) => (r.key === row.key ? convertToNew(r) : r)));
-                  // The name is the existing dish's — the vendor will want to change it.
+                  // The name is the existing item's — the vendor will want to change it.
                   requestAnimationFrame(() => {
                     const el = document.getElementById(`${uid}-${row.key}-name`) as HTMLInputElement | null;
                     el?.focus();
@@ -569,7 +589,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
 
           <p className="text-sm" aria-live="polite">
             {missingPrices > 0
-              ? `${missingPrices} ${missingPrices === 1 ? "dish needs a price" : "dishes need a price"} before saving.`
+              ? `${missingPrices} ${missingPrices === 1 ? `${vocab.item} needs a price` : `${vocab.items} need a price`} before saving.`
               : null}
           </p>
 
@@ -602,7 +622,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
               disabled={saving || busy || counts.create + counts.update === 0}
             >
               {saving ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
-              {saving ? "Saving…" : primaryLabel(counts)}
+              {saving ? "Saving…" : primaryLabel(counts, vocab)}
             </Button>
           </div>
         </div>
@@ -616,6 +636,7 @@ type ReviewRowProps = {
   index: number;
   idBase: string;
   datalistId: string;
+  vocab: StoreVocabulary;
   errors: RowErrors | undefined;
   emojiOpen: boolean;
   onEmojiOpen: (open: boolean) => void;
@@ -625,18 +646,28 @@ type ReviewRowProps = {
 };
 
 /** "Matched to Masala Chai on your menu — is that right?" + "No, add as a new dish". */
-function FuzzyMatchNote({ name, onConvert, disabled }: { name: string; onConvert: () => void; disabled: boolean }) {
+function FuzzyMatchNote({
+  name,
+  onConvert,
+  disabled,
+  vocab,
+}: {
+  name: string;
+  onConvert: () => void;
+  disabled: boolean;
+  vocab: StoreVocabulary;
+}) {
   return (
     <div className="col-span-2 flex flex-wrap items-center gap-2 rounded-md border border-dashed border-primary/50 bg-background p-2 text-sm text-foreground md:col-span-5">
       <span className="flex min-w-[min(100%,14rem)] flex-1 items-start gap-1.5">
         <HelpCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
         <span>
-          Matched to <strong>{name}</strong> on your menu — is that right?
+          Matched to <strong>{name}</strong> on your {vocab.catalogue} — is that right?
         </span>
       </span>
       <Button type="button" variant="outline" className="min-h-11" onClick={onConvert} disabled={disabled}>
         <Plus aria-hidden="true" />
-        No, add as a new dish
+        No, add as a new {vocab.item}
       </Button>
     </div>
   );
@@ -647,6 +678,7 @@ function ReviewRow({
   index,
   idBase,
   datalistId,
+  vocab,
   errors,
   emojiOpen,
   onEmojiOpen,
@@ -655,7 +687,8 @@ function ReviewRow({
   disabled,
 }: ReviewRowProps) {
   const n = index + 1;
-  const label = row.name.trim() || `dish ${n}`;
+  const label = row.name.trim() || `${vocab.item} ${n}`;
+  const starterEmojis = emojiChoices(vocab);
   const unchanged = row.action === "unchanged";
   const isUpdate = row.action === "update_price" && Boolean(row.existingMenuItemId);
   const priceParsed = parseRupeeInput(row.price);
@@ -666,7 +699,9 @@ function ReviewRow({
     return (
       <li>
         <fieldset className="grid grid-cols-[2.75rem_minmax(0,1fr)] items-center gap-3 rounded-md border border-dashed border-border p-2 text-muted-foreground md:grid-cols-[2.75rem_minmax(0,1fr)_8rem_11rem_2.75rem]">
-          <legend className="sr-only">Dish {n}</legend>
+          <legend className="sr-only">
+            {vocab.Item} {n}
+          </legend>
           <span className="flex h-11 w-11 items-center justify-center">
             <input
               type="checkbox"
@@ -684,11 +719,11 @@ function ReviewRow({
               {row.name}
             </p>
             <p id={`${idBase}-note`} className="text-xs">
-              Already on your menu
+              Already on your {vocab.catalogue}
               {row.existingPriceInPaise !== null ? ` at ${formatINRCompact(row.existingPriceInPaise)}` : ""}
             </p>
           </div>
-          {row.matchedFuzzy ? <FuzzyMatchNote name={row.name} onConvert={onConvertToNew} disabled={disabled} /> : null}
+          {row.matchedFuzzy ? <FuzzyMatchNote name={row.name} onConvert={onConvertToNew} disabled={disabled} vocab={vocab} /> : null}
         </fieldset>
       </li>
     );
@@ -703,7 +738,9 @@ function ReviewRow({
           !row.selected && "opacity-70",
         )}
       >
-        <legend className="sr-only">Dish {n}</legend>
+        <legend className="sr-only">
+            {vocab.Item} {n}
+          </legend>
         <label className="flex h-11 w-11 cursor-pointer items-center justify-center md:row-span-2">
           <input
             type="checkbox"
@@ -715,11 +752,11 @@ function ReviewRow({
           />
         </label>
 
-        {/* Name (read-only for a price update: it's an existing dish) */}
+        {/* Name (read-only for a price update: it's an existing item) */}
         <div className="min-w-0 space-y-1">
           {isUpdate ? (
             <>
-              <p className="text-xs font-medium text-muted-foreground md:sr-only">Dish</p>
+              <p className="text-xs font-medium text-muted-foreground md:sr-only">{vocab.Item}</p>
               <p className="flex min-h-11 items-center text-sm font-medium">
                 <span aria-hidden="true" className="mr-1">
                   {row.emoji}
@@ -745,6 +782,27 @@ function ReviewRow({
               {errors?.name ? (
                 <p id={errId("name")} className="text-xs font-medium text-destructive">
                   {errors.name}
+                </p>
+              ) : null}
+              {/* Pack size: new rows only — a price update never changes a saved item's unit. */}
+              <label htmlFor={`${idBase}-unit`} className="text-xs font-medium text-muted-foreground">
+                {vocab.foodArt ? "Unit (optional)" : "Pack size (optional)"}
+              </label>
+              <Input
+                id={`${idBase}-unit`}
+                value={row.unit}
+                autoComplete="off"
+                maxLength={MENU_UNIT_MAX}
+                placeholder={vocab.foodArt ? "kg, piece" : "100 g, 60 capsules"}
+                disabled={disabled}
+                onChange={(e) => onChange({ unit: e.target.value })}
+                aria-invalid={errors?.unit ? true : undefined}
+                aria-describedby={errors?.unit ? errId("unit") : undefined}
+                className="min-h-11"
+              />
+              {errors?.unit ? (
+                <p id={errId("unit")} className="text-xs font-medium text-destructive">
+                  {errors.unit}
                 </p>
               ) : null}
             </>
@@ -844,12 +902,12 @@ function ReviewRow({
             aria-label={`Pick an emoji for ${label}`}
             className="col-span-2 grid grid-cols-5 gap-2 sm:grid-cols-10 md:col-span-5"
           >
-            {(FOOD_EMOJIS as readonly string[]).includes(row.emoji)
+            {starterEmojis.includes(row.emoji)
               ? null
               : [row.emoji].map((emo) => (
                   <EmojiOption key={emo} emo={emo} selected onPick={() => onEmojiOpen(false)} />
                 ))}
-            {FOOD_EMOJIS.map((emo) => (
+            {starterEmojis.map((emo) => (
               <EmojiOption
                 key={emo}
                 emo={emo}
@@ -864,7 +922,7 @@ function ReviewRow({
         ) : null}
 
         {isUpdate && row.matchedFuzzy ? (
-          <FuzzyMatchNote name={row.name} onConvert={onConvertToNew} disabled={disabled} />
+          <FuzzyMatchNote name={row.name} onConvert={onConvertToNew} disabled={disabled} vocab={vocab} />
         ) : null}
       </fieldset>
     </li>

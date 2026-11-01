@@ -6,6 +6,7 @@
 
 import type { EffectiveDropStatus } from "@/lib/drops";
 import { dbDateToYmd, utcToIstParts } from "@/lib/drops-time";
+import type { StoreKind } from "@/lib/store-vocabulary";
 import type { DropUpsertInput } from "@/lib/zod-drops";
 
 const DAY_MS = 86_400_000;
@@ -61,9 +62,10 @@ const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Frida
  * The title a new drop starts with, from its cooking day: "2026-10-17" →
  * "Saturday menu". "" when the day isn't a valid "YYYY-MM-DD".
  */
-export function defaultDropTitle(cookingYmd: string): string {
+export function defaultDropTitle(cookingYmd: string, kind: StoreKind = "food"): string {
   if (!isValidYmd(cookingYmd)) return "";
-  return `${WEEKDAYS[new Date(ymdToUtcMidnightMs(cookingYmd)).getUTCDay()]} menu`;
+  // "Saturday menu" for a kitchen, "Saturday batch" for any other store (lib/store-vocabulary.ts).
+  return `${WEEKDAYS[new Date(ymdToUtcMidnightMs(cookingYmd)).getUTCDay()]} ${kind === "food" ? "menu" : "batch"}`;
 }
 
 /** Usual cut-off: the evening before the cooking day. */

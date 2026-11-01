@@ -31,6 +31,7 @@ import {
   type OfferEligibilityKind,
 } from "@/lib/offers";
 import type { OfferDto } from "@/lib/offers-server";
+import { fillVocabulary, vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
 import { parsePercentInput, percentInputFromBps, type OfferUpsertBody } from "@/lib/zod-offers";
 import { cn } from "@/lib/utils";
 
@@ -48,6 +49,8 @@ export type OffersClientProps = {
   drops: OfferDrop[];
   /** MANAGER or OWNER. Cashiers can read the list. */
   canEdit: boolean;
+  /** Words for the catalogue (lib/store-vocabulary.ts). */
+  storeKind: StoreKind;
 };
 
 type FormState = {
@@ -181,8 +184,9 @@ const ERROR_DEPENDENTS: Partial<Record<keyof FormState, (keyof FieldErrors)[]>> 
   startsOn: ["endsOn"],
 };
 
+/** `{catalogue}` is filled with the store's word for it (lib/store-vocabulary.ts). */
 const API_ERRORS: Record<string, string> = {
-  unknown_items: "One of the chosen items is no longer on your menu. Pick the items again.",
+  unknown_items: "One of the chosen items is no longer on your {catalogue}. Pick the items again.",
   unknown_drops: "One of the chosen drops no longer exists. Pick the drops again.",
   offer_limit_reached: "You have reached the limit of 20 offers. Delete one you no longer use.",
 };
@@ -198,9 +202,9 @@ function describeOffer(o: OfferDto, itemCount: number): string {
   return `${formatPercentBps(o.percentBps)} off ${o.minQty} or more ${what}${incl}`;
 }
 
-function whereLabel(o: OfferDto): string {
+function whereLabel(o: OfferDto, kind: StoreKind): string {
   const parts = [
-    o.onMenuOrders ? "Online menu" : null,
+    o.onMenuOrders ? (kind === "food" ? "Online menu" : "Online store") : null,
     o.onDrops ? (o.dropIds.length > 0 ? `${o.dropIds.length} chosen ${o.dropIds.length === 1 ? "drop" : "drops"}` : "Drops") : null,
     o.onPos ? "Counter" : null,
   ].filter(Boolean);
@@ -225,7 +229,8 @@ const CHECKBOX = "h-5 w-5 shrink-0 accent-[hsl(var(--primary))]";
 const SELECT =
   "touch-target flex h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
 
-export function OffersClient({ initialOffers, menuItems, drops, canEdit }: OffersClientProps) {
+export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKind }: OffersClientProps) {
+  const vocab = vocabularyForKind(storeKind);
   const router = useRouter();
   const ids = useId();
   const [offers, setOffers] = useState(initialOffers);
@@ -296,7 +301,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit }: Offer
       if (res.status === 403) return { ok: false as const, message: "Only a manager or the owner can change offers." };
       return {
         ok: false as const,
-        message: API_ERRORS[json.error ?? ""] ?? "Could not save. Check the details and try again.",
+        message: fillVocabulary(API_ERRORS[json.error ?? ""] ?? "", vocab) || "Could not save. Check the details and try again.",
       };
     } catch {
       return { ok: false as const, message: "Network error. Please try again." };
@@ -396,7 +401,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit }: Offer
                     </p>
                     <p className="text-sm text-foreground">{describeOffer(o, o.eligibleItemIds.length)}</p>
                     <p className="text-xs text-muted-foreground">
-                      {whereLabel(o)}
+                      {whereLabel(o, storeKind)}
                       {dates ? ` · ${dates}` : ""}
                     </p>
                   </div>
@@ -532,7 +537,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit }: Offer
                       {...errProps("eligibleTag")}
                     />
                     <p className="text-xs text-muted-foreground">
-                      Add tags to items on the Menu page (Edit item → Tags).
+                      Add tags to items on the {vocab.catalogueTitle} page (Edit item → Tags).
                     </p>
                     {err("eligibleTag")}
                   </div>
@@ -542,7 +547,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit }: Offer
                   <fieldset className="space-y-1" {...errProps("eligibleItemIds")}>
                     <legend className="text-sm font-medium">Items</legend>
                     {menuItems.length === 0 ? (
-                      <p className="text-sm text-muted-foreground">Add items to your menu first.</p>
+                      <p className="text-sm text-muted-foreground">Add items to your {vocab.catalogue} first.</p>
                     ) : (
                       <div className="max-h-56 overflow-y-auto rounded-md border px-3">
                         {menuItems.map((m) => (
@@ -637,7 +642,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit }: Offer
                       checked={form.onMenuOrders}
                       onChange={(e) => set("onMenuOrders", e.target.checked)}
                     />
-                    Online store, everyday menu
+                    Online store, everyday {vocab.catalogue}
                   </label>
                   <label className={CHECK_ROW}>
                     <input

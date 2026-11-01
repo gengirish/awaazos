@@ -42,7 +42,8 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     id: "orders",
     href: "/settings/orders",
     title: "Online orders",
-    description: "Let customers order from your menu, for pickup or delivery.",
+    // `{catalogue}`: "menu" or "product list" (lib/store-vocabulary.ts fillVocabulary).
+    description: "Let customers order from your {catalogue}, for pickup or delivery.",
     icon: ShoppingBag,
   },
   {

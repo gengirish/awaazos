@@ -6,6 +6,7 @@ import {
   isBlankDraft,
   ONBOARDING_STEPS,
   resumeStep,
+  stepDescription,
   validateItemDraft,
 } from "./onboarding-steps";
 
@@ -73,5 +74,14 @@ describe("step copy", () => {
   it("has four steps and never says stall", () => {
     expect(ONBOARDING_STEPS.map((s) => s.title)).toEqual(["Your store", "Getting paid", "What you sell", "Order alerts"]);
     for (const s of ONBOARDING_STEPS) expect(`${s.title} ${s.description}`.toLowerCase()).not.toContain("stall");
+  });
+});
+
+describe("stepDescription", () => {
+  it("keeps the kitchen wording and swaps in the product wording only where a step has one", () => {
+    expect(stepDescription(ONBOARDING_STEPS[0]!, "food")).toBe("Where you cook and sell from. You can change this later.");
+    expect(stepDescription(ONBOARDING_STEPS[0]!, "goods")).toBe("Where you sell from. You can change this later.");
+    expect(stepDescription(ONBOARDING_STEPS[2]!, "goods")).toContain("in Products");
+    expect(stepDescription(ONBOARDING_STEPS[1]!, "goods")).toBe(ONBOARDING_STEPS[1]!.description);
   });
 });

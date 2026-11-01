@@ -67,6 +67,16 @@ customer: most of their orders are remote.
 Dropped: a separate "DM quick reply". The storefront Share button and the WhatsApp order flow
 cover it; revisit if the kitchens in step 1 still paste prices into DMs.
 
+## Beyond kitchens
+
+From 2026-10-31 the product also serves home sellers who aren't kitchens. The first is a holistic
+wellness products seller (local pickup and delivery, like the kitchens). The flows are the same —
+store link, drops, everyday orders, UPI, one orders board — only the words change:
+a store whose type isn't food sees "Products", "product" and "Packing list" instead of "Menu",
+"dish" and "Prep sheet" (`lib/store-vocabulary.ts`), and every product can carry a pack size
+("100 g", "60 capsules"). The marketing site speaks to home sellers in general, kitchens first.
+Not built for them: courier shipping across India (pincode fees, tracking numbers).
+
 ## Not the customer
 
 - Kitchens where Swiggy/Zomato is most of the volume — the aggregator owns ordering and payment.

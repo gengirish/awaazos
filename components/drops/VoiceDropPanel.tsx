@@ -10,6 +10,7 @@ import { useOnline } from "@/hooks/useOnline";
 import { useVoiceDictation, type DictationError } from "@/hooks/useVoiceDictation";
 import { voiceSummary } from "@/lib/drop-voice";
 import type { DropDraft } from "@/lib/parse-drop-types";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import type { SttSource } from "@/lib/stt-source";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +30,8 @@ export type VoiceDropPanelProps = {
   onMenuItemAdded: (item: AddedMenuItem, quantity: number | null) => void;
   /** Owners get a link to billing when voice is paused by the billing lock. */
   canManageBilling?: boolean;
+  /** The store's words for its catalogue (lib/store-vocabulary.ts). */
+  vocab: StoreVocabulary;
 };
 
 const LANG_LABEL: Record<string, string> = {
@@ -40,6 +43,12 @@ const LANG_LABEL: Record<string, string> = {
 };
 
 /** One sentence in the way a home cook would say it in that language (romanised). */
+/** A product store's plan (lib/store-vocabulary.ts). The dormant languages fall back to English. */
+const GOODS_EXAMPLE: Record<string, string> = {
+  "en-IN": "This Saturday, 20 herbal tea packs at 299 rupees, 10 gift boxes at 899, delivery 4 to 7 in the evening, orders till Friday 9 pm.",
+  "hi-IN": "Is Saturday 20 herbal tea pack 299 rupaye, 10 gift box 899, delivery shaam 4 se 7 baje, order Friday raat 9 baje tak.",
+};
+
 const EXAMPLE: Record<string, string> = {
   "en-IN": "Tomorrow, 20 ragi laddu at 150 rupees, 15 thepla, pickup 6 to 8 in the evening, orders till 4.",
   "hi-IN": "Aaj ke liye 20 ragi laddu 150 rupaye, 15 thepla, pickup shaam 6 se 8 baje, order 4 baje tak.",
@@ -93,6 +102,7 @@ export function VoiceDropPanel({
   canUndo,
   onMenuItemAdded,
   canManageBilling = false,
+  vocab,
 }: VoiceDropPanelProps) {
   const [result, setResult] = useState<Result | null>(null);
   const [adding, setAdding] = useState<Unmatched | null>(null);
@@ -128,19 +138,19 @@ export function VoiceDropPanel({
       const unmatched = (draft.unmatched ?? []).map((u, i) => ({ ...u, key: `${i}-${u.spokenName}` }));
       const warnings = [...(draft.warnings ?? [])];
       for (const it of draft.items ?? []) {
-        if (it.matchedByName) warnings.push(`Picked “${it.name}” from your menu by name — check it's the right dish.`);
+        if (it.matchedByName) warnings.push(`Picked “${it.name}” from your ${vocab.catalogue} by name — check it's the right ${vocab.item}.`);
       }
       if (applied.unknownItemIds.length > 0) {
-        warnings.push("Some dishes weren't on your menu and were left out — check the item list.");
+        warnings.push(`Some ${vocab.items} weren't on your ${vocab.catalogue} and were left out — check the item list.`);
       }
       if (applied.fieldCount === 0 && applied.dishCount === 0 && unmatched.length === 0) {
         return "nothing_found";
       }
       focusSummary.current = true;
       setUndone(false);
-      setResult({ summary: voiceSummary(applied.fieldCount, applied.dishCount), warnings, unmatched });
+      setResult({ summary: voiceSummary(applied.fieldCount, applied.dishCount, vocab), warnings, unmatched });
     },
-    [voiceLang],
+    [voiceLang, vocab],
   );
 
   const { state, transcript, error, start, stop } = useVoiceDictation({ voiceLang, onTranscript: parse });
@@ -198,10 +208,13 @@ export function VoiceDropPanel({
             ? "Voice changes undone."
             : result
               ? "Done — check the form below."
-              : "Tap the mic and say what you're cooking, how many, the price and the timings.";
+              : `Tap the mic and say what you're ${vocab.kind === "food" ? "cooking" : "selling"}, how many, the price and the timings.`;
 
   const langLabel = LANG_LABEL[voiceLang] ?? voiceLang;
-  const example = EXAMPLE[voiceLang] ?? EXAMPLE["en-IN"];
+  const example =
+    vocab.kind === "food"
+      ? (EXAMPLE[voiceLang] ?? EXAMPLE["en-IN"])
+      : (GOODS_EXAMPLE[voiceLang] ?? GOODS_EXAMPLE["en-IN"]);
 
   return (
     <section
@@ -332,8 +345,8 @@ export function VoiceDropPanel({
 
           {result.unmatched.length > 0 ? (
             <div>
-              <h3 className="text-sm font-medium">Not on your menu</h3>
-              <ul className="mt-1 space-y-2" aria-label="Dishes not on your menu">
+              <h3 className="text-sm font-medium">Not on your {vocab.catalogue}</h3>
+              <ul className="mt-1 space-y-2" aria-label={`${vocab.Items} not on your ${vocab.catalogue}`}>
                 {result.unmatched.map((u) => (
                   <li key={u.key} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
                     <span className="min-w-0 flex-1 text-sm">
@@ -344,11 +357,11 @@ export function VoiceDropPanel({
                       type="button"
                       variant="outline"
                       className="min-h-11"
-                      aria-label={`Add ${u.spokenName} to menu`}
+                      aria-label={`Add ${u.spokenName} to ${vocab.catalogue}`}
                       onClick={() => setAdding(u)}
                     >
                       <Plus aria-hidden="true" />
-                      <span aria-hidden="true">Add to menu</span>
+                      <span aria-hidden="true">Add to {vocab.catalogue}</span>
                     </Button>
                     <Button
                       type="button"
@@ -366,7 +379,8 @@ export function VoiceDropPanel({
                 ))}
               </ul>
               <p className="mt-1 text-xs text-muted-foreground">
-                Add to menu saves the dish and ticks it in the item list below, with the quantity you said.
+                Add to {vocab.catalogue} saves the {vocab.item} and ticks it in the item list below, with the quantity you
+                said.
               </p>
             </div>
           ) : null}
@@ -379,6 +393,7 @@ export function VoiceDropPanel({
           spokenName={adding.spokenName}
           onClose={() => setAdding(null)}
           onAdded={menuItemAdded}
+          vocab={vocab}
         />
       ) : null}
 

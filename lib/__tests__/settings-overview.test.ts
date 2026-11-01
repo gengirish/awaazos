@@ -148,3 +148,29 @@ describe("legacy anchors", () => {
     });
   });
 });
+
+describe("wording for a store that isn't a kitchen", () => {
+  it("names the everyday-orders setting as that store's Settings does", () => {
+    expect(ordersStatus({ acceptMenuOrders: false, menuFulfilmentMode: "PICKUP" }, "goods").text).toBe(
+      "Order any time: Off",
+    );
+  });
+
+  it("never says menu in the checklist", () => {
+    const items = setupChecklist(
+      {
+        availableItemCount: 0,
+        publishStorefront: true,
+        upiId: "shop@upi",
+        acceptPayOnDelivery: false,
+        acceptMenuOrders: false,
+        dropCount: 0,
+      },
+      "goods",
+    );
+    expect(items.map((i) => i.id)).toEqual(["menu_items", "first_drop"]);
+    expect(items[0]).toMatchObject({ text: "Add at least one item to your product list", linkText: "Go to Products", href: "/menu" });
+    expect(items[1]!.text).toBe("Create your first drop or turn on everyday orders");
+    expect(JSON.stringify(items)).not.toMatch(/menu(?! ?_items)(?!")/i);
+  });
+});

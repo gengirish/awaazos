@@ -7,6 +7,7 @@ import { parseDropFromTranscript } from "@/lib/parse-drop";
 import { prisma } from "@/lib/prisma";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, requireActiveBilling, requireVendorRole } from "@/lib/rbac";
+import { storeKind } from "@/lib/store-vocabulary";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
         menuItems: menuRows,
         transcript: body.transcript,
         lang: body.lang ?? "en-IN",
+        kind: storeKind(ctx.vendor.stallType),
       }));
     } catch (parseErr) {
       console.error(

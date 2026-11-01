@@ -1,0 +1,35 @@
+{
+  "id": "en-003-wellness-pack-sizes",
+  "lang": "en-IN",
+  "transcript": "Ashwagandha powder 250 grams 399, tulsi green tea 100 grams 199, in herbal. Cold pressed coconut oil 500 ml 350.",
+  "expected": {
+    "items": [
+      {
+        "name": "Ashwagandha Powder",
+        "action": "create",
+        "priceInPaise": 39900,
+        "unit": "250 g",
+        "category": "Herbal"
+      },
+      {
+        "name": "Tulsi Green Tea",
+        "action": "create",
+        "priceInPaise": 19900,
+        "unit": "100 g",
+        "category": "Herbal"
+      },
+      {
+        "name": "Cold Pressed Coconut Oil",
+        "action": "create",
+        "priceInPaise": 35000,
+        "unit": "500 ml"
+      }
+    ]
+  },
+  "tags": [
+    "products",
+    "pack-size",
+    "category-scope"
+  ],
+  "notes": "A wellness seller: the gram/ml number is the pack size, the other number the price."
+}

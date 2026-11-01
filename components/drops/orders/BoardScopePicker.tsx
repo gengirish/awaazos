@@ -10,6 +10,8 @@ type Props = {
   showMenu: boolean;
   drops: BoardDrop[];
   onScope: (next: BoardScope) => void;
+  /** "Menu orders" / "Everyday orders" (lib/store-vocabulary.ts). */
+  catalogueOrders: string;
 };
 
 /**
@@ -17,7 +19,7 @@ type Props = {
  * Its own file so OrdersBoard can load it with next/dynamic — the select
  * primitives are heavy, and a vendor with a single source never sees a picker.
  */
-export default function BoardScopePicker({ scope, showMenu, drops, onScope }: Props) {
+export default function BoardScopePicker({ scope, showMenu, drops, onScope, catalogueOrders }: Props) {
   return (
     <Select value={scope} onValueChange={onScope}>
       <SelectTrigger
@@ -28,7 +30,7 @@ export default function BoardScopePicker({ scope, showMenu, drops, onScope }: Pr
       </SelectTrigger>
       <SelectContent align="end">
         <SelectItem value="all">All orders</SelectItem>
-        {showMenu && <SelectItem value="menu">Menu orders</SelectItem>}
+        {showMenu && <SelectItem value="menu">{catalogueOrders}</SelectItem>}
         {drops.map((d) => (
           <SelectItem key={d.id} value={d.id}>
             {d.title} · {formatIstDate(new Date(d.fulfilmentStartsAt))}

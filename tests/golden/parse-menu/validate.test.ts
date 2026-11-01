@@ -55,7 +55,17 @@ describe("golden parse-menu: fixture integrity", () => {
 
   it("covers the high-leverage cases", () => {
     const tags = new Set(fixtures.flatMap((f) => f.tags));
-    for (const t of ["indic-numerals", "category-scope", "existing-match", "update-price", "no-price", "dedupe", "unparsed"]) {
+    for (const t of [
+      "indic-numerals",
+      "category-scope",
+      "existing-match",
+      "update-price",
+      "no-price",
+      "dedupe",
+      "unparsed",
+      "pack-size",
+      "products",
+    ]) {
       expect(tags.has(t), `missing tag: ${t}`).toBe(true);
     }
   });
@@ -70,7 +80,13 @@ describe("golden parse-menu: fixture integrity", () => {
         items: fx.expected.items.map((i) => {
           const paise = i.priceInPaise ?? (i.existingMenuItemId ? byId.get(i.existingMenuItemId)!.priceInPaise : 1_000);
           const price = i.priceSpoken === false ? null : paiseToRupees(paise);
-          return { name: i.name, priceRupees: price, category: i.category ?? null, existingMenuItemId: i.existingMenuItemId ?? null };
+          return {
+            name: i.name,
+            priceRupees: price,
+            category: i.category ?? null,
+            unit: i.unit ?? null,
+            existingMenuItemId: i.existingMenuItemId ?? null,
+          };
         }),
         unparsed: fx.expected.unparsed,
       });

@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
 export type MenuTile = {
@@ -25,6 +26,8 @@ export type MenuTile = {
 
 export type QuickAddGridProps = {
   items: MenuTile[];
+  /** The store's words (lib/store-vocabulary.ts): "Menu" or "Products". */
+  vocab: StoreVocabulary;
 };
 
 type ItemGroup = { category: string | null; items: MenuTile[] };
@@ -55,7 +58,7 @@ function groupByCategory(items: MenuTile[]): ItemGroup[] {
   return Array.from(byCat.entries()).map(([category, groupItems]) => ({ category, items: groupItems }));
 }
 
-export function QuickAddGrid({ items }: QuickAddGridProps) {
+export function QuickAddGrid({ items, vocab }: QuickAddGridProps) {
   const cartItems = useCartStore((s) => s.items);
   const [query, setQuery] = useState("");
   const [pendingScroll, setPendingScroll] = useState<string | null>(null);
@@ -113,18 +116,18 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
         title="No items yet"
         titleAs="h2"
         titleId="quick-add-heading"
-        description="Add menu items so cashiers can tap or speak them into the cart."
+        description={`Add ${vocab.kind === "food" ? "menu items" : vocab.items} so cashiers can tap or speak them into the cart.`}
         action={
           <Link
             href="/menu"
             className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            Open menu &rarr;
+            Open {vocab.catalogueTitle} &rarr;
           </Link>
         }
       >
         <p className="text-xs text-muted-foreground">
-          Tip: items marked unavailable on /menu will not appear here.
+          Tip: items marked sold out in {vocab.catalogueTitle} will not appear here.
         </p>
       </EmptyState>
     );
@@ -143,7 +146,7 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
         <div className="mb-4 space-y-2">
           <div>
             <label htmlFor="quick-add-search" className="mb-1 block text-xs font-medium text-muted-foreground">
-              Search menu
+              Search {vocab.catalogue}
             </label>
             <div className="relative">
               <Search
@@ -164,7 +167,7 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
           {categories.length > 1 ? (
             <div
               role="group"
-              aria-label="Menu categories"
+              aria-label={`${vocab.catalogueTitle} categories`}
               className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-thin"
             >
               {categories.map((c) => (

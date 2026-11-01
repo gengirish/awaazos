@@ -16,6 +16,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { paiseToRupees, rupeesToPaise } from "@/lib/currency";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 
 /** The menu row the drop form needs for a dish added from here. */
 export type AddedMenuItem = {
@@ -44,16 +45,17 @@ function priceToPaise(raw: string): number | null {
   }
 }
 
-function failureMessage(status: number, body: ApiBody): string {
+function failureMessage(status: number, body: ApiBody, vocab: StoreVocabulary): string {
+  const menuItem = vocab.kind === "food" ? "menu item" : vocab.item;
   if (status === 400) return body.issues?.[0]?.message ?? "Check the name and price, then try again.";
   if (status === 402) {
     return body.error === "billing_locked"
-      ? "Adding dishes is paused until you subscribe."
-      : "Your plan doesn't allow another menu item.";
+      ? `Adding ${vocab.items} is paused until you subscribe.`
+      : `Your plan doesn't allow another ${menuItem}.`;
   }
-  if (status === 409) return "A dish with this name is already on your menu.";
-  if (status === 401 || status === 403) return "You don't have permission to add menu items.";
-  return "Could not add this dish. Please try again.";
+  if (status === 409) return `A ${vocab.item} with this name is already on your ${vocab.catalogue}.`;
+  if (status === 401 || status === 403) return `You don't have permission to add ${menuItem}s.`;
+  return `Could not add this ${vocab.item}. Please try again.`;
 }
 
 export type AddMenuItemDialogProps = {
@@ -61,6 +63,8 @@ export type AddMenuItemDialogProps = {
   spokenName: string;
   onClose: () => void;
   onAdded: (item: AddedMenuItem) => void;
+  /** The store's words for its catalogue (lib/store-vocabulary.ts). */
+  vocab: StoreVocabulary;
 };
 
 /**
@@ -71,7 +75,7 @@ export type AddMenuItemDialogProps = {
  * Deliberately not a `<form>`: it opens from inside the drop form, and a submit
  * event in a portal still bubbles through React to that form's handler.
  */
-export function AddMenuItemDialog({ spokenName, onClose, onAdded }: AddMenuItemDialogProps) {
+export function AddMenuItemDialog({ spokenName, onClose, onAdded, vocab }: AddMenuItemDialogProps) {
   const [name, setName] = useState(spokenName);
   // Rupees as typed; converted to paise only on save.
   const [price, setPrice] = useState("");
@@ -84,7 +88,7 @@ export function AddMenuItemDialog({ spokenName, onClose, onAdded }: AddMenuItemD
     const cleanName = name.trim();
     const paise = priceToPaise(price);
     const next = {
-      name: cleanName ? undefined : "Enter the dish name",
+      name: cleanName ? undefined : `Enter the ${vocab.item} name`,
       price: paise === null ? "Enter a price in rupees, e.g. 120" : undefined,
     };
     setErrors(next);
@@ -102,7 +106,7 @@ export function AddMenuItemDialog({ spokenName, onClose, onAdded }: AddMenuItemD
       const body = (await res.json().catch(() => ({}))) as ApiBody;
       const d = body.data;
       if (!res.ok || !d?.id) {
-        setFailure(failureMessage(res.status, body));
+        setFailure(failureMessage(res.status, body, vocab));
         return;
       }
       onAdded({
@@ -129,15 +133,16 @@ export function AddMenuItemDialog({ spokenName, onClose, onAdded }: AddMenuItemD
     <ResponsiveDialog open onOpenChange={(o) => !o && !saving && onClose()}>
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle>Add to your menu</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle>Add to your {vocab.catalogue}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
-            It is saved to your menu and ticked for this drop. You can add a photo and more on the Menu page later.
+            It is saved to your {vocab.catalogue} and ticked for this drop. You can add a photo and more on the{" "}
+            {vocab.catalogueTitle} page later.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         <ResponsiveDialogBody className="space-y-4">
           <div className="space-y-1.5">
             <label htmlFor="add-dish-name" className="text-sm font-medium">
-              Dish name
+              {vocab.Item} name
             </label>
             <Input
               id="add-dish-name"
@@ -186,7 +191,7 @@ export function AddMenuItemDialog({ spokenName, onClose, onAdded }: AddMenuItemD
           </Button>
           <Button type="button" className="min-h-11" disabled={saving} onClick={() => void save()}>
             {saving ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
-            {saving ? "Adding…" : "Add dish"}
+            {saving ? "Adding…" : `Add ${vocab.item}`}
           </Button>
         </ResponsiveDialogFooter>
       </ResponsiveDialogContent>

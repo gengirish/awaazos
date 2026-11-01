@@ -3,14 +3,17 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import type { StoreKind } from "@/lib/store-vocabulary";
+
 /** The FSSAI number shown to buyers on the storefront. */
 export type FssaiNumberClientProps = {
   initialFssaiNumber: string | null;
+  storeKind: StoreKind;
 };
 
 const FSSAI = /^\d{14}$/;
 
-export function FssaiNumberClient({ initialFssaiNumber }: FssaiNumberClientProps) {
+export function FssaiNumberClient({ initialFssaiNumber, storeKind }: FssaiNumberClientProps) {
   const [fssai, setFssai] = useState(initialFssaiNumber ?? "");
   const [savedFssai, setSavedFssai] = useState(initialFssaiNumber ?? "");
   const [fssaiError, setFssaiError] = useState<string | null>(null);
@@ -78,7 +81,8 @@ export function FssaiNumberClient({ initialFssaiNumber }: FssaiNumberClientProps
         className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 font-mono text-base tabular-nums ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
       />
       <p id="fssai-hint" className={`text-xs ${fssaiError ? "text-destructive" : "text-muted-foreground"}`}>
-        {fssaiError ?? "14 digits. Shown on your store page so customers know your kitchen is registered."}
+        {fssaiError ??
+          `14 digits. Shown on your store page so customers know ${storeKind === "food" ? "your kitchen is" : "you are"} registered.`}
       </p>
       <button
         type="button"

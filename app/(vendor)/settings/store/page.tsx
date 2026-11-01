@@ -19,7 +19,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Online store · Settings · AwaazOS" };
 
 export default async function StoreSettingsPage() {
-  const { vendor, isOwner } = await requireSettingsContext();
+  const { vendor, isOwner, storeKind, vocab } = await requireSettingsContext();
 
   const [settings, availableItemCount, communities] = await Promise.all([
     prisma.vendorSettings.findUnique({
@@ -34,7 +34,7 @@ export default async function StoreSettingsPage() {
     <>
       <SettingsPageHeader
         title="Online store"
-        description="A web page with your menu that customers open from a QR or a WhatsApp link."
+        description={`A web page with your ${vocab.catalogue} that customers open from a QR or a WhatsApp link.`}
       />
       <div className="space-y-4">
         <SettingsCard title="Store name">
@@ -70,12 +70,13 @@ export default async function StoreSettingsPage() {
             initialPublished={settings?.publishStorefront ?? false}
             hasUpiId={Boolean(vendor.upiId)}
             availableItemCount={availableItemCount}
+            catalogueTitle={vocab.catalogueTitle}
           />
         </SettingsCard>
         {communities.length > 0 ? (
           <SettingsCard
             title="Community pages"
-            description="Pages for your housing society that link to the home kitchens living there."
+            description={`Pages for your housing society that link to the ${storeKind === "food" ? "home kitchens" : "home sellers"} living there.`}
           >
             <CommunitiesClient
               initial={communities}
@@ -87,8 +88,12 @@ export default async function StoreSettingsPage() {
         <SettingsCard title="Instagram" description="Shown on your store page as a link to your profile.">
           <InstagramHandleClient initialHandle={settings?.instagramHandle ?? null} isOwner={isOwner} />
         </SettingsCard>
-        <SettingsCard title="Food licence" description="Shown on your store page.">
-          <FssaiNumberClient initialFssaiNumber={settings?.fssaiNumber ?? null} />
+        {/* Many non-food products (supplements, herbal teas) need an FSSAI licence too, so every store keeps the field. */}
+        <SettingsCard
+          title={storeKind === "food" ? "Food licence" : "FSSAI licence (if you have one)"}
+          description="Shown on your store page."
+        >
+          <FssaiNumberClient initialFssaiNumber={settings?.fssaiNumber ?? null} storeKind={storeKind} />
         </SettingsCard>
       </div>
     </>

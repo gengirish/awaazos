@@ -5,6 +5,7 @@ import { MenuGrid } from "@/components/menu/MenuGrid";
 import { VoiceMenuPanel } from "@/components/menu/VoiceMenuPanel";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
 
 export default async function MenuPage(props: {
   searchParams: Promise<{ add?: string | string[]; voice?: string | string[] }>;
@@ -16,9 +17,11 @@ export default async function MenuPage(props: {
   const voiceOpen = voice === "1";
 
   let vendorId: string;
+  let vocab: StoreVocabulary;
   try {
     const ctx = await requireVendorRole("CASHIER");
     vendorId = ctx.vendor.id;
+    vocab = storeVocabulary(ctx.vendor.stallType);
   } catch (e) {
     if (e instanceof AuthError) {
       redirect("/sign-in");
@@ -38,7 +41,7 @@ export default async function MenuPage(props: {
   return (
     <div className="bg-background p-4 pb-10 md:p-6">
       <header className="mx-auto mb-6 max-w-5xl">
-        <h1 className="font-display text-2xl font-semibold text-foreground">Menu</h1>
+        <h1 className="font-display text-2xl font-semibold text-foreground">{vocab.catalogueTitle}</h1>
         <p className="text-sm text-muted-foreground">Add items, set their order, and mark what is sold out.</p>
       </header>
       <main id="main-menu" className="mx-auto max-w-5xl space-y-6">
@@ -47,8 +50,9 @@ export default async function MenuPage(props: {
           categories={categories}
           itemCount={items.length}
           defaultOpen={voiceOpen}
+          vocab={vocab}
         />
-        <MenuGrid initialItems={items} prefillName={prefillName || undefined} />
+        <MenuGrid initialItems={items} prefillName={prefillName || undefined} vocab={vocab} />
       </main>
     </div>
   );

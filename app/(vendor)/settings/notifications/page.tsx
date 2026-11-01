@@ -21,7 +21,7 @@ const WHAT_YOU_GET = [
 
 export default async function NotificationsSettingsPage() {
   // Any staff member may opt in their own phone; the context only checks sign-in.
-  await requireSettingsContext();
+  const { storeKind } = await requireSettingsContext();
 
   return (
     <>
@@ -34,7 +34,7 @@ export default async function NotificationsSettingsPage() {
           <PushAlertsButton variant="settings" />
         </SettingsCard>
 
-        <SettingsCard title="Voice alert" description="Hear new orders spoken aloud while you cook.">
+        <SettingsCard title="Voice alert" description={`Hear new orders spoken aloud while you ${storeKind === "food" ? "cook" : "work"}.`}>
           <VoiceAlertToggle />
         </SettingsCard>
 

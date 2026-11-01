@@ -10,6 +10,7 @@ import { getOrderSignal } from "@/lib/drops-signal";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { loadSetupChecklist } from "@/lib/setup-checklist-server";
+import { storeVocabulary } from "@/lib/store-vocabulary";
 
 export const dynamic = "force-dynamic";
 
@@ -78,6 +79,7 @@ export default async function OrdersPage(props: Props) {
         initialDropId={dropId}
         initialSignal={signal}
         staffRole={ctx.staff.role}
+        vocab={storeVocabulary(ctx.vendor.stallType)}
         riders={parseDeliveryRiders(settings?.deliveryRiders)}
       />
     </main>

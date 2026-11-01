@@ -1,0 +1,26 @@
+{
+  "id": "hi-010-sweets-by-kilo",
+  "lang": "hi-IN",
+  "transcript": "kaju katli nau sau rupaye kilo, motichoor laddu aadha kilo teen sau",
+  "expected": {
+    "items": [
+      {
+        "name": "Kaju Katli",
+        "action": "create",
+        "priceInPaise": 90000,
+        "unit": "kg"
+      },
+      {
+        "name": "Motichoor Laddu",
+        "action": "create",
+        "priceInPaise": 30000,
+        "unit": "500 g"
+      }
+    ]
+  },
+  "tags": [
+    "pack-size",
+    "indic-numerals"
+  ],
+  "notes": "Kitchen regression for units: per-kilo pricing and a half-kilo box."
+}

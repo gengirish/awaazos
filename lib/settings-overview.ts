@@ -1,6 +1,7 @@
 import type { FulfilmentMode, Plan, ReceiptPaper, StaffRole } from "@prisma/client";
 
 import { PLAN_LIMITS, VOICE_LANGUAGES } from "./constants";
+import { vocabularyForKind, type StoreKind } from "./store-vocabulary";
 
 /**
  * Pure helpers behind the Settings hub (/settings): one-line status per area
@@ -9,6 +10,9 @@ import { PLAN_LIMITS, VOICE_LANGUAGES } from "./constants";
  *
  * The checklist is drawn by components/setup/SetupChecklistCard.tsx (Settings,
  * /orders, /pos, /drops) from lib/setup-checklist-server.ts.
+ *
+ * Copy that names the catalogue follows the store's kind (lib/store-vocabulary.ts):
+ * "Order from menu" for a kitchen, "Order any time" for any other store.
  */
 
 export type SettingsSnapshot = {
@@ -67,10 +71,12 @@ export function storeStatus(s: Pick<SettingsSnapshot, "slug" | "publishStorefron
 
 export function ordersStatus(
   s: Pick<SettingsSnapshot, "acceptMenuOrders" | "menuFulfilmentMode">,
+  kind: StoreKind = "food",
 ): SectionStatus {
+  const title = vocabularyForKind(kind).catalogueOrdersTitle;
   return s.acceptMenuOrders
-    ? { text: `Order from menu: On · ${FULFILMENT_LABEL[s.menuFulfilmentMode]}`, on: true }
-    : { text: "Order from menu: Off", on: false };
+    ? { text: `${title}: On · ${FULFILMENT_LABEL[s.menuFulfilmentMode]}`, on: true }
+    : { text: `${title}: Off`, on: false };
 }
 
 /** `activeOffers` = offers switched on (their dates are not looked at here). */
@@ -153,14 +159,15 @@ export type SetupChecklistInput = Pick<
  * What is still missing before customers can order online. Empty means
  * everything essential is done, and the checklist is hidden.
  */
-export function setupChecklist(s: SetupChecklistInput): ChecklistItem[] {
+export function setupChecklist(s: SetupChecklistInput, kind: StoreKind = "food"): ChecklistItem[] {
+  const vocab = vocabularyForKind(kind);
   const items: ChecklistItem[] = [];
   if (s.availableItemCount <= 0) {
     items.push({
       id: "menu_items",
-      text: "Add at least one item to your menu",
+      text: `Add at least one item to your ${vocab.catalogue}`,
       href: "/menu",
-      linkText: "Go to Menu",
+      linkText: `Go to ${vocab.catalogueTitle}`,
       // The API lets a cashier add items, but the shell hides Menu from them (lib/app-nav.ts).
       minRole: "MANAGER",
     });
@@ -187,11 +194,11 @@ export function setupChecklist(s: SetupChecklistInput): ChecklistItem[] {
   if (s.dropCount <= 0 && !s.acceptMenuOrders) {
     items.push({
       id: "first_drop",
-      text: "Create your first drop or turn on menu orders",
+      text: `Create your first drop or turn on ${vocab.catalogueOrders.toLowerCase()}`,
       href: "/drops/new",
       linkText: "Create a drop",
       minRole: "MANAGER",
-      hint: "To sell from your everyday menu instead, the owner turns on Order from menu in Settings → Online orders.",
+      hint: `To sell from your everyday ${vocab.catalogue} instead, the owner turns on ${vocab.catalogueOrdersTitle} in Settings → Online orders.`,
     });
   }
   return items;

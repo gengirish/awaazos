@@ -5,6 +5,7 @@ import { useState } from "react";
 import { SettingsCard } from "@/components/settings/SettingsChrome";
 import { PayOnDeliveryClient } from "@/components/settings/PayOnDeliveryClient";
 import { UpiDetailsClient } from "@/components/settings/UpiDetailsClient";
+import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
 
 /**
  * UPI details + pay on delivery share state: removing the UPI ID warns only
@@ -16,6 +17,7 @@ export type PaymentMethodsClientProps = {
   initialUpiName: string | null;
   initialAcceptPayOnDelivery: boolean;
   isOwner: boolean;
+  storeKind: StoreKind;
 };
 
 export function PaymentMethodsClient({
@@ -23,6 +25,7 @@ export function PaymentMethodsClient({
   initialUpiName,
   initialAcceptPayOnDelivery,
   isOwner,
+  storeKind,
 }: PaymentMethodsClientProps) {
   const [hasUpiId, setHasUpiId] = useState(Boolean(initialUpiId));
   const [payOnDelivery, setPayOnDelivery] = useState(initialAcceptPayOnDelivery);
@@ -38,18 +41,20 @@ export function PaymentMethodsClient({
             initialUpiName={initialUpiName}
             acceptPayOnDelivery={payOnDelivery}
             isOwner={isOwner}
+            storeKind={storeKind}
             onSaved={(id) => setHasUpiId(Boolean(id))}
           />
       </SettingsCard>
 
       <SettingsCard
         title="Pay on delivery"
-        description="For online orders and Drops: let customers pay when they get their food."
+        description={`For online orders and Drops: let customers pay when they get their ${vocabularyForKind(storeKind).goods}.`}
       >
           <PayOnDeliveryClient
             initialAcceptPayOnDelivery={initialAcceptPayOnDelivery}
             hasUpiId={hasUpiId}
             onChange={setPayOnDelivery}
+            storeKind={storeKind}
           />
       </SettingsCard>
     </>

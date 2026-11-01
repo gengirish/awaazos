@@ -35,8 +35,8 @@ const nameKey = (s: string) => s.toLowerCase().replace(/\s+/g, " ").trim();
 /**
  * POST /api/menu/bulk — save the rows a vendor confirmed in the voice menu
  * builder. One transaction:
- *   - rows with `existingMenuItemId` → price update only, compound
- *     `where { id, vendorId }`; an id that isn't this vendor's is skipped as
+ *   - rows with `existingMenuItemId` → price update only (a `unit` on such a
+ *     row is ignored), compound `where { id, vendorId }`; an id that isn't this vendor's is skipped as
  *     `not_found` (never touches another tenant, never says whether it exists);
  *   - other rows → created with the same slug / alias / sortOrder rules as
  *     POST /api/menu (lib/menu-create.ts).
@@ -128,6 +128,7 @@ export async function POST(req: NextRequest) {
               isPopular: false,
               isAvailable: true,
               showOnline: true,
+              unit: c.unit ?? null,
             }),
           );
           created = await tx.menuItem.createManyAndReturn({ data });

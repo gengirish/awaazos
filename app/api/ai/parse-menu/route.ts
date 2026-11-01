@@ -4,6 +4,7 @@ import { z } from "zod";
 import { reserveAnthropicTokens } from "@/lib/ai-usage-guard";
 import { requireEnv } from "@/lib/env";
 import { parseMenuFromTranscript } from "@/lib/parse-menu";
+import { storeVocabulary } from "@/lib/store-vocabulary";
 import { prisma } from "@/lib/prisma";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, requireActiveBilling, requireVendorRole } from "@/lib/rbac";
@@ -83,6 +84,7 @@ export async function POST(req: NextRequest) {
         menuItems: menuRows,
         transcript: body.transcript,
         lang: body.lang ?? "en-IN",
+        vocab: storeVocabulary(ctx.vendor.stallType),
       }));
     } catch (parseErr) {
       console.error(

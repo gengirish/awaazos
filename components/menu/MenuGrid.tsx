@@ -1,7 +1,7 @@
 "use client";
 
 import type { MenuItem } from "@prisma/client";
-import { UtensilsCrossed } from "lucide-react";
+import { Package, UtensilsCrossed } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -10,11 +10,14 @@ import { MenuItemCard, type MenuMoveDirection } from "@/components/menu/MenuItem
 import { MenuItemForm } from "@/components/menu/MenuItemForm";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 
 type MenuGridProps = {
   initialItems: MenuItem[];
   /** Open the add form with this name on first render (`/menu?add=…`). */
   prefillName?: string;
+  /** The store's words (lib/store-vocabulary.ts). */
+  vocab: StoreVocabulary;
 };
 
 /** One request for the whole order (POST /api/menu/reorder). False when it did not save. */
@@ -31,7 +34,7 @@ async function saveOrder(rows: MenuItem[]): Promise<boolean> {
   }
 }
 
-export function MenuGrid({ initialItems, prefillName }: MenuGridProps) {
+export function MenuGrid({ initialItems, prefillName, vocab }: MenuGridProps) {
   const router = useRouter();
   const [items, setItems] = useState<MenuItem[]>(initialItems);
   const [formOpen, setFormOpen] = useState(Boolean(prefillName));
@@ -145,9 +148,9 @@ export function MenuGrid({ initialItems, prefillName }: MenuGridProps) {
       {items.length === 0 ? (
         // The only "Add item" on the page while the menu is empty.
         <EmptyState
-          icon={UtensilsCrossed}
+          icon={vocab.foodArt ? UtensilsCrossed : Package}
           title="No items yet"
-          description="Add your first item here, or use Add dishes by voice above to say several with their prices."
+          description={`Add your first item here, or use Add ${vocab.items} by voice above to say several with their prices.`}
           action={
             <Button type="button" className="min-h-11" onClick={openCreate}>
               Add item
@@ -201,6 +204,7 @@ export function MenuGrid({ initialItems, prefillName }: MenuGridProps) {
         onSaved={refresh}
         defaultName={defaultName}
         categories={categories}
+        vocab={vocab}
       />
     </div>
   );

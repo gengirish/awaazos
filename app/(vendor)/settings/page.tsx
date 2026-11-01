@@ -24,6 +24,7 @@ import {
   type SectionStatus,
   type SettingsSnapshot,
 } from "@/lib/settings-overview";
+import { fillVocabulary } from "@/lib/store-vocabulary";
 import { hasStoredRazorpayCreds, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 
 import { requireSettingsContext } from "./_context";
@@ -68,7 +69,7 @@ function StatusLine({ status }: { status: SectionStatus }) {
 }
 
 export default async function SettingsHubPage() {
-  const { vendor, user, access, isOwner, canManage } = await requireSettingsContext();
+  const { vendor, user, access, isOwner, canManage, storeKind, vocab } = await requireSettingsContext();
 
   const pushConfigured = isPushConfigured();
   const [settings, availableItemCount, pushDeviceCount, activeOfferCount, dropCount] = await Promise.all([
@@ -116,7 +117,7 @@ export default async function SettingsHubPage() {
 
   const statuses: Record<SettingsSectionId, SectionStatus> = {
     store: storeStatus(snapshot),
-    orders: ordersStatus(snapshot),
+    orders: ordersStatus(snapshot, storeKind),
     offers: offersStatus(activeOfferCount),
     payments: paymentsStatus(snapshot),
     receipts: receiptsStatus({
@@ -130,7 +131,7 @@ export default async function SettingsHubPage() {
   };
   // Same rule and card as /orders and /pos: only steps this role can act on.
   const checklist = checklistForRole(
-    setupChecklist(snapshot),
+    setupChecklist(snapshot, storeKind),
     isOwner ? "OWNER" : canManage ? "MANAGER" : "CASHIER",
   );
 
@@ -163,7 +164,7 @@ export default async function SettingsHubPage() {
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block font-semibold text-foreground">{section.title}</span>
-                    <span className="hidden truncate text-xs text-muted-foreground sm:block">{section.description}</span>
+                    <span className="hidden truncate text-xs text-muted-foreground sm:block">{fillVocabulary(section.description, vocab)}</span>
                     <span className="mt-0.5 block text-sm text-muted-foreground">
                       <StatusLine status={statuses[section.id]} />
                     </span>
