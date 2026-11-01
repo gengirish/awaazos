@@ -84,7 +84,7 @@ model VendorSettings {
   voiceLang                String         @default("en-IN") // hi-IN, te-IN, kn-IN, ta-IN
   receiptFooter            String? // "Thanks for visiting!"
   receiptPaper             ReceiptPaper   @default(MM80) // Width of the printed receipt (/receipts/[bill])
-  theme                    String         @default("orange") // orange | green | blue | purple
+  theme                    String         @default("orange") // Store colour, STORE_THEMES in lib/store-theme.ts (Settings → Online store)
   hsnDefault               String? // Default HSN/SAC code for menu items without one
   publishStorefront        Boolean        @default(false) // Opt-in: expose /s/<vendor slug> to the public
   fssaiNumber              String? // 14-digit FSSAI registration; shown on storefront + receipts

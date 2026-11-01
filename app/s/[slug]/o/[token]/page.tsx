@@ -45,6 +45,7 @@ import { appBaseUrl, isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/
 import { qrSvgDataUrl } from "@/lib/qr";
 import { buildUpiDeepLink } from "@/lib/upi";
 import { cn } from "@/lib/utils";
+import { storeThemeAttribute } from "@/lib/store-theme";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -90,8 +91,6 @@ export const runtime = "nodejs";
  * (payment submitted, rejected, expired) the link moves into the status card;
  * without an opted-in number the copy never says "message the store".
  */
-
-const BRAND_THEMES = new Set(["green", "amber", "red", "blue", "purple"]);
 
 const loadOrder = cache(async (slug: string, token: string) => {
   return prisma.transaction.findFirst({
@@ -272,8 +271,7 @@ export default async function StorefrontOrderPage(props: {
   });
   const pickupNote = drop ? drop.pickupNote : (vendor.settings?.menuPickupNote ?? null);
   const slug = vendor.slug;
-  const rawTheme = vendor.settings?.theme ?? "orange";
-  const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
+  const theme = storeThemeAttribute(vendor.settings?.theme);
 
   const awaitingUpi = state === "AWAITING_PAYMENT" && order.paymentMethod === "UPI";
   // The seller answered "Not received" to an earlier "I've paid" and nothing has changed since.

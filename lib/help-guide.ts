@@ -319,13 +319,13 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
   {
     id: "store-look",
     group: "setup",
-    title: "Change your store name, banner or logo",
-    steps: "Edit the name and upload a banner and logo. Customers see them at the top of your store.",
+    title: "Change your store name, banner, logo or colour",
+    steps: "Edit the name, upload a banner and logo, and pick a store colour. Customers see them at the top of your store; the colour tints its buttons and links.",
     nav: "settings",
     href: "/settings/store",
     trail: ["Online store"],
     ownerOnly: true,
-    keywords: "photo picture brand rename",
+    keywords: "photo picture brand rename colour color theme",
   },
   {
     id: "store-details",

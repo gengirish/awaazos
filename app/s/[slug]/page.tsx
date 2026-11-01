@@ -69,6 +69,7 @@ import { storeVocabulary } from "@/lib/store-vocabulary";
 import { storeInfoFacts, type StoreFactKind } from "@/lib/store-info";
 import { viewerIsStoreStaff } from "@/lib/storefront-viewer";
 import { buildUpiCollectLink } from "@/lib/upi";
+import { storeThemeAttribute } from "@/lib/store-theme";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -162,9 +163,6 @@ const FACT_ICON: Record<StoreFactKind, typeof Store> = {
   payment: Wallet,
   fssai: BadgeCheck,
 };
-
-/** Themes with a `[data-theme=…]` block in globals.css; anything else stays saffron. */
-const BRAND_THEMES = new Set(["green", "amber", "red", "blue", "purple"]);
 
 /**
  * Deduped across generateMetadata() and the page render — React `cache` keeps
@@ -580,8 +578,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
     ? buildUpiCollectLink({ upiId: vendor.upiId, name: payeeName })
     : null;
   const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
-  const rawTheme = vendor.settings?.theme ?? "orange";
-  const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
+  const theme = storeThemeAttribute(vendor.settings?.theme);
 
   const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
   // The open-amount "Scan to pay" QR, only for a read-only menu (see #pay below).

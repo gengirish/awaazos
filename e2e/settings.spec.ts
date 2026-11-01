@@ -211,6 +211,55 @@ test.describe("settings hub", () => {
     expect(blank.status()).toBe(400);
   });
 
+  test("store colour: one tap saves it, the store page carries it, the API rejects an unknown one", async ({
+    page,
+    request,
+  }) => {
+    test.setTimeout(120_000);
+    await createVendorSession(page, request, "store-colour", "/settings/store");
+
+    const me = (await (await page.request.get("/api/vendor")).json()) as { vendor: { slug: string } };
+
+    const card = page.getByRole("region", { name: "Store colour" });
+    const group = card.getByRole("group", { name: "Store colour" });
+    await expect(group.getByRole("radio", { name: "Saffron" })).toBeChecked();
+
+    // Every swatch is a 44 px tap target (the label wraps the hidden radio).
+    const purple = group.getByRole("radio", { name: "Purple" });
+    const box = await group.getByText("Purple").locator("..").boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+
+    await purple.check();
+    await expect(page.getByText("Store colour: Purple.")).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("radio", { name: "Purple" })).toBeChecked();
+
+    const publish = await page.request.patch("/api/vendor", {
+      data: { publishStorefront: true },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(publish.status()).toBe(200);
+    await page.goto(`/s/${me.vendor.slug}`);
+    await expect(page.locator("#store-top")).toHaveAttribute("data-theme", "purple");
+
+    // Back to the default: the attribute goes away, the brand primary applies.
+    const reset = await page.request.patch("/api/vendor", {
+      data: { theme: "orange" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(reset.status()).toBe(200);
+    await page.reload();
+    await expect(page.locator("#store-top")).not.toHaveAttribute("data-theme", /./);
+
+    const bad = await page.request.patch("/api/vendor", {
+      data: { theme: "pink" },
+      headers: { "Content-Type": "application/json" },
+      failOnStatusCode: false,
+    });
+    expect(bad.status()).toBe(400);
+  });
+
   test("online store has a banner & logo card; the upload routes validate before storing", async ({ page, request }) => {
     await createVendorSession(page, request, "settings-images", "/settings/store");
 

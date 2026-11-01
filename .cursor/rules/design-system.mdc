@@ -29,11 +29,14 @@ screens still carry raw classes and move over as they are touched.
 ## Vendor theme override
 
 `VendorSettings.theme` swaps `--primary` and `--ring` through a `[data-theme]`
-block in `app/globals.css` — never hardcode hex in components. The values with
-a block are `green | amber | red | blue | purple`; `orange` (the column default)
-and anything unknown stay on the default primary. Only the storefront pages
-(`/s/[slug]` and below, `BRAND_THEMES`) apply it, and no API route or Settings
-screen writes the column yet.
+block in `app/globals.css` — never hardcode hex in components. The one list is
+`STORE_THEMES` in `lib/store-theme.ts`: `green | amber | red | blue | purple`
+have a block; `orange` (the column default) and anything unknown stay on the
+default primary (`storeThemeAttribute()` returns `undefined`, so no attribute is
+rendered). Only the storefront pages (`/s/[slug]` and below) apply it. The owner
+picks it in Settings → Online store → Store colour (`StoreThemeClient`, one tap =
+`PATCH /api/vendor { theme }`); the swatches are painted by the same
+`[data-theme]` blocks, so the picker never carries a hex of its own.
 
 Every theme primary must keep white text at 4.5:1 or better:
 

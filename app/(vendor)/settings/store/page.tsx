@@ -8,6 +8,7 @@ import { StoreDetailsClient } from "@/components/settings/StoreDetailsClient";
 import { StoreHandleClient } from "@/components/settings/StoreHandleClient";
 import { StoreImagesClient } from "@/components/settings/StoreImagesClient";
 import { StoreNameClient } from "@/components/settings/StoreNameClient";
+import { StoreThemeClient } from "@/components/settings/StoreThemeClient";
 import { StorefrontClient } from "@/components/settings/StorefrontClient";
 import { listVendorCommunities } from "@/lib/community-server";
 import { prisma } from "@/lib/prisma";
@@ -24,7 +25,7 @@ export default async function StoreSettingsPage() {
   const [settings, availableItemCount, communities] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: vendor.id },
-      select: { publishStorefront: true, fssaiNumber: true, instagramHandle: true },
+      select: { publishStorefront: true, fssaiNumber: true, instagramHandle: true, theme: true },
     }),
     prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
     listVendorCommunities(vendor.id),
@@ -63,6 +64,9 @@ export default async function StoreSettingsPage() {
             initialLogoUrl={vendor.logoUrl}
             isOwner={isOwner}
           />
+        </SettingsCard>
+        <SettingsCard title="Store colour" description="Tints the buttons and links on your store page.">
+          <StoreThemeClient initialTheme={settings?.theme} isOwner={isOwner} />
         </SettingsCard>
         <SettingsCard title="Your store page">
           <StorefrontClient

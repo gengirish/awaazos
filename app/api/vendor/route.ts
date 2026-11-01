@@ -19,6 +19,7 @@ import { resolveStallTypeOther } from "@/lib/stall-type";
 import { requireVendorRole } from "@/lib/rbac";
 import { GSTIN_FORMAT_MESSAGE, GSTIN_PATTERN, RECEIPT_FOOTER_MAX } from "@/lib/receipt";
 import { storeHandleSchema } from "@/lib/store-handle";
+import { STORE_THEMES } from "@/lib/store-theme";
 import { storeNameSchema } from "@/lib/store-name";
 import { buyerWhatsappNumber } from "@/lib/storefront-order";
 import { UPI_ID_FORMAT_MESSAGE, UPI_ID_PATTERN } from "@/lib/upi";
@@ -57,6 +58,8 @@ const patchSchema = z.object({
   acceptWhatsappOrders: z.boolean().optional(),
   // Show a WhatsApp chat link to every storefront visitor. Off by default.
   showWhatsappOnStore: z.boolean().optional(),
+  // The store colour (lib/store-theme.ts); the storefront pages read it as data-theme.
+  theme: z.enum(STORE_THEMES).optional(),
   // "@handle" or a profile URL; stored bare. "" or null clears it.
   instagramHandle: z
     .string()
@@ -296,6 +299,9 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.instagramHandle !== undefined) {
         settingsUpdate.instagramHandle = vendorFields.instagramHandle || null;
+      }
+      if (vendorFields.theme !== undefined) {
+        settingsUpdate.theme = vendorFields.theme;
       }
       if (vendorFields.voiceLang !== undefined) {
         settingsUpdate.voiceLang = vendorFields.voiceLang;
