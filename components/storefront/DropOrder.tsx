@@ -15,10 +15,10 @@ import {
   type BuyerPrefill,
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
+import { ItemPrice } from "@/components/storefront/ItemPrice";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
-import { formatINRCompact } from "@/lib/currency";
-import { applyOffers, type ResolvedOffer } from "@/lib/offers";
+import { applyOffers, salePriceFor, type ResolvedOffer } from "@/lib/offers";
 import {
   cartStorageKey,
   maxOrderableQty,
@@ -156,7 +156,7 @@ export function DropOrder(props: DropOrderProps) {
     })),
     offers,
   );
-  const appliedOffer = offered.discounts[0] ?? null;
+  const appliedOffer = offered.applied;
   // What the cart bars show: items less the offer discount (delivery is added at checkout).
   const payablePaise = offered.totalPaise;
   const canPay = payment.upi || payment.cod;
@@ -244,9 +244,10 @@ export function DropOrder(props: DropOrderProps) {
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">{item.name}</span>
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                  <span className="font-mono font-bold tabular-nums text-foreground">
-                    {formatINRCompact(item.priceInPaise)}
-                  </span>
+                  <ItemPrice
+                    priceInPaise={item.priceInPaise}
+                    sale={orderable ? salePriceFor(offers, item.menuItemId, item.priceInPaise) : null}
+                  />
                   {badge ? (
                     <span
                       className={cn(
