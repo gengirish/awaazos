@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   MapPin,
   MessageCircle,
+  Package,
   QrCode,
   ShoppingBag,
   Store,
@@ -785,7 +786,11 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             {/* What and where, as one quiet line under the name. */}
             <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-semibold text-muted-foreground">
               <span className="inline-flex items-center gap-1.5">
-                <UtensilsCrossed className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                {foodArt ? (
+                  <UtensilsCrossed className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                ) : (
+                  <Package className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                )}
                 {stallTypeLabel(vendor.stallType, vendor.stallTypeOther)}
               </span>
               {place ? (
