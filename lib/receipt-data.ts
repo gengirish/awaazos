@@ -45,6 +45,7 @@ const RECEIPT_TX_SELECT = {
     select: {
       id: true,
       slug: true,
+      isDemo: true,
       name: true,
       city: true,
       state: true,
@@ -97,6 +98,7 @@ function toView(row: ReceiptRow, publicToken: string | null, baseUrl: string): R
       baseUrl,
     }),
     receiptUrl: publicReceiptUrl(publicToken, baseUrl),
+    referralSlug: row.vendor.isDemo ? null : row.vendor.slug,
   };
 }
 

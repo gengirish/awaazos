@@ -12,6 +12,7 @@ import {
 } from "@/lib/razorpay";
 import { billingRateLimit, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { redeemBankedRewardsAtSubscribe } from "@/lib/referral-server";
 import {
   BILLING_INTERVALS,
   LIVE_SUBSCRIPTION_STATUSES,
@@ -71,12 +72,6 @@ export async function POST(req: NextRequest) {
     // if billing isn't configured on this deploy.
     const keyId = getRazorpayKeyId();
 
-    const now = new Date();
-    // Subscribing during the trial defers the first charge to the trial's end.
-    const trialEndsAt = ctx.vendor.trialEndsAt;
-    const startAt = trialEndsAt && trialEndsAt.getTime() > now.getTime() ? trialEndsAt : null;
-    const startAtSec = startAt ? Math.floor(startAt.getTime() / 1000) : null;
-
     const settings = await prisma.vendorSettings.findUnique({
       where: { vendorId: ctx.vendor.id },
       select: { razorpaySubId: true, razorpaySubStatus: true },
@@ -86,14 +81,39 @@ export async function POST(req: NextRequest) {
     }
 
     // An earlier checkout nobody paid: reuse it if it's for the same plan,
-    // otherwise cancel it so its emailed link can't be paid later.
+    // otherwise cancel it so its emailed link can't be paid later. Fetched
+    // before any banked referral months are redeemed, so a live sub found
+    // here never has free time applied under it.
     const previousId = settings?.razorpaySubId;
+    let previous: Awaited<ReturnType<typeof fetchSubscription>> | null = null;
     if (previousId) {
       try {
-        const previous = await fetchSubscription(previousId);
-        if (LIVE_SUBSCRIPTION_STATUSES.includes(previous.status)) {
-          return NextResponse.json({ error: ALREADY_SUBSCRIBED }, { status: 400 });
-        }
+        previous = await fetchSubscription(previousId);
+      } catch (err) {
+        // Unknown to Razorpay (e.g. test-mode id under live keys) or a timeout:
+        // carry on and make a fresh one.
+        console.warn(
+          "[api/razorpay/create-subscription] previous sub %s: %s",
+          maskId(previousId),
+          err instanceof Error ? err.message : "unknown",
+        );
+      }
+      if (previous && LIVE_SUBSCRIPTION_STATUSES.includes(previous.status)) {
+        return NextResponse.json({ error: ALREADY_SUBSCRIBED }, { status: 400 });
+      }
+    }
+
+    const now = new Date();
+    // Banked referral months (lib/referral.ts) move trialEndsAt forward first,
+    // so the first charge below is deferred past them. Nothing banked → null.
+    const redeemedTrialEnd = await redeemBankedRewardsAtSubscribe(ctx.vendor.id, now);
+    // Subscribing during the trial defers the first charge to the trial's end.
+    const trialEndsAt = redeemedTrialEnd ?? ctx.vendor.trialEndsAt;
+    const startAt = trialEndsAt && trialEndsAt.getTime() > now.getTime() ? trialEndsAt : null;
+    const startAtSec = startAt ? Math.floor(startAt.getTime() / 1000) : null;
+
+    if (previousId && previous) {
+      try {
         if (previous.status === "created") {
           const mapped = planFromRazorpayPlanId(previous.plan_id);
           const sameStart = (previous.start_at ?? null) === startAtSec;

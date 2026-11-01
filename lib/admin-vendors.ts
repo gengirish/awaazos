@@ -25,14 +25,22 @@ const ADMIN_VENDOR_SELECT = {
 
 export type AdminVendorRow = Prisma.VendorGetPayload<{ select: typeof ADMIN_VENDOR_SELECT }>;
 
+/** The list also says which store referred this one (slug only, lib/referral.ts). */
+const ADMIN_VENDOR_LIST_SELECT = {
+  ...ADMIN_VENDOR_SELECT,
+  referredBy: { select: { slug: true } },
+} satisfies Prisma.VendorSelect;
+
+export type AdminVendorListRow = Prisma.VendorGetPayload<{ select: typeof ADMIN_VENDOR_LIST_SELECT }>;
+
 /** Newest stores first, optionally narrowed to a name or slug match. */
-export function listAdminVendors(query: string): Promise<AdminVendorRow[]> {
+export function listAdminVendors(query: string): Promise<AdminVendorListRow[]> {
   const q = query.trim();
   return prisma.vendor.findMany({
     where: q
       ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { slug: { contains: q, mode: "insensitive" } }] }
       : undefined,
-    select: ADMIN_VENDOR_SELECT,
+    select: ADMIN_VENDOR_LIST_SELECT,
     orderBy: { createdAt: "desc" },
     take: ADMIN_VENDOR_LIST_LIMIT,
   });

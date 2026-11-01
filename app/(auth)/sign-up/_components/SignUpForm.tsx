@@ -17,11 +17,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { clearStoredReferral, syncStoredReferral } from "@/components/auth/referral-code-store";
 import { useStoreHandleCheck } from "@/hooks/useStoreHandleCheck";
 import { STALL_TYPES } from "@/lib/constants";
 import { STALL_TYPE_OTHER_MAX, STALL_TYPE_OTHER_MESSAGE, stallTypeOtherSchema } from "@/lib/stall-type";
 import { HOME_PATH } from "@/lib/home";
 import { checkPasswordPolicy } from "@/lib/password-strength";
+import { REFERRAL_QUERY_PARAM, REFERRED_TRIAL_DAYS } from "@/lib/referral";
 import {
   normaliseStoreHandle,
   STORE_HANDLE_MAX,
@@ -110,12 +112,22 @@ function handleHintClass(check: HandleCheck): string {
   return "text-muted-foreground";
 }
 
-export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: string }) {
+export function SignUpForm({
+  ctaLabel,
+  referredCtaLabel,
+  ctaNote,
+}: {
+  ctaLabel: string;
+  /** The call to action when a referral code is present: the longer trial. */
+  referredCtaLabel: string;
+  ctaNote: string;
+}) {
   const router = useRouter();
   const searchParams = useSearchParams();
   // A new store still has setup to finish, so the landing resolver sends it
   // to /onboarding (lib/home.ts). An explicit callbackUrl still wins.
   const callbackUrl = searchParams.get("callbackUrl") || HOME_PATH;
+  const refParam = searchParams.get(REFERRAL_QUERY_PARAM);
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -133,10 +145,17 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [emailTaken, setEmailTaken] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  // Referral code (lib/referral.ts): from ?ref= or one kept on this device
+  // from an earlier visit. Read after mount, since localStorage is client-only.
+  const [referralCode, setReferralCode] = useState<string | null>(null);
 
   useEffect(() => {
     setHost(window.location.host);
   }, []);
+
+  useEffect(() => {
+    setReferralCode(syncStoredReferral(refParam));
+  }, [refParam]);
 
   const handleCheck = useStoreHandleCheck(storeHandle);
 
@@ -203,6 +222,7 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
           stallType,
           ...(stallType === "OTHER" ? { stallTypeOther } : {}),
           phone: phone.trim() || undefined,
+          ...(referralCode ? { ref: referralCode } : {}),
         }),
       });
     } catch {
@@ -234,6 +254,9 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
       return;
     }
 
+    // The account exists: the code has done its job on this device.
+    clearStoredReferral();
+
     try {
       const sign = await signIn("credentials", {
         email: normalizedEmail,
@@ -260,6 +283,11 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
       {/* noValidate: onSubmit checks the fields so every error shows under its own field. */}
       <form onSubmit={onSubmit} noValidate>
         <CardContent className="space-y-4">
+          {referralCode ? (
+            <p className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-foreground" role="note">
+              You were invited by a seller — your free trial is {REFERRED_TRIAL_DAYS} days.
+            </p>
+          ) : null}
           {error ? (
             <p className="text-sm text-destructive" role="alert">
               {error}
@@ -424,7 +452,7 @@ export function SignUpForm({ ctaLabel, ctaNote }: { ctaLabel: string; ctaNote: s
         </CardContent>
         <CardFooter className="flex flex-col items-stretch gap-2">
           <Button type="submit" className="w-full" disabled={submitting}>
-            {submitting ? "Creating…" : ctaLabel}
+            {submitting ? "Creating…" : referralCode ? referredCtaLabel : ctaLabel}
           </Button>
           <p className="text-center text-xs text-muted-foreground">
             By continuing you agree to the{" "}

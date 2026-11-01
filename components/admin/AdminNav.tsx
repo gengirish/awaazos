@@ -3,6 +3,7 @@ import Link from "next/link";
 const LINKS = [
   { href: "/admin/metrics", label: "Weekly metrics", superAdminOnly: false },
   { href: "/admin/vendors", label: "Stores and free access", superAdminOnly: true },
+  { href: "/admin/referrals", label: "Referrals", superAdminOnly: true },
   { href: "/admin/demo-stores", label: "Demo-store pipeline", superAdminOnly: false },
   { href: "/admin/communities", label: "Community pages", superAdminOnly: false },
   { href: "/admin/pricing", label: "Pricing calculator", superAdminOnly: false },

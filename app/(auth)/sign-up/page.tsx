@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 
 import { PLAN_MARKETING } from "@/lib/plan-copy";
+import { REFERRED_TRIAL_DAYS } from "@/lib/referral";
 
 import { SignUpForm } from "./_components/SignUpForm";
 
@@ -17,7 +18,9 @@ export default function SignUpPage() {
   return (
     <main id="main" className="flex min-h-dvh flex-col items-center justify-center bg-muted/30 p-4">
       <Suspense fallback={<div className="text-muted-foreground">Loading…</div>}>
-        <SignUpForm ctaLabel={cta} ctaNote={ctaNote} />
+        {/* With a referral code the form swaps in the longer trial's label, so
+            the button never says 30 days beside the 60-day note. */}
+        <SignUpForm ctaLabel={cta} referredCtaLabel={`Start ${REFERRED_TRIAL_DAYS} days free`} ctaNote={ctaNote} />
       </Suspense>
     </main>
   );

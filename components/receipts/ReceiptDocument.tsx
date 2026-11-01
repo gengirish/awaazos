@@ -17,6 +17,7 @@ export function ReceiptDocument({
   className,
   compact = false,
   headingLevel = 1,
+  poweredByPrintOnly = false,
 }: {
   view: ReceiptView;
   className?: string;
@@ -24,6 +25,12 @@ export function ReceiptDocument({
   compact?: boolean;
   /** The vendor name's heading level: 1 on a page of its own, deeper when embedded. */
   headingLevel?: 1 | 2 | 3;
+  /**
+   * Show the "Powered by AwaazOS" line on paper only. The customer page
+   * (/r/[token]) sets it because it shows the referral footer link on screen
+   * instead, so the screen never carries both.
+   */
+  poweredByPrintOnly?: boolean;
 }) {
   const Heading = (["h1", "h2", "h3"] as const)[headingLevel - 1];
   const state = receiptState(view);
@@ -111,7 +118,7 @@ export function ReceiptDocument({
 
       <footer className="space-y-0.5 text-center">
         <p className="whitespace-pre-line break-words">{view.receiptFooter?.trim() || DEFAULT_RECEIPT_FOOTER}</p>
-        <p className="text-[10px]">Powered by AwaazOS</p>
+        <p className={cn("text-[10px]", poweredByPrintOnly && "hidden print:block")}>Powered by AwaazOS</p>
       </footer>
     </article>
   );

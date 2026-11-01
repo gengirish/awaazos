@@ -6,6 +6,8 @@ import { TRIAL_DAYS } from "@/lib/constants";
 import { hashPassword } from "@/lib/password";
 import { checkPasswordPolicy } from "@/lib/password-strength";
 import { prisma } from "@/lib/prisma";
+import { signUpTrialEndsAt } from "@/lib/referral";
+import { resolveReferrerForSignUp } from "@/lib/referral-server";
 import { resolveStallTypeOther } from "@/lib/stall-type";
 import { authRateLimit, getClientIp, tooManyRequests } from "@/lib/ratelimit";
 import { STORE_HANDLE_TAKEN_MESSAGE } from "@/lib/store-handle";
@@ -39,7 +41,7 @@ export async function POST(req: Request) {
   const email = parsed.data.email.trim().toLowerCase();
   const name = parsed.data.name.trim();
   const stallName = parsed.data.stallName.trim();
-  const { stallType, password, storeHandle } = parsed.data;
+  const { stallType, password, storeHandle, ref } = parsed.data;
   // Valid whenever the schema passed (it requires a description for OTHER).
   const other = resolveStallTypeOther(stallType, parsed.data.stallTypeOther);
   const stallTypeOther = other.ok ? other.value : null;
@@ -75,6 +77,9 @@ export async function POST(req: Request) {
             role: "USER",
           },
         });
+        // A bad, unknown or self-referring code is simply no referrer; it
+        // never fails sign-up (lib/referral.ts).
+        const referrer = await resolveReferrerForSignUp(ref, { email, phone: phoneE164 }, tx);
         const vendor = await tx.vendor.create({
           data: {
             slug,
@@ -85,8 +90,10 @@ export async function POST(req: Request) {
             phone: phoneE164,
             email,
             // Free trial with STARTER limits; billingAccess() (lib/plan.ts)
-            // evaluates it lazily — nothing runs when it ends.
-            trialEndsAt: new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000),
+            // evaluates it lazily — nothing runs when it ends. Longer when
+            // the store came through a referral link.
+            trialEndsAt: signUpTrialEndsAt(referrer !== null, TRIAL_DAYS),
+            referredByVendorId: referrer?.id ?? null,
           },
         });
         await tx.vendorSettings.create({
@@ -101,7 +108,12 @@ export async function POST(req: Request) {
             role: "OWNER",
           },
         });
-        return { userId: user.id, vendorId: vendor.id, vendorSlug: vendor.slug };
+        return {
+          userId: user.id,
+          vendorId: vendor.id,
+          vendorSlug: vendor.slug,
+          referred: referrer !== null,
+        };
       });
 
       const res = NextResponse.json(result, { status: 201 });

@@ -582,6 +582,28 @@ them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireAc
   (the cart's discount row does).
 - Test store data: `npm run seed:quiche-plans -- <slug>` (dry run; `--create` writes).
 
+### Referrals ("Refer a seller")
+
+Stores refer other stores; buyers are not part of it. Rules in the header of `lib/referral.ts`
+(pure), database side in `lib/referral-server.ts`; design in `docs/REFERRALS.md`.
+
+- The code is the referrer's slug: `/sign-up?ref=<slug>`, shared from Settings → Refer a seller
+  (OWNER: link, wa.me text, story image) and carried by the "Powered by AwaazOS" footer on
+  `/s/[slug]`, the buyer's order page and `/r/[token]` (not on demo stores). The sign-up page keeps
+  the code in localStorage for 30 days and posts it as `ref`.
+- `POST /api/auth/register` sets `Vendor.referredByVendorId` once (`resolveReferrerForSignUp`:
+  unknown, inactive, demo or self-referring stores are ignored, sign-up never fails over a code)
+  and gives a `REFERRED_TRIAL_DAYS` (60) trial instead of 30.
+- **Paid in free time, never cash.** The referred store's first `subscription.charged` with a
+  positive amount earns one `ReferralReward` (1 month, 2 for yearly; unique per referred store;
+  ≤ 12 months per referrer per rolling year), inside `recordSubscriptionEvent`'s transaction.
+- **No timers.** A referrer on the trial or locked with no live subscription gets `trialEndsAt`
+  moved forward at once. Otherwise the reward is banked (`EARNED`) and `create-subscription`
+  redeems it into `trialEndsAt` just before computing `start_at`. Credit against a live paid
+  subscription is not built (it needs Razorpay pause/resume on UPI AutoPay checked first).
+- Admin: `/admin/referrals` (SUPER_ADMIN) and two figures on `/admin/metrics`.
+- DB tests: `npm run test:referrals:db` (throwaway `DATABASE_URL`).
+
 ### Internal demo stores (founder outreach)
 
 `/api/internal/demo-stores` (POST create, GET / DELETE `/{external_ref}`, POST `/{external_ref}/handover`)

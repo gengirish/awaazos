@@ -13,6 +13,7 @@ Index of the operational and planning docs. Code wins wherever a doc disagrees w
 | [`NAMING.md`](NAMING.md) | Product name and domain: why rename from AwaazOS, the Ordaro recommendation, every candidate checked and why not |
 | [`INTERNAL_DEMO_STORES.md`](INTERNAL_DEMO_STORES.md) | Internal API that builds a demo store for a prospect and hands it over (founder outreach) |
 | [`RAZORPAY_SUBSCRIPTIONS_PLAN.md`](RAZORPAY_SUBSCRIPTIONS_PLAN.md) | The 30-day trial, the lock and Starter subscriptions: design and what shipped per phase |
+| [`REFERRALS.md`](REFERRALS.md) | "Refer a seller": store-to-store referrals paid in free months, attribution and redemption |
 
 ## Operations
 

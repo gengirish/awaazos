@@ -22,6 +22,7 @@ import { OrderLinkActions } from "@/components/storefront/OrderLinkActions";
 import { OrderRefresh } from "@/components/storefront/OrderRefresh";
 import { OtherCartsNotice } from "@/components/storefront/OtherCartsNotice";
 import { PaidClaimForm } from "@/components/storefront/PaidClaimForm";
+import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
 import { RazorpayPayButton } from "@/components/storefront/RazorpayPayButton";
 import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
@@ -675,9 +676,7 @@ export default async function StorefrontOrderPage(props: {
 
       <footer className="space-y-2 px-4 pb-10 pt-2 text-center text-xs text-muted-foreground">
         {vendor.settings?.fssaiNumber ? <p>FSSAI Lic. No. {vendor.settings.fssaiNumber}</p> : null}
-        <Link href="/" className="inline-flex min-h-11 items-center font-semibold hover:text-primary">
-          Billing by AwaazOS — Bol. Bill. Becho.
-        </Link>
+        <PoweredByFooter slug={vendor.slug} isDemo={vendor.isDemo} />
       </footer>
     </div>
   );

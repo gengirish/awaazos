@@ -86,6 +86,14 @@ export function offersStatus(activeOffers: number): SectionStatus {
     : { text: "No offers on", on: false };
 }
 
+/** Settings → Refer a seller, from `ReferralSummary` counts. */
+export function referStatus(s: { signedUp: number; monthsRedeemed: number; monthsBanked: number }): SectionStatus {
+  const months = s.monthsRedeemed + s.monthsBanked;
+  if (months > 0) return { text: `${months} free ${months === 1 ? "month" : "months"} earned`, on: true };
+  if (s.signedUp > 0) return { text: `${s.signedUp} ${s.signedUp === 1 ? "store" : "stores"} signed up`, on: true };
+  return { text: "No invites yet", on: false };
+}
+
 export function paymentsStatus(
   s: Pick<SettingsSnapshot, "upiId" | "acceptPayOnDelivery" | "razorpayConfigured">,
 ): SectionStatus {
