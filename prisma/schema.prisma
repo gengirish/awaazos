@@ -13,56 +13,64 @@ datasource db {
 // ─── VENDOR (Tenant) ────────────────────────────────────────────────
 
 model Vendor {
-  id              String    @id @default(cuid())
-  slug            String    @unique // URL-safe handle, e.g. "ravis-bhel"
-  name            String // Stall/shop name
-  ownerName       String
-  phone           String? // +91 format
-  email           String?
-  upiId           String? // e.g. vendor@okaxis
-  upiName         String? // Name shown on UPI screen
-  logoUrl         String? // Vercel Blob URL
-  bannerUrl       String? // Vercel Blob URL — wide cover photo on /s/[slug] (POST /api/vendor/banner)
-  plan            Plan      @default(FREE)
-  planExpiresAt   DateTime?
+  id                 String    @id @default(cuid())
+  slug               String    @unique // URL-safe handle, e.g. "ravis-bhel"
+  name               String // Stall/shop name
+  ownerName          String
+  phone              String? // +91 format
+  email              String?
+  upiId              String? // e.g. vendor@okaxis
+  upiName            String? // Name shown on UPI screen
+  logoUrl            String? // Vercel Blob URL
+  bannerUrl          String? // Vercel Blob URL — wide cover photo on /s/[slug] (POST /api/vendor/banner)
+  plan               Plan      @default(FREE)
+  planExpiresAt      DateTime?
   // End of the 30-day free trial (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md). Set at
   // sign-up; null = grandfathered vendor on FREE, never locked. Evaluated
   // lazily by billingAccess() in lib/plan.ts — nothing runs at this instant.
-  trialEndsAt     DateTime?
-  stallType       StallType @default(GENERAL)
+  trialEndsAt        DateTime?
+  stallType          StallType @default(GENERAL)
   // The seller's own words when stallType is OTHER ("Pickles & podis"); null otherwise.
-  stallTypeOther  String?   @db.VarChar(40)
-  city            String?
+  stallTypeOther     String?   @db.VarChar(40)
+  city               String?
   // No default: a default ("Telangana" until 2026-10) put every store that had
   // not chosen one in Telangana on its public page. Null = not given.
-  state           String?
-  gstin           String? // 15-char GST identifier (optional)
-  isActive        Boolean   @default(true)
-  onboardingDone  Boolean   @default(false)
+  state              String?
+  gstin              String? // 15-char GST identifier (optional)
+  isActive           Boolean   @default(true)
+  onboardingDone     Boolean   @default(false)
   // Internal demo store built for a prospect by POST /api/internal/demo-stores
   // (lib/demo-store.ts). Owned by the internal demo account until the prospect
   // claims it; excluded from platform metrics and subscriptions; noindex.
-  isDemo          Boolean   @default(false)
-  demoExternalRef String?   @unique // The outreach workflow's idempotency key; kept after claim
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
+  isDemo             Boolean   @default(false)
+  demoExternalRef    String?   @unique // The outreach workflow's idempotency key; kept after claim
+  // The store whose referral link this store signed up through (lib/referral.ts).
+  // Set once at sign-up, never changed. Null = not referred.
+  referredByVendorId String?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  menuItems          MenuItem[]
-  transactions       Transaction[]
-  receipts           Receipt[]
-  staff              StaffMember[]
-  settings           VendorSettings?
-  dailySummaries     DailySummary[]
-  billSequences      BillSequence[]
-  voiceParseLogs     VoiceParseLog[]
-  drops              Drop[]
-  pushSubscriptions  PushSubscription[]
-  subscriptionEvents SubscriptionEvent[]
-  offers             Offer[]
-  demoHandovers      DemoHandover[]
-  communities        CommunityMember[]
+  menuItems             MenuItem[]
+  transactions          Transaction[]
+  receipts              Receipt[]
+  staff                 StaffMember[]
+  settings              VendorSettings?
+  dailySummaries        DailySummary[]
+  billSequences         BillSequence[]
+  voiceParseLogs        VoiceParseLog[]
+  drops                 Drop[]
+  pushSubscriptions     PushSubscription[]
+  subscriptionEvents    SubscriptionEvent[]
+  offers                Offer[]
+  demoHandovers         DemoHandover[]
+  communities           CommunityMember[]
+  referredBy            Vendor?             @relation("VendorReferrals", fields: [referredByVendorId], references: [id], onDelete: SetNull)
+  referrals             Vendor[]            @relation("VendorReferrals")
+  referralRewardsEarned ReferralReward[]    @relation("ReferralRewardReferrer")
+  referralRewardFrom    ReferralReward?     @relation("ReferralRewardReferred")
 
   @@index([slug])
+  @@index([referredByVendorId])
   @@map("vendors")
 }
 
@@ -824,4 +832,34 @@ enum StaffRole {
   OWNER
   MANAGER
   CASHIER
+}
+
+// One free STARTER month a referrer earned when the store they referred paid
+// its first subscription charge (lib/referral.ts). Unique on the referred
+// store, so one referral can never pay twice. No timers: EARNED rows are
+// redeemed on a webhook (trial extension) or at subscribe time.
+model ReferralReward {
+  id               String               @id @default(cuid())
+  referrerVendorId String
+  referredVendorId String               @unique
+  months           Int // 1, or 2 when the referred store paid yearly
+  status           ReferralRewardStatus @default(EARNED)
+  // How it was redeemed: "trial_extension" | "subscribe_start"; null while EARNED.
+  redeemedVia      String?
+  // The referred store's first-charge event (SubscriptionEvent.razorpayEventId).
+  sourceEventId    String
+  earnedAt         DateTime             @default(now())
+  redeemedAt       DateTime?
+
+  referrer Vendor @relation("ReferralRewardReferrer", fields: [referrerVendorId], references: [id], onDelete: Cascade)
+  referred Vendor @relation("ReferralRewardReferred", fields: [referredVendorId], references: [id], onDelete: Cascade)
+
+  @@index([referrerVendorId, status])
+  @@index([earnedAt])
+  @@map("referral_rewards")
+}
+
+enum ReferralRewardStatus {
+  EARNED // banked, not yet applied
+  REDEEMED // applied as free time
 }
