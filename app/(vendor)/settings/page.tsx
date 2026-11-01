@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
 import { LegacyAnchorRedirect } from "@/components/settings/LegacyAnchorRedirect";
-import { SETTINGS_SECTIONS, type SettingsSectionId } from "@/components/settings/sections";
+import { settingsSectionsFor, type SettingsSectionId } from "@/components/settings/sections";
 import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
 import { trialDaysLeft } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
@@ -17,6 +17,7 @@ import {
   paymentsStatus,
   planStatus,
   receiptsStatus,
+  referStatus,
   setupChecklist,
   storeStatus,
   offersStatus,
@@ -24,6 +25,7 @@ import {
   type SectionStatus,
   type SettingsSnapshot,
 } from "@/lib/settings-overview";
+import { loadReferralSummary } from "@/lib/referral-server";
 import { fillVocabulary } from "@/lib/store-vocabulary";
 import { hasStoredRazorpayCreds, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 
@@ -72,7 +74,9 @@ export default async function SettingsHubPage() {
   const { vendor, user, access, isOwner, canManage, storeKind, vocab } = await requireSettingsContext();
 
   const pushConfigured = isPushConfigured();
-  const [settings, availableItemCount, pushDeviceCount, activeOfferCount, dropCount] = await Promise.all([
+  const sections = settingsSectionsFor({ isOwner, isDemo: vendor.isDemo });
+  const showRefer = sections.some((s) => s.id === "refer");
+  const [settings, availableItemCount, pushDeviceCount, activeOfferCount, dropCount, referral] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: vendor.id },
       select: {
@@ -91,6 +95,7 @@ export default async function SettingsHubPage() {
     pushConfigured ? countVendorPushDevices(vendor.id) : Promise.resolve(0),
     prisma.offer.count({ where: { vendorId: vendor.id, isActive: true } }),
     prisma.drop.count({ where: { vendorId: vendor.id } }),
+    showRefer ? loadReferralSummary(vendor) : Promise.resolve(null),
   ]);
 
   const snapshot: SettingsSnapshot = {
@@ -128,6 +133,7 @@ export default async function SettingsHubPage() {
     notifications: notificationsStatus(snapshot),
     voice: voiceStatus(snapshot),
     billing: planStatus(snapshot),
+    refer: referral ? referStatus(referral) : { text: "", on: false },
   };
   // Same rule and card as /orders and /pos: only steps this role can act on.
   const checklist = checklistForRole(
@@ -151,7 +157,7 @@ export default async function SettingsHubPage() {
 
       <nav aria-label="Settings sections">
         <ul className="divide-y divide-border overflow-hidden rounded-lg border bg-card">
-          {SETTINGS_SECTIONS.map((section) => {
+          {sections.map((section) => {
             const Icon = section.icon;
             return (
               <li key={section.id}>

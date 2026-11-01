@@ -26,6 +26,7 @@ import { ItemPhoto } from "@/components/storefront/ItemPhoto";
 import { CartHubProvider } from "@/components/storefront/CartHub";
 import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
 import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
+import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
 import { RecentOrderLink } from "@/components/storefront/RecentOrderLink";
 import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import { StoreBackButton } from "@/components/storefront/StoreBackButton";
@@ -1085,15 +1086,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
           </main>
 
           <footer className="px-4 pb-10 pt-2 text-center">
-            <Link
-              href="/"
-              className="group inline-flex min-h-11 items-center rounded-full"
-            >
-              {/* The link is the 44px tap target; the pill inside keeps its size. */}
-              <span className="inline-flex items-center rounded-full border border-border/60 bg-background px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors group-hover:border-primary/40 group-hover:text-primary">
-                Billing by AwaazOS — Bol. Bill. Becho.
-              </span>
-            </Link>
+            <PoweredByFooter slug={vendor.slug} isDemo={vendor.isDemo} />
           </footer>
         </CartHubProvider>
       </StoreSearchProvider>

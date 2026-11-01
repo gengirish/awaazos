@@ -128,6 +128,11 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
                     </div>
                     <p className="mt-2 text-sm text-foreground">{status}</p>
                     <p className="text-xs text-muted-foreground">Signed up {formatIstDate(vendor.createdAt)}</p>
+                    {vendor.referredBy ? (
+                      <p className="text-xs text-muted-foreground">
+                        Referred by <span className="font-mono">{vendor.referredBy.slug}</span>
+                      </p>
+                    ) : null}
                     <StoreHealthLine health={healthFor(health, vendor.id)} now={now} />
                     {note ? <p className="mt-2 text-sm text-muted-foreground">{note}</p> : null}
                     <div className="mt-4">

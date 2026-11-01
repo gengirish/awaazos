@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAdminMetrics } from "@/lib/admin-metrics";
+import { REFERRAL_METRICS_DAYS, getReferralMetrics } from "@/lib/admin-referrals";
 import { formatINR } from "@/lib/currency";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
 
@@ -50,7 +51,8 @@ export default async function AdminMetricsPage() {
     throw err;
   }
 
-  const metrics = await getAdminMetrics();
+  const now = new Date();
+  const [metrics, referrals] = await Promise.all([getAdminMetrics(now), getReferralMetrics(now)]);
 
   const voicePctLabel = `${ONE_DECIMAL.format(metrics.voiceSuccessRate7d * 100)}%`;
   const activeWow = formatDelta(metrics.wowGrowth.activeVendorsWoW);

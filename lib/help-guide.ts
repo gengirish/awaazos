@@ -1,6 +1,8 @@
 import type { StaffRole } from "@prisma/client";
 
 import { appNavItemsForRole, appTabBarForRole, type AppNavId } from "@/lib/app-nav";
+import { TRIAL_DAYS } from "@/lib/constants";
+import { REFERRAL_REWARD_CAP_PER_YEAR, REFERRED_TRIAL_DAYS, rewardMonthsFor } from "@/lib/referral";
 import { fillVocabulary, vocabularyForKind, type StoreKind, type StoreVocabulary } from "@/lib/store-vocabulary";
 
 /**
@@ -436,6 +438,17 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     href: "/settings/billing",
     trail: ["Plan & billing"],
     keywords: "trial upgrade pay subscription locked price",
+  },
+  {
+    id: "refer-seller",
+    group: "setup",
+    title: "Invite another seller and earn free months",
+    steps: `Copy your link, or tap Share on WhatsApp or Instagram story. A store that signs up with it gets ${REFERRED_TRIAL_DAYS} days free instead of ${TRIAL_DAYS}. When it pays for its first subscription you get ${rewardMonthsFor("monthly")} free month (${rewardMonthsFor("yearly")} if it pays yearly), up to ${REFERRAL_REWARD_CAP_PER_YEAR} a year.`,
+    nav: "settings",
+    href: "/settings/refer",
+    trail: ["Refer a seller"],
+    ownerOnly: true,
+    keywords: "referral refer invite friend link reward free month trial share",
   },
 ];
 

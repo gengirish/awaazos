@@ -6,6 +6,7 @@ import { cache } from "react";
 
 import { ReceiptDocument } from "@/components/receipts/ReceiptDocument";
 import { PrintButton } from "@/components/receipts/PrintButton";
+import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
 import { loadPublicReceipt } from "@/lib/receipt-data";
 
 export const dynamic = "force-dynamic";
@@ -49,7 +50,8 @@ export default async function PublicReceiptPage({ params }: { params: Promise<{ 
         id="main"
         className="receipt-page-mm80 mx-auto w-full max-w-sm bg-white p-5 shadow-md print:w-[72mm] print:max-w-none print:p-0 print:shadow-none"
       >
-        <ReceiptDocument view={view} />
+        {/* On screen the paper's "Powered by" line gives way to the footer link below. */}
+        <ReceiptDocument view={view} poweredByPrintOnly={view.referralSlug != null} />
       </main>
       <nav aria-label="Receipt actions" className="mx-auto mt-4 flex w-full max-w-sm flex-col gap-2 print:hidden">
         <PrintButton>
@@ -65,6 +67,11 @@ export default async function PublicReceiptPage({ params }: { params: Promise<{ 
           </Link>
         ) : null}
       </nav>
+      {view.referralSlug ? (
+        <footer className="mx-auto mt-6 flex w-full max-w-sm justify-center print:hidden">
+          <PoweredByFooter slug={view.referralSlug} isDemo={false} />
+        </footer>
+      ) : null}
     </div>
   );
 }

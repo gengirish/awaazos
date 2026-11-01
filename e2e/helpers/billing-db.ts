@@ -70,3 +70,13 @@ export async function setPlatformRole(email: string, role: UserRole): Promise<vo
 export function makeGrandfatheredFree(email: string): Promise<void> {
   return setVendorBilling(email, { plan: "FREE", planExpiresAt: null, trialEndsAt: null });
 }
+
+/** Referral columns of the vendor registered with `email` (local databases only). */
+export async function getVendorReferral(
+  email: string,
+): Promise<{ id: string; referredByVendorId: string | null; trialEndsAt: Date | null }> {
+  return db().vendor.findFirstOrThrow({
+    where: { email },
+    select: { id: true, referredByVendorId: true, trialEndsAt: true },
+  });
+}

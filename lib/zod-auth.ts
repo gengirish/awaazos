@@ -33,6 +33,9 @@ export const signUpSchema = z
       },
       { message: "Enter a valid +91 Indian mobile number" },
     ),
+  // Referral code from `/sign-up?ref=<slug>` (lib/referral.ts). Free text on
+  // purpose: a bad code is ignored by the register route, never a 400.
+  ref: z.string().max(80).optional(),
   })
   .superRefine((v, ctx) => {
     if (v.stallType === "OTHER" && !stallTypeOtherSchema.safeParse(v.stallTypeOther ?? "").success) {

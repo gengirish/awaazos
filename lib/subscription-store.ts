@@ -14,6 +14,7 @@
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { earnReferralRewardInTx } from "@/lib/referral-server";
 import {
   applySubscriptionEvent,
   type SubscriptionEventName,
@@ -97,6 +98,27 @@ export async function recordSubscriptionEvent(
           create: { vendorId, ...patch.settings },
           update: patch.settings,
         });
+      }
+
+      // Store-to-store referral (lib/referral.ts): the referred store's first
+      // real charge earns its referrer free time. Same transaction, so a
+      // replayed event (P2002 on the ledger above) never reaches here, and
+      // the reward is unique on the referred store besides.
+      if (event === "subscription.charged" && (input.amountPaise ?? 0) > 0 && sub.mapped) {
+        const reward = await earnReferralRewardInTx(tx, {
+          referredVendorId: vendorId,
+          sourceEventId: eventId,
+          interval: sub.mapped.interval,
+        });
+        if (reward.kind === "earned") {
+          console.info(
+            "[subscription-store] referral reward earned referrer=%s referred=%s months=%d redeemed=%s",
+            reward.referrerVendorId,
+            vendorId,
+            reward.months,
+            reward.redeemed,
+          );
+        }
       }
       return { kind: "applied" as const, vendorId };
     });

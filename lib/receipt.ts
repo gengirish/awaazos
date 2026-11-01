@@ -48,6 +48,12 @@ export type ReceiptView = {
   storefrontUrl: string | null;
   /** Absolute `/r/<token>` link to this receipt, when a base URL is known. */
   receiptUrl: string | null;
+  /**
+   * The store's slug for the customer page's "Start your own store" referral
+   * link (lib/referral.ts). Null for a demo store, which never refers; absent
+   * in views not built by lib/receipt-data.ts (Settings preview, tests).
+   */
+  referralSlug?: string | null;
 };
 
 export const DEFAULT_RECEIPT_FOOTER = "Thanks for visiting!";

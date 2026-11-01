@@ -89,7 +89,7 @@ export async function earnReferralRewardInTx(
       settings: { select: { razorpaySubStatus: true } },
     },
   });
-  if (referrer.isDemo) return { kind: "none" };
+  if (referrer.isDemo || !referrer.isActive) return { kind: "none" };
 
   const earnedLastYear = await tx.referralReward.aggregate({
     where: { referrerVendorId, earnedAt: { gte: new Date(now.getTime() - YEAR_MS) } },
@@ -147,9 +147,16 @@ export async function redeemBankedRewardsAtSubscribe(
     const months = banked.reduce((n, r) => n + r.months, 0);
     const vendor = await tx.vendor.findUniqueOrThrow({
       where: { id: vendorId },
-      select: { trialEndsAt: true },
+      select: { trialEndsAt: true, planExpiresAt: true },
     });
-    const trialEndsAt = extendTrialEndsAt(vendor.trialEndsAt, months, now);
+    // Count from whichever covered time ends later, so free months never
+    // overlap the trial or what is left of a paid period.
+    const coveredUntil =
+      vendor.planExpiresAt &&
+      (!vendor.trialEndsAt || vendor.planExpiresAt.getTime() > vendor.trialEndsAt.getTime())
+        ? vendor.planExpiresAt
+        : vendor.trialEndsAt;
+    const trialEndsAt = extendTrialEndsAt(coveredUntil, months, now);
     await tx.vendor.update({ where: { id: vendorId }, data: { trialEndsAt } });
     await tx.referralReward.updateMany({
       where: { id: { in: banked.map((r) => r.id) }, referrerVendorId: vendorId, status: "EARNED" },

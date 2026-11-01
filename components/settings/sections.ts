@@ -1,6 +1,7 @@
 import {
   Bell,
   CreditCard,
+  Gift,
   LayoutList,
   Mic,
   ReceiptText,
@@ -20,7 +21,8 @@ export type SettingsSectionId =
   | "receipts"
   | "notifications"
   | "voice"
-  | "billing";
+  | "billing"
+  | "refer";
 
 export type SettingsSection = {
   id: SettingsSectionId;
@@ -28,6 +30,11 @@ export type SettingsSection = {
   title: string;
   description: string;
   icon: LucideIcon;
+  /**
+   * Listed only to an OWNER of a real (non-demo) store. Other sections are
+   * listed to every role and disable owner-only controls on the page.
+   */
+  ownerOnly?: boolean;
 };
 
 export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
@@ -88,7 +95,24 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     description: "Your AwaazOS plan, usage and upgrades.",
     icon: CreditCard,
   },
+  {
+    id: "refer",
+    href: "/settings/refer",
+    title: "Refer a seller",
+    description: "Share your link. When a store you invite subscribes, you get free months.",
+    icon: Gift,
+    ownerOnly: true,
+  },
 ];
+
+/**
+ * The sections this viewer sees in the hub and the sidebar: `ownerOnly` ones
+ * only for an OWNER, and never on a demo store (lib/referral.ts: demo stores
+ * neither earn nor give rewards).
+ */
+export function settingsSectionsFor(viewer: { isOwner: boolean; isDemo: boolean }): SettingsSection[] {
+  return SETTINGS_SECTIONS.filter((s) => !s.ownerOnly || (viewer.isOwner && !viewer.isDemo));
+}
 
 export const SETTINGS_OVERVIEW = { href: "/settings", title: "Overview", icon: LayoutList } as const;
 

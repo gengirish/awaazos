@@ -30,7 +30,7 @@
  *       their next subscribe, which moves `trialEndsAt` forward first so the
  *       existing "first charge at trial end" `start_at` picks it up.
  *   Credit against a live subscription (pausing a paid cycle) is not built.
- * - Demo stores neither earn nor give rewards, and a store claimed from a demo
+ * - Demo and inactive stores never earn, demo stores never give rewards, and a store claimed from a demo
  *   (founder-sourced) is never attributed.
  */
 
