@@ -188,7 +188,7 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
         offers,
       );
       const discountByLine = new Map(offered.lines.map((l) => [l.key, l.discountPaise]));
-      const appliedOffer = offered.discounts[0] ?? null;
+      const appliedOffer = offered.applied;
       const discountPaise = offered.discountTotalPaise;
 
       const deliveryFeePaise = input.fulfilmentType === "DELIVERY" ? settings.menuDeliveryFeePaise : 0;

@@ -537,19 +537,27 @@ single-order compound scope, so one stale order never rolls back the rest. Respo
 
 DB-backed drops tests are opt-in: `npm run test:drops:db` (needs a throwaway `DATABASE_URL`).
 
-### Offers (quantity plan discounts)
+### Offers (sales and quantity plans)
 
-An `Offer` is a vendor's plan: "4+ quiches incl. 1 paneer → 10% off". The rules live in
+An `Offer` is a vendor's sale ("Diwali sale: 10% off everything") or plan ("4+ quiches incl. 1 paneer →
+10% off"); `isSaleOffer` tells them apart (`minQty` 1, no "at least N of tag X"). The rules live in
 `lib/offers.ts` (pure, client-safe; read its header before touching it) and nowhere else. Sellers edit
 them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireActiveBilling`).
 
 - **Eligibility:** all items, chosen item ids, or a `MenuItem.tags` tag (seller free text, edited in
   the menu item form; compared trimmed and case-insensitively). The optional "at least N of tag X" is
   counted among the eligible lines only.
-- **One offer per order, never stacked.** The largest discount wins; ties go to the higher `minQty`,
-  then the older offer. Only eligible lines are discounted; delivery fees never are.
-- **Rounding:** `floor(eligibleSubtotal × bps / 10 000)`, split across eligible lines by largest
-  remainder into `OrderItem.discountPaise` (item analytics are net of it).
+- **Sales price each item.** Every item takes its deepest live sale, so one order can use several
+  sales, and the storefront card shows the struck-out price and `salePriceFor()` before the item is in
+  the cart (`components/storefront/ItemPrice.tsx`). A sale rounds down per unit, so card price × qty is
+  exactly the bill.
+- **Plans never stack**, with each other or with sales: the cart gets its sale prices or the one plan
+  with the largest discount, whichever saves more (a tie keeps the sale prices). Between plans, ties go
+  to the higher `minQty`, then the older offer. Only eligible lines are discounted; delivery fees never are.
+- **One name per bill:** `OffersResult.applied` is what `Transaction.offerId` / `offerName` record (the
+  plan, the sale, or several sales as "A + B" / "A + 2 more", ≤ 60 chars). Never read `discounts[0]`.
+- **Rounding:** a plan takes `floor(eligibleSubtotal × bps / 10 000)`, split across eligible lines by
+  largest remainder into `OrderItem.discountPaise` (item analytics are net of it).
   `subtotal − discount + delivery + tax = total`; counter tax is charged on `subtotal − discount`.
 - **No timers.** `startsAt` / `endsAt` are compared on every read (`offerIsLive`).
 - **The server prices; browsers preview.** `placeStorefrontOrder` and `placeMenuOrder` call
@@ -563,7 +571,8 @@ them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireAc
 - `Transaction.offerName` is a snapshot (`offerId` is set null on delete), so old bills keep their
   line. Receipts, WhatsApp text, boards and the CSV label it with `discountLabel()`.
 - Not built: coupon codes, per-customer limits, fixed amount / bundle price (enum values reserved),
-  buy-X-get-Y, stacking, recurring subscriptions.
+  buy-X-get-Y, a plan on top of sales, recurring subscriptions. POS item tiles don't show sale prices
+  (the cart's discount row does).
 - Test store data: `npm run seed:quiche-plans -- <slug>` (dry run; `--create` writes).
 
 ### Internal demo stores (founder outreach)
