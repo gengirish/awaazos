@@ -2,7 +2,7 @@
 
 import { AlertCircle, Clock, Loader2, MapPin, Minus, Plus, ShoppingBag } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
 import { rememberRecentOrder } from "@/components/storefront/recent-orders";
 import { Input } from "@/components/ui/input";
@@ -24,6 +24,7 @@ import {
   checkoutErrorsFromIssues,
   checkoutFieldForErrorCode,
   firstInvalidField,
+  maxOrderableQty,
   orderErrorMessage,
   parseSavedBuyer,
   parseStoredCart,
@@ -43,8 +44,9 @@ import { cn } from "@/lib/utils";
  * Shared buyer-side checkout pieces for the public storefront, used by both
  * DropOrder (pre-order batches) and MenuOrder (everyday menu): quantity
  * stepper, sticky cart bar, device-local cart persistence, and the checkout
- * sheet with remember-me, phone normalisation, idempotent submit and
- * per-field error copy.
+ * sheet with an editable cart summary (the same stepper, so quantities can be
+ * changed and lines removed without leaving the sheet), remember-me, phone
+ * normalisation, idempotent submit and per-field error copy.
  *
  * The server is authoritative for price, stock and every limit. Nothing here
  * sends a price — callers build the request body from ids + quantities only.
@@ -64,7 +66,18 @@ export type BuyerPrefill = {
   address: string | null;
 };
 
-export type CheckoutLine = { id: string; name: string; priceInPaise: number; qty: number };
+export type CheckoutLine = {
+  id: string;
+  name: string;
+  priceInPaise: number;
+  qty: number;
+  /**
+   * The most of this line the buyer may order (stock and per-order limit, see
+   * `maxOrderableQty`). Caps the "+" in the sheet's cart summary; absent =
+   * the generic line cap.
+   */
+  max?: number;
+};
 
 export type CheckoutDetails = {
   customerName: string;
@@ -339,6 +352,13 @@ export type CheckoutSheetProps = {
   description: string;
   lines: CheckoutLine[];
   /**
+   * Lets the buyer change quantities (and remove lines, at 0) from the cart
+   * summary inside the sheet. The caller owns the cart: it applies the change
+   * and passes the new `lines` (and `discount`) back down. Absent → read-only
+   * summary.
+   */
+  onChangeQty?: (id: string, qty: number) => void;
+  /**
    * The offer this cart earns, as previewed in the browser (lib/offers.ts).
    * The server prices the order again when it is placed.
    */
@@ -383,6 +403,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     idPrefix,
     description,
     lines,
+    onChangeQty,
     discount,
     fulfilmentTypes,
     deliveryFeePaise,
@@ -678,16 +699,11 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
 
         <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col" noValidate>
           <ResponsiveDialogBody className="space-y-5">
-            <ul className="space-y-1 rounded-xl bg-muted/50 px-3 py-2 text-sm">
-              {lines.map((l) => (
-                <li key={l.id} className="flex justify-between gap-3">
-                  <span className="min-w-0 truncate">
-                    {l.qty} × {l.name}
-                  </span>
-                  <span className="font-mono tabular-nums">{formatINR(l.priceInPaise * l.qty)}</span>
-                </li>
-              ))}
-            </ul>
+            <CartLines
+              lines={lines}
+              onChangeQty={onChangeQty}
+              onAddMore={onChangeQty && !submitting ? () => onOpenChange(false) : undefined}
+            />
 
             <div className="space-y-2">
               <Label htmlFor={ids.name}>Your name</Label>
@@ -960,6 +976,109 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
         </form>
       </ResponsiveDialogContent>
     </ResponsiveDialog>
+  );
+}
+
+const EMPTY_CART_COPY = "Your cart is empty. Close this to add items.";
+
+/**
+ * The cart summary at the top of the sheet. With `onChangeQty`, each line
+ * carries the same −/qty/+ stepper as the store page, so the buyer corrects an
+ * order where they are about to pay for it. A line leaves the list at 0; focus
+ * then moves to the neighbouring line's stepper (or the empty-cart message),
+ * never out of the sheet. Prices shown are the item's list price; the offer
+ * row below the form shows what comes off.
+ */
+function CartLines({
+  lines,
+  onChangeQty,
+  onAddMore,
+}: {
+  lines: CheckoutLine[];
+  onChangeQty?: (id: string, qty: number) => void;
+  /** Closes the sheet so the buyer can pick more from the store page. */
+  onAddMore?: () => void;
+}) {
+  const listRef = useRef<HTMLUListElement>(null);
+  const emptyRef = useRef<HTMLParagraphElement>(null);
+  /** Index of the line just removed by its stepper; the next render focuses its neighbour. */
+  const removedAtRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    const removedAt = removedAtRef.current;
+    if (removedAt === null) return;
+    removedAtRef.current = null;
+    if (lines.length === 0) {
+      emptyRef.current?.focus();
+      return;
+    }
+    const li = listRef.current?.children[Math.min(removedAt, lines.length - 1)];
+    li?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+  }, [lines]);
+
+  if (lines.length === 0) {
+    return (
+      <p
+        ref={emptyRef}
+        tabIndex={-1}
+        role="status"
+        className="rounded-xl border border-dashed border-border bg-muted/50 px-3 py-3 text-sm text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        {EMPTY_CART_COPY}
+      </p>
+    );
+  }
+
+  if (!onChangeQty) {
+    return (
+      <ul className="space-y-1 rounded-xl bg-muted/50 px-3 py-2 text-sm">
+        {lines.map((l) => (
+          <li key={l.id} className="flex justify-between gap-3">
+            <span className="min-w-0 truncate">
+              {l.qty} × {l.name}
+            </span>
+            <span className="font-mono tabular-nums">{formatINR(l.priceInPaise * l.qty)}</span>
+          </li>
+        ))}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="rounded-xl bg-muted/50 px-3 py-1">
+      <ul ref={listRef} aria-label="Items in your cart" className="divide-y divide-border/60">
+        {lines.map((l, index) => (
+          <li key={l.id} className="flex items-center gap-3 py-2">
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
+              <span className="truncate font-semibold">{l.name}</span>
+              <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                <span className="font-bold text-foreground">{formatINR(l.priceInPaise * l.qty)}</span>
+                {l.qty > 1 ? ` · ${formatINR(l.priceInPaise)} each` : null}
+              </span>
+            </span>
+            <QtyStepper
+              itemName={l.name}
+              qty={l.qty}
+              max={l.max ?? maxOrderableQty(null, null)}
+              onChange={(q) => {
+                if (q <= 0) removedAtRef.current = index;
+                onChangeQty(l.id, q);
+              }}
+            />
+          </li>
+        ))}
+      </ul>
+      {onAddMore ? (
+        <button
+          type="button"
+          onClick={onAddMore}
+          className="-mx-1 inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Add more items
+        </button>
+      ) : null}
+    </div>
   );
 }
 

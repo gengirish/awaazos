@@ -316,7 +316,9 @@ export function DropOrder(props: DropOrderProps) {
           name: l.item.name,
           priceInPaise: l.item.priceInPaise,
           qty: l.qty,
+          max: maxOrderableQty(remainingFor(l.item), l.item.perOrderLimit),
         }))}
+        onChangeQty={setQty}
         discount={appliedOffer}
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
