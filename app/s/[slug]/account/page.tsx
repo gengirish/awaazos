@@ -15,6 +15,7 @@ import { formatIstDate, formatIstTime } from "@/lib/drops-time";
 import { prisma } from "@/lib/prisma";
 import { orderStatusLabel, type StatusTone } from "@/lib/storefront-order";
 import { cn } from "@/lib/utils";
+import { storeThemeAttribute } from "@/lib/store-theme";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -31,8 +32,6 @@ export const runtime = "nodejs";
  * phone on an order is unverified, so matching on it would show one person
  * another person's orders. UTR is read only to derive the status label.
  */
-
-const BRAND_THEMES = new Set(["green", "amber", "red", "blue", "purple"]);
 
 const loadVendor = cache(async (slug: string) =>
   prisma.vendor.findFirst({
@@ -70,8 +69,7 @@ export default async function StorefrontAccountPage(
   if (!vendor) notFound();
 
   const customer = await getCurrentCustomer();
-  const rawTheme = vendor.settings?.theme ?? "orange";
-  const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
+  const theme = storeThemeAttribute(vendor.settings?.theme);
   const accountPath = `/s/${vendor.slug}/account`;
 
   const orders = customer
