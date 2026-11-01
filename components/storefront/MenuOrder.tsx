@@ -334,7 +334,9 @@ export function MenuOrder(props: MenuOrderProps) {
           name: l.item.name,
           priceInPaise: l.item.priceInPaise,
           qty: l.qty,
+          max,
         }))}
+        onChangeQty={setQty}
         discount={appliedOffer}
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
