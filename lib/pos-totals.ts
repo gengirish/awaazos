@@ -72,7 +72,7 @@ export function computeCartTotals(items: readonly CartLine[], settings: PosTaxSe
   return {
     subtotalPaise,
     discountPaise,
-    offer: offered.discounts[0] ?? null,
+    offer: offered.applied,
     nudge: offered.nudge,
     taxPaise,
     totalPaise: subtotalPaise - discountPaise + taxPaise,

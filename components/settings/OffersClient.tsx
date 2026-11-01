@@ -199,6 +199,8 @@ function describeOffer(o: OfferDto, itemCount: number): string {
         ? `${itemCount} chosen ${itemCount === 1 ? "item" : "items"}`
         : "any items";
   const incl = o.requiredTag && o.requiredTagQty > 0 ? `, including ${o.requiredTagQty} tagged "${o.requiredTag}"` : "";
+  // minQty 1 with no "including" condition is a sale (isSaleOffer in lib/offers.ts).
+  if (o.minQty <= 1 && !incl) return `Sale · ${formatPercentBps(o.percentBps)} off ${what}`;
   return `${formatPercentBps(o.percentBps)} off ${o.minQty} or more ${what}${incl}`;
 }
 
@@ -580,6 +582,9 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
                       {...errProps("minQty")}
                     />
                     {err("minQty")}
+                    <p className="text-xs text-muted-foreground">
+                      1 makes it a sale: your store shows each item&apos;s old price struck out next to the sale price.
+                    </p>
                   </div>
                   <div className="space-y-2">
                     <Label htmlFor={fid("percent")}>Discount (%)</Label>

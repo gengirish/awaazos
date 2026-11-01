@@ -16,9 +16,10 @@ import {
   type BuyerPrefill,
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
+import { ItemPrice } from "@/components/storefront/ItemPrice";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { formatINRCompact } from "@/lib/currency";
-import { applyOffers, type ResolvedOffer } from "@/lib/offers";
+import { applyOffers, salePriceFor, type ResolvedOffer } from "@/lib/offers";
 import {
   cartStorageKey,
   fulfilmentOptionsLabel,
@@ -80,24 +81,6 @@ export type MenuOrderProps = {
 };
 
 const NO_OFFERS: readonly ResolvedOffer[] = [];
-
-/** Price, unit and the Popular badge — the same line in both layouts. */
-function ItemPrice({ item }: { item: MenuOrderItem }) {
-  return (
-    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-      <span className="font-mono font-bold tabular-nums text-foreground">
-        {formatINRCompact(item.priceInPaise)}
-        {item.unit ? <span className="font-sans font-medium text-muted-foreground"> / {item.unit}</span> : null}
-      </span>
-      {item.isPopular ? (
-        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
-          <Sparkles className="h-3 w-3" aria-hidden="true" />
-          Popular
-        </span>
-      ) : null}
-    </span>
-  );
-}
 
 export function MenuOrder(props: MenuOrderProps) {
   const {
@@ -162,7 +145,7 @@ export function MenuOrder(props: MenuOrderProps) {
     lines.map((l) => ({ key: l.item.id, menuItemId: l.item.id, priceInPaise: l.item.priceInPaise, qty: l.qty })),
     offers,
   );
-  const appliedOffer = offered.discounts[0] ?? null;
+  const appliedOffer = offered.applied;
   // What the cart bars show: items less the offer discount (delivery is added at checkout).
   const payablePaise = offered.totalPaise;
   const canPay = payment.upi || payment.cod;
@@ -210,6 +193,19 @@ export function MenuOrder(props: MenuOrderProps) {
       router.refresh();
     }
   }
+
+  // Price (sale-aware, lib/offers.ts), unit and the Popular badge: the same line in both layouts.
+  const priceLine = (item: MenuOrderItem) => (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+      <ItemPrice priceInPaise={item.priceInPaise} sale={salePriceFor(offers, item.id, item.priceInPaise)} unit={item.unit} />
+      {item.isPopular ? (
+        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
+          <Sparkles className="h-3 w-3" aria-hidden="true" />
+          Popular
+        </span>
+      ) : null}
+    </span>
+  );
 
   return (
     <div id="menu-order" className="scroll-mt-16">
@@ -271,7 +267,7 @@ export function MenuOrder(props: MenuOrderProps) {
                       {item.description ? (
                         <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
                       ) : null}
-                      <ItemPrice item={item} />
+                      {priceLine(item)}
                     </span>
                     <QtyStepper
                       itemName={item.name}
@@ -295,7 +291,7 @@ export function MenuOrder(props: MenuOrderProps) {
                       {item.description ? (
                         <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
                       ) : null}
-                      <ItemPrice item={item} />
+                      {priceLine(item)}
                     </span>
 
                     <QtyStepper

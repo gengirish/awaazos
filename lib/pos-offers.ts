@@ -62,7 +62,7 @@ export async function checkPosDiscount(
     return { ok: true, offerId: null, offerName: null, lineDiscounts: none, unverified: false };
   }
 
-  const applied = priced.discounts[0];
+  const applied = priced.applied;
   if (applied && priced.discountTotalPaise === body.discountPaise) {
     return {
       ok: true,

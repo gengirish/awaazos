@@ -4,10 +4,13 @@ import {
   applyOffers,
   discountLabel,
   formatPercentBps,
+  isSaleOffer,
+  OFFER_NAME_MAX,
   offerIsLive,
   offerNudgeText,
   offerSummary,
   resolveOffers,
+  salePriceFor,
   type OfferLine,
   type OfferRule,
 } from "@/lib/offers";
@@ -240,6 +243,83 @@ describe("applyOffers — scope, ties and rounding", () => {
 
   it("rejects fractional paise", () => {
     expect(() => applyOffers([{ key: "x", menuItemId: "x", priceInPaise: 10.5, qty: 1 }], [])).toThrow();
+  });
+});
+
+describe("sales — offers that need no quantity", () => {
+  const sale = (over: Partial<OfferRule> & Pick<OfferRule, "id" | "name">) =>
+    rule({ eligibility: "ALL", eligibleTag: null, requiredTag: null, requiredTagQty: 0, minQty: 1, ...over });
+  const BHEL_20 = sale({ id: "bhel20", name: "Bhel sale", eligibility: "ITEMS", eligibleItemIds: ["bhel"], percentBps: 2000 });
+  const QUICHE_10 = sale({ id: "quiche10", name: "Quiche sale", eligibility: "TAG", eligibleTag: "quiche", percentBps: 1000 });
+
+  it("tells sales from plans", () => {
+    const [s, p] = offers([QUICHE_10, WEEKLY]);
+    expect(isSaleOffer(s!)).toBe(true);
+    expect(isSaleOffer(p!)).toBe(false);
+    // minQty 1 with "at least 1 paneer" is a condition, so a plan.
+    expect(isSaleOffer(offers([sale({ id: "x", name: "X", requiredTag: "paneer", requiredTagQty: 1 })])[0]!)).toBe(false);
+  });
+
+  it("gives the card price, and the cart charges exactly that per unit", () => {
+    const live = offers([QUICHE_10]);
+    // ₹55 at 10% → ₹49.50.
+    expect(salePriceFor(live, "q_pcc", 5500)).toEqual({ salePricePaise: 4950, offerId: "quiche10", offerName: "Quiche sale", percentBps: 1000 });
+    expect(salePriceFor(live, "bhel", 4000)).toBeNull();
+    const r = applyOffers(cart({ q_pcc: 3 }), live);
+    expect(r.totalPaise).toBe(3 * 4950);
+  });
+
+  it("rounds each unit down, so price × qty is the bill", () => {
+    const odd = sale({ id: "odd", name: "Odd", percentBps: 1250 });
+    const live = resolveOffers([odd], [], { channel: "POS", now: NOW });
+    // 12.5% of 3333 = 416.6 → 416 per unit; the card shows 2917.
+    expect(salePriceFor(live, "a", 3333)!.salePricePaise).toBe(2917);
+    const r = applyOffers([{ key: "a", menuItemId: "a", priceInPaise: 3333, qty: 3 }], live);
+    expect(r.totalPaise).toBe(3 * 2917);
+  });
+
+  it("applies different sales to different items in one order", () => {
+    const r = applyOffers(cart({ q_pcc: 1, bhel: 1 }), offers([QUICHE_10, BHEL_20]));
+    expect(r.lines.map((l) => l.discountPaise)).toEqual([550, 800]);
+    expect(r.discounts.map((d) => d.offerId)).toEqual(["bhel20", "quiche10"]);
+    expect(r.applied).toMatchObject({ offerId: "bhel20", name: "Bhel sale + Quiche sale", discountPaise: 1350, percentBps: 2000 });
+  });
+
+  it("takes the deepest sale on an item", () => {
+    const all5 = sale({ id: "all5", name: "Everything 5%", percentBps: 500 });
+    expect(salePriceFor(offers([all5, BHEL_20]), "bhel", 4000)!.offerId).toBe("bhel20");
+    const r = applyOffers(cart({ bhel: 1, q_pcc: 1 }), offers([all5, BHEL_20]));
+    expect(r.lines.map((l) => l.discountPaise)).toEqual([800, 275]);
+  });
+
+  it("keeps the sale prices unless a plan saves more, and never stacks a plan on them", () => {
+    const four = cart({ q_pcc: 1, q_rbz: 1, q_pcz: 1, q_psp: 1 });
+    // Sale 5% on quiches (₹14) vs Weekly Plan 10% (₹28): the plan wins alone.
+    const q5 = sale({ id: "q5", name: "Quiche 5%", eligibility: "TAG", eligibleTag: "quiche", percentBps: 500 });
+    const plan = applyOffers(four, offers([q5, WEEKLY]));
+    expect(plan.applied).toMatchObject({ offerId: "weekly", discountPaise: 2800 });
+    expect(plan.discounts).toHaveLength(1);
+    // A 10% sale ties the 10% plan: the buyer keeps the prices they were shown.
+    const tie = applyOffers(four, offers([QUICHE_10, WEEKLY]));
+    expect(tie.applied!.offerId).toBe("quiche10");
+    expect(tie.discountTotalPaise).toBe(2800);
+  });
+
+  it("only nudges toward a plan that beats the sale already in the cart", () => {
+    expect(applyOffers(cart({ q_pcz: 1 }), offers([QUICHE_10, WEEKLY])).nudge).toBeNull();
+    expect(applyOffers(cart({ q_pcz: 1 }), offers([QUICHE_10, FAMILY])).nudge!.offerId).toBe("family");
+  });
+
+  it("shortens a combined name to fit the bill's column", () => {
+    const long = (id: string) => sale({ id, name: `${id} ${"x".repeat(40)}`, eligibility: "ITEMS", eligibleItemIds: [id] });
+    const r = applyOffers(cart({ q_pcc: 1, bhel: 1, q_rbz: 1 }), offers([long("q_pcc"), long("bhel"), long("q_rbz")]));
+    expect(r.applied!.name.length).toBeLessThanOrEqual(OFFER_NAME_MAX);
+    expect(r.applied!.name).toMatch(/ \+ 2 more$/);
+  });
+
+  it("reads as a sale in the offer chips", () => {
+    expect(offerSummary(offers([QUICHE_10])[0]!)).toBe("Quiche sale: 10% off quiche items");
+    expect(offerSummary(offers([sale({ id: "all", name: "Diwali sale" })])[0]!)).toBe("Diwali sale: 10% off everything");
   });
 });
 

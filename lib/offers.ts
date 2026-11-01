@@ -6,19 +6,31 @@
  * the storefront and POS carts call the same function for their preview, so a
  * preview can only disagree with the bill when the offers themselves changed.
  *
+ * Two kinds of offer, told apart by their rule (`isSaleOffer`):
+ *
+ *   - A **sale** needs no quantity: `minQty` 1 and no "at least N of tag X".
+ *     It prices each item on its own, so the storefront can show the item's
+ *     sale price before it is in the cart (`salePriceFor`) and that is exactly
+ *     what the buyer pays: `qty × (price − floor(price × bps / 10 000))`. An item
+ *     covered by several sales takes the deepest; different items may come from
+ *     different sales in one order.
+ *   - A **plan** needs a quantity ("4+ quiches incl. 1 paneer").
+ *
  * Rules:
  *
- *   1. **One offer per order, never stacked.** Of the offers a cart qualifies
- *      for, the one with the largest discount wins. Ties go to the higher
- *      `minQty`, then to the older offer.
+ *   1. **Plans never stack, with each other or with sales.** The cart gets
+ *      either its sale prices or the one plan with the largest discount,
+ *      whichever saves more; a tie keeps the sale prices the buyer was shown.
+ *      Between plans, ties go to the higher `minQty`, then to the older offer.
  *   2. **Only eligible lines are discounted.** A cart that mixes quiches with a
  *      Bhel Puri gets the percentage off the quiches alone. Delivery fees are
  *      never discounted.
  *   3. **The "at least N of tag X" units are counted among eligible lines.** A
  *      paneer item outside the offer does not unlock it.
- *   4. **Paise, rounded down.** `discount = floor(eligibleSubtotal × bps / 10 000)`
- *      (same direction as tax), then split across the eligible lines by largest
- *      remainder so the per-line shares sum to it exactly.
+ *   4. **Paise, rounded down.** A plan takes `floor(eligibleSubtotal × bps / 10 000)`
+ *      (same direction as tax), split across the eligible lines by largest
+ *      remainder so the per-line shares sum to it exactly. A sale rounds down
+ *      per unit, so the price on the item card times the quantity is the bill.
  *   5. **No timers.** `startsAt` / `endsAt` are compared with `now` on every
  *      read (`offerIsLive`); nothing is written when a date passes.
  *
@@ -27,7 +39,7 @@
  * `subtotal − discount + delivery fee + tax = total`.
  *
  * Out of scope, by design: coupon codes, per-customer limits, fixed bundle
- * prices, buy-X-get-Y, stacking, recurring subscriptions.
+ * prices, buy-X-get-Y, stacking a plan on sales, recurring subscriptions.
  */
 
 export type OfferChannel = "MENU" | "DROP" | "POS";
@@ -112,8 +124,14 @@ export type OfferNudge = {
 
 export type OffersResult = {
   lines: PricedLine[];
-  /** Zero or one entry: offers never stack. */
+  /** What was applied: one plan, or one entry per sale used (largest first). */
   discounts: AppliedDiscount[];
+  /**
+   * The one offer a bill records (`Transaction.offerId` / `offerName`): the plan,
+   * the single sale, or for several sales the largest one's id and a combined
+   * name ("Diwali sale + 1 more"). null when nothing was applied.
+   */
+  applied: AppliedDiscount | null;
   subtotalPaise: number;
   discountTotalPaise: number;
   /** `subtotalPaise − discountTotalPaise`. Delivery fee and tax are the caller's. */
@@ -234,6 +252,94 @@ export function offersForItems(offers: readonly ResolvedOffer[], visibleIds: Ite
   return out;
 }
 
+/** A sale needs no quantity, so one unit already gets it (see the header). */
+export function isSaleOffer(o: Pick<ResolvedOffer, "minQty" | "requiredQty">): boolean {
+  return o.minQty <= 1 && o.requiredQty === 0;
+}
+
+function saleCovers(o: ResolvedOffer, menuItemId: string | null): boolean {
+  if (o.eligibleItemIds === null) return true;
+  return menuItemId !== null && o.eligibleItemIds.includes(menuItemId);
+}
+
+/** Paise off one unit at this percentage, rounded down. */
+function unitSaleDiscount(priceInPaise: number, bps: number): number {
+  return Math.floor((priceInPaise * bps) / 10_000);
+}
+
+/** The deepest sale on this item (the older offer on a tie), or null. */
+function bestSaleFor(
+  offers: readonly ResolvedOffer[],
+  menuItemId: string | null,
+  priceInPaise: number,
+): ResolvedOffer | null {
+  let best: ResolvedOffer | null = null;
+  for (const o of offers) {
+    if (!isSaleOffer(o) || !saleCovers(o, menuItemId)) continue;
+    if (unitSaleDiscount(priceInPaise, o.percentBps) <= 0) continue;
+    if (!best || o.percentBps > best.percentBps) best = o;
+  }
+  return best;
+}
+
+export type SalePrice = {
+  /** What one unit costs on sale. */
+  salePricePaise: number;
+  offerId: string;
+  offerName: string;
+  percentBps: number;
+};
+
+/**
+ * One unit's sale price, for the item card (struck-out price, then this), or
+ * null when no sale covers it. `offers` are the ones live on this page;
+ * quantity plans never give a card price. Times the quantity, this is what the
+ * cart charges, unless a plan saves the buyer more.
+ */
+export function salePriceFor(
+  offers: readonly ResolvedOffer[],
+  menuItemId: string | null,
+  priceInPaise: number,
+): SalePrice | null {
+  const o = bestSaleFor(offers, menuItemId, priceInPaise);
+  if (!o) return null;
+  return {
+    salePricePaise: priceInPaise - unitSaleDiscount(priceInPaise, o.percentBps),
+    offerId: o.id,
+    offerName: o.name,
+    percentBps: o.percentBps,
+  };
+}
+
+/** "Diwali sale", or "Diwali sale + 2 more" when several sales were used, within OFFER_NAME_MAX. */
+function combinedSaleName(used: readonly AppliedDiscount[]): string {
+  const first = used[0]!.name;
+  if (used.length === 1) return first;
+  const all = used.map((d) => d.name).join(" + ");
+  if (all.length <= OFFER_NAME_MAX) return all;
+  const suffix = ` + ${used.length - 1} more`;
+  return `${first.slice(0, OFFER_NAME_MAX - suffix.length).trimEnd()}${suffix}`;
+}
+
+type SaleEvaluation = { shares: number[]; used: AppliedDiscount[]; discountPaise: number };
+
+function evaluateSales(lines: readonly OfferLine[], offers: readonly ResolvedOffer[]): SaleEvaluation {
+  const byOffer = new Map<string, AppliedDiscount>();
+  const shares = lines.map((l) => {
+    const o = bestSaleFor(offers, l.menuItemId, l.priceInPaise);
+    if (!o || l.qty === 0) return 0;
+    const share = l.qty * unitSaleDiscount(l.priceInPaise, o.percentBps);
+    const entry = byOffer.get(o.id) ?? { offerId: o.id, name: o.name, percentBps: o.percentBps, discountPaise: 0 };
+    entry.discountPaise += share;
+    byOffer.set(o.id, entry);
+    return share;
+  });
+  const used = [...byOffer.values()].sort(
+    (a, b) => b.discountPaise - a.discountPaise || b.percentBps - a.percentBps,
+  );
+  return { shares, used, discountPaise: shares.reduce((a, b) => a + b, 0) };
+}
+
 type Evaluation = {
   offer: ResolvedOffer;
   order: number;
@@ -284,12 +390,13 @@ function allocate(lines: readonly OfferLine[], ev: Evaluation): number[] {
   return shares;
 }
 
-function nudgeFor(evals: Evaluation[], applied: Evaluation | null): OfferNudge | null {
+/** `appliedBps`: the deepest percentage the cart already gets, or null. */
+function nudgeFor(evals: Evaluation[], appliedBps: number | null): OfferNudge | null {
   let best: { ev: Evaluation; missing: number } | null = null;
   for (const ev of evals) {
     if (ev.qualifies || ev.eligibleQty === 0) continue;
     // Not worth mentioning unless it beats what the cart already gets.
-    if (applied && ev.offer.percentBps <= applied.offer.percentBps) continue;
+    if (appliedBps !== null && ev.offer.percentBps <= appliedBps) continue;
     const missing = Math.max(ev.offer.minQty - ev.eligibleQty, ev.offer.requiredQty - ev.requiredQty, 0);
     if (missing === 0) continue;
     if (
@@ -326,7 +433,9 @@ export function applyOffers(lines: readonly OfferLine[], offers: readonly Resolv
     subtotalPaise += l.priceInPaise * l.qty;
   }
 
-  const evals = offers.map((o, i) => evaluate(lines, o, i));
+  const sales = evaluateSales(lines, offers);
+  // Plans only: a sale's percentage is already in `sales`, item by item.
+  const evals = offers.map((o, i) => evaluate(lines, o, i)).filter((ev) => !isSaleOffer(ev.offer));
   let applied: Evaluation | null = null;
   for (const ev of evals) {
     if (!ev.qualifies) continue;
@@ -339,24 +448,43 @@ export function applyOffers(lines: readonly OfferLine[], offers: readonly Resolv
     }
   }
 
-  const shares = applied ? allocate(lines, applied) : lines.map(() => 0);
-  const discountTotalPaise = applied?.discountPaise ?? 0;
+  // The cart was shown its sale prices: a plan replaces them only by saving more.
+  const plan = applied !== null && applied.discountPaise > sales.discountPaise ? applied : null;
+  const salesWin = plan === null && sales.discountPaise > 0;
+
+  let shares: number[];
+  let discounts: AppliedDiscount[];
+  if (plan) {
+    shares = allocate(lines, plan);
+    discounts = [
+      { offerId: plan.offer.id, name: plan.offer.name, percentBps: plan.offer.percentBps, discountPaise: plan.discountPaise },
+    ];
+  } else if (salesWin) {
+    shares = sales.shares;
+    discounts = sales.used;
+  } else {
+    shares = lines.map(() => 0);
+    discounts = [];
+  }
+
+  const discountTotalPaise = shares.reduce((a, b) => a + b, 0);
+  const summary: AppliedDiscount | null =
+    discounts.length === 0
+      ? null
+      : {
+          offerId: discounts[0]!.offerId,
+          name: salesWin ? combinedSaleName(discounts) : discounts[0]!.name,
+          percentBps: Math.max(...discounts.map((d) => d.percentBps)),
+          discountPaise: discountTotalPaise,
+        };
   return {
     lines: lines.map((l, i) => ({ ...l, totalPaise: l.priceInPaise * l.qty, discountPaise: shares[i]! })),
-    discounts: applied
-      ? [
-          {
-            offerId: applied.offer.id,
-            name: applied.offer.name,
-            percentBps: applied.offer.percentBps,
-            discountPaise: discountTotalPaise,
-          },
-        ]
-      : [],
+    discounts,
+    applied: summary,
     subtotalPaise,
     discountTotalPaise,
     totalPaise: subtotalPaise - discountTotalPaise,
-    nudge: nudgeFor(evals, applied),
+    nudge: nudgeFor(evals, summary?.percentBps ?? null),
   };
 }
 
@@ -367,8 +495,12 @@ function itemsPhrase(qty: number, ...labels: (string | null)[]): string {
   return `${qty} ${words ? `${words} ` : ""}${qty === 1 ? "item" : "items"}`;
 }
 
-/** "Weekly Plan: 4+ quiche items incl. 1 paneer → 10% off". */
+/** "Weekly Plan: 4+ quiche items incl. 1 paneer → 10% off"; a sale reads "Diwali sale: 10% off quiche items". */
 export function offerSummary(o: ResolvedOffer): string {
+  if (isSaleOffer(o)) {
+    const what = o.eligibleLabel ? ` ${o.eligibleLabel} items` : o.eligibleItemIds === null ? " everything" : "";
+    return `${o.name}: ${formatPercentBps(o.percentBps)} off${what}`;
+  }
   const need = `${o.minQty}+ ${o.eligibleLabel ? `${o.eligibleLabel} ` : ""}items`;
   const incl = o.requiredQty > 0 && o.requiredLabel ? ` incl. ${o.requiredQty} ${o.requiredLabel}` : "";
   return `${o.name}: ${need}${incl} → ${formatPercentBps(o.percentBps)} off`;
