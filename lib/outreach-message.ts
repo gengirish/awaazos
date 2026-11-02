@@ -22,27 +22,32 @@ function greeting(ownerName: string | null | undefined): string {
   return first ? `Hi ${first},` : "Hi,";
 }
 
-function introduction(senderName: string | null | undefined): string {
+const WHAT_WE_BUILD = "AwaazOS for home businesses that take orders on Instagram and WhatsApp.";
+
+/** "Founder" only when it is true: everyone else on the team writes as themselves. */
+function introduction(senderName: string | null | undefined, senderIsFounder: boolean): string {
   const first = firstName(senderName);
-  return first
-    ? `I'm ${first}, founder of IntelliForge. I build AwaazOS for home kitchens that take orders on Instagram and WhatsApp.`
-    : "I'm writing from IntelliForge. We build AwaazOS for home kitchens that take orders on Instagram and WhatsApp.";
+  if (!first) return `I'm writing from IntelliForge. We build ${WHAT_WE_BUILD}`;
+  return senderIsFounder
+    ? `I'm ${first}, founder of IntelliForge. I build ${WHAT_WE_BUILD}`
+    : `I'm ${first} from IntelliForge. We build ${WHAT_WE_BUILD}`;
 }
 
 /**
  * First message: who is writing and for whom, the demo store link with what
- * the seller will see when they tap it (a store page with their menu), what
+ * the seller will see when they tap it (a store page with their items), what
  * it does for them, the trial, and a 15-minute ask.
  */
 export function outreachIntroMessage(input: {
   ownerName?: string | null;
   senderName?: string | null;
+  senderIsFounder?: boolean;
   storeName: string;
   storeUrl: string;
 }): string {
   return [
-    `${greeting(input.ownerName)} ${introduction(input.senderName)}`,
-    `I made a demo store for ${input.storeName} with your menu on it: ${input.storeUrl}`,
+    `${greeting(input.ownerName)} ${introduction(input.senderName, input.senderIsFounder ?? false)}`,
+    `I made a demo store for ${input.storeName} with your items on it: ${input.storeUrl}`,
     "Customers order and pay by UPI there instead of in DMs, and you see every order, advance and balance due on one board.",
     "It's a demo with made-up orders. Nothing is live and nothing is charged.",
     `If it looks useful, the store is yours free for ${TRIAL_DAYS} days. Could we do 15 minutes this week? If it doesn't fit, I'd like to hear why.`,

@@ -19,7 +19,7 @@ const h = vi.hoisted(() => {
   delete process.env.UPSTASH_REDIS_REST_URL;
   delete process.env.UPSTASH_REDIS_REST_TOKEN;
   /** The signed-in caller, or null when signed out. */
-  return { user: null as null | { id: string; role: "USER" | "ADMIN" | "SUPER_ADMIN" } };
+  return { user: null as null | { id: string; role: "USER" | "SALES" | "ADMIN" | "SUPER_ADMIN" } };
 });
 
 vi.mock("@/lib/rbac", () => {
@@ -31,7 +31,7 @@ vi.mock("@/lib/rbac", () => {
       super(message);
     }
   }
-  const RANK = { USER: 0, ADMIN: 1, SUPER_ADMIN: 2 };
+  const RANK = { USER: 0, SALES: 1, ADMIN: 2, SUPER_ADMIN: 3 };
   return {
     AuthError,
     requirePlatformRole: vi.fn(async (required: keyof typeof RANK) => {
@@ -126,7 +126,7 @@ describe.skipIf(!ENABLED)("admin outreach GUI — DB integration", () => {
     };
   }
 
-  async function makeUser(role: "USER" | "ADMIN") {
+  async function makeUser(role: "USER" | "SALES" | "ADMIN") {
     const email = `${role.toLowerCase()}-${randomBytes(3).toString("hex")}-${TAG}@example.test`;
     emails.push(email);
     const u = await prisma.user.create({ data: { email, name: role, role } });
@@ -160,6 +160,87 @@ describe.skipIf(!ENABLED)("admin outreach GUI — DB integration", () => {
     const audit = await prisma.demoAuditLog.findMany({ where: { externalRef: ref("one") }, select: { action: true, actor: true } });
     expect(audit.map((r) => r.action).sort()).toEqual(["create", "delete", "handover"]);
     expect(new Set(audit.map((r) => r.actor))).toEqual(new Set([`admin:${a.id}`]));
+  });
+
+  it("a SALES user reaches only the stores they built, can't delete, and no ADMIN route", async () => {
+    const a = await makeUser("SALES");
+    const b = await makeUser("SALES");
+    const scope = await import("@/lib/sales-scope");
+    const pipeline = await import("@/lib/admin-demo-stores");
+    const earnings = await import("@/lib/sales-earnings-server");
+
+    h.user = { id: a.id, role: "SALES" };
+    expect((await stores.POST(json(payload(ref("mine"))), none)).status).toBe(201);
+    expect((await stores.POST(json(payload(ref("mine"))), none)).status).toBe(200);
+    expect((await store.DELETE(json({}, "DELETE"), ctx({ externalRef: ref("mine") }))).status).toBe(404);
+    expect((await invites.POST(json({ email: "x@example.test" }), none)).status).toBe(404);
+    expect((await handover.POST(json({ owner_email: "p@example.test" }), ctx({ externalRef: ref("mine") }))).status).toBe(201);
+
+    // Another intern: the store looks missing, and the lead can't be rebuilt.
+    h.user = { id: b.id, role: "SALES" };
+    const taken = await stores.POST(json(payload(ref("mine"))), none);
+    expect(taken.status).toBe(409);
+    expect(await taken.json()).toMatchObject({ error: "lead_taken" });
+    expect((await handover.POST(json({ owner_email: "p@example.test" }), ctx({ externalRef: ref("mine") }))).status).toBe(404);
+
+    const mine = await prisma.vendor.findUniqueOrThrow({ where: { demoExternalRef: ref("mine") }, select: { id: true } });
+    expect(await scope.demoVendorIdsBuiltBy(`admin:${a.id}`)).toEqual([mine.id]);
+    expect(await scope.demoVendorIdsBuiltBy(`admin:${b.id}`)).toEqual([]);
+    expect(await pipeline.listDemoPipeline([])).toEqual([]);
+
+    // An ADMIN isn't scoped: the same store still hands over.
+    const boss = await makeUser("ADMIN");
+    h.user = { id: boss.id, role: "ADMIN" };
+    expect((await handover.POST(json({ owner_email: "p@example.test" }), ctx({ externalRef: ref("mine") }))).status).toBe(201);
+
+    // Earnings: the webhook's charge and a repeat of it pay once; a ₹0 event pays nothing.
+    const event = (id: string, paymentId: string, amountPaise: number) => ({
+      vendorId: mine.id,
+      razorpayEventId: `${TAG}-${id}`,
+      event: "subscription.charged",
+      subscriptionId: `sub_${TAG}`,
+      paymentId,
+      amountPaise,
+      status: "active",
+    });
+    await prisma.subscriptionEvent.createMany({
+      data: [event("a", "pay_1", 35_282), event("b", "pay_1", 35_282), event("c", "pay_0", 0)],
+    });
+    const [own] = await earnings.loadSalesEarnings(a.id);
+    expect(own).toMatchObject({ storesBuilt: 1, totalSharePaise: 14_950 });
+    expect(await earnings.loadSalesEarnings(b.id)).toEqual([]);
+    const everyone = await earnings.loadSalesEarnings();
+    expect(everyone.find((r) => r.userId === a.id)?.totalSharePaise).toBe(14_950);
+
+    // A removed intern is still owed: they drop to USER and stay on the report.
+    h.user = superAdmin;
+    expect((await admin.DELETE(json({}, "DELETE"), ctx({ userId: a.id }))).status).toBe(200);
+    expect((await prisma.user.findUniqueOrThrow({ where: { id: a.id }, select: { role: true } })).role).toBe("USER");
+    expect((await earnings.loadSalesEarnings()).some((r) => r.userId === a.id)).toBe(true);
+
+    await prisma.subscriptionEvent.deleteMany({ where: { razorpayEventId: { startsWith: `${TAG}-` } } });
+  });
+
+  it("an invite grants the role it was made for, and never demotes", async () => {
+    const email = `sales-new-${TAG}@example.test`;
+    emails.push(email);
+    const res = await invites.POST(json({ email, role: "SALES" }), none);
+    expect(res.status).toBe(201);
+    const url = ((await res.json()) as { data: { invite_url: string } }).data.invite_url;
+    h.user = null;
+    const ok = await redeem.POST(
+      json({ token: tokenOf(url, "/admin-invite/"), name: "Intern", password: "Outreach-2026!" }) as never,
+    );
+    expect(ok.status).toBe(200);
+    expect((await prisma.user.findUniqueOrThrow({ where: { email }, select: { role: true } })).role).toBe("SALES");
+
+    // A SALES invite for an ADMIN is refused; an ADMIN invite for a SALES user is a promotion.
+    h.user = superAdmin;
+    const boss = await makeUser("ADMIN");
+    expect((await invites.POST(json({ email: boss.email, role: "SALES" }), none)).status).toBe(409);
+    expect((await invites.POST(json({ email, role: "SALES" }), none)).status).toBe(409);
+    expect((await invites.POST(json({ email, role: "ADMIN" }), none)).status).toBe(201);
+    expect((await invites.POST(json({ email, role: "SUPER_ADMIN" }), none)).status).toBe(400);
   });
 
   it("refuses payment details by name", async () => {

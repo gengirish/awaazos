@@ -282,7 +282,7 @@ Rules every one of them follows:
   reads exactly one column (the encrypted webhook secret) first, and nothing else until verified.
   Unknown vendor and bad signature are indistinguishable (both 400).
 
-Two role axes: platform `UserRole` (`USER < ADMIN < SUPER_ADMIN`) and per-tenant `StaffRole`
+Two role axes: platform `UserRole` (`USER < SALES < ADMIN < SUPER_ADMIN`) and per-tenant `StaffRole`
 (`CASHIER < MANAGER < OWNER`). Plan gates are separate again: `requirePlan(vendor, Plan.STARTER)`
 throws `PlanGateError` (402) carrying `{ required, current }` so the UI can render an upgrade CTA.
 Limits live in `PLAN_LIMITS` in `lib/constants.ts`.
@@ -628,6 +628,11 @@ only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts`
   (`lib/admin-invites.ts`, `/admin-invite/[token]`); an ADMIN sees only the demo-store and metrics pages.
   Each demo store and claim link has a "Message on WhatsApp" wa.me button with an editable pre-filled
   message (`lib/outreach-message.ts`) to the seller's saved business number; nothing is sent server-side.
+- **Sales interns:** platform role `SALES` (`USER < SALES < ADMIN < SUPER_ADMIN`), invited on `/admin/admins`.
+  They see only the demo stores they built (`lib/sales-scope.ts`, ownership = the audit "create" row), can't
+  delete, and everything at ADMIN or above stays 404. `/admin/earnings` reports their share
+  (`lib/sales-earnings.ts`: `SALES_SHARE_BPS` of what the store pays excluding GST, `SALES_SHARE_MONTHS` from
+  its first charge, read from `SubscriptionEvent`); it moves no money, records no payouts and doesn't see refunds.
 
 Also added with it, for real orders too: `MenuItem.unit` ("₹1,200 / kg" on the storefront),
 `Transaction.advancePaidPaise` (order stays PENDING; the board shows "Advance paid · Balance due") and

@@ -7,11 +7,14 @@ import { AuthError, requirePlatformRole } from "@/lib/rbac";
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Build a demo store — AwaazOS" };
 
-/** /admin/demo-stores/new — any platform ADMIN builds a prospect's demo store (lib/demo-store-form.ts). */
+/** /admin/demo-stores/new — any platform ADMIN or SALES user builds a prospect's demo store (lib/demo-store-form.ts). */
 export default async function NewDemoStorePage() {
   let senderName: string | null;
+  let senderIsFounder: boolean;
   try {
-    senderName = (await requirePlatformRole("ADMIN")).user.name;
+    const { user } = await requirePlatformRole("SALES");
+    senderName = user.name;
+    senderIsFounder = user.role === "SUPER_ADMIN";
   } catch (err) {
     if (err instanceof AuthError) notFound();
     throw err;
@@ -39,7 +42,7 @@ export default async function NewDemoStorePage() {
         </nav>
       </header>
       <main id="main" className="mx-auto max-w-3xl">
-        <DemoStoreForm senderName={senderName} />
+        <DemoStoreForm senderName={senderName} senderIsFounder={senderIsFounder} />
       </main>
     </div>
   );

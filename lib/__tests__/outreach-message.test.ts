@@ -10,16 +10,29 @@ describe("outreachIntroMessage", () => {
     const text = outreachIntroMessage({
       ownerName: "Lahari Pruthvi",
       senderName: "Girish Hiremath",
+      senderIsFounder: true,
       storeName: "Tasty Treats by Lah",
       storeUrl: STORE_URL,
     });
     expect(text.startsWith("Hi Lahari, I'm Girish, founder of IntelliForge.")).toBe(true);
     expect(text).toContain("Instagram and WhatsApp");
-    expect(text).toContain(`demo store for Tasty Treats by Lah with your menu on it: ${STORE_URL}`);
+    expect(text).toContain(`demo store for Tasty Treats by Lah with your items on it: ${STORE_URL}`);
     expect(text).toContain("advance and balance due on one board");
     expect(text).toContain("Nothing is live and nothing is charged");
     expect(text).toContain(`yours free for ${TRIAL_DAYS} days`);
     expect(text).toContain("15 minutes this week");
+  });
+
+  it("never calls anyone but a platform owner the founder", () => {
+    const text = outreachIntroMessage({ senderName: "Asha Rao", storeName: "Frosted", storeUrl: STORE_URL });
+    expect(text.startsWith("Hi, I'm Asha from IntelliForge. We build AwaazOS")).toBe(true);
+    expect(text).not.toContain("founder");
+  });
+
+  it("doesn't assume the seller is a kitchen", () => {
+    const text = outreachIntroMessage({ senderName: "Asha", storeName: "Pravarha", storeUrl: STORE_URL });
+    expect(text).toContain("home businesses");
+    expect(text).not.toMatch(/kitchen|menu/i);
   });
 
   it("reads naturally with no owner or sender name", () => {

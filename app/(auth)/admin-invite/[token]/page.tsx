@@ -13,7 +13,7 @@ const LINK_CLASS = "inline-flex min-h-11 items-center text-sm font-medium text-p
 
 /**
  * /admin-invite/<token>: someone a SUPER_ADMIN invited becomes a platform ADMIN
- * (lib/admin-invites.ts). Public; the token is the whole credential. Unknown,
+ * or SALES user (lib/admin-invites.ts). Public; the token is the whole credential. Unknown,
  * used and expired links look the same.
  */
 export default async function AdminInvitePage(props: { params: Promise<{ token: string }> }) {

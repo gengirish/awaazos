@@ -45,12 +45,12 @@ export default async function HomePage() {
 }
 
 /**
- * Outreach admins invited on /admin/admins have an account but no store of
+ * Outreach admins and sales interns invited on /admin/admins have an account but no store of
  * their own, so `requireVendorRole` refuses them; they land on their pipeline.
  */
 async function isPlatformAdmin(): Promise<boolean> {
   try {
-    await requirePlatformRole("ADMIN");
+    await requirePlatformRole("SALES");
     return true;
   } catch (e) {
     if (e instanceof AuthError) return false;

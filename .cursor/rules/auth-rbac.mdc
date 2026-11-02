@@ -33,7 +33,7 @@ export class PlanGateError extends AuthError {
   constructor(public readonly required: Plan, public readonly current: Plan);
 }
 
-// Platform-wide (USER, ADMIN, SUPER_ADMIN)
+// Platform-wide (USER, SALES, ADMIN, SUPER_ADMIN)
 export async function requirePlatformRole(role: UserRole): Promise<{ user }>;
 
 // Per-tenant (OWNER > MANAGER > CASHIER)

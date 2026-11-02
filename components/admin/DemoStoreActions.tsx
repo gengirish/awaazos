@@ -25,6 +25,10 @@ type Props = {
   phone: string | null;
   /** The signed-in admin, named in the WhatsApp message. */
   senderName: string | null;
+  /** Only a platform owner introduces themselves as the founder. */
+  senderIsFounder: boolean;
+  /** A SALES user can't delete a store. */
+  canDelete: boolean;
 };
 
 /**
@@ -33,7 +37,7 @@ type Props = {
  * (POST …/handover) or delete the store (DELETE). Claimed stores don't get
  * this component. Nothing is sent from our side.
  */
-export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, senderName }: Props) {
+export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, senderName, senderIsFounder, canDelete }: Props) {
   const router = useRouter();
   const emailId = useId();
   const [open, setOpen] = useState(false);
@@ -156,7 +160,7 @@ export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, send
         <div className="space-y-3">
           <OutreachWhatsApp
             phone={phone}
-            message={outreachIntroMessage({ senderName, storeName, storeUrl })}
+            message={outreachIntroMessage({ senderName, senderIsFounder, storeName, storeUrl })}
             label="Message on WhatsApp"
           />
           <Button type="button" size="sm" variant="outline" onClick={() => setMessaging(false)}>
@@ -171,9 +175,11 @@ export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, send
           <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
             Hand over to the seller
           </Button>
-          <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setConfirmDelete(true)}>
-            Delete
-          </Button>
+          {canDelete ? (
+            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setConfirmDelete(true)}>
+              Delete
+            </Button>
+          ) : null}
         </div>
       )}
 

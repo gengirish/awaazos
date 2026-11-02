@@ -21,6 +21,7 @@ import { healthFor, loadStoreHealth } from "@/lib/admin-store-health";
 import { publicStoreUrl } from "@/lib/demo-store";
 import { formatIstDate } from "@/lib/datetime";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
+import { demoVendorIdsBuiltBy } from "@/lib/sales-scope";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin demo stores — AwaazOS" };
@@ -40,12 +41,17 @@ function stageDetail(stage: DemoStage): string | null {
 
 export default async function AdminDemoStoresPage() {
   // Role read from the database, 404 rather than 403. Any platform ADMIN runs
-  // outreach here; SUPER_ADMIN additionally sees the store and admin pages.
+  // outreach here; SUPER_ADMIN additionally sees the store and admin pages. A
+  // SALES user sees only the stores they built and can't delete them.
   let superAdmin: boolean;
+  let isSales: boolean;
+  let userId: string;
   let senderName: string | null;
   try {
-    const { user } = await requirePlatformRole("ADMIN");
+    const { user } = await requirePlatformRole("SALES");
     superAdmin = user.role === "SUPER_ADMIN";
+    isSales = user.role === "SALES";
+    userId = user.id;
     senderName = user.name;
   } catch (err) {
     if (err instanceof AuthError) notFound();
@@ -53,7 +59,7 @@ export default async function AdminDemoStoresPage() {
   }
 
   const now = new Date();
-  const rows = await listDemoPipeline();
+  const rows = await listDemoPipeline(isSales ? await demoVendorIdsBuiltBy(`admin:${userId}`) : undefined);
   const health = await loadStoreHealth(
     rows.map((r) => r.id),
     now,
@@ -70,9 +76,10 @@ export default async function AdminDemoStoresPage() {
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Internal · Platform admin</p>
         <h1 className="mt-1 font-display text-3xl font-bold text-foreground">Demo-store pipeline</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Every store built for a prospect, whether they claimed it, and whether they use it afterwards.
+          {isSales ? "Every store you built" : "Every store built"} for a prospect, whether they claimed it, and whether
+          they use it afterwards.
         </p>
-        <AdminNav current="/admin/demo-stores" superAdmin={superAdmin} />
+        <AdminNav current="/admin/demo-stores" superAdmin={superAdmin} sales={isSales} />
         <Button asChild className="mt-4">
           <Link href="/admin/demo-stores/new">Build a demo store</Link>
         </Button>
@@ -138,6 +145,8 @@ export default async function AdminDemoStoresPage() {
                         storeUrl={publicStoreUrl(row.slug)}
                         phone={row.settings?.whatsappNumber ?? null}
                         senderName={senderName}
+                        senderIsFounder={superAdmin}
+                        canDelete={!isSales}
                       />
                     ) : null}
                   </li>
