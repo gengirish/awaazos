@@ -155,7 +155,7 @@ export function UpiPayOptions({
       ) : null}
       <p className="select-all break-all font-mono text-sm text-foreground">{upiId}</p>
       <p className="text-sm text-muted-foreground">
-        App didn&apos;t open? Open any UPI app → Pay to UPI ID → paste the UPI ID
+        App didn&apos;t open, or warned the payment may fail? Open any UPI app → Pay to UPI ID → paste the UPI ID
         {hasAmount ? ", then the amount" : ""}.
       </p>
 

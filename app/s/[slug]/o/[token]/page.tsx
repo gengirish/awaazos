@@ -24,6 +24,7 @@ import { OtherCartsNotice } from "@/components/storefront/OtherCartsNotice";
 import { PaidClaimForm } from "@/components/storefront/PaidClaimForm";
 import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
 import { RazorpayPayButton } from "@/components/storefront/RazorpayPayButton";
+import { SaveQrButton } from "@/components/storefront/SaveQrButton";
 import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
 import { formatINR, paiseToRupees } from "@/lib/currency";
@@ -43,7 +44,7 @@ import { discountLabel } from "@/lib/offers";
 import { paymentProofEnabled } from "@/lib/payment-proof";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl, isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
-import { qrSvgDataUrl } from "@/lib/qr";
+import { qrPngDataUrl, qrSvgDataUrl } from "@/lib/qr";
 import { buildUpiDeepLink } from "@/lib/upi";
 import { cn } from "@/lib/utils";
 import { storeThemeAttribute } from "@/lib/store-theme";
@@ -64,7 +65,9 @@ export const runtime = "nodejs";
  * UPI pay: `UpiPayOptions` (client) leads with the generic `upi://` button on
  * Android and with per-app buttons (GPay / PhonePe / Paytm) on iPhone, where
  * `upi://` has no app chooser; plus copy-UPI-ID / copy-amount. The QR, for
- * scanning from a second phone, sits in a collapsed <details> under them. Only
+ * scanning from a second phone, sits in a collapsed <details> under them; on a
+ * phone, "Save QR to gallery" (PNG) covers apps that refuse a link to a personal
+ * UPI ID and ask for a scanned QR instead. Only
  * the vendor VPA and total reach it. Step 2, "Tell the store you've paid", is
  * the outlined `PaidClaimForm` — it never marks the order paid.
  *
@@ -299,6 +302,9 @@ export default async function StorefrontOrderPage(props: {
         })
       : null;
   const qrSrc = upiLink ? await qrSvgDataUrl(upiLink, 220) : "";
+  // For "Save QR to gallery" (scan-from-gallery when the app refuses the link).
+  // Not for demo stores: their QR is a sample and must not leave the page.
+  const qrPng = upiLink && !order.vendor.isDemo ? await qrPngDataUrl(upiLink, 512) : "";
   const minsLeft = awaitingUpi ? holdMinutesLeft(order.createdAt, PENDING_HOLD_MINUTES, now) : 0;
   // A clock time, not a countdown: it stays right while the page sits open.
   const payBy = formatIstTime(new Date(order.createdAt.getTime() + PENDING_HOLD_MINUTES * 60_000));
@@ -517,6 +523,14 @@ export default async function StorefrontOrderPage(props: {
                     genericLabel={`Pay ${formatINR(order.totalPaise)} with a UPI app`}
                     emphasis={payOnline ? "secondary" : "primary"}
                   />
+                  {qrPng ? (
+                    <div className="space-y-1.5 sm:hidden">
+                      <SaveQrButton pngDataUrl={qrPng} fileName={`upi-${order.billNumber}`} />
+                      <p className="text-sm text-muted-foreground">
+                        Then use &ldquo;Scan from gallery&rdquo; in your UPI app.
+                      </p>
+                    </div>
+                  ) : null}
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Paying {payeeName} · ref {order.billNumber}
                   </p>
