@@ -101,6 +101,7 @@ export const PLAN_MARKETING: Record<MarketedPlan, PlanMarketing> = {
       `${trial} — no card needed`,
       "Your own store link for your Instagram bio and WhatsApp",
       "Drops with a cut-off and stock limits, so you never oversell",
+      "Online payments into your own Razorpay account, marked paid by themselves",
       "UPI payments you confirm, or pay on delivery",
       "One orders board, a prep sheet and order alerts on your phone",
       "Receipts you send from your own WhatsApp",
