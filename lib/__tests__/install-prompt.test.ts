@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { detectInstallMode, isInAppBrowser, type InstallEnv } from "@/lib/install-prompt";
+import { detectInstallMode, hasInstallGuide, isInAppBrowser, type InstallEnv } from "@/lib/install-prompt";
 
 const UA = {
   androidChrome:
@@ -87,5 +87,23 @@ describe("detectInstallMode", () => {
 
   it("shows nothing where there is no install path at all", () => {
     expect(detectInstallMode(env({ userAgent: UA.desktopFirefox, maxTouchPoints: 0 }))).toBe("none");
+  });
+});
+
+describe("hasInstallGuide", () => {
+  it("opens on iPhone and iPad, in a real browser or an in-app one", () => {
+    expect(hasInstallGuide("ios", { userAgent: UA.iphoneSafari, maxTouchPoints: 5 })).toBe(true);
+    expect(hasInstallGuide("ios", { userAgent: UA.ipadDesktopMode, maxTouchPoints: 5 })).toBe(true);
+    expect(hasInstallGuide("in-app", { userAgent: UA.iphoneInstagram, maxTouchPoints: 5 })).toBe(true);
+  });
+
+  it("never takes over Chromium's prompt, or opens on Android at all", () => {
+    expect(hasInstallGuide("prompt", { userAgent: UA.androidChrome, maxTouchPoints: 5 })).toBe(false);
+    expect(hasInstallGuide("in-app", { userAgent: UA.androidInstagram, maxTouchPoints: 5 })).toBe(false);
+  });
+
+  it("stays shut once installed, and before the mode is known", () => {
+    expect(hasInstallGuide("none", { userAgent: UA.iphoneSafari, maxTouchPoints: 5 })).toBe(false);
+    expect(hasInstallGuide("loading", { userAgent: UA.iphoneSafari, maxTouchPoints: 5 })).toBe(false);
   });
 });

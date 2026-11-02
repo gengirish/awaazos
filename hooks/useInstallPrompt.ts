@@ -2,7 +2,7 @@
 
 import { useSyncExternalStore } from "react";
 
-import { detectInstallMode, INSTALL_DISMISS_KEY, type InstallMode } from "@/lib/install-prompt";
+import { detectInstallMode, hasInstallGuide, INSTALL_DISMISS_KEY, type InstallMode } from "@/lib/install-prompt";
 
 /**
  * One shared install state for the whole page: the shell's "Install app" row,
@@ -22,6 +22,8 @@ type BeforeInstallPromptEvent = Event & {
 
 export type InstallState = {
   mode: InstallMode | "loading";
+  /** This device can open the step-by-step dialog (lib/install-guide.ts). */
+  guide: boolean;
   /** The home-screen banner was dismissed on this device. */
   dismissed: boolean;
   /** The browser's install dialog is open. */
@@ -30,7 +32,7 @@ export type InstallState = {
   bannerShowing: boolean;
 };
 
-const INITIAL: InstallState = { mode: "loading", dismissed: false, installing: false, bannerShowing: false };
+const INITIAL: InstallState = { mode: "loading", guide: false, dismissed: false, installing: false, bannerShowing: false };
 
 let state: InstallState = INITIAL;
 let deferred: BeforeInstallPromptEvent | null = null;
@@ -41,8 +43,13 @@ const listeners = new Set<() => void>();
 
 function set(patch: Partial<InstallState>): void {
   const next = { ...state, ...patch };
+  next.guide = hasInstallGuide(next.mode, {
+    userAgent: navigator.userAgent,
+    maxTouchPoints: navigator.maxTouchPoints ?? 0,
+  });
   if (
     next.mode === state.mode &&
+    next.guide === state.guide &&
     next.dismissed === state.dismissed &&
     next.installing === state.installing &&
     next.bannerShowing === state.bannerShowing
