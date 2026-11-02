@@ -412,9 +412,10 @@ Signed-in platform admins can do everything above without the API key:
 
 | Page | Who | What |
 | --- | --- | --- |
-| `/admin/demo-stores` | ADMIN, SUPER_ADMIN | Pipeline; per demo store "Hand over to the seller" (claim link) and "Delete" |
-| `/admin/demo-stores/new` | ADMIN, SUPER_ADMIN | Build a store from a form (8 sample orders generated from the dishes, `lib/demo-store-form.ts`) or a pasted payload |
-| `/admin/admins` | SUPER_ADMIN | Invite admins by one-time link, void invites, remove admins |
+| `/admin/demo-stores` | SALES (own stores, no "Delete"), ADMIN, SUPER_ADMIN | Pipeline; per demo store "Hand over to the seller" (claim link) and "Delete" |
+| `/admin/earnings` | SALES (own), SUPER_ADMIN (everyone) | Revenue share by month and store (`lib/sales-earnings.ts`). A report; it records no payouts |
+| `/admin/demo-stores/new` | SALES, ADMIN, SUPER_ADMIN | Build a store from a form (8 sample orders generated from the dishes, `lib/demo-store-form.ts`) or a pasted payload |
+| `/admin/admins` | SUPER_ADMIN | Invite admins and sales interns by one-time link, void invites, remove them |
 | `/admin-invite/[token]` | public | Invitee creates their account (own password), or signs in and accepts if the email already has one |
 
 - Routes: `POST /api/admin/demo-stores`, `DELETE /api/admin/demo-stores/{ref}`,
@@ -430,6 +431,10 @@ Signed-in platform admins can do everything above without the API key:
   the owner's name typed on `/new` is not saved.
 - An ADMIN sees `/admin/demo-stores` and `/admin/metrics` only. `/home` sends an admin with no store of
   their own to `/admin/demo-stores`.
+- **SALES (sales interns, `lib/sales-scope.ts`):** ranks below ADMIN, so every ADMIN route and page stays 404.
+  They reach only the stores whose audit "create" row names them; someone else's store is 404, and building
+  on a ref someone else holds is 409 `lead_taken`. Only a SUPER_ADMIN's outreach message says "founder".
+  The lead lock is per `external_ref`: the same seller under a different ref is not caught.
 - Admin invites (`lib/admin-invites.ts`): 192-bit token, SHA-256 stored, 7 days, one use, a new invite
   voids the previous one for that email. Nothing is sent. Redeeming never demotes a SUPER_ADMIN, and a
   link sent to another email answers like a dead link. Removing sets ADMIN → USER; never a SUPER_ADMIN

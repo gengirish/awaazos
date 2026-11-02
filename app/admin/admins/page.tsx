@@ -12,7 +12,7 @@ export const metadata = { title: "Admins — AwaazOS" };
 
 /**
  * /admin/admins — SUPER_ADMIN only (404 for anyone else). Invite people to run
- * outreach as platform ADMIN, void pending invites, and remove admins
+ * outreach as platform ADMIN or SALES, void pending invites, and remove them
  * (lib/admin-invites.ts).
  */
 export default async function AdminsPage() {
@@ -36,7 +36,8 @@ export default async function AdminsPage() {
         <h1 className="mt-1 font-display text-3xl font-bold text-foreground">Admins</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           An admin can build demo stores, make claim links, delete unclaimed demo stores and see the weekly metrics.
-          Only super admins see every store, give free access and manage admins.
+          Only super admins see every store, give free access and manage admins. A sales intern sees only the demo
+          stores they built and their own earnings, and can&apos;t delete stores.
         </p>
         <AdminNav current="/admin/admins" superAdmin />
       </header>
@@ -70,9 +71,9 @@ export default async function AdminsPage() {
                 </div>
                 <div className="flex items-center gap-3">
                   <Badge variant={a.role === "SUPER_ADMIN" ? "default" : "outline"}>
-                    {a.role === "SUPER_ADMIN" ? "Super admin" : "Admin"}
+                    {a.role === "SUPER_ADMIN" ? "Super admin" : a.role === "SALES" ? "Sales intern" : "Admin"}
                   </Badge>
-                  {a.role === "ADMIN" && a.id !== me ? <AdminRemove userId={a.id} label={a.name || a.email} /> : null}
+                  {a.role !== "SUPER_ADMIN" && a.id !== me ? <AdminRemove userId={a.id} label={a.name || a.email} /> : null}
                 </div>
               </li>
             ))}
@@ -90,7 +91,9 @@ export default async function AdminsPage() {
               {invites.map((inv) => (
                 <li key={inv.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-card p-4 shadow-xs">
                   <div className="min-w-0">
-                    <p className="truncate font-medium text-foreground">{inv.email}</p>
+                    <p className="truncate font-medium text-foreground">
+                      {inv.email} · {inv.role === "SALES" ? "Sales intern" : "Admin"}
+                    </p>
                     <p className="text-sm text-muted-foreground">
                       Sent {formatIstDate(inv.createdAt)}, works until {formatIstDate(inv.expiresAt)}
                     </p>

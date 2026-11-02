@@ -1,9 +1,11 @@
 /**
  * Platform admins for founder outreach (/admin/admins, /admin-invite/[token]).
  *
- * Roles: SUPER_ADMIN (platform owners) invites people as ADMIN. An ADMIN can run
- * the demo-store pipeline (/admin/demo-stores: build, claim links, delete
- * unclaimed) and read /admin/metrics — nothing else. Rules:
+ * Roles: SUPER_ADMIN (platform owners) invites people as ADMIN or SALES. An ADMIN
+ * can run the demo-store pipeline (/admin/demo-stores: build, claim links, delete
+ * unclaimed) and read /admin/metrics — nothing else. A SALES user (a sales intern)
+ * sees only the demo stores they built (lib/sales-scope.ts), can't delete them,
+ * and sees their own /admin/earnings. Rules:
  *
  * - An invite is a one-time link for one email, valid ADMIN_INVITE_TTL_DAYS.
  *   Only a SHA-256 of the 192-bit token is stored; a new invite for the same
@@ -12,14 +14,15 @@
  * - Redeeming it either creates the account with the invitee's own password
  *   (no account for that email yet) or promotes the signed-in account whose
  *   email matches. Never anyone else's account, and never a demotion: a
- *   SUPER_ADMIN who redeems one stays SUPER_ADMIN.
- * - Removing an admin sets them back to USER. A SUPER_ADMIN can't be removed
- *   here, and nobody removes themselves.
+ *   SUPER_ADMIN who redeems one stays SUPER_ADMIN, an ADMIN who redeems a SALES
+ *   invite stays ADMIN.
+ * - Removing an admin or SALES user sets them back to USER. A SUPER_ADMIN can't
+ *   be removed here, and nobody removes themselves.
  * - Unknown, used and expired links are one answer.
  */
 import { createHash, randomBytes } from "node:crypto";
 
-import { Prisma } from "@prisma/client";
+import { Prisma, type UserRole } from "@prisma/client";
 
 import { hashPassword } from "@/lib/password";
 import { prisma } from "@/lib/prisma";
@@ -27,6 +30,14 @@ import { appBaseUrl } from "@/lib/storefront-razorpay";
 
 export const ADMIN_INVITE_TTL_DAYS = 7;
 const DAY_MS = 24 * 60 * 60 * 1000;
+
+export const ADMIN_INVITE_ROLES = ["SALES", "ADMIN"] as const;
+export type AdminInviteRole = (typeof ADMIN_INVITE_ROLES)[number];
+
+/** Would taking an invite for `to` raise `from`? Anything else is left as it is. */
+function invitePromotes(from: UserRole, to: UserRole): boolean {
+  return from === "USER" || (from === "SALES" && to === "ADMIN");
+}
 
 export class AdminInviteError extends Error {
   constructor(
@@ -52,17 +63,22 @@ export function plausibleInviteToken(token: string): boolean {
 
 // ─── Invite ─────────────────────────────────────────────────────────
 
-export async function createAdminInvite(email: string, invitedById: string, now: Date = new Date()) {
+export async function createAdminInvite(
+  email: string,
+  invitedById: string,
+  role: AdminInviteRole = "ADMIN",
+  now: Date = new Date(),
+) {
   const normalised = email.trim().toLowerCase();
   const existing = await prisma.user.findUnique({ where: { email: normalised }, select: { role: true } });
-  if (existing && existing.role !== "USER") throw new AdminInviteError(409, "already_admin");
+  if (existing && !invitePromotes(existing.role, role)) throw new AdminInviteError(409, "already_admin");
 
   const token = randomBytes(24).toString("base64url");
   const expiresAt = new Date(now.getTime() + ADMIN_INVITE_TTL_DAYS * DAY_MS);
   const [, invite] = await prisma.$transaction([
     prisma.adminInvite.deleteMany({ where: { email: normalised, usedAt: null } }),
     prisma.adminInvite.create({
-      data: { email: normalised, tokenHash: hashAdminInviteToken(token), invitedById, expiresAt },
+      data: { email: normalised, tokenHash: hashAdminInviteToken(token), role, invitedById, expiresAt },
       select: { id: true },
     }),
   ]);
@@ -73,7 +89,7 @@ export async function createAdminInvite(email: string, invitedById: string, now:
 export function listPendingAdminInvites(now: Date = new Date()) {
   return prisma.adminInvite.findMany({
     where: { usedAt: null, expiresAt: { gt: now } },
-    select: { id: true, email: true, createdAt: true, expiresAt: true },
+    select: { id: true, email: true, role: true, createdAt: true, expiresAt: true },
     orderBy: { createdAt: "desc" },
     take: 50,
   });
@@ -98,10 +114,14 @@ export async function loadAdminInvite(token: string, now: Date = new Date()) {
 }
 
 /** Burns the token inside `tx`; throws the one "invalid or expired" answer if it can't. */
-async function burnInvite(tx: Prisma.TransactionClient, token: string, now: Date): Promise<string> {
+async function burnInvite(
+  tx: Prisma.TransactionClient,
+  token: string,
+  now: Date,
+): Promise<{ email: string; role: UserRole }> {
   const invite = await tx.adminInvite.findUnique({
     where: { tokenHash: hashAdminInviteToken(token) },
-    select: { id: true, email: true },
+    select: { id: true, email: true, role: true },
   });
   if (!invite) throw new AdminInviteError(400, "invalid_or_expired");
   const burned = await tx.adminInvite.updateMany({
@@ -109,10 +129,10 @@ async function burnInvite(tx: Prisma.TransactionClient, token: string, now: Date
     data: { usedAt: now },
   });
   if (burned.count !== 1) throw new AdminInviteError(400, "invalid_or_expired");
-  return invite.email;
+  return { email: invite.email, role: invite.role };
 }
 
-/** No account for the invited email yet: create it as ADMIN with the invitee's own password. */
+/** No account for the invited email yet: create it with the invite's role and the invitee's own password. */
 export async function redeemAdminInviteAsNewUser(
   input: { token: string; name: string; password: string },
   now: Date = new Date(),
@@ -120,11 +140,11 @@ export async function redeemAdminInviteAsNewUser(
   const passwordHash = await hashPassword(input.password);
   try {
     return await prisma.$transaction(async (tx) => {
-      const email = await burnInvite(tx, input.token, now);
+      const { email, role } = await burnInvite(tx, input.token, now);
       if (await tx.user.findUnique({ where: { email }, select: { id: true } })) {
         throw new AdminInviteError(409, "email_in_use");
       }
-      await tx.user.create({ data: { email, name: input.name.trim(), passwordHash, role: "ADMIN" } });
+      await tx.user.create({ data: { email, name: input.name.trim(), passwordHash, role } });
       return { email };
     });
   } catch (err) {
@@ -147,9 +167,9 @@ export async function redeemAdminInviteAsUser(token: string, userId: string, now
     if (!user || !invite || invite.email !== user.email.toLowerCase()) {
       throw new AdminInviteError(400, "invalid_or_expired");
     }
-    await burnInvite(tx, token, now);
-    if (user.role === "USER") {
-      await tx.user.update({ where: { id: userId }, data: { role: "ADMIN" } });
+    const { role } = await burnInvite(tx, token, now);
+    if (invitePromotes(user.role, role)) {
+      await tx.user.update({ where: { id: userId }, data: { role } });
     }
   });
 }
@@ -158,15 +178,18 @@ export async function redeemAdminInviteAsUser(token: string, userId: string, now
 
 export function listPlatformAdmins() {
   return prisma.user.findMany({
-    where: { role: { in: ["ADMIN", "SUPER_ADMIN"] } },
+    where: { role: { in: ["SALES", "ADMIN", "SUPER_ADMIN"] } },
     select: { id: true, name: true, email: true, role: true, createdAt: true },
     orderBy: [{ role: "desc" }, { createdAt: "asc" }],
   });
 }
 
-/** ADMIN → USER. A SUPER_ADMIN, yourself or a non-admin is refused. */
+/** ADMIN or SALES → USER. A SUPER_ADMIN, yourself or a non-admin is refused. */
 export async function removePlatformAdmin(userId: string, actingUserId: string): Promise<void> {
   if (userId === actingUserId) throw new AdminInviteError(409, "cannot_remove_self");
-  const res = await prisma.user.updateMany({ where: { id: userId, role: "ADMIN" }, data: { role: "USER" } });
+  const res = await prisma.user.updateMany({
+    where: { id: userId, role: { in: ["ADMIN", "SALES"] } },
+    data: { role: "USER" },
+  });
   if (res.count !== 1) throw new AdminInviteError(404, "not_found");
 }

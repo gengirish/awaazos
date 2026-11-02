@@ -10,8 +10,9 @@ import { prisma } from "@/lib/prisma";
 
 const USER_ROLE_RANK: Record<UserRole, number> = {
   USER: 0,
-  ADMIN: 1,
-  SUPER_ADMIN: 2,
+  SALES: 1,
+  ADMIN: 2,
+  SUPER_ADMIN: 3,
 };
 
 /** Business hierarchy: CASHIER < MANAGER < OWNER */

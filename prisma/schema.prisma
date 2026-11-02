@@ -681,6 +681,7 @@ model AdminInvite {
   id          String    @id @default(cuid())
   email       String
   tokenHash   String    @unique
+  role        UserRole  @default(ADMIN) // SALES or ADMIN: what redeeming it grants
   invitedById String
   expiresAt   DateTime
   usedAt      DateTime?
@@ -730,6 +731,7 @@ model CommunityMember {
 
 enum UserRole {
   USER // Default — vendors and their staff
+  SALES // Sales intern: only the demo stores they built, and their earnings
   ADMIN // IntelliForge support / ops
   SUPER_ADMIN // Platform owners
 }

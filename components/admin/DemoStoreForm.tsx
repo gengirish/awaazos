@@ -53,6 +53,7 @@ const ERROR_TEXT: Record<string, string> = {
   payment_details_not_allowed:
     "A field looks like a UPI id, bank detail, payment key or email. Remove it: demo stores always use demo@upi.",
   demo_owner_not_configured: "DEMO_OWNER_EMAIL is not set on the server, so demo stores can't be built.",
+  lead_taken: "Someone on the team already has a demo store under this reference. Ask them or an admin before contacting this seller.",
 };
 
 const EMPTY_ITEM: DemoStoreFormItem = { name: "", unit: "", priceRupees: "", category: "" };
@@ -123,7 +124,7 @@ function profileField(payload: unknown, key: string): string {
  * offers the first WhatsApp message to the seller (lib/outreach-message.ts).
  * `senderName` is the signed-in admin's name, for that message.
  */
-export function DemoStoreForm({ senderName }: { senderName: string | null }) {
+export function DemoStoreForm({ senderName, senderIsFounder }: { senderName: string | null; senderIsFounder: boolean }) {
   const ids = useId();
   const [mode, setMode] = useState<"form" | "json">("form");
   const [form, setForm] = useState<DemoStoreFormValues>(INITIAL);
@@ -263,6 +264,7 @@ export function DemoStoreForm({ senderName }: { senderName: string | null }) {
             message={outreachIntroMessage({
               ownerName: created.ownerName,
               senderName,
+              senderIsFounder,
               storeName: created.storeName,
               storeUrl: created.public_url,
             })}

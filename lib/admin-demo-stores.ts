@@ -4,7 +4,8 @@
  * internal API) and how far the prospect got. Read-only.
  *
  * Cross-tenant, like lib/admin-vendors.ts: callers must have passed
- * `requirePlatformRole("ADMIN")` first — outreach admins work this page. The
+ * `requirePlatformRole("SALES")` first — outreach admins and sales interns work
+ * this page, and a SALES caller passes the stores they built. The
  * handover's prospect email is never selected — the stage needs only its dates.
  * The only contact detail read is the seller's public business number.
  *
@@ -36,10 +37,10 @@ const DEMO_PIPELINE_SELECT = {
 
 export type DemoPipelineRow = Prisma.VendorGetPayload<{ select: typeof DEMO_PIPELINE_SELECT }>;
 
-/** Newest demo stores first, claimed ones included. */
-export function listDemoPipeline(): Promise<DemoPipelineRow[]> {
+/** Newest demo stores first, claimed ones included. `onlyVendorIds` narrows it to one person's stores. */
+export function listDemoPipeline(onlyVendorIds?: string[]): Promise<DemoPipelineRow[]> {
   return prisma.vendor.findMany({
-    where: { demoExternalRef: { not: null } },
+    where: { demoExternalRef: { not: null }, ...(onlyVendorIds ? { id: { in: onlyVendorIds } } : {}) },
     select: DEMO_PIPELINE_SELECT,
     orderBy: { createdAt: "desc" },
     take: DEMO_PIPELINE_LIMIT,

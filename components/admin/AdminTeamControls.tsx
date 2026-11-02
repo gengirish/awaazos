@@ -11,7 +11,7 @@ import { Notice } from "@/components/ui/notice";
 import { formatIstDate } from "@/lib/datetime";
 
 const ERROR_TEXT: Record<string, string> = {
-  already_admin: "That account is already an admin.",
+  already_admin: "That account already has this access or more.",
   cannot_remove_self: "You can't remove yourself.",
   not_found: "Already gone. Refresh the page.",
 };
@@ -20,7 +20,9 @@ const ERROR_TEXT: Record<string, string> = {
 export function AdminInviteCreate() {
   const router = useRouter();
   const emailId = useId();
+  const roleId = useId();
   const [email, setEmail] = useState("");
+  const [role, setRole] = useState<"SALES" | "ADMIN">("SALES");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<{ url: string; expiresAt: string; email: string } | null>(null);
@@ -39,7 +41,7 @@ export function AdminInviteCreate() {
       const res = await fetch("/api/admin/admins/invites", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: value }),
+        body: JSON.stringify({ email: value, role }),
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -84,6 +86,19 @@ export function AdminInviteCreate() {
             onChange={(e) => setEmail(e.target.value)}
             disabled={busy}
           />
+        </div>
+        <div className="w-full sm:w-48">
+          <Label htmlFor={roleId}>Role</Label>
+          <select
+            id={roleId}
+            className="mt-1 flex min-h-11 w-full rounded-md border border-input bg-background px-3 text-base ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+            value={role}
+            onChange={(e) => setRole(e.target.value === "ADMIN" ? "ADMIN" : "SALES")}
+            disabled={busy}
+          >
+            <option value="SALES">Sales intern</option>
+            <option value="ADMIN">Admin</option>
+          </select>
         </div>
         <Button type="submit" disabled={busy}>
           {busy ? "Making…" : "Make invite link"}

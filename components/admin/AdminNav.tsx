@@ -1,18 +1,30 @@
 import Link from "next/link";
 
 const LINKS = [
-  { href: "/admin/metrics", label: "Weekly metrics", superAdminOnly: false },
-  { href: "/admin/vendors", label: "Stores and free access", superAdminOnly: true },
-  { href: "/admin/referrals", label: "Referrals", superAdminOnly: true },
-  { href: "/admin/demo-stores", label: "Demo-store pipeline", superAdminOnly: false },
-  { href: "/admin/communities", label: "Community pages", superAdminOnly: false },
-  { href: "/admin/pricing", label: "Pricing calculator", superAdminOnly: false },
-  { href: "/admin/admins", label: "Admins", superAdminOnly: true },
+  { href: "/admin/metrics", label: "Weekly metrics", superAdminOnly: false, sales: false },
+  { href: "/admin/vendors", label: "Stores and free access", superAdminOnly: true, sales: false },
+  { href: "/admin/referrals", label: "Referrals", superAdminOnly: true, sales: false },
+  { href: "/admin/demo-stores", label: "Demo-store pipeline", superAdminOnly: false, sales: true },
+  { href: "/admin/earnings", label: "Sales earnings", superAdminOnly: true, sales: true },
+  { href: "/admin/communities", label: "Community pages", superAdminOnly: false, sales: false },
+  { href: "/admin/pricing", label: "Pricing calculator", superAdminOnly: false, sales: false },
+  { href: "/admin/admins", label: "Admins", superAdminOnly: true, sales: false },
 ] as const;
 
-/** The admin pages link to each other here. Store and admin pages are SUPER_ADMIN only. */
-export function AdminNav({ current, superAdmin }: { current: (typeof LINKS)[number]["href"]; superAdmin: boolean }) {
-  const links = LINKS.filter((l) => l.href !== current && (superAdmin || !l.superAdminOnly));
+/**
+ * The admin pages link to each other here. Store and admin pages are SUPER_ADMIN
+ * only; a SALES user gets just the pipeline and earnings.
+ */
+export function AdminNav({
+  current,
+  superAdmin,
+  sales = false,
+}: {
+  current: (typeof LINKS)[number]["href"];
+  superAdmin: boolean;
+  sales?: boolean;
+}) {
+  const links = LINKS.filter((l) => l.href !== current && (sales ? l.sales : superAdmin || !l.superAdminOnly));
   if (links.length === 0) return null;
   return (
     <nav aria-label="Admin" className="mt-2 flex flex-wrap gap-x-5">
