@@ -494,6 +494,8 @@ with a redirect to `/pos` when a cached `/pos` exists, so the Home Screen icon s
 till. Manifest `id` stays `"/"`. Install affordances (`components/pwa/InstallPrompt.tsx`) and every
 copy of the phone-alerts opt-in (`components/push/PushAlertsButton.tsx`) are views over module-level
 stores (`hooks/useInstallPrompt.ts`, `hooks/usePushAlerts.ts`) — add a copy, never a second detector.
+iPhone/iPad also get a step-by-step dialog from `@khmyznikov/pwa-install` (`lib/install-guide.ts`, loaded on
+the tap, version pinned). Never on Chromium: it would replace the one-tap prompt, and its Android sheet has no close button.
 Both are event-driven: no timers, no polling.
 
 **Setup checklist and billing notices** follow the seller to where they land: `/orders`, `/drops` and

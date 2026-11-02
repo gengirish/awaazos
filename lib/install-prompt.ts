@@ -33,6 +33,8 @@ export const INSTALL_COPY = {
   title: "Install AwaazOS",
   prompt: "Opens from your Home Screen like any app, with order alerts.",
   action: "Install app",
+  /** Opens the step-by-step dialog (lib/install-guide.ts). */
+  guide: "Show me how",
   /** Same steps as the phone-alerts hint in components/push/PushAlertsButton.tsx. */
   ios: "On iPhone: tap Share → Add to Home Screen, then open AwaazOS from your Home Screen. Order alerts only work from there.",
   iosShort: "Tap Share → Add to Home Screen",
@@ -56,6 +58,18 @@ export function isInAppBrowser(userAgent: string, maxTouchPoints = 0): boolean {
     return !/Safari\//i.test(userAgent);
   }
   return false;
+}
+
+/**
+ * Can this device open the step-by-step dialog (lib/install-guide.ts)? iPhone
+ * and iPad only, in a real browser or an in-app one. On Android an in-app
+ * browser keeps the written line.
+ */
+export function hasInstallGuide(
+  mode: InstallMode | "loading",
+  env: Pick<InstallEnv, "userAgent" | "maxTouchPoints">,
+): boolean {
+  return (mode === "ios" || mode === "in-app") && isIOS(env.userAgent, env.maxTouchPoints);
 }
 
 export function detectInstallMode(env: InstallEnv): InstallMode {
