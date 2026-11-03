@@ -18,12 +18,12 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { BuyerReceivedButton } from "@/components/storefront/BuyerReceivedButton";
+import { OnlinePayFlow } from "@/components/storefront/OnlinePayFlow";
 import { OrderLinkActions } from "@/components/storefront/OrderLinkActions";
 import { OrderRefresh } from "@/components/storefront/OrderRefresh";
 import { OtherCartsNotice } from "@/components/storefront/OtherCartsNotice";
 import { PaidClaimForm } from "@/components/storefront/PaidClaimForm";
 import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
-import { RazorpayPayButton } from "@/components/storefront/RazorpayPayButton";
 import { SaveQrButton } from "@/components/storefront/SaveQrButton";
 import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
@@ -77,9 +77,10 @@ export const runtime = "nodejs";
  * `OrderLinkActions` remembers the order on the device (token, bill number and
  * time only) and shares the order link.
  *
- * When the store has connected its own Razorpay account (PRO plan), "Pay
- * online" is offered above the UPI intent/QR. The buyer's own name and phone
- * are handed to that button only to prefill Razorpay Checkout. Razorpay
+ * When the store has connected its own Razorpay account, "Pay online" is the
+ * only option shown; the UPI intent/QR and "Payment done?" wait in `OnlinePayFlow`
+ * until Razorpay fails. The buyer's own name and phone are handed to that button
+ * only to prefill Razorpay Checkout. Razorpay
  * credentials are selected for presence checks only — never rendered or passed
  * to a client component.
  *
@@ -357,6 +358,78 @@ export default async function StorefrontOrderPage(props: {
           { key: "handed", label: payOnDelivery ? `${lastStep} · pay then` : lastStep, done: handedOver },
         ];
   const storeHref = `/s/${slug}`;
+
+  const payHeading = (
+    <h2 id="pay-heading" className="font-display text-xl font-bold text-awaaz-charcoal">
+      Pay {formatINR(order.totalPaise)}
+    </h2>
+  );
+  // What a buyer can do without Razorpay. With Razorpay it stays hidden until Razorpay fails.
+  const directPay = upiLink ? (
+    <>
+      <UpiPayOptions
+        upiLink={upiLink}
+        upiId={vendor.upiId ?? ""}
+        amountPaise={order.totalPaise}
+        genericLabel={`Pay ${formatINR(order.totalPaise)} with a UPI app`}
+        emphasis={payOnline ? "secondary" : "primary"}
+        foldFallback
+      >
+        {qrPng ? (
+          <div className="space-y-1.5 sm:hidden">
+            <SaveQrButton pngDataUrl={qrPng} fileName={`upi-${order.billNumber}`} />
+            <p className="text-sm text-muted-foreground">
+              Then use &ldquo;Scan from gallery&rdquo; in your UPI app.
+            </p>
+          </div>
+        ) : null}
+      </UpiPayOptions>
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Paying {payeeName} · ref {order.billNumber}
+      </p>
+      <details className="group overflow-hidden rounded-xl border border-border/60 text-left">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm font-semibold text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
+          <QrCode className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span className="flex-1">Paying from another phone? Show QR</span>
+          <ChevronDown
+            className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
+            aria-hidden="true"
+          />
+        </summary>
+        <div className="border-t border-border/50 px-3 py-4 text-center">
+          <div className="mx-auto w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
+            <UpiQrImage
+              src={qrSrc}
+              alt={`UPI QR code to pay ${formatINR(order.totalPaise)} to ${payeeName}`}
+              size={220}
+              sample={order.vendor.isDemo}
+            />
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">Scan it with the phone you pay from.</p>
+        </div>
+      </details>
+    </>
+  ) : waLink ? (
+    <p className="text-sm text-muted-foreground">
+      The store hasn&apos;t added a UPI ID yet — message them to pay.
+    </p>
+  ) : null;
+  // A claim needs a payment to be about: one the buyer could make here or by messaging
+  // the store, or an earlier one the seller answered "Not received".
+  const claimSection =
+    directPay || paymentRejected ? (
+      <section aria-labelledby="claim-heading" className="space-y-3 border-t border-border/50 p-4 sm:p-6">
+        <h2 id="claim-heading" className="font-display text-lg font-bold text-awaaz-charcoal">
+          Payment done?
+        </h2>
+        <PaidClaimForm
+          slug={slug}
+          token={params.token}
+          requireReference={paymentRejected}
+          askScreenshot={proofUploads}
+        />
+      </section>
+    ) : null;
   // "I've received my order": a confirmed delivery that isn't waiting on an
   // upfront payment. Pickups are handed over in person.
   const liveDelivery = order.fulfilmentType === "DELIVERY" && confirmed;
@@ -496,89 +569,32 @@ export default async function StorefrontOrderPage(props: {
 
         {awaitingUpi ? (
           <div className="rounded-2xl border border-primary/25 bg-background text-center shadow-xs">
-            <section aria-labelledby="pay-heading" className="space-y-4 p-4 sm:p-6">
-              <h2 id="pay-heading" className="font-display text-xl font-bold text-awaaz-charcoal">
-                Pay {formatINR(order.totalPaise)}
-              </h2>
-              {payOnline ? (
-                <>
-                  <RazorpayPayButton
-                    slug={slug}
-                    token={params.token}
-                    amountLabel={formatINR(order.totalPaise)}
-                    prefillName={order.customerName}
-                    prefillContact={order.customerPhone}
-                  />
-                  {upiLink ? (
-                    <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                      or pay directly with a UPI app
-                    </p>
-                  ) : null}
-                </>
-              ) : null}
-              {upiLink ? (
-                <>
-                  <UpiPayOptions
-                    upiLink={upiLink}
-                    upiId={vendor.upiId ?? ""}
-                    amountPaise={order.totalPaise}
-                    genericLabel={`Pay ${formatINR(order.totalPaise)} with a UPI app`}
-                    emphasis={payOnline ? "secondary" : "primary"}
-                    foldFallback
-                  >
-                    {qrPng ? (
-                      <div className="space-y-1.5 sm:hidden">
-                        <SaveQrButton pngDataUrl={qrPng} fileName={`upi-${order.billNumber}`} />
-                        <p className="text-sm text-muted-foreground">
-                          Then use &ldquo;Scan from gallery&rdquo; in your UPI app.
-                        </p>
-                      </div>
-                    ) : null}
-                  </UpiPayOptions>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    Paying {payeeName} · ref {order.billNumber}
-                  </p>
-                  <details className="group overflow-hidden rounded-xl border border-border/60 text-left">
-                    <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm font-semibold text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
-                      <QrCode className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                      <span className="flex-1">Paying from another phone? Show QR</span>
-                      <ChevronDown
-                        className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
-                        aria-hidden="true"
-                      />
-                    </summary>
-                    <div className="border-t border-border/50 px-3 py-4 text-center">
-                      <div className="mx-auto w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
-                        <UpiQrImage
-                          src={qrSrc}
-                          alt={`UPI QR code to pay ${formatINR(order.totalPaise)} to ${payeeName}`}
-                          size={220}
-                          sample={order.vendor.isDemo}
-                        />
-                      </div>
-                      <p className="mt-3 text-xs text-muted-foreground">Scan it with the phone you pay from.</p>
-                    </div>
-                  </details>
-                </>
-              ) : payOnline ? null : (
-                <p className="text-sm text-muted-foreground">
-                  {waLink
-                    ? "The store hasn't added a UPI ID yet — message them to pay."
-                    : "The store hasn't added a UPI ID yet, so it can't take a UPI payment here."}
-                </p>
-              )}
-            </section>
-            <section aria-labelledby="claim-heading" className="space-y-3 border-t border-border/50 p-4 sm:p-6">
-              <h2 id="claim-heading" className="font-display text-lg font-bold text-awaaz-charcoal">
-                Payment done?
-              </h2>
-              <PaidClaimForm
+            {payOnline ? (
+              <OnlinePayFlow
                 slug={slug}
                 token={params.token}
-                requireReference={paymentRejected}
-                askScreenshot={proofUploads}
+                amountLabel={formatINR(order.totalPaise)}
+                prefillName={order.customerName}
+                prefillContact={order.customerPhone}
+                fallback={upiLink ? "upi" : waLink ? "message" : null}
+                startOpen={paymentRejected}
+                heading={payHeading}
+                directPay={directPay}
+                claim={claimSection}
               />
-            </section>
+            ) : (
+              <>
+                <section aria-labelledby="pay-heading" className="space-y-4 p-4 sm:p-6">
+                  {payHeading}
+                  {directPay ?? (
+                    <p className="text-sm text-muted-foreground">
+                      The store hasn&apos;t added a UPI ID yet, so it can&apos;t take a UPI payment here.
+                    </p>
+                  )}
+                </section>
+                {claimSection}
+              </>
+            )}
           </div>
         ) : null}
 

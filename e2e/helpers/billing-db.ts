@@ -42,6 +42,21 @@ export async function setVendorBilling(
 }
 
 /**
+ * Give a store placeholder Razorpay keys, so its order page offers "Pay online"
+ * without calling Razorpay (saving through the API validates them against it).
+ * Nothing decrypts them unless a real start call runs, so specs mock that call.
+ */
+export async function setRazorpayKeysBySlug(slug: string): Promise<void> {
+  const res = await db().vendorSettings.updateMany({
+    where: { vendor: { slug } },
+    data: { razorpayKeyId: "rzp_test_e2e", razorpayKeySecretEnc: "e2e", razorpayWebhookSecretEnc: "e2e" },
+  });
+  if (res.count !== 1) {
+    throw new Error(`setRazorpayKeysBySlug: expected 1 store for the slug, got ${res.count}`);
+  }
+}
+
+/**
  * Change the role of the staff member registered with `email`. Registration
  * only ever creates an OWNER and there is no staff-invite flow yet, so this is
  * the one way a spec can see the app as a CASHIER or MANAGER. Same guard as
