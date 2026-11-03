@@ -54,7 +54,8 @@ jobs:
 
   e2e:
     name: E2E (${{ matrix.project }})
-    runs-on: ubuntu-latest
+    # Pinned: `playwright install --with-deps` has no ubuntu-latest (26.04) support yet.
+    runs-on: ubuntu-24.04
     timeout-minutes: 45
     needs: quality
     strategy:
