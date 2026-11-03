@@ -70,78 +70,82 @@ test.describe("Razorpay first on the order page", () => {
     }
     await setRazorpayKeysBySlug(slug);
 
-    const ctx: BrowserContext = await browser.newContext(CONTEXT_OPTIONS);
-    // Stands in for checkout.js. `__rzpScript` picks what the buyer does in the window.
-    await ctx.addInitScript(() => {
-      type Opts = { handler: (r: unknown) => void; modal: { ondismiss: () => void } };
-      (window as unknown as { Razorpay: unknown }).Razorpay = class {
-        constructor(private o: Opts) {}
-        on() {}
-        open() {
-          if (localStorage.getItem("__rzpScript") === "paid") {
-            this.o.handler({ razorpay_order_id: "o", razorpay_payment_id: "p", razorpay_signature: "s" });
+    // One browser per order: checkout shows a returning buyer's saved details as a card.
+    const contexts: BrowserContext[] = [];
+    async function newBuyer(): Promise<Page> {
+      const ctx = await browser.newContext(CONTEXT_OPTIONS);
+      contexts.push(ctx);
+      // Stands in for checkout.js. `__rzpScript` picks what the buyer does in the window.
+      await ctx.addInitScript(() => {
+        type Opts = { handler: (r: unknown) => void; modal: { ondismiss: () => void } };
+        (window as unknown as { Razorpay: unknown }).Razorpay = class {
+          constructor(private o: Opts) {}
+          on() {}
+          open() {
+            if (localStorage.getItem("__rzpScript") === "paid") {
+              this.o.handler({ razorpay_order_id: "o", razorpay_payment_id: "p", razorpay_signature: "s" });
+            }
+            this.o.modal.ondismiss();
           }
-          this.o.modal.ondismiss();
-        }
-      };
-    });
+        };
+      });
+      return ctx.newPage();
+    }
 
     try {
       // ── Healthy: the Razorpay button alone ──────────────────────────
-      const buyer = await ctx.newPage();
-      await placeOrder(buyer, slug, item);
-      await expect(buyer.getByRole("button", { name: PAY_ONLINE })).toBeVisible();
-      await expectDirectPay(buyer, false);
+      const refused = await newBuyer();
+      await placeOrder(refused, slug, item);
+      await expect(refused.getByRole("button", { name: PAY_ONLINE })).toBeVisible();
+      await expectDirectPay(refused, false);
 
       // ── Payment still being confirmed: stays closed, or they'd pay twice ──
-      await mockStart(buyer, 409, { error: "payment_processing" });
-      await buyer.getByRole("button", { name: PAY_ONLINE }).click();
-      await expect(buyer.getByText(/your payment went through/i)).toBeVisible();
-      await expectDirectPay(buyer, false);
-      await buyer.unroute("**/razorpay");
+      await mockStart(refused, 409, { error: "payment_processing" });
+      await refused.getByRole("button", { name: PAY_ONLINE }).click();
+      await expect(refused.getByText(/your payment went through/i)).toBeVisible();
+      await expectDirectPay(refused, false);
+      await refused.unroute("**/razorpay");
 
       // ── Razorpay refuses the store: UPI opens, and survives a reload ──
-      await mockStart(buyer, 409, { error: "online_payment_unavailable" });
-      await buyer.getByRole("button", { name: PAY_ONLINE }).click();
-      await expect(buyer.getByText(/please pay by upi below/i)).toBeVisible();
-      await expectDirectPay(buyer, true);
-      await buyer.reload();
-      await expectDirectPay(buyer, true);
-      await buyer.unroute("**/razorpay");
+      await mockStart(refused, 409, { error: "online_payment_unavailable" });
+      await refused.getByRole("button", { name: PAY_ONLINE }).click();
+      await expect(refused.getByText(/please pay by upi below/i)).toBeVisible();
+      await expectDirectPay(refused, true);
+      await refused.reload();
+      await expectDirectPay(refused, true);
 
       // ── Buyer closes the Razorpay window: UPI opens ─────────────────
-      await placeOrder(buyer, slug, item);
-      await expectDirectPay(buyer, false);
-      await mockStart(buyer, 200, START_OK);
-      await buyer.getByRole("button", { name: PAY_ONLINE }).click();
-      await expect(buyer.getByText(/payment cancelled/i)).toBeVisible();
-      await expectDirectPay(buyer, true);
-      await buyer.unroute("**/razorpay");
+      const closer = await newBuyer();
+      await placeOrder(closer, slug, item);
+      await expectDirectPay(closer, false);
+      await mockStart(closer, 200, START_OK);
+      await closer.getByRole("button", { name: PAY_ONLINE }).click();
+      await expect(closer.getByText(/payment cancelled/i)).toBeVisible();
+      await expectDirectPay(closer, true);
 
       // ── Paid, but our confirmation failed: stays closed ─────────────
-      await placeOrder(buyer, slug, item);
-      await buyer.evaluate(() => localStorage.setItem("__rzpScript", "paid"));
-      await mockStart(buyer, 200, START_OK);
-      await buyer.route("**/razorpay/verify", (route) => route.fulfill({ status: 502, body: "{}" }));
-      await buyer.getByRole("button", { name: PAY_ONLINE }).click();
-      await expect(buyer.getByText(/please don't pay again/i)).toBeVisible();
-      await expectDirectPay(buyer, false);
-      await buyer.unroute("**/razorpay");
-      await buyer.unroute("**/razorpay/verify");
-      await buyer.evaluate(() => localStorage.removeItem("__rzpScript"));
+      const paid = await newBuyer();
+      await placeOrder(paid, slug, item);
+      await paid.evaluate(() => localStorage.setItem("__rzpScript", "paid"));
+      await mockStart(paid, 200, START_OK);
+      await paid.route("**/razorpay/verify", (route) => route.fulfill({ status: 502, body: "{}" }));
+      await paid.getByRole("button", { name: PAY_ONLINE }).click();
+      await expect(paid.getByText(/please don't pay again/i)).toBeVisible();
+      await expectDirectPay(paid, false);
 
       // ── No UPI ID left: the error names no way out it can't deliver ──
-      await placeOrder(buyer, slug, item);
+      const noUpi = await newBuyer();
+      await placeOrder(noUpi, slug, item);
       const cleared = await page.request.patch("/api/vendor", { data: { upiId: null }, headers: JSON_HEADERS });
       expect(cleared.status()).toBe(200);
-      await buyer.reload();
-      await mockStart(buyer, 409, { error: "online_payment_unavailable" });
-      await buyer.getByRole("button", { name: PAY_ONLINE }).click();
-      await expect(buyer.getByText(/please try again later/i)).toBeVisible();
-      await expect(buyer.getByText(/pay by upi/i)).toHaveCount(0);
-      await expect(buyer.getByRole("heading", { name: "Payment done?" })).toHaveCount(0);
+      await noUpi.reload();
+      await mockStart(noUpi, 409, { error: "online_payment_unavailable" });
+      await noUpi.getByRole("button", { name: PAY_ONLINE }).click();
+      await expect(noUpi.getByText(/please try again later/i)).toBeVisible();
+      await expect(noUpi.getByText(/pay by upi/i)).toHaveCount(0);
+      await expect(noUpi.getByRole("heading", { name: "Payment done?" })).toHaveCount(0);
     } finally {
-      await ctx.close();
+      await Promise.all(contexts.map((c) => c.close()));
     }
   });
 });
