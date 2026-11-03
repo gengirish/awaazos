@@ -6,6 +6,7 @@ import {
   Mic,
   ReceiptText,
   ShoppingBag,
+  Star,
   Store,
   Tag,
   Wallet,
@@ -16,6 +17,7 @@ import {
 export type SettingsSectionId =
   | "store"
   | "orders"
+  | "feedback"
   | "offers"
   | "payments"
   | "receipts"
@@ -52,6 +54,13 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     // `{catalogue}`: "menu" or "product list" (lib/store-vocabulary.ts fillVocabulary).
     description: "Let customers order from your {catalogue}, for pickup or delivery.",
     icon: ShoppingBag,
+  },
+  {
+    id: "feedback",
+    href: "/settings/feedback",
+    title: "Customer feedback",
+    description: "Ratings and comments from customers after they get their order.",
+    icon: Star,
   },
   {
     id: "offers",

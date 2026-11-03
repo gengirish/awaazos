@@ -4,14 +4,15 @@ import { formatINRCompact } from "@/lib/currency";
 
 /**
  * The "how this store works" line under the store name on /s/[slug]: how the
- * everyday menu is handed over, how buyers pay, and the food-safety licence.
+ * everyday menu is handed over, how buyers pay, the food-safety licence, and
+ * the store's rating once it has enough of them.
  * Pure and client-safe; the page passes only what it already loaded.
  *
  * Handover facts appear only when the everyday menu takes orders: each drop
  * shows its own pickup/delivery terms on its card, so a store-wide line would
  * contradict them. Payment appears whenever something can be ordered.
  */
-export type StoreFactKind = "pickup" | "delivery" | "payment" | "fssai";
+export type StoreFactKind = "pickup" | "delivery" | "payment" | "fssai" | "rating";
 export type StoreFact = { kind: StoreFactKind; text: string };
 
 export function storeInfoFacts(input: {
@@ -23,8 +24,11 @@ export function storeInfoFacts(input: {
   upi: boolean;
   cod: boolean;
   fssaiNumber: string | null;
+  /** `publicRatingText()`; null until the store has enough ratings. */
+  ratingText?: string | null;
 }): StoreFact[] {
   const facts: StoreFact[] = [];
+  if (input.ratingText) facts.push({ kind: "rating", text: input.ratingText });
   if (input.menuOrdering) {
     if (input.fulfilmentMode !== "DELIVERY") facts.push({ kind: "pickup", text: "Pickup" });
     if (input.fulfilmentMode !== "PICKUP") {

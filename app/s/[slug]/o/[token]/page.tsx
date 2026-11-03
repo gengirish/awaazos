@@ -19,6 +19,7 @@ import { cache } from "react";
 
 import { BuyerReceivedButton } from "@/components/storefront/BuyerReceivedButton";
 import { OrderAgainButton } from "@/components/storefront/OrderAgainButton";
+import { OrderFeedbackForm } from "@/components/storefront/OrderFeedbackForm";
 import { OnlinePayFlow } from "@/components/storefront/OnlinePayFlow";
 import { OrderLinkActions } from "@/components/storefront/OrderLinkActions";
 import { OrderRefresh } from "@/components/storefront/OrderRefresh";
@@ -43,6 +44,7 @@ import {
 } from "@/lib/storefront-order";
 import { discountLabel } from "@/lib/offers";
 import { orderIsOver, planOrderAgain } from "@/lib/order-again";
+import { RATING_WORDS } from "@/lib/order-feedback";
 import { loadOrderableNow } from "@/lib/order-again-server";
 import { paymentProofEnabled } from "@/lib/payment-proof";
 import { prisma } from "@/lib/prisma";
@@ -100,7 +102,8 @@ export const runtime = "nodejs";
  * without an opted-in number the copy never says "message the store".
  *
  * Once the order is over, "Order again" (lib/order-again.ts) fills the buyer's
- * saved cart with whatever from it the store sells today.
+ * saved cart with whatever from it the store sells today. Once it is handed
+ * over, the buyer can rate it, once (lib/order-feedback.ts).
  */
 
 const loadOrder = cache(async (slug: string, token: string) => {
@@ -133,6 +136,8 @@ const loadOrder = cache(async (slug: string, token: string) => {
       fulfilmentType: true,
       outForDeliveryAt: true,
       buyerReceivedAt: true,
+      isSample: true,
+      feedback: { select: { rating: true } },
       deliveryAddress: true,
       notes: true,
       customerName: true,
@@ -548,6 +553,15 @@ export default async function StorefrontOrderPage(props: {
           <p role="status" className="text-center text-sm font-semibold">
             Thanks — the store knows you got it.
           </p>
+        ) : null}
+
+        {order.feedback ? (
+          <p role="status" className="text-center text-sm font-semibold">
+            Thanks for your feedback. You rated this {order.feedback.rating} of 5 ·{" "}
+            {RATING_WORDS[order.feedback.rating - 1]}.
+          </p>
+        ) : handedOver && !order.isSample ? (
+          <OrderFeedbackForm slug={slug} token={params.token} vendorName={vendor.name} />
         ) : null}
 
         {againPlan ? <OrderAgainButton slug={slug} plan={againPlan} billNumber={order.billNumber} /> : null}

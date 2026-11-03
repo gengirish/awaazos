@@ -2,6 +2,7 @@ import type { StaffRole } from "@prisma/client";
 
 import { appNavItemsForRole, appTabBarForRole, type AppNavId } from "@/lib/app-nav";
 import { TRIAL_DAYS } from "@/lib/constants";
+import { PUBLIC_RATING_MIN } from "@/lib/order-feedback";
 import { REFERRAL_REWARD_CAP_PER_YEAR, REFERRED_TRIAL_DAYS, rewardMonthsFor } from "@/lib/referral";
 import { fillVocabulary, vocabularyForKind, type StoreKind, type StoreVocabulary } from "@/lib/store-vocabulary";
 
@@ -438,6 +439,16 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     href: "/settings/billing",
     trail: ["Plan & billing"],
     keywords: "trial upgrade pay subscription locked price",
+  },
+  {
+    id: "customer-feedback",
+    group: "setup",
+    title: "See what customers said",
+    steps: `Customers can rate an order on their order page once you mark it delivered or picked up. The rating and any comment show on the order card too, and stay listed here. Your store page shows only your average, once you have ${PUBLIC_RATING_MIN} ratings. Comments stay with you.`,
+    nav: "settings",
+    href: "/settings/feedback",
+    trail: ["Customer feedback"],
+    keywords: "rating ratings review stars feedback comment complaint customer",
   },
   {
     id: "refer-seller",

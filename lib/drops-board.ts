@@ -77,6 +77,8 @@ export type BoardOrder = {
   buyerOrderPath?: string | null;
   /** When the buyer tapped "I've received my order" (ISO); null = not yet. */
   buyerReceivedAt?: string | null;
+  /** The buyer's rating of this order; staff-only, the comment included. */
+  feedback?: { rating: number; comment: string | null } | null;
   displayState: OrderDisplayState;
   holdsStock: boolean;
   bucket: BoardBucket;

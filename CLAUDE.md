@@ -233,7 +233,7 @@ storefront surface** — unauthenticated, and no longer read-only (buyers place 
 | `/r/[token]` | Customer receipt page (see "Receipt module"; not gated on `publishStorefront`) |
 | `/d/[token]` + `POST /api/d/[token]` | Rider's "Delivered" link (see "Delivery handoff"; not gated on `publishStorefront`) |
 | `/c/[slug]` | Community page: links to the listed stores of one housing society (see "Community pages") |
-| `/api/s/**` | Order placement, UTR submit, "I've received my order", vendor-Razorpay start/verify, buyer magic-link auth |
+| `/api/s/**` | Order placement, UTR submit, "I've received my order", order rating, vendor-Razorpay start/verify, buyer magic-link auth |
 | `/api/webhooks/razorpay-orders/[vendorId]` | Per-vendor Razorpay webhook (vendor's own secret) |
 | `/api/webhooks/razorpay-partner` | Partner-app webhook for "Connect Razorpay" stores (platform secret) |
 
@@ -597,6 +597,16 @@ them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireAc
   buy-X-get-Y, a plan on top of sales, recurring subscriptions. POS item tiles don't show sale prices
   (the cart's discount row does).
 - Test store data: `npm run seed:quiche-plans -- <slug>` (dry run; `--create` writes).
+
+### Customer feedback
+
+Rules in the header of `lib/order-feedback.ts` (pure), database side in `lib/order-feedback-server.ts`.
+A buyer rates a handed-over order once, on its order page (`POST /api/s/[slug]/orders/[token]/feedback`,
+IP-limited; 1 to 5 stars, optional comment ≤ 500 chars; `OrderFeedback`, unique per transaction). Not
+sample orders. The seller sees it on the order card and in Settings → Customer feedback (the board drops
+old orders, so the push links there). Push and logs never carry the comment. The public store gets only
+the average and count, from `PUBLIC_RATING_MIN` (5) ratings, not on demo stores, computed on each render:
+no timers, nothing cached on `Vendor`. There are no per-item ratings.
 
 ### Referrals ("Refer a seller")
 

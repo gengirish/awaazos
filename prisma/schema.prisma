@@ -68,6 +68,7 @@ model Vendor {
   referrals             Vendor[]            @relation("VendorReferrals")
   referralRewardsEarned ReferralReward[]    @relation("ReferralRewardReferrer")
   referralRewardFrom    ReferralReward?     @relation("ReferralRewardReferred")
+  orderFeedback         OrderFeedback[]
 
   @@index([slug])
   @@index([referredByVendorId])
@@ -431,6 +432,7 @@ model Transaction {
 
   orderItems OrderItem[]
   receipt    Receipt?
+  feedback   OrderFeedback?
 
   @@unique([vendorId, clientRef])
   @@index([vendorId, createdAt])
@@ -439,6 +441,22 @@ model Transaction {
   @@index([dropId])
   @@index([customerId])
   @@map("transactions")
+}
+
+// A buyer's rating of one handed-over order (lib/order-feedback.ts). The comment
+// is seen only by the store; the public page gets an average and a count.
+model OrderFeedback {
+  id            String      @id @default(cuid())
+  vendorId      String
+  vendor        Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  transactionId String      @unique
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  rating        Int // 1 to 5
+  comment       String?     @db.VarChar(500)
+  createdAt     DateTime    @default(now())
+
+  @@index([vendorId, createdAt])
+  @@map("order_feedback")
 }
 
 model OrderItem {

@@ -1,6 +1,7 @@
 import type { FulfilmentMode, Plan, ReceiptPaper, StaffRole } from "@prisma/client";
 
 import { PLAN_LIMITS, VOICE_LANGUAGES } from "./constants";
+import { formatAverageRating, ratingCountLabel, type RatingSummary } from "./order-feedback";
 import { vocabularyForKind, type StoreKind } from "./store-vocabulary";
 
 /**
@@ -86,6 +87,13 @@ export function offersStatus(activeOffers: number): SectionStatus {
   return activeOffers > 0
     ? { text: `${activeOffers} ${activeOffers === 1 ? "offer" : "offers"} on`, on: true }
     : { text: "No offers on", on: false };
+}
+
+/** Settings → Customer feedback. */
+export function feedbackStatus(s: RatingSummary): SectionStatus {
+  return s.count > 0
+    ? { text: `${formatAverageRating(s)} from ${ratingCountLabel(s.count)}`, on: true }
+    : { text: "No ratings yet", on: false };
 }
 
 /** Settings → Refer a seller, from `ReferralSummary` counts. */

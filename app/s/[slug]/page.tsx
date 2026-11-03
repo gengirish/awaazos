@@ -11,6 +11,7 @@ import {
   Package,
   QrCode,
   ShoppingBag,
+  Star,
   Store,
   Sparkles,
   Truck,
@@ -53,6 +54,8 @@ import { instagramProfileUrl } from "@/lib/instagram";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
 import { offersForItems, resolveOffers, type ResolvedOffer } from "@/lib/offers";
 import { loadOfferRules, type OfferSource } from "@/lib/offers-server";
+import { publicRatingText } from "@/lib/order-feedback";
+import { loadRatingSummary } from "@/lib/order-feedback-server";
 import { prisma } from "@/lib/prisma";
 import {
   buyerWhatsappNumber,
@@ -166,6 +169,7 @@ const FACT_ICON: Record<StoreFactKind, typeof Store> = {
   payment: Wallet,
   // Not a tick: the number is checked for shape only, never verified with FSSAI.
   fssai: FileText,
+  rating: Star,
 };
 
 /**
@@ -641,7 +645,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
         orderableMenuIds,
       )
     : [];
-  const [dropViews, customer, isStaff] = await Promise.all([
+  const [dropViews, customer, isStaff, ratings] = await Promise.all([
     buildDropViews(
       vendor.drops,
       now,
@@ -651,6 +655,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
     ),
     getCurrentCustomer(),
     viewerIsStoreStaff(vendor.id),
+    vendor.isDemo ? null : loadRatingSummary(vendor.id),
   ]);
   const prefill: BuyerPrefill | null = customer
     ? { name: customer.name, phone: customer.phone, address: customer.savedAddress }
@@ -678,6 +683,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
     upi: payment.upi,
     cod: payment.cod,
     fssaiNumber: vendor.settings?.fssaiNumber ?? null,
+    ratingText: ratings ? publicRatingText(ratings) : null,
   });
   const instagramHandle = vendor.settings?.instagramHandle ?? null;
   const instagramLink = instagramProfileUrl(instagramHandle);
