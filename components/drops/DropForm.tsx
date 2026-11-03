@@ -252,7 +252,11 @@ export function DropForm({
     fulfilmentMode: initial.fulfilmentMode,
     fulfilmentStart: initial.fulfilmentStart,
     fulfilmentEnd: initial.fulfilmentEnd,
-    deliveryFee: paiseToInput(initial.deliveryFeePaise ?? 0),
+    // Empty on a pickup drop, so turning delivery on asks for a fee instead of defaulting to free.
+    deliveryFee:
+      (initial.fulfilmentMode ?? "PICKUP") === "PICKUP" && !initial.deliveryFeePaise
+        ? ""
+        : paiseToInput(initial.deliveryFeePaise ?? 0),
     pickupNote: initial.pickupNote ?? "",
     closesAtDate: initial.closesAtDate,
     closesAtTime: initial.closesAtTime,
@@ -441,8 +445,8 @@ export function DropForm({
 
     if (!form.title.trim()) fe.title = `Give this drop a name, e.g. ${vocab.dropExample}`;
 
-    const deliveryFeePaise = form.fulfilmentMode === "PICKUP" ? 0 : rupeeInputToPaise(form.deliveryFee || "0");
-    if (deliveryFeePaise === null) fe.deliveryFeePaise = "Enter the fee in rupees, e.g. 30";
+    const deliveryFeePaise = form.fulfilmentMode === "PICKUP" ? 0 : rupeeInputToPaise(form.deliveryFee);
+    if (deliveryFeePaise === null) fe.deliveryFeePaise = "Enter the fee in rupees, e.g. 30, or 0 for free delivery";
 
     const items: DropUpsertInput["items"] = [];
     selectedIds.forEach((id, idx) => {
@@ -962,12 +966,12 @@ export function DropForm({
                 id="drop-fee"
                 inputMode="decimal"
                 className={inputCls}
-                placeholder="0"
+                placeholder="30"
                 value={form.deliveryFee}
                 onChange={(e) => set("deliveryFee", e.target.value)}
                 {...errProps("deliveryFeePaise")}
               />
-              <p className="text-xs text-muted-foreground">Leave 0 for free delivery.</p>
+              <p className="text-xs text-muted-foreground">Enter 0 for free delivery.</p>
               {err("deliveryFeePaise")}
             </div>
           ) : null}

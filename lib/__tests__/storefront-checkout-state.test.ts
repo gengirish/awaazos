@@ -15,12 +15,22 @@ import {
   restoreCartLines,
   sameCartLines,
   serializeCart,
+  savedContactUsable,
   validateCheckout,
   validateCheckoutField,
   type CheckoutInput,
 } from "@/lib/storefront-order";
 
 const NOW = Date.UTC(2026, 9, 5, 6, 30);
+
+describe("savedContactUsable", () => {
+  it("folds only a name with a real Indian mobile", () => {
+    expect(savedContactUsable("Priya", "98480 12345")).toBe(true);
+    expect(savedContactUsable("  ", "98480 12345")).toBe(false);
+    expect(savedContactUsable("Priya", "123")).toBe(false);
+    expect(savedContactUsable("", "")).toBe(false);
+  });
+});
 
 describe("cartStorageKey", () => {
   it("scopes menu and per-drop carts by store", () => {

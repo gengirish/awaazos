@@ -382,6 +382,11 @@ export function validateCheckoutField(field: CheckoutField, input: CheckoutInput
   }
 }
 
+/** Saved name and phone are good enough to show as one card instead of two fields. */
+export function savedContactUsable(name: string, phone: string): boolean {
+  return name.trim() !== "" && looksLikeIndianMobile(phone);
+}
+
 /** Every client-side error at once (empty object = valid). */
 export function validateCheckout(input: CheckoutInput): CheckoutFieldErrors {
   const out: CheckoutFieldErrors = {};

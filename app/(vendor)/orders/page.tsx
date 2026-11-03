@@ -44,6 +44,7 @@ export default async function OrdersPage(props: Props) {
         menuFulfilmentMode: true,
         publishStorefront: true,
         acceptPayOnDelivery: true,
+        fssaiNumber: true,
         deliveryRiders: true,
       },
     }),

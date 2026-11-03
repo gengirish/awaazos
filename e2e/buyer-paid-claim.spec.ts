@@ -51,13 +51,13 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
       await sheet.getByLabel("Your name").fill("Claim Buyer");
       await sheet.getByLabel("Mobile number").fill("98480 54321");
       await sheet.getByRole("radio", { name: /pay now by upi/i }).check();
-      await sheet.getByRole("button", { name: /place order · ₹120\.00/i }).click();
+      await sheet.getByRole("button", { name: /place order(?: & pay)? · ₹120\.00/i }).click();
       await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
       const orderPath = new URL(buyer.url()).pathname;
       const token = orderPath.split("/").pop() as string;
       const claimUrl = `/api/s/${slug}/orders/${token}/utr`;
 
-      const paidButton = buyer.getByRole("button", { name: "I've paid" });
+      const paidButton = buyer.getByRole("button", { name: "Payment done" });
       await expect(paidButton).toBeVisible();
       expect((await paidButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
       await paidButton.click();
@@ -99,11 +99,11 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
       const bare = await buyer.request.post(claimUrl, { data: {}, headers: JSON_HEADERS });
       expect(bare.status()).toBe(400);
       expect(((await bare.json()) as { error: string }).error).toBe("reference_required");
-      await buyer.getByRole("button", { name: "I've paid" }).click();
+      await buyer.getByRole("button", { name: "Send to the store" }).click();
       await expect(buyer.getByText(/Enter the 12-digit UPI reference/)).toBeVisible();
 
       await buyer.getByLabel(/UPI reference/i).fill("412345678901");
-      await buyer.getByRole("button", { name: "I've paid" }).click();
+      await buyer.getByRole("button", { name: "Send to the store" }).click();
       await expect(buyer.getByRole("heading", { name: /payment submitted/i })).toBeVisible();
 
       // ── Seller: sees the UTR, answers "Payment received" ────────────
@@ -126,9 +126,9 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
 
       // ── Buyer: paid ─────────────────────────────────────────────────
       await buyer.reload();
-      await expect(buyer.getByRole("heading", { name: /^paid$/i })).toBeVisible();
+      await expect(buyer.getByRole("heading", { name: /^confirmed$/i })).toBeVisible();
       await expect(buyer.getByText(/couldn't find your payment/i)).toHaveCount(0);
-      await expect(buyer.getByRole("button", { name: "I've paid" })).toHaveCount(0);
+      await expect(buyer.getByRole("button", { name: "Payment done" })).toHaveCount(0);
     } finally {
       await buyerCtx.close();
       await otherCtx.close();

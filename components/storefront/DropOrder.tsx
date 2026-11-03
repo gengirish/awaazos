@@ -76,6 +76,9 @@ export type DropOrderProps = {
   payment: { upi: boolean; cod: boolean };
   /** The store has a usable WhatsApp number (see CheckoutSheet). */
   whatsapp?: boolean;
+  /** See CheckoutSheet. */
+  theme?: string;
+  notesExample?: string;
   /**
    * Signed-in buyer's own saved details (lib/customer-auth.ts). Non-empty
    * fields win over the device's "remember me" values; absent for guests.
@@ -100,6 +103,8 @@ export function DropOrder(props: DropOrderProps) {
     pickupWindow,
     payment,
     whatsapp,
+    theme,
+    notesExample,
     prefill,
     offers = NO_OFFERS,
   } = props;
@@ -305,6 +310,8 @@ export function DropOrder(props: DropOrderProps) {
       ) : null}
 
       <CheckoutSheet
+        theme={theme}
+        notesExample={notesExample}
         open={open}
         onOpenChange={setOpen}
         slug={slug}

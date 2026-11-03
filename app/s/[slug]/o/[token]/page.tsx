@@ -67,9 +67,9 @@ export const runtime = "nodejs";
  * `upi://` has no app chooser; plus copy-UPI-ID / copy-amount. The QR, for
  * scanning from a second phone, sits in a collapsed <details> under them; on a
  * phone, "Save QR to gallery" (PNG) covers apps that refuse a link to a personal
- * UPI ID and ask for a scanned QR instead. Only
- * the vendor VPA and total reach it. Step 2, "Tell the store you've paid", is
- * the outlined `PaidClaimForm` — it never marks the order paid.
+ * UPI ID and ask for a scanned QR instead; it sits with the other fallbacks under
+ * "UPI app didn't open…". Only the vendor VPA and total reach it. Below the pay
+ * button, "Payment done?" is `PaidClaimForm` — it never marks the order paid.
  *
  * Nothing here polls. `OrderRefresh` re-reads the order when the buyer comes
  * back to the tab and from its "Check for update" button; the hold deadline is
@@ -289,7 +289,8 @@ export default async function StorefrontOrderPage(props: {
   const hasProof = order.paymentProofUrl !== null;
   // Claimed: the buyer can still add the reference or a screenshot to help the seller.
   const claimedUpi = state === "PAYMENT_SUBMITTED" && order.paymentMethod === "UPI";
-  const canAddReference = claimedUpi && !order.upiRef;
+  // One piece of evidence is enough: a screenshot already sent ends the asking.
+  const canAddReference = claimedUpi && !order.upiRef && !hasProof;
   const canAddScreenshot = claimedUpi && proofUploads && !hasProof;
   const payeeName = vendor.upiName ?? vendor.name;
   const upiLink =
@@ -466,7 +467,8 @@ export default async function StorefrontOrderPage(props: {
           </p>
         ) : null}
 
-        {steps ? <OrderProgress steps={steps} /> : null}
+        {/* While payment is due the next step is the pay button, right below. */}
+        {steps && !awaitingUpi ? <OrderProgress steps={steps} /> : null}
 
         {waFirst && waLink ? (
           <section
@@ -496,7 +498,7 @@ export default async function StorefrontOrderPage(props: {
           <div className="rounded-2xl border border-primary/25 bg-background text-center shadow-xs">
             <section aria-labelledby="pay-heading" className="space-y-4 p-4 sm:p-6">
               <h2 id="pay-heading" className="font-display text-xl font-bold text-awaaz-charcoal">
-                1 · Pay {formatINR(order.totalPaise)}
+                Pay {formatINR(order.totalPaise)}
               </h2>
               {payOnline ? (
                 <>
@@ -522,15 +524,17 @@ export default async function StorefrontOrderPage(props: {
                     amountPaise={order.totalPaise}
                     genericLabel={`Pay ${formatINR(order.totalPaise)} with a UPI app`}
                     emphasis={payOnline ? "secondary" : "primary"}
-                  />
-                  {qrPng ? (
-                    <div className="space-y-1.5 sm:hidden">
-                      <SaveQrButton pngDataUrl={qrPng} fileName={`upi-${order.billNumber}`} />
-                      <p className="text-sm text-muted-foreground">
-                        Then use &ldquo;Scan from gallery&rdquo; in your UPI app.
-                      </p>
-                    </div>
-                  ) : null}
+                    foldFallback
+                  >
+                    {qrPng ? (
+                      <div className="space-y-1.5 sm:hidden">
+                        <SaveQrButton pngDataUrl={qrPng} fileName={`upi-${order.billNumber}`} />
+                        <p className="text-sm text-muted-foreground">
+                          Then use &ldquo;Scan from gallery&rdquo; in your UPI app.
+                        </p>
+                      </div>
+                    ) : null}
+                  </UpiPayOptions>
                   <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                     Paying {payeeName} · ref {order.billNumber}
                   </p>
@@ -566,7 +570,7 @@ export default async function StorefrontOrderPage(props: {
             </section>
             <section aria-labelledby="claim-heading" className="space-y-3 border-t border-border/50 p-4 sm:p-6">
               <h2 id="claim-heading" className="font-display text-lg font-bold text-awaaz-charcoal">
-                2 · Tell the store you&apos;ve paid
+                Payment done?
               </h2>
               <PaidClaimForm
                 slug={slug}

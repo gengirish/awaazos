@@ -74,6 +74,8 @@ export type StoreVocabulary = {
   nextBatch: string;
   /** Show the dish drawings (lib/food-images.ts) and offer food emoji. */
   foodArt: boolean;
+  /** Example text in the checkout's note field. */
+  orderNoteExample: string;
 };
 
 const FOOD: StoreVocabulary = {
@@ -95,6 +97,7 @@ const FOOD: StoreVocabulary = {
   dropExample: "Saturday bakes",
   nextBatch: "tomorrow's cooking",
   foodArt: true,
+  orderNoteExample: "eggless, less spicy…",
 };
 
 const GOODS: StoreVocabulary = {
@@ -116,6 +119,7 @@ const GOODS: StoreVocabulary = {
   dropExample: "Festive gift boxes",
   nextBatch: "your next batch",
   foodArt: false,
+  orderNoteExample: "gift wrap, call before delivery…",
 };
 
 export function storeVocabulary(stallType: StallType | null | undefined): StoreVocabulary {
@@ -127,7 +131,7 @@ export function vocabularyForKind(kind: StoreKind): StoreVocabulary {
   return kind === "food" ? FOOD : GOODS;
 }
 
-type VocabularyWord = Exclude<keyof StoreVocabulary, "kind" | "foodArt">;
+type VocabularyWord = Exclude<keyof StoreVocabulary, "kind" | "foodArt" | "orderNoteExample">;
 
 /**
  * Fill `{word}` tokens in fixed copy (lib/help-guide.ts, the setup checklist):
@@ -136,7 +140,7 @@ type VocabularyWord = Exclude<keyof StoreVocabulary, "kind" | "foodArt">;
  */
 export function fillVocabulary(text: string, vocab: StoreVocabulary): string {
   return text.replace(/\{(\w+)\}/g, (whole, key: string) => {
-    if (key === "kind" || key === "foodArt" || !(key in vocab)) return whole;
+    if (key === "kind" || key === "foodArt" || key === "orderNoteExample" || !(key in vocab)) return whole;
     return vocab[key as VocabularyWord];
   });
 }

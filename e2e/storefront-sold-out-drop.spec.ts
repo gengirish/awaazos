@@ -91,7 +91,6 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
     await sheet.getByLabel("Your name").fill("Priya Buyer");
     await sheet.getByLabel("Mobile number").fill("98480 12345");
     await sheet.getByRole("radio", { name: "Pickup" }).check();
-    await sheet.getByRole("radio", { name: /pay on delivery/i }).check();
     await sheet.getByRole("button", { name: /place order/i }).click();
     await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
     // The menu cart was left behind — the order page says so.

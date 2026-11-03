@@ -417,7 +417,9 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   keeps the reason in Upstash (30-day TTL, fail-open) for Settings → Payments; the next accepted order,
   a reconnect, new keys or a disconnect clears it. Sellers without a Razorpay account sign up inside the
   Connect flow (Razorpay's co-branded onboarding), so there is no separate referral link.
-- **"I've paid" never marks an order paid.** `POST /api/s/[slug]/orders/[token]/utr` records
+- **"I've paid" never marks an order paid.** The buyer sees "Payment done?" with a screenshot picker
+  (`PaidClaimForm`), or one "Payment done" button with no private Blob store. A direct UPI payment is
+  invisible to us, so this signal stays: it is what keeps a drop's stock held. `POST /api/s/[slug]/orders/[token]/utr` records
   `Transaction.paymentClaimedAt` (UTR optional) → display state `PAYMENT_SUBMITTED`. The vendor answers
   on the board: "Payment received" (`mark_paid` → `markOrderPaid`) or "Not received"
   (`reject_payment`: clears the claim and UTR, stamps `paymentRejectedAt`, per-order only). After a

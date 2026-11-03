@@ -83,6 +83,30 @@ describe("settings hub status lines", () => {
   });
 });
 
+describe("setupChecklist: FSSAI", () => {
+  const ready = {
+    availableItemCount: 3,
+    publishStorefront: true,
+    upiId: "a.b@ybl",
+    acceptPayOnDelivery: true,
+    acceptMenuOrders: true,
+    dropCount: 1,
+  };
+
+  it("prompts a food store without a number, and only the owner", () => {
+    const items = setupChecklist({ ...ready, fssaiNumber: null }, "food");
+    expect(items.map((i) => i.id)).toEqual(["fssai_number"]);
+    expect(items[0]?.reminder).toBe(true);
+    expect(checklistForRole(items, "MANAGER")).toEqual([]);
+    expect(checklistForRole(items, "OWNER")).toHaveLength(1);
+  });
+
+  it("is quiet once saved, and for a goods store", () => {
+    expect(setupChecklist({ ...ready, fssaiNumber: "12345678901234" }, "food")).toEqual([]);
+    expect(setupChecklist({ ...ready, fssaiNumber: null }, "goods")).toEqual([]);
+  });
+});
+
 describe("setupChecklist", () => {
   const ready = {
     availableItemCount: 3,
@@ -91,6 +115,7 @@ describe("setupChecklist", () => {
     acceptPayOnDelivery: true,
     acceptMenuOrders: false,
     dropCount: 1,
+      fssaiNumber: "12345678901234",
   };
   const nothing = {
     availableItemCount: 0,
@@ -99,6 +124,7 @@ describe("setupChecklist", () => {
     acceptPayOnDelivery: false,
     acceptMenuOrders: false,
     dropCount: 0,
+      fssaiNumber: "12345678901234",
   };
 
   it("is empty when the stall can take online orders", () => {
@@ -165,6 +191,7 @@ describe("wording for a store that isn't a kitchen", () => {
         acceptPayOnDelivery: false,
         acceptMenuOrders: false,
         dropCount: 0,
+      fssaiNumber: "12345678901234",
       },
       "goods",
     );

@@ -12,11 +12,15 @@ import { cn } from "@/lib/utils";
 const UTR = /^[A-Za-z0-9]{10,22}$/;
 
 /**
- * Buyer tells the seller "I've paid". The UPI reference (UTR) is optional — it
- * just helps the seller find the payment. This only records the claim; the
- * seller answers "Payment received" or "Not received".
+ * Buyer tells the seller the payment is done. A direct UPI payment is invisible
+ * to us, so this signal is what keeps a drop's stock held past the 15 minutes
+ * and tells the seller to look. It only records the claim; the seller answers
+ * "Payment received" or "Not received".
  *
- *   default            "I've paid" button + optional reference
+ *   default            screenshot picker, then "Send to the store"; with no
+ *                      screenshot, "I don't have a screenshot" sends the same
+ *                      claim. No private store → one "Payment done" button
+ *   askReference       also ask for the UPI reference (UTR), optional
  *   requireReference   after a "Not received": the reference is mandatory
  *   claimed            already claimed: offer to add what is still missing
  *                      (`askReference`, `askScreenshot`); one of them is needed
@@ -27,8 +31,8 @@ const UTR = /^[A-Za-z0-9]{10,22}$/;
  * failed upload never undoes the claim: the form says so and the claimed-state
  * form on the refreshed page offers the screenshot again.
  *
- * "I've paid" is outlined: on the order page it is step 2, under the filled
- * pay button, and must not look like a second way to pay. The reference field
+ * The claim button stays quiet until there is a screenshot to send: it sits under
+ * the filled pay button and must not look like a second way to pay. The reference field
  * keeps `inputMode="text"` because the server accepts letters as well as digits
  * (`utrSubmitSchema`: 10–22 alphanumerics — some banks issue such references).
  */
@@ -37,7 +41,7 @@ export function PaidClaimForm({
   token,
   requireReference = false,
   claimed = false,
-  askReference = true,
+  askReference = false,
   askScreenshot = false,
 }: {
   slug: string;
@@ -54,7 +58,10 @@ export function PaidClaimForm({
   const [error, setError] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  const needsRef = askReference && (requireReference || (claimed && !askScreenshot));
+  const needsRef = requireReference || (askReference && claimed && !askScreenshot);
+  const showReference = askReference || requireReference;
+  // First claim, screenshot on offer and none chosen: the button is the quiet way out.
+  const quietClaim = !claimed && !showReference && askScreenshot && !shot;
   const orderApi = `/api/s/${encodeURIComponent(slug)}/orders/${encodeURIComponent(token)}`;
 
   function clearShot() {
@@ -152,7 +159,11 @@ export function PaidClaimForm({
   }
 
   const buttonLabel = !claimed
-    ? "I've paid"
+    ? quietClaim
+      ? "I don't have a screenshot"
+      : shot || requireReference
+        ? "Send to the store"
+        : "Payment done"
     : askReference && askScreenshot
       ? "Send to the store"
       : askScreenshot
@@ -167,7 +178,7 @@ export function PaidClaimForm({
 
   return (
     <form onSubmit={submit} className="space-y-3 text-left" noValidate>
-      {askReference ? (
+      {showReference ? (
         <div className="space-y-2">
           <Label htmlFor="utr">
             UPI reference (UTR){" "}
@@ -202,7 +213,7 @@ export function PaidClaimForm({
       ) : null}
       {askScreenshot ? (
         <div className="space-y-2">
-          <p id="shot-label" className="text-sm font-medium leading-none">
+          <p id="shot-label" className={cn("text-sm font-medium leading-none", !claimed && !showReference && "sr-only")}>
             Payment screenshot <span className="font-normal text-muted-foreground">(optional)</span>
           </p>
           {/* The native input stays in the tab order (sr-only, not hidden) so the label works by keyboard. */}
@@ -239,25 +250,27 @@ export function PaidClaimForm({
               className="flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-primary/40 bg-background px-4 text-sm font-semibold text-primary hover:bg-primary/5 peer-focus-visible:ring-2 peer-focus-visible:ring-primary peer-focus-visible:ring-offset-2"
             >
               <ImagePlus className="h-4 w-4" aria-hidden="true" />
-              Add screenshot
+              Add payment screenshot
             </label>
           )}
-          {askReference ? null : errorBox}
+          {showReference ? null : errorBox}
           <p id="shot-hint" className="text-xs text-muted-foreground">
             Only the store sees it, and it is deleted once they check your payment.
           </p>
         </div>
       ) : null}
-      {askReference || askScreenshot ? null : errorBox}
+      {showReference || askScreenshot ? null : errorBox}
       <button
         type="submit"
         disabled={submitting}
         aria-busy={submitting}
         className={cn(
-          "inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-6 text-base font-bold focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60",
-          claimed
-            ? "bg-primary text-primary-foreground shadow-md"
-            : "border border-primary/40 bg-background text-primary hover:bg-primary/5",
+          "inline-flex w-full items-center justify-center gap-2 rounded-xl px-6 font-bold focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60",
+          quietClaim
+            ? "min-h-11 text-sm text-primary hover:underline"
+            : claimed || shot
+              ? "min-h-12 bg-primary text-base text-primary-foreground shadow-md"
+              : "min-h-12 border border-primary/40 bg-background text-base text-primary hover:bg-primary/5",
         )}
       >
         {submitting ? (
@@ -267,7 +280,7 @@ export function PaidClaimForm({
       </button>
       {!claimed ? (
         <p className="text-center text-xs text-muted-foreground">
-          The store checks its UPI app and confirms. Tapping this does not mark the order paid.
+          The store checks its UPI app, then confirms your order.
         </p>
       ) : null}
     </form>

@@ -2,7 +2,7 @@ import type { FulfilmentMode } from "@prisma/client";
 import type { Metadata } from "next";
 import {
   ArrowUp,
-  BadgeCheck,
+  FileText,
   CalendarClock,
   Instagram,
   LayoutDashboard,
@@ -164,7 +164,8 @@ const FACT_ICON: Record<StoreFactKind, typeof Store> = {
   pickup: Store,
   delivery: Truck,
   payment: Wallet,
-  fssai: BadgeCheck,
+  // Not a tick: the number is checked for shape only, never verified with FSSAI.
+  fssai: FileText,
 };
 
 /**
@@ -468,6 +469,8 @@ function DropSection({
   now,
   prefill,
   menuOrdering,
+  theme,
+  notesExample,
 }: {
   view: DropView;
   slug: string;
@@ -477,6 +480,8 @@ function DropSection({
   prefill: BuyerPrefill | null;
   /** Everyday menu is orderable — a sold-out drop points buyers at it. */
   menuOrdering: boolean;
+  theme: string | undefined;
+  notesExample: string;
 }) {
   const { drop, visibility, soldOut } = view;
   const headingId = `drop-${drop.id}`;
@@ -579,6 +584,8 @@ function DropSection({
           payment={payment}
           whatsapp={whatsapp}
           prefill={prefill}
+          theme={theme}
+          notesExample={notesExample}
           offers={view.offers}
         />
       </div>
@@ -599,7 +606,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   // In a food store, items without a photo get a drawing of the dish when one
   // matches (lib/food-images.ts); display only, nothing is stored. Any other
   // store keeps the emoji: "Tulsi Tea" is a product, not a cup of chai.
-  const { foodArt } = storeVocabulary(vendor.stallType);
+  const { foodArt, orderNoteExample } = storeVocabulary(vendor.stallType);
   const menuItems = (menuHidden ? [] : vendor.menuItems).map((item) => ({
     ...item,
     imageUrl: item.imageUrl ?? (foodArt ? foodImageFor(item.name, item.category) : null),
@@ -786,14 +793,17 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
 
             {/* What and where, as one quiet line under the name. */}
             <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-semibold text-muted-foreground">
-              <span className="inline-flex items-center gap-1.5">
-                {foodArt ? (
-                  <UtensilsCrossed className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                ) : (
-                  <Package className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                )}
-                {stallTypeLabel(vendor.stallType, vendor.stallTypeOther)}
-              </span>
+              {/* GENERAL is the sign-up default: it says nothing to a buyer. */}
+              {vendor.stallType !== "GENERAL" ? (
+                <span className="inline-flex items-center gap-1.5">
+                  {foodArt ? (
+                    <UtensilsCrossed className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  ) : (
+                    <Package className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  )}
+                  {stallTypeLabel(vendor.stallType, vendor.stallTypeOther)}
+                </span>
+              ) : null}
               {place ? (
                 <span className="inline-flex items-center gap-1.5">
                   <MapPin className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
@@ -943,6 +953,8 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                       now={now}
                       prefill={prefill}
                       menuOrdering={menuOrdering}
+                      theme={theme}
+                      notesExample={orderNoteExample}
                     />
                   </Searchable>
                 ))}
@@ -1020,6 +1032,8 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                     payment={payment}
                     whatsapp={whatsapp}
                     prefill={prefill}
+                    theme={theme}
+                    notesExample={orderNoteExample}
                     offers={menuOffers}
                   />
                 ) : null}

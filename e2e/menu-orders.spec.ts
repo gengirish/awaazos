@@ -80,13 +80,13 @@ test.describe("menu orders: order straight from the everyday menu", () => {
       // The cart can be corrected inside the sheet: 2 × bhel + panna = ₹200.
       const cart = sheet.getByRole("list", { name: "Items in your cart" });
       await cart.getByRole("button", { name: `Add one more ${bhel}` }).click();
-      await expect(sheet.getByRole("button", { name: /place order · ₹275\.00/i })).toBeVisible();
+      await expect(sheet.getByRole("button", { name: /place order(?: & pay)? · ₹275\.00/i })).toBeVisible();
       await cart.getByRole("button", { name: `Remove one ${bhel}` }).click();
-      await expect(sheet.getByRole("button", { name: /place order · ₹200\.00/i })).toBeVisible();
+      await expect(sheet.getByRole("button", { name: /place order(?: & pay)? · ₹200\.00/i })).toBeVisible();
       // Removing the last of a line drops it; "Add more items" goes back to the store page.
       await cart.getByRole("button", { name: `Remove one ${panna}` }).click();
       await expect(cart.getByText(panna)).toHaveCount(0);
-      await expect(sheet.getByRole("button", { name: /place order · ₹150\.00/i })).toBeVisible();
+      await expect(sheet.getByRole("button", { name: /place order(?: & pay)? · ₹150\.00/i })).toBeVisible();
       await sheet.getByRole("button", { name: "Add more items" }).click();
       await expect(sheet).toBeHidden();
       await buyer.getByRole("button", { name: `Add ${panna}` }).click();
@@ -96,8 +96,7 @@ test.describe("menu orders: order straight from the everyday menu", () => {
       await sheet.getByLabel("Your name").fill("Ravi Buyer");
       await sheet.getByLabel("Mobile number").fill("98480 54321");
       // Default menu fulfilment is pickup-only, so there is no delivery choice to make.
-      await sheet.getByRole("radio", { name: /pay on delivery/i }).check();
-      await sheet.getByRole("button", { name: /place order · ₹200\.00/i }).click();
+      await sheet.getByRole("button", { name: /place order(?: & pay)? · ₹200\.00/i }).click();
 
       await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
       await expect(buyer.getByRole("heading", { name: "Your order" })).toBeVisible();
