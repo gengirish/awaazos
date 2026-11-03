@@ -50,14 +50,17 @@ const BLOCKER_COPY: Record<MenuOrdersBlocker, { text: string; href: string; link
   },
 };
 
-function paiseToInput(paise: number): string {
-  return paise > 0 ? String(paiseToRupees(paise)) : "";
+/**
+ * Pickup-only with no fee: empty, so a seller turning delivery on has to say what
+ * it costs instead of advertising "Free delivery" by default. Delivery already on: the saved fee, 0 included.
+ */
+function feeToInput(paise: number, mode: FulfilmentMode): string {
+  return mode === "PICKUP" && paise <= 0 ? "" : String(paiseToRupees(paise));
 }
 
-/** "" → 0, "30" / "12.50" → paise, anything else → null (invalid). */
+/** "30" / "12.50" / "0" → paise, anything else (empty too) → null (invalid). */
 function feeInputToPaise(raw: string): number | null {
   const t = raw.trim();
-  if (t === "") return 0;
   if (!/^\d{1,4}(\.\d{1,2})?$/.test(t)) return null;
   try {
     const p = rupeesToPaise(Number(t));
@@ -83,11 +86,11 @@ export function MenuOrdersClient({
   const [enabled, setEnabled] = useState(initialAcceptMenuOrders);
   const [blocker, setBlocker] = useState<MenuOrdersBlocker | null>(null);
   const [mode, setMode] = useState<FulfilmentMode>(initialFulfilmentMode);
-  const [fee, setFee] = useState(paiseToInput(initialDeliveryFeePaise));
+  const [fee, setFee] = useState(feeToInput(initialDeliveryFeePaise, initialFulfilmentMode));
   const [note, setNote] = useState(initialPickupNote ?? "");
   const [saved, setSaved] = useState({
     mode: initialFulfilmentMode,
-    fee: paiseToInput(initialDeliveryFeePaise),
+    fee: feeToInput(initialDeliveryFeePaise, initialFulfilmentMode),
     note: initialPickupNote ?? "",
   });
   const [feeError, setFeeError] = useState<string | null>(null);
@@ -136,7 +139,7 @@ export function MenuOrdersClient({
   function saveDetails() {
     const feePaise = showFee ? feeInputToPaise(fee) : null;
     if (showFee && feePaise === null) {
-      setFeeError("Enter a fee between ₹0 and ₹1,000, like 30 or 25.50.");
+      setFeeError("Enter your delivery fee, up to ₹1,000, like 30 or 25.50. Enter 0 for free delivery.");
       return;
     }
     setFeeError(null);
@@ -144,8 +147,8 @@ export function MenuOrdersClient({
     if (showFee && feePaise !== null) body.menuDeliveryFeePaise = feePaise;
     startTransition(async () => {
       if (await patch(body)) {
-        setSaved({ mode, fee: showFee && feePaise !== null ? paiseToInput(feePaise) : saved.fee, note: note.trim() });
-        if (showFee && feePaise !== null) setFee(paiseToInput(feePaise));
+        setSaved({ mode, fee: showFee && feePaise !== null ? feeToInput(feePaise, mode) : saved.fee, note: note.trim() });
+        if (showFee && feePaise !== null) setFee(feeToInput(feePaise, mode));
         toast.success(`${ordering} details saved.`);
       }
     });
@@ -270,7 +273,7 @@ export function MenuOrdersClient({
               setFee(e.target.value.replace(/[^\d.]/g, ""));
               setFeeError(null);
             }}
-            placeholder="0"
+            placeholder="30"
             aria-invalid={feeError ? true : undefined}
             aria-describedby="menu-delivery-fee-hint"
             className="flex min-h-11 w-full max-w-xs rounded-md border border-input bg-background px-3 font-mono text-base tabular-nums ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -279,7 +282,7 @@ export function MenuOrdersClient({
             id="menu-delivery-fee-hint"
             className={cn("text-xs", feeError ? "text-destructive" : "text-muted-foreground")}
           >
-            {feeError ?? "Added to delivery orders only. Leave empty for free delivery."}
+            {feeError ?? "Added to delivery orders only. Enter 0 for free delivery."}
           </p>
         </div>
       )}

@@ -37,6 +37,8 @@ export type SettingsSnapshot = {
   pushConfigured: boolean;
   /** Opted-in alert devices across the vendor's active staff. */
   pushDeviceCount: number;
+  /** Shown on the store. Format-checked only, never verified with FSSAI. */
+  fssaiNumber: string | null;
 };
 
 /** One on/off fact inside a status line, e.g. "UPI" on. */
@@ -145,10 +147,12 @@ export function notificationsStatus(
   return { text: `On · ${s.pushDeviceCount} ${s.pushDeviceCount === 1 ? "device" : "devices"}`, on: true };
 }
 
-export type ChecklistItemId = "menu_items" | "publish_store" | "payment_method" | "first_drop";
+export type ChecklistItemId = "menu_items" | "publish_store" | "payment_method" | "first_drop" | "fssai_number";
 
 export type ChecklistItem = {
   id: ChecklistItemId;
+  /** Worth doing, but customers can already order without it. Alone, it is one slim row, not the card. */
+  reminder?: boolean;
   text: string;
   href: string;
   linkText: string;
@@ -160,7 +164,13 @@ export type ChecklistItem = {
 
 export type SetupChecklistInput = Pick<
   SettingsSnapshot,
-  "availableItemCount" | "publishStorefront" | "upiId" | "acceptPayOnDelivery" | "acceptMenuOrders" | "dropCount"
+  | "availableItemCount"
+  | "publishStorefront"
+  | "upiId"
+  | "acceptPayOnDelivery"
+  | "acceptMenuOrders"
+  | "dropCount"
+  | "fssaiNumber"
 >;
 
 /**
@@ -207,6 +217,18 @@ export function setupChecklist(s: SetupChecklistInput, kind: StoreKind = "food")
       linkText: "Create a drop",
       minRole: "MANAGER",
       hint: `To sell from your everyday ${vocab.catalogue} instead, the owner turns on ${vocab.catalogueOrdersTitle} in Settings → Online orders.`,
+    });
+  }
+  // A prompt, not a gate: nothing refuses a food store without one. Goods stores
+  // keep the field in Settings, but many don't need a licence, so no step.
+  if (kind === "food" && !s.fssaiNumber?.trim()) {
+    items.push({
+      id: "fssai_number",
+      reminder: true,
+      text: "Add your FSSAI number so buyers can trust your food",
+      href: "/settings/store",
+      linkText: "Go to Online store",
+      minRole: "OWNER",
     });
   }
   return items;

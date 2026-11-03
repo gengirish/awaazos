@@ -69,9 +69,9 @@ export const ORDER_JOURNEY: readonly OrderJourneyStep[] = [
   {
     id: "pay",
     who: "Customer",
-    title: "Pays and taps I've paid",
+    title: "Pays and tells you it's done",
     when: "UPI orders",
-    text: "They pay from their UPI app, then tap I've paid, with the UPI reference or a screenshot of the payment if they have one. Open the screenshot from the order card, but check your UPI app and tap Payment received, or Not received if it isn't there. Their tap never marks the order paid by itself.",
+    text: "They pay from their UPI app, then send you a screenshot of the payment, or tell you it's done without one. Open the screenshot from the order card, but check your UPI app and tap Payment received, or Not received if it isn't there. Their tap never marks the order paid by itself.",
   },
   {
     id: "confirm",

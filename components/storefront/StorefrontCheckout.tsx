@@ -30,6 +30,7 @@ import {
   parseStoredCart,
   restoreCartLines,
   sameCartLines,
+  savedContactUsable,
   serializeCart,
   validateCheckout,
   validateCheckoutField,
@@ -46,12 +47,13 @@ import { cn } from "@/lib/utils";
  * stepper, sticky cart bar, device-local cart persistence, and the checkout
  * sheet with an editable cart summary (the same stepper, so quantities can be
  * changed and lines removed without leaving the sheet), remember-me, phone
- * normalisation, idempotent submit and per-field error copy.
+ * normalisation, idempotent submit and per-field error copy. A returning buyer
+ * sees their saved details as one card with "Change", so the order is a tap.
  *
  * The server is authoritative for price, stock and every limit. Nothing here
  * sends a price — callers build the request body from ids + quantities only.
- * Buyer details live only in this component's state and (opt-in) the device's
- * localStorage; they are never logged. The saved cart holds ids + quantities
+ * Buyer details live only in this component's state and the device's
+ * localStorage (on by default, untick "Remember" to clear); they are never logged. The saved cart holds ids + quantities
  * only, never buyer details. A placed order is remembered on the device as its
  * token, bill number and time (recent-orders.ts) so a guest can find it again.
  */
@@ -378,6 +380,13 @@ export type CheckoutSheetProps = {
    */
   whatsapp?: boolean;
   prefill?: BuyerPrefill | null;
+  /**
+   * The store's colour (`storeThemeAttribute`). The sheet is portalled to
+   * <body>, outside the page's `data-theme`, so it carries its own.
+   */
+  theme?: string;
+  /** Example text in the note field (`StoreVocabulary.orderNoteExample`). */
+  notesExample?: string;
   /** Focus goes back here when the sheet closes (the Checkout button). */
   returnFocusRef?: React.RefObject<HTMLElement | null>;
   /** Request body from the buyer's details — ids and quantities only, never prices. */
@@ -412,6 +421,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     payment,
     whatsapp = false,
     prefill,
+    theme,
+    notesExample,
     returnFocusRef,
     buildBody,
     onRejected,
@@ -423,7 +434,12 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
   const [notes, setNotes] = useState("");
-  const [remember, setRemember] = useState(false);
+  const [remember, setRemember] = useState(true);
+  /** Name and phone are already known: show them as one card with "Change". */
+  const [contactFolded, setContactFolded] = useState(false);
+  /** Same for the address. Set when details load, never while typing, so the field can't vanish mid-word. */
+  const [addressFolded, setAddressFolded] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [fulfilment, setFulfilment] = useState<FulfilmentType>(fulfilmentTypes[0] ?? "PICKUP");
   const [method, setMethod] = useState<PaymentMethod | null>(
     payment.upi ? "UPI" : payment.cod ? "CASH" : null,
@@ -475,6 +491,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
       setName(saved.name);
       setPhone(saved.phone);
       setAddress(saved.address);
+      const usable = savedContactUsable(saved.name, saved.phone);
+      setContactFolded(usable);
+      setAddressFolded(usable && saved.address.trim() !== "");
       if (saved.fulfilment && fulfilmentTypesRef.current.includes(saved.fulfilment)) {
         setFulfilment(saved.fulfilment);
       }
@@ -490,7 +509,6 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     mountedAtRef.current = Date.now();
     const saved = parseSavedBuyer(readSavedBuyerRaw());
     const p = prefillRef.current;
-    if (saved) setRemember(true);
     applySaved({
       name: p?.name || saved?.name || "",
       phone: formatIndianMobile(p?.phone ?? null) || saved?.phone || "",
@@ -563,6 +581,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
 
   function showFieldErrors(errors: CheckoutFieldErrors) {
     setFieldErrors(errors);
+    if (errors.name || errors.phone) setContactFolded(false);
+    if (errors.address) setAddressFolded(false);
     const first = firstInvalidField(errors);
     if (first) setFocusRequest((r) => ({ field: first, n: (r?.n ?? 0) + 1 }));
   }
@@ -595,6 +615,15 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
   const feePaise = fulfilment === "DELIVERY" ? deliveryFeePaise : 0;
   const discountPaise = discount?.discountPaise ?? 0;
   const totalPaise = subtotalPaise - discountPaise + feePaise;
+  // One way to pay needs no choice. Two radios only when there are two.
+  const onlyPayment = payment.upi && payment.cod ? null : payment.upi ? "UPI" : payment.cod ? "CASH" : null;
+  const showBreakdown = discountPaise > 0 || fulfilment === "DELIVERY";
+
+  function changeDetails() {
+    setContactFolded(false);
+    setAddressFolded(false);
+    setFocusRequest((r) => ({ field: "name", n: (r?.n ?? 0) + 1 }));
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -684,6 +713,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     <ResponsiveDialog open={open} onOpenChange={(v) => !submitting && onOpenChange(v)}>
       {/* Header (title + close) and footer (total + Place order) stay put; only the fields scroll. */}
       <ResponsiveDialogContent
+        data-theme={theme}
         onCloseAutoFocus={(e) => {
           const target = returnFocusRef?.current;
           if (target && target.isConnected) {
@@ -705,57 +735,91 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
               onAddMore={onChangeQty && !submitting ? () => onOpenChange(false) : undefined}
             />
 
-            <div className="space-y-2">
-              <Label htmlFor={ids.name}>Your name</Label>
-              <Input
-                id={ids.name}
-                autoComplete="name"
-                value={name}
-                onChange={(e) => {
-                  setName(e.target.value);
-                  revalidate("name", { name: e.target.value });
-                }}
-                maxLength={80}
-                required
-                aria-invalid={fieldErrors.name ? true : undefined}
-                aria-describedby={describedBy("name")}
-                className="h-11 scroll-my-24 aria-invalid:border-destructive"
-              />
-              <FieldError id={ids.error("name")} message={fieldErrors.name} />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor={ids.phone}>Mobile number</Label>
-              <div className="flex items-center gap-2">
-                <span
-                  className="inline-flex h-11 items-center rounded-md border border-input bg-muted px-3 font-mono text-sm text-muted-foreground"
-                  aria-hidden="true"
-                >
-                  +91
+            {contactFolded ? (
+              <div className="flex items-start gap-3 rounded-xl border border-border/70 px-3 py-2 text-sm">
+                <span className="min-w-0 flex-1 py-1">
+                  <span className="block truncate font-semibold">{name}</span>
+                  <span className="block font-mono text-xs tabular-nums text-muted-foreground">
+                    {formatIndianMobile(normaliseIndianMobile(phone))}
+                  </span>
+                  {fulfilment === "DELIVERY" && addressFolded ? (
+                    <span className="mt-1 block whitespace-pre-line break-words text-muted-foreground">{address}</span>
+                  ) : null}
                 </span>
-                <Input
-                  id={ids.phone}
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel-national"
-                  placeholder="98765 43210"
-                  value={phone}
-                  onChange={(e) => {
-                    setPhone(e.target.value);
-                    revalidate("phone", { phone: e.target.value });
-                  }}
-                  maxLength={16}
-                  required
-                  aria-invalid={fieldErrors.phone ? true : undefined}
-                  aria-describedby={describedBy("phone", ids.phoneHint)}
-                  className="h-11 scroll-my-24 aria-invalid:border-destructive"
-                />
+                <button
+                  type="button"
+                  onClick={changeDetails}
+                  className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg px-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  Change
+                  <span className="sr-only"> your details</span>
+                </button>
               </div>
-              <FieldError id={ids.error("phone")} message={fieldErrors.phone} />
-              <p id={ids.phoneHint} className="text-xs text-muted-foreground">
-                The store uses this to reach you about this order.
-              </p>
-            </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor={ids.name}>Your name</Label>
+                  <Input
+                    id={ids.name}
+                    autoComplete="name"
+                    value={name}
+                    onChange={(e) => {
+                      setName(e.target.value);
+                      revalidate("name", { name: e.target.value });
+                    }}
+                    maxLength={80}
+                    required
+                    aria-invalid={fieldErrors.name ? true : undefined}
+                    aria-describedby={describedBy("name")}
+                    className="h-11 scroll-my-24 aria-invalid:border-destructive"
+                  />
+                  <FieldError id={ids.error("name")} message={fieldErrors.name} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor={ids.phone}>Mobile number</Label>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="inline-flex h-11 items-center rounded-md border border-input bg-muted px-3 font-mono text-sm text-muted-foreground"
+                      aria-hidden="true"
+                    >
+                      +91
+                    </span>
+                    <Input
+                      id={ids.phone}
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel-national"
+                      placeholder="98765 43210"
+                      value={phone}
+                      onChange={(e) => {
+                        setPhone(e.target.value);
+                        revalidate("phone", { phone: e.target.value });
+                      }}
+                      maxLength={16}
+                      required
+                      aria-invalid={fieldErrors.phone ? true : undefined}
+                      aria-describedby={describedBy("phone", ids.phoneHint)}
+                      className="h-11 scroll-my-24 aria-invalid:border-destructive"
+                    />
+                  </div>
+                  <FieldError id={ids.error("phone")} message={fieldErrors.phone} />
+                  <p id={ids.phoneHint} className="text-xs text-muted-foreground">
+                    The store uses this to reach you about this order.
+                  </p>
+                </div>
+
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={remember}
+                    onChange={(e) => onRememberChange(e.target.checked)}
+                    className="h-5 w-5 accent-[hsl(var(--primary))]"
+                  />
+                  Remember my details on this device
+                </label>
+              </>
+            )}
 
             {fulfilmentTypes.length > 1 ? (
               <fieldset className="space-y-2">
@@ -789,13 +853,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                   ))}
                 </div>
               </fieldset>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                {fulfilment === "DELIVERY" ? "Delivery only" : "Pickup only"}
-              </p>
-            )}
+            ) : null}
 
-            {fulfilment === "DELIVERY" ? (
+            {fulfilment === "DELIVERY" && addressFolded ? null : fulfilment === "DELIVERY" ? (
               <div className="space-y-2">
                 <Label htmlFor={ids.address}>Delivery address</Label>
                 <textarea
@@ -841,17 +901,29 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor={`${idPrefix}-notes`}>Notes for the store (optional)</Label>
-              <Input
-                id={`${idPrefix}-notes`}
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                maxLength={280}
-                placeholder="eggless, less spicy…"
-                className="h-11"
-              />
-            </div>
+            {notesOpen ? (
+              <div className="space-y-2">
+                <Label htmlFor={`${idPrefix}-notes`}>Note for the store (optional)</Label>
+                <Input
+                  id={`${idPrefix}-notes`}
+                  value={notes}
+                  onChange={(e) => setNotes(e.target.value)}
+                  maxLength={280}
+                  placeholder={notesExample}
+                  autoFocus
+                  className="h-11"
+                />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setNotesOpen(true)}
+                className="-mx-1 inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
+                <Plus className="h-4 w-4" aria-hidden="true" />
+                Add a note for the store
+              </button>
+            )}
 
             <fieldset
               id={ids.payment}
@@ -860,7 +932,16 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
               className="space-y-2"
             >
               <legend className="text-sm font-medium">Payment</legend>
-              <div className="grid gap-2 sm:grid-cols-2">
+              {onlyPayment ? (
+                <p className="text-sm text-muted-foreground">
+                  {onlyPayment === "UPI"
+                    ? "Pay by UPI on the next screen, with any UPI app."
+                    : fulfilment === "PICKUP"
+                      ? "Pay when you collect."
+                      : "Pay on delivery, by cash or UPI at the door."}
+                </p>
+              ) : null}
+              <div className={cn("grid gap-2 sm:grid-cols-2", onlyPayment && "hidden")}>
                 {payment.upi ? (
                   <PaymentOption
                     name={`${idPrefix}-payment`}
@@ -870,7 +951,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                       revalidate("payment", { method: "UPI" });
                     }}
                     label="Pay now by UPI"
-                    hint="Any UPI app — you'll see a QR next"
+                    hint="Any UPI app, on the next screen"
                     invalid={!!fieldErrors.payment}
                     describedBy={describedBy("payment")}
                   />
@@ -899,35 +980,17 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
               <FieldError id={ids.error("payment")} message={fieldErrors.payment} />
             </fieldset>
 
-            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
-              <input
-                type="checkbox"
-                checked={remember}
-                onChange={(e) => onRememberChange(e.target.checked)}
-                className="h-5 w-5 accent-[hsl(var(--primary))]"
-              />
-              Remember my details on this device
-            </label>
-
-            {discountPaise > 0 || feePaise > 0 ? (
-              <dl className="space-y-1 border-t border-border pt-3 text-sm">
-                <div className="flex justify-between">
-                  <dt>Items</dt>
-                  <dd className="font-mono tabular-nums">{formatINR(subtotalPaise)}</dd>
-                </div>
-                {discount && discountPaise > 0 ? (
-                  <div className="flex justify-between gap-3 font-semibold text-primary">
-                    <dt className="min-w-0 break-words">{discountLabel(discount.name)}</dt>
-                    <dd className="shrink-0 font-mono tabular-nums">−{formatINR(discountPaise)}</dd>
-                  </div>
-                ) : null}
-                {feePaise > 0 ? (
-                  <div className="flex justify-between">
-                    <dt>Delivery fee</dt>
-                    <dd className="font-mono tabular-nums">{formatINR(feePaise)}</dd>
-                  </div>
-                ) : null}
-              </dl>
+            {whatsapp ? (
+              <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  checked={sendOnWhatsapp}
+                  onChange={(e) => setSendOnWhatsapp(e.target.checked)}
+                  disabled={submitting}
+                  className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                />
+                Also send my order to the store on WhatsApp
+              </label>
             ) : null}
           </ResponsiveDialogBody>
 
@@ -943,24 +1006,34 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
           </div>
 
           <ResponsiveDialogFooter className="flex-col gap-2 md:flex-col md:border-t md:pb-4 md:pt-3">
+            {/* In the fixed footer: the cart lines show list prices, so what comes off
+                and what delivery costs must be in view next to the total. */}
+            {showBreakdown ? (
+              <dl className="space-y-0.5 text-sm">
+                <div className="flex justify-between">
+                  <dt>Items</dt>
+                  <dd className="font-mono tabular-nums">{formatINR(subtotalPaise)}</dd>
+                </div>
+                {discount && discountPaise > 0 ? (
+                  <div className="flex justify-between gap-3 font-semibold text-primary">
+                    <dt className="min-w-0 break-words">{discountLabel(discount.name)}</dt>
+                    <dd className="shrink-0 font-mono tabular-nums">−{formatINR(discountPaise)}</dd>
+                  </div>
+                ) : null}
+                {fulfilment === "DELIVERY" ? (
+                  <div className="flex justify-between">
+                    <dt>Delivery fee</dt>
+                    <dd className="font-mono tabular-nums">{feePaise > 0 ? formatINR(feePaise) : "Free"}</dd>
+                  </div>
+                ) : null}
+              </dl>
+            ) : null}
             <p className="flex justify-between text-base font-bold">
               <span>Total</span>
               <span className="font-mono tabular-nums" aria-live="polite">
                 {formatINR(totalPaise)}
               </span>
             </p>
-            {whatsapp ? (
-              <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
-                <input
-                  type="checkbox"
-                  checked={sendOnWhatsapp}
-                  onChange={(e) => setSendOnWhatsapp(e.target.checked)}
-                  disabled={submitting}
-                  className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                />
-                Also send my order to the store on WhatsApp
-              </label>
-            ) : null}
             <button
               type="submit"
               disabled={submitting || lines.length === 0}
@@ -970,7 +1043,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
               {submitting ? (
                 <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
               ) : null}
-              {submitting ? "Placing order…" : `Place order · ${formatINR(totalPaise)}`}
+              {submitting
+                ? "Placing order…"
+                : `${method === "UPI" ? "Place order & pay" : "Place order"} · ${formatINR(totalPaise)}`}
             </button>
           </ResponsiveDialogFooter>
         </form>

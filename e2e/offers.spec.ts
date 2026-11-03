@@ -162,8 +162,7 @@ test.describe("offers: quantity plan discounts", () => {
       await expect(sheet).toContainText("−₹26.50");
       await sheet.getByLabel("Your name").fill("Meera Buyer");
       await sheet.getByLabel("Mobile number").fill("98480 54321");
-      await sheet.getByRole("radio", { name: /pay on delivery/i }).check();
-      await sheet.getByRole("button", { name: /place order · ₹238\.50/i }).click();
+      await sheet.getByRole("button", { name: /place order(?: & pay)? · ₹238\.50/i }).click();
 
       await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
       await expect(buyer.getByRole("heading", { name: "Your order" })).toBeVisible();

@@ -54,9 +54,8 @@ test.describe("WhatsApp orders opt-in", () => {
       const sheet = buyer.getByRole("dialog", { name: "Checkout" });
       await sheet.getByLabel("Your name").fill("Lakshmi Buyer");
       await sheet.getByLabel("Mobile number").fill("98480 54321");
-      await sheet.getByRole("radio", { name: /pay on delivery/i }).check();
       await expect(sheet.getByRole("button", { name: /whatsapp/i })).toHaveCount(0);
-      await sheet.getByRole("button", { name: /place order · ₹60\.00/i }).click();
+      await sheet.getByRole("button", { name: /place order(?: & pay)? · ₹60\.00/i }).click();
       await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
       orderPath = new URL(buyer.url()).pathname;
 

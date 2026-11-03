@@ -74,6 +74,9 @@ export type MenuOrderProps = {
   /** The store has a usable WhatsApp number (see CheckoutSheet). */
   whatsapp?: boolean;
   prefill?: BuyerPrefill | null;
+  /** See CheckoutSheet. */
+  theme?: string;
+  notesExample?: string;
   /** Offers live on menu orders (lib/offers.ts). Preview only; the server re-prices. */
   offers?: readonly ResolvedOffer[];
   /** Rows for a kitchen's menu; a photo gallery (two columns, tap to enlarge) for goods. */
@@ -93,6 +96,8 @@ export function MenuOrder(props: MenuOrderProps) {
     payment,
     whatsapp,
     prefill,
+    theme,
+    notesExample,
     offers = NO_OFFERS,
     layout = "list",
   } = props;
@@ -323,6 +328,8 @@ export function MenuOrder(props: MenuOrderProps) {
       )}
 
       <CheckoutSheet
+        theme={theme}
+        notesExample={notesExample}
         open={open}
         onOpenChange={onSheetOpenChange}
         slug={slug}

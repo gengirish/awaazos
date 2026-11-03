@@ -80,7 +80,9 @@ function StoreLink({ store }: { store: { slug: string; name: string } }) {
 /**
  * What is still missing before customers can order online, each step a link to
  * where it is fixed. Server-rendered from `loadSetupChecklist()`
- * (lib/setup-checklist-server.ts); it disappears once every step is done.
+ * (lib/setup-checklist-server.ts); it disappears once every step is done. With
+ * only reminders left the store is already taking orders, so they are slim rows
+ * that don't push the work down or say "start taking online orders".
  *
  *   const setup = await loadSetupChecklist({ vendor: ctx.vendor, role: ctx.staff.role });
  *   <SetupChecklistCard {...setup} className="mb-4" />
@@ -93,6 +95,28 @@ export function SetupChecklistCard({
   className,
 }: SetupChecklistCardProps) {
   if (items.length === 0) return null;
+
+  if (items.every((item) => item.reminder)) {
+    return (
+      <ul className={cn("space-y-2", className)}>
+        {items.map((item) => (
+          <li key={item.id} className={BOX}>
+            <Link
+              href={item.href}
+              className={cn(
+                "flex min-h-11 items-center justify-between gap-3 rounded-lg px-4 py-2 text-sm font-medium",
+                FOCUS,
+              )}
+            >
+              <span>{item.text}</span>
+              <span className="sr-only">{item.linkText}</span>
+              <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+            </Link>
+          </li>
+        ))}
+      </ul>
+    );
+  }
 
   if (variant === "compact") {
     return (

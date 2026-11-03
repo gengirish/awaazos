@@ -18,6 +18,7 @@ type KnownSettings = {
   publishStorefront: boolean;
   acceptPayOnDelivery: boolean;
   acceptMenuOrders: boolean;
+  fssaiNumber: string | null;
 };
 
 export type SetupChecklistInput = {
@@ -52,7 +53,7 @@ export async function loadSetupChecklist({ vendor, role, known }: SetupChecklist
       ? known.settings
       : prisma.vendorSettings.findUnique({
           where: { vendorId: vendor.id },
-          select: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true },
+          select: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true, fssaiNumber: true },
         }),
     known?.availableItemCount ?? prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
     prisma.drop.count({ where: { vendorId: vendor.id } }),
@@ -67,6 +68,7 @@ export async function loadSetupChecklist({ vendor, role, known }: SetupChecklist
       acceptPayOnDelivery: settings?.acceptPayOnDelivery ?? true,
       acceptMenuOrders: settings?.acceptMenuOrders ?? false,
       dropCount,
+      fssaiNumber: settings?.fssaiNumber ?? null,
     }, storeKind(vendor.stallType)),
     role,
   );

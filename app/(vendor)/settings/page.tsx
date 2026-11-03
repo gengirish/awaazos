@@ -85,6 +85,7 @@ export default async function SettingsHubPage() {
         acceptPayOnDelivery: true,
         acceptMenuOrders: true,
         menuFulfilmentMode: true,
+        fssaiNumber: true,
         receiptPaper: true,
         autoPrintReceipt: true,
         // Presence only — the encrypted secrets never leave this server component.
@@ -105,6 +106,7 @@ export default async function SettingsHubPage() {
     menuFulfilmentMode: settings?.menuFulfilmentMode ?? "PICKUP",
     upiId: vendor.upiId,
     acceptPayOnDelivery: settings?.acceptPayOnDelivery ?? true,
+    fssaiNumber: settings?.fssaiNumber ?? null,
     razorpayConfigured: hasStoredRazorpayCreds(settings),
     voiceLang: settings?.voiceLang ?? "en-IN",
     plan: vendor.plan,

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
+import { Check, ChevronDown, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { copyText } from "@/lib/clipboard";
@@ -17,7 +17,8 @@ import { cn } from "@/lib/utils";
  *   app, so one button per app (`upiAppLinks`, same params) leads and the
  *   generic link drops to "Other UPI app".
  * - Everywhere: "Copy UPI ID" / "Copy amount" and a one-line manual route, the
- *   fallback that works with every UPI app.
+ *   fallback that works with every UPI app. `foldFallback` tucks these (and
+ *   `children`, more fallbacks) under one line, so the pay button stands alone.
  *
  * Platform detection runs in an effect, so the server render and the first
  * client render are identical (no hydration mismatch); iOS re-orders after
@@ -36,6 +37,10 @@ export type UpiPayOptionsProps = {
   emphasis?: "primary" | "secondary";
   /** Hide the app-opening links from `sm` up (desktop has no UPI app to open). */
   linksMobileOnly?: boolean;
+  /** Fold the fallbacks under "UPI app didn't open or showed a warning?". */
+  foldFallback?: boolean;
+  /** More fallbacks, shown after the manual route. */
+  children?: React.ReactNode;
   className?: string;
 };
 
@@ -50,6 +55,8 @@ export function UpiPayOptions({
   genericLabel,
   emphasis = "primary",
   linksMobileOnly = false,
+  foldFallback = false,
+  children,
   className,
 }: UpiPayOptionsProps) {
   const [ios, setIos] = useState(false);
@@ -120,13 +127,8 @@ export function UpiPayOptions({
     FOCUS,
   );
 
-  return (
-    <div className={cn("space-y-3", className)}>
-      <div className={cn("space-y-3", linksMobileOnly && "sm:hidden")}>
-        {appButtons}
-        {genericButton}
-      </div>
-
+  const fallback = (
+    <>
       <div className={cn("grid gap-2", hasAmount ? "grid-cols-2" : "grid-cols-1")}>
         <button type="button" onClick={() => void copy("upi")} className={copyButtonClass}>
           {copied === "upi" ? (
@@ -158,6 +160,31 @@ export function UpiPayOptions({
         App didn&apos;t open, or warned the payment may fail? Open any UPI app → Pay to UPI ID → paste the UPI ID
         {hasAmount ? ", then the amount" : ""}.
       </p>
+      {children}
+    </>
+  );
+
+  return (
+    <div className={cn("space-y-3", className)}>
+      <div className={cn("space-y-3", linksMobileOnly && "sm:hidden")}>
+        {appButtons}
+        {genericButton}
+      </div>
+
+      {foldFallback ? (
+        <details className="group overflow-hidden rounded-xl border border-border/60 text-left">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm font-semibold text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
+            <span className="flex-1">UPI app didn&apos;t open or showed a warning?</span>
+            <ChevronDown
+              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+          </summary>
+          <div className="space-y-3 border-t border-border/50 px-3 py-3">{fallback}</div>
+        </details>
+      ) : (
+        fallback
+      )}
 
       {/* Always mounted so screen readers announce the change. */}
       <p role="status" aria-live="polite" className="sr-only">

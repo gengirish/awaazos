@@ -93,6 +93,8 @@ export default async function StorefrontAccountPage(
           upiRef: true,
           paymentClaimedAt: true,
           fulfilmentStatus: true,
+          fulfilmentType: true,
+          outForDeliveryAt: true,
           drop: { select: { title: true } },
         },
       })
@@ -168,7 +170,11 @@ export default async function StorefrontAccountPage(
                       },
                       now,
                     );
-                    const status = orderStatusLabel(state, o.fulfilmentStatus);
+                    const status = orderStatusLabel(state, o.fulfilmentStatus, {
+                      menuOrder: !o.drop,
+                      fulfilmentType: o.fulfilmentType,
+                      outForDelivery: o.fulfilmentType === "DELIVERY" && o.outForDeliveryAt !== null,
+                    });
                     return (
                       <li key={o.id}>
                         <Link
