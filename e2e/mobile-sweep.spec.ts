@@ -20,6 +20,9 @@ import { CONTEXT_OPTIONS, createMenuItem, createVendorSession, type MenuItemRow 
 /**
  * Mobile baseline sweep.
  *
+ * Runs on the `mobile` project only: 44 px comes from `@media (pointer: coarse)`,
+ * so a desktop browser at phone width would measure a density no phone gets.
+ *
  * Every vendor and public screen, at three widths, measured for the two things
  * that make a page unusable on a phone: horizontal overflow and tap targets
  * under 44x44 CSS px. A full-page screenshot of each lands in
@@ -29,8 +32,8 @@ import { CONTEXT_OPTIONS, createMenuItem, createVendorSession, type MenuItemRow 
  * listed in `e2e/mobile-sweep.baseline.json` is tolerated, anything new fails,
  * and anything that has been fixed is logged so the baseline can be tightened.
  *
- *   npx playwright test e2e/mobile-sweep.spec.ts                       # check
- *   MOBILE_SWEEP_UPDATE=1 npx playwright test e2e/mobile-sweep.spec.ts --workers=1   # re-record
+ *   npx playwright test e2e/mobile-sweep.spec.ts --project=mobile                       # check
+ *   MOBILE_SWEEP_UPDATE=1 npx playwright test e2e/mobile-sweep.spec.ts --project=mobile --workers=1   # re-record
  *
  * Writes real rows — run against a throwaway Postgres only (see CLAUDE.md).
  */

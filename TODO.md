@@ -255,22 +255,16 @@ Dialog / Sheet close buttons now carry `touch-target`, which sets a 44px floor u
 `@media (pointer: coarse)` (`app/globals.css`). Phones and tablets get 44px; a desktop with a mouse
 keeps the 40px `h-10` density on purpose.
 
-Still open: the `test.fixme` in `e2e/accessibility.spec.ts` ("auth page buttons meet the 44px
-minimum") predates that change and its comment is stale. Run it on the Pixel 7 project (coarse
-pointer) and un-skip it there, or delete it if desktop density is the accepted rule.
-
 ### 4.2 E2E gaps that need infrastructure first
 - **StaffRole enforcement** (a CASHIER refused an OWNER-only write) — untestable because there is
   no staff-management API to create a non-owner member.
 - **CSV export contents** — the PII rule says last-4 phone only and DD/MM/YYYY IST, both untested,
   because the route is STARTER-gated and nothing can upgrade a plan from a test.
 
-### 4.3 E2E does not run on CI
-**Answered:** the Playwright job in `.github/workflows/ci.yml` is switched off (`if: false`,
-2026-10-13), so nothing gates `main` on E2E. The suite runs only locally against a throwaway
-Postgres (recipe in `CLAUDE.md`), and a merge is a production deploy. Decide whether to re-enable
-the job (it is fully defined: Postgres 15 service, `prisma db push`, chromium) or keep the local
-step as the rule. `docs/BRANCH_PROTECTION.md` should match whichever is chosen.
+### 4.3 E2E on CI does not gate merges
+`E2E (chromium)` and `E2E (mobile)` run on every PR and push to `main`, but `main` has no branch
+protection, so a red run does not stop a merge. Turning it on is the owner's call: settings in
+`docs/BRANCH_PROTECTION.md`.
 
 ### 4.4 Customer phone numbers are stored as typed
 `POST /api/transactions` (`transactionPostBodySchema` in `lib/transaction-post-body.ts`) and

@@ -1,8 +1,7 @@
 import { expect, test } from "@playwright/test";
 
-import { prisma } from "../lib/prisma";
-
-import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/vendor";
+import { CAN_SET_BILLING, addRatedOrders } from "./helpers/billing-db";
+import { CONTEXT_OPTIONS, createMenuItem, createVendorSession, openStoreForMenuOrders } from "./helpers/vendor";
 
 /**
  * A buyer rates a handed-over order; the seller sees the stars and the comment,
@@ -16,6 +15,7 @@ test.describe("order feedback", () => {
     request,
     browser,
   }) => {
+    test.skip(!CAN_SET_BILLING, "needs a local throwaway database to add ratings");
     test.setTimeout(240_000);
     const suffix = Math.random().toString(36).slice(2, 7);
     const dish = `Bhel ${suffix}`;
@@ -23,21 +23,8 @@ test.describe("order feedback", () => {
 
     // ── Vendor: one item, pay on delivery, menu ordering ───────────────
     await createVendorSession(page, request, "feedback", "/menu");
-    const vendorRes = await page.request.get("/api/vendor");
-    const { id: vendorId, slug } = ((await vendorRes.json()) as { vendor: { id: string; slug: string } }).vendor;
     await createMenuItem(page, { name: dish, priceInRupees: 75, category: "Snacks" });
-    await page.goto("/settings/store");
-    const publish = page.getByRole("switch", { name: /publish/i });
-    if ((await publish.getAttribute("aria-checked")) !== "true") await publish.click();
-    await expect(publish).toHaveAttribute("aria-checked", "true");
-    await page.goto("/settings/payments");
-    const payOnDelivery = page.getByRole("switch", { name: /pay on delivery/i });
-    if ((await payOnDelivery.getAttribute("aria-checked")) !== "true") await payOnDelivery.click();
-    await expect(payOnDelivery).toHaveAttribute("aria-checked", "true");
-    await page.goto("/settings/orders");
-    const menuSwitch = page.getByRole("switch", { name: /order from your menu/i });
-    await menuSwitch.click();
-    await expect(menuSwitch).toHaveAttribute("aria-checked", "true");
+    const { id: vendorId, slug } = await openStoreForMenuOrders(page);
 
     const buyerCtx = await browser.newContext(CONTEXT_OPTIONS);
     try {
@@ -86,6 +73,9 @@ test.describe("order feedback", () => {
       expect(((await again.json()) as { error: string }).error).toBe("already_rated");
       const bad = await buyer.request.post(feedbackUrl, { data: { rating: 6 } });
       expect(bad.status()).toBe(400);
+      // A real token under another store's link is a miss, like any unknown order.
+      const wrongStore = await buyer.request.post(feedbackUrl.replace(slug, `${slug}-other`), { data: { rating: 5 } });
+      expect(wrongStore.status()).toBe(404);
 
       // ── Seller sees stars and comment, on the card and in Settings ───
       await page.reload();
@@ -106,24 +96,7 @@ test.describe("order feedback", () => {
       await expect(buyer.locator("body")).not.toContainText(comment);
 
       // ── Four more ratings: the average appears, the comment still doesn't ──
-      const order = await prisma.transaction.findFirstOrThrow({
-        where: { vendorId, orderToken: orderPath.split("/").pop() },
-      });
-      for (const [i, rating] of [5, 5, 5, 4].entries()) {
-        const copy = await prisma.transaction.create({
-          data: {
-            vendorId,
-            billNumber: `${order.billNumber}-${i}`,
-            subtotalPaise: order.subtotalPaise,
-            totalPaise: order.totalPaise,
-            paymentMethod: order.paymentMethod,
-            source: "STOREFRONT",
-            fulfilmentStatus: "DELIVERED",
-          },
-          select: { id: true },
-        });
-        await prisma.orderFeedback.create({ data: { vendorId, transactionId: copy.id, rating } });
-      }
+      await addRatedOrders(vendorId, [5, 5, 5, 4]);
       await buyer.reload();
       await expect(about).toContainText("4.6 out of 5 · 5 ratings");
       await expect(buyer.locator("body")).not.toContainText(comment);

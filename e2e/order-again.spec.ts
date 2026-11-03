@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { createLoginToken } from "../lib/customer-auth";
 
-import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/vendor";
+import { CONTEXT_OPTIONS, createMenuItem, createVendorSession, openStoreForMenuOrders } from "./helpers/vendor";
 
 /**
  * After an order is over the buyer can fill the cart from it, on the order page
@@ -23,22 +23,9 @@ test.describe("order again", () => {
 
     // ── Vendor: two items, pay on delivery, menu ordering ──────────────
     await createVendorSession(page, request, "orderagain", "/menu");
-    const vendorRes = await page.request.get("/api/vendor");
-    const slug = ((await vendorRes.json()) as { vendor: { slug: string } }).vendor.slug;
     await createMenuItem(page, { name: kept, priceInRupees: 75, category: "Snacks" });
     await createMenuItem(page, { name: gone, priceInRupees: 50, category: "Drinks" });
-    await page.goto("/settings/store");
-    const publish = page.getByRole("switch", { name: /publish/i });
-    if ((await publish.getAttribute("aria-checked")) !== "true") await publish.click();
-    await expect(publish).toHaveAttribute("aria-checked", "true");
-    await page.goto("/settings/payments");
-    const payOnDelivery = page.getByRole("switch", { name: /pay on delivery/i });
-    if ((await payOnDelivery.getAttribute("aria-checked")) !== "true") await payOnDelivery.click();
-    await expect(payOnDelivery).toHaveAttribute("aria-checked", "true");
-    await page.goto("/settings/orders");
-    const menuSwitch = page.getByRole("switch", { name: /order from your menu/i });
-    await menuSwitch.click();
-    await expect(menuSwitch).toHaveAttribute("aria-checked", "true");
+    const { slug } = await openStoreForMenuOrders(page);
 
     const buyerCtx = await browser.newContext(CONTEXT_OPTIONS);
     try {

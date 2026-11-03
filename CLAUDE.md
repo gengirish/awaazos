@@ -52,8 +52,10 @@ docker rm -f awaazos-e2e     # when done
 ```
 
 Exported vars win: Next does not overwrite an env var that is already set.
-`BASE_URL=https://…` runs the read-only specs against a deployment, but the
-vendor-creating specs will write to whatever database that deployment uses.
+`e2e/global-setup.ts` enforces this: a run stops before any spec if `DATABASE_URL` (exported, or in a
+`.env` file when not exported) isn't local, if `BASE_URL` is production, or if `BASE_URL` is any other
+deployment without `E2E_ALLOW_REMOTE=1`, because the vendor-creating specs write to that deployment's
+database. `e2e/mobile-sweep.spec.ts` runs on the `mobile` project only (44 px is a coarse-pointer rule).
 
 ### Golden tests (LLM/ASR regression harness)
 
@@ -744,13 +746,14 @@ voice-only path needs a tap fallback** (`QuickAddGrid`).
 ## Before pushing
 
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → unit → build → bundle-size budget
-(`npm run perf:budget`, see `docs/PERFORMANCE.md`), plus gitleaks (full history) and `npm audit --audit-level=high`. The Playwright job is switched off
-on CI (`if: false`, 2026-10-13) — run the suite locally, see below. A husky
+(`npm run perf:budget`, see `docs/PERFORMANCE.md`), plus gitleaks (full history) and `npm audit --audit-level=high`. Two Playwright jobs, `E2E (chromium)` and
+`E2E (mobile)`, run after that on a throwaway Postgres: they apply the migrations from empty and check them against the schema. `main` has no
+branch protection, so a red run does not stop a merge, which is a production deploy: look before merging. A husky
 pre-commit hook runs `lint-staged` (eslint `--max-warnings=0`) and gitleaks if installed locally.
 
 Repo workflow for a meaningful change: `npm test && npm run typecheck && npm run lint && npm run build`
-→ Playwright against a throwaway Postgres (see "E2E writes real rows" above) → conventional commit
-→ push. Merging to `main` is the production deploy (see "Deploy topology"); never run the e2e
+→ conventional commit → push → green CI, E2E included (locally, Playwright against a throwaway Postgres:
+see "E2E writes real rows" above). Merging to `main` is the production deploy (see "Deploy topology"); never run the e2e
 suite against the production deployment, because its vendor-creating specs write to the live
 database.
 

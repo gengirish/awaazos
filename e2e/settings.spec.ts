@@ -225,12 +225,12 @@ test.describe("settings hub", () => {
     await expect(group.getByRole("radio", { name: "Saffron" })).toBeChecked();
 
     // Every swatch is a 44 px tap target (the label wraps the hidden radio).
-    const purple = group.getByRole("radio", { name: "Purple" });
-    const box = await group.getByText("Purple").locator("..").boundingBox();
+    const purpleSwatch = group.getByText("Purple").locator("..");
+    const box = await purpleSwatch.boundingBox();
     expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
     expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
 
-    await purple.check();
+    await purpleSwatch.click();
     await expect(page.getByText("Store colour: Purple.")).toBeVisible();
     await page.reload();
     await expect(page.getByRole("radio", { name: "Purple" })).toBeChecked();

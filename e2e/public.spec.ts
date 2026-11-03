@@ -4,7 +4,7 @@ test.describe("public surfaces", () => {
   test("landing page renders hero + product badge + sign-up CTA", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveTitle(/AwaazOS/i);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText(/pre-orders/i);
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(/orders from Instagram and WhatsApp/i);
     await expect(page.getByText(/IntelliForge AI/i).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /sign in/i }).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /start 30 days free/i }).first()).toBeVisible();
