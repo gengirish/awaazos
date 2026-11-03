@@ -62,6 +62,29 @@ export async function setRazorpayKeysBySlug(slug: string): Promise<void> {
  * the one way a spec can see the app as a CASHIER or MANAGER. Same guard as
  * above: local throwaway database only (`CAN_SET_BILLING`).
  */
+/** Delivered orders with these ratings, so a spec needn't place each one through the store. */
+export async function addRatedOrders(vendorId: string, ratings: readonly number[]): Promise<void> {
+  for (const rating of ratings) {
+    await db().orderFeedback.create({
+      data: {
+        rating,
+        vendor: { connect: { id: vendorId } },
+        transaction: {
+          create: {
+            vendor: { connect: { id: vendorId } },
+            billNumber: `E2E-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+            subtotalPaise: 7_500,
+            totalPaise: 7_500,
+            paymentMethod: "CASH",
+            source: "STOREFRONT",
+            fulfilmentStatus: "DELIVERED",
+          },
+        },
+      },
+    });
+  }
+}
+
 export async function setStaffRole(email: string, role: StaffRole): Promise<void> {
   const res = await db().staffMember.updateMany({ where: { user: { email } }, data: { role } });
   if (res.count !== 1) {

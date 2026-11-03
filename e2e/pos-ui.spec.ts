@@ -92,6 +92,6 @@ test.describe("POS sale — driven through the UI", () => {
 
     await page.goto("/pos");
     await expect(page.getByRole("heading", { name: "No items yet" })).toBeVisible();
-    await expect(page.getByRole("link", { name: /Open menu/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Open menu/i })).toBeVisible();
   });
 });

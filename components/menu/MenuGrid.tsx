@@ -12,6 +12,9 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
 
+/** Fired by VoiceMenuPanel after it saves rows. */
+export const MENU_CHANGED_EVENT = "awaazos:menu-changed";
+
 type MenuGridProps = {
   initialItems: MenuItem[];
   /** Open the add form with this name on first render (`/menu?add=…`). */
@@ -68,6 +71,24 @@ export function MenuGrid({ initialItems, prefillName, vocab }: MenuGridProps) {
   const refresh = useCallback(() => {
     router.refresh();
   }, [router]);
+
+  // A voice save (VoiceMenuPanel): the list reads the rows itself, because the
+  // router.refresh() fired beside that save was sometimes never applied, which
+  // left new dishes hidden until a reload (e2e/voice-menu.spec.ts caught it).
+  useEffect(() => {
+    async function reload() {
+      try {
+        const res = await fetch("/api/menu", { credentials: "include" });
+        if (!res.ok) return;
+        const body = (await res.json()) as { data?: MenuItem[] };
+        if (body.data) setItems(body.data);
+      } catch {
+        // Offline: the list catches up on the next page load.
+      }
+    }
+    window.addEventListener(MENU_CHANGED_EVENT, reload);
+    return () => window.removeEventListener(MENU_CHANGED_EVENT, reload);
+  }, []);
 
   function openCreate() {
     setDefaultName("");

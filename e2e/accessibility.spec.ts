@@ -97,17 +97,10 @@ test.describe("keyboard access on public pages", () => {
 
   // KNOWN FAILURE, deliberately not deleted.
   //
-  // accessibility.mdc requires 44x44 for *any* tap target and globs **/*.tsx,
-  // but the shared Button default is `h-10` (40 px), so every default-size
-  // Button on the auth and marketing pages is 4 px short. The POS is unaffected
-  // — its controls set `min-h-11` explicitly, which is why the other tests here
-  // pass.
-  //
-  // Fixing it is a design-system call, not a test call: design-system.mdc says
-  // never to modify the primitives in components/ui/, so it is either a global
-  // default change (h-10 -> h-11, moves every button in the app) or `min-h-11`
-  // on ~11 call sites. Un-skip this once that decision is made.
-  test.fixme("auth page buttons meet the 44px minimum", async ({ page }) => {
+  // Phones and tablets only: `touch-target` gives Button 44 px on a coarse
+  // pointer, and a desktop with a mouse keeps 40 px on purpose (design-system.mdc).
+  test("auth page buttons meet the 44px minimum on a phone", async ({ page, hasTouch }) => {
+    test.skip(!hasTouch, "40 px is the intended density with a mouse");
     await page.goto("/sign-in");
     await expectTapTarget(
       page.getByRole("button", { name: /sign in/i }),

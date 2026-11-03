@@ -37,6 +37,20 @@ export type TransactionCreated = {
 };
 
 /**
+ * Open a signed-in vendor's store for "order from menu" with pay on delivery.
+ * Through the API: the settings screens have their own specs, this is only setup.
+ */
+export async function openStoreForMenuOrders(page: Page): Promise<{ id: string; slug: string }> {
+  const res = await page.request.patch("/api/vendor", {
+    data: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true },
+    headers: { "Content-Type": "application/json" },
+  });
+  expect(res.ok(), "opening the store for menu orders").toBe(true);
+  const me = await page.request.get("/api/vendor");
+  return ((await me.json()) as { vendor: { id: string; slug: string } }).vendor;
+}
+
+/**
  * Register a fresh vendor (OWNER) via the public API. Does NOT sign in.
  *
  * Registration is one `prisma.$transaction` creating User + Vendor +

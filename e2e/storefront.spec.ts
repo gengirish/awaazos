@@ -198,8 +198,10 @@ test.describe("public storefront", () => {
     await page.getByLabel("Describe your business").fill("Pickles & podis");
     await page.getByLabel("Area and city").fill("Sahakar Nagar, Bengaluru");
     await page.getByLabel("State", { exact: true }).fill("");
+    // Wait for the write itself: other forms on this page already read "Saved".
+    const saved = page.waitForResponse((r) => r.url().endsWith("/api/vendor") && r.request().method() === "PATCH");
     await page.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(page.getByRole("button", { name: "Saved", exact: true }).first()).toBeVisible();
+    expect((await saved).ok()).toBe(true);
 
     const anon = await browser.newContext(CONTEXT_OPTIONS);
     const buyer = await anon.newPage();
