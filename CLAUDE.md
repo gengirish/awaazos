@@ -404,6 +404,9 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   AES-256-GCM-encrypted with `PAYMENT_KEYS_ENCRYPTION_KEY` (`lib/secret-box.ts`). Never the platform
   `RAZORPAY_*` account — collecting on a vendor's behalf makes us an RBI payment aggregator.
   The other paths are UPI intent + the buyer's "I've paid" claim (vendor verifies) and pay on delivery.
+  A store with Razorpay shows only "Pay online" on the order page: UPI and "Payment done?" stay hidden (`OnlinePayFlow`,
+  `lib/storefront-direct-pay.ts`) until Razorpay fails, its window is closed or the seller answered "Not received", and
+  never on `payment_processing`, so nobody is invited to pay twice. Checkout still needs a UPI ID to reach Razorpay.
 - **Connect Razorpay** (`lib/razorpay-oauth.ts`, plan in `docs/RAZORPAY_PARTNER_PLAN.md`): the same
   vendor-owned account reached by our Razorpay Technology Partner OAuth app instead of pasted keys
   (`RAZORPAY_OAUTH_CLIENT_ID` / `_SECRET` / `_MODE`). One method per store: connecting clears the keys,
