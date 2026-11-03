@@ -2,9 +2,16 @@
 
 import { CreditCard, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 import { loadCheckout, type RazorpayOrderSuccess } from "@/lib/razorpay-checkout";
+import {
+  checkoutCancelledMessage,
+  checkoutLoadFailedMessage,
+  startErrorMessage,
+  startErrorOpensDirectPay,
+  type DirectPayFallback,
+} from "@/lib/storefront-direct-pay";
 
 /**
  * "Pay online" for a storefront order, through the store's OWN Razorpay
@@ -21,6 +28,10 @@ import { loadCheckout, type RazorpayOrderSuccess } from "@/lib/razorpay-checkout
  * (flaky network) the buyer is pointed at the order page's "Check for update"
  * button (OrderRefresh) rather than told to pay again.
  *
+ * `onOfferDirectPay` fires when Razorpay can't take this payment, so the page can
+ * show the way to pay without it (lib/storefront-direct-pay.ts). Never once Checkout
+ * reports success: the buyer has paid and must not be invited to pay again.
+ *
  * `prefillName` / `prefillContact` are the buyer's own details on the buyer's
  * own order page; they go only to Razorpay Checkout, never to a log.
  */
@@ -34,35 +45,32 @@ type StartPaymentData = {
   billNumber: string;
 };
 
-const START_ERRORS: Record<string, string> = {
-  order_expired: "This order's hold has expired, so the items were released. Please place the order again.",
-  not_awaiting_payment: "This order isn't waiting for payment any more. Tap “Check for update” above to see its status.",
-  online_payment_unavailable: "Online payment isn't available for this store right now. Please pay by UPI below.",
-  payment_processing: "Your payment went through — we're confirming it. Tap “Check for update” above in a minute.",
-  razorpay_unavailable: "Couldn't reach the payment service. Please try again, or pay by UPI below.",
-  rate_limited: "Too many attempts. Please wait a minute and try again.",
-};
-
 export function RazorpayPayButton({
   slug,
   token,
   amountLabel,
   prefillName,
   prefillContact,
+  fallback,
+  onOfferDirectPay,
 }: {
   slug: string;
   token: string;
   amountLabel: string;
   prefillName?: string | null;
   prefillContact?: string | null;
+  fallback: DirectPayFallback;
+  onOfferDirectPay: () => void;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | null>(null);
+  const paid = useRef(false);
 
   const base = `/api/s/${encodeURIComponent(slug)}/orders/${encodeURIComponent(token)}/razorpay`;
 
   async function confirm(resp: RazorpayOrderSuccess) {
+    paid.current = true;
     setBusy(true);
     setMessage({ text: "Payment received — confirming with the store…", tone: "info" });
     try {
@@ -108,9 +116,10 @@ export function RazorpayPayButton({
       const json = (await res.json().catch(() => ({}))) as { data?: StartPaymentData; error?: string };
       if (!res.ok || !json.data) {
         setMessage({
-          text: START_ERRORS[json.error ?? ""] ?? "Couldn't start the payment. Please try again, or pay by UPI below.",
+          text: startErrorMessage(json.error, fallback),
           tone: json.error === "payment_processing" ? "info" : "error",
         });
+        if (startErrorOpensDirectPay(json.error)) onOfferDirectPay();
         setBusy(false);
         return;
       }
@@ -120,14 +129,17 @@ export function RazorpayPayButton({
         await loadCheckout();
       } catch {
         setMessage({
-          text: "Couldn't load the payment window. Check your connection, or pay by UPI below.",
+          text: checkoutLoadFailedMessage(fallback),
           tone: "error",
         });
+        onOfferDirectPay();
         setBusy(false);
         return;
       }
       const Razorpay = window.Razorpay;
       if (!Razorpay) {
+        setMessage({ text: checkoutLoadFailedMessage(fallback), tone: "error" });
+        onOfferDirectPay();
         setBusy(false);
         return;
       }
@@ -149,9 +161,11 @@ export function RazorpayPayButton({
         modal: {
           confirm_close: true,
           ondismiss: () => {
+            if (paid.current) return;
             setBusy(false);
+            onOfferDirectPay();
             setMessage((m) =>
-              m?.tone === "error" ? m : { text: "Payment cancelled. You can try again, or pay by UPI below.", tone: "info" },
+              m?.tone === "error" ? m : { text: checkoutCancelledMessage(fallback), tone: "info" },
             );
           },
         },
@@ -159,10 +173,12 @@ export function RazorpayPayButton({
       rzp.on("payment.failed", () => {
         // Checkout lets the buyer retry inside the window; this just leaves a note.
         setMessage({ text: "That payment didn't go through. No money was taken — try again or use another method.", tone: "error" });
+        onOfferDirectPay();
       });
       rzp.open();
     } catch {
       setMessage({ text: "Couldn't reach the store — check your connection and try again.", tone: "error" });
+      onOfferDirectPay();
       setBusy(false);
     }
   }
