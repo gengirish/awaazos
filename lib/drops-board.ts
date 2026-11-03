@@ -73,6 +73,8 @@ export type BoardOrder = {
   riderName?: string | null;
   /** The rider's "Delivered" link token (/d/<token>); staff-only, delivery orders only. */
   riderToken?: string | null;
+  /** The buyer's own page (/s/<slug>/o/<token>), for messages the seller sends; staff-only. */
+  buyerOrderPath?: string | null;
   /** When the buyer tapped "I've received my order" (ISO); null = not yet. */
   buyerReceivedAt?: string | null;
   displayState: OrderDisplayState;
@@ -481,6 +483,33 @@ export function firstName(name: string | null | undefined): string {
 export function whatsappHref(phoneE164: string, text?: string): string {
   const digits = phoneE164.replace(/\D/g, "");
   return text ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : `https://wa.me/${digits}`;
+}
+
+/**
+ * What the seller's WhatsApp button says to the buyer, by where the order is.
+ * `ready` is the pickup message: there is no "ready" status, the seller just
+ * says so. Holds the buyer's first name, so it only ever leaves the device
+ * through the seller's own WhatsApp. An open-ended message stops mid-sentence
+ * for the seller to finish, so it carries no link.
+ */
+export function buyerUpdateMessage(
+  o: Pick<BoardOrder, "billNumber" | "customerName" | "fulfilmentType" | "fulfilmentStatus" | "outForDeliveryAt">,
+  vendorName: string,
+  orderUrl: string | null,
+  ready = false,
+): string {
+  const name = o.customerName?.trim().split(/\s+/)[0] || "there";
+  const order = `Hi ${name}, your order ${o.billNumber} from ${vendorName}`;
+  const withLink = (text: string) => (orderUrl ? `${text}\nYour order: ${orderUrl}` : text);
+  if (ready) return withLink(`${order} is ready for pickup.`);
+  if (o.fulfilmentStatus === "CANCELLED") return `${order} has been cancelled: `;
+  if (o.fulfilmentStatus === "DELIVERED") {
+    return withLink(`${order} was ${o.fulfilmentType === "PICKUP" ? "picked up" : "delivered"}. Thank you!`);
+  }
+  if (o.fulfilmentStatus === "CONFIRMED") {
+    return withLink(`${order} ${o.outForDeliveryAt ? "is on the way" : "is confirmed"}.`);
+  }
+  return `Hi ${name}, about your order ${o.billNumber} from ${vendorName}: `;
 }
 
 /**

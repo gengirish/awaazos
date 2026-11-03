@@ -6,12 +6,15 @@ import { cache } from "react";
 
 import { CustomerProfile, CustomerSignOut } from "@/components/storefront/CustomerProfile";
 import { CustomerSignIn } from "@/components/storefront/CustomerSignIn";
+import { OrderAgainButton } from "@/components/storefront/OrderAgainButton";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Notice } from "@/components/ui/notice";
 import { formatINR } from "@/lib/currency";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { orderDisplayState } from "@/lib/drops";
 import { formatIstDate, formatIstTime } from "@/lib/drops-time";
+import { orderIsOver, orderItemsSummary, planOrderAgain } from "@/lib/order-again";
+import { loadOrderableNow } from "@/lib/order-again-server";
 import { prisma } from "@/lib/prisma";
 import { orderStatusLabel, type StatusTone } from "@/lib/storefront-order";
 import { cn } from "@/lib/utils";
@@ -96,11 +99,13 @@ export default async function StorefrontAccountPage(
           fulfilmentType: true,
           outForDeliveryAt: true,
           drop: { select: { title: true } },
+          orderItems: { select: { menuItemId: true, name: true, qty: true }, orderBy: { id: "asc" } },
         },
       })
     : [];
 
   const now = new Date();
+  const orderable = orders.length > 0 ? await loadOrderableNow(vendor.id, now) : null;
 
   return (
     <div data-theme={theme} className="min-h-screen bg-awaaz-cream/40">
@@ -175,6 +180,11 @@ export default async function StorefrontAccountPage(
                       fulfilmentType: o.fulfilmentType,
                       outForDelivery: o.fulfilmentType === "DELIVERY" && o.outForDeliveryAt !== null,
                     });
+                    const summary = orderItemsSummary(o.orderItems);
+                    const againPlan =
+                      orderable && orderIsOver(state, o.fulfilmentStatus)
+                        ? planOrderAgain(o.orderItems, orderable)
+                        : null;
                     return (
                       <li key={o.id}>
                         <Link
@@ -183,9 +193,12 @@ export default async function StorefrontAccountPage(
                         >
                           <ShoppingBag className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-semibold text-foreground">
-                              {o.drop?.title ?? "Order"}
+                            <span className="line-clamp-2 block text-sm font-semibold text-foreground">
+                              {o.drop?.title ?? (summary || "Order")}
                             </span>
+                            {o.drop && summary ? (
+                              <span className="line-clamp-2 block text-xs text-muted-foreground">{summary}</span>
+                            ) : null}
                             <span className="block text-xs text-muted-foreground">
                               {formatIstDate(o.createdAt)} · {formatIstTime(o.createdAt)} ·{" "}
                               <span className="font-mono">{o.billNumber}</span>
@@ -204,6 +217,14 @@ export default async function StorefrontAccountPage(
                           </span>
                           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                         </Link>
+                        {againPlan ? (
+                          <OrderAgainButton
+                            slug={vendor.slug}
+                            plan={againPlan}
+                            billNumber={o.billNumber}
+                            className="px-4 pb-3"
+                          />
+                        ) : null}
                       </li>
                     );
                   })}

@@ -146,11 +146,11 @@ export const runtime = "nodejs";
 type StorefrontVendor = NonNullable<Awaited<ReturnType<typeof loadStorefront>>>;
 
 /**
- * Top padding that drops the logo (64 px, 88 px from `sm`) so it straddles the
- * banner's bottom edge: banner height (160 / 224 px) − pill row above (56 px)
- * − half the logo.
+ * Top padding under a banner. On a phone the name sits beside the logo, so both
+ * start below the banner: banner height (112 px) − pill row above (56 px) + 12 px.
+ * From `sm` the 88 px logo straddles the bottom edge: 224 − 56 − half the logo.
  */
-const BANNER_LOGO_OFFSET = "pt-[72px] sm:pt-[124px]";
+const BANNER_LOGO_OFFSET = "pt-[68px] sm:pt-[124px]";
 
 /** Header contact pills (WhatsApp chat, Instagram profile). */
 const CONTACT_LINK =
@@ -722,7 +722,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
       <header className="relative overflow-hidden border-b border-border/50 bg-linear-to-b from-primary/20 via-primary/[0.07] to-background">
         {vendor.bannerUrl ? (
           // Decorative cover photo. BANNER_LOGO_OFFSET below is derived from these heights.
-          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-40 sm:h-56">
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-28 sm:h-56">
             <Image src={vendor.bannerUrl} alt="" fill priority sizes="100vw" className="object-cover" />
             {/* Darkens the top edge so the Share / Sign in pills read on any photo. */}
             <div className="absolute inset-0 bg-linear-to-b from-black/30 via-transparent to-transparent" />
@@ -764,11 +764,13 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
         </div>
 
         <div
-          className={`relative mx-auto max-w-2xl px-4 pb-7 sm:px-6 sm:pb-9 ${
+          className={`relative mx-auto max-w-2xl px-4 pb-4 sm:px-6 sm:pb-9 ${
             vendor.bannerUrl ? BANNER_LOGO_OFFSET : "pt-4 sm:pt-8"
           }`}
         >
-          <div className="flex flex-col items-center text-center">
+          {/* A phone keeps this short, so the items start high on the screen: name beside the logo. */}
+          <div className="flex flex-col items-start text-left sm:items-center sm:text-center">
+            <div className="flex w-full items-center gap-3 sm:flex-col sm:gap-0">
             {vendor.logoUrl ? (
               <Image
                 src={vendor.logoUrl}
@@ -786,13 +788,18 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
               </div>
             )}
 
-            <h1 className="mt-3 font-display text-3xl font-bold leading-tight tracking-tight text-awaaz-charcoal sm:text-4xl sm:leading-10">
-              {displayStoreName(vendor)}
-            </h1>
-            {tagline ? <p className="mt-2 max-w-md text-base leading-snug text-muted-foreground">{tagline}</p> : null}
+              <div className="min-w-0 sm:mt-3">
+                <h1 className="font-display text-2xl font-bold leading-tight tracking-tight text-awaaz-charcoal sm:text-4xl sm:leading-10">
+                  {displayStoreName(vendor)}
+                </h1>
+                {tagline ? (
+                  <p className="mt-1 max-w-md text-sm leading-snug text-muted-foreground sm:mx-auto sm:mt-2 sm:text-base">{tagline}</p>
+                ) : null}
+              </div>
+            </div>
 
             {/* What and where, as one quiet line under the name. */}
-            <p className="mt-2 flex flex-wrap items-center justify-center gap-x-3 gap-y-1 text-sm font-semibold text-muted-foreground">
+            <p className="mt-2 flex flex-wrap items-center justify-start gap-x-3 gap-y-1 text-sm font-semibold text-muted-foreground sm:justify-center">
               {/* GENERAL is the sign-up default: it says nothing to a buyer. */}
               {vendor.stallType !== "GENERAL" ? (
                 <span className="inline-flex items-center gap-1.5">
@@ -816,14 +823,14 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             {facts.length > 0 ? (
               <ul
                 aria-label="About this store"
-                className="mt-4 flex max-w-md flex-wrap items-center justify-center gap-2"
+                className="mt-2 flex max-w-md flex-wrap items-center justify-start gap-x-3 gap-y-1 sm:mt-4 sm:justify-center sm:gap-2"
               >
                 {facts.map((fact) => {
                   const Icon = FACT_ICON[fact.kind];
                   return (
                     <li
                       key={fact.kind}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border/70 bg-background px-3 py-1.5 text-xs font-semibold text-foreground"
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground sm:rounded-full sm:border sm:border-border/70 sm:bg-background sm:px-3 sm:py-1.5"
                     >
                       <Icon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
                       {fact.text}
@@ -834,7 +841,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             ) : null}
 
             {whatsappLink || instagramLink ? (
-              <ul aria-label="Contact" className="mt-3 flex flex-wrap items-center justify-center gap-2">
+              <ul aria-label="Contact" className="mt-3 flex flex-wrap items-center justify-start gap-2 sm:justify-center">
                 {whatsappLink ? (
                   <li>
                     <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>
@@ -858,7 +865,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             {nextClosing ? (
               <a
                 href="#drops"
-                className="mt-5 inline-flex min-h-11 max-w-full items-center gap-2 rounded-full bg-primary px-6 py-2 text-left text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 motion-reduce:transition-none"
+                className="mt-3 inline-flex min-h-11 max-w-full items-center gap-2 rounded-full bg-primary px-6 py-2 text-left text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 motion-reduce:transition-none"
               >
                 <ShoppingBag className="h-4 w-4 shrink-0" aria-hidden="true" />
                 Pre-order · closes {formatIstDeadline(nextClosing, now)}
@@ -869,7 +876,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
               dropViews.length > 0 ? (
                 <a
                   href="#menu-order"
-                  className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                 >
                   <ShoppingBag className="h-4 w-4" aria-hidden="true" />
                   Order now
@@ -878,7 +885,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
             ) : upiLink && !menuHidden ? (
               <a
                 href="#pay"
-                className="mt-5 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
               >
                 <QrCode className="h-4 w-4" aria-hidden="true" />
                 Scan &amp; pay
@@ -998,9 +1005,9 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                               <Image
                                 src={item.imageUrl}
                                 alt=""
-                                width={44}
-                                height={44}
-                                className="h-11 w-11 rounded-xl object-cover ring-1 ring-border/60"
+                                width={64}
+                                height={64}
+                                className="h-16 w-16 rounded-xl object-cover ring-1 ring-border/60"
                               />
                             ) : (
                               <span aria-hidden="true" className="text-2xl leading-none">

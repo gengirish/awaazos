@@ -51,6 +51,8 @@ export const boardOrderSelect = {
   outForDeliveryAt: true,
   riderName: true,
   riderToken: true,
+  orderToken: true,
+  vendor: { select: { slug: true } },
   buyerReceivedAt: true,
   orderItems: {
     select: { id: true, dropItemId: true, name: true, qty: true, priceInPaise: true, totalPaise: true },
@@ -89,6 +91,9 @@ export function toBoardOrder(row: BoardOrderRow, now: Date = new Date()): BoardO
     outForDeliveryAt: row.outForDeliveryAt?.toISOString() ?? null,
     riderName: row.riderName,
     riderToken: row.riderToken,
+    buyerOrderPath: row.orderToken
+      ? `/s/${encodeURIComponent(row.vendor.slug)}/o/${encodeURIComponent(row.orderToken)}`
+      : null,
     buyerReceivedAt: row.buyerReceivedAt?.toISOString() ?? null,
     displayState,
     holdsStock: orderHoldsStock(row, now),
