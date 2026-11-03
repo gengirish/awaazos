@@ -122,6 +122,16 @@ export function buyerReceivedPayload(o: {
   };
 }
 
+/** A buyer rated an order. Never the comment: lock screens are public. Older orders have left the board. */
+export function orderRatedPayload(o: { billNumber: string; rating: number }): PushPayload {
+  return {
+    title: "⭐ New rating",
+    body: `${o.billNumber} — ${o.rating} out of 5`,
+    url: "/settings/feedback",
+    tag: `rated-${o.billNumber}`,
+  };
+}
+
 export type SendResult = { sent: number; removed: number; failed: number };
 
 /** Send to every opted-in device of the vendor's active staff (or only `userId`'s). */

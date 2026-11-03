@@ -100,6 +100,7 @@ export default async function StorefrontAccountPage(
           outForDeliveryAt: true,
           drop: { select: { title: true } },
           orderItems: { select: { menuItemId: true, name: true, qty: true }, orderBy: { id: "asc" } },
+          feedback: { select: { rating: true } },
         },
       })
     : [];
@@ -211,6 +212,13 @@ export default async function StorefrontAccountPage(
                             >
                               {status.label}
                             </span>
+                            {o.feedback ? (
+                              <span className="ml-2 text-xs font-semibold text-muted-foreground">
+                                You rated {o.feedback.rating} of 5
+                              </span>
+                            ) : o.fulfilmentStatus === "DELIVERED" ? (
+                              <span className="ml-2 text-xs font-semibold text-primary">Rate this order</span>
+                            ) : null}
                           </span>
                           <span className="shrink-0 font-mono text-sm font-bold tabular-nums">
                             {formatINR(o.totalPaise)}

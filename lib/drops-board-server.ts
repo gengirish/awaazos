@@ -54,6 +54,7 @@ export const boardOrderSelect = {
   orderToken: true,
   vendor: { select: { slug: true } },
   buyerReceivedAt: true,
+  feedback: { select: { rating: true, comment: true } },
   orderItems: {
     select: { id: true, dropItemId: true, name: true, qty: true, priceInPaise: true, totalPaise: true },
     orderBy: { id: "asc" },
@@ -95,6 +96,7 @@ export function toBoardOrder(row: BoardOrderRow, now: Date = new Date()): BoardO
       ? `/s/${encodeURIComponent(row.vendor.slug)}/o/${encodeURIComponent(row.orderToken)}`
       : null,
     buyerReceivedAt: row.buyerReceivedAt?.toISOString() ?? null,
+    feedback: row.feedback,
     displayState,
     holdsStock: orderHoldsStock(row, now),
     bucket: boardBucket({ displayState, fulfilmentStatus: row.fulfilmentStatus }),

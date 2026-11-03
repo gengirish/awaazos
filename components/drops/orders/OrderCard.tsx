@@ -15,6 +15,7 @@ import {
   Phone,
   Send,
   ShoppingBag,
+  Star,
   Undo2,
   UtensilsCrossed,
   XCircle,
@@ -37,6 +38,7 @@ import {
 import type { DeliveryRider } from "@/lib/delivery-riders";
 import { formatINR } from "@/lib/currency";
 import { discountLabel } from "@/lib/offers";
+import { RATING_WORDS } from "@/lib/order-feedback";
 import {
   balanceDuePaise,
   availableOrderActions,
@@ -327,6 +329,7 @@ export function OrderCard({
                       : "Delivery"}
                 </span>
                 {buyerSaysReceived && <span className="font-semibold">· Customer got it</span>}
+                {order.feedback && <span className="font-semibold">· Rated {order.feedback.rating} of 5</span>}
                 {order.notes && (
                   <span className="inline-flex items-center gap-1 font-semibold text-destructive">
                     <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
@@ -494,6 +497,20 @@ export function OrderCard({
             {unpaid && <span className="block">Collect the payment, then tap Delivered.</span>}
           </span>
         </p>
+      )}
+
+      {order.feedback && (
+        <div className="mt-2 flex gap-2 rounded-md border bg-muted/50 px-3 py-2 text-sm">
+          <Star className="mt-0.5 h-4 w-4 shrink-0 fill-primary text-primary" aria-hidden />
+          <p className="min-w-0">
+            <span className="font-semibold">
+              Customer rated this {order.feedback.rating} of 5 · {RATING_WORDS[order.feedback.rating - 1]}
+            </span>
+            {order.feedback.comment && (
+              <span className="block whitespace-pre-wrap break-words">{order.feedback.comment}</span>
+            )}
+          </p>
+        </div>
       )}
 
       {outForDelivery && outAt && (
