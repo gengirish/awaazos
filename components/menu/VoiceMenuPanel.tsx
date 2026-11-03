@@ -4,6 +4,7 @@ import { AlertCircle, CheckCircle2, HelpCircle, Loader2, Mic, Plus, RotateCcw, S
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 
+import { MENU_CHANGED_EVENT } from "@/components/menu/MenuGrid";
 import { defaultEmoji, emojiChoices } from "@/components/menu/MenuItemForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -322,6 +323,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
       setSaved({ summary: saveSummary(created, updated), skipped: body.data.skipped ?? [] });
       clearReview();
       reset();
+      window.dispatchEvent(new Event(MENU_CHANGED_EVENT));
       router.refresh();
       return;
     }
