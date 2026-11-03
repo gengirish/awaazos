@@ -10,10 +10,10 @@ import { cn } from "@/lib/utils";
  * A catalogue item's picture on the public store: the seller's photo (or a
  * dish drawing, lib/food-images.ts), else its emoji on a tinted tile.
  *
- * `size="row"` is the 72 px square of the list rows; `size="tile"` fills the
+ * `size="row"` is the 80 px square of the list rows; `size="tile"` fills the
  * width of a gallery card (goods stores). With `enlarge`, a photo opens
  * full-size in a dialog on tap: a jewellery buyer wants to see the beads,
- * and a 72 px thumbnail hides them. The emoji tile never opens anything.
+ * and an 80 px thumbnail hides them. The emoji tile never opens anything.
  */
 export type ItemPhotoProps = {
   src: string | null;
@@ -27,7 +27,7 @@ export type ItemPhotoProps = {
 };
 
 const FRAME: Record<ItemPhotoProps["size"], string> = {
-  row: "h-18 w-18 shrink-0 rounded-xl",
+  row: "h-20 w-20 shrink-0 rounded-xl",
   tile: "aspect-square w-full rounded-xl",
 };
 
@@ -54,9 +54,9 @@ export function ItemPhoto({ src, emoji, name, size, enlarge = false, dimmed = fa
     <Image
       src={src}
       alt=""
-      width={size === "tile" ? 480 : 72}
-      height={size === "tile" ? 480 : 72}
-      sizes={size === "tile" ? "(min-width: 640px) 33vw, 50vw" : "72px"}
+      width={size === "tile" ? 480 : 80}
+      height={size === "tile" ? 480 : 80}
+      sizes={size === "tile" ? "(min-width: 640px) 33vw, 50vw" : "80px"}
       className={cn(FRAME[size], "object-cover ring-1 ring-border/60", dimmed && "opacity-50")}
     />
   );

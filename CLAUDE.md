@@ -539,6 +539,15 @@ delivered or cancelled it shows no buyer details. The buyer's "I've received my 
 delivered, an unpaid one waits for the seller — a buyer's tap never books cash. Both push to the
 seller (bill number only) and bump the board signal.
 
+**Order again** (`lib/order-again.ts`, `lib/order-again-server.ts`): once an order is over (handed over,
+cancelled, lapsed), the buyer's order page and account page offer it. It fills the normal saved cart on
+the device (everyday menu or the open drop that can take the most of the order, matched by
+`OrderItem.menuItemId`) and opens the store; checkout re-checks everything. Read on page render only.
+
+**Messages to the buyer** (`buyerUpdateMessage` in `lib/drops-board.ts`): the order card's WhatsApp button
+pre-fills text for the order's status with the buyer's order link, plus "Ready for pickup" on a confirmed
+pickup. A `wa.me` link the seller sends from their own WhatsApp; it stamps nothing and sends nothing from us.
+
 **Bulk order actions** (`lib/order-bulk.ts` client-safe, `lib/storefront-order-bulk.ts` server): the
 board selects orders and applies confirm / mark_paid / deliver via `POST /api/drops/[id]/orders/bulk`
 and `POST /api/storefront-orders/bulk` (`{ orderIds: 1..50 unique, action }`, CASHIER); a selection

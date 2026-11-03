@@ -229,10 +229,10 @@ export function DropOrder(props: DropOrderProps) {
                 <Image
                   src={item.imageUrl}
                   alt=""
-                  width={72}
-                  height={72}
+                  width={80}
+                  height={80}
                   className={cn(
-                    "h-18 w-18 shrink-0 rounded-xl object-cover ring-1 ring-border/60",
+                    "h-20 w-20 shrink-0 rounded-xl object-cover ring-1 ring-border/60",
                     soldOut && "opacity-50",
                   )}
                 />
@@ -240,7 +240,7 @@ export function DropOrder(props: DropOrderProps) {
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "flex h-18 w-18 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-3xl",
+                    "flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-3xl",
                     soldOut && "opacity-50",
                   )}
                 >

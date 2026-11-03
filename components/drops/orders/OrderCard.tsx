@@ -12,7 +12,6 @@ import {
   ImageIcon,
   IndianRupee,
   Loader2,
-  MessageCircle,
   Phone,
   Send,
   ShoppingBag,
@@ -22,6 +21,7 @@ import {
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
+import { BuyerWhatsAppLinks } from "@/components/drops/orders/BuyerWhatsAppLinks";
 import { RiderHandoffButton } from "@/components/drops/orders/RiderHandoffButton";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
@@ -40,11 +40,9 @@ import { discountLabel } from "@/lib/offers";
 import {
   balanceDuePaise,
   availableOrderActions,
-  firstName,
   markPaidNeedsConfirm,
   orderStateLabel,
   primaryOrderAction,
-  whatsappHref,
   type BoardOrder,
   type OrderAction,
 } from "@/lib/drops-board";
@@ -527,7 +525,7 @@ export function OrderCard({
       {ordered.length > 0 && <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">{ordered.map(btn)}</div>}
 
       {order.customerPhone && (
-        <div className="mt-2 flex gap-2">
+        <div className="mt-2 flex flex-wrap gap-2">
           <a
             href={`tel:${order.customerPhone}`}
             className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
@@ -536,19 +534,7 @@ export function OrderCard({
             <Phone className="h-4 w-4" aria-hidden />
             Call
           </a>
-          <a
-            href={whatsappHref(
-              order.customerPhone,
-              `Hi ${firstName(order.customerName)}, about your order ${order.billNumber} from ${vendorName}: `,
-            )}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`WhatsApp ${order.customerName ?? "customer"}`}
-          >
-            <MessageCircle className="h-4 w-4" aria-hidden />
-            WhatsApp
-          </a>
+          <BuyerWhatsAppLinks order={order} phone={order.customerPhone} vendorName={vendorName} />
         </div>
       )}
 

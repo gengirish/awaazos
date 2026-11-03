@@ -18,6 +18,7 @@ import { notFound } from "next/navigation";
 import { cache } from "react";
 
 import { BuyerReceivedButton } from "@/components/storefront/BuyerReceivedButton";
+import { OrderAgainButton } from "@/components/storefront/OrderAgainButton";
 import { OnlinePayFlow } from "@/components/storefront/OnlinePayFlow";
 import { OrderLinkActions } from "@/components/storefront/OrderLinkActions";
 import { OrderRefresh } from "@/components/storefront/OrderRefresh";
@@ -41,6 +42,8 @@ import {
   type StatusTone,
 } from "@/lib/storefront-order";
 import { discountLabel } from "@/lib/offers";
+import { orderIsOver, planOrderAgain } from "@/lib/order-again";
+import { loadOrderableNow } from "@/lib/order-again-server";
 import { paymentProofEnabled } from "@/lib/payment-proof";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl, isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
@@ -95,6 +98,9 @@ export const runtime = "nodejs";
  * nothing is sent from our side. Where the buyer is stuck waiting on the store
  * (payment submitted, rejected, expired) the link moves into the status card;
  * without an opted-in number the copy never says "message the store".
+ *
+ * Once the order is over, "Order again" (lib/order-again.ts) fills the buyer's
+ * saved cart with whatever from it the store sells today.
  */
 
 const loadOrder = cache(async (slug: string, token: string) => {
@@ -109,6 +115,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
       },
     },
     select: {
+      vendorId: true,
       billNumber: true,
       createdAt: true,
       subtotalPaise: true,
@@ -131,7 +138,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
       customerName: true,
       customerPhone: true,
       orderItems: {
-        select: { id: true, name: true, qty: true, totalPaise: true },
+        select: { id: true, menuItemId: true, name: true, qty: true, totalPaise: true },
       },
       drop: {
         select: {
@@ -347,6 +354,9 @@ export default async function StorefrontOrderPage(props: {
   const confirmed = order.fulfilmentStatus === "CONFIRMED";
   const handedOver = order.fulfilmentStatus === "DELIVERED";
   const lastStep = handedOverLabel(order.fulfilmentType);
+  const againPlan = orderIsOver(state, order.fulfilmentStatus)
+    ? planOrderAgain(order.orderItems, await loadOrderableNow(order.vendorId, now))
+    : null;
   const steps: ProgressStep[] | null =
     state === "CANCELLED" || state === "EXPIRED"
       ? null
@@ -539,6 +549,8 @@ export default async function StorefrontOrderPage(props: {
             Thanks — the store knows you got it.
           </p>
         ) : null}
+
+        {againPlan ? <OrderAgainButton slug={slug} plan={againPlan} billNumber={order.billNumber} /> : null}
 
         {/* While payment is due the next step is the pay button, right below. */}
         {steps && !awaitingUpi ? <OrderProgress steps={steps} /> : null}
