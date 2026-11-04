@@ -1,4 +1,4 @@
-import { ChevronRight, CircleDashed, ListChecks } from "lucide-react";
+import { ChevronRight, CircleDashed, ListChecks, X } from "lucide-react";
 import Link from "next/link";
 
 import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
@@ -73,6 +73,41 @@ function StoreLink({ store }: { store: { slug: string; name: string } }) {
         <CopyStoreLinkButton slug={store.slug} />
         <ShareStoreButton vendorName={store.name} slug={store.slug} />
       </div>
+    </div>
+  );
+}
+
+/** One reminder as a dismissible banner, for the orders board's banner slot. */
+export function SetupReminderBanner({
+  item,
+  onDismiss,
+  className,
+}: {
+  item: ChecklistItem;
+  onDismiss: () => void;
+  className?: string;
+}) {
+  return (
+    <div className={cn("flex items-center gap-1 pr-1", BOX, className)}>
+      <Link
+        href={item.href}
+        className={cn(
+          "flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 rounded-lg py-2 pl-4 pr-2 text-sm font-medium",
+          FOCUS,
+        )}
+      >
+        <span>{item.text}</span>
+        <span className="sr-only">{item.linkText}</span>
+        <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
+      </Link>
+      <button
+        type="button"
+        onClick={onDismiss}
+        aria-label="Dismiss for now"
+        className={cn("inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md", FOCUS)}
+      >
+        <X className="h-4 w-4" aria-hidden="true" />
+      </button>
     </div>
   );
 }

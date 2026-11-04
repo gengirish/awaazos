@@ -1,13 +1,10 @@
 "use client";
 
-import { AlertTriangle, Bell, BellOff, BellRing, Loader2, Send, Settings, Share, X } from "lucide-react";
-import Link from "next/link";
-import { useState, type ReactNode } from "react";
+import { AlertTriangle, Bell, BellOff, BellRing, Loader2, Send, Share } from "lucide-react";
+import type { ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
-import { dismissInstallHint, useInstallPrompt } from "@/hooks/useInstallPrompt";
 import {
-  dismissPushHint,
   PUSH_COPY as COPY,
   recheckPushAlerts,
   sendTestPushAlert,
@@ -22,13 +19,9 @@ import { cn } from "@/lib/utils";
  * "Get alerts on this phone" — Web Push opt-in for new storefront orders.
  *
  * `PushAlertsButton`
- *   `board`: compact, sits in the orders-board header next to Refresh / Sound
- *            (from md) and in the "More actions" sheet (phones).
+ *   `board`: compact, inside the sheet opened from the orders board's bar.
  *   `settings`: full controls for /settings/notifications (adds "Send test alert").
- * `PushAlertsPrompt`
- *   Phones only: a dismissible row under the board header, shown only while
- *   this device has not opted in. Instant order alerts depend on the opt-in,
- *   so it must not live only inside a sheet.
+ * The orders board's bar has its own control, PushAlertsBarButton.tsx.
  *
  * Every copy is a view over one shared store (hooks/usePushAlerts.ts): the
  * subscription is detected once per page and an action in one copy shows in
@@ -40,28 +33,6 @@ import { cn } from "@/lib/utils";
  */
 
 type Variant = "board" | "settings";
-
-const DISMISS_BUTTON =
-  "inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-md hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
-
-const MANAGE_DEVICES_LINK =
-  "inline-flex min-h-11 items-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
-
-/**
- * iPhone, not installed: the alerts tip and the install banner give the same
- * Add-to-Home-Screen steps. One at a time, and one dismissal for both: while
- * the install banner is on screen it is the hint, and dismissing either hides
- * the other too.
- */
-function useIosHintHidden(push: PushAlertsState): boolean {
-  const install = useInstallPrompt();
-  return push.dismissed || install.dismissed || install.bannerShowing;
-}
-
-function dismissIosHint(): void {
-  dismissPushHint();
-  dismissInstallHint();
-}
 
 function LiveMessage({ message }: { message: string }) {
   return (
@@ -105,33 +76,24 @@ function SubscribeButton({
 }
 
 export function PushAlertsButton({ variant }: { variant: Variant }) {
-  const push = usePushAlerts();
-  const iosHintHidden = useIosHintHidden(push);
-  const { view, busy, message, tooMany, dismissed } = push;
+  const { view, busy, message } = usePushAlerts();
 
   const isBoard = variant === "board";
 
   if (view === "loading") return null;
   if (view === "not-configured" && isBoard) return null;
-  if (isBoard && view === "unsupported" && dismissed) return null;
-  if (isBoard && view === "ios-needs-install" && iosHintHidden) return null;
 
   const live = <LiveMessage message={message} />;
 
+  // On the board the bar's button says it, in a toast.
   const feedback =
-    message && view !== "denied" ? (
-      <div className={cn("flex flex-wrap items-center gap-2", isBoard && "basis-full")}>
+    message && view !== "denied" && !isBoard ? (
+      <div className="flex flex-wrap items-center gap-2">
         <p className="text-sm text-muted-foreground">{message}</p>
-        {tooMany && isBoard && (
-          <Link href="/settings/notifications" className={MANAGE_DEVICES_LINK}>
-            <Settings className="h-4 w-4" aria-hidden />
-            Manage devices
-          </Link>
-        )}
       </div>
     ) : null;
 
-  const note = (icon: ReactNode, text: string, opts?: { onDismiss?: () => void }) => (
+  const note = (icon: ReactNode, text: string) => (
     <div
       className={cn(
         "flex items-start gap-2 rounded-md border bg-muted/50 p-3 text-sm text-muted-foreground",
@@ -142,16 +104,6 @@ export function PushAlertsButton({ variant }: { variant: Variant }) {
         {icon}
       </span>
       <p className="min-w-0 flex-1">{text}</p>
-      {opts?.onDismiss && (
-        <button
-          type="button"
-          onClick={opts.onDismiss}
-          className={cn(DISMISS_BUTTON, "-m-2")}
-          aria-label="Dismiss phone alerts tip"
-        >
-          <X className="h-4 w-4" aria-hidden />
-        </button>
-      )}
     </div>
   );
 
@@ -161,14 +113,10 @@ export function PushAlertsButton({ variant }: { variant: Variant }) {
       body = note(<BellOff className="h-4 w-4" />, COPY.notConfigured);
       break;
     case "unsupported":
-      body = note(<BellOff className="h-4 w-4" />, COPY.unsupported, {
-        onDismiss: isBoard ? dismissPushHint : undefined,
-      });
+      body = note(<BellOff className="h-4 w-4" />, COPY.unsupported);
       break;
     case "ios-needs-install":
-      body = note(<Share className="h-4 w-4" />, COPY.iosInstall, {
-        onDismiss: isBoard ? dismissIosHint : undefined,
-      });
+      body = note(<Share className="h-4 w-4" />, COPY.iosInstall);
       break;
     case "denied":
       body = (
@@ -242,116 +190,11 @@ export function PushAlertsButton({ variant }: { variant: Variant }) {
       break;
   }
 
-  if (isBoard) {
-    return (
-      <>
-        {body}
-        {live}
-      </>
-    );
-  }
+  if (isBoard) return <div className="flex flex-wrap items-center gap-2">{body}</div>;
   return (
     <div className="flex flex-col gap-3">
       {body}
       {live}
-    </div>
-  );
-}
-
-/**
- * Phones only (`md:hidden`; from md the opt-in is in the board header): the
- * opt-in, on the board itself, while this device has not opted in.
- *
- *   not subscribed          the "Get alerts on this phone" button + dismiss
- *   iPhone, not installed   the Add-to-Home-Screen tip + dismiss — unless the
- *                           install banner is already giving it
- *   just subscribed here    a one-line confirmation, until the page is left
- *   anything else           nothing: subscribed, blocked, unsupported, not
- *                           configured or dismissed. Managing alerts stays in
- *                           the "More actions" sheet and in Settings.
- */
-export function PushAlertsPrompt({ className }: { className?: string }) {
-  const push = usePushAlerts();
-  const iosHintHidden = useIosHintHidden(push);
-  /**
-   * The opt-in was started from this row. Once it succeeds the row has nothing
-   * left to offer, so it confirms instead of vanishing under the vendor's thumb.
-   * Set on the tap (not on success) so the row, and its live region, stay
-   * mounted across the change.
-   */
-  const [startedHere, setStartedHere] = useState(false);
-  const { view, busy, message, tooMany, dismissed } = push;
-
-  let body: ReactNode = null;
-  if (view === "subscribed" && startedHere) {
-    body = (
-      <div className="flex items-center gap-2 rounded-md border border-primary/40 bg-primary/10 py-1 pl-3 pr-1 text-sm text-foreground">
-        <BellRing className="h-4 w-4 shrink-0" aria-hidden />
-        <p className="min-w-0 flex-1 py-2">{COPY.turnedOn}</p>
-        <button
-          type="button"
-          onClick={() => setStartedHere(false)}
-          className={DISMISS_BUTTON}
-          aria-label="Dismiss alerts confirmation"
-        >
-          <X className="h-4 w-4" aria-hidden />
-        </button>
-      </div>
-    );
-  } else if (view === "default" && !dismissed) {
-    body = (
-      <div>
-        <div className="flex items-center gap-1">
-          <SubscribeButton
-            busy={busy}
-            variant="outline"
-            className="min-w-0 flex-1"
-            onStart={() => setStartedHere(true)}
-          />
-          <button
-            type="button"
-            onClick={dismissPushHint}
-            className={DISMISS_BUTTON}
-            aria-label="Dismiss phone alerts tip"
-          >
-            <X className="h-4 w-4" aria-hidden />
-          </button>
-        </div>
-        {message ? (
-          <div className="mt-1 flex flex-wrap items-center gap-2">
-            <p className="text-sm text-muted-foreground">{message}</p>
-            {tooMany ? (
-              <Link href="/settings/notifications" className={MANAGE_DEVICES_LINK}>
-                <Settings className="h-4 w-4" aria-hidden />
-                Manage devices
-              </Link>
-            ) : null}
-          </div>
-        ) : null}
-      </div>
-    );
-  } else if (view === "ios-needs-install" && !iosHintHidden) {
-    body = (
-      <div className="flex items-start gap-2 rounded-md border bg-muted/50 py-1 pl-3 pr-1 text-sm text-muted-foreground">
-        <Share className="mt-2.5 h-4 w-4 shrink-0" aria-hidden />
-        <p className="min-w-0 flex-1 py-2">{COPY.iosInstall}</p>
-        <button
-          type="button"
-          onClick={dismissIosHint}
-          className={DISMISS_BUTTON}
-          aria-label="Dismiss phone alerts tip"
-        >
-          <X className="h-4 w-4" aria-hidden />
-        </button>
-      </div>
-    );
-  }
-
-  if (!body) return null;
-  return (
-    <div data-testid="push-alerts-prompt" className={cn("md:hidden", className)}>
-      {body}
-      <LiveMessage message={message} />
     </div>
   );
 }

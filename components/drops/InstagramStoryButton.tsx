@@ -8,42 +8,32 @@ import { AI_IMAGES_ENABLED, aiImageErrorMessage } from "@/lib/ai-image-types";
 import { withInstagramTag } from "@/lib/order-channel";
 import { cn } from "@/lib/utils";
 
-type Props = {
+type StoryOptions = {
   /** Same-origin PNG endpoint: a drop's or the whole store's story image. */
   src: string;
   /** Name of the downloaded / shared file. */
   fileName: string;
   /** Storefront link, copied for the vendor to paste into Instagram's Link sticker. */
   url: string;
-  className: string;
   onStatus: (message: string) => void;
-  /**
-   * A prepared image kept by a parent that outlives this button. The orders
-   * board puts the share controls in a bottom sheet, which unmounts when it
-   * closes; without this, closing the sheet between the two taps would throw
-   * the downloaded image away and ask for it again.
-   */
-  story?: StoryImage | null;
-  onStory?: (story: StoryImage) => void;
 };
 
+type Props = StoryOptions & { className: string };
+
 export type StoryImage = { file: File; objectUrl: string };
-type Ready = StoryImage;
 
 /**
  * Two taps on purpose: the first fetches the story PNG, the second hands it to
  * the share sheet. iOS Safari drops the user gesture across an `await fetch`,
  * so calling navigator.share right after the download would throw
  * NotAllowedError. Browsers that can't share files get a plain download.
+ *
+ * A hook so the orders board's Share menu can run the same flow from menu items.
+ * Keep the caller mounted between the two taps: the prepared image lives here.
  */
-export function InstagramStoryButton({ src, fileName, url, className, onStatus, story, onStory }: Props) {
+export function useInstagramStory({ src, fileName, url, onStatus }: StoryOptions) {
   const [loading, setLoading] = useState(false);
-  const [ownReady, setOwnReady] = useState<Ready | null>(null);
-  const ready = ownReady ?? story ?? null;
-  const setReady = (r: Ready) => {
-    setOwnReady(r);
-    onStory?.(r);
-  };
+  const [ready, setReady] = useState<StoryImage | null>(null);
 
   async function copyLink() {
     try {
@@ -54,7 +44,7 @@ export function InstagramStoryButton({ src, fileName, url, className, onStatus, 
     }
   }
 
-  function download(r: Ready) {
+  function download(r: StoryImage) {
     const a = document.createElement("a");
     a.href = r.objectUrl;
     a.download = r.file.name;
@@ -100,7 +90,7 @@ export function InstagramStoryButton({ src, fileName, url, className, onStatus, 
     }
   }
 
-  async function share(r: Ready) {
+  async function share(r: StoryImage) {
     try {
       await navigator.share({ files: [r.file] });
     } catch (err) {
@@ -108,6 +98,12 @@ export function InstagramStoryButton({ src, fileName, url, className, onStatus, 
       download(r);
     }
   }
+
+  return { ready, loading, prepare, share, download };
+}
+
+export function InstagramStoryButton({ src, fileName, url, className, onStatus }: Props) {
+  const { ready, loading, prepare, share, download } = useInstagramStory({ src, fileName, url, onStatus });
 
   if (ready) {
     return (

@@ -3,7 +3,7 @@
 import { Check, Copy, MessageCircle, Share2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
-import { InstagramStoryButton, type StoryImage } from "@/components/drops/InstagramStoryButton";
+import { InstagramStoryButton } from "@/components/drops/InstagramStoryButton";
 import { buildDropShareText, buildWhatsAppShareUrl } from "@/lib/drops-share";
 import { cn } from "@/lib/utils";
 
@@ -17,9 +17,6 @@ export type ShareDropButtonProps = {
   fulfilmentEndsAt: string; // ISO
   fulfilmentMode: "DELIVERY" | "PICKUP" | "BOTH";
   itemNames: string[];
-  /** Prepared Instagram story image held by the parent (see InstagramStoryButton). */
-  story?: StoryImage | null;
-  onStory?: (story: StoryImage) => void;
   /** Only the main Share button (drop list cards). Copy, WhatsApp and the story image stay on the edit page. */
   compact?: boolean;
 };
@@ -45,8 +42,6 @@ export function ShareDropButton(props: ShareDropButtonProps) {
     fulfilmentEndsAt,
     fulfilmentMode,
     itemNames,
-    story,
-    onStory,
     compact = false,
   } = props;
 
@@ -159,8 +154,6 @@ export function ShareDropButton(props: ShareDropButtonProps) {
           url={url}
           className={baseBtn}
           onStatus={setStatus}
-          story={story}
-          onStory={onStory}
         />
       </div>
       <p aria-live="polite" role="status" className="min-h-5 text-xs text-muted-foreground">

@@ -4,7 +4,7 @@ import type { FulfilmentMode, StaffRole } from "@prisma/client";
 import {
   BellRing,
   ChefHat,
-  ExternalLink,
+  CircleAlert,
   Loader2,
   PackageCheck,
   Pencil,
@@ -22,25 +22,15 @@ import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 
-import type { StoryImage } from "@/components/drops/InstagramStoryButton";
-import { BoardMoreActions, MORE_ACTION_ROW } from "@/components/drops/orders/BoardMoreActions";
+import type { OverflowLink } from "@/components/drops/orders/BoardMenus";
 import { BulkActionBar } from "@/components/drops/orders/BulkActionBar";
 import { OrderCard, type OrderSource } from "@/components/drops/orders/OrderCard";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
-import { PushAlertsButton, PushAlertsPrompt } from "@/components/push/PushAlertsButton";
+import { PushAlertsBarButton } from "@/components/push/PushAlertsBarButton";
 import { Button } from "@/components/ui/button";
 import { RadioOption } from "@/components/ui/radio-option";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
-import {
-  ResponsiveDialog,
-  ResponsiveDialogBody,
-  ResponsiveDialogContent,
-  ResponsiveDialogDescription,
-  ResponsiveDialogHeader,
-  ResponsiveDialogTitle,
-  ResponsiveDialogTrigger,
-} from "@/components/ui/responsive-dialog";
 import { usePushAlerts } from "@/hooks/usePushAlerts";
 import type { DeliveryRider } from "@/lib/delivery-riders";
 import { formatINR } from "@/lib/currency";
@@ -71,7 +61,7 @@ import {
   type OrderAction,
 } from "@/lib/drops-board";
 import type { BoardDrop } from "@/lib/drops-board-server";
-import { buildWhatsAppShareUrl } from "@/lib/drops-share";
+import { shareOrOpenWhatsApp } from "@/lib/drops-share";
 import { formatIstDate, formatIstTime } from "@/lib/drops-time";
 import { BOARD_POLL_MS, toMakeFromOrders } from "@/lib/menu-orders-board";
 import {
@@ -100,11 +90,19 @@ const BoardScopePicker = dynamic(() => import("@/components/drops/orders/BoardSc
   ssr: false,
   loading: () => <div aria-hidden className="h-11 w-40 rounded-md border border-input" />,
 });
-// Only sellers taking menu orders see the store's share controls; load them after the board.
-const ShareStoreControls = dynamic(
-  () => import("@/components/drops/ShareStoreControls").then((m) => m.ShareStoreControls),
-  { loading: () => <div aria-hidden className="h-11 rounded-full border border-input" /> },
-);
+// The header's menus load after the board; each placeholder holds its control's place.
+const BoardShareMenu = dynamic(() => import("@/components/drops/orders/BoardMenus").then((m) => m.BoardShareMenu), {
+  loading: () => <div aria-hidden className="h-11 w-28 rounded-md bg-primary/40" />,
+});
+const BoardOverflowMenu = dynamic(() => import("@/components/drops/orders/BoardMenus").then((m) => m.BoardOverflowMenu), {
+  loading: () => <div aria-hidden className="h-11 w-11 rounded-md border border-input" />,
+});
+const MenuStatusPill = dynamic(() => import("@/components/drops/orders/BoardMenus").then((m) => m.MenuStatusPill), {
+  loading: () => <div aria-hidden className="h-11 w-36 rounded-full border border-input" />,
+});
+const BoardInfoHint = dynamic(() => import("@/components/drops/orders/BoardMenus").then((m) => m.BoardInfoHint), {
+  loading: () => <div aria-hidden className="h-11 w-11" />,
+});
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 /** Coming back to the tab (e.g. tapping a push alert) refetches at most this often. */
@@ -145,8 +143,6 @@ const HANDOVER_FILTERS: { id: HandoverFilter; label: string }[] = [
 ];
 
 const ORDERS_URL = "/api/storefront-orders";
-/** `story` key for the whole store's Instagram image (drops use their id). */
-const STORE_STORY = "store";
 const SIGNAL_URL = "/api/storefront-orders/signal";
 
 const MENU_MODE_LABEL: Record<FulfilmentMode, string> = {
@@ -173,26 +169,14 @@ const ACTION_DONE: Record<OrderAction, string> = {
   undeliver: "Moved back to confirmed",
 };
 
-const LINK_BTN =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
-
-/** Summary tile: one line (label · figure) on phones, label over figure from sm. */
-const KPI_TILE =
-  "flex min-w-0 flex-wrap items-baseline justify-between gap-x-1.5 rounded-lg border bg-card px-2 py-1.5 sm:block sm:p-3";
-const KPI_VALUE = "font-mono text-sm font-bold tabular-nums sm:text-lg";
+/** Summary tile: one line, label and figure. Four in a row from sm, 2×2 on phones. */
+const KPI_TILE = "flex min-w-0 flex-wrap items-center justify-between gap-x-1.5 rounded-lg border bg-card px-2.5 py-1.5";
+const KPI_VALUE = "font-mono text-sm font-bold tabular-nums";
 
 const SEGMENT_BTN =
   "inline-flex min-h-11 items-center justify-center gap-1 rounded-md border px-2 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
 
 const STATUS_BADGE = "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold";
-
-/** Header controls built by the board (they need its state), laid out by each header. */
-type BoardTools = {
-  refreshButton: ReactNode;
-  lastChecked: ReactNode;
-  soundButton: (className?: string) => ReactNode;
-  pollNote: ReactNode;
-};
 
 function beep(ctx: AudioContext | null) {
   if (!ctx) return;
@@ -214,7 +198,7 @@ function beep(ctx: AudioContext | null) {
 export function OrdersBoard({
   vendorName,
   vendorSlug,
-  acceptMenuOrders,
+  acceptMenuOrders: initialAcceptMenuOrders,
   menuFulfilmentMode,
   initialOrders,
   initialDrops,
@@ -225,6 +209,11 @@ export function OrdersBoard({
   vocab,
 }: Props) {
   const [orders, setOrders] = useState(initialOrders);
+  const [acceptMenuOrders, setAcceptMenuOrders] = useState(initialAcceptMenuOrders);
+  const [menuStatusPending, setMenuStatusPending] = useState(false);
+  // Paused from this page: the menu stays a source even with no orders on it,
+  // so the status pill that can turn it back on doesn't vanish under her thumb.
+  const [pausedHere, setPausedHere] = useState(false);
   const [drops, setDrops] = useState(initialDrops);
   const [scope, setScope] = useState<BoardScope>(initialDropId ?? "all");
   const [filter, setFilter] = useState<BoardFilter>("needs_action");
@@ -238,6 +227,7 @@ export function OrdersBoard({
   // show" button. Cleared when she taps it or acts on any order.
   const [unseenIds, setUnseenIds] = useState<readonly string[]>(NO_IDS);
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [handover, setHandover] = useState<HandoverFilter>("all");
   const [soundOn, setSoundOn] = useState(false);
   /** Saved choice was "on" but audio is still locked until the first tap. */
@@ -247,11 +237,6 @@ export function OrdersBoard({
   const [now, setNow] = useState(() => new Date());
   /** null = KV unavailable → fallback mode. */
   const [signalMode, setSignalMode] = useState<"kv" | "fallback">(initialSignal === null ? "fallback" : "kv");
-  // Held here, not in the share button: on phones the button lives in the "More
-  // actions" sheet, which unmounts on close. The Instagram flow is two taps
-  // (fetch, then share), and the fetched image must outlive a closed sheet.
-  // Keyed by drop id, or STORE_STORY for the whole store's image.
-  const [story, setStory] = useState<{ key: string; image: StoryImage } | null>(null);
 
   const signalRef = useRef<number | null>(initialSignal);
   const ordersRef = useRef(orders);
@@ -266,13 +251,15 @@ export function OrdersBoard({
   const pinnedDropRef = useRef<string | null>(initialDropId);
   const rootRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Partial<Record<BoardFilter, HTMLButtonElement | null>>>({});
-  // The shared phone-alerts store (hooks/usePushAlerts.ts): the opt-in copies on
-  // this page already subscribe to it, so reading it here asks the browser nothing new.
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchToggleRef = useRef<HTMLButtonElement>(null);
+  // The shared phone-alerts store (hooks/usePushAlerts.ts): the bar's control
+  // already subscribes to it, so reading it here asks the browser nothing new.
   const push = usePushAlerts();
 
   // What the board can be narrowed to. With a single source there is nothing to
   // choose, so the board simply is that source (and shows its details).
-  const showMenu = acceptMenuOrders || orders.some((o) => o.dropId === null);
+  const showMenu = acceptMenuOrders || pausedHere || orders.some((o) => o.dropId === null);
   const sources = useMemo<BoardScope[]>(
     () => [...(showMenu ? ["menu"] : []), ...drops.map((d) => d.id)],
     [showMenu, drops],
@@ -581,6 +568,18 @@ export function OrdersBoard({
     [scoped, trimmedQuery],
   );
   const showSearch = scoped.length >= SEARCH_MIN_ORDERS || query !== "";
+  const searchExpanded = searchOpen || query !== "";
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  const closeSearch = () => {
+    setQuery("");
+    setSearchOpen(false);
+    setSelected(EMPTY_SELECTION);
+    searchToggleRef.current?.focus();
+  };
   const unseenCount = useMemo(() => {
     if (unseenIds.length === 0) return 0;
     const ids = new Set(unseenIds);
@@ -661,25 +660,52 @@ export function OrdersBoard({
     if (unseenIds.some((id) => !inScope.has(id))) changeScope("all");
     changeFilter("needs_action");
     setQuery("");
+    setSearchOpen(false);
     seenNewOrders();
     rootRef.current?.scrollIntoView({ block: "start" });
     // The button she tapped is gone; keep focus on the list's own tab.
     tabRefs.current.needs_action?.focus({ preventScroll: true });
   };
 
-  const shareStore = async () => {
+  const shareStore = () => {
     const url = `${window.location.origin}/s/${encodeURIComponent(vendorSlug)}`;
-    const text = `Order from ${vendorName}: ${url}`;
-    if (typeof navigator.share === "function") {
-      try {
-        await navigator.share({ title: vendorName, text, url });
+    void shareOrOpenWhatsApp({ title: vendorName, text: `Order from ${vendorName}: ${url}`, url });
+  };
+
+  const changeAcceptMenuOrders = async (next: boolean) => {
+    if (next === acceptMenuOrders || menuStatusPending) return;
+    setMenuStatusPending(true);
+    try {
+      const res = await fetch("/api/vendor", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acceptMenuOrders: next }),
+      });
+      if (res.ok) {
+        setAcceptMenuOrders(next);
+        if (!next) setPausedHere(true);
+        toast.success(
+          next
+            ? `Customers can now order from your ${vocab.catalogue}.`
+            : `Paused. Customers can't order from your ${vocab.catalogue} until you turn it back on.`,
+        );
         return;
-      } catch (err) {
-        if (err instanceof Error && err.name === "AbortError") return; // she closed the share sheet
-        // Share API present but refused: fall through to WhatsApp.
       }
+      const { error } = (await res.json().catch(() => ({}))) as { error?: string };
+      toast.error(
+        error === "storefront_not_published"
+          ? "Publish your store first, so customers have a page to order from."
+          : error === "no_payment_method"
+            ? "Customers need a way to pay. Add your UPI ID, or allow pay on delivery."
+            : res.status === 403
+              ? "Only the owner can change this setting."
+              : "Could not save. Try again.",
+      );
+    } catch {
+      toast.error("No internet. Nothing was changed.");
+    } finally {
+      setMenuStatusPending(false);
     }
-    window.open(buildWhatsAppShareUrl(text), "_blank", "noopener,noreferrer");
   };
 
   const targetsFor = (action: BulkOrderAction) => bulkTargets(visible, activeSelected, action, isFrozen);
@@ -744,54 +770,15 @@ export function OrdersBoard({
     if (result.failed.length > 0) await refresh();
   };
 
-  const tools: BoardTools = {
-    refreshButton: (
-      <Button
-        type="button"
-        variant="outline"
-        className="min-h-11"
-        onClick={() => void refresh({ manual: true })}
-        disabled={refreshing}
-        aria-busy={refreshing}
-      >
-        {refreshing ? (
-          <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
-        ) : (
-          <RefreshCw aria-hidden />
-        )}
-        Refresh
-      </Button>
-    ),
-    lastChecked: lastChecked ? (
-      <span className="min-w-0 text-xs leading-tight text-muted-foreground">Last checked {formatIstTime(lastChecked)}</span>
-    ) : null,
-    // Rendered twice (header from md, "More actions" sheet on phones). Both carry
-    // data-sound-toggle so the "first tap enables sound" listener leaves them alone.
-    soundButton: (className) => (
-      <Button
-        type="button"
-        variant="outline"
-        className={cn("min-h-11", className)}
-        onClick={toggleSound}
-        aria-pressed={soundOn}
-        data-sound-toggle
-      >
-        {soundOn || soundPending ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />}
-        {soundOn ? "Sound on" : soundPending ? "Sound on — tap to enable" : "Sound off"}
-      </Button>
-    ),
-    pollNote: (
-      <p className="mt-2 text-xs text-muted-foreground">
-        {!pollKind
-          ? "Not checking for new orders automatically. Tap Refresh to update."
-          : push.view === "subscribed"
-            ? "New orders appear automatically while this screen is open."
-            : push.view === "default" || push.view === "denied" || push.view === "ios-needs-install"
-              ? "Checks every few minutes. Turn on phone alerts to see orders instantly."
-              : "Checks every few minutes. Tap Refresh to check now."}
-      </p>
-    ),
-  };
+  const pollNote = !pollKind
+    ? "Not checking for new orders automatically. Tap Refresh to update."
+    : push.view === "subscribed"
+      ? "New orders appear automatically while this screen is open."
+      : push.view === "default" || push.view === "denied" || push.view === "ios-needs-install"
+        ? "Checks every few minutes. Turn on phone alerts to see orders instantly."
+        : "Checks every few minutes. Tap Refresh to check now.";
+
+  const soundLabel = soundOn ? "Sound on" : soundPending ? "Sound on — tap to enable" : "Sound off";
 
   const dropTitles = useMemo(() => new Map(drops.map((d) => [d.id, d.title])), [drops]);
   // Only worth saying where an order came from while the list mixes sources.
@@ -803,33 +790,6 @@ export function OrdersBoard({
         : { kind: "drop", label: dropTitles.get(o.dropId) ?? "Drop" };
 
   const storeIsLive = acceptMenuOrders || drops.some((d) => liveEffectiveStatus(d, now) === "OPEN");
-
-  // Rendered up to three times (header from md, the phone share sheet and "More
-  // actions" sheet, the empty state on phones); the story image lives up here.
-  const share =
-    drop && effective === "OPEN" ? (
-      <ShareDropButton
-        dropId={drop.id}
-        vendorName={vendorName}
-        vendorSlug={vendorSlug}
-        dropTitle={drop.title}
-        closesAt={drop.closesAt}
-        fulfilmentStartsAt={drop.fulfilmentStartsAt}
-        fulfilmentEndsAt={drop.fulfilmentEndsAt}
-        fulfilmentMode={drop.fulfilmentMode}
-        itemNames={drop.items.map((i) => i.name)}
-        story={story?.key === drop.id ? story.image : null}
-        onStory={(image) => setStory({ key: drop.id, image })}
-      />
-    ) : !drop && acceptMenuOrders ? (
-      // Sellers who take orders from their everyday menu share the store itself.
-      <ShareStoreControls
-        vendorName={vendorName}
-        vendorSlug={vendorSlug}
-        story={story?.key === STORE_STORY ? story.image : null}
-        onStory={(image) => setStory({ key: STORE_STORY, image })}
-      />
-    ) : null;
 
   const canEditDrops = staffRole !== "CASHIER";
   const newDropAction = canEditDrops ? (
@@ -898,8 +858,22 @@ export function OrdersBoard({
         ? {
             title: "No orders yet",
             description: "Share your drop on WhatsApp to get the first one.",
-            // From md the same control sits in the header, just above.
-            action: <div className="w-full max-w-sm md:hidden">{share}</div>,
+            action: (
+              <div className="w-full max-w-sm">
+                <ShareDropButton
+                  compact
+                  dropId={drop.id}
+                  vendorName={vendorName}
+                  vendorSlug={vendorSlug}
+                  dropTitle={drop.title}
+                  closesAt={drop.closesAt}
+                  fulfilmentStartsAt={drop.fulfilmentStartsAt}
+                  fulfilmentEndsAt={drop.fulfilmentEndsAt}
+                  fulfilmentMode={drop.fulfilmentMode}
+                  itemNames={drop.items.map((i) => i.name)}
+                />
+              </div>
+            ),
           }
         : effective === "DRAFT" && canEditDrops
           ? {
@@ -939,7 +913,7 @@ export function OrdersBoard({
       title: "No orders yet",
       description: "Share your store link on WhatsApp to get the first one.",
       action: (
-        <Button type="button" onClick={() => void shareStore()}>
+        <Button type="button" onClick={shareStore}>
           <Share2 aria-hidden />
           Share store link
         </Button>
@@ -966,14 +940,12 @@ export function OrdersBoard({
         storeIsLive={storeIsLive}
         vendorName={vendorName}
         vendorSlug={vendorSlug}
-        tools={tools}
-        share={share}
+        canChangeMenuStatus={staffRole === "OWNER"}
+        menuStatusPending={menuStatusPending}
+        onMenuStatus={(next) => void changeAcceptMenuOrders(next)}
         onScope={changeScope}
         vocab={vocab}
       />
-
-      {/* Phones, until this device has alerts on: the opt-in must not hide in the sheet. */}
-      <PushAlertsPrompt className="mb-3" />
 
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
@@ -983,7 +955,6 @@ export function OrdersBoard({
         <h2 id="summary-h" className="sr-only">
           Summary
         </h2>
-        {/* Phones: label and figure share a line, so the 2×2 block is about half as tall. */}
         <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
           <li className={KPI_TILE}>
             <p className="text-xs text-muted-foreground">Paid</p>
@@ -997,8 +968,16 @@ export function OrdersBoard({
             <p className="text-xs text-muted-foreground">Live orders</p>
             <p className={KPI_VALUE}>{summary.activeOrders}</p>
           </li>
-          <li className={KPI_TILE}>
-            <p className="text-xs text-muted-foreground">Payment to check</p>
+          <li className={cn(KPI_TILE, summary.counts.PAYMENT_SUBMITTED > 0 && "border-warning bg-warning/10")}>
+            <p
+              className={cn(
+                "inline-flex items-center gap-1 text-xs",
+                summary.counts.PAYMENT_SUBMITTED > 0 ? "font-semibold text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {summary.counts.PAYMENT_SUBMITTED > 0 && <CircleAlert className="h-3.5 w-3.5 text-warning" aria-hidden />}
+              Payment to check
+            </p>
             {/* Only a buyer's "I've paid" claim is something to check; unpaid UPI orders just wait. */}
             <p className={KPI_VALUE}>{summary.counts.PAYMENT_SUBMITTED}</p>
             {summary.counts.AWAITING_PAYMENT > 0 && (
@@ -1017,12 +996,8 @@ export function OrdersBoard({
           </p>
         )}
         {showToMake && (
-          // Phones: heading and chips share a row, no card. From sm: the card as before.
-          <div
-            className="mt-2 flex items-start gap-2 sm:mt-3 sm:block sm:rounded-lg sm:border sm:bg-card sm:p-3"
-            aria-live="polite"
-          >
-            <h3 className="shrink-0 text-sm font-semibold leading-7 sm:leading-normal">
+          <div className="mt-2 flex items-start gap-2" aria-live="polite">
+            <h3 className="shrink-0 text-sm font-semibold leading-7">
               {vocab.kind === "food"
                 ? activeScope === "all"
                   ? "To make (menu)"
@@ -1032,14 +1007,14 @@ export function OrdersBoard({
                   : "To pack"}
             </h3>
             {toMake.length === 0 ? (
-              <p className="text-sm leading-7 text-muted-foreground sm:mt-1 sm:leading-normal">{vocab.kind === "food" ? "Nothing to make right now." : "Nothing to pack right now."}
+              <p className="text-sm leading-7 text-muted-foreground">{vocab.kind === "food" ? "Nothing to make right now." : "Nothing to pack right now."}
               </p>
             ) : (
-              <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5 sm:mt-2 sm:gap-2" aria-label={vocab.kind === "food" ? "Items to make" : "Items to pack"}>
+              <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5" aria-label={vocab.kind === "food" ? "Items to make" : "Items to pack"}>
                 {toMake.map((r) => (
                   <li
                     key={r.name}
-                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border bg-background px-2.5 text-sm sm:min-h-9 sm:px-3"
+                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border bg-background px-2.5 text-sm"
                   >
                     <span className="font-mono font-bold tabular-nums">{r.qty} ×</span>
                     <span>{r.name}</span>
@@ -1057,11 +1032,12 @@ export function OrdersBoard({
         From md: the pill row as before. aria-label keeps each tab's name
         "Label (count)" in both layouts. One tab stop; arrow keys, Home and End
         move between tabs. The "new orders" button rides along, so an order that
-        lands while she is deep in another list is one tap away.
+        lands while she is deep in another list is one tap away; so does search,
+        an icon at the end of the row until it is opened.
       */}
       <nav
         aria-label="Filter orders"
-        className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-3 border-b bg-background px-4 py-2 md:mb-4 md:overflow-x-auto md:border-b-0"
+        className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-3 border-b bg-background px-4 py-2 md:border-b-0"
       >
         {unseenCount > 0 && (
           <button
@@ -1073,84 +1049,93 @@ export function OrdersBoard({
             {unseenCount === 1 ? "1 new order" : `${unseenCount} new orders`} — show
           </button>
         )}
-        <div
-          role="tablist"
-          aria-label="Order status"
-          onKeyDown={onTabKeyDown}
-          className="grid grid-cols-[repeat(4,minmax(0,1fr))_2.75rem] gap-0.5 md:flex md:gap-2"
-        >
-          {BOARD_FILTERS.map((f) => {
-            const active = filter === f.id;
-            return (
-              <button
-                key={f.id}
-                ref={(el) => {
-                  tabRefs.current[f.id] = el;
-                }}
-                id={`orders-tab-${f.id}`}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                aria-controls="orders-list"
-                aria-label={`${f.label} (${counts[f.id]})`}
-                tabIndex={active ? 0 : -1}
-                onClick={() => changeFilter(f.id)}
-                className={cn(
-                  "flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border py-1 text-center text-xs font-medium leading-tight focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
-                  "md:min-h-11 md:shrink-0 md:flex-row md:gap-1 md:whitespace-nowrap md:rounded-full md:px-4 md:py-0 md:text-sm",
-                  active
-                    ? "border-primary bg-primary text-primary-foreground max-md:font-semibold max-md:underline max-md:underline-offset-2"
-                    : "border-input bg-background hover:bg-accent",
-                )}
-              >
-                <span className="max-w-full break-words">{f.label}</span>
-                <span className="font-mono text-sm font-bold tabular-nums md:hidden">{counts[f.id]}</span>
-                <span className="hidden md:inline">({counts[f.id]})</span>
-              </button>
-            );
-          })}
+        <div className="flex items-start gap-1 md:gap-2">
+          <div
+            role="tablist"
+            aria-label="Order status"
+            onKeyDown={onTabKeyDown}
+            className="grid min-w-0 flex-1 grid-cols-[repeat(4,minmax(0,1fr))_2.75rem] gap-0.5 md:flex md:gap-2 md:overflow-x-auto md:p-0.5"
+          >
+            {BOARD_FILTERS.map((f) => {
+              const active = filter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  ref={(el) => {
+                    tabRefs.current[f.id] = el;
+                  }}
+                  id={`orders-tab-${f.id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  aria-controls="orders-list"
+                  aria-label={`${f.label} (${counts[f.id]})`}
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => changeFilter(f.id)}
+                  className={cn(
+                    "flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border py-1 text-center text-xs font-medium leading-tight focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
+                    "md:min-h-11 md:shrink-0 md:flex-row md:gap-1 md:whitespace-nowrap md:rounded-full md:px-4 md:py-0 md:text-sm",
+                    active
+                      ? "border-primary bg-primary text-primary-foreground max-md:font-semibold max-md:underline max-md:underline-offset-2"
+                      : "border-input bg-background hover:bg-accent",
+                  )}
+                >
+                  <span className="max-w-full break-words">{f.label}</span>
+                  <span className="font-mono text-sm font-bold tabular-nums md:hidden">{counts[f.id]}</span>
+                  <span className="hidden md:inline">({counts[f.id]})</span>
+                </button>
+              );
+            })}
+          </div>
+          {showSearch && (
+            <Button
+              ref={searchToggleRef}
+              type="button"
+              variant="outline"
+              size="icon"
+              className="shrink-0 rounded-full max-md:min-h-12 max-md:rounded-md md:h-11 md:w-11"
+              aria-label={searchExpanded ? "Close search" : "Search orders"}
+              aria-expanded={searchExpanded}
+              aria-controls="orders-search"
+              onClick={() => (searchExpanded ? closeSearch() : setSearchOpen(true))}
+            >
+              {searchExpanded ? <X aria-hidden /> : <Search aria-hidden />}
+            </Button>
+          )}
         </div>
+        {showSearch && searchExpanded && (
+          <div className="relative mt-2">
+            <label htmlFor="orders-search" className="sr-only">
+              Search orders
+            </label>
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              ref={searchInputRef}
+              id="orders-search"
+              type="text"
+              role="searchbox"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSelected(EMPTY_SELECTION);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") closeSearch();
+              }}
+              placeholder="Name, bill number or last 4 of phone"
+              className="pl-9"
+            />
+          </div>
+        )}
       </nav>
 
       <section id="orders-list" role="tabpanel" aria-labelledby={`orders-tab-${filter}`} aria-busy={refreshing}>
-        {showSearch && (
-          <div className="mb-3">
-            <label htmlFor="orders-search" className="mb-1 block text-xs font-medium text-muted-foreground">
-              Search orders
-            </label>
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                id="orders-search"
-                type="text"
-                role="searchbox"
-                inputMode="search"
-                enterKeyHint="search"
-                autoComplete="off"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setSelected(EMPTY_SELECTION);
-                }}
-                placeholder="Name, bill number or last 4 of phone"
-                className="pl-9 pr-12"
-              />
-              {query !== "" && (
-                <button
-                  type="button"
-                  aria-label="Clear search"
-                  onClick={() => setQuery("")}
-                  className="absolute right-0 top-1/2 inline-flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <X className="h-4 w-4" aria-hidden />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
         {showHandover && (
           <div role="radiogroup" aria-label="Pickup or delivery" className="mb-3 grid grid-cols-3 gap-1">
             {HANDOVER_FILTERS.map((h) => (
@@ -1232,16 +1217,63 @@ export function OrdersBoard({
           />
         )}
       </section>
+
+      {/* The bulk bar takes this spot while orders are selected. */}
+      {activeSelected.size === 0 && (
+        <div
+          role="group"
+          aria-label="Live updates"
+          className="sticky bottom-[var(--app-bottom-inset,0px)] z-10 -mx-4 mt-4 flex items-center gap-1 border-t bg-background px-4 py-1 md:gap-2"
+        >
+          {lastChecked ? (
+            <span className="min-w-0 text-xs leading-tight text-muted-foreground">
+              Last checked {formatIstTime(lastChecked)}
+            </span>
+          ) : null}
+          <BoardInfoHint label="How new orders are checked">
+            <p>{pollNote}</p>
+          </BoardInfoHint>
+          <div className="ml-auto flex shrink-0 items-center gap-1 md:gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-w-11 px-2 md:px-3"
+              onClick={() => void refresh({ manual: true })}
+              disabled={refreshing}
+              aria-busy={refreshing}
+              aria-label="Refresh"
+            >
+              {refreshing ? (
+                <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <RefreshCw aria-hidden />
+              )}
+              <span className="hidden md:inline">Refresh</span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-w-11 px-2 md:px-3"
+              onClick={toggleSound}
+              aria-pressed={soundOn}
+              aria-label={soundLabel}
+              data-sound-toggle
+            >
+              {soundOn || soundPending ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />}
+              <span className="hidden md:inline">{soundLabel}</span>
+            </Button>
+            <PushAlertsBarButton />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 /**
- * The board's one header: the title, the "Show" picker (only when there is
- * more than one source to pick from), the details of whatever is showing, and
- * the action row. The links beside the details and the rows of the phone "More
- * actions" sheet follow the scope: a drop offers Edit, Prep sheet and sharing;
- * everything else offers the store and the order settings.
+ * The board's one header: the title, the status and "Show" picker, Share and
+ * the "⋯" menu, then the details of a drop when one is showing. Share and "⋯"
+ * follow the scope: a drop offers Edit, its prep sheet and its own sharing.
  */
 function BoardHeader({
   scope,
@@ -1254,8 +1286,9 @@ function BoardHeader({
   storeIsLive,
   vendorName,
   vendorSlug,
-  tools,
-  share,
+  canChangeMenuStatus,
+  menuStatusPending,
+  onMenuStatus,
   onScope,
   vocab,
 }: {
@@ -1269,244 +1302,131 @@ function BoardHeader({
   storeIsLive: boolean;
   vendorName: string;
   vendorSlug: string;
-  tools: BoardTools;
-  /**
-   * The drop's share control while it is taking orders; without a drop, the
-   * store's while menu orders are on; else null. Built by the board.
-   */
-  share: ReactNode;
+  canChangeMenuStatus: boolean;
+  menuStatusPending: boolean;
+  onMenuStatus: (accepting: boolean) => void;
   onScope: (scope: BoardScope) => void;
   vocab: StoreVocabulary;
 }) {
-  const PrepIcon = vocab.kind === "food" ? ChefHat : PackageCheck;
   const hasPicker = sources.length > 1;
-  const storeHref = `/s/${vendorSlug}`;
-
-  let details: ReactNode;
-  let links: ReactNode;
-  let sheetDescription: string;
-  let sheetRows: (close: () => void) => ReactNode;
-
-  if (drop && effective) {
-    const closesAt = new Date(drop.closesAt);
-    const fStart = new Date(drop.fulfilmentStartsAt);
-    const fEnd = new Date(drop.fulfilmentEndsAt);
-    const editHref = `/drops/${drop.id}/edit`;
-    const prepHref = `/drops/${drop.id}/prep`;
-
-    details = (
-      <>
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          {/* The picker already names the drop; without one, say it here. */}
-          {!hasPicker && <h2 className="min-w-0 break-words text-base font-semibold text-foreground">{drop.title}</h2>}
-          <span
-            className={cn(STATUS_BADGE, effective === "OPEN" ? "border-primary bg-primary/10" : "border-border bg-muted")}
-          >
-            {DROP_STATUS_LABEL[effective]}
-          </span>
-        </div>
-        <dl className="mt-2 grid grid-cols-1 gap-1 text-sm text-muted-foreground sm:grid-cols-2">
-          <div>
-            <dt className="inline font-medium text-foreground">Orders close: </dt>
-            <dd className="inline">
-              {formatIstDate(closesAt)}, {formatIstTime(closesAt)}
-            </dd>
-          </div>
-          <div>
-            <dt className="inline font-medium text-foreground">
-              {drop.fulfilmentMode === "PICKUP" ? "Pickup" : drop.fulfilmentMode === "DELIVERY" ? "Delivery" : "Delivery / pickup"}:{" "}
-            </dt>
-            <dd className="inline">
-              {formatIstDate(fStart)}, {formatIstTime(fStart)} – {formatIstTime(fEnd)}
-            </dd>
-          </div>
-        </dl>
-      </>
-    );
-    links = (
-      <>
-        <Link href={editHref} className={LINK_BTN}>
-          <Pencil className="h-4 w-4" aria-hidden />
-          Edit
-        </Link>
-        <Link href={prepHref} className={LINK_BTN}>
-          <PrepIcon className="h-4 w-4" aria-hidden />
-          {vocab.prepSheet}
-        </Link>
-      </>
-    );
-    sheetDescription = "Edit, share and alert settings for this drop.";
-    sheetRows = () => (
-      <>
-        <Link href={editHref} className={MORE_ACTION_ROW}>
-          <Pencil className="h-4 w-4 shrink-0" aria-hidden />
-          Edit
-        </Link>
-        <Link href={prepHref} className={MORE_ACTION_ROW}>
-          <PrepIcon className="h-4 w-4 shrink-0" aria-hidden />
-          {vocab.prepSheet}
-        </Link>
-        {share ? (
-          <div className="rounded-md border border-input p-3">
-            <h3 className="mb-2 text-sm font-semibold">Share this drop</h3>
-            {share}
-          </div>
-        ) : null}
-      </>
-    );
-  } else {
-    const isMenu = scope === "menu";
-    const scopeNote = isMenu ? catalogueBoardScope(vocab) : allBoardScope(vocab);
-
-    details = (
-      <>
-        {isMenu && (
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <span
-              className={cn(STATUS_BADGE, acceptMenuOrders ? "border-primary bg-primary/10" : "border-border bg-muted")}
-            >
-              {acceptMenuOrders ? "Taking orders" : "Not taking orders"}
-            </span>
-            {acceptMenuOrders && (
-              <span className="text-sm text-muted-foreground">{MENU_MODE_LABEL[menuFulfilmentMode]}</span>
-            )}
-          </div>
-        )}
-        {/* Phones read this in the "More actions" sheet instead. */}
-        <p className={cn("hidden text-xs text-muted-foreground md:block", isMenu && "mt-1")}>{scopeNote}</p>
-      </>
-    );
-    links = (
-      <>
-        {storeIsLive && (
-          <a href={storeHref} target="_blank" rel="noopener noreferrer" className={LINK_BTN}>
-            <ExternalLink className="h-4 w-4" aria-hidden />
-            My store
-          </a>
-        )}
-        <Link href="/settings/orders" className={LINK_BTN}>
-          <Settings className="h-4 w-4" aria-hidden />
-          Settings
-        </Link>
-      </>
-    );
-    sheetDescription = scopeNote;
-    sheetRows = (close) => (
-      <>
-        {storeIsLive && (
-          <a href={storeHref} target="_blank" rel="noopener noreferrer" className={MORE_ACTION_ROW} onClick={close}>
-            <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
-            My store
-          </a>
-        )}
-        <Link href="/settings/orders" className={MORE_ACTION_ROW}>
-          <Settings className="h-4 w-4 shrink-0" aria-hidden />
-          Settings
-        </Link>
-        {share ? (
-          <div className="rounded-md border border-input p-3">
-            <h3 className="mb-2 text-sm font-semibold">Share your store</h3>
-            {share}
-          </div>
-        ) : null}
-      </>
-    );
-  }
-
-  // On a phone the "all orders" view has no details to show; skip the empty row.
-  const detailsOnPhone = Boolean(drop) || scope === "menu";
+  const isMenu = !drop && scope === "menu";
+  const scopeNote = drop ? null : isMenu ? catalogueBoardScope(vocab) : allBoardScope(vocab);
+  const overflowLinks: OverflowLink[] = [
+    ...(drop
+      ? [
+          { label: "Edit", href: `/drops/${drop.id}/edit`, icon: Pencil },
+          {
+            label: vocab.prepSheet,
+            href: `/drops/${drop.id}/prep`,
+            icon: vocab.kind === "food" ? ChefHat : PackageCheck,
+          },
+        ]
+      : []),
+    { label: "Order settings", href: "/settings/orders", icon: Settings },
+  ];
+  // A drop is shared while it takes orders; otherwise the store, while its menu does.
+  const shareDrop =
+    drop && effective === "OPEN"
+      ? {
+          id: drop.id,
+          title: drop.title,
+          closesAt: drop.closesAt,
+          fulfilmentStartsAt: drop.fulfilmentStartsAt,
+          fulfilmentEndsAt: drop.fulfilmentEndsAt,
+          fulfilmentMode: drop.fulfilmentMode,
+          itemNames: drop.items.map((i) => i.name),
+        }
+      : null;
 
   return (
-    <header className="mb-3 md:mb-4">
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-        <h1 className="font-display text-xl font-bold text-foreground md:text-2xl">Orders</h1>
-        {hasPicker && (
-          <BoardScopePicker
-            scope={scope}
-            showMenu={sources.includes("menu")}
-            drops={drops}
-            onScope={onScope}
-            catalogueOrders={vocab.catalogueOrders}
+    <header className="mb-3">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+        <div className="flex min-w-0 items-center gap-1">
+          <h1 className="font-display text-xl font-bold text-foreground md:text-2xl">Orders</h1>
+          {scopeNote ? (
+            <BoardInfoHint label="About this list">
+              <p>{scopeNote}</p>
+            </BoardInfoHint>
+          ) : null}
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-2 md:order-last md:ml-0">
+          <BoardShareMenu
+            key={shareDrop?.id ?? "store"}
+            vendorName={vendorName}
+            vendorSlug={vendorSlug}
+            drop={shareDrop}
+            shareStore={!drop && acceptMenuOrders}
+            storeIsLive={storeIsLive}
           />
-        )}
+          <BoardOverflowMenu links={overflowLinks} />
+        </div>
+        {isMenu || hasPicker ? (
+          <div className="flex min-w-0 basis-full items-center gap-2 md:ml-auto md:basis-auto">
+            {isMenu ? (
+              <MenuStatusPill
+                accepting={acceptMenuOrders}
+                modeLabel={MENU_MODE_LABEL[menuFulfilmentMode]}
+                canChange={canChangeMenuStatus}
+                pending={menuStatusPending}
+                onChange={onMenuStatus}
+              />
+            ) : null}
+            {hasPicker ? (
+              <BoardScopePicker
+                scope={scope}
+                showMenu={sources.includes("menu")}
+                drops={drops}
+                onScope={onScope}
+                catalogueOrders={vocab.catalogueOrders}
+              />
+            ) : null}
+          </div>
+        ) : null}
       </div>
-      <div
-        className={cn(
-          "mt-2 flex-wrap items-start justify-between gap-3 md:mt-3 md:flex",
-          detailsOnPhone ? "flex" : "hidden",
-        )}
-      >
-        <div className="min-w-0 max-md:flex-1 max-md:basis-0">{details}</div>
-        <div className="hidden flex-wrap gap-2 md:flex">{links}</div>
-        {/* Phones: sharing an open drop is the way to get orders, so it does not hide in "More". */}
-        {share ? <ShareSheetButton what={drop ? "drop" : "store"}>{share}</ShareSheetButton> : null}
-      </div>
-      <ActionRow tools={tools} lead={share} sheetDescription={sheetDescription} sheetRows={sheetRows} />
-      {tools.pollNote}
+      {drop && effective ? <DropDetails drop={drop} effective={effective} named={hasPicker} /> : null}
     </header>
   );
 }
 
-/**
- * Refresh and "last checked" at every width. From md the other controls sit
- * beside them, as before. On phones they move into the "More actions" sheet,
- * so one row of controls is all that stands between the title and the orders.
- */
-function ActionRow({
-  tools,
-  lead,
-  sheetDescription,
-  sheetRows,
+function DropDetails({
+  drop,
+  effective,
+  named,
 }: {
-  tools: BoardTools;
-  /** Shown before Refresh, from md only. Phones get it through `sheetRows`. */
-  lead?: ReactNode;
-  sheetDescription: string;
-  /** Rows only the sheet shows (the header shows them elsewhere from md). */
-  sheetRows: (close: () => void) => ReactNode;
+  drop: BoardDrop;
+  effective: EffectiveDropStatus;
+  /** The picker already names the drop; without one, say it here. */
+  named: boolean;
 }) {
+  const closesAt = new Date(drop.closesAt);
+  const fStart = new Date(drop.fulfilmentStartsAt);
+  const fEnd = new Date(drop.fulfilmentEndsAt);
   return (
-    <div className="mt-2 flex items-center gap-2 md:mt-3 md:flex-wrap">
-      {lead ? <div className="hidden md:block">{lead}</div> : null}
-      {tools.refreshButton}
-      {tools.lastChecked}
-      {tools.soundButton("hidden md:inline-flex")}
-      <div className="hidden md:contents">
-        <PushAlertsButton variant="board" />
+    <div className="mt-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {!named && <h2 className="min-w-0 break-words text-base font-semibold text-foreground">{drop.title}</h2>}
+        <span
+          className={cn(STATUS_BADGE, effective === "OPEN" ? "border-primary bg-primary/10" : "border-border bg-muted")}
+        >
+          {DROP_STATUS_LABEL[effective]}
+        </span>
       </div>
-      <BoardMoreActions description={sheetDescription}>
-        {(close) => (
-          <>
-            {sheetRows(close)}
-            {tools.soundButton("min-h-12 w-full justify-start gap-3")}
-            <div className="flex flex-wrap items-center gap-2">
-              <PushAlertsButton variant="board" />
-            </div>
-          </>
-        )}
-      </BoardMoreActions>
+      <dl className="mt-2 grid grid-cols-1 gap-1 text-sm text-muted-foreground sm:grid-cols-2">
+        <div>
+          <dt className="inline font-medium text-foreground">Orders close: </dt>
+          <dd className="inline">
+            {formatIstDate(closesAt)}, {formatIstTime(closesAt)}
+          </dd>
+        </div>
+        <div>
+          <dt className="inline font-medium text-foreground">
+            {drop.fulfilmentMode === "PICKUP" ? "Pickup" : drop.fulfilmentMode === "DELIVERY" ? "Delivery" : "Delivery / pickup"}:{" "}
+          </dt>
+          <dd className="inline">
+            {formatIstDate(fStart)}, {formatIstTime(fStart)} – {formatIstTime(fEnd)}
+          </dd>
+        </div>
+      </dl>
     </div>
-  );
-}
-
-/** Phones only: the share control one tap from the header (from md it sits in the action row). */
-function ShareSheetButton({ what, children }: { what: "drop" | "store"; children: ReactNode }) {
-  const title = what === "drop" ? "Share this drop" : "Share your store";
-  return (
-    <ResponsiveDialog>
-      <ResponsiveDialogTrigger asChild>
-        <Button type="button" variant="outline" className="shrink-0 md:hidden" aria-label={title}>
-          <Share2 aria-hidden />
-          Share
-        </Button>
-      </ResponsiveDialogTrigger>
-      <ResponsiveDialogContent>
-        <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle>{title}</ResponsiveDialogTitle>
-          <ResponsiveDialogDescription>Send it to your customers to get orders.</ResponsiveDialogDescription>
-        </ResponsiveDialogHeader>
-        <ResponsiveDialogBody>{children}</ResponsiveDialogBody>
-      </ResponsiveDialogContent>
-    </ResponsiveDialog>
   );
 }

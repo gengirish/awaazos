@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { boardHeaderAction, closeBoardActions } from "./helpers/board";
+import { boardMenuItem, closeBoardMenu } from "./helpers/board";
 import { createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
@@ -114,9 +114,9 @@ test.describe("Orders board: menu and drop orders together", () => {
     await expect(dropCard).toBeVisible();
     await expect(menuCard).toHaveCount(0);
     await expect(page.locator("p", { hasText: "To cook:" })).toContainText("Board Laddu 1");
-    await expect(await boardHeaderAction(page, "link", "Prep sheet")).toHaveAttribute("href", `/drops/${drop.id}/prep`);
-    await expect(await boardHeaderAction(page, "link", "Edit")).toHaveAttribute("href", `/drops/${drop.id}/edit`);
-    await closeBoardActions(page);
+    await expect(await boardMenuItem(page, "More actions", "Prep sheet")).toHaveAttribute("href", `/drops/${drop.id}/prep`);
+    await expect(await boardMenuItem(page, "More actions", "Edit")).toHaveAttribute("href", `/drops/${drop.id}/edit`);
+    await closeBoardMenu(page);
 
     // ── Narrow to menu orders ────────────────────────────────────────────
     await picker.click();

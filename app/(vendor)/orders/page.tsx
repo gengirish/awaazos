@@ -1,10 +1,9 @@
 import { redirect } from "next/navigation";
 
 import { BillingAccessNotice } from "@/components/billing/TrialNotice";
+import { OrdersBannerSlot } from "@/components/drops/orders/OrdersBannerSlot";
 import { OrdersBoard } from "@/components/drops/orders/OrdersBoard";
-import { InstallBanner } from "@/components/pwa/InstallPrompt";
 import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
-import { OwnerSurveyPrompt } from "@/components/survey/OwnerSurveyPrompt";
 import { parseDeliveryRiders } from "@/lib/delivery-riders";
 import { loadOrdersBoard } from "@/lib/drops-board-server";
 import { getOrderSignal } from "@/lib/drops-signal";
@@ -57,6 +56,9 @@ export default async function OrdersPage(props: Props) {
     loadSetupChecklist({ vendor: ctx.vendor, role: ctx.staff.role, known: { settings } }),
     shouldAskOwnerSurvey(ctx.vendor, ctx.staff.role),
   ]);
+  // Steps still open keep the checklist. Once only reminders are left, the
+  // first of them competes for the one banner slot with the other prompts.
+  const remindersOnly = setup.items.every((item) => item.reminder);
 
   return (
     <main id="main" className="bg-background p-4 pb-16 md:p-6">
@@ -72,10 +74,12 @@ export default async function OrdersPage(props: Props) {
         isOwner={ctx.staff.role === "OWNER"}
         className="mx-auto mb-3 max-w-3xl"
       />
-      <SetupChecklistCard {...setup} titleAs="p" className="mx-auto mb-3 max-w-3xl" />
-      {askSurvey ? <OwnerSurveyPrompt className="mx-auto mb-3 max-w-3xl" /> : null}
-      {/* Same column as the board. Renders nothing once installed or dismissed. */}
-      <InstallBanner className="mx-auto mb-3 max-w-3xl" />
+      {remindersOnly ? null : <SetupChecklistCard {...setup} titleAs="p" className="mx-auto mb-3 max-w-3xl" />}
+      <OrdersBannerSlot
+        reminder={remindersOnly ? (setup.items[0] ?? null) : null}
+        askSurvey={askSurvey}
+        className="mx-auto mb-3 max-w-3xl"
+      />
       <OrdersBoard
         vendorName={ctx.vendor.name}
         vendorSlug={ctx.vendor.slug}
