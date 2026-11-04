@@ -7,10 +7,14 @@
  * drift from what the gates enforce; `lib/__tests__/plan-copy.test.ts` checks it.
  *
  * Rules:
- * - One offer: a `TRIAL_DAYS`-day free trial with Starter limits, then Starter
+ * - A `TRIAL_DAYS`-day free trial with Starter limits, then Lite, Starter or Pro,
  *   monthly or yearly (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md). FREE is not
  *   marketed — it stays in `PLAN_LIMITS` only for vendors who signed up before
  *   the trial existed.
+ * - Starter is the plan we want chosen (the decoy effect). Lite sits just under
+ *   its price with far less, and Pro well above it with little more. All three
+ *   are real plans and the copy states their limits plainly. Everything else on
+ *   the marketing surface (the trial, `cta`, `ctaNote`) quotes Starter.
  * - Prices exclude GST (`GST_BPS`); every paid price says "+ GST".
  * - Only advertise what ships. No "staff logins" until invites exist and
  *   `maxStaff` is enforced (TODO.md §2).
@@ -19,7 +23,7 @@
  *   one line, not the pitch.
  * - Voice is English & Hindi only — te/kn/ta are dormant (`VOICE_LANGUAGES`).
  * - `cta` is the ONE sign-up label on the marketing and sign-up surfaces.
- * - PRO / ENTERPRISE are not sold; they stay off the marketing surface.
+ * - ENTERPRISE is not sold; it stays off the marketing surface.
  */
 import type { Plan } from "@prisma/client";
 
@@ -28,7 +32,7 @@ import { formatINRCompact } from "@/lib/currency";
 import { subscriptionBasePaise } from "@/lib/subscription";
 
 /** Tiers shown on the marketing surface, in display order. FREE and PRO stay hidden. */
-export const MARKETED_PLANS = ["STARTER"] as const satisfies readonly Plan[];
+export const MARKETED_PLANS = ["LITE", "STARTER", "PRO"] as const satisfies readonly Plan[];
 export type MarketedPlan = (typeof MARKETED_PLANS)[number];
 
 export type PlanMarketing = {
@@ -60,6 +64,8 @@ export type PlanMarketing = {
   bullets: string[];
   /** Visually emphasised tier. */
   emphasis: boolean;
+  /** Short label on the emphasised tier's card. */
+  badge: string | null;
 };
 
 function billsPerMonth(plan: Plan): string {
@@ -75,28 +81,55 @@ const STARTER_MONTHLY_PAISE = subscriptionBasePaise("STARTER", "monthly");
 const STARTER_YEARLY_PAISE = subscriptionBasePaise("STARTER", "yearly");
 const STARTER_CSV = PLAN_LIMITS.STARTER.csvExport;
 
+function amountOf(plan: MarketedPlan): string {
+  return formatINRCompact(subscriptionBasePaise(plan, "monthly"));
+}
+
+/** The fields every tier words the same way. */
+function priceCopy(plan: MarketedPlan) {
+  const amount = amountOf(plan);
+  return {
+    label: PLAN_LIMITS[plan].label,
+    amount,
+    period: "/mo" as const,
+    taxNote: "+ GST" as const,
+    price: `${amount}/mo + GST`,
+    yearlyPrice: `${formatINRCompact(subscriptionBasePaise(plan, "yearly"))}/yr + GST`,
+    yearlyNote: `${YEARLY_MONTHS_FREE} months free`,
+    trial,
+    cta: `Start ${trial}`,
+    ctaNote: `No card needed. Then ${amount}/month + GST.`,
+  };
+}
+
 /** Whole months of the monthly price that paying yearly saves. */
 export const YEARLY_MONTHS_FREE = Math.floor(
   (12 * STARTER_MONTHLY_PAISE - STARTER_YEARLY_PAISE) / STARTER_MONTHLY_PAISE,
 );
 
-const starterAmount = formatINRCompact(STARTER_MONTHLY_PAISE);
 const trial = `${TRIAL_DAYS} days free`;
 
 export const PLAN_MARKETING: Record<MarketedPlan, PlanMarketing> = {
+  LITE: {
+    ...priceCopy("LITE"),
+    teaser: `For your first few orders: ${billsPerMonth("LITE").toLowerCase()}, UPI or pay on delivery, and ${analyticsDays("LITE")}.`,
+    summary: "The basics, for a store just starting out.",
+    bullets: [
+      "Your own store link for your Instagram bio and WhatsApp",
+      "Drops with a cut-off and stock limits",
+      "UPI payments you confirm, or pay on delivery",
+      "One orders board, a prep sheet and order alerts on your phone",
+      "Receipts you send from your own WhatsApp",
+      billsPerMonth("LITE"),
+      analyticsDays("LITE"),
+    ],
+    emphasis: false,
+    badge: null,
+  },
   STARTER: {
-    label: PLAN_LIMITS.STARTER.label,
-    amount: starterAmount,
-    period: "/mo",
-    taxNote: "+ GST",
-    price: `${starterAmount}/mo + GST`,
-    yearlyPrice: `${formatINRCompact(STARTER_YEARLY_PAISE)}/yr + GST`,
-    yearlyNote: `${YEARLY_MONTHS_FREE} months free`,
-    trial,
-    cta: `Start ${trial}`,
-    ctaNote: `No card needed. Then ${starterAmount}/month + GST.`,
+    ...priceCopy("STARTER"),
     teaser: `${trial}, no card needed. Your store link, drops with a cut-off, UPI orders on one board, receipts on WhatsApp, and ${billsPerMonth("STARTER").toLowerCase()}.`,
-    summary: "Everything a home business needs to take orders and get paid, on one plan.",
+    summary: "Everything a home business needs to take orders and get paid.",
     bullets: [
       `${trial} — no card needed`,
       "Your own store link for your Instagram bio and WhatsApp",
@@ -111,5 +144,14 @@ export const PLAN_MARKETING: Record<MarketedPlan, PlanMarketing> = {
       ...(STARTER_CSV ? ["CSV export of your bills"] : []),
     ],
     emphasis: true,
+    badge: "Best value",
+  },
+  PRO: {
+    ...priceCopy("PRO"),
+    teaser: `Everything in ${PLAN_LIMITS.STARTER.label}, with ${analyticsDays("PRO")}.`,
+    summary: "For a store that wants its whole year in one place.",
+    bullets: [`Everything in ${PLAN_LIMITS.STARTER.label}`, billsPerMonth("PRO"), analyticsDays("PRO")],
+    emphasis: false,
+    badge: null,
   },
 };

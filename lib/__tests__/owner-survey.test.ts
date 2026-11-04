@@ -134,7 +134,7 @@ describe("a charge on a custom-price plan", () => {
   });
 
   it("stays unmapped with no notes or notes we didn't write", () => {
-    for (const notes of [undefined, { vendorId: "v1" }, { plan: "PRO", interval: "monthly" }, { plan: "STARTER", interval: "weekly" }]) {
+    for (const notes of [undefined, { vendorId: "v1" }, { plan: "ENTERPRISE", interval: "monthly" }, { plan: "STARTER", interval: "weekly" }]) {
       expect(toSubscriptionSnapshot("sub_1", { ...entity, notes }).mapped).toBeNull();
     }
   });

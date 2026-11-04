@@ -142,6 +142,15 @@ export function storeLockedPayload(): PushPayload {
   };
 }
 
+export function orderCapPayload(): PushPayload {
+  return {
+    title: "🔒 A customer just tried to order",
+    body: "You've reached this month's order limit. Move up to keep taking orders",
+    url: "/settings/billing",
+    tag: "order-cap",
+  };
+}
+
 export type SendResult = { sent: number; removed: number; failed: number };
 
 /** Send to every opted-in device of the vendor's active staff (or only `userId`'s). */

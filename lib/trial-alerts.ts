@@ -8,6 +8,7 @@
  *   first   5 to 2 IST days before `trialEndsAt`, once
  *   final   the day before and the last day, once
  *   locked  a buyer's order was refused (`orders_paused`), at most once a day
+ *   cap     a buyer's order was refused (`monthly_txn_cap_reached`), same limit
  *
  * A reminder's key carries the trial's end date, so an extension (free access
  * by hand, a referral reward) earns the seller new reminders for the new date.
@@ -58,4 +59,8 @@ export function trialReminderKey(vendorId: string, kind: TrialReminderKind, ends
 
 export function storeLockedKey(vendorId: string): string {
   return `store-locked-alert:${vendorId}`;
+}
+
+export function orderCapKey(vendorId: string): string {
+  return `order-cap-alert:${vendorId}`;
 }

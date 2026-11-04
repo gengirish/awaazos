@@ -122,6 +122,7 @@ export const storeHandleRateLimit = makeLimiter({
 
 const PLAN_AI_LIMITS: Record<Plan, { perMinute: number; burstPerSecond: number }> = {
   FREE: { perMinute: 10, burstPerSecond: 2 },
+  LITE: { perMinute: 10, burstPerSecond: 2 },
   STARTER: { perMinute: 30, burstPerSecond: 4 },
   PRO: { perMinute: 120, burstPerSecond: 12 },
   ENTERPRISE: { perMinute: 300, burstPerSecond: 30 },

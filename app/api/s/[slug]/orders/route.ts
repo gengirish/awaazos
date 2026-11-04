@@ -6,7 +6,7 @@ import { beginIdempotency, getIdempotencyKey } from "@/lib/idempotency";
 import { orderChannelFor } from "@/lib/order-channel";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
-import { alertSellerStoreLockedInBackground } from "@/lib/trial-alerts-server";
+import { alertSellerOrderCapInBackground, alertSellerStoreLockedInBackground } from "@/lib/trial-alerts-server";
 import { storefrontOrderSchema } from "@/lib/zod-drops";
 
 export const dynamic = "force-dynamic";
@@ -179,6 +179,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
       // with no plan details — the buyer must not learn the vendor's plan.
       const { code, ...details } = result.error;
       if (code === "orders_paused") alertSellerStoreLockedInBackground(vendor.id);
+      if (code === "monthly_txn_cap_reached") alertSellerOrderCapInBackground(vendor.id);
       status = 409;
       responseBody = { error: code, ...details };
       console.info(

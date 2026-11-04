@@ -58,6 +58,11 @@ export async function POST(req: NextRequest) {
 
     const body = bodySchema.parse(await req.json());
 
+    // A store's own price is a price for Starter (lib/subscription.ts).
+    if (ctx.vendor.customPricePaise !== null && body.plan !== "STARTER") {
+      return NextResponse.json({ error: "Your store has its own price on the Starter plan." }, { status: 400 });
+    }
+
     // Only a plan that is paid for blocks this — a vendor on the free trial
     // reads as STARTER but must still be able to subscribe.
     if (ctx.access.kind === "paid" && PLAN_RANK[ctx.access.plan] >= PLAN_RANK[body.plan]) {
@@ -72,11 +77,16 @@ export async function POST(req: NextRequest) {
     // if billing isn't configured on this deploy.
     const keyId = getRazorpayKeyId();
 
+    // Paying for a lower plan and moving up. Razorpay can't move a UPI AutoPay
+    // subscription to another plan, so the old one ends and a new one starts.
+    const isUpgrade = ctx.access.kind === "paid";
+
     const settings = await prisma.vendorSettings.findUnique({
       where: { vendorId: ctx.vendor.id },
       select: { razorpaySubId: true, razorpaySubStatus: true },
     });
-    if (settings?.razorpaySubStatus && LIVE_SUBSCRIPTION_STATUSES.includes(settings.razorpaySubStatus)) {
+    const liveOnFile = LIVE_SUBSCRIPTION_STATUSES.includes(settings?.razorpaySubStatus ?? "");
+    if (liveOnFile && !isUpgrade) {
       return NextResponse.json({ error: ALREADY_SUBSCRIBED }, { status: 400 });
     }
 
@@ -98,9 +108,15 @@ export async function POST(req: NextRequest) {
           err instanceof Error ? err.message : "unknown",
         );
       }
-      if (previous && LIVE_SUBSCRIPTION_STATUSES.includes(previous.status)) {
+      if (previous && LIVE_SUBSCRIPTION_STATUSES.includes(previous.status) && !isUpgrade) {
         return NextResponse.json({ error: ALREADY_SUBSCRIBED }, { status: 400 });
       }
+    }
+    const replacesLive =
+      isUpgrade && (liveOnFile || (previous !== null && LIVE_SUBSCRIPTION_STATUSES.includes(previous.status)));
+    // Couldn't read the one being replaced: stop, or it could keep charging too.
+    if (replacesLive && !previous) {
+      return NextResponse.json({ error: "Couldn't reach Razorpay. Please try again." }, { status: 503 });
     }
 
     // This store's plan: the list plan, or the one for its custom price. Before
@@ -110,6 +126,13 @@ export async function POST(req: NextRequest) {
       interval: body.interval,
       customPricePaise: ctx.vendor.customPricePaise,
     });
+
+    // Not in the forgiving try below: if this fails, nothing new may be created,
+    // or the seller is charged twice. The id on file changes below, so this
+    // cancellation's webhook won't clear it.
+    if (replacesLive && previousId) {
+      await cancelSubscription(previousId, false);
+    }
 
     const now = new Date();
     // Banked referral months (lib/referral.ts) move trialEndsAt forward first,

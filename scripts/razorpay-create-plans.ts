@@ -19,10 +19,13 @@ import path from "node:path";
 import Razorpay from "razorpay";
 
 import {
+  BILLING_INTERVALS,
   gstPaise,
+  SUBSCRIBABLE_PLANS,
   subscriptionBasePaise,
   subscriptionChargePaise,
   type BillingInterval,
+  type SubscribablePlan,
 } from "../lib/subscription";
 
 function loadEnvLocal(): void {
@@ -39,10 +42,16 @@ function rupees(paise: number): string {
   return `₹${Math.floor(paise / 100)}.${String(paise % 100).padStart(2, "0")}`;
 }
 
-const PLANS: { interval: BillingInterval; env: string; period: "monthly" | "yearly"; name: string }[] = [
-  { interval: "monthly", env: "RAZORPAY_PLAN_STARTER_MONTHLY", period: "monthly", name: "AwaazOS Starter (monthly)" },
-  { interval: "yearly", env: "RAZORPAY_PLAN_STARTER_YEARLY", period: "yearly", name: "AwaazOS Starter (yearly)" },
-];
+const PLANS: { plan: SubscribablePlan; interval: BillingInterval; env: string; period: "monthly" | "yearly"; name: string }[] =
+  SUBSCRIBABLE_PLANS.flatMap((plan) =>
+    BILLING_INTERVALS.map((interval) => ({
+      plan,
+      interval,
+      env: `RAZORPAY_PLAN_${plan}_${interval.toUpperCase()}`,
+      period: interval,
+      name: `AwaazOS ${plan.charAt(0)}${plan.slice(1).toLowerCase()} (${interval})`,
+    })),
+  );
 
 async function main(): Promise<void> {
   loadEnvLocal();
@@ -61,8 +70,8 @@ async function main(): Promise<void> {
 
   const lines: string[] = [];
   for (const p of PLANS) {
-    const base = subscriptionBasePaise("STARTER", p.interval);
-    const amount = subscriptionChargePaise("STARTER", p.interval);
+    const base = subscriptionBasePaise(p.plan, p.interval);
+    const amount = subscriptionChargePaise(p.plan, p.interval);
     const description = `${rupees(base)} + 18% GST (${rupees(gstPaise(base))})`;
 
     const match = existing.find(

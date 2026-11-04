@@ -21,6 +21,8 @@
  */
 import type { Plan } from "@prisma/client";
 
+import { PLAN_RANK } from "@/lib/constants";
+
 /**
  * Days a paid plan keeps working after `planExpiresAt`, so a late or retried
  * renewal webhook never downgrades a vendor who is actually paying.
@@ -67,12 +69,20 @@ export function isPlanInGrace(vendor: PlanFields, now: Date = new Date()): boole
   return now.getTime() > vendor.planExpiresAt.getTime() && !isPlanExpired(vendor, now);
 }
 
-/** Where the vendor stands right now. Paid always wins over trial or lock. */
+/**
+ * Where the vendor stands right now. Paid wins over trial or lock, unless the
+ * plan is below the trial's: subscribing to LITE during the trial grants it at
+ * once (`subscription.authenticated`), and must not cut the trial short.
+ */
 export function billingAccess(vendor: PlanFields, now: Date = new Date()): BillingAccess {
-  if (vendor.plan !== "FREE" && !isPlanExpired(vendor, now)) {
-    return { kind: "paid", plan: vendor.plan };
-  }
   const trialEndsAt = vendor.trialEndsAt ?? null;
+  if (vendor.plan !== "FREE" && !isPlanExpired(vendor, now)) {
+    const trialIsBetter =
+      trialEndsAt !== null &&
+      now.getTime() < trialEndsAt.getTime() &&
+      PLAN_RANK[vendor.plan] < PLAN_RANK[TRIAL_PLAN];
+    if (!trialIsBetter) return { kind: "paid", plan: vendor.plan };
+  }
   if (!trialEndsAt) return { kind: "free" };
   if (now.getTime() < trialEndsAt.getTime()) return { kind: "trial", endsAt: trialEndsAt };
   // Locked from whichever ended last: the trial, or a paid period (+ grace).

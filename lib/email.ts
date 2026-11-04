@@ -411,6 +411,26 @@ export type SendStoreLockedEmailInput = {
   customPricePaise: number | null;
 };
 
+export type SendOrderCapEmailInput = { to: string; name: string | null; storeName: string; billingUrl: string };
+
+export async function sendOrderCapEmail(input: SendOrderCapEmailInput): Promise<{ delivered: boolean }> {
+  return sendSellerNotice(
+    {
+      to: input.to,
+      name: input.name,
+      subject: `A customer just tried to order from ${input.storeName}`,
+      heading: "A customer just tried to order",
+      paragraphs: [
+        `A customer just tried to order from ${input.storeName}, but you've reached your plan's order limit for this month, so the order didn't go through.`,
+        "Move up to a plan with unlimited orders to keep your store open. The limit also resets at the start of next month.",
+      ],
+      cta: "See plans",
+      url: input.billingUrl,
+    },
+    "email.order_cap",
+  );
+}
+
 export async function sendStoreLockedEmail(input: SendStoreLockedEmailInput): Promise<{ delivered: boolean }> {
   return sendSellerNotice(
     {

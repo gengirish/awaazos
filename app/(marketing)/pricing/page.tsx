@@ -10,13 +10,12 @@ const starter = PLAN_MARKETING.STARTER;
 
 export const metadata: Metadata = {
   title: "Pricing — AwaazOS",
-  description: `${starter.trial}, then ${starter.price}. A store link for your Instagram bio, drops with a cut-off, and UPI orders on one board.`,
+  description: `${starter.trial}, then plans from ${PLAN_MARKETING.LITE.price}. A store link for your Instagram bio, drops with a cut-off, and UPI orders on one board.`,
 };
 
-// One offer: a free trial, then Starter monthly or yearly. FREE (grandfathered
-// vendors only), PRO and ENTERPRISE stay in `lib/constants` for the gates but
-// never on the marketing surface. Copy is shared with the landing teaser via
-// lib/plan-copy.ts.
+// A free trial, then Lite, Starter or Pro, monthly or yearly. FREE (grandfathered
+// vendors only) and ENTERPRISE stay in `lib/constants` for the gates but never on
+// the marketing surface. Copy is shared with the landing teaser via lib/plan-copy.ts.
 const VISIBLE_TIERS = MARKETED_PLANS;
 
 export default async function PricingPage() {
@@ -25,18 +24,19 @@ export default async function PricingPage() {
 
   return (
     <div className="min-h-screen bg-background px-4 py-10 md:px-6">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-5xl">
         <header className="mb-10 text-center">
           <h1 className="font-display text-3xl font-semibold text-balance text-foreground sm:text-4xl md:text-5xl">
-            {starter.trial}. Then {starter.price}.
+            {starter.trial}. Then pick your plan.
           </h1>
           <p className="mt-3 text-muted-foreground">
             Orders, UPI billing and receipts for home kitchens and home sellers on Instagram and WhatsApp. Try everything
-            for {TRIAL_DAYS} days, no card needed. Subscribe only if it earns its place in your business.
+            for {TRIAL_DAYS} days on {starter.label}, no card needed. Subscribe only if it earns its place in your
+            business.
           </p>
         </header>
 
-        <div className="mx-auto grid max-w-md gap-6">
+        <div className="mx-auto grid max-w-md gap-6 md:max-w-none md:grid-cols-3">
           {VISIBLE_TIERS.map((tier) => (
             <section
               key={tier}
@@ -44,6 +44,11 @@ export default async function PricingPage() {
                 PLAN_MARKETING[tier].emphasis ? "ring-2 ring-awaaz-orange ring-offset-2 ring-offset-background" : ""
               }`}
             >
+              {PLAN_MARKETING[tier].badge ? (
+                <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
+                  {PLAN_MARKETING[tier].badge}
+                </p>
+              ) : null}
               <h2 className="font-display text-xl font-semibold">{PLAN_MARKETING[tier].label}</h2>
               <p className="mt-2 text-3xl font-bold tracking-tight">{PLAN_MARKETING[tier].price}</p>
               <p className="mt-1 text-sm text-muted-foreground">

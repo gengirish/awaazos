@@ -208,6 +208,24 @@ describe("applySubscriptionEvent", () => {
 describe("Razorpay plan ids", () => {
   afterEach(() => vi.unstubAllEnvs());
 
+  it("finds and maps Lite and Pro, monthly and yearly", () => {
+    for (const plan of ["LITE", "PRO"] as const) {
+      for (const interval of ["monthly", "yearly"] as const) {
+        const id = `plan_${plan}_${interval}`;
+        vi.stubEnv(`RAZORPAY_PLAN_${plan}_${interval.toUpperCase()}`, id);
+        expect(getRazorpayPlanId(plan, interval)).toBe(id);
+        expect(planFromRazorpayPlanId(id)).toEqual({ plan, interval });
+      }
+    }
+  });
+
+  it("charges each plan its base plus GST, a year being ten months", () => {
+    expect(subscriptionChargePaise("LITE", "monthly")).toBe(29382);
+    expect(subscriptionChargePaise("LITE", "yearly")).toBe(293820);
+    expect(subscriptionChargePaise("PRO", "monthly")).toBe(94282);
+    expect(subscriptionChargePaise("PRO", "yearly")).toBe(942820);
+  });
+
   it("maps monthly, yearly, the legacy monthly name and PRO", () => {
     vi.stubEnv("RAZORPAY_PLAN_STARTER_MONTHLY", "plan_m");
     vi.stubEnv("RAZORPAY_PLAN_STARTER_YEARLY", "plan_y");

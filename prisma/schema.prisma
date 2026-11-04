@@ -811,8 +811,9 @@ enum UserRole {
 
 enum Plan {
   FREE // 50 transactions/month, 1 staff
-  STARTER // ₹299/month — 500 txn, 3 staff, WhatsApp receipts
-  PRO // ₹799/month — unlimited, Razorpay links, analytics export
+  LITE // ₹249/month — limits in PLAN_LIMITS (lib/constants.ts)
+  STARTER // ₹299/month — unlimited orders, online payments, CSV
+  PRO // ₹799/month — Starter + a year of analytics
   ENTERPRISE // Custom
 }
 

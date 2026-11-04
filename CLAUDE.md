@@ -292,8 +292,9 @@ Limits live in `PLAN_LIMITS` in `lib/constants.ts`.
 
 ### Billing: trial, lock and platform subscriptions
 
-Full design in `docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md`. One offer is sold: a `TRIAL_DAYS` (30) day
-free trial with STARTER limits, then STARTER monthly or yearly. Prices exclude 18% GST
+Full design in `docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md`. A `TRIAL_DAYS` (30) day free trial with STARTER
+limits, then LITE, STARTER or PRO, monthly or yearly (`SUBSCRIBABLE_PLANS`). Starter is the plan we want
+chosen: Lite is a decoy just under its price with far less, Pro a high anchor (`lib/plan-copy.ts`). Prices exclude 18% GST
 (`GST_BPS`); the Razorpay plan amount is base + GST (`subscriptionChargePaise`).
 
 `billingAccess(vendor)` in `lib/plan.ts` derives one of four states from `Vendor.plan`,
@@ -330,6 +331,11 @@ passes, so Neon can sleep.
   `plan` / `planExpiresAt` anywhere else.
 - Marketing copy (`lib/plan-copy.ts`) and the legal pages read the trial length and prices from
   the constants. FREE is not marketed.
+- **Three plans:** LITE ranks below STARTER, so `requirePlan(STARTER)` gates and `razorpayLinks` shut it out. It never
+  cuts a running trial short (`billingAccess`). A store with `customPricePaise` is offered Starter only. Moving up
+  goes through `create-subscription`: Razorpay can't move a UPI AutoPay subscription between plans, so it cancels the
+  live one first (a failed cancel stops there, so nobody is charged twice), then starts the new one. Moving down is
+  cancel, then subscribe once the old plan ends. Plan ids: `npm run razorpay:create-plans`.
 - **Free access by hand:** a platform SUPER_ADMIN picks a "free until" day for a store on
   `/admin/vendors` (`PATCH /api/admin/vendors/[id]/free-access`, `lib/admin-free-access.ts`). It only
   moves `trialEndsAt` (23:59 IST that day, today … +24 months), so the store is on the trial for
@@ -338,8 +344,8 @@ passes, so Neon can sleep.
 - **Seller alerts** (`lib/trial-alerts.ts`, `lib/trial-alerts-server.ts`): reminder emails 5 and 1 IST days
   before `trialEndsAt`, from the project's one cron, `GET /api/cron/trial-reminders` (`vercel.json`, daily 09:00
   IST, `Authorization: Bearer $CRON_SECRET`; secret unset → 401 and no reminders). It only reads Postgres and
-  never changes billing state. When a buyer hits `orders_paused`, the route pushes and emails the store's owners,
-  at most once a day, with nothing about the buyer. Each send is claimed in Upstash (`SET NX`); no KV → no alert.
+  never changes billing state. When a buyer hits `orders_paused` or `monthly_txn_cap_reached`, the route pushes and
+  emails the store's owners, at most once a day, with nothing about the buyer. Each send is claimed in Upstash (`SET NX`); no KV → no alert.
 - **A store's own price:** a platform SUPER_ADMIN sets `Vendor.customPricePaise` on `/admin/vendors`
   (`PATCH /api/admin/vendors/[id]/price`; whole rupees, ₹49 to ₹4,999 a month before GST; a year is ten
   months). Rules in `lib/subscription.ts`. Show a seller their price through `storeBasePaise` /
