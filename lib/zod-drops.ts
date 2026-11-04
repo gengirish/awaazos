@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { PER_ORDER_OVER_MAX } from "@/lib/drops-builder";
 import { istToUtc, ymdToDbDate } from "@/lib/drops-time";
+import { INSTAGRAM_SRC } from "@/lib/order-channel";
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const hm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM (24h)");
@@ -162,6 +163,7 @@ export const storefrontOrderSchema = z.object({
   deliveryAddress: z.string().trim().max(500).nullish(),
   notes: z.string().trim().max(280).nullish(),
   paymentMethod: z.enum(["UPI", "CASH"]),
+  src: z.literal(INSTAGRAM_SRC).optional(),
 });
 
 export type StorefrontOrderInput = z.infer<typeof storefrontOrderSchema>;
@@ -194,6 +196,7 @@ export const storefrontMenuOrderSchema = z.object({
   deliveryAddress: z.string().trim().max(500).nullish(),
   notes: z.string().trim().max(280).nullish(),
   paymentMethod: z.enum(["UPI", "CASH"]),
+  src: z.literal(INSTAGRAM_SRC).optional(),
 });
 
 export type StorefrontMenuOrderInput = z.infer<typeof storefrontMenuOrderSchema>;

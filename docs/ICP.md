@@ -48,13 +48,15 @@ customer: most of their orders are remote.
 
 1. **Validate the ICP.** Get 5–10 Instagram kitchens to each run one real drop. Nothing below is
    proven until that happens.
-2. **Instagram in-app browser.** Most buyers open the storefront inside Instagram. Test and fix
+2. **Instagram in-app browser** (by hand: `docs/runbooks/INSTAGRAM_BROWSER_TEST.md`; not yet run).
+   Most buyers open the storefront inside Instagram. Test and fix
    storefront → checkout → UPI app hand-off → WhatsApp hand-off on iOS and Android, and show an
    "Open in browser" hint only where a step fails. Guest checkout needs no sign-in; only the
    buyer's Account page relies on an email link, which loses the session in another browser.
    iPhone UPI payment is PR #35.
-3. **Measure Instagram demand.** Count storefront orders that arrive from Instagram (a `?src=ig`
-   tag on shared links plus the in-app browser's user agent) on `/admin/metrics`.
+3. ~~**Measure Instagram demand.**~~ **Built 2026-11-04:** storefront orders that arrive from Instagram
+   (a `?src=ig` tag on Instagram links plus the in-app browser's user agent) are counted on
+   `/admin/metrics`, from the day it ships. `lib/order-channel.ts`.
 4. **Store-level story image** for kitchens that sell from the everyday menu rather than drops.
 5. ~~**30-day unlimited trial replaces FREE**~~ **Shipped 2026-10-10:** new sign-ups get STARTER
    features for 30 days, then are locked until paid; existing FREE vendors are grandfathered.

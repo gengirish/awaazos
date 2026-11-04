@@ -398,6 +398,8 @@ model Transaction {
   // Demo-store sample order (lib/demo-store.ts). On handover they are archived
   // (archivedAt set, hidden from every list) or deleted.
   isSample          Boolean       @default(false)
+  // Where a storefront order came from (lib/order-channel.ts): "instagram" or null.
+  orderChannel      String?       @db.VarChar(20)
   archivedAt        DateTime?
 
   // Storefront pre-orders (source = STOREFRONT). Null for counter sales.

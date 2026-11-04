@@ -4,18 +4,19 @@ import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
 import { copyText } from "@/lib/clipboard";
+import { withInstagramTag } from "@/lib/order-channel";
 
 /**
  * "Copy link" for the vendor's own store link (`/s/<slug>`), beside
- * `ShareStoreButton` on the setup checklist. Copies the canonical URL, never
- * the current location. The label goes back to "Copy link" when the button
+ * `ShareStoreButton` on the setup checklist, under "Put it in your Instagram
+ * bio": the canonical URL with the Instagram tag, never the current location. The label goes back to "Copy link" when the button
  * loses focus — no timer.
  */
 export function CopyStoreLinkButton({ slug }: { slug: string }) {
   const [status, setStatus] = useState<"" | "copied" | "failed">("");
 
   async function copy() {
-    const ok = await copyText(`${window.location.origin}/s/${encodeURIComponent(slug)}`);
+    const ok = await copyText(withInstagramTag(`${window.location.origin}/s/${encodeURIComponent(slug)}`));
     setStatus(ok ? "copied" : "failed");
   }
 

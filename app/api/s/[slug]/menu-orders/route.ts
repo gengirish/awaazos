@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { beginIdempotency, getIdempotencyKey } from "@/lib/idempotency";
 import { placeMenuOrder } from "@/lib/menu-orders";
+import { orderChannelFor } from "@/lib/order-channel";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
 import { storefrontMenuOrderSchema } from "@/lib/zod-drops";
@@ -151,6 +152,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
       notes: input.notes ?? null,
       paymentMethod: input.paymentMethod,
       customerId: customer?.id ?? null,
+      orderChannel: orderChannelFor({ src: input.src, userAgent: req.headers.get("user-agent") }),
     });
 
     if (result.ok && customer) {
