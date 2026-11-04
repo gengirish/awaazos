@@ -697,6 +697,8 @@ only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts`
   (`lib/admin-invites.ts`, `/admin-invite/[token]`); an ADMIN sees only the demo-store and metrics pages.
   Each demo store and claim link has a "Message on WhatsApp" wa.me button with an editable pre-filled
   message (`lib/outreach-message.ts`) to the seller's saved business number; nothing is sent server-side.
+  Making a claim link here also emails it to the seller (`sendDemoClaimEmail`), and the response says whether it
+  went (`emailed`). The internal API's handover still sends nothing.
 - **Sales interns:** platform role `SALES` (`USER < SALES < ADMIN < SUPER_ADMIN`), invited on `/admin/admins`.
   They see only the demo stores they built (`lib/sales-scope.ts`, ownership = the audit "create" row), can't
   delete, and everything at ADMIN or above stays 404. `/admin/earnings` reports their share

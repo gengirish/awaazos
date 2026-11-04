@@ -33,9 +33,9 @@ type Props = {
 
 /**
  * A demo store's actions on /admin/demo-stores: message the seller on WhatsApp
- * (wa.me from the admin's own phone), make a claim link for their email
- * (POST …/handover) or delete the store (DELETE). Claimed stores don't get
- * this component. Nothing is sent from our side.
+ * (wa.me from the admin's own phone), email them a claim link (POST …/handover)
+ * or delete the store (DELETE). Claimed stores don't get this component. The
+ * claim email is the only thing sent from our side.
  */
 export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, senderName, senderIsFounder, canDelete }: Props) {
   const router = useRouter();
@@ -45,7 +45,7 @@ export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, send
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [link, setLink] = useState<{ url: string; expiresAt: string } | null>(null);
+  const [link, setLink] = useState<{ url: string; expiresAt: string; emailed: boolean } | null>(null);
   const [copied, setCopied] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const base = `/api/admin/demo-stores/${encodeURIComponent(externalRef)}`;
@@ -66,13 +66,13 @@ export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, send
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
-        data?: { claim_url: string; expires_at: string };
+        data?: { claim_url: string; expires_at: string; emailed: boolean };
       };
       if (!res.ok || !body.data) {
         setError(ERROR_TEXT[body.error ?? ""] ?? (res.status === 400 ? "Enter a valid email." : "Could not make the link. Try again."));
         return;
       }
-      setLink({ url: body.data.claim_url, expiresAt: body.data.expires_at });
+      setLink({ url: body.data.claim_url, expiresAt: body.data.expires_at, emailed: body.data.emailed });
       setCopied(false);
       router.refresh();
     } catch {
@@ -118,7 +118,10 @@ export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, send
           </p>
           <p className="break-all rounded-md bg-muted px-3 py-2 font-mono text-xs">{link.url}</p>
           <p className="text-xs text-muted-foreground">
-            Send it to the seller yourself. Making another link voids this one.
+            {link.emailed
+              ? "We emailed it to the seller. A mistyped address won't show an error here, so check it. "
+              : "We couldn't email it, so send it to the seller yourself. "}
+            Making another link voids this one.
           </p>
           <Button type="button" size="sm" variant="outline" onClick={() => void copy(link.url)}>
             {copied ? "Copied" : "Copy claim link"}
@@ -148,9 +151,12 @@ export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, send
               disabled={busy}
               autoFocus
             />
+            <p className="mt-1 text-xs text-muted-foreground">
+              We email the claim link here, and their account uses this address. Check the spelling.
+            </p>
           </div>
           <Button type="submit" disabled={busy}>
-            {busy ? "Making…" : "Make claim link"}
+            {busy ? "Sending…" : "Email claim link"}
           </Button>
           <Button type="button" variant="outline" disabled={busy} onClick={() => setOpen(false)}>
             Cancel
