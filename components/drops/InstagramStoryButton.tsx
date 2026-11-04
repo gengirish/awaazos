@@ -3,6 +3,7 @@
 import { Download, Instagram, Loader2 } from "lucide-react";
 import { useState } from "react";
 
+import { withInstagramTag } from "@/lib/order-channel";
 import { cn } from "@/lib/utils";
 
 type Props = {
@@ -44,7 +45,7 @@ export function InstagramStoryButton({ src, fileName, url, className, onStatus, 
 
   async function copyLink() {
     try {
-      await navigator.clipboard.writeText(url);
+      await navigator.clipboard.writeText(withInstagramTag(url));
       return true;
     } catch {
       return false;

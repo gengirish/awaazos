@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/responsive-dialog";
 import { formatINR, sumPaise } from "@/lib/currency";
 import { discountLabel } from "@/lib/offers";
+import { orderSrcFromSearch } from "@/lib/order-channel";
 import { formatIndianMobile, normaliseIndianMobile } from "@/lib/phone";
 import {
   CHECKOUT_FIELD_MESSAGES,
@@ -649,8 +650,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
           "Content-Type": "application/json",
           "Idempotency-Key": idemKeyRef.current,
         },
-        body: JSON.stringify(
-          buildBody({
+        body: JSON.stringify({
+          ...buildBody({
             customerName: name.trim(),
             customerPhone: normaliseIndianMobile(phone),
             fulfilmentType: fulfilment,
@@ -658,7 +659,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
             notes: notes.trim() || null,
             paymentMethod: method ?? "UPI",
           }),
-        ),
+          src: orderSrcFromSearch(window.location.search),
+        }),
       });
     } catch {
       setSubmitting(false);

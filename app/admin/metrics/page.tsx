@@ -140,6 +140,21 @@ export default async function AdminMetricsPage() {
         <Card className="md:col-span-3">
           <CardHeader>
             <CardTitle className="text-sm font-medium text-muted-foreground">
+              Orders from Instagram
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-4xl font-bold tabular-nums text-foreground">{metrics.instagram7d.orders}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Of {metrics.instagram7d.allStorefrontOrders} storefront orders in the last 7 days;{" "}
+              {metrics.instagram7d.paid} paid. Placed in Instagram&apos;s browser or from a <code>?src=ig</code> link.
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-3">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
               Week-over-week growth
             </CardTitle>
           </CardHeader>

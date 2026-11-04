@@ -555,6 +555,11 @@ the device (everyday menu or the open drop that can take the most of the order, 
 pre-fills text for the order's status with the buyer's order link, plus "Ready for pickup" on a confirmed
 pickup. A `wa.me` link the seller sends from their own WhatsApp; it stamps nothing and sends nothing from us.
 
+**Instagram orders** (`lib/order-channel.ts`): `Transaction.orderChannel` is `"instagram"` when the order was
+placed in Instagram's in-app browser (user agent) or from a store page opened through a `?src=ig` link (posted as
+`src`). Only links the seller is told to put on Instagram carry the tag: the setup card's bio link and the story
+button's Link sticker. The general Copy link stays clean. `/admin/metrics` counts them; the user agent is never stored.
+
 **Bulk order actions** (`lib/order-bulk.ts` client-safe, `lib/storefront-order-bulk.ts` server): the
 board selects orders and applies confirm / mark_paid / deliver via `POST /api/drops/[id]/orders/bulk`
 and `POST /api/storefront-orders/bulk` (`{ orderIds: 1..50 unique, action }`, CASHIER); a selection
