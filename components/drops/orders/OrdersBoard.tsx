@@ -26,7 +26,7 @@ import type { OverflowLink } from "@/components/drops/orders/BoardMenus";
 import { BulkActionBar } from "@/components/drops/orders/BulkActionBar";
 import { OrderCard, type OrderSource } from "@/components/drops/orders/OrderCard";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
-import { PushAlertsBarButton } from "@/components/push/PushAlertsButton";
+import { PushAlertsBarButton } from "@/components/push/PushAlertsBarButton";
 import { Button } from "@/components/ui/button";
 import { RadioOption } from "@/components/ui/radio-option";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -170,7 +170,7 @@ const ACTION_DONE: Record<OrderAction, string> = {
 };
 
 /** Summary tile: one line, label and figure. Four in a row from sm, 2×2 on phones. */
-const KPI_TILE = "flex min-w-0 flex-wrap items-baseline justify-between gap-x-1.5 rounded-lg border bg-card px-2.5 py-1.5";
+const KPI_TILE = "flex min-w-0 flex-wrap items-center justify-between gap-x-1.5 rounded-lg border bg-card px-2.5 py-1.5";
 const KPI_VALUE = "font-mono text-sm font-bold tabular-nums";
 
 const SEGMENT_BTN =
