@@ -94,6 +94,33 @@ test.describe("owner survey", () => {
   });
 });
 
+test.describe("public survey link", () => {
+  test("anyone can answer with no sign-in", async ({ page }) => {
+    await page.goto("/survey");
+    await expect(page).toHaveURL(/\/survey$/);
+    await expect(page.getByRole("heading", { name: "Tell us what's hard" })).toBeVisible();
+    await expect(page.getByText(/may use it to offer your store a price/)).toHaveCount(0);
+
+    await page.getByLabel("Finding new customers").check();
+    await page.getByRole("group", { name: /how many orders/ }).getByLabel("Under 10").check();
+    await page.getByRole("group", { name: /what would you pay/ }).getByLabel("Nothing yet").check();
+    await page.getByRole("button", { name: "Send my answers" }).click();
+    await expect(page.getByRole("status").filter({ hasText: "Thank you" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Send my answers" })).toHaveCount(0);
+  });
+
+  test("the API rejects a bad answer and takes a good one", async ({ request }) => {
+    const bad = await request.post("/api/survey", {
+      data: { ...ANSWERS, topPain: "overselling" },
+      headers: JSON_HEADERS,
+    });
+    expect(bad.status()).toBe(400);
+
+    const good = await request.post("/api/survey", { data: ANSWERS, headers: JSON_HEADERS });
+    expect(good.status()).toBe(201);
+  });
+});
+
 test.describe("a store's own price", () => {
   test("a store owner with no platform role gets 404 from the pages and the API", async ({ page, request }) => {
     await createVendorSession(page, request, "price-none");
@@ -141,11 +168,20 @@ test.describe("a store's own price", () => {
       });
       expect(saved.status()).toBe(200);
 
+      const publicComment = `From the public link ${Date.now()}`;
+      const publicAnswer = await request.post("/api/survey", {
+        data: { ...ANSWERS, comment: publicComment },
+        headers: JSON_HEADERS,
+      });
+      expect(publicAnswer.status()).toBe(201);
+
       const admin = await registerVendor(request, "price-super");
       await setPlatformRole(admin.email, "SUPER_ADMIN");
       await signIn(page, admin, "/admin/survey");
 
-      await expect(page.getByRole("row", { name: /Booking delivery and briefing riders/ })).toBeVisible();
+      await expect(page.getByRole("region", { name: "From the public link" })).toContainText(publicComment);
+
+      await expect(page.getByRole("row", { name: /Booking delivery and briefing riders/ }).first()).toBeVisible();
       const answer = page.getByRole("listitem").filter({ hasText: store.stallName });
       await expect(answer).toContainText("Rider tracking");
       await answer.getByRole("link", { name: "Set price" }).click();

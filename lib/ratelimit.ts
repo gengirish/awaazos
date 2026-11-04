@@ -100,6 +100,16 @@ export const authRateLimit = makeLimiter({
 });
 
 /**
+ * 5 public survey answers per IP per hour (POST /api/survey). A person answers
+ * once; the allowance is for a family or a shop sharing one connection.
+ */
+export const publicSurveyRateLimit = makeLimiter({
+  name: "public-survey",
+  windowMs: 60 * 60_000,
+  max: 5,
+});
+
+/**
  * 30 store-link availability checks per IP per minute (GET /api/auth/store-handle).
  * The forms debounce typing, so a person makes a handful; a scraper of taken
  * handles gets the public /s/<handle> page's answer no faster than this.

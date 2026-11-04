@@ -234,6 +234,7 @@ storefront surface** — unauthenticated, and no longer read-only (buyers place 
 | `/s/[slug]/account` | Signed-in buyer's own orders/profile |
 | `/r/[token]` | Customer receipt page (see "Receipt module"; not gated on `publishStorefront`) |
 | `/d/[token]` + `POST /api/d/[token]` | Rider's "Delivered" link (see "Delivery handoff"; not gated on `publishStorefront`) |
+| `/survey` + `POST /api/survey` | Public seller survey: collects answers, shows nothing back (see "Owner survey"; no store involved) |
 | `/c/[slug]` | Community page: links to the listed stores of one housing society (see "Community pages") |
 | `/api/s/**` | Order placement, UTR submit, "I've received my order", order rating, vendor-Razorpay start/verify, buyer magic-link auth |
 | `/api/webhooks/razorpay-orders/[vendorId]` | Per-vendor Razorpay webhook (vendor's own secret) |
@@ -639,6 +640,10 @@ pay, an optional comment. `/orders` and `/drops` show a prompt until answered ("
 answers beside its price. Answers never set a price by themselves, and `SURVEY_USE_NOTICE` tells the owner they
 may inform it: keep it on the form. Pain keys are stored, so retire one rather than renaming it. The comment is
 free text: never in a log. Read on page render only: no timers.
+
+The same questions are public at `/survey` (no sign-in, `noindex`, `POST /api/survey`, 5 per IP per hour), for
+sellers with no account. `PublicSurveyResponse` holds the answers and nothing else: no store, name, number or IP.
+`/admin/survey` counts them apart from the stores', because anyone can answer twice, and they never inform a price.
 
 ### Referrals ("Refer a seller")
 

@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import {
   OWNER_PAINS,
   painLabel,
+  PUBLIC_SURVEY_NOTICE,
   SURVEY_COMMENT_MAX,
   SURVEY_USE_NOTICE,
   WEEKLY_ORDER_BANDS,
@@ -60,8 +61,17 @@ function RadioChoices({
  * The owner survey. Answering again replaces the store's answers
  * (PUT /api/vendor/survey). The notice above the questions says what they are
  * used for, including price: keep it there.
+ *
+ * With `isPublic` (the /survey page) nobody is signed in: the answers go to
+ * POST /api/survey, tied to no store, and can't be changed once sent.
  */
-export function OwnerSurveyForm({ answers }: { answers: OwnerSurveyAnswers | null }) {
+export function OwnerSurveyForm({
+  answers,
+  isPublic = false,
+}: {
+  answers: OwnerSurveyAnswers | null;
+  isPublic?: boolean;
+}) {
   const router = useRouter();
   const [pains, setPains] = useState<string[]>([...(answers?.pains ?? [])]);
   const [topPain, setTopPain] = useState(answers?.topPain ?? "");
@@ -91,17 +101,21 @@ export function OwnerSurveyForm({ answers }: { answers: OwnerSurveyAnswers | nul
     setError(null);
     setSaving(true);
     try {
-      const res = await fetch("/api/vendor/survey", {
-        method: "PUT",
+      const res = await fetch(isPublic ? "/api/survey" : "/api/vendor/survey", {
+        method: isPublic ? "POST" : "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ pains, topPain: effectiveTop, weeklyOrders, willingToPay, comment }),
       });
       if (!res.ok) {
-        setError("Could not save your answers. Try again.");
+        setError(
+          res.status === 429
+            ? "Too many answers from this connection. Try again in an hour."
+            : "Could not save your answers. Try again.",
+        );
         return;
       }
       setSaved(true);
-      router.refresh();
+      if (!isPublic) router.refresh();
     } catch {
       setError("Could not save your answers. Check your connection and try again.");
     } finally {
@@ -109,9 +123,17 @@ export function OwnerSurveyForm({ answers }: { answers: OwnerSurveyAnswers | nul
     }
   }
 
+  if (isPublic && saved) {
+    return (
+      <p role="status" className="text-sm text-foreground">
+        Thank you. We read every answer.
+      </p>
+    );
+  }
+
   return (
     <form onSubmit={(e) => void submit(e)} className="space-y-6">
-      <p className="text-sm text-muted-foreground">{SURVEY_USE_NOTICE}</p>
+      <p className="text-sm text-muted-foreground">{isPublic ? PUBLIC_SURVEY_NOTICE : SURVEY_USE_NOTICE}</p>
 
       <fieldset>
         <legend className={LEGEND}>What is hard about running your store right now?</legend>

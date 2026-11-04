@@ -13,6 +13,11 @@
  * Keys are stored on the row, so never rename one. Retire a pain by moving it
  * out of OWNER_PAINS into RETIRED_PAIN_LABELS, so old answers still read.
  *
+ * The same questions go out on the public /survey link, for sellers with no
+ * account. Those answers (`PublicSurveyResponse`) are tied to no store, can't be
+ * changed afterwards and never inform a price, so /admin/survey counts them
+ * apart from the stores' own: nothing stops one person answering twice.
+ *
  * The comment is the owner's free text and may name people: never in a log.
  */
 import { z } from "zod";
@@ -64,6 +69,10 @@ export const SURVEY_COMMENT_MAX = 500;
 /** Shown above the form. Says plainly what the answers are used for. */
 export const SURVEY_USE_NOTICE =
   "We read every answer. It decides what we build next, and we may use it to offer your store a price that fits.";
+
+/** Shown above the public form: there is no store to price, and no reason to leave a name. */
+export const PUBLIC_SURVEY_NOTICE =
+  "We read every answer, and it decides what we build next. No sign-in, and we don't ask for your name or number.";
 
 export const ownerSurveySchema = z
   .object({

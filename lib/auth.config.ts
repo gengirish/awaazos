@@ -26,6 +26,8 @@ function isPublicPath(pathname: string): boolean {
   // shows nothing unless the token matches an unused, unexpired AdminInvite.
   if (pathname.startsWith("/admin-invite/")) return true;
   if (pathname === "/pricing" || pathname.startsWith("/pricing/")) return true;
+  // The public seller survey: it collects answers and shows nothing back.
+  if (pathname === "/survey") return true;
   // Privacy, terms, refund, DPDP rights — linked from the public footer.
   if (pathname === "/legal" || pathname.startsWith("/legal/")) return true;
   // Public vendor storefronts. Opt-in per vendor: the route itself 404s unless
