@@ -13,12 +13,14 @@ import {
   MessageCircle,
   MoreHorizontal,
   Share2,
+  Sparkles,
   type LucideIcon,
 } from "lucide-react";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 
+import { AiImagePromptForm } from "@/components/ai/AiImagePromptForm";
 import { useInstagramStory } from "@/components/drops/InstagramStoryButton";
 import { Button } from "@/components/ui/button";
 import {
@@ -32,6 +34,15 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogBody,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
+import { AI_IMAGES_ENABLED } from "@/lib/ai-image-types";
 import { buildDropShareText, buildWhatsAppShareUrl, shareOrOpenWhatsApp } from "@/lib/drops-share";
 import { cn } from "@/lib/utils";
 
@@ -94,6 +105,7 @@ export function BoardShareMenu({
   // window is unavailable during SSR; fill the origin in after mount.
   const [origin, setOrigin] = useState("");
   const [copied, setCopied] = useState(false);
+  const [aiStoryOpen, setAiStoryOpen] = useState(false);
 
   useEffect(() => {
     setOrigin(window.location.origin);
@@ -147,86 +159,117 @@ export function BoardShareMenu({
   const CopyIcon = copied ? Check : Copy;
 
   return (
-    <DropdownMenu modal={false}>
-      <DropdownMenuTrigger asChild>
-        <Button type="button" className="shrink-0">
-          <Share2 aria-hidden />
-          Share
-          <ChevronDown aria-hidden />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        {canShare && (
-          <>
-            <DropdownMenuItem
-              onSelect={() =>
-                void shareOrOpenWhatsApp({
-                  title: drop ? `${drop.title} by ${vendorName}` : vendorName,
-                  text: shareText,
-                  url,
-                })
-              }
-            >
-              <Share2 aria-hidden />
-              {drop ? "Share this drop" : "Share store link"}
-            </DropdownMenuItem>
-            {/* Stays open: the item itself says "Copied". */}
-            <DropdownMenuItem
-              onSelect={(e) => {
-                e.preventDefault();
-                void copy();
-              }}
-            >
-              <CopyIcon aria-hidden />
-              {copied ? "Copied" : drop ? "Copy message" : "Copy link"}
-            </DropdownMenuItem>
-            {drop && (
-              <DropdownMenuItem onSelect={() => window.open(buildWhatsAppShareUrl(shareText), "_blank", "noopener,noreferrer")}>
-                <MessageCircle aria-hidden />
-                WhatsApp
-              </DropdownMenuItem>
-            )}
-            {story.ready ? (
-              <>
-                <DropdownMenuItem onSelect={() => void story.share(story.ready!)}>
-                  <Instagram aria-hidden />
-                  Share story image
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => story.download(story.ready!)}>
-                  <Download aria-hidden />
-                  Download story image
-                </DropdownMenuItem>
-              </>
-            ) : (
-              // Stays open: the second tap of the story flow happens right here.
+    <>
+      <DropdownMenu modal={false}>
+        <DropdownMenuTrigger asChild>
+          <Button type="button" className="shrink-0">
+            <Share2 aria-hidden />
+            Share
+            <ChevronDown aria-hidden />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          {canShare && (
+            <>
               <DropdownMenuItem
-                aria-busy={story.loading}
+                onSelect={() =>
+                  void shareOrOpenWhatsApp({
+                    title: drop ? `${drop.title} by ${vendorName}` : vendorName,
+                    text: shareText,
+                    url,
+                  })
+                }
+              >
+                <Share2 aria-hidden />
+                {drop ? "Share this drop" : "Share store link"}
+              </DropdownMenuItem>
+              {/* Stays open: the item itself says "Copied". */}
+              <DropdownMenuItem
                 onSelect={(e) => {
                   e.preventDefault();
-                  if (!story.loading) void story.prepare();
+                  void copy();
                 }}
               >
-                {story.loading ? (
-                  <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
-                ) : (
-                  <Instagram aria-hidden />
-                )}
-                Instagram story
+                <CopyIcon aria-hidden />
+                {copied ? "Copied" : drop ? "Copy message" : "Copy link"}
               </DropdownMenuItem>
-            )}
-          </>
-        )}
-        {canShare && storeIsLive && <DropdownMenuSeparator />}
-        {storeIsLive && (
-          <DropdownMenuItem asChild>
-            <a href={storeHref} target="_blank" rel="noopener noreferrer">
-              <ExternalLink aria-hidden />
-              Open store
-            </a>
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+              {drop && (
+                <DropdownMenuItem onSelect={() => window.open(buildWhatsAppShareUrl(shareText), "_blank", "noopener,noreferrer")}>
+                  <MessageCircle aria-hidden />
+                  WhatsApp
+                </DropdownMenuItem>
+              )}
+              {story.ready ? (
+                <>
+                  <DropdownMenuItem onSelect={() => void story.share(story.ready!)}>
+                    <Instagram aria-hidden />
+                    Share story image
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => story.download(story.ready!)}>
+                    <Download aria-hidden />
+                    Download story image
+                  </DropdownMenuItem>
+                </>
+              ) : (
+                // Stays open: the second tap of the story flow happens right here.
+                <DropdownMenuItem
+                  aria-busy={story.loading}
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    if (!story.loading) void story.prepare();
+                  }}
+                >
+                  {story.loading ? (
+                    <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
+                  ) : (
+                    <Instagram aria-hidden />
+                  )}
+                  Instagram story
+                </DropdownMenuItem>
+              )}
+              {AI_IMAGES_ENABLED && !story.ready && (
+                // A dialog, not an inline form: a menu takes every key for its own navigation.
+                <DropdownMenuItem onSelect={() => setAiStoryOpen(true)}>
+                  <Sparkles aria-hidden />
+                  Story with an AI background
+                </DropdownMenuItem>
+              )}
+            </>
+          )}
+          {canShare && storeIsLive && <DropdownMenuSeparator />}
+          {storeIsLive && (
+            <DropdownMenuItem asChild>
+              <a href={storeHref} target="_blank" rel="noopener noreferrer">
+                <ExternalLink aria-hidden />
+                Open store
+              </a>
+            </DropdownMenuItem>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {AI_IMAGES_ENABLED && (
+        <ResponsiveDialog open={aiStoryOpen} onOpenChange={setAiStoryOpen}>
+          <ResponsiveDialogContent>
+            <ResponsiveDialogHeader>
+              <ResponsiveDialogTitle>Story with an AI background</ResponsiveDialogTitle>
+              <ResponsiveDialogDescription>The story image over a background you describe.</ResponsiveDialogDescription>
+            </ResponsiveDialogHeader>
+            <ResponsiveDialogBody>
+              <AiImagePromptForm
+                label="Describe the background"
+                placeholder="Warm morning light on a wooden table"
+                submitLabel="Make story image"
+                busy={story.loading}
+                onSubmit={(prompt) => {
+                  void story.prepare(prompt);
+                  setAiStoryOpen(false);
+                }}
+              />
+            </ResponsiveDialogBody>
+          </ResponsiveDialogContent>
+        </ResponsiveDialog>
+      )}
+    </>
   );
 }
 

@@ -133,6 +133,22 @@ test.describe("orders board layout", () => {
     await closeBoardMenu(page);
   });
 
+  test("the AI story background stays reachable from Share, when it is switched on", async ({ page, request }) => {
+    test.skip(process.env.NEXT_PUBLIC_AI_IMAGES_ENABLED !== "true", "the feature flag is off in this build");
+    test.slow();
+    await storeWithOrder(page, request, "layout-ai");
+    await page.goto("/orders");
+    await (await boardMenuItem(page, "Share", "Story with an AI background")).click();
+    const dialog = page.getByRole("dialog", { name: "Story with an AI background" });
+    await expect(dialog).toBeVisible();
+    const box = dialog.getByLabel("Describe the background");
+    await box.click();
+    await box.pressSequentially("warm light");
+    await expect(box).toHaveValue("warm light");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+  });
+
   test("the status pill pauses and reopens menu orders for the owner", async ({ page, request }) => {
     test.slow();
     const store = await storeWithOrder(page, request, "layout-pause");
@@ -186,6 +202,11 @@ test.describe("orders board layout", () => {
     const bar = page.getByRole("group", { name: "Live updates" });
     await bar.getByRole("button", { name: /^Sound on/ }).click();
     await expect(bar.getByRole("button", { name: /^Sound o/ })).toHaveAttribute("aria-pressed", /true|false/);
+
+    // Alerts: a labelled control until this device is subscribed, whichever browser this is.
+    if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {
+      await expect(bar.getByRole("button", { name: /alerts/i })).toBeVisible();
+    }
 
     // The polling note lives behind the info button.
     await expect(page.getByText(/Checks every few minutes/)).toHaveCount(0);
