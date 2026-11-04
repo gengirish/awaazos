@@ -89,6 +89,11 @@ export function offersStatus(activeOffers: number): SectionStatus {
     : { text: "No offers on", on: false };
 }
 
+/** Settings → Tell us what's hard. */
+export function surveyStatus(answered: boolean): SectionStatus {
+  return answered ? { text: "Answered", on: true } : { text: "Not answered yet", on: false };
+}
+
 /** Settings → Customer feedback. */
 export function feedbackStatus(s: RatingSummary): SectionStatus {
   return s.count > 0

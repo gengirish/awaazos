@@ -3,6 +3,7 @@ import {
   CreditCard,
   Gift,
   LayoutList,
+  ListChecks,
   Mic,
   ReceiptText,
   ShoppingBag,
@@ -24,7 +25,8 @@ export type SettingsSectionId =
   | "notifications"
   | "voice"
   | "billing"
-  | "refer";
+  | "refer"
+  | "survey";
 
 export type SettingsSection = {
   id: SettingsSectionId;
@@ -110,6 +112,14 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     title: "Refer a seller",
     description: "Share your link. When a store you invite subscribes, you get free months.",
     icon: Gift,
+    ownerOnly: true,
+  },
+  {
+    id: "survey",
+    href: "/settings/survey",
+    title: "Tell us what's hard",
+    description: "A short survey on what slows your store down, so we build the right things next.",
+    icon: ListChecks,
     ownerOnly: true,
   },
 ];

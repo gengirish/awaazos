@@ -112,6 +112,7 @@ export default async function BillingSettingsPage() {
               cancelAtEnd={settings?.razorpaySubCancelAtEnd ?? false}
               prefillName={user.name}
               prefillEmail={user.email}
+              customPricePaise={vendor.customPricePaise}
             />
           </section>
         </div>

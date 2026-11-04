@@ -16,7 +16,7 @@
  *      out-of-band must mint a fresh token, not read one out of logs.
  */
 
-import { PLAN_PRICES_PAISE, PLAN_PRICES_YEARLY_PAISE } from "@/lib/constants";
+import { storeBasePaise } from "@/lib/subscription";
 import { formatINR } from "@/lib/currency";
 import { formatIstDate } from "@/lib/datetime";
 import { logger } from "@/lib/logger";
@@ -364,9 +364,9 @@ async function sendSellerNotice(
   }
 }
 
-function subscriptionPriceLine(): string {
-  const monthly = formatINR(PLAN_PRICES_PAISE.STARTER);
-  const yearly = formatINR(PLAN_PRICES_YEARLY_PAISE.STARTER ?? 0);
+function subscriptionPriceLine(customPricePaise: number | null): string {
+  const monthly = formatINR(storeBasePaise("monthly", customPricePaise));
+  const yearly = formatINR(storeBasePaise("yearly", customPricePaise));
   return `It costs ${monthly} a month or ${yearly} a year, plus GST.`;
 }
 
@@ -378,6 +378,8 @@ export type SendTrialReminderEmailInput = {
   /** IST calendar days to `endsAt` (lib/trial-alerts.ts). */
   daysLeft: number;
   billingUrl: string;
+  /** This store's own price (lib/subscription.ts). Null = the list price. */
+  customPricePaise: number | null;
 };
 
 export async function sendTrialReminderEmail(input: SendTrialReminderEmailInput): Promise<{ delivered: boolean }> {
@@ -390,7 +392,7 @@ export async function sendTrialReminderEmail(input: SendTrialReminderEmailInput)
       heading: `Your free trial ends ${when}`,
       paragraphs: [
         `The free trial for ${input.storeName} ends ${when} (${formatIstDate(input.endsAt)}). Subscribe to keep taking orders after that.`,
-        subscriptionPriceLine(),
+        subscriptionPriceLine(input.customPricePaise),
         "If you don't subscribe, customers can't place new orders. Your existing orders and records stay available.",
       ],
       cta: "Choose a plan",
@@ -405,6 +407,8 @@ export type SendStoreLockedEmailInput = {
   name: string | null;
   storeName: string;
   billingUrl: string;
+  /** This store's own price (lib/subscription.ts). Null = the list price. */
+  customPricePaise: number | null;
 };
 
 export async function sendStoreLockedEmail(input: SendStoreLockedEmailInput): Promise<{ delivered: boolean }> {
@@ -417,7 +421,7 @@ export async function sendStoreLockedEmail(input: SendStoreLockedEmailInput): Pr
       paragraphs: [
         `A customer just tried to order from ${input.storeName}, but your free trial or plan has ended, so the order didn't go through.`,
         "Subscribe to reopen your store. Your existing orders and records are safe.",
-        subscriptionPriceLine(),
+        subscriptionPriceLine(input.customPricePaise),
       ],
       cta: "Reopen my store",
       url: input.billingUrl,

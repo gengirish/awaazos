@@ -461,6 +461,18 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     ownerOnly: true,
     keywords: "referral refer invite friend link reward free month trial share",
   },
+  {
+    id: "owner-survey",
+    group: "setup",
+    title: "Tell us what slows your store down",
+    steps:
+      "Pick what is hard about running your store and which part hurts most. It takes about a minute, and you can change your answers later. We use them to decide what to build next, and we may use them to offer your store a price that fits.",
+    nav: "settings",
+    href: "/settings/survey",
+    trail: ["Tell us what's hard"],
+    ownerOnly: true,
+    keywords: "survey feedback problem request feature suggestion price",
+  },
 ];
 
 export type ResolvedHelpTopic = HelpTopic & {

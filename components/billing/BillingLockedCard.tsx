@@ -2,8 +2,10 @@ import type { StaffRole } from "@prisma/client";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
+import { formatINRCompact } from "@/lib/currency";
 import { formatIstDate } from "@/lib/datetime";
 import { PLAN_MARKETING } from "@/lib/plan-copy";
+import { storeBasePaise } from "@/lib/subscription";
 
 /** What ran out when a vendor became locked: the free trial, or a paid period. */
 export type LockReason = "trial" | "paid";
@@ -28,10 +30,13 @@ export function BillingLockedCard({
   since,
   staffRole,
   trialEndsAt,
+  customPricePaise,
 }: {
   since: Date;
   staffRole: StaffRole;
   trialEndsAt: Date | null | undefined;
+  /** This store's own price (lib/subscription.ts). Null = the list price. */
+  customPricePaise: number | null;
 }) {
   const reason = lockReason(since, trialEndsAt);
   const starter = PLAN_MARKETING.STARTER;
@@ -50,9 +55,15 @@ export function BillingLockedCard({
           still here.
         </p>
         <p className="mt-4 text-lg font-semibold">
-          {starter.price}
+          {customPricePaise === null
+            ? starter.price
+            : `${formatINRCompact(storeBasePaise("monthly", customPricePaise))}/mo + GST`}
           <span className="block text-sm font-normal text-muted-foreground">
-            or {starter.yearlyPrice} — {starter.yearlyNote}
+            or{" "}
+            {customPricePaise === null
+              ? starter.yearlyPrice
+              : `${formatINRCompact(storeBasePaise("yearly", customPricePaise))}/yr + GST`}{" "}
+            — {starter.yearlyNote}
           </span>
         </p>
         <div className="mt-6 flex flex-col gap-3">
