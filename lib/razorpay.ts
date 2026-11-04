@@ -55,12 +55,34 @@ export function getRazorpayPlanId(plan: SubscribablePlan, interval: BillingInter
   return id;
 }
 
+/**
+ * Plans we no longer sell but subscribers still renew on, because a Razorpay
+ * plan's amount is fixed: `RAZORPAY_RETIRED_PLANS=plan_abc:STARTER:monthly,...`,
+ * printed by `npm run razorpay:create-plans`. Without an entry, a subscription
+ * from before its `notes` carried the plan would stop being credited.
+ */
+function retiredPlan(planId: string): { plan: Plan; interval: BillingInterval } | null {
+  for (const entry of (process.env.RAZORPAY_RETIRED_PLANS ?? "").split(",")) {
+    const [id, plan, interval] = entry.trim().split(":");
+    if (
+      id === planId &&
+      (SUBSCRIBABLE_PLANS as readonly unknown[]).includes(plan) &&
+      (BILLING_INTERVALS as readonly unknown[]).includes(interval)
+    ) {
+      return { plan: plan as SubscribablePlan, interval: interval as BillingInterval };
+    }
+  }
+  return null;
+}
+
 /** Map a Razorpay `plan_id` to our plan + interval using the env ids (no throw if unset). */
 export function planFromRazorpayPlanId(
   planId: string,
 ): { plan: Plan; interval: BillingInterval } | null {
   if (!planId) return null;
   const e = process.env;
+  const retired = retiredPlan(planId);
+  if (retired) return retired;
   if (planId === e.RAZORPAY_PLAN_STARTER_YEARLY) return { plan: "STARTER", interval: "yearly" };
   if (planId === e.RAZORPAY_PLAN_STARTER_MONTHLY || planId === e.RAZORPAY_PLAN_STARTER) {
     return { plan: "STARTER", interval: "monthly" };
@@ -100,6 +122,12 @@ export function verifyRazorpaySignature(rawBody: string, signature: string | nul
   } catch {
     return false;
   }
+}
+
+/** What Razorpay will charge per cycle on this plan, in paise. */
+export async function fetchRazorpayPlanAmountPaise(planId: string): Promise<number> {
+  const plan = await withTimeout(getRazorpay().plans.fetch(planId), RAZORPAY_API_TIMEOUT_MS, "razorpay.plans.fetch");
+  return Number(plan.item.amount);
 }
 
 /** A plan at a custom amount (lib/custom-subscription-plan.ts). Returns its Razorpay id. */

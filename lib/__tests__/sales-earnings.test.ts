@@ -63,7 +63,7 @@ describe("storeEarnings", () => {
       charge("2026-11-01T00:00:00Z", "y1", YEARLY_CHARGE),
       charge("2027-11-01T00:00:00Z", "y2", YEARLY_CHARGE),
     ]);
-    expect(earned?.lines.map((l) => l.sharePaise)).toEqual([149_500]);
+    expect(earned?.lines.map((l) => l.sharePaise)).toEqual([249_500]);
   });
 });
 

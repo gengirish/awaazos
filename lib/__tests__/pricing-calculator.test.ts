@@ -19,13 +19,14 @@ import {
   type PricingInputs,
 } from "@/lib/pricing-calculator";
 
-const c: PricingInputs = { ...PRICING_DEFAULTS };
+// Fixed prices, so a change of list price does not move the arithmetic below.
+const c: PricingInputs = { ...PRICING_DEFAULTS, flatPaise: 29900, capPaise: 29900, annualPaise: 299000 };
 
 describe("pricing calculator", () => {
   it("defaults to today's STARTER prices with GST on", () => {
-    expect(c.flatPaise).toBe(PLAN_PRICES_PAISE.STARTER);
-    expect(c.annualPaise).toBe(PLAN_PRICES_YEARLY_PAISE.STARTER);
-    expect(c.chargeGst).toBe(true);
+    expect(PRICING_DEFAULTS.flatPaise).toBe(PLAN_PRICES_PAISE.STARTER);
+    expect(PRICING_DEFAULTS.annualPaise).toBe(PLAN_PRICES_YEARLY_PAISE.STARTER);
+    expect(PRICING_DEFAULTS.chargeGst).toBe(true);
   });
 
   it("prices each plan at ₹1L sales", () => {

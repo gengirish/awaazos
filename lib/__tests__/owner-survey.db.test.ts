@@ -49,6 +49,7 @@ vi.mock("@/lib/rbac", () => {
 vi.mock("@/lib/razorpay", () => ({
   createRazorpayPlan: h.createRazorpayPlan,
   getRazorpayPlanId: (_plan: string, interval: string) => `plan_list_${interval}`,
+  fetchRazorpayPlanAmountPaise: async () => 588820,
 }));
 
 const ANSWERS = {

@@ -38,15 +38,15 @@ export type MarketedPlan = (typeof MARKETED_PLANS)[number];
 export type PlanMarketing = {
   /** Display name, e.g. "Starter". */
   label: string;
-  /** "₹299/mo + GST". */
+  /** "₹499/mo + GST". */
   price: string;
-  /** Just the monthly amount: "₹299". */
+  /** Just the monthly amount: "₹499". */
   amount: string;
   /** Billing period suffix for `amount`. */
   period: "/mo";
   /** Prices exclude GST (`GST_BPS`). */
   taxNote: "+ GST";
-  /** "₹2,990/yr + GST". */
+  /** "₹4,990/yr + GST". */
   yearlyPrice: string;
   /** Why yearly is worth it: "2 months free". */
   yearlyNote: string;
@@ -54,7 +54,7 @@ export type PlanMarketing = {
   trial: string;
   /** The one sign-up call to action: "Start 30 days free". */
   cta: string;
-  /** Line shown beside the CTA: "No card needed. Then ₹299/month + GST." */
+  /** Line shown beside the CTA: "No card needed. Then ₹499/month + GST." */
   ctaNote: string;
   /** One line for the landing-page teaser card. */
   teaser: string;

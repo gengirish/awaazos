@@ -163,7 +163,7 @@ test.describe("a store's own price", () => {
       const ownerContext = await browser.newContext(CONTEXT_OPTIONS);
       const ownerPage = await ownerContext.newPage();
       await signIn(ownerPage, store, "/settings/billing");
-      await expect(ownerPage.getByRole("button", { name: /Starter monthly/ })).toContainText("₹352.82");
+      await expect(ownerPage.getByRole("button", { name: /Starter monthly/ })).toContainText("₹588.82");
 
       const saved = await ownerPage.request.put("/api/vendor/survey", {
         data: { ...ANSWERS, comment: "Rider tracking" },
@@ -218,7 +218,7 @@ test.describe("a store's own price", () => {
       await dialog.getByRole("button", { name: "Save price" }).click();
       await expect(row).toContainText("On the list price");
       await ownerPage.reload();
-      await expect(ownerPage.getByRole("button", { name: /Starter monthly/ })).toContainText("₹352.82");
+      await expect(ownerPage.getByRole("button", { name: /Starter monthly/ })).toContainText("₹588.82");
 
       await ownerContext.close();
     });

@@ -10,10 +10,11 @@
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
-import { createRazorpayPlan, getRazorpayPlanId } from "@/lib/razorpay";
+import { createRazorpayPlan, fetchRazorpayPlanAmountPaise, getRazorpayPlanId } from "@/lib/razorpay";
 import {
   storeBasePaise,
   storeChargePaise,
+  subscriptionChargePaise,
   type BillingInterval,
   type SubscribablePlan,
 } from "@/lib/subscription";
@@ -24,8 +25,18 @@ export async function resolveSubscriptionPlanId(input: {
   customPricePaise: number | null;
 }): Promise<string> {
   const { plan, interval, customPricePaise } = input;
-  // No custom price: the list plan, and the plan's env vars say which.
-  if (customPricePaise === null) return getRazorpayPlanId(plan, interval);
+  // No custom price: the list plan, and the plan's env vars say which. A price
+  // lives in lib/constants.ts and an amount in Razorpay, so check they agree:
+  // an env id left on an old plan must not charge other than the page says.
+  if (customPricePaise === null) {
+    const planId = getRazorpayPlanId(plan, interval);
+    const amountPaise = await fetchRazorpayPlanAmountPaise(planId);
+    const expectedPaise = subscriptionChargePaise(plan, interval);
+    if (amountPaise !== expectedPaise) {
+      throw new Error(`Razorpay plan for ${plan} ${interval} charges ${amountPaise}, expected ${expectedPaise}`);
+    }
+    return planId;
+  }
 
   const basePaise = storeBasePaise(interval, customPricePaise);
   const key = { basePaise, interval };

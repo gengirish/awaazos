@@ -6,7 +6,7 @@ Code: `lib/referral.ts` (rules, pure), `lib/referral-server.ts` (database).
 ## Why free months, not commission
 
 A cash commission brings TDS on commission (section 194H), GST questions for the person paid,
-payout rails and KYC. At ₹299 a month none of that pays for itself. A free month costs only
+payout rails and KYC. At ₹499 a month none of that pays for itself. A free month costs only
 revenue we would not have had, and it is paid only after the referred store has paid us, so a
 fake sign-up is worth nothing to anyone.
 

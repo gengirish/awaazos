@@ -90,7 +90,7 @@ All of this on a phone, in <8 seconds per transaction. **Hindi + English at MVP.
 - 💳 **UPI deep links + QR** — vendor's own UPI ID, no MDR fees, scannable from any UPI app
 - 📊 **Analytics dashboard** — Recharts revenue trend, hourly heatmap, top sellers, voice adoption %, payment method breakdown — every chart has a `<details>` data table for accessibility
 - 🏢 **Multi-tenant** — `vendorId` scoping enforced on every query, two-layer RBAC (platform `UserRole` + per-tenant `StaffRole`)
-- 💸 **Trial + Razorpay subscriptions** — 30-day free trial with Starter limits, then Starter at ₹299/month or ₹2,990/year (+ GST), paid in place with Razorpay Checkout. Trial, paid and locked states are derived on every read (`billingAccess()`), with no timers; a locked store keeps read access to its records. A super admin can extend a store's free access by date (`/admin/vendors`)
+- 💸 **Trial + Razorpay subscriptions** — 30-day free trial with Starter limits, then Starter at ₹499/month or ₹4,990/year (+ GST), paid in place with Razorpay Checkout. Trial, paid and locked states are derived on every read (`billingAccess()`), with no timers; a locked store keeps read access to its records. A super admin can extend a store's free access by date (`/admin/vendors`)
 - 🖼️ **Store banner & logo** — the owner uploads a cover photo and logo for `/s/[slug]` in Settings → Online store; photos are shrunk on the phone before upload
 - 🛍️ **Public storefront + Drops** — opt-in `/s/[slug]` page where buyers order from the everyday menu or from a pre-order "drop" (cut-off, capped stock, prep sheet). Payment by UPI + the buyer's "I've paid" claim (the seller confirms), pay on delivery, or the vendor's own Razorpay keys. Optional Instagram and WhatsApp links in the store header
 - 📋 **One orders board** — `/orders` holds menu orders and every drop's orders, with a source picker, search, pickup/delivery filter, bulk confirm / mark paid / deliver, and Undo after handover
@@ -337,7 +337,7 @@ awaazos/
 
 ## 💸 Pricing
 
-**30 days free, then Starter at ₹299/month or ₹2,990/year (+ 18% GST).** Unlimited bills.
+**30 days free, then Starter at ₹499/month or ₹4,990/year (+ 18% GST).** Unlimited bills.
 
 One plan is sold. Stores that signed up before the trial stay on the old FREE tier (50 bills a
 month) and are never locked. Plan enforcement is server-side: `requirePlan(vendor, Plan.STARTER)`

@@ -811,9 +811,9 @@ enum UserRole {
 
 enum Plan {
   FREE // 50 transactions/month, 1 staff
-  LITE // ₹249/month — limits in PLAN_LIMITS (lib/constants.ts)
-  STARTER // ₹299/month — unlimited orders, online payments, CSV
-  PRO // ₹799/month — Starter + a year of analytics
+  LITE // ₹449/month — limits in PLAN_LIMITS (lib/constants.ts)
+  STARTER // ₹499/month — unlimited orders, online payments, CSV
+  PRO // ₹999/month — Starter + a year of analytics
   ENTERPRISE // Custom
 }
 

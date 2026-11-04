@@ -45,7 +45,7 @@ export const PLAN_LIMITS: Record<
   // already shuts it out; storefront Razorpay reads `razorpayLinks`.
   LITE: {
     label: "Lite",
-    pricePaise: 24900,
+    pricePaise: 44900,
     txnPerMonth: 50,
     maxStaff: 1,
     whatsappReceipts: false,
@@ -58,7 +58,7 @@ export const PLAN_LIMITS: Record<
   },
   STARTER: {
     label: "Starter",
-    pricePaise: 29900,
+    pricePaise: 49900,
     // Unlimited: STARTER matches the 30-day trial
     // (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md), so converting changes nothing.
     txnPerMonth: null,
@@ -74,7 +74,7 @@ export const PLAN_LIMITS: Record<
   },
   PRO: {
     label: "Pro",
-    pricePaise: 79900,
+    pricePaise: 99900,
     txnPerMonth: null,
     maxStaff: null,
     whatsappReceipts: true,
@@ -169,9 +169,9 @@ export const BRAND = {
 /** Per-plan SaaS price in paise (monthly). Mirrors `PLAN_LIMITS.*.pricePaise` for gates and marketing. */
 export const PLAN_PRICES_PAISE: Record<Plan, number> = {
   FREE: 0,
-  LITE: 24900,
-  STARTER: 29900,
-  PRO: 79900,
+  LITE: 44900,
+  STARTER: 49900,
+  PRO: 99900,
   ENTERPRISE: 0,
 };
 
@@ -180,9 +180,9 @@ export const PLAN_PRICES_PAISE: Record<Plan, number> = {
  * free). Only plans that can be bought yearly are listed.
  */
 export const PLAN_PRICES_YEARLY_PAISE: Partial<Record<Plan, number>> = {
-  LITE: 249000,
-  STARTER: 299000,
-  PRO: 799000,
+  LITE: 449000,
+  STARTER: 499000,
+  PRO: 999000,
 };
 
 /**

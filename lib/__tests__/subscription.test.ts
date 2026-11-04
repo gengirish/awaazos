@@ -47,9 +47,9 @@ describe("prices", () => {
 
   it("Razorpay plan amounts are base + GST", () => {
     expect(subscriptionBasePaise("STARTER", "monthly")).toBe(PLAN_PRICES_PAISE.STARTER);
-    expect(subscriptionChargePaise("STARTER", "monthly")).toBe(35282);
-    expect(subscriptionBasePaise("STARTER", "yearly")).toBe(299000);
-    expect(subscriptionChargePaise("STARTER", "yearly")).toBe(352820);
+    expect(subscriptionChargePaise("STARTER", "monthly")).toBe(58882);
+    expect(subscriptionBasePaise("STARTER", "yearly")).toBe(499000);
+    expect(subscriptionChargePaise("STARTER", "yearly")).toBe(588820);
   });
 
   it("yearly is 10× monthly (two months free)", () => {
@@ -220,10 +220,21 @@ describe("Razorpay plan ids", () => {
   });
 
   it("charges each plan its base plus GST, a year being ten months", () => {
-    expect(subscriptionChargePaise("LITE", "monthly")).toBe(29382);
-    expect(subscriptionChargePaise("LITE", "yearly")).toBe(293820);
-    expect(subscriptionChargePaise("PRO", "monthly")).toBe(94282);
-    expect(subscriptionChargePaise("PRO", "yearly")).toBe(942820);
+    expect(subscriptionChargePaise("LITE", "monthly")).toBe(52982);
+    expect(subscriptionChargePaise("LITE", "yearly")).toBe(529820);
+    expect(subscriptionChargePaise("PRO", "monthly")).toBe(117882);
+    expect(subscriptionChargePaise("PRO", "yearly")).toBe(1178820);
+  });
+
+  it("keeps crediting retired plans, and ignores entries it can't trust", () => {
+    vi.stubEnv(
+      "RAZORPAY_RETIRED_PLANS",
+      "plan_old_m:STARTER:monthly, plan_old_y:STARTER:yearly,plan_bad:ENTERPRISE:monthly,plan_worse:STARTER:weekly",
+    );
+    expect(planFromRazorpayPlanId("plan_old_m")).toEqual({ plan: "STARTER", interval: "monthly" });
+    expect(planFromRazorpayPlanId("plan_old_y")).toEqual({ plan: "STARTER", interval: "yearly" });
+    expect(planFromRazorpayPlanId("plan_bad")).toBeNull();
+    expect(planFromRazorpayPlanId("plan_worse")).toBeNull();
   });
 
   it("maps monthly, yearly, the legacy monthly name and PRO", () => {
