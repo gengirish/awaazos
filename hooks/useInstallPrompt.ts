@@ -32,6 +32,11 @@ export type InstallState = {
   bannerShowing: boolean;
 };
 
+/** The home-screen banner has something to offer: an install path, and not dismissed here. */
+export function isInstallBannerEligible({ mode, dismissed }: Pick<InstallState, "mode" | "dismissed">): boolean {
+  return (mode === "prompt" || mode === "ios") && !dismissed;
+}
+
 const INITIAL: InstallState = { mode: "loading", guide: false, dismissed: false, installing: false, bannerShowing: false };
 
 let state: InstallState = INITIAL;

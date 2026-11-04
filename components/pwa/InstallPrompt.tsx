@@ -6,6 +6,7 @@ import { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import {
   dismissInstallHint,
+  isInstallBannerEligible,
   promptInstall,
   setInstallBannerPresence,
   useInstallPrompt,
@@ -34,8 +35,9 @@ import { cn } from "@/lib/utils";
 const ICON_BADGE = "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground";
 
 export function InstallBanner({ className }: { className?: string }) {
-  const { mode, guide, dismissed, installing } = useInstallPrompt();
-  const visible = (mode === "prompt" || mode === "ios") && !dismissed;
+  const install = useInstallPrompt();
+  const { mode, guide, installing } = install;
+  const visible = isInstallBannerEligible(install);
 
   useEffect(() => {
     if (!visible) return;
