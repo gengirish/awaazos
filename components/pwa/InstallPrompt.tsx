@@ -1,14 +1,12 @@
 "use client";
 
 import { Download, Share, X } from "lucide-react";
-import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
   dismissInstallHint,
   isInstallBannerEligible,
   promptInstall,
-  setInstallBannerPresence,
   useInstallPrompt,
 } from "@/hooks/useInstallPrompt";
 import { openInstallGuide } from "@/lib/install-guide";
@@ -20,7 +18,8 @@ import { cn } from "@/lib/utils";
  * (hooks/useInstallPrompt.ts) and draw nothing on the server or before mount.
  *
  *   InstallBanner      one dismissible in-flow banner on the home screens
- *                      (/orders, /pos), until dismissed or installed.
+ *                      (/pos; on /orders through its banner slot), until
+ *                      dismissed or installed.
  *   InstallSheetRow    a row in the shell's "More" sheet on phones. Stays after
  *                      the banner is dismissed: it is how to find install again.
  *   InstallRailButton  the rail foot from md, only where the browser can prompt.
@@ -38,12 +37,6 @@ export function InstallBanner({ className }: { className?: string }) {
   const install = useInstallPrompt();
   const { mode, guide, installing } = install;
   const visible = isInstallBannerEligible(install);
-
-  useEffect(() => {
-    if (!visible) return;
-    setInstallBannerPresence(true);
-    return () => setInstallBannerPresence(false);
-  }, [visible]);
 
   if (!visible) return null;
 

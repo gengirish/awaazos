@@ -28,8 +28,6 @@ export type InstallState = {
   dismissed: boolean;
   /** The browser's install dialog is open. */
   installing: boolean;
-  /** A home-screen banner is on screen right now (see `setInstallBannerPresence`). */
-  bannerShowing: boolean;
 };
 
 /** The home-screen banner has something to offer: an install path, and not dismissed here. */
@@ -37,13 +35,12 @@ export function isInstallBannerEligible({ mode, dismissed }: Pick<InstallState, 
   return (mode === "prompt" || mode === "ios") && !dismissed;
 }
 
-const INITIAL: InstallState = { mode: "loading", guide: false, dismissed: false, installing: false, bannerShowing: false };
+const INITIAL: InstallState = { mode: "loading", guide: false, dismissed: false, installing: false };
 
 let state: InstallState = INITIAL;
 let deferred: BeforeInstallPromptEvent | null = null;
 let installed = false;
 let started = false;
-let banners = 0;
 const listeners = new Set<() => void>();
 
 function set(patch: Partial<InstallState>): void {
@@ -56,8 +53,7 @@ function set(patch: Partial<InstallState>): void {
     next.mode === state.mode &&
     next.guide === state.guide &&
     next.dismissed === state.dismissed &&
-    next.installing === state.installing &&
-    next.bannerShowing === state.bannerShowing
+    next.installing === state.installing
   ) {
     return;
   }
@@ -172,12 +168,3 @@ export function dismissInstallHint(): void {
   set({ dismissed: true });
 }
 
-/**
- * The banner reports itself while it is on screen, so the phone-alerts hint
- * (which gives iPhone users the same Add-to-Home-Screen steps) can stand down
- * and a vendor never reads the instruction twice on one screen.
- */
-export function setInstallBannerPresence(showing: boolean): void {
-  banners = Math.max(0, banners + (showing ? 1 : -1));
-  set({ bannerShowing: banners > 0 });
-}

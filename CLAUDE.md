@@ -475,11 +475,17 @@ httpOnly `awz_cust` cookie. A buyer session never touches staff RBAC or widens a
 in one list (`loadOrdersBoard` in `lib/drops-board-server.ts`: the last 3 IST days, older orders
 still open, and every order of a drop whose handover window ended within those 3 days).
 `BoardOrder.dropId` says which kind an order is. The "Show orders from" picker narrows the board
-to menu orders or one drop (then the header offers that drop's Edit / Prep sheet / share); with a
-single source there is no picker. `/orders?drop=<id>` opens it on a drop and keeps a past drop on
+to menu orders or one drop (then its Share and "⋯" menus offer that drop's sharing, Edit and Prep sheet);
+with a single source there is no picker. `/orders?drop=<id>` opens it on a drop and keeps a past drop on
 the board; `/drops/[id]` only redirects there. **Don't add a second orders page.** Actions still
 go to the order's own route family (`orderActionBase` in `lib/drops-board.ts`), so each keeps its
 compound scope; the frozen rule is per order (`isDropFrozen` on its drop).
+
+**Board layout** (`components/drops/orders/`): at most one banner above the board (`OrdersBannerSlot`, rules in
+`lib/orders-banner.ts`): FSSAI reminder, then install, then the owner survey; "Not now" lasts 7 days per device.
+Billing notices and a checklist with open steps sit outside the slot. The header has one Share menu and one "⋯"
+menu (`BoardMenus.tsx`). In menu scope the status pill sets `acceptMenuOrders` for an OWNER through `PATCH
+/api/vendor`; it does not touch drops. Refresh, Sound and phone alerts are in the live sync bar at the bottom.
 
 Orders board freshness: order placement and board actions bump one per-vendor Upstash counter
 (`bumpOrderSignal` in `lib/drops-signal.ts`, fire-and-forget). Instant alerts come from Web Push;
@@ -499,7 +505,7 @@ screens are public). 404/410 from the push service deletes the row. Feature-gate
 **Spoken new-order alert** (`lib/order-voice.ts`): on each push `public/sw.js` also posts
 `{ type: "awz-push", tag }` to open pages. `OrderVoiceAlerts` (vendor layout) says "New order received
 from <first name>" via `speechSynthesis` when Sound is on for the device (one localStorage choice,
-**on by default**, shared by the board's Sound button and Settings → Notifications), then fires
+**on by default**, shared by the sync bar's Sound button and Settings → Notifications), then fires
 `PUSH_ARRIVED_EVENT` so an open board refetches at once. **The name never goes in the push payload**:
 the page reads it from `GET /api/storefront-orders/announce?bill=` (CASHIER, `{ vendorId, billNumber }`,
 returns the first name only) and gives it only to an on-device voice (`localService`); otherwise it
@@ -656,7 +662,7 @@ no timers, nothing cached on `Vendor`. There are no per-item ratings.
 Rules in the header of `lib/owner-survey.ts` (pure), database side in `lib/owner-survey-server.ts`. An OWNER
 of a real store answers once, changeably, in Settings → Tell us what's hard (`PUT /api/vendor/survey`,
 `OwnerSurveyResponse`, one row per store): which problems, which hurts most, orders a week, the most they can handle, what they would
-pay, an optional comment. `/orders` and `/drops` show a prompt until answered ("Not now" is per device).
+pay, an optional comment. `/orders` and `/drops` show a prompt until answered ("Not now" snoozes it for 7 days on that device).
 `/admin/survey` (SUPER_ADMIN) ranks the problems to decide what to build; `/admin/vendors` shows one store's
 answers beside its price. Answers never set a price by themselves, and `SURVEY_USE_NOTICE` tells the owner they
 may inform it: keep it on the form. Pain keys are stored, so retire one rather than renaming it. The comment is

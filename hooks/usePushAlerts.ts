@@ -43,12 +43,7 @@ export type PushAlertsState = {
   /** Visible + announced feedback for the last action. */
   message: string;
   tooMany: boolean;
-  /** The phone-alerts tip / prompt was dismissed on this device. */
-  dismissed: boolean;
 };
-
-/** Per-device: "don't nudge me about phone alerts here". */
-export const PUSH_DISMISS_KEY = "awz_push_hint_dismissed_v1";
 
 export const PUSH_COPY = {
   notConfigured: "Phone alerts aren't set up on this server yet.",
@@ -66,7 +61,7 @@ export const PUSH_COPY = {
   testFailed: "Couldn't send a test alert. Try again.",
 } as const;
 
-const INITIAL: PushAlertsState = { view: "loading", busy: null, message: "", tooMany: false, dismissed: false };
+const INITIAL: PushAlertsState = { view: "loading", busy: null, message: "", tooMany: false };
 
 let state: PushAlertsState = INITIAL;
 let detectSeq = 0;
@@ -75,14 +70,6 @@ const listeners = new Set<() => void>();
 function set(patch: Partial<PushAlertsState>): void {
   state = { ...state, ...patch };
   listeners.forEach((l) => l());
-}
-
-function readDismissed(): boolean {
-  try {
-    return window.localStorage.getItem(PUSH_DISMISS_KEY) === "1";
-  } catch {
-    return false;
-  }
 }
 
 async function detectView(): Promise<PushView> {
@@ -108,7 +95,7 @@ function subscribe(listener: () => void): () => void {
   listeners.add(listener);
   if (listeners.size === 1) {
     // First copy on this page: drop the last page's feedback and look again.
-    set({ dismissed: readDismissed(), message: "", tooMany: false });
+    set({ message: "", tooMany: false });
     recheckPushAlerts();
   }
   return () => {
@@ -175,12 +162,3 @@ export async function sendTestPushAlert(): Promise<void> {
   }
 }
 
-/** Hide the phone-alerts tip and prompt on this device. The opt-in stays in the sheet and in Settings. */
-export function dismissPushHint(): void {
-  try {
-    window.localStorage.setItem(PUSH_DISMISS_KEY, "1");
-  } catch {
-    // Private mode / blocked storage: the hint just comes back next visit.
-  }
-  set({ dismissed: true });
-}

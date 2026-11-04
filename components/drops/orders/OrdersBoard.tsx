@@ -4,6 +4,7 @@ import type { FulfilmentMode, StaffRole } from "@prisma/client";
 import {
   BellRing,
   ChefHat,
+  CircleAlert,
   Loader2,
   PackageCheck,
   Pencil,
@@ -22,11 +23,10 @@ import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, 
 import { toast } from "sonner";
 
 import type { OverflowLink } from "@/components/drops/orders/BoardMenus";
-import { BoardMoreActions } from "@/components/drops/orders/BoardMoreActions";
 import { BulkActionBar } from "@/components/drops/orders/BulkActionBar";
 import { OrderCard, type OrderSource } from "@/components/drops/orders/OrderCard";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
-import { PushAlertsButton, PushAlertsPrompt } from "@/components/push/PushAlertsButton";
+import { PushAlertsBarButton } from "@/components/push/PushAlertsButton";
 import { Button } from "@/components/ui/button";
 import { RadioOption } from "@/components/ui/radio-option";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -169,23 +169,14 @@ const ACTION_DONE: Record<OrderAction, string> = {
   undeliver: "Moved back to confirmed",
 };
 
-/** Summary tile: one line (label · figure) on phones, label over figure from sm. */
-const KPI_TILE =
-  "flex min-w-0 flex-wrap items-baseline justify-between gap-x-1.5 rounded-lg border bg-card px-2 py-1.5 sm:block sm:p-3";
-const KPI_VALUE = "font-mono text-sm font-bold tabular-nums sm:text-lg";
+/** Summary tile: one line, label and figure. Four in a row from sm, 2×2 on phones. */
+const KPI_TILE = "flex min-w-0 flex-wrap items-baseline justify-between gap-x-1.5 rounded-lg border bg-card px-2.5 py-1.5";
+const KPI_VALUE = "font-mono text-sm font-bold tabular-nums";
 
 const SEGMENT_BTN =
   "inline-flex min-h-11 items-center justify-center gap-1 rounded-md border px-2 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
 
 const STATUS_BADGE = "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold";
-
-/** Header controls built by the board (they need its state), laid out by each header. */
-type BoardTools = {
-  refreshButton: ReactNode;
-  lastChecked: ReactNode;
-  soundButton: (className?: string) => ReactNode;
-  pollNote: ReactNode;
-};
 
 function beep(ctx: AudioContext | null) {
   if (!ctx) return;
@@ -236,6 +227,7 @@ export function OrdersBoard({
   // show" button. Cleared when she taps it or acts on any order.
   const [unseenIds, setUnseenIds] = useState<readonly string[]>(NO_IDS);
   const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
   const [handover, setHandover] = useState<HandoverFilter>("all");
   const [soundOn, setSoundOn] = useState(false);
   /** Saved choice was "on" but audio is still locked until the first tap. */
@@ -259,8 +251,10 @@ export function OrdersBoard({
   const pinnedDropRef = useRef<string | null>(initialDropId);
   const rootRef = useRef<HTMLDivElement>(null);
   const tabRefs = useRef<Partial<Record<BoardFilter, HTMLButtonElement | null>>>({});
-  // The shared phone-alerts store (hooks/usePushAlerts.ts): the opt-in copies on
-  // this page already subscribe to it, so reading it here asks the browser nothing new.
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchToggleRef = useRef<HTMLButtonElement>(null);
+  // The shared phone-alerts store (hooks/usePushAlerts.ts): the bar's control
+  // already subscribes to it, so reading it here asks the browser nothing new.
   const push = usePushAlerts();
 
   // What the board can be narrowed to. With a single source there is nothing to
@@ -574,6 +568,18 @@ export function OrdersBoard({
     [scoped, trimmedQuery],
   );
   const showSearch = scoped.length >= SEARCH_MIN_ORDERS || query !== "";
+  const searchExpanded = searchOpen || query !== "";
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  const closeSearch = () => {
+    setQuery("");
+    setSearchOpen(false);
+    setSelected(EMPTY_SELECTION);
+    searchToggleRef.current?.focus();
+  };
   const unseenCount = useMemo(() => {
     if (unseenIds.length === 0) return 0;
     const ids = new Set(unseenIds);
@@ -654,6 +660,7 @@ export function OrdersBoard({
     if (unseenIds.some((id) => !inScope.has(id))) changeScope("all");
     changeFilter("needs_action");
     setQuery("");
+    setSearchOpen(false);
     seenNewOrders();
     rootRef.current?.scrollIntoView({ block: "start" });
     // The button she tapped is gone; keep focus on the list's own tab.
@@ -763,54 +770,15 @@ export function OrdersBoard({
     if (result.failed.length > 0) await refresh();
   };
 
-  const tools: BoardTools = {
-    refreshButton: (
-      <Button
-        type="button"
-        variant="outline"
-        className="min-h-11"
-        onClick={() => void refresh({ manual: true })}
-        disabled={refreshing}
-        aria-busy={refreshing}
-      >
-        {refreshing ? (
-          <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
-        ) : (
-          <RefreshCw aria-hidden />
-        )}
-        Refresh
-      </Button>
-    ),
-    lastChecked: lastChecked ? (
-      <span className="min-w-0 text-xs leading-tight text-muted-foreground">Last checked {formatIstTime(lastChecked)}</span>
-    ) : null,
-    // Rendered twice (header from md, "More actions" sheet on phones). Both carry
-    // data-sound-toggle so the "first tap enables sound" listener leaves them alone.
-    soundButton: (className) => (
-      <Button
-        type="button"
-        variant="outline"
-        className={cn("min-h-11", className)}
-        onClick={toggleSound}
-        aria-pressed={soundOn}
-        data-sound-toggle
-      >
-        {soundOn || soundPending ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />}
-        {soundOn ? "Sound on" : soundPending ? "Sound on — tap to enable" : "Sound off"}
-      </Button>
-    ),
-    pollNote: (
-      <p className="mt-2 text-xs text-muted-foreground">
-        {!pollKind
-          ? "Not checking for new orders automatically. Tap Refresh to update."
-          : push.view === "subscribed"
-            ? "New orders appear automatically while this screen is open."
-            : push.view === "default" || push.view === "denied" || push.view === "ios-needs-install"
-              ? "Checks every few minutes. Turn on phone alerts to see orders instantly."
-              : "Checks every few minutes. Tap Refresh to check now."}
-      </p>
-    ),
-  };
+  const pollNote = !pollKind
+    ? "Not checking for new orders automatically. Tap Refresh to update."
+    : push.view === "subscribed"
+      ? "New orders appear automatically while this screen is open."
+      : push.view === "default" || push.view === "denied" || push.view === "ios-needs-install"
+        ? "Checks every few minutes. Turn on phone alerts to see orders instantly."
+        : "Checks every few minutes. Tap Refresh to check now.";
+
+  const soundLabel = soundOn ? "Sound on" : soundPending ? "Sound on — tap to enable" : "Sound off";
 
   const dropTitles = useMemo(() => new Map(drops.map((d) => [d.id, d.title])), [drops]);
   // Only worth saying where an order came from while the list mixes sources.
@@ -972,16 +940,12 @@ export function OrdersBoard({
         storeIsLive={storeIsLive}
         vendorName={vendorName}
         vendorSlug={vendorSlug}
-        tools={tools}
         canChangeMenuStatus={staffRole === "OWNER"}
         menuStatusPending={menuStatusPending}
         onMenuStatus={(next) => void changeAcceptMenuOrders(next)}
         onScope={changeScope}
         vocab={vocab}
       />
-
-      {/* Phones, until this device has alerts on: the opt-in must not hide in the sheet. */}
-      <PushAlertsPrompt className="mb-3" />
 
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
@@ -991,7 +955,6 @@ export function OrdersBoard({
         <h2 id="summary-h" className="sr-only">
           Summary
         </h2>
-        {/* Phones: label and figure share a line, so the 2×2 block is about half as tall. */}
         <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
           <li className={KPI_TILE}>
             <p className="text-xs text-muted-foreground">Paid</p>
@@ -1005,8 +968,16 @@ export function OrdersBoard({
             <p className="text-xs text-muted-foreground">Live orders</p>
             <p className={KPI_VALUE}>{summary.activeOrders}</p>
           </li>
-          <li className={KPI_TILE}>
-            <p className="text-xs text-muted-foreground">Payment to check</p>
+          <li className={cn(KPI_TILE, summary.counts.PAYMENT_SUBMITTED > 0 && "border-warning bg-warning/10")}>
+            <p
+              className={cn(
+                "inline-flex items-center gap-1 text-xs",
+                summary.counts.PAYMENT_SUBMITTED > 0 ? "font-semibold text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {summary.counts.PAYMENT_SUBMITTED > 0 && <CircleAlert className="h-3.5 w-3.5 text-warning" aria-hidden />}
+              Payment to check
+            </p>
             {/* Only a buyer's "I've paid" claim is something to check; unpaid UPI orders just wait. */}
             <p className={KPI_VALUE}>{summary.counts.PAYMENT_SUBMITTED}</p>
             {summary.counts.AWAITING_PAYMENT > 0 && (
@@ -1025,12 +996,8 @@ export function OrdersBoard({
           </p>
         )}
         {showToMake && (
-          // Phones: heading and chips share a row, no card. From sm: the card as before.
-          <div
-            className="mt-2 flex items-start gap-2 sm:mt-3 sm:block sm:rounded-lg sm:border sm:bg-card sm:p-3"
-            aria-live="polite"
-          >
-            <h3 className="shrink-0 text-sm font-semibold leading-7 sm:leading-normal">
+          <div className="mt-2 flex items-start gap-2" aria-live="polite">
+            <h3 className="shrink-0 text-sm font-semibold leading-7">
               {vocab.kind === "food"
                 ? activeScope === "all"
                   ? "To make (menu)"
@@ -1040,14 +1007,14 @@ export function OrdersBoard({
                   : "To pack"}
             </h3>
             {toMake.length === 0 ? (
-              <p className="text-sm leading-7 text-muted-foreground sm:mt-1 sm:leading-normal">{vocab.kind === "food" ? "Nothing to make right now." : "Nothing to pack right now."}
+              <p className="text-sm leading-7 text-muted-foreground">{vocab.kind === "food" ? "Nothing to make right now." : "Nothing to pack right now."}
               </p>
             ) : (
-              <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5 sm:mt-2 sm:gap-2" aria-label={vocab.kind === "food" ? "Items to make" : "Items to pack"}>
+              <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5" aria-label={vocab.kind === "food" ? "Items to make" : "Items to pack"}>
                 {toMake.map((r) => (
                   <li
                     key={r.name}
-                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border bg-background px-2.5 text-sm sm:min-h-9 sm:px-3"
+                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border bg-background px-2.5 text-sm"
                   >
                     <span className="font-mono font-bold tabular-nums">{r.qty} ×</span>
                     <span>{r.name}</span>
@@ -1065,11 +1032,12 @@ export function OrdersBoard({
         From md: the pill row as before. aria-label keeps each tab's name
         "Label (count)" in both layouts. One tab stop; arrow keys, Home and End
         move between tabs. The "new orders" button rides along, so an order that
-        lands while she is deep in another list is one tap away.
+        lands while she is deep in another list is one tap away; so does search,
+        an icon at the end of the row until it is opened.
       */}
       <nav
         aria-label="Filter orders"
-        className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-3 border-b bg-background px-4 py-2 md:mb-4 md:overflow-x-auto md:border-b-0"
+        className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-3 border-b bg-background px-4 py-2 md:border-b-0"
       >
         {unseenCount > 0 && (
           <button
@@ -1081,84 +1049,93 @@ export function OrdersBoard({
             {unseenCount === 1 ? "1 new order" : `${unseenCount} new orders`} — show
           </button>
         )}
-        <div
-          role="tablist"
-          aria-label="Order status"
-          onKeyDown={onTabKeyDown}
-          className="grid grid-cols-[repeat(4,minmax(0,1fr))_2.75rem] gap-0.5 md:flex md:gap-2"
-        >
-          {BOARD_FILTERS.map((f) => {
-            const active = filter === f.id;
-            return (
-              <button
-                key={f.id}
-                ref={(el) => {
-                  tabRefs.current[f.id] = el;
-                }}
-                id={`orders-tab-${f.id}`}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                aria-controls="orders-list"
-                aria-label={`${f.label} (${counts[f.id]})`}
-                tabIndex={active ? 0 : -1}
-                onClick={() => changeFilter(f.id)}
-                className={cn(
-                  "flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border py-1 text-center text-xs font-medium leading-tight focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
-                  "md:min-h-11 md:shrink-0 md:flex-row md:gap-1 md:whitespace-nowrap md:rounded-full md:px-4 md:py-0 md:text-sm",
-                  active
-                    ? "border-primary bg-primary text-primary-foreground max-md:font-semibold max-md:underline max-md:underline-offset-2"
-                    : "border-input bg-background hover:bg-accent",
-                )}
-              >
-                <span className="max-w-full break-words">{f.label}</span>
-                <span className="font-mono text-sm font-bold tabular-nums md:hidden">{counts[f.id]}</span>
-                <span className="hidden md:inline">({counts[f.id]})</span>
-              </button>
-            );
-          })}
+        <div className="flex items-start gap-1 md:gap-2">
+          <div
+            role="tablist"
+            aria-label="Order status"
+            onKeyDown={onTabKeyDown}
+            className="grid min-w-0 flex-1 grid-cols-[repeat(4,minmax(0,1fr))_2.75rem] gap-0.5 md:flex md:gap-2 md:overflow-x-auto md:p-0.5"
+          >
+            {BOARD_FILTERS.map((f) => {
+              const active = filter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  ref={(el) => {
+                    tabRefs.current[f.id] = el;
+                  }}
+                  id={`orders-tab-${f.id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  aria-controls="orders-list"
+                  aria-label={`${f.label} (${counts[f.id]})`}
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => changeFilter(f.id)}
+                  className={cn(
+                    "flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border py-1 text-center text-xs font-medium leading-tight focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
+                    "md:min-h-11 md:shrink-0 md:flex-row md:gap-1 md:whitespace-nowrap md:rounded-full md:px-4 md:py-0 md:text-sm",
+                    active
+                      ? "border-primary bg-primary text-primary-foreground max-md:font-semibold max-md:underline max-md:underline-offset-2"
+                      : "border-input bg-background hover:bg-accent",
+                  )}
+                >
+                  <span className="max-w-full break-words">{f.label}</span>
+                  <span className="font-mono text-sm font-bold tabular-nums md:hidden">{counts[f.id]}</span>
+                  <span className="hidden md:inline">({counts[f.id]})</span>
+                </button>
+              );
+            })}
+          </div>
+          {showSearch && (
+            <Button
+              ref={searchToggleRef}
+              type="button"
+              variant="outline"
+              size="icon"
+              className="shrink-0 rounded-full max-md:min-h-12 max-md:rounded-md md:h-11 md:w-11"
+              aria-label={searchExpanded ? "Close search" : "Search orders"}
+              aria-expanded={searchExpanded}
+              aria-controls="orders-search"
+              onClick={() => (searchExpanded ? closeSearch() : setSearchOpen(true))}
+            >
+              {searchExpanded ? <X aria-hidden /> : <Search aria-hidden />}
+            </Button>
+          )}
         </div>
+        {showSearch && searchExpanded && (
+          <div className="relative mt-2">
+            <label htmlFor="orders-search" className="sr-only">
+              Search orders
+            </label>
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              ref={searchInputRef}
+              id="orders-search"
+              type="text"
+              role="searchbox"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSelected(EMPTY_SELECTION);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") closeSearch();
+              }}
+              placeholder="Name, bill number or last 4 of phone"
+              className="pl-9"
+            />
+          </div>
+        )}
       </nav>
 
       <section id="orders-list" role="tabpanel" aria-labelledby={`orders-tab-${filter}`} aria-busy={refreshing}>
-        {showSearch && (
-          <div className="mb-3">
-            <label htmlFor="orders-search" className="mb-1 block text-xs font-medium text-muted-foreground">
-              Search orders
-            </label>
-            <div className="relative">
-              <Search
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
-                aria-hidden
-              />
-              <Input
-                id="orders-search"
-                type="text"
-                role="searchbox"
-                inputMode="search"
-                enterKeyHint="search"
-                autoComplete="off"
-                value={query}
-                onChange={(e) => {
-                  setQuery(e.target.value);
-                  setSelected(EMPTY_SELECTION);
-                }}
-                placeholder="Name, bill number or last 4 of phone"
-                className="pl-9 pr-12"
-              />
-              {query !== "" && (
-                <button
-                  type="button"
-                  aria-label="Clear search"
-                  onClick={() => setQuery("")}
-                  className="absolute right-0 top-1/2 inline-flex min-h-11 min-w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground hover:text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <X className="h-4 w-4" aria-hidden />
-                </button>
-              )}
-            </div>
-          </div>
-        )}
         {showHandover && (
           <div role="radiogroup" aria-label="Pickup or delivery" className="mb-3 grid grid-cols-3 gap-1">
             {HANDOVER_FILTERS.map((h) => (
@@ -1240,6 +1217,55 @@ export function OrdersBoard({
           />
         )}
       </section>
+
+      {/* The bulk bar takes this spot while orders are selected. */}
+      {activeSelected.size === 0 && (
+        <div
+          role="group"
+          aria-label="Live updates"
+          className="sticky bottom-[var(--app-bottom-inset,0px)] z-10 -mx-4 mt-4 flex items-center gap-1 border-t bg-background px-4 py-1 md:gap-2"
+        >
+          {lastChecked ? (
+            <span className="min-w-0 text-xs leading-tight text-muted-foreground">
+              Last checked {formatIstTime(lastChecked)}
+            </span>
+          ) : null}
+          <BoardInfoHint label="How new orders are checked">
+            <p>{pollNote}</p>
+          </BoardInfoHint>
+          <div className="ml-auto flex shrink-0 items-center gap-1 md:gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-w-11 px-2 md:px-3"
+              onClick={() => void refresh({ manual: true })}
+              disabled={refreshing}
+              aria-busy={refreshing}
+              aria-label="Refresh"
+            >
+              {refreshing ? (
+                <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <RefreshCw aria-hidden />
+              )}
+              <span className="hidden md:inline">Refresh</span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-w-11 px-2 md:px-3"
+              onClick={toggleSound}
+              aria-pressed={soundOn}
+              aria-label={soundLabel}
+              data-sound-toggle
+            >
+              {soundOn || soundPending ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />}
+              <span className="hidden md:inline">{soundLabel}</span>
+            </Button>
+            <PushAlertsBarButton />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1260,7 +1286,6 @@ function BoardHeader({
   storeIsLive,
   vendorName,
   vendorSlug,
-  tools,
   canChangeMenuStatus,
   menuStatusPending,
   onMenuStatus,
@@ -1277,7 +1302,6 @@ function BoardHeader({
   storeIsLive: boolean;
   vendorName: string;
   vendorSlug: string;
-  tools: BoardTools;
   canChangeMenuStatus: boolean;
   menuStatusPending: boolean;
   onMenuStatus: (accepting: boolean) => void;
@@ -1360,8 +1384,6 @@ function BoardHeader({
         ) : null}
       </div>
       {drop && effective ? <DropDetails drop={drop} effective={effective} named={hasPicker} /> : null}
-      <ActionRow tools={tools} />
-      {tools.pollNote}
     </header>
   );
 }
@@ -1405,30 +1427,6 @@ function DropDetails({
           </dd>
         </div>
       </dl>
-    </div>
-  );
-}
-
-/** Refresh and "last checked" at every width; on phones sound and alerts sit in the "More" sheet. */
-function ActionRow({ tools }: { tools: BoardTools }) {
-  return (
-    <div className="mt-2 flex items-center gap-2 md:mt-3 md:flex-wrap">
-      {tools.refreshButton}
-      {tools.lastChecked}
-      {tools.soundButton("hidden md:inline-flex")}
-      <div className="hidden md:contents">
-        <PushAlertsButton variant="board" />
-      </div>
-      <BoardMoreActions description="Sound and phone alerts for new orders.">
-        {() => (
-          <>
-            {tools.soundButton("min-h-12 w-full justify-start gap-3")}
-            <div className="flex flex-wrap items-center gap-2">
-              <PushAlertsButton variant="board" />
-            </div>
-          </>
-        )}
-      </BoardMoreActions>
     </div>
   );
 }
