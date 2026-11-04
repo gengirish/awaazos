@@ -6,6 +6,7 @@ import { Check, Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
 import { Notice } from "@/components/ui/notice";
+import { Switch } from "@/components/ui/switch";
 
 /**
  * Owner-facing control for the public storefront at /s/<slug>.
@@ -83,32 +84,7 @@ export function StorefrontClient({
               : "Your store page is private. Nobody outside your staff can see it."}
           </p>
         </div>
-        <button
-          id="storefront-toggle"
-          type="button"
-          role="switch"
-          aria-checked={published}
-          onClick={() => toggle(!published)}
-          disabled={pending}
-          className="inline-flex min-h-11 min-w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <span className="sr-only">
-            {published ? "Unpublish store" : "Publish store"}
-          </span>
-          {/* 44px tap target around the 28px visual track. */}
-          <span
-            aria-hidden="true"
-            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-              published ? "bg-primary" : "bg-input"
-            }`}
-          >
-            <span
-              className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform motion-reduce:transition-none ${
-                published ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </span>
-        </button>
+        <Switch id="storefront-toggle" checked={published} onCheckedChange={toggle} disabled={pending} />
       </div>
 
       {published ? (

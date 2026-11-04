@@ -19,6 +19,7 @@
 @theme inline {
   --color-border: hsl(var(--border));
   --color-input: hsl(var(--input));
+  --color-switch-off: hsl(var(--switch-off));
   --color-ring: hsl(var(--ring));
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -200,6 +201,8 @@
     --warning-foreground: 0 0% 100%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
+    /* A switch's off track. --input is about 1.2:1 on white; this is 4.72:1. */
+    --switch-off: 215 16% 47%;
     --ring: 25 100% 37%;
     --radius: 0.5rem;
     /* Brand tokens — awaaz-orange is the same value as --primary (white text 4.93:1) */
@@ -256,6 +259,7 @@
     --warning-foreground: 26 83% 14%;
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
+    --switch-off: 215 20% 50%;
     --ring: 25 100% 37%;
   }
 }

@@ -53,7 +53,7 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
   await page.getByLabel("Title").fill(dropTitle);
   await page.getByRole("radio", { name: "Both" }).click();
   // Drops hide the everyday menu by default; this test is about the hand-off to it.
-  await page.getByRole("checkbox", { name: /also show my everyday menu/i }).check();
+  await page.getByRole("switch", { name: /also show my everyday menu/i }).click();
   await page.getByRole("checkbox", { name: new RegExp(bhel) }).check();
   await page.getByRole("listitem").filter({ hasText: bhel }).getByLabel("How many can you make?").fill("1");
   await page.getByRole("button", { name: "Create drop" }).click();

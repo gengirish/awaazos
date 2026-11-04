@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Notice } from "@/components/ui/notice";
+import { RadioOption } from "@/components/ui/radio-option";
 import { HOME_PATH } from "@/lib/home";
 
 const ERRORS: Record<string, string> = {
@@ -150,32 +151,24 @@ export function ClaimStoreForm({
               />
             </div>
           )}
-          <fieldset className="space-y-1">
+          <fieldset className="space-y-2">
             <legend className="text-sm font-medium">Sample orders</legend>
-            <label className="flex min-h-11 items-center gap-3 text-sm">
-              <input
-                type="radio"
-                name="sampleOrders"
-                value="archive"
-                checked={sampleOrders === "archive"}
-                onChange={() => setSampleOrders("archive")}
-                disabled={submitting}
-                className="size-4"
-              />
-              Hide them from my orders
-            </label>
-            <label className="flex min-h-11 items-center gap-3 text-sm">
-              <input
-                type="radio"
-                name="sampleOrders"
-                value="delete"
-                checked={sampleOrders === "delete"}
-                onChange={() => setSampleOrders("delete")}
-                disabled={submitting}
-                className="size-4"
-              />
-              Delete them
-            </label>
+            <RadioOption
+              name="sampleOrders"
+              value="archive"
+              checked={sampleOrders === "archive"}
+              onChange={() => setSampleOrders("archive")}
+              disabled={submitting}
+              label="Hide them from my orders"
+            />
+            <RadioOption
+              name="sampleOrders"
+              value="delete"
+              checked={sampleOrders === "delete"}
+              onChange={() => setSampleOrders("delete")}
+              disabled={submitting}
+              label="Delete them"
+            />
           </fieldset>
 
           {error ? (

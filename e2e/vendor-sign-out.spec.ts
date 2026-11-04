@@ -87,7 +87,7 @@ test.describe("vendor sign-out", () => {
     await page.getByRole("button", { name: /^Cutting Chai/ }).click();
     await page.getByRole("button", { name: "Collect payment" }).click();
     const payDialog = page.getByRole("dialog");
-    await payDialog.getByRole("button", { name: "Cash" }).click();
+    await payDialog.getByRole("radio", { name: "Cash" }).check();
     await payDialog.getByRole("button", { name: /Mark as paid/ }).click();
     await expect(page.getByText("Offline #1")).toBeVisible({ timeout: 20_000 });
     await page.getByRole("button", { name: /New order/ }).click();

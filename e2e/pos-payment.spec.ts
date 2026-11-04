@@ -40,7 +40,8 @@ test.describe("POS payment sheet", () => {
     await expect(received).toHaveAttribute("inputmode", "decimal");
 
     // None of the calculator buttons may collide with the "Cash" mode button.
-    await expect(dialog.getByRole("button", { name: /cash/i })).toHaveCount(1);
+    await expect(dialog.getByRole("radio", { name: /cash/i })).toHaveCount(1);
+    await expect(dialog.getByRole("button", { name: /cash/i })).toHaveCount(0);
 
     // Quick tenders: next notes above ₹40, plus Exact.
     await expect(dialog.getByRole("button", { name: "Exact" })).toBeVisible();
@@ -78,7 +79,7 @@ test.describe("POS payment sheet", () => {
     await createVendorSession(page, request, "pospay-noupi");
     const dialog = await ringUpForty(page);
 
-    await dialog.getByRole("button", { name: "UPI QR" }).click();
+    await dialog.getByRole("radio", { name: "UPI QR" }).check();
     await expect(dialog.getByText("Take cash now — add a UPI ID in Settings later.")).toBeVisible();
     const link = dialog.getByRole("link", { name: "Payment settings" });
     await expect(link).toBeVisible();

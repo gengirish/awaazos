@@ -91,7 +91,12 @@ test.describe("drops: home-kitchen pre-order day", () => {
     await expect(page.getByRole("heading", { name: "New drop" })).toBeVisible();
     await page.getByLabel("Title").fill(dropTitle);
     await page.getByRole("radio", { name: "Both" }).click();
-    await expect(page.getByRole("radio", { name: "Both" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "Both" })).toBeChecked();
+    // A native radio group: arrow keys move the choice.
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByRole("radio", { name: "Pickup" })).toBeChecked();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("radio", { name: "Both" })).toBeChecked();
 
     // The form defaults the cut-off to tonight 21:00 (or tomorrow 10:00 if it's
     // already late), cooking day tomorrow — always in the future.
