@@ -302,6 +302,8 @@ export type PlaceOrderInput = {
   paymentMethod: "UPI" | "CASH";
   /** Signed-in storefront customer, if any (lib/customer-auth.ts). */
   customerId?: string | null;
+  /** lib/order-channel.ts; decided by the route from the request. */
+  orderChannel?: "instagram" | null;
   now?: Date;
 };
 
@@ -460,6 +462,7 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
           // The rider's "Delivered" link (app/d/[token]); deliveries only.
           riderToken: input.fulfilmentType === "DELIVERY" ? generateOrderToken() : null,
           customerId: input.customerId ?? null,
+          orderChannel: input.orderChannel ?? null,
           orderItems: {
             create: priced.map((p) => ({
               menuItemId: p.item.menuItemId,

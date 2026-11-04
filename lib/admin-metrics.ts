@@ -55,6 +55,8 @@ export type AdminMetrics = {
   billsPerVendorPerDayMedian: number;
   voiceSuccessRate7d: number;
   weeklyGmvPaise: number;
+  /** Storefront orders placed in the last 7 days, paid or not (lib/order-channel.ts). */
+  instagram7d: { orders: number; paid: number; allStorefrontOrders: number };
   wowGrowth: {
     activeVendorsWoW: number;
     gmvWoW: number;
@@ -80,6 +82,9 @@ export async function getAdminMetrics(now: Date = new Date()): Promise<AdminMetr
     thisWeekSum,
     lastWeekVendorGroups,
     lastWeekSum,
+    instagramOrders,
+    instagramPaid,
+    storefrontOrders,
   ] = await Promise.all([
     prisma.transaction.groupBy({
       by: ["vendorId"],
@@ -130,6 +135,21 @@ export async function getAdminMetrics(now: Date = new Date()): Promise<AdminMetr
       },
       _sum: { totalPaise: true },
     }),
+    prisma.transaction.count({
+      where: { ...REAL_SALES, source: "STOREFRONT", orderChannel: "instagram", createdAt: { gte: thisWeekStart } },
+    }),
+    prisma.transaction.count({
+      where: {
+        ...REAL_SALES,
+        source: "STOREFRONT",
+        orderChannel: "instagram",
+        paymentStatus: "PAID",
+        createdAt: { gte: thisWeekStart },
+      },
+    }),
+    prisma.transaction.count({
+      where: { ...REAL_SALES, source: "STOREFRONT", createdAt: { gte: thisWeekStart } },
+    }),
   ]);
 
   const weeklyActiveVendors = thisWeekVendorGroups.length;
@@ -151,6 +171,7 @@ export async function getAdminMetrics(now: Date = new Date()): Promise<AdminMetr
     billsPerVendorPerDayMedian,
     voiceSuccessRate7d,
     weeklyGmvPaise,
+    instagram7d: { orders: instagramOrders, paid: instagramPaid, allStorefrontOrders: storefrontOrders },
     wowGrowth: {
       activeVendorsWoW: wowDelta(weeklyActiveVendors, lastWeekActiveVendors),
       gmvWoW: wowDelta(weeklyGmvPaise, lastWeekGmvPaise),
