@@ -77,3 +77,6 @@ tests/golden/stt/audio/*
 # local agent tooling (worktrees, per-user settings)
 .kilo/
 .claude/settings.local.json
+
+# founder-outreach working files (seller contacts, demo-store payloads, API scripts); local only
+outreach/
