@@ -52,6 +52,7 @@ const GROQ_STT_VENDOR_MONTHLY_MINUTE_CAP: Record<Plan, number> = {
 // AI images for banners and stories. A seller needs a handful, not a stream.
 const FAL_IMAGE_VENDOR_MONTHLY_CAP: Record<Plan, number> = {
   FREE: 0,
+  LITE: 0,
   STARTER: 30,
   PRO: 100,
   ENTERPRISE: 300,
