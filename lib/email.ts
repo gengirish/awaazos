@@ -1,6 +1,6 @@
 /**
- * Transactional email: password-reset links, buyer sign-in links and billing
- * notices to sellers.
+ * Transactional email: password-reset links, buyer sign-in links, billing
+ * notices to sellers and demo store claim links.
  *
  * Sends through AgentMail's REST API over plain `fetch`, so this module adds
  * no dependency. Swapping provider (Resend, SES, Postmark) means rewriting
@@ -16,6 +16,7 @@
  *      out-of-band must mint a fresh token, not read one out of logs.
  */
 
+import { TRIAL_DAYS } from "@/lib/constants";
 import { storeBasePaise } from "@/lib/subscription";
 import { formatINR } from "@/lib/currency";
 import { formatIstDate } from "@/lib/datetime";
@@ -335,7 +336,16 @@ function buildSellerNoticeHtml(input: {
 }
 
 async function sendSellerNotice(
-  input: { to: string; name: string | null; subject: string; heading: string; paragraphs: string[]; cta: string; url: string },
+  input: {
+    to: string;
+    name: string | null;
+    subject: string;
+    heading: string;
+    paragraphs: string[];
+    cta: string;
+    url: string;
+    labels?: string[];
+  },
   event: string,
 ): Promise<{ delivered: boolean }> {
   try {
@@ -352,7 +362,7 @@ async function sendSellerNotice(
         subject: input.subject.replace(/[\r\n]+/g, " ").trim(),
         text: buildSellerNoticeText(greetingName, input.paragraphs, input.url),
         html: buildSellerNoticeHtml({ ...input, greetingName }),
-        labels: ["billing-notice", "transactional"],
+        labels: input.labels ?? ["billing-notice", "transactional"],
       },
       event,
     );
@@ -447,5 +457,28 @@ export async function sendStoreLockedEmail(input: SendStoreLockedEmailInput): Pr
       url: input.billingUrl,
     },
     "email.store_locked",
+  );
+}
+
+export type SendDemoClaimEmailInput = { to: string; storeName: string; claimUrl: string; expiresAt: Date };
+
+/** The one-time link that makes a demo store the seller's own. Never logs the link. */
+export async function sendDemoClaimEmail(input: SendDemoClaimEmailInput): Promise<{ delivered: boolean }> {
+  return sendSellerNotice(
+    {
+      to: input.to,
+      name: null,
+      subject: `${input.storeName} is ready for you to claim`,
+      heading: "Your store is ready",
+      paragraphs: [
+        `We set up ${input.storeName} on AwaazOS for you. Claim it and the store moves to your account, with a ${TRIAL_DAYS}-day free trial.`,
+        "You'll choose a password, or sign in if you already use AwaazOS. You can hide or delete the sample orders, and you add your own UPI ID before taking real orders.",
+        `The link works once, until ${formatIstDate(input.expiresAt)}.`,
+      ],
+      cta: "Claim my store",
+      url: input.claimUrl,
+      labels: ["demo-claim", "transactional"],
+    },
+    "email.demo_claim",
   );
 }

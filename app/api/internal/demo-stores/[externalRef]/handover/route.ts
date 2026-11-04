@@ -18,7 +18,7 @@ export const POST = internalRoute<{ externalRef: string }>(
     const ref = externalRefSchema.safeParse(params.externalRef);
     if (!ref.success) return NextResponse.json({ error: "Not found" }, { status: 404 });
     const body = demoHandoverSchema.parse(await readJson(req));
-    const data = await createHandover(ref.data, body.owner_email, actor);
-    return NextResponse.json({ data }, { status: 201 });
+    const { claim_url, expires_at } = await createHandover(ref.data, body.owner_email, actor);
+    return NextResponse.json({ data: { claim_url, expires_at } }, { status: 201 });
   },
 );

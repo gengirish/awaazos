@@ -380,12 +380,13 @@ export async function deleteDemoStore(externalRef: string, actor: string): Promi
 
 /**
  * A one-time claim link for `email`, valid DEMO_CLAIM_TTL_DAYS. Sends nothing
+ * (the admin route emails the link; the internal API leaves that to its caller)
  * and creates no account. A new invite voids the store's earlier unused ones.
  */
 export async function createHandover(externalRef: string, email: string, actor: string, now: Date = new Date()) {
   const v = await prisma.vendor.findUnique({
     where: { demoExternalRef: externalRef },
-    select: { id: true, isDemo: true },
+    select: { id: true, isDemo: true, name: true },
   });
   if (!v) throw new DemoStoreError(404, "not_found");
   if (!v.isDemo) throw new DemoStoreError(409, "not_a_demo_store");
@@ -397,7 +398,7 @@ export async function createHandover(externalRef: string, email: string, actor: 
     prisma.demoHandover.create({ data: { vendorId: v.id, email, tokenHash: hashClaimToken(token), expiresAt } }),
     prisma.demoAuditLog.create({ data: { action: "handover", externalRef, vendorId: v.id, actor } }),
   ]);
-  return { claim_url: claimUrl(token), expires_at: expiresAt.toISOString() };
+  return { claim_url: claimUrl(token), expires_at: expiresAt.toISOString(), store_name: v.name };
 }
 
 /**
