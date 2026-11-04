@@ -1,4 +1,5 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then exit 1; else echo \"Skipping $VERCEL_ENV build: preview deployments are disabled, main deploys to production\"; exit 0; fi"
+  "ignoreCommand": "if [ \"$VERCEL_ENV\" = \"production\" ]; then exit 1; else echo \"Skipping $VERCEL_ENV build: preview deployments are disabled, main deploys to production\"; exit 0; fi",
+  "crons": [{ "path": "/api/cron/trial-reminders", "schedule": "30 3 * * *" }]
 }

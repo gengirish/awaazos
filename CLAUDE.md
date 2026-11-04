@@ -334,6 +334,11 @@ passes, so Neon can sleep.
   moves `trialEndsAt` (23:59 IST that day, today … +24 months), so the store is on the trial for
   longer; `plan` / `planExpiresAt` are untouched. Anyone else gets 404. The log line
   "admin granted free access" is the only audit trail.
+- **Seller alerts** (`lib/trial-alerts.ts`, `lib/trial-alerts-server.ts`): reminder emails 5 and 1 IST days
+  before `trialEndsAt`, from the project's one cron, `GET /api/cron/trial-reminders` (`vercel.json`, daily 09:00
+  IST, `Authorization: Bearer $CRON_SECRET`; secret unset → 401 and no reminders). It only reads Postgres and
+  never changes billing state. When a buyer hits `orders_paused`, the route pushes and emails the store's owners,
+  at most once a day, with nothing about the buyer. Each send is claimed in Upstash (`SET NX`); no KV → no alert.
 - E2E: new vendors are on the trial. Specs that need another state set it in the database with
   `e2e/helpers/billing-db.ts` (local databases only).
 

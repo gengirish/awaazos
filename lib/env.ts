@@ -52,6 +52,9 @@ const envSchema = z.object({
   // screenshots (lib/payment-proof.ts). Absent → the upload field is hidden.
   PAYMENT_PROOF_BLOB_READ_WRITE_TOKEN: z.string().optional(),
   REDIS_URL: z.string().optional(),
+  // Bearer secret Vercel Cron sends to /api/cron/* (lib/cron-auth.ts). Absent →
+  // every cron call is 401, so the trial reminder emails don't go out.
+  CRON_SECRET: z.string().optional(),
   // Internal demo-store API (lib/internal-auth.ts). Absent or < 32 chars →
   // every /api/internal/* call is 401. Server-side only; never NEXT_PUBLIC_.
   INTERNAL_API_KEY: z.string().optional(),
