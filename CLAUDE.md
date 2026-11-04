@@ -336,6 +336,10 @@ passes, so Neon can sleep.
   goes through `create-subscription`: Razorpay can't move a UPI AutoPay subscription between plans, so it cancels the
   live one first (a failed cancel stops there, so nobody is charged twice), then starts the new one. Moving down is
   cancel, then subscribe once the old plan ends. Plan ids: `npm run razorpay:create-plans`.
+- **Changing a list price:** Razorpay plan amounts are fixed, so set the new constants, create new plans and put their ids
+  on Vercel in the same deploy. Old ids go in `RAZORPAY_RETIRED_PLANS` so existing subscribers stay credited, and
+  `resolveSubscriptionPlanId` refuses a list plan whose Razorpay amount differs from `subscriptionChargePaise`.
+  `npm run billing:keep-signup-price` keeps stores that signed up earlier on the price they were told (`customPricePaise`).
 - **Free access by hand:** a platform SUPER_ADMIN picks a "free until" day for a store on
   `/admin/vendors` (`PATCH /api/admin/vendors/[id]/free-access`, `lib/admin-free-access.ts`). It only
   moves `trialEndsAt` (23:59 IST that day, today … +24 months), so the store is on the trial for
