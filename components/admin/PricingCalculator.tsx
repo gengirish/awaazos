@@ -4,6 +4,7 @@ import { useId, useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { CUSTOM_PRICE_MAX_RUPEES, CUSTOM_PRICE_MIN_RUPEES } from "@/lib/subscription";
 import { cn } from "@/lib/utils";
 import {
   DEFAULT_SEGMENTS,
@@ -14,6 +15,7 @@ import {
   formatBps,
   formatRupees,
   kitchenCost,
+  newAccountOfferSavingPaise,
   ordersPerMonth,
   percentToBps,
   platformRevenue,
@@ -46,6 +48,10 @@ export function PricingCalculator() {
   const [aovRupees, setAovRupees] = useState(PRICING_DEFAULTS.aovPaise / 100);
   const [gatewaySharePct, setGatewaySharePct] = useState(PRICING_DEFAULTS.gatewayShareBps / 100);
   const [gateway, setGateway] = useState<GatewayKey>("razorpay");
+  const [instantSettlement, setInstantSettlement] = useState(PRICING_DEFAULTS.instantSettlement);
+  const [instantFee, setInstantFee] = useState(percentText(PRICING_DEFAULTS.instantSettlementBps));
+  const [platformGateway, setPlatformGateway] = useState(percentText(PRICING_DEFAULTS.platformGatewayBps));
+  const [partnerCommission, setPartnerCommission] = useState(percentText(PRICING_DEFAULTS.partnerCommissionBps));
   const [flat, setFlat] = useState(rupeesText(PRICING_DEFAULTS.flatPaise));
   const [fee, setFee] = useState(percentText(PRICING_DEFAULTS.feeBps));
   const [cap, setCap] = useState(rupeesText(PRICING_DEFAULTS.capPaise));
@@ -61,12 +67,16 @@ export function PricingCalculator() {
     aovPaise: aovRupees * 100,
     gatewayShareBps: gatewaySharePct * 100,
     gatewayRateBps: GATEWAYS.find((g) => g.key === gateway)?.rateBps ?? 0,
+    instantSettlement,
+    instantSettlementBps: percentToBps(instantFee) ?? 0,
     flatPaise: wholeRupeesToPaise(flat) ?? 0,
     feeBps: percentToBps(fee) ?? 0,
     capPaise: wholeRupeesToPaise(cap) ?? 0,
     annualPaise: wholeRupeesToPaise(annual) ?? 0,
     chargeGst,
     appCommissionBps: percentToBps(appCommission) ?? 0,
+    platformGatewayBps: percentToBps(platformGateway) ?? 0,
+    partnerCommissionBps: percentToBps(partnerCommission) ?? 0,
   };
 
   const parsedSegments: Segment[] = segments.map((s) => ({
@@ -133,7 +143,7 @@ export function PricingCalculator() {
             max={100}
             step={5}
             onChange={setGatewaySharePct}
-            hint="The rest is paid by direct UPI, with no gateway fee."
+            hint="The rest is paid by direct UPI or cash, with no gateway fee."
           />
           <SelectField label="Payment gateway" value={gateway} onChange={(v) => setGateway(v as GatewayKey)}>
             {GATEWAYS.map((g) => (
@@ -142,6 +152,23 @@ export function PricingCalculator() {
               </option>
             ))}
           </SelectField>
+          <SelectField
+            label="Settlement"
+            value={instantSettlement ? "instant" : "standard"}
+            onChange={(v) => setInstantSettlement(v === "instant")}
+          >
+            <option value="standard">Standard (T+2) – free</option>
+            <option value="instant">Instant (T+0) – extra fee</option>
+          </SelectField>
+          {instantSettlement ? (
+            <TextField
+              label="Instant settlement fee (%)"
+              value={instantFee}
+              onChange={setInstantFee}
+              valid={percentToBps(instantFee) !== null}
+              hint="Plus GST. Razorpay sets it per account, usually 0.2 to 0.3%: Dashboard → Settlements."
+            />
+          ) : null}
 
           <hr className="border-border" />
           <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">AwaazOS plans</h2>
@@ -172,7 +199,32 @@ export function PricingCalculator() {
             valid={percentToBps(appCommission) !== null}
             hint="For the comparison line only."
           />
-          <p className="text-xs text-muted-foreground">Defaults are today&apos;s STARTER prices.</p>
+          {tab === "platform" ? (
+            <>
+              <TextField
+                label="Razorpay fee on our charges (%)"
+                value={platformGateway}
+                onChange={setPlatformGateway}
+                valid={percentToBps(platformGateway) !== null}
+                hint="Plus GST. Taken from AwaazOS, not the kitchen. Check the rate for subscriptions on our account."
+              />
+              <TextField
+                label="Partner commission (%)"
+                value={partnerCommission}
+                onChange={setPartnerCommission}
+                valid={percentToBps(partnerCommission) !== null}
+                hint="On connected kitchens' gateway volume. 0 until our rate is confirmed."
+              />
+            </>
+          ) : null}
+          <p className="text-xs text-muted-foreground">
+            Defaults are today&apos;s STARTER prices. A store&apos;s own price (₹{CUSTOM_PRICE_MIN_RUPEES} to ₹
+            {CUSTOM_PRICE_MAX_RUPEES.toLocaleString("en-IN")} a month) is set on the Stores page.
+          </p>
+          <p className="text-xs text-muted-foreground">
+            We can only bill the flat and annual plans today. A % fee would need a monthly invoice: direct UPI orders
+            are invisible to us, and Razorpay money goes straight to the kitchen.
+          </p>
         </section>
 
         <div
@@ -207,6 +259,7 @@ function KitchenView({ c }: { c: PricingInputs }) {
   const flatAwaazos = flat.feePaise + flat.feeGstPaise;
   const allDirect = kitchenCost("flat", c.salesPaise, { ...c, gatewayShareBps: 0 });
   const appCost = deliveryAppCostPaise(c.salesPaise, c);
+  const offerSaving = newAccountOfferSavingPaise(c.salesPaise, c);
 
   return (
     <>
@@ -257,6 +310,9 @@ function KitchenView({ c }: { c: PricingInputs }) {
             </thead>
             <tbody>
               <Row label={`${gatewayName} fees (incl. GST)`} values={results.map((r) => r.cost.gatewayPaise)} />
+              {c.instantSettlement ? (
+                <Row label="Instant settlement (incl. GST)" values={results.map((r) => r.cost.settlementPaise)} />
+              ) : null}
               <Row label="AwaazOS fee" values={results.map((r) => r.cost.feePaise)} />
               {c.chargeGst ? <Row label="GST on AwaazOS fee" values={results.map((r) => r.cost.feeGstPaise)} /> : null}
               <Row label="Total cost" bold values={results.map((r) => r.cost.totalPaise)} />
@@ -270,7 +326,10 @@ function KitchenView({ c }: { c: PricingInputs }) {
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
           About {orders.toLocaleString("en-IN")} orders a month at {formatRupees(c.aovPaise)} each. Gateway fees apply only
-          to the {c.gatewayShareBps / 100}% paid through {gatewayName}.
+          to the {c.gatewayShareBps / 100}% paid through {gatewayName}, and come out of the kitchen&apos;s own account.{" "}
+          {c.instantSettlement
+            ? `Instant settlement is charged on what ${gatewayName} settles after its fee.`
+            : "Standard settlement lands in about 2 business days at no extra charge."}
         </p>
       </section>
 
@@ -290,6 +349,12 @@ function KitchenView({ c }: { c: PricingInputs }) {
             UPI instead, the total cost would be <b>{formatRupees(allDirect.totalPaise)}</b>
             {flat.gatewayPaise > flatAwaazos ? " — the gateway saving alone covers AwaazOS" : ""}.
           </li>
+          {gatewayName === "Razorpay" && offerSaving > 0 ? (
+            <li>
+              On a new Razorpay account, the offer of no gateway fee for 90 days or the first ₹5L would save about{" "}
+              <b>{formatRupees(offerSaving)}</b>. Check that it still applies before quoting it.
+            </li>
+          ) : null}
           <li>
             The same sales on a delivery app at {formatBps(c.appCommissionBps)} commission:{" "}
             <b>{formatRupees(appCost)}</b> (incl. GST).
@@ -473,6 +538,15 @@ function PlatformView({
               ))}
               <Row label="Per month" bold values={revenue.monthlyByPlan} />
               <Row label="Per year" bold values={revenue.monthlyByPlan.map((v) => v * 12)} />
+              <Row label="Razorpay fee on our charges, per month" values={revenue.gatewayCostByPlan} />
+              {revenue.partnerCommissionPaise > 0 ? (
+                <Row
+                  label="Partner commission, per month"
+                  values={PRICING_PLANS.map(() => revenue.partnerCommissionPaise)}
+                />
+              ) : null}
+              <Row label="We keep, per month" bold values={revenue.netMonthlyByPlan} />
+              <Row label="We keep, per year" bold values={revenue.netMonthlyByPlan.map((v) => v * 12)} />
               <tr>
                 <th scope="row" className="whitespace-nowrap py-2 pr-2 text-left font-normal">
                   Share of kitchens&apos; sales
@@ -488,7 +562,8 @@ function PlatformView({
         </div>
         <p className="mt-3 text-xs text-muted-foreground">
           &ldquo;Flat&rdquo; assumes every kitchen signs up and stays, which small kitchens are least likely to do on a
-          fixed fee.
+          fixed fee. &ldquo;We keep&rdquo; counts the GST on Razorpay&apos;s fee as a cost, and is before any input credit,
+          referral months, a sales intern&apos;s share and our other costs.
         </p>
       </section>
     </>
