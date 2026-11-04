@@ -7,6 +7,7 @@ import { Plus, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioOption } from "@/components/ui/radio-option";
 import { Notice } from "@/components/ui/notice";
 import { OutreachWhatsApp } from "@/components/admin/OutreachWhatsApp";
 import { StoreImagesClient } from "@/components/settings/StoreImagesClient";
@@ -298,13 +299,23 @@ export function DemoStoreForm({ senderName, senderIsFounder }: { senderName: str
 
   return (
     <form onSubmit={onSubmit} className="space-y-6" noValidate>
-      <div role="group" aria-label="How to enter the store" className="flex gap-2">
-        <Button type="button" variant={mode === "form" ? "default" : "outline"} aria-pressed={mode === "form"} onClick={() => setMode("form")}>
-          Fill in a form
-        </Button>
-        <Button type="button" variant={mode === "json" ? "default" : "outline"} aria-pressed={mode === "json"} onClick={() => setMode("json")}>
-          Paste JSON
-        </Button>
+      <div role="radiogroup" aria-label="How to enter the store" className="grid grid-cols-2 gap-2 sm:max-w-sm">
+        <RadioOption
+          size="compact"
+          name="demo-store-mode"
+          value="form"
+          checked={mode === "form"}
+          onChange={() => setMode("form")}
+          label="Fill in a form"
+        />
+        <RadioOption
+          size="compact"
+          name="demo-store-mode"
+          value="json"
+          checked={mode === "json"}
+          onChange={() => setMode("json")}
+          label="Paste JSON"
+        />
       </div>
 
       {mode === "json" ? (
@@ -420,7 +431,7 @@ export function DemoStoreForm({ senderName, senderIsFounder }: { senderName: str
                   <label key={lang} className="flex min-h-11 items-center gap-2 text-sm">
                     <input
                       type="checkbox"
-                      className="size-4"
+                      className="size-4 accent-primary"
                       checked={form.languages.includes(lang)}
                       onChange={(e) => toggleLanguage(lang, e.target.checked)}
                     />
@@ -496,7 +507,7 @@ export function DemoStoreForm({ senderName, senderIsFounder }: { senderName: str
                     disabled={form.items.length === 1}
                     onClick={() => set("items", form.items.filter((_, j) => j !== i))}
                   >
-                    <Trash2 aria-hidden className="size-4" />
+                    <Trash2 aria-hidden className="size-4 accent-primary" />
                   </Button>
                 </li>
               ))}
@@ -507,7 +518,7 @@ export function DemoStoreForm({ senderName, senderIsFounder }: { senderName: str
               disabled={form.items.length >= MAX_ROWS}
               onClick={() => set("items", [...form.items, { ...EMPTY_ITEM }])}
             >
-              <Plus aria-hidden className="size-4" /> Add a dish
+              <Plus aria-hidden className="size-4 accent-primary" /> Add a dish
             </Button>
           </fieldset>
 
@@ -516,7 +527,7 @@ export function DemoStoreForm({ senderName, senderIsFounder }: { senderName: str
             <label className="flex min-h-11 items-start gap-3 text-sm">
               <input
                 type="checkbox"
-                className="mt-0.5 size-4"
+                className="mt-0.5 size-4 accent-primary"
                 checked={form.withSampleOrders}
                 onChange={(e) => set("withSampleOrders", e.target.checked)}
               />

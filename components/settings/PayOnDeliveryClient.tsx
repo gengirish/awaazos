@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { LastPaymentMethodNotice, lastPaymentMethodBlockersFrom } from "@/components/settings/LastPaymentMethodNotice";
+import { Switch } from "@/components/ui/switch";
 import type { PaymentGuardBlocker } from "@/lib/payment-guard";
 import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
 
@@ -84,30 +85,13 @@ export function PayOnDeliveryClient({
             </p>
           ) : null}
         </div>
-        <button
+        <Switch
           id="pay-on-delivery-toggle"
-          type="button"
-          role="switch"
-          aria-checked={payOnDelivery}
+          checked={payOnDelivery}
           aria-describedby={serverBlock ? "pay-on-delivery-blocker" : undefined}
-          onClick={() => togglePayOnDelivery(!payOnDelivery)}
+          onCheckedChange={togglePayOnDelivery}
           disabled={pending}
-          className="group inline-flex min-h-11 min-w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <span className="sr-only">{payOnDelivery ? "Turn off pay on delivery" : "Turn on pay on delivery"}</span>
-          <span
-            aria-hidden="true"
-            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-              payOnDelivery ? "bg-primary" : "bg-input"
-            }`}
-          >
-            <span
-              className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform motion-reduce:transition-none ${
-                payOnDelivery ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </span>
-        </button>
+        />
       </div>
       {serverBlock ? <LastPaymentMethodNotice id="pay-on-delivery-blocker" blockers={serverBlock} storeKind={storeKind} /> : null}
     </div>

@@ -1,9 +1,9 @@
 "use client";
 
-import { Volume2, VolumeX } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import {
   canSpeak,
   readOrderSoundPref,
@@ -42,28 +42,26 @@ export function VoiceAlertToggle() {
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="flex flex-wrap items-center gap-2">
-        <Button
-          type="button"
-          variant={on ? "outline" : "default"}
-          className="min-h-11"
-          onClick={toggle}
-          aria-pressed={on}
-        >
-          {on ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />}
-          {on ? "Voice alert on" : "Voice alert off"}
-        </Button>
-        {on ? (
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-1">
+          <label htmlFor="voice-alert-toggle" className="text-sm font-medium">
+            Voice alert on this device
+          </label>
+          <p className="text-sm text-muted-foreground">
+            Says “New order received from” and the customer&apos;s first name as soon as an order comes in, while AwaazOS
+            is open on this device and its volume is up. Needs alerts turned on above. With the screen locked or the app
+            closed you still get the notification, but the phone can&apos;t speak it.
+          </p>
+        </div>
+        <Switch id="voice-alert-toggle" checked={on} onCheckedChange={toggle} />
+      </div>
+      {on ? (
+        <div>
           <Button type="button" variant="ghost" className="min-h-11" onClick={() => speakNewOrder()}>
             Play sample
           </Button>
-        ) : null}
-      </div>
-      <p className="text-sm text-muted-foreground">
-        Says “New order received from” and the customer&apos;s first name as soon as an order comes in, while AwaazOS
-        is open on this device and its volume is up. Needs alerts turned on above. With the screen locked or the app
-        closed you still get the notification, but the phone can&apos;t speak it.
-      </p>
+        </div>
+      ) : null}
     </div>
   );
 }

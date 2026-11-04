@@ -135,4 +135,55 @@ test.describe("Orders board: menu and drop orders together", () => {
     await expect(page.getByRole("tab", { name: "All (1)" })).toBeVisible();
     await expect(page.locator("p", { hasText: "To cook:" })).toContainText("Board Laddu 1");
   });
+
+  test("the Confirmed list splits into pickup and delivery, one radio at a time", async ({ page, request }) => {
+    await createVendorSession(page, request, "board-handover");
+    const json = { "Content-Type": "application/json" };
+    const settings = await page.request.patch("/api/vendor", {
+      data: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true, menuFulfilmentMode: "BOTH" },
+      headers: json,
+    });
+    expect(settings.status()).toBe(200);
+    const { vendor } = (await (await page.request.get("/api/vendor")).json()) as { vendor: { slug: string } };
+    const poha = await createMenuItem(page, { name: "Handover Poha", priceInRupees: 40 });
+
+    const orderIds: string[] = [];
+    for (const [i, fulfilmentType] of (["PICKUP", "DELIVERY", "DELIVERY"] as const).entries()) {
+      const placed = await request.post(`/api/s/${vendor.slug}/menu-orders`, {
+        data: {
+          items: [{ menuItemId: poha.id, qty: 1 }],
+          customerName: `Buyer ${i}`,
+          customerPhone: `+91984805432${i}`,
+          fulfilmentType,
+          deliveryAddress: "12 Lake Road",
+          paymentMethod: "CASH",
+        },
+        headers: json,
+      });
+      expect(placed.status()).toBe(201);
+    }
+    const list = (await (await page.request.get("/api/storefront-orders")).json()) as { data: { id: string }[] };
+    orderIds.push(...list.data.map((o) => o.id));
+    const confirmed = await page.request.post("/api/storefront-orders/bulk", {
+      data: { orderIds, action: "confirm" },
+      headers: json,
+    });
+    expect(confirmed.status()).toBe(200);
+
+    await page.setViewportSize({ width: 360, height: 740 });
+    await page.goto("/orders");
+    await page.getByRole("tab", { name: /^Confirmed/ }).click();
+    const group = page.getByRole("radiogroup", { name: "Pickup or delivery" });
+    await expect(group.getByRole("radio", { name: "All (3)" })).toBeChecked();
+
+    await group.getByRole("radio", { name: "Delivery (2)" }).check();
+    await expect(page.getByRole("heading", { name: "Buyer 1" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Buyer 0" })).toHaveCount(0);
+
+    // Nothing in the row sticks out of its cell on the narrowest phone.
+    const overflowing = await group
+      .locator("label")
+      .evaluateAll((labels) => labels.filter((l) => l.scrollWidth > l.clientWidth).length);
+    expect(overflowing).toBe(0);
+  });
 });

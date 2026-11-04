@@ -2,13 +2,13 @@
 
 import type { MenuItem } from "@prisma/client";
 import Image from "next/image";
-import { ArrowDown, ArrowUp, CircleCheck, CircleSlash, Pencil } from "lucide-react";
+import { ArrowDown, ArrowUp, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
-import { ShowOnlineSwitch } from "@/components/menu/ShowOnlineSwitch";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
 import { formatINR } from "@/lib/currency";
 import { cn } from "@/lib/utils";
 
@@ -133,38 +133,26 @@ export function MenuItemCard({ item, onEdit, onChanged, onMove, canMoveUp = fals
             </div>
           ) : null}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          {/* One control for "can it be ordered": the state is the label, with its own icon. */}
-          <button
-            type="button"
-            role="switch"
-            aria-checked={item.isAvailable}
+        <div className="flex items-center gap-1 text-sm">
+          <Switch
+            checked={item.isAvailable}
             aria-label={`Selling ${item.name}`}
             disabled={saving}
-            onClick={() => void toggleSelling()}
-            className={cn(
-              "inline-flex min-h-11 items-center gap-2 rounded-full border px-4 text-sm font-semibold transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 motion-reduce:transition-none",
-              item.isAvailable
-                ? "border-primary/40 bg-primary/10 text-foreground"
-                : "border-border bg-muted text-muted-foreground",
-            )}
-          >
-            {item.isAvailable ? (
-              <CircleCheck className="h-4 w-4 shrink-0 text-primary" aria-hidden />
-            ) : (
-              <CircleSlash className="h-4 w-4 shrink-0" aria-hidden />
-            )}
+            onCheckedChange={() => void toggleSelling()}
+          />
+          {/* The word stays next to the switch, so a sold-out dish reads at a glance. */}
+          <span aria-hidden="true" className={item.isAvailable ? undefined : "font-semibold text-muted-foreground"}>
             {item.isAvailable ? "Selling" : "Sold out"}
-          </button>
+          </span>
           {item.isPopular ? (
-            <span className="rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">Popular</span>
+            <span className="ml-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">Popular</span>
           ) : null}
         </div>
         <div className="flex items-center gap-1 text-sm">
-          <ShowOnlineSwitch
+          <Switch
             checked={item.showOnline}
             onCheckedChange={toggleShowOnline}
-            label={`Show ${item.name} online`}
+            aria-label={`Show ${item.name} online`}
             disabled={saving}
           />
           <span aria-hidden="true">Show online</span>

@@ -10,6 +10,7 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
 import {
   ResponsiveDialog,
   ResponsiveDialogBody,
@@ -408,30 +409,12 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      role="switch"
-                      aria-checked={o.isActive}
+                    <Switch
                       aria-label={`${o.name} active`}
+                      checked={o.isActive}
                       disabled={!canEdit || pending}
-                      onClick={() => toggleActive(o)}
-                      className="inline-flex min-h-11 min-w-14 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <span
-                        aria-hidden="true"
-                        className={cn(
-                          "relative inline-flex h-7 w-12 items-center rounded-full transition-colors",
-                          o.isActive ? "bg-primary" : "bg-input",
-                        )}
-                      >
-                        <span
-                          className={cn(
-                            "inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform motion-reduce:transition-none",
-                            o.isActive ? "translate-x-6" : "translate-x-1",
-                          )}
-                        />
-                      </span>
-                    </button>
+                      onCheckedChange={() => toggleActive(o)}
+                    />
                     {canEdit ? (
                       <>
                         <Button

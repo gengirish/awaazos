@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { Switch } from "@/components/ui/switch";
 import { formatIndianMobile, normaliseIndianMobile } from "@/lib/phone";
 import { buyerWhatsappNumber } from "@/lib/storefront-order";
 
@@ -168,29 +169,7 @@ export function WhatsappOrdersClient({
             Customers who order will be able to see this phone number.
           </p>
         </div>
-        <button
-          id="whatsapp-orders-toggle"
-          type="button"
-          role="switch"
-          aria-checked={accept}
-          onClick={() => toggle(!accept)}
-          disabled={disabled}
-          className="group inline-flex min-h-11 min-w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <span className="sr-only">{accept ? "Turn off WhatsApp orders" : "Turn on WhatsApp orders"}</span>
-          <span
-            aria-hidden="true"
-            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-              accept ? "bg-primary" : "bg-input"
-            }`}
-          >
-            <span
-              className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform motion-reduce:transition-none ${
-                accept ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </span>
-        </button>
+        <Switch id="whatsapp-orders-toggle" checked={accept} onCheckedChange={toggle} disabled={disabled} />
       </div>
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
@@ -206,31 +185,7 @@ export function WhatsappOrdersClient({
             Anyone who opens your store page will be able to see this phone number.
           </p>
         </div>
-        <button
-          id="whatsapp-store-toggle"
-          type="button"
-          role="switch"
-          aria-checked={showOnStore}
-          onClick={() => toggleShowOnStore(!showOnStore)}
-          disabled={disabled}
-          className="group inline-flex min-h-11 min-w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <span className="sr-only">
-            {showOnStore ? "Hide the WhatsApp button on your store page" : "Show a WhatsApp button on your store page"}
-          </span>
-          <span
-            aria-hidden="true"
-            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-              showOnStore ? "bg-primary" : "bg-input"
-            }`}
-          >
-            <span
-              className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform motion-reduce:transition-none ${
-                showOnStore ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </span>
-        </button>
+        <Switch id="whatsapp-store-toggle" checked={showOnStore} onCheckedChange={toggleShowOnStore} disabled={disabled} />
       </div>
       {!isOwner ? <p className="text-xs text-muted-foreground">Only the owner can change this.</p> : null}
     </div>

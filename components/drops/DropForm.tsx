@@ -10,6 +10,8 @@ import { toast } from "sonner";
 import type { AddedMenuItem } from "@/components/drops/AddMenuItemDialog";
 import { VoiceDropPanel, type VoiceApplyResult } from "@/components/drops/VoiceDropPanel";
 import { Button } from "@/components/ui/button";
+import { RadioOption } from "@/components/ui/radio-option";
+import { Switch } from "@/components/ui/switch";
 import { Notice } from "@/components/ui/notice";
 import {
   ResponsiveDialog,
@@ -898,25 +900,17 @@ export function DropForm({
             <FromVoiceBadge show={fromVoice("fulfilmentMode")} />
           </div>
           <div role="radiogroup" aria-label={`How customers get their ${vocab.goods}`} className="grid grid-cols-3 gap-2">
-            {MODES.map((m) => {
-              const active = form.fulfilmentMode === m.value;
-              return (
-                <button
-                  key={m.value}
-                  type="button"
-                  role="radio"
-                  aria-checked={active}
-                  onClick={() => set("fulfilmentMode", m.value)}
-                  className={`min-h-11 rounded-md border px-2 text-sm font-medium transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                    active
-                      ? "border-primary bg-primary text-primary-foreground"
-                      : "border-input bg-background hover:bg-accent"
-                  }`}
-                >
-                  {m.label}
-                </button>
-              );
-            })}
+            {MODES.map((m) => (
+              <RadioOption
+                key={m.value}
+                size="compact"
+                name="drop-fulfilment-mode"
+                value={m.value}
+                checked={form.fulfilmentMode === m.value}
+                onChange={() => set("fulfilmentMode", m.value)}
+                label={m.label}
+              />
+            ))}
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
@@ -1032,15 +1026,12 @@ export function DropForm({
             {err("closesAtTime")}
           </fieldset>
 
-          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium">
-            <input
-              type="checkbox"
-              className="h-5 w-5 accent-primary"
-              checked={form.useOpensAt}
-              onChange={(e) => set("useOpensAt", e.target.checked)}
-            />
-            Start taking orders later, not as soon as I open the drop
-          </label>
+          <div className="flex items-center justify-between gap-4">
+            <label htmlFor="drop-opens-later" className="text-sm font-medium">
+              Start taking orders later, not as soon as I open the drop
+            </label>
+            <Switch id="drop-opens-later" checked={form.useOpensAt} onCheckedChange={(next) => set("useOpensAt", next)} />
+          </div>
           {form.useOpensAt ? (
             <fieldset className="space-y-1.5">
               <legend className="text-sm font-medium">Orders open at</legend>
@@ -1069,25 +1060,22 @@ export function DropForm({
             </fieldset>
           ) : null}
 
-          <div className="space-y-1">
-            <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm font-medium">
-              <input
-                type="checkbox"
-                className="h-5 w-5 shrink-0 accent-primary"
-                checked={form.showEverydayMenu}
-                onChange={(e) => set("showEverydayMenu", e.target.checked)}
-                aria-describedby="drop-everyday-help"
-              />
-              Also show my everyday {vocab.catalogue} while this drop is open
-            </label>
-            <p id="drop-everyday-help" className="pl-8 text-xs text-muted-foreground">
-              Off: customers see only this drop. On: your regular {vocab.catalogue} appears below it.
-            </p>
-            {fromVoice("showEverydayMenu") ? (
-              <div className="pl-8">
-                <FromVoiceBadge show />
-              </div>
-            ) : null}
+          <div className="flex items-start justify-between gap-4">
+            <div className="space-y-1">
+              <label htmlFor="drop-everyday-menu" className="text-sm font-medium">
+                Also show my everyday {vocab.catalogue} while this drop is open
+              </label>
+              <p id="drop-everyday-help" className="text-xs text-muted-foreground">
+                Off: customers see only this drop. On: your regular {vocab.catalogue} appears below it.
+              </p>
+              <FromVoiceBadge show={fromVoice("showEverydayMenu")} />
+            </div>
+            <Switch
+              id="drop-everyday-menu"
+              checked={form.showEverydayMenu}
+              onCheckedChange={(next) => set("showEverydayMenu", next)}
+              aria-describedby="drop-everyday-help"
+            />
           </div>
         </section>
       </fieldset>

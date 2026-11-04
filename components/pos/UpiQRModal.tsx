@@ -7,6 +7,7 @@ import { Check, ChevronDown } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
+import { RadioOption } from "@/components/ui/radio-option";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -193,25 +194,23 @@ export function UpiQRModal({
         ) : null}
       </div>
 
-      <div className="flex gap-2 rounded-lg border p-1">
-        <Button
-          type="button"
-          variant={payMode === "UPI" ? "default" : "ghost"}
-          aria-pressed={payMode === "UPI"}
-          className="h-11 flex-1"
-          onClick={() => setPayMode("UPI")}
-        >
-          UPI QR
-        </Button>
-        <Button
-          type="button"
-          variant={payMode === "CASH" ? "default" : "ghost"}
-          aria-pressed={payMode === "CASH"}
-          className="h-11 flex-1"
-          onClick={() => setPayMode("CASH")}
-        >
-          Cash
-        </Button>
+      <div role="radiogroup" aria-label="Payment mode" className="grid grid-cols-2 gap-2">
+        <RadioOption
+          size="compact"
+          name="pos-pay-mode"
+          value="UPI"
+          checked={payMode === "UPI"}
+          onChange={() => setPayMode("UPI")}
+          label="UPI QR"
+        />
+        <RadioOption
+          size="compact"
+          name="pos-pay-mode"
+          value="CASH"
+          checked={payMode === "CASH"}
+          onChange={() => setPayMode("CASH")}
+          label="Cash"
+        />
       </div>
 
       {payMode === "UPI" ? (

@@ -7,6 +7,8 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { Notice } from "@/components/ui/notice";
+import { RadioOption } from "@/components/ui/radio-option";
+import { Switch } from "@/components/ui/switch";
 import { paiseToRupees, rupeesToPaise } from "@/lib/currency";
 import type { MenuOrdersBlocker } from "@/lib/menu-orders-board";
 import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
@@ -170,36 +172,17 @@ export function MenuOrdersClient({
           </p>
           <p className="text-xs text-muted-foreground">
             Hide single items from your store with &ldquo;Show online&rdquo; on the {vocab.catalogueTitle} page. Drops
-            hide the everyday {vocab.catalogue} unless you tick &ldquo;Also show my everyday {vocab.catalogue}&rdquo;.
+            hide the everyday {vocab.catalogue} unless you turn on &ldquo;Also show my everyday {vocab.catalogue}&rdquo;.
           </p>
           {!isOwner && <p className="text-xs text-muted-foreground">Only the owner can change this.</p>}
         </div>
-        <button
+        <Switch
           id="menu-orders-toggle"
-          type="button"
-          role="switch"
-          aria-checked={enabled}
+          checked={enabled}
           aria-describedby={blockerCopy ? "menu-orders-blocker" : undefined}
-          onClick={() => toggle(!enabled)}
+          onCheckedChange={toggle}
           disabled={pending || !isOwner}
-          className="group inline-flex min-h-11 min-w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <span className="sr-only">{enabled ? `Turn off ordering from ${vocab.catalogue}` : `Turn on ordering from ${vocab.catalogue}`}</span>
-          <span
-            aria-hidden="true"
-            className={cn(
-              "relative inline-flex h-7 w-12 items-center rounded-full transition-colors",
-              enabled ? "bg-primary" : "bg-input",
-            )}
-          >
-            <span
-              className={cn(
-                "inline-block h-5 w-5 transform rounded-full bg-background shadow-sm transition-transform motion-reduce:transition-none",
-                enabled ? "translate-x-6" : "translate-x-1",
-              )}
-            />
-          </span>
-        </button>
+        />
       </div>
 
       {blockerCopy && (
@@ -237,23 +220,17 @@ export function MenuOrdersClient({
 
       <fieldset className="space-y-2" disabled={!isOwner}>
         <legend className="text-sm font-medium">How customers get their order</legend>
-        <div role="radiogroup" aria-label="How customers get their order" className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {MODES.map((m) => (
-            <button
+            <RadioOption
               key={m.id}
-              type="button"
-              role="radio"
-              aria-checked={mode === m.id}
-              onClick={() => setMode(m.id)}
-              className={cn(
-                "min-h-11 rounded-full border px-4 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-                mode === m.id
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-input bg-background hover:bg-accent",
-              )}
-            >
-              {m.label}
-            </button>
+              size="compact"
+              name="menu-fulfilment-mode"
+              value={m.id}
+              checked={mode === m.id}
+              onChange={() => setMode(m.id)}
+              label={m.label}
+            />
           ))}
         </div>
       </fieldset>

@@ -125,6 +125,11 @@ export async function auditPage(page: Page, rootSelector: string | null = null):
             clean(el.getAttribute("placeholder")) || clean(el.getAttribute("name")) || clean(el.id);
           if (fallback) return fallback;
         }
+        // A <label htmlFor> names a button over its own content, as for a switch.
+        if (el instanceof HTMLButtonElement) {
+          const label = clean(Array.from(el.labels ?? []).map((l) => l.textContent).join(" "));
+          if (label) return label;
+        }
         const text = clean(el.textContent);
         if (text) return text;
         const alt = clean(el.querySelector("img[alt]")?.getAttribute("alt"));

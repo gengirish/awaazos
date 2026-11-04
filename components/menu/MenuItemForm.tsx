@@ -19,7 +19,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { ShowOnlineSwitch } from "@/components/menu/ShowOnlineSwitch";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import {
   ResponsiveDialog,
@@ -722,20 +722,12 @@ export function MenuItemForm({
                 name="isPopular"
                 render={({ field }) => (
                   <FormItem className="space-y-0">
-                    {/* The label is the 44px tap area; the box itself draws at 20px. */}
-                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
-                      <FormControl>
-                        <input
-                          type="checkbox"
-                          id="isPopular"
-                          className="h-5 w-5 shrink-0 cursor-pointer accent-primary"
-                          checked={field.value ?? false}
-                          onChange={field.onChange}
-                          aria-label="Mark as popular"
-                        />
-                      </FormControl>
-                      <span>Popular item</span>
-                    </label>
+                    <div className="flex items-center gap-3">
+                      <Switch id="isPopular" checked={field.value ?? false} onCheckedChange={field.onChange} />
+                      <label htmlFor="isPopular" className="cursor-pointer text-sm">
+                        Popular item
+                      </label>
+                    </div>
                   </FormItem>
                 )}
               />
@@ -743,19 +735,21 @@ export function MenuItemForm({
                 control={form.control}
                 name="isAvailable"
                 render={({ field }) => (
-                  <FormItem className="space-y-0">
-                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
-                      <FormControl>
-                        <input
-                          type="checkbox"
-                          id="isAvailable"
-                          className="h-5 w-5 shrink-0 cursor-pointer accent-primary"
-                          checked={field.value ?? true}
-                          onChange={field.onChange}
-                        />
-                      </FormControl>
-                      <span>Selling now (untick when sold out)</span>
-                    </label>
+                  <FormItem className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        id="isAvailable"
+                        checked={field.value ?? true}
+                        onCheckedChange={field.onChange}
+                        aria-describedby="isAvailable-help"
+                      />
+                      <label htmlFor="isAvailable" className="cursor-pointer text-sm">
+                        Selling now
+                      </label>
+                    </div>
+                    <p id="isAvailable-help" className="text-xs text-muted-foreground">
+                      Off: shown as sold out.
+                    </p>
                   </FormItem>
                 )}
               />
@@ -765,16 +759,15 @@ export function MenuItemForm({
                 render={({ field }) => (
                   <FormItem className="space-y-1">
                     <div className="flex flex-row items-center gap-3">
-                      <ShowOnlineSwitch
+                      <Switch
                         id="showOnline"
                         checked={field.value ?? true}
                         onCheckedChange={field.onChange}
-                        label="Show online"
-                        describedBy="showOnline-help"
+                        aria-describedby="showOnline-help"
                       />
-                      <span className="text-sm" aria-hidden="true">
+                      <label htmlFor="showOnline" className="cursor-pointer text-sm">
                         Show online
-                      </span>
+                      </label>
                     </div>
                     <p id="showOnline-help" className="text-xs text-muted-foreground">
                       Off: sold at your counter only, hidden from your store page.

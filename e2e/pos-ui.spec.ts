@@ -46,7 +46,7 @@ test.describe("POS sale — driven through the UI", () => {
     await expect(dialog).toBeVisible();
     await expect(dialog).toContainText("₹40.00");
 
-    await dialog.getByRole("button", { name: "Cash" }).click();
+    await dialog.getByRole("radio", { name: "Cash" }).check();
     // The accessible name carries a trailing ✓, so exact matching would fail.
     await dialog.getByRole("button", { name: /Mark as paid/ }).click();
 
