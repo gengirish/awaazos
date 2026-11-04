@@ -3,6 +3,8 @@
 import { Download, Instagram, Loader2 } from "lucide-react";
 import { useState } from "react";
 
+import { AiImagePromptForm } from "@/components/ai/AiImagePromptForm";
+import { AI_IMAGES_ENABLED, aiImageErrorMessage } from "@/lib/ai-image-types";
 import { withInstagramTag } from "@/lib/order-channel";
 import { cn } from "@/lib/utils";
 
@@ -59,14 +61,27 @@ export function InstagramStoryButton({ src, fileName, url, className, onStatus, 
     a.click();
   }
 
-  async function prepare() {
+  /** With a prompt, the same image over an AI background (POST on the same route). */
+  async function prepare(prompt?: string) {
     onStatus("");
     setLoading(true);
     // Clipboard first, while the tap still counts as a user gesture.
     const copied = await copyLink();
     try {
-      const res = await fetch(src);
-      if (!res.ok) throw new Error(String(res.status));
+      const res = await fetch(
+        src,
+        prompt
+          ? { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt }) }
+          : undefined,
+      );
+      if (!res.ok) {
+        if (prompt) {
+          const data = (await res.json().catch(() => ({}))) as { error?: string };
+          onStatus(aiImageErrorMessage(data.error, res.status));
+          return;
+        }
+        throw new Error(String(res.status));
+      }
       const blob = await res.blob();
       const file = new File([blob], fileName, { type: "image/png" });
       const r = { file, objectUrl: URL.createObjectURL(blob) };
@@ -114,18 +129,34 @@ export function InstagramStoryButton({ src, fileName, url, className, onStatus, 
   }
 
   return (
-    <button
-      type="button"
-      onClick={prepare}
-      disabled={loading}
-      className={cn(className, "flex-1 border border-border bg-background text-foreground hover:bg-muted")}
-    >
-      {loading ? (
-        <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-      ) : (
-        <Instagram className="h-4 w-4" aria-hidden="true" />
-      )}
-      Instagram story
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() => prepare()}
+        disabled={loading}
+        className={cn(className, "flex-1 border border-border bg-background text-foreground hover:bg-muted")}
+      >
+        {loading ? (
+          <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
+        ) : (
+          <Instagram className="h-4 w-4" aria-hidden="true" />
+        )}
+        Instagram story
+      </button>
+      {AI_IMAGES_ENABLED ? (
+        <details className="w-full basis-full">
+          <summary className="flex min-h-11 cursor-pointer items-center text-sm font-medium">
+            Story with an AI background
+          </summary>
+          <AiImagePromptForm
+            label="Describe the background"
+            placeholder="Warm morning light on a wooden table"
+            submitLabel="Make story image"
+            busy={loading}
+            onSubmit={(prompt) => void prepare(prompt)}
+          />
+        </details>
+      ) : null}
+    </>
   );
 }

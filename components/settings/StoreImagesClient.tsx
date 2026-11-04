@@ -6,6 +6,8 @@ import { useRouter } from "next/navigation";
 import { useId, useRef, useState } from "react";
 import { toast } from "sonner";
 
+import { AiImagePromptForm } from "@/components/ai/AiImagePromptForm";
+import { AI_IMAGES_ENABLED, aiImageErrorMessage, dataUriToFile } from "@/lib/ai-image-types";
 import { downscaleImage, type DownscaleOptions } from "@/lib/image-downscale";
 import { cn } from "@/lib/utils";
 
@@ -14,7 +16,8 @@ import { cn } from "@/lib/utils";
  * POST/DELETE /api/vendor/banner and /api/vendor/logo. Photos are shrunk in
  * the browser first (lib/image-downscale.ts); the server re-validates.
  * `endpointBase` points the same controls at another store's routes: the admin
- * demo-store screen uses /api/admin/demo-stores/<ref>.
+ * demo-store screen uses /api/admin/demo-stores/<ref>. An AI banner (only on the
+ * seller's own routes) is a preview until "Use this banner" uploads it the same way.
  */
 export type StoreImagesClientProps = {
   storeName: string;
@@ -64,7 +67,9 @@ function ImageField({
   const hintId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const [url, setUrl] = useState(initialUrl);
-  const [busy, setBusy] = useState<"upload" | "remove" | null>(null);
+  const [busy, setBusy] = useState<"upload" | "remove" | "generate" | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+  const canGenerate = AI_IMAGES_ENABLED && kind === "banner" && endpointBase === "/api/vendor";
   const [status, setStatus] = useState("");
 
   async function upload(picked: File) {
@@ -92,6 +97,33 @@ function ImageField({
     } finally {
       setBusy(null);
       if (inputRef.current) inputRef.current.value = "";
+    }
+  }
+
+  async function generate(prompt: string) {
+    setBusy("generate");
+    setStatus("Making your banner…");
+    try {
+      const res = await fetch(`${endpointBase}/banner/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+        credentials: "include",
+      });
+      const data = (await res.json().catch(() => ({}))) as { data?: { image: string }; error?: string };
+      if (!res.ok || !data.data) {
+        const msg = aiImageErrorMessage(data.error, res.status);
+        setStatus(msg);
+        toast.error(msg);
+        return;
+      }
+      setPreview(data.data.image);
+      setStatus("Here's your banner. Use it, or describe another.");
+    } catch {
+      setStatus("Network error — please try again.");
+      toast.error("Network error — please try again.");
+    } finally {
+      setBusy(null);
     }
   }
 
@@ -200,6 +232,48 @@ function ImageField({
           </button>
         ) : null}
       </div>
+
+      {canGenerate && isOwner ? (
+        <div className="space-y-3 rounded-lg border p-3">
+          {preview ? (
+            <>
+              <div className="relative aspect-[8/3] w-full overflow-hidden rounded-lg border">
+                <Image src={preview} alt="Preview of the AI banner" fill sizes="(min-width: 640px) 600px, 100vw" className="object-cover" />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => {
+                    const file = dataUriToFile(preview, "banner.jpg");
+                    setPreview(null);
+                    void upload(file);
+                  }}
+                  className={cn(btn, "bg-primary text-primary-foreground shadow-xs hover:opacity-90")}
+                >
+                  Use this banner
+                </button>
+                <button
+                  type="button"
+                  disabled={busy !== null}
+                  onClick={() => setPreview(null)}
+                  className={cn(btn, "border border-input bg-background hover:bg-accent")}
+                >
+                  Discard
+                </button>
+              </div>
+            </>
+          ) : null}
+          <AiImagePromptForm
+            label="Or describe a banner"
+            placeholder="Warm morning light on a wooden table"
+            submitLabel="Make banner"
+            busy={busy === "generate"}
+            disabled={busy !== null}
+            onSubmit={(prompt) => void generate(prompt)}
+          />
+        </div>
+      ) : null}
 
       <p aria-live="polite" role="status" className="min-h-5 text-xs text-muted-foreground">
         {status}

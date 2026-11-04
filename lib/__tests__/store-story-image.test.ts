@@ -80,3 +80,13 @@ describe("StoreStoryCard", () => {
     expect(html).toContain("and 2 more");
   });
 });
+
+describe("StoreStoryCard with an AI background", () => {
+  it("draws the picture behind the text, and nothing without one", () => {
+    const src = "data:image/jpeg;base64,AAAA";
+    const withBg = renderToStaticMarkup(createElement(StoreStoryCard, { story: story(), host: "h.test", background: src }));
+    expect(withBg).toContain(src);
+    expect(withBg).toContain("Ragi Kitchen");
+    expect(renderToStaticMarkup(card(story(), "h.test"))).not.toContain("<img");
+  });
+});

@@ -1,4 +1,4 @@
-import { STORY_MAX_ITEMS, STORY_SAFE, storyOrderUrl } from "@/lib/drop-story-image";
+import { STORY_MAX_ITEMS, STORY_SAFE, StoryBackground, storyOrderUrl, storyPanel } from "@/lib/drop-story-image";
 import { fulfilmentModeLabel, OG_COLORS as C, Price, truncate } from "@/lib/og-parts";
 import { prisma } from "@/lib/prisma";
 import { STOREFRONT_MENU_ITEM_WHERE } from "@/lib/storefront-order";
@@ -46,7 +46,8 @@ export async function loadStoreStory(vendorId: string) {
 
 export type StoreStory = NonNullable<Awaited<ReturnType<typeof loadStoreStory>>>;
 
-export function StoreStoryCard({ story, host }: { story: StoreStory; host: string }) {
+export function StoreStoryCard({ story, host, background }: { story: StoreStory; host: string; background?: string }) {
+  const panel = storyPanel(background);
   const shown = story.items.slice(0, STORY_MAX_ITEMS);
   const more = story.items.length - shown.length;
   const pickupNote = story.fulfilmentMode !== "DELIVERY" ? story.pickupNote?.trim() : "";
@@ -65,7 +66,8 @@ export function StoreStoryCard({ story, host }: { story: StoreStory; host: strin
         fontFamily: "sans-serif",
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column" }}>
+      <StoryBackground src={background} />
+      <div style={{ display: "flex", flexDirection: "column", ...panel }}>
         <div style={{ display: "flex", fontSize: 44, color: C.primary, fontWeight: 700 }}>
           {story.acceptMenuOrders ? "Now taking orders" : "Our menu"}
           {story.city ? ` · ${truncate(story.city, 18)}` : ""}
@@ -75,7 +77,7 @@ export function StoreStoryCard({ story, host }: { story: StoreStory; host: strin
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", flexDirection: "column", ...panel }}>
         {shown.map((it, i) => (
           <div
             key={i}
@@ -102,7 +104,7 @@ export function StoreStoryCard({ story, host }: { story: StoreStory; host: strin
         ) : null}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", flexDirection: "column", ...panel }}>
         <div
           style={{
             display: "flex",

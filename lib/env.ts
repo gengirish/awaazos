@@ -48,6 +48,8 @@ const envSchema = z.object({
   GUPSHUP_APP_NAME: z.string().optional(),
   GUPSHUP_SOURCE_NUMBER: z.string().optional(),
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
+  // AI images (lib/ai-image.ts). Server only. Absent → those routes answer 503.
+  FAL_KEY: z.string().optional(),
   // Read-write token of a separate PRIVATE Blob store for buyers' payment
   // screenshots (lib/payment-proof.ts). Absent → the upload field is hidden.
   PAYMENT_PROOF_BLOB_READ_WRITE_TOKEN: z.string().optional(),
