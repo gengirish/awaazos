@@ -7,6 +7,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { rememberRecentOrder } from "@/components/storefront/recent-orders";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioOption } from "@/components/ui/radio-option";
 import {
   ResponsiveDialog,
   ResponsiveDialogBody,
@@ -828,30 +829,23 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                 <legend className="text-sm font-medium">Delivery or pickup</legend>
                 <div className="grid grid-cols-2 gap-2">
                   {fulfilmentTypes.map((t) => (
-                    <label
+                    <RadioOption
                       key={t}
-                      className={cn(
-                        "flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold has-focus-visible:ring-2 has-focus-visible:ring-primary",
-                        fulfilment === t ? "border-primary bg-primary/10 text-primary" : "border-border",
-                      )}
-                    >
-                      <input
-                        type="radio"
-                        name={`${idPrefix}-fulfilment`}
-                        value={t}
-                        checked={fulfilment === t}
-                        onChange={() => {
-                          setFulfilment(t);
-                          revalidate("address", { fulfilment: t });
-                        }}
-                        className="h-4 w-4 accent-[hsl(var(--primary))]"
-                      />
-                      {t === "DELIVERY"
-                        ? deliveryFeePaise > 0
-                          ? `Delivery (+${formatINR(deliveryFeePaise)})`
-                          : "Delivery"
-                        : "Pickup"}
-                    </label>
+                      name={`${idPrefix}-fulfilment`}
+                      value={t}
+                      checked={fulfilment === t}
+                      onChange={() => {
+                        setFulfilment(t);
+                        revalidate("address", { fulfilment: t });
+                      }}
+                      label={
+                        t === "DELIVERY"
+                          ? deliveryFeePaise > 0
+                            ? `Delivery (+${formatINR(deliveryFeePaise)})`
+                            : "Delivery"
+                          : "Pickup"
+                      }
+                    />
                   ))}
                 </div>
               </fieldset>
@@ -1180,24 +1174,15 @@ function PaymentOption(props: {
   describedBy: string | undefined;
 }) {
   return (
-    <label
-      className={cn(
-        "flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 has-focus-visible:ring-2 has-focus-visible:ring-primary",
-        props.checked ? "border-primary bg-primary/10" : props.invalid ? "border-destructive" : "border-border",
-      )}
-    >
-      <input
-        type="radio"
-        name={props.name}
-        checked={props.checked}
-        onChange={props.onSelect}
-        aria-describedby={props.describedBy}
-        className="mt-0.5 h-4 w-4 scroll-my-24 accent-[hsl(var(--primary))]"
-      />
-      <span className="flex flex-col">
-        <span className="text-sm font-semibold">{props.label}</span>
-        <span className="text-xs text-muted-foreground">{props.hint}</span>
-      </span>
-    </label>
+    <RadioOption
+      name={props.name}
+      checked={props.checked}
+      onChange={props.onSelect}
+      aria-describedby={props.describedBy}
+      inputClassName="scroll-my-24"
+      invalid={props.invalid}
+      label={props.label}
+      hint={props.hint}
+    />
   );
 }

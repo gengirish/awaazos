@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { RadioOption } from "@/components/ui/radio-option";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import {
@@ -18,7 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const CHOICE =
-  "flex min-h-11 cursor-pointer items-center gap-3 rounded-md border px-3 py-2 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/5 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring";
+  "flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/10 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring";
 
 const LEGEND = "font-medium text-foreground";
 
@@ -40,17 +41,14 @@ function RadioChoices({
       <legend className={LEGEND}>{legend}</legend>
       <div className="mt-2 grid gap-2 sm:grid-cols-2">
         {options.map((o) => (
-          <label key={o.key} className={CHOICE}>
-            <input
-              type="radio"
-              name={name}
-              value={o.key}
-              checked={value === o.key}
-              onChange={() => onChange(o.key)}
-              className="h-4 w-4 shrink-0"
-            />
-            {o.label}
-          </label>
+          <RadioOption
+            key={o.key}
+            name={name}
+            value={o.key}
+            checked={value === o.key}
+            onChange={() => onChange(o.key)}
+            label={o.label}
+          />
         ))}
       </div>
     </fieldset>
@@ -147,7 +145,7 @@ export function OwnerSurveyForm({
                 type="checkbox"
                 checked={pains.includes(pain.key)}
                 onChange={(e) => togglePain(pain.key, e.target.checked)}
-                className="h-4 w-4 shrink-0"
+                className="h-4 w-4 shrink-0 accent-primary"
               />
               {pain.label}
             </label>

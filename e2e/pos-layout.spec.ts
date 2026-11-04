@@ -309,7 +309,7 @@ test.describe("POS sale clears the cart", () => {
     await page.getByRole("button", { name: /Collect payment/ }).click();
 
     const dialog = page.getByRole("dialog");
-    await dialog.getByRole("button", { name: "Cash" }).click();
+    await dialog.getByRole("radio", { name: "Cash" }).check();
     await dialog.getByRole("button", { name: /Mark as paid/ }).click();
     await expect(page.getByText(/AWZ-\d{8}-\d{4}/)).toBeVisible({ timeout: 20_000 });
 

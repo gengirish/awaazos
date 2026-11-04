@@ -113,7 +113,7 @@ test.describe("voice drop builder", () => {
     expect(box?.height).toBeGreaterThanOrEqual(80);
 
     // Tap fallback untouched before voice: default delivery, nothing selected.
-    await expect(page.getByRole("radio", { name: "Delivery" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "Delivery" })).toBeChecked();
     const titleBefore = await page.getByLabel("Title").inputValue();
 
     await mic.click();
@@ -129,7 +129,7 @@ test.describe("voice drop builder", () => {
     // ── Fields filled from the draft ──
     await expect(page.getByLabel("Title")).toHaveValue(draft.title);
     await expect(page.getByLabel("Cooking day")).toHaveValue(draft.date);
-    await expect(page.getByRole("radio", { name: "Pickup" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "Pickup" })).toBeChecked();
     await expect(page.getByLabel("From", { exact: true })).toHaveValue("18:00");
     await expect(page.getByLabel("Until", { exact: true })).toHaveValue("20:00");
     await expect(page.getByLabel("Order cut-off date")).toHaveValue(draft.date);
@@ -162,7 +162,7 @@ test.describe("voice drop builder", () => {
     await panel.getByRole("button", { name: "Undo voice changes" }).click();
     await expect(panel.getByText("Voice changes undone.")).toBeVisible();
     await expect(page.getByLabel("Title")).toHaveValue(titleBefore);
-    await expect(page.getByRole("radio", { name: "Delivery" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "Delivery" })).toBeChecked();
     await expect(page.getByRole("checkbox", { name: new RegExp(menu.laddu.name) })).not.toBeChecked();
     await expect(page.getByText("From voice", { exact: true })).toHaveCount(0);
     await expect(panel.getByRole("button", { name: "Undo voice changes" })).toHaveCount(0);

@@ -29,6 +29,7 @@ import { OrderCard, type OrderSource } from "@/components/drops/orders/OrderCard
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
 import { PushAlertsButton, PushAlertsPrompt } from "@/components/push/PushAlertsButton";
 import { Button } from "@/components/ui/button";
+import { RadioOption } from "@/components/ui/radio-option";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import {
@@ -1151,30 +1152,25 @@ export function OrdersBoard({
           </div>
         )}
         {showHandover && (
-          <div role="group" aria-label="Pickup or delivery" className="mb-3 grid grid-cols-3 gap-1">
-            {HANDOVER_FILTERS.map((h) => {
-              const on = handover === h.id;
-              return (
-                <button
-                  key={h.id}
-                  type="button"
-                  aria-pressed={on}
-                  onClick={() => {
-                    setHandover(h.id);
-                    setSelected(EMPTY_SELECTION);
-                  }}
-                  className={cn(
-                    SEGMENT_BTN,
-                    on
-                      ? "border-primary bg-primary/10 font-semibold underline underline-offset-2"
-                      : "border-input bg-background hover:bg-accent",
-                  )}
-                >
-                  {h.label}
-                  <span className="font-mono tabular-nums">({filterByHandover(inFilter, h.id).length})</span>
-                </button>
-              );
-            })}
+          <div role="radiogroup" aria-label="Pickup or delivery" className="mb-3 grid grid-cols-3 gap-1">
+            {HANDOVER_FILTERS.map((h) => (
+              <RadioOption
+                key={h.id}
+                size="compact"
+                name="orders-handover"
+                value={h.id}
+                checked={handover === h.id}
+                onChange={() => {
+                  setHandover(h.id);
+                  setSelected(EMPTY_SELECTION);
+                }}
+                label={
+                  <span className="flex flex-wrap items-baseline justify-center gap-x-1 leading-tight">
+                    {h.label} <span className="font-mono tabular-nums">({filterByHandover(inFilter, h.id).length})</span>
+                  </span>
+                }
+              />
+            ))}
           </div>
         )}
         {visible.length === 0 ? (

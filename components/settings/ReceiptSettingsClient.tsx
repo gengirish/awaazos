@@ -13,6 +13,8 @@ import {
   RECEIPT_PAPER,
   type ReceiptView,
 } from "@/lib/receipt";
+import { RadioOption } from "@/components/ui/radio-option";
+import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 
 export type ReceiptSettingsValues = {
@@ -191,25 +193,16 @@ export function ReceiptSettingsClient({
           <legend className="text-sm font-medium">Printer paper</legend>
           <div className="flex flex-wrap gap-2">
             {PAPERS.map((p) => (
-              <label
+              <RadioOption
                 key={p}
-                className={cn(
-                  "inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border px-4 text-sm font-medium has-focus-visible:ring-2 has-focus-visible:ring-ring has-disabled:cursor-not-allowed has-disabled:opacity-50",
-                  values.receiptPaper === p
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-input bg-background hover:bg-accent",
-                )}
-              >
-                <input
-                  type="radio"
-                  name="receipt-paper"
-                  value={p}
-                  checked={values.receiptPaper === p}
-                  onChange={() => setValues((v) => ({ ...v, receiptPaper: p }))}
-                  className="sr-only"
-                />
-                {RECEIPT_PAPER[p].label}
-              </label>
+                size="compact"
+                name="receipt-paper"
+                value={p}
+                checked={values.receiptPaper === p}
+                onChange={() => setValues((v) => ({ ...v, receiptPaper: p }))}
+                label={RECEIPT_PAPER[p].label}
+                className="px-3"
+              />
             ))}
           </div>
           <p className="text-xs text-muted-foreground">
@@ -227,31 +220,12 @@ export function ReceiptSettingsClient({
               &ldquo;Print receipt&rdquo; after the sale.
             </p>
           </div>
-          <button
+          <Switch
             id="receipt-autoprint"
-            type="button"
-            role="switch"
-            aria-checked={values.autoPrintReceipt}
-            onClick={() => setValues((v) => ({ ...v, autoPrintReceipt: !v.autoPrintReceipt }))}
+            checked={values.autoPrintReceipt}
+            onCheckedChange={(next) => setValues((v) => ({ ...v, autoPrintReceipt: next }))}
             disabled={!isOwner}
-            className="group inline-flex min-h-11 min-w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <span className="sr-only">{values.autoPrintReceipt ? "Auto-print on" : "Auto-print off"}</span>
-            <span
-              aria-hidden="true"
-              className={cn(
-                "relative inline-flex h-7 w-12 items-center rounded-full transition-colors",
-                values.autoPrintReceipt ? "bg-primary" : "bg-input",
-              )}
-            >
-              <span
-                className={cn(
-                  "inline-block h-5 w-5 transform rounded-full bg-background shadow-sm transition-transform motion-reduce:transition-none",
-                  values.autoPrintReceipt ? "translate-x-6" : "translate-x-1",
-                )}
-              />
-            </span>
-          </button>
+          />
         </div>
 
         <button

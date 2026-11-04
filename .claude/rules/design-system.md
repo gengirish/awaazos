@@ -81,8 +81,8 @@ Every theme primary must keep white text at 4.5:1 or better:
   one-screen tweak belongs at the call site via `className`. Re-running
   `npx shadcn@latest add` over an edited primitive drops those edits — diff first.
 - Pull new components via `npx shadcn@latest add <name>` (don't hand-write).
-  The exceptions are `responsive-dialog.tsx`, `confirm-dialog.tsx`, `empty-state.tsx`
-  and `notice.tsx`, which are ours.
+  The exceptions are `responsive-dialog.tsx`, `confirm-dialog.tsx`, `empty-state.tsx`,
+  `notice.tsx` and `radio-option.tsx`, which are ours.
 
 ## Touch defaults built into the primitives
 
@@ -98,6 +98,24 @@ Every theme primary must keep white text at 4.5:1 or better:
 - A hand-rolled `<button>` / `<a>` gets no floor: give it `min-h-11` (and
   `min-w-11` if icon-only) or the `touch-target` class.
 - Dialog / Sheet close buttons are a 44×44 hit area around the 16 px icon.
+
+## Toggles and choices
+
+One rule for every on/off or pick-one control. Don't hand-roll them.
+
+- **A single on/off setting is a `Switch`** (`components/ui/switch.tsx`): a 48×28 px
+  track in a 56×44 px tap area. Name it with `<label htmlFor>` or `aria-label`. The
+  off track is `--switch-off` (4.72:1 on white); `--input` is too faint for it.
+- **Choosing one of 2 to 5 options is a `RadioOption`** (`components/ui/radio-option.tsx`):
+  a native radio inside its label, which gives arrow keys for free. Same `name` across
+  a group, inside a `<fieldset>` + `<legend>` or `role="radiogroup"`. `size="compact"`
+  is for tight rows (POS payment mode, board filters). Never `aria-pressed` buttons for
+  this. More than 5 options is a `Select`.
+- **Choosing several, or a one-off opt-in on a form, is a checkbox** (native,
+  `accent-primary`, inside its label): picking dishes, bulk select, "Remember my details".
+- Leave these as they are: tabs that swap a panel (`role="tab"`), links that navigate
+  (`aria-current`), a button that does an action that can fail (phone alerts asks for
+  browser permission), and a button with a third state (the board's Sound button).
 
 ## Modals
 
