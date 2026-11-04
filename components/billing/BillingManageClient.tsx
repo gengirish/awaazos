@@ -5,7 +5,15 @@ import { useState } from "react";
 
 import { formatINR, formatINRCompact } from "@/lib/currency";
 import { loadCheckout, type RazorpaySubscriptionSuccess } from "@/lib/razorpay-checkout";
-import { storeBasePaise, storeChargePaise, type BillingInterval } from "@/lib/subscription";
+import { PLAN_LIMITS } from "@/lib/constants";
+import {
+  BILLING_INTERVALS,
+  gstPaise,
+  storeBasePaise,
+  subscriptionBasePaise,
+  type BillingInterval,
+  type SubscribablePlan,
+} from "@/lib/subscription";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -23,10 +31,21 @@ import { Button } from "@/components/ui/button";
  * refresh, never to pay again.
  */
 
-const INTERVAL_LABEL: Record<BillingInterval, { button: string; per: string }> = {
-  monthly: { button: "Starter monthly", per: "/month" },
-  yearly: { button: "Starter yearly", per: "/year" },
+const INTERVAL_LABEL: Record<BillingInterval, { word: string; per: string }> = {
+  monthly: { word: "monthly", per: "/month" },
+  yearly: { word: "yearly", per: "/year" },
 };
+
+function buttonLabel(plan: SubscribablePlan, interval: BillingInterval): string {
+  return `${PLAN_LIMITS[plan].label} ${INTERVAL_LABEL[interval].word}`;
+}
+
+/** One cycle before GST. A store's own price is a price for Starter. */
+function basePaise(plan: SubscribablePlan, interval: BillingInterval, customPricePaise: number | null): number {
+  return plan === "STARTER" ? storeBasePaise(interval, customPricePaise) : subscriptionBasePaise(plan, interval);
+}
+
+type Pending = { plan: SubscribablePlan; interval: BillingInterval };
 
 /** Verify attempts after a payment, while Razorpay moves the subscription to active. */
 const VERIFY_ATTEMPTS = 3;
@@ -38,15 +57,18 @@ const STILL_CONFIRMING =
 type Message = { text: string; tone: "error" | "info" };
 
 export function BillingManageClient({
-  canSubscribe,
+  plans,
+  isUpgrade,
   canCancel,
   cancelAtEnd,
   prefillName,
   prefillEmail,
   customPricePaise,
 }: {
-  /** Not on a paid plan and no subscription already collecting (trial, locked or free). */
-  canSubscribe: boolean;
+  /** Plans this store can buy now. Empty when paying for the top one, or one is about to start. */
+  plans: readonly SubscribablePlan[];
+  /** Paying for a lower plan: buying one of `plans` replaces that subscription. */
+  isUpgrade: boolean;
   /** A subscription that is collecting (or about to) is on file. */
   canCancel: boolean;
   /** Cancelled, still paid up until the cycle ends. */
@@ -57,8 +79,7 @@ export function BillingManageClient({
   /** This store's own price (lib/subscription.ts). Null = the list price. */
   customPricePaise: number | null;
 }) {
-  // PRO is not sold (TODO.md §2): only STARTER, monthly or yearly.
-  const [pending, setPending] = useState<null | "cancel" | BillingInterval>(null);
+  const [pending, setPending] = useState<null | "cancel" | Pending>(null);
   const [message, setMessage] = useState<Message | null>(null);
 
   async function confirmPayment(resp: RazorpaySubscriptionSuccess) {
@@ -96,14 +117,14 @@ export function BillingManageClient({
     setPending(null);
   }
 
-  async function subscribe(interval: BillingInterval) {
+  async function subscribe(plan: SubscribablePlan, interval: BillingInterval) {
     setMessage(null);
-    setPending(interval);
+    setPending({ plan, interval });
     try {
       const res = await fetch("/api/razorpay/create-subscription", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plan: "STARTER", interval }),
+        body: JSON.stringify({ plan, interval }),
       });
       const data = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -134,11 +155,12 @@ export function BillingManageClient({
         return;
       }
 
+      const base = basePaise(plan, interval, customPricePaise);
       const rzp = new Razorpay({
         key: data.keyId,
         subscription_id: data.subscriptionId,
         name: "AwaazOS",
-        description: `${INTERVAL_LABEL[interval].button} — ${formatINR(storeChargePaise(interval, customPricePaise))} incl. GST`,
+        description: `${buttonLabel(plan, interval)} — ${formatINR(base + gstPaise(base))} incl. GST`,
         prefill: {
           ...(prefillName ? { name: prefillName } : {}),
           ...(prefillEmail ? { email: prefillEmail } : {}),
@@ -191,30 +213,40 @@ export function BillingManageClient({
 
   return (
     <div className="flex flex-col gap-3">
-      {canSubscribe ? (
-        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          {(["monthly", "yearly"] as const).map((interval) => (
-            <Button
-              key={interval}
-              type="button"
-              variant={interval === "yearly" ? "outline" : "default"}
-              className="min-h-11 h-auto flex-col items-start py-2 text-left"
-              disabled={pending !== null}
-              aria-busy={pending === interval}
-              onClick={() => void subscribe(interval)}
-            >
-              <span>{pending === interval ? "Opening payment…" : INTERVAL_LABEL[interval].button}</span>
-              <span className="text-xs font-normal opacity-80">
-                {formatINRCompact(storeBasePaise(interval, customPricePaise))}
-                {INTERVAL_LABEL[interval].per} + GST ={" "}
-                {formatINR(storeChargePaise(interval, customPricePaise))}
-                {interval === "yearly" ? " · 2 months free" : ""}
-              </span>
-            </Button>
-          ))}
+      {plans.map((plan) => (
+        <div key={plan} className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+          {BILLING_INTERVALS.map((interval) => {
+            const base = basePaise(plan, interval, customPricePaise);
+            const isPending =
+              pending !== null && pending !== "cancel" && pending.plan === plan && pending.interval === interval;
+            return (
+              <Button
+                key={interval}
+                type="button"
+                variant={plan === "STARTER" && interval === "monthly" ? "default" : "outline"}
+                className="min-h-11 h-auto flex-col items-start py-2 text-left"
+                disabled={pending !== null}
+                aria-busy={isPending}
+                onClick={() => void subscribe(plan, interval)}
+              >
+                <span>{isPending ? "Opening payment…" : buttonLabel(plan, interval)}</span>
+                <span className="text-xs font-normal opacity-80">
+                  {formatINRCompact(base)}
+                  {INTERVAL_LABEL[interval].per} + GST = {formatINR(base + gstPaise(base))}
+                  {interval === "yearly" ? " · 2 months free" : ""}
+                </span>
+              </Button>
+            );
+          })}
         </div>
+      ))}
+      {plans.length > 0 && isUpgrade ? (
+        <p className="text-sm text-muted-foreground">
+          Moving up ends your current subscription now and starts the new one, charged today. Time you already paid
+          for isn&apos;t refunded, and your new plan runs for at least that long.
+        </p>
       ) : null}
-      {canSubscribe ? (
+      {plans.length > 0 ? (
         <p className="text-xs text-muted-foreground">UPI Autopay, cards or netbanking · secured by Razorpay</p>
       ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">

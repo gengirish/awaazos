@@ -4,13 +4,13 @@ import { redirect } from "next/navigation";
 import { lockReason } from "@/components/billing/BillingLockedCard";
 import { BillingManageClient } from "@/components/billing/BillingManageClient";
 import { SettingsPageHeader } from "@/components/settings/SettingsChrome";
-import { PLAN_LIMITS, TRIAL_DAYS } from "@/lib/constants";
+import { PLAN_LIMITS, PLAN_RANK, TRIAL_DAYS } from "@/lib/constants";
 import { formatIstDate } from "@/lib/datetime";
 import { countBillableTxnThisMonth } from "@/lib/drops";
 import { isPlanExpired, isPlanInGrace, planGraceEndsAt, trialDaysLeft } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
-import { LIVE_SUBSCRIPTION_STATUSES } from "@/lib/subscription";
+import { LIVE_SUBSCRIPTION_STATUSES, SUBSCRIBABLE_PLANS, type SubscribablePlan } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +42,15 @@ export default async function BillingSettingsPage() {
     // More than TRIAL_DAYS left means free access granted on /admin/vendors.
     const trialLeft = access.kind === "trial" ? trialDaysLeft(access.endsAt, now) : 0;
     const hasLiveSubscription = LIVE_SUBSCRIPTION_STATUSES.includes(settings?.razorpaySubStatus ?? "");
+    // A store's own price is for Starter alone. Paying: only a step up, which
+    // replaces the subscription. Otherwise anything, unless one is already live.
+    const sellable: readonly SubscribablePlan[] = vendor.customPricePaise === null ? SUBSCRIBABLE_PLANS : ["STARTER"];
+    const plansOnOffer =
+      access.kind === "paid"
+        ? sellable.filter((plan) => PLAN_RANK[plan] > PLAN_RANK[access.plan])
+        : hasLiveSubscription
+          ? []
+          : sellable;
 
     return (
       <>
@@ -59,7 +68,10 @@ export default async function BillingSettingsPage() {
             {access.kind === "trial" ? (
               <p className="mt-1 text-sm text-muted-foreground">
                 {trialLeft > TRIAL_DAYS ? trialLeft : `${trialLeft} of ${TRIAL_DAYS}`} days left — ends on{" "}
-                {formatIstDate(access.endsAt)}. Subscribe any time; you won&apos;t be charged until the trial ends.
+                {formatIstDate(access.endsAt)}.{" "}
+                {hasLiveSubscription
+                  ? "Your subscription starts when the trial ends."
+                  : "Subscribe any time; you won't be charged until the trial ends."}
               </p>
             ) : access.kind === "locked" ? (
               <p className="mt-1 text-sm font-medium text-destructive">
@@ -104,7 +116,8 @@ export default async function BillingSettingsPage() {
           <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
             <h2 className="mb-4 font-medium">Actions</h2>
             <BillingManageClient
-              canSubscribe={access.kind !== "paid" && !hasLiveSubscription}
+              plans={plansOnOffer}
+              isUpgrade={access.kind === "paid"}
               // Live, or a subscription from before the status column existed.
               canCancel={
                 hasLiveSubscription || Boolean(settings?.razorpaySubId && !settings.razorpaySubStatus)

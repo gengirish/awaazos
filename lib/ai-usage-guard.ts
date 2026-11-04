@@ -15,6 +15,7 @@ function secondsUntilMonthEnd(date = new Date()): number {
 
 const ANTHROPIC_VENDOR_MONTHLY_TOKEN_CAP: Record<Plan, number> = {
   FREE: 100_000,
+  LITE: 100_000,
   STARTER: 2_000_000,
   PRO: 20_000_000,
   ENTERPRISE: 100_000_000,
@@ -22,6 +23,7 @@ const ANTHROPIC_VENDOR_MONTHLY_TOKEN_CAP: Record<Plan, number> = {
 
 const SARVAM_VENDOR_MONTHLY_MINUTE_CAP: Record<Plan, number> = {
   FREE: 0,
+  LITE: 0,
   STARTER: 1_200,
   PRO: 6_000,
   ENTERPRISE: 20_000,
@@ -29,6 +31,7 @@ const SARVAM_VENDOR_MONTHLY_MINUTE_CAP: Record<Plan, number> = {
 
 const OPENAI_STT_VENDOR_MONTHLY_MINUTE_CAP: Record<Plan, number> = {
   FREE: 0,
+  LITE: 0,
   STARTER: 1_200,
   PRO: 6_000,
   ENTERPRISE: 20_000,
@@ -40,6 +43,7 @@ const OPENAI_STT_VENDOR_MONTHLY_MINUTE_CAP: Record<Plan, number> = {
 // fails or trips its breaker.
 const GROQ_STT_VENDOR_MONTHLY_MINUTE_CAP: Record<Plan, number> = {
   FREE: 0,
+  LITE: 0,
   STARTER: 2_400,
   PRO: 12_000,
   ENTERPRISE: 40_000,

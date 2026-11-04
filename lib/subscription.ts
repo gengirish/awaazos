@@ -25,8 +25,8 @@ import { GST_BPS, PLAN_PRICES_PAISE, PLAN_PRICES_YEARLY_PAISE } from "@/lib/cons
 export const BILLING_INTERVALS = ["monthly", "yearly"] as const;
 export type BillingInterval = (typeof BILLING_INTERVALS)[number];
 
-/** Paid plans a vendor can buy through Razorpay. PRO is not sold (TODO.md §2). */
-export const SUBSCRIBABLE_PLANS = ["STARTER"] as const satisfies readonly Plan[];
+/** Paid plans a vendor can buy through Razorpay, cheapest first. */
+export const SUBSCRIBABLE_PLANS = ["LITE", "STARTER", "PRO"] as const satisfies readonly Plan[];
 export type SubscribablePlan = (typeof SUBSCRIBABLE_PLANS)[number];
 
 /** Billing cycles before a Razorpay subscription completes: ten years either way. */
@@ -62,7 +62,8 @@ export function subscriptionChargePaise(plan: SubscribablePlan, interval: Billin
  * (lib/sales-earnings.ts) gets the base back from a charge.
  *
  * It applies when the owner next subscribes (lib/custom-subscription-plan.ts).
- * A live subscription keeps the price it was made at.
+ * A live subscription keeps the price it was made at. It is a price for STARTER:
+ * a store with one is offered only that (create-subscription refuses the others).
  */
 export const CUSTOM_PRICE_MIN_RUPEES = 49;
 export const CUSTOM_PRICE_MAX_RUPEES = 4999;

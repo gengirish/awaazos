@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-import { CAN_SET_BILLING, makeGrandfatheredFree } from "./helpers/billing-db";
+import { CAN_SET_BILLING, daysFromNow, makeGrandfatheredFree, setVendorBilling } from "./helpers/billing-db";
 import { createVendorSession } from "./helpers/vendor";
 
 type PlanGateBody = {
@@ -21,6 +21,33 @@ type PlanGateBody = {
  */
 test.describe("plan gates return structured 402s", () => {
   test.skip(!CAN_SET_BILLING, "needs a local throwaway database to put the vendor on FREE");
+
+  test("a paying Lite store is held to Lite, and is offered only a step up", async ({ page, request }) => {
+    const creds = await createVendorSession(page, request, "gate-lite");
+    await setVendorBilling(creds.email, { plan: "LITE", planExpiresAt: daysFromNow(20), trialEndsAt: daysFromNow(-1) });
+
+    const csv = await page.request.get("/api/transactions/export?from=2026-01-01&to=2026-12-31");
+    expect(csv.status()).toBe(402);
+    expect(((await csv.json()) as PlanGateBody).currentPlan).toBe("LITE");
+
+    await page.goto("/settings/billing");
+    await expect(page.getByText("Lite", { exact: true })).toBeVisible();
+    await expect(page.getByText(/\/ 50 bills/)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Starter monthly/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Pro yearly/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Lite monthly/ })).toHaveCount(0);
+    await expect(page.getByText(/ends your current subscription now/)).toBeVisible();
+  });
+
+  test("a store on the trial is offered all three plans", async ({ page, request }) => {
+    await createVendorSession(page, request, "gate-trial-plans");
+
+    await page.goto("/settings/billing");
+    for (const name of [/Lite monthly/, /Lite yearly/, /Starter monthly/, /Starter yearly/, /Pro monthly/, /Pro yearly/]) {
+      await expect(page.getByRole("button", { name })).toBeVisible();
+    }
+    await expect(page.getByText(/ends your current subscription now/)).toHaveCount(0);
+  });
 
   test("CSV export is STARTER-only and refuses a FREE vendor", async ({ page, request }) => {
     const creds = await createVendorSession(page, request, "gate-csv");

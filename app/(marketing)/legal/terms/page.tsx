@@ -38,8 +38,10 @@ export default function TermsPage() {
           needed to start it.
         </li>
         <li>
-          After the trial, creating new bills and taking new orders needs a paid subscription: {starter.price} or{" "}
-          {starter.yearlyPrice}. Without one, your existing bills, reports and settings stay available to view and
+          After the trial, creating new bills and taking new orders needs a paid subscription: {PLAN_MARKETING.LITE.label}{" "}
+          at {PLAN_MARKETING.LITE.price} or {PLAN_MARKETING.LITE.yearlyPrice}, {starter.label} at {starter.price} or{" "}
+          {starter.yearlyPrice}, or {PLAN_MARKETING.PRO.label} at {PLAN_MARKETING.PRO.price} or{" "}
+          {PLAN_MARKETING.PRO.yearlyPrice}. Without one, your existing bills, reports and settings stay available to view and
           export, and orders already placed can still be completed.
         </li>
         <li>

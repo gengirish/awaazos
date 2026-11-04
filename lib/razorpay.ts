@@ -40,8 +40,13 @@ function starterPlanEnv(interval: BillingInterval): string | undefined {
     : (process.env.RAZORPAY_PLAN_STARTER_MONTHLY || process.env.RAZORPAY_PLAN_STARTER);
 }
 
+function planEnv(plan: SubscribablePlan, interval: BillingInterval): string | undefined {
+  if (plan === "STARTER") return starterPlanEnv(interval);
+  return process.env[`RAZORPAY_PLAN_${plan}_${interval.toUpperCase()}`];
+}
+
 export function getRazorpayPlanId(plan: SubscribablePlan, interval: BillingInterval): string {
-  const id = plan === "STARTER" ? starterPlanEnv(interval) : undefined;
+  const id = planEnv(plan, interval);
   if (!id) {
     throw new Error(
       `Required environment variable RAZORPAY_PLAN_${plan}_${interval.toUpperCase()} is not configured`,
@@ -60,7 +65,12 @@ export function planFromRazorpayPlanId(
   if (planId === e.RAZORPAY_PLAN_STARTER_MONTHLY || planId === e.RAZORPAY_PLAN_STARTER) {
     return { plan: "STARTER", interval: "monthly" };
   }
-  // PRO is no longer sold, but a hand-made PRO subscription must still renew.
+  for (const plan of ["LITE", "PRO"] as const) {
+    for (const interval of BILLING_INTERVALS) {
+      if (planId === planEnv(plan, interval)) return { plan, interval };
+    }
+  }
+  // From before PRO was sold: a hand-made PRO subscription must still renew.
   if (planId === e.RAZORPAY_PLAN_PRO) return { plan: "PRO", interval: "monthly" };
   return null;
 }

@@ -12,8 +12,17 @@ function allCopy(plan: MarketedPlan): string {
 }
 
 describe("plan marketing copy", () => {
-  it("markets only STARTER (FREE is grandfathered, PRO is not sold)", () => {
-    expect([...MARKETED_PLANS]).toEqual(["STARTER"]);
+  it("markets Lite, Starter and Pro, cheapest first (FREE is grandfathered)", () => {
+    expect([...MARKETED_PLANS]).toEqual(["LITE", "STARTER", "PRO"]);
+  });
+
+  it("Starter is the one emphasised plan, and Lite really is weaker", () => {
+    expect(MARKETED_PLANS.filter((plan) => PLAN_MARKETING[plan].emphasis)).toEqual(["STARTER"]);
+    expect(PLAN_PRICES_PAISE.LITE).toBeLessThan(PLAN_PRICES_PAISE.STARTER);
+    expect(PLAN_LIMITS.LITE.monthlyTxnCap).not.toBeNull();
+    expect(PLAN_LIMITS.LITE.razorpayLinks).toBe(false);
+    expect(PLAN_LIMITS.LITE.csvExport).toBe(false);
+    expect(PLAN_LIMITS.LITE.analyticsDays).toBeLessThan(PLAN_LIMITS.STARTER.analyticsDays);
   });
 
   it.each(MARKETED_PLANS)("%s copy matches PLAN_LIMITS, prices and the trial length", (plan) => {

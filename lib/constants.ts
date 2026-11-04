@@ -40,10 +40,26 @@ export const PLAN_LIMITS: Record<
     sarvamStt: false,
     analyticsDays: 7,
   },
+  // Sold just under Starter and well short of it, so Starter is the easy choice
+  // (lib/plan-copy.ts). Ranks below STARTER, so every requirePlan(STARTER) gate
+  // already shuts it out; storefront Razorpay reads `razorpayLinks`.
+  LITE: {
+    label: "Lite",
+    pricePaise: 24900,
+    txnPerMonth: 50,
+    maxStaff: 1,
+    whatsappReceipts: false,
+    razorpayLinks: false,
+    monthlyTxnCap: 50,
+    whatsapp: false,
+    csvExport: false,
+    sarvamStt: false,
+    analyticsDays: 30,
+  },
   STARTER: {
     label: "Starter",
     pricePaise: 29900,
-    // Unlimited: STARTER is the one paid tier and matches the 30-day trial
+    // Unlimited: STARTER matches the 30-day trial
     // (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md), so converting changes nothing.
     txnPerMonth: null,
     maxStaff: 3,
@@ -153,6 +169,7 @@ export const BRAND = {
 /** Per-plan SaaS price in paise (monthly). Mirrors `PLAN_LIMITS.*.pricePaise` for gates and marketing. */
 export const PLAN_PRICES_PAISE: Record<Plan, number> = {
   FREE: 0,
+  LITE: 24900,
   STARTER: 29900,
   PRO: 79900,
   ENTERPRISE: 0,
@@ -163,7 +180,9 @@ export const PLAN_PRICES_PAISE: Record<Plan, number> = {
  * free). Only plans that can be bought yearly are listed.
  */
 export const PLAN_PRICES_YEARLY_PAISE: Partial<Record<Plan, number>> = {
+  LITE: 249000,
   STARTER: 299000,
+  PRO: 799000,
 };
 
 /**
@@ -183,7 +202,8 @@ export const GST_BPS = 1800;
 /** Plan ordering for subscription gates (higher = better). */
 export const PLAN_RANK: Record<Plan, number> = {
   FREE: 0,
-  STARTER: 1,
-  PRO: 2,
-  ENTERPRISE: 3,
+  LITE: 1,
+  STARTER: 2,
+  PRO: 3,
+  ENTERPRISE: 4,
 };

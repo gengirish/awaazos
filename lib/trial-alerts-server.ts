@@ -11,18 +11,19 @@
 
 import { waitUntil } from "@vercel/functions";
 
-import { sendStoreLockedEmail, sendTrialReminderEmail } from "@/lib/email";
+import { sendOrderCapEmail, sendStoreLockedEmail, sendTrialReminderEmail } from "@/lib/email";
 import { getKv } from "@/lib/kv";
 import { logger } from "@/lib/logger";
 import { billingAccess } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
-import { sendToVendor, storeLockedPayload } from "@/lib/push";
+import { orderCapPayload, sendToVendor, storeLockedPayload } from "@/lib/push";
 import { appBaseUrl } from "@/lib/storefront-razorpay";
 import {
   STORE_LOCKED_KEY_TTL_SECONDS,
   TRIAL_REMINDER_FIRST_DAYS,
   TRIAL_REMINDER_KEY_TTL_SECONDS,
   istDaysUntil,
+  orderCapKey,
   storeLockedKey,
   trialReminderDue,
   trialReminderKey,
@@ -157,12 +158,58 @@ export async function alertSellerStoreLocked(vendorId: string): Promise<void> {
   }
 }
 
-/** For the buyer's request: the buyer never waits on this. */
-export function alertSellerStoreLockedInBackground(vendorId: string): void {
-  const p = alertSellerStoreLocked(vendorId);
+/**
+ * A buyer's order was just refused by the monthly order cap. Same rules as the
+ * locked alert: owners only, once a day, never throws, nothing about the buyer.
+ */
+export async function alertSellerOrderCap(vendorId: string): Promise<void> {
+  const kv = getKv();
+  if (!kv) return;
+  const key = orderCapKey(vendorId);
+  try {
+    const claimed = await kv.set(key, "1", { nx: true, ex: STORE_LOCKED_KEY_TTL_SECONDS });
+    if (claimed === null) return;
+
+    const vendor = await prisma.vendor.findFirst({
+      where: { id: vendorId },
+      select: { name: true, staff: OWNERS_SELECT },
+    });
+
+    let reached = 0;
+    for (const owner of vendor?.staff ?? []) {
+      const push = await sendToVendor(vendorId, orderCapPayload(), { userId: owner.userId }).catch(() => null);
+      reached += push?.sent ?? 0;
+      if (!owner.user.email) continue;
+      const email = await sendOrderCapEmail({
+        to: owner.user.email,
+        name: owner.name,
+        storeName: vendor!.name,
+        billingUrl: billingUrl(),
+      });
+      if (email.delivered) reached += 1;
+    }
+
+    if (reached === 0) await kv.del(key);
+    logger.info({ vendorId, reached }, "order_cap_alert.done");
+  } catch (err) {
+    logger.error({ vendorId, err: err instanceof Error ? err.name : "unknown" }, "order_cap_alert.failed");
+  }
+}
+
+function inBackground(p: Promise<void>): void {
   try {
     waitUntil(p);
   } catch {
     // Outside a Vercel request context the promise still runs to completion.
   }
+}
+
+/** For the buyer's request: the buyer never waits on this. */
+export function alertSellerStoreLockedInBackground(vendorId: string): void {
+  inBackground(alertSellerStoreLocked(vendorId));
+}
+
+/** For the buyer's request: the buyer never waits on this. */
+export function alertSellerOrderCapInBackground(vendorId: string): void {
+  inBackground(alertSellerOrderCap(vendorId));
 }
