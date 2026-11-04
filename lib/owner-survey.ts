@@ -83,6 +83,7 @@ export const ownerSurveySchema = z
       .refine((pains) => new Set(pains).size === pains.length, "Repeated answer"),
     topPain: z.enum(OWNER_PAIN_KEYS),
     weeklyOrders: z.enum(WEEKLY_ORDER_BANDS.map((b) => b.key) as [WeeklyOrderBand, ...WeeklyOrderBand[]]),
+    maxWeeklyOrders: z.enum(WEEKLY_ORDER_BANDS.map((b) => b.key) as [WeeklyOrderBand, ...WeeklyOrderBand[]]),
     willingToPay: z.enum(WILLING_TO_PAY_BANDS.map((b) => b.key) as [WillingToPayBand, ...WillingToPayBand[]]),
     comment: z
       .string()
@@ -100,6 +101,8 @@ export type OwnerSurveyAnswers = {
   pains: readonly string[];
   topPain: string;
   weeklyOrders: string;
+  /** The most they can handle, on the same bands. Null on answers saved before it was asked. */
+  maxWeeklyOrders: string | null;
   willingToPay: string;
   comment: string | null;
 };
@@ -135,12 +138,13 @@ export type SurveySummary = {
   responses: number;
   pains: PainTally[];
   weeklyOrders: BandTally[];
+  maxWeeklyOrders: BandTally[];
   willingToPay: BandTally[];
 };
 
 function tallyBands(
   bands: readonly { key: string; label: string }[],
-  answers: readonly string[],
+  answers: readonly (string | null)[],
 ): BandTally[] {
   return bands.map((b) => ({ key: b.key, label: b.label, count: answers.filter((a) => a === b.key).length }));
 }
@@ -171,6 +175,10 @@ export function summariseSurvey(rows: readonly OwnerSurveyAnswers[]): SurveySumm
     weeklyOrders: tallyBands(
       WEEKLY_ORDER_BANDS,
       rows.map((r) => r.weeklyOrders),
+    ),
+    maxWeeklyOrders: tallyBands(
+      WEEKLY_ORDER_BANDS,
+      rows.map((r) => r.maxWeeklyOrders),
     ),
     willingToPay: tallyBands(
       WILLING_TO_PAY_BANDS,

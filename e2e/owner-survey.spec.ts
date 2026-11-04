@@ -15,6 +15,7 @@ const ANSWERS = {
   pains: ["delivery"],
   topPain: "delivery",
   weeklyOrders: "10_30",
+  maxWeeklyOrders: "30_80",
   willingToPay: "199_499",
 };
 
@@ -31,12 +32,13 @@ test.describe("owner survey", () => {
 
     // Incomplete: says so and saves nothing.
     await page.getByRole("button", { name: "Send my answers" }).click();
-    await expect(page.getByRole("alert").filter({ hasText: "first three questions" })).toBeVisible();
+    await expect(page.getByRole("alert").filter({ hasText: "first four questions" })).toBeVisible();
 
     await page.getByLabel("Checking who has paid").check();
     await page.getByLabel("Booking delivery and briefing riders").check();
     await page.getByRole("group", { name: "Which one hurts most?" }).getByLabel("Checking who has paid").check();
     await page.getByRole("group", { name: /how many orders/ }).getByLabel("30 to 80").check();
+    await page.getByRole("group", { name: /most orders you can handle/ }).getByLabel("80 to 200").check();
     await page.getByRole("group", { name: /what would you pay/ }).getByLabel("₹199 to ₹499").check();
     await page.getByLabel(/Anything else we should build/).fill("Rider tracking");
     await page.getByRole("button", { name: "Send my answers" }).click();
@@ -103,6 +105,7 @@ test.describe("public survey link", () => {
 
     await page.getByLabel("Finding new customers").check();
     await page.getByRole("group", { name: /how many orders/ }).getByLabel("Under 10").check();
+    await page.getByRole("group", { name: /most orders you can handle/ }).getByLabel("10 to 30").check();
     await page.getByRole("group", { name: /what would you pay/ }).getByLabel("Nothing yet").check();
     await page.getByRole("button", { name: "Send my answers" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Thank you" })).toBeVisible();

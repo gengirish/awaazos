@@ -68,10 +68,10 @@ model Vendor {
   offers                Offer[]
   demoHandovers         DemoHandover[]
   communities           CommunityMember[]
-  referredBy            Vendor?             @relation("VendorReferrals", fields: [referredByVendorId], references: [id], onDelete: SetNull)
-  referrals             Vendor[]            @relation("VendorReferrals")
-  referralRewardsEarned ReferralReward[]    @relation("ReferralRewardReferrer")
-  referralRewardFrom    ReferralReward?     @relation("ReferralRewardReferred")
+  referredBy            Vendor?              @relation("VendorReferrals", fields: [referredByVendorId], references: [id], onDelete: SetNull)
+  referrals             Vendor[]             @relation("VendorReferrals")
+  referralRewardsEarned ReferralReward[]     @relation("ReferralRewardReferrer")
+  referralRewardFrom    ReferralReward?      @relation("ReferralRewardReferred")
   orderFeedback         OrderFeedback[]
   ownerSurveyResponse   OwnerSurveyResponse?
 
@@ -469,16 +469,18 @@ model OrderFeedback {
 // One owner's answers per store, changeable (lib/owner-survey.ts). Pain and
 // band values are the keys defined there.
 model OwnerSurveyResponse {
-  id           String   @id @default(cuid())
-  vendorId     String   @unique
-  vendor       Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  pains        String[]
-  topPain      String
-  weeklyOrders String
-  willingToPay String
-  comment      String?  @db.VarChar(500)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id              String   @id @default(cuid())
+  vendorId        String   @unique
+  vendor          Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  pains           String[]
+  topPain         String
+  weeklyOrders    String
+  /// Null on answers saved before the question existed.
+  maxWeeklyOrders String?
+  willingToPay    String
+  comment         String?  @db.VarChar(500)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
   @@index([updatedAt])
   @@map("owner_survey_responses")
@@ -486,13 +488,15 @@ model OwnerSurveyResponse {
 
 /// Answers from the public /survey link. Tied to no store or person (lib/owner-survey.ts).
 model PublicSurveyResponse {
-  id           String   @id @default(cuid())
-  pains        String[]
-  topPain      String
-  weeklyOrders String
-  willingToPay String
-  comment      String?  @db.VarChar(500)
-  createdAt    DateTime @default(now())
+  id              String   @id @default(cuid())
+  pains           String[]
+  topPain         String
+  weeklyOrders    String
+  /// Null on answers saved before the question existed.
+  maxWeeklyOrders String?
+  willingToPay    String
+  comment         String?  @db.VarChar(500)
+  createdAt       DateTime @default(now())
 
   @@index([createdAt])
   @@map("public_survey_responses")

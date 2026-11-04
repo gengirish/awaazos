@@ -634,7 +634,7 @@ no timers, nothing cached on `Vendor`. There are no per-item ratings.
 
 Rules in the header of `lib/owner-survey.ts` (pure), database side in `lib/owner-survey-server.ts`. An OWNER
 of a real store answers once, changeably, in Settings → Tell us what's hard (`PUT /api/vendor/survey`,
-`OwnerSurveyResponse`, one row per store): which problems, which hurts most, orders a week, what they would
+`OwnerSurveyResponse`, one row per store): which problems, which hurts most, orders a week, the most they can handle, what they would
 pay, an optional comment. `/orders` and `/drops` show a prompt until answered ("Not now" is per device).
 `/admin/survey` (SUPER_ADMIN) ranks the problems to decide what to build; `/admin/vendors` shows one store's
 answers beside its price. Answers never set a price by themselves, and `SURVEY_USE_NOTICE` tells the owner they

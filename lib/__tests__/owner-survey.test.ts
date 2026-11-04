@@ -22,10 +22,17 @@ const VALID = {
   pains: ["payment_matching", "delivery"],
   topPain: "delivery",
   weeklyOrders: "10_30",
+  maxWeeklyOrders: "30_80",
   willingToPay: "199_499",
 };
 
 describe("ownerSurveySchema", () => {
+  it("requires the most orders they can handle, on the same bands", () => {
+    const { maxWeeklyOrders: _omitted, ...withoutMax } = VALID;
+    expect(ownerSurveySchema.safeParse(withoutMax).success).toBe(false);
+    expect(ownerSurveySchema.safeParse({ ...VALID, maxWeeklyOrders: "lots" }).success).toBe(false);
+  });
+
   it("accepts a full answer and turns a blank comment into null", () => {
     expect(ownerSurveySchema.parse({ ...VALID, comment: "   " }).comment).toBeNull();
     expect(ownerSurveySchema.parse(VALID).comment).toBeNull();
@@ -47,6 +54,7 @@ describe("summariseSurvey", () => {
     pains,
     topPain,
     weeklyOrders: "10_30",
+    maxWeeklyOrders: null,
     willingToPay: "nothing_yet",
     comment: null,
   });
@@ -63,6 +71,8 @@ describe("summariseSurvey", () => {
       ["profit", 1, 3],
     ]);
     expect(summary.weeklyOrders.find((b) => b.key === "10_30")?.count).toBe(3);
+    // Answers from before the question count as no answer, not as a band.
+    expect(summary.maxWeeklyOrders.reduce((total, b) => total + b.count, 0)).toBe(0);
     expect(summary.willingToPay.find((b) => b.key === "over_999")?.count).toBe(0);
   });
 

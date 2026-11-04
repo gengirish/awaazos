@@ -55,6 +55,7 @@ const ANSWERS = {
   pains: ["payment_matching", "delivery"],
   topPain: "delivery",
   weeklyOrders: "10_30",
+  maxWeeklyOrders: "30_80",
   willingToPay: "199_499",
   comment: "Rider tracking",
 };
