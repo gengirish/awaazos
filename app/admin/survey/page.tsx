@@ -69,6 +69,7 @@ function SurveyResults({ title, summary }: { title: string; summary: SurveySumma
 
       <div className="grid gap-4 sm:grid-cols-2">
         <BandList title="Orders a week" bands={summary.weeklyOrders} />
+        <BandList title="Most they can handle a week" bands={summary.maxWeeklyOrders} />
         <BandList title="Would pay a month, before GST" bands={summary.willingToPay} />
       </div>
     </>

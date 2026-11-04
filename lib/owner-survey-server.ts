@@ -11,6 +11,7 @@ const ANSWER_SELECT = {
   pains: true,
   topPain: true,
   weeklyOrders: true,
+  maxWeeklyOrders: true,
   willingToPay: true,
   comment: true,
 } as const;

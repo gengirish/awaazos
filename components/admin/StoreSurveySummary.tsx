@@ -27,6 +27,12 @@ export function StoreSurveySummary({ answers }: { answers: OwnerSurveyAnswers | 
         <dt className="inline font-medium">Orders a week: </dt>
         <dd className="inline">{weeklyOrdersLabel(answers.weeklyOrders)}</dd>
       </div>
+      {answers.maxWeeklyOrders ? (
+        <div>
+          <dt className="inline font-medium">Most they can handle a week: </dt>
+          <dd className="inline">{weeklyOrdersLabel(answers.maxWeeklyOrders)}</dd>
+        </div>
+      ) : null}
       <div>
         <dt className="inline font-medium">Would pay a month: </dt>
         <dd className="inline">{willingToPayLabel(answers.willingToPay)}</dd>

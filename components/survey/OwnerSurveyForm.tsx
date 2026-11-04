@@ -76,6 +76,7 @@ export function OwnerSurveyForm({
   const [pains, setPains] = useState<string[]>([...(answers?.pains ?? [])]);
   const [topPain, setTopPain] = useState(answers?.topPain ?? "");
   const [weeklyOrders, setWeeklyOrders] = useState(answers?.weeklyOrders ?? "");
+  const [maxWeeklyOrders, setMaxWeeklyOrders] = useState(answers?.maxWeeklyOrders ?? "");
   const [willingToPay, setWillingToPay] = useState(answers?.willingToPay ?? "");
   const [comment, setComment] = useState(answers?.comment ?? "");
   const [saving, setSaving] = useState(false);
@@ -84,7 +85,8 @@ export function OwnerSurveyForm({
 
   // One problem chosen is the one that hurts most, without asking again.
   const effectiveTop = pains.length === 1 ? pains[0] : pains.includes(topPain) ? topPain : "";
-  const complete = pains.length > 0 && effectiveTop !== "" && weeklyOrders !== "" && willingToPay !== "";
+  const complete =
+    pains.length > 0 && effectiveTop !== "" && weeklyOrders !== "" && maxWeeklyOrders !== "" && willingToPay !== "";
 
   function togglePain(key: string, on: boolean) {
     setSaved(false);
@@ -95,7 +97,7 @@ export function OwnerSurveyForm({
     e.preventDefault();
     setSaved(false);
     if (!complete) {
-      setError("Please answer the first three questions.");
+      setError("Please answer the first four questions.");
       return;
     }
     setError(null);
@@ -104,7 +106,7 @@ export function OwnerSurveyForm({
       const res = await fetch(isPublic ? "/api/survey" : "/api/vendor/survey", {
         method: isPublic ? "POST" : "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ pains, topPain: effectiveTop, weeklyOrders, willingToPay, comment }),
+        body: JSON.stringify({ pains, topPain: effectiveTop, weeklyOrders, maxWeeklyOrders, willingToPay, comment }),
       });
       if (!res.ok) {
         setError(
@@ -174,6 +176,17 @@ export function OwnerSurveyForm({
         onChange={(key) => {
           setSaved(false);
           setWeeklyOrders(key);
+        }}
+      />
+
+      <RadioChoices
+        name="max-weekly-orders"
+        legend="What is the most orders you can handle in a week?"
+        options={WEEKLY_ORDER_BANDS}
+        value={maxWeeklyOrders}
+        onChange={(key) => {
+          setSaved(false);
+          setMaxWeeklyOrders(key);
         }}
       />
 
