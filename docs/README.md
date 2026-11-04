@@ -25,6 +25,7 @@ Index of the operational and planning docs. Code wins wherever a doc disagrees w
 | [`runbooks/ON_CALL.md`](runbooks/ON_CALL.md) | Daily checks, alert routing, provider escalation contacts |
 | [`runbooks/ROLLBACK.md`](runbooks/ROLLBACK.md) | Rolling back Vercel, the Fly worker app and the Fly Whisper app |
 | [`runbooks/DR_RESTORE.md`](runbooks/DR_RESTORE.md) | Restoring Neon from point-in-time and re-pointing the apps |
+| [`runbooks/LIVE_SUBSCRIPTION_CHECK.md`](runbooks/LIVE_SUBSCRIPTION_CHECK.md) | One real subscription and the trial alerts, checked by hand |
 | [`BRANCH_PROTECTION.md`](BRANCH_PROTECTION.md) | Required status checks for `main` (whether protection is enabled is TODO 4.3) |
 | [`DEMO_GUIDE.md`](DEMO_GUIDE.md) | Live demo walkthrough |
 | [`../scripts/README.md`](../scripts/README.md) | STT provider smoke scripts, bundle budget, agent-rule sync, Razorpay plan setup, offer seed data, PWA icons |

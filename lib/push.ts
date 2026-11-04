@@ -132,6 +132,16 @@ export function orderRatedPayload(o: { billNumber: string; rating: number }): Pu
   };
 }
 
+/** A buyer's order was refused because the store is locked. Nothing about the buyer. */
+export function storeLockedPayload(): PushPayload {
+  return {
+    title: "🔒 A customer just tried to order",
+    body: "Subscribe to reopen your store",
+    url: "/settings/billing",
+    tag: "locked-store",
+  };
+}
+
 export type SendResult = { sent: number; removed: number; failed: number };
 
 /** Send to every opted-in device of the vendor's active staff (or only `userId`'s). */
