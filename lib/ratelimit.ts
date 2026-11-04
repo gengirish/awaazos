@@ -174,6 +174,16 @@ export const billingRateLimit = makeLimiter({
 });
 
 /**
+ * 6 AI images per vendor per minute. Each one is a billed fal job, so this is
+ * far below the text AI limits.
+ */
+export const aiImageRateLimit = makeLimiter({
+  name: "ai-image",
+  windowMs: 60_000,
+  max: 6,
+});
+
+/**
  * Best-effort client IP extraction from a Next.js request.
  * Vercel populates x-forwarded-for; falls back to x-real-ip; "unknown"
  * means the limiter buckets all anonymous traffic together (safe default).

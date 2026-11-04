@@ -49,6 +49,18 @@ const GROQ_STT_VENDOR_MONTHLY_MINUTE_CAP: Record<Plan, number> = {
   ENTERPRISE: 40_000,
 };
 
+// AI images for banners and stories. A seller needs a handful, not a stream.
+const FAL_IMAGE_VENDOR_MONTHLY_CAP: Record<Plan, number> = {
+  FREE: 0,
+  STARTER: 30,
+  PRO: 100,
+  ENTERPRISE: 300,
+};
+
+function globalFalImageCap(): number {
+  return Number(process.env.GLOBAL_FAL_MONTHLY_IMAGE_CAP ?? 3_000);
+}
+
 function globalAnthropicCap(): number {
   return Number(process.env.GLOBAL_ANTHROPIC_MONTHLY_TOKEN_CAP ?? 200_000_000);
 }
@@ -220,6 +232,49 @@ export async function releaseOpenaiSttMinutes(args: {
   const vendorKey = `usage:openai-stt:vendor:${args.vendorId}:${m}`;
   const globalKey = `usage:openai-stt:global:${m}`;
   await Promise.all([unbumpCounter(vendorKey, delta), unbumpCounter(globalKey, delta)]);
+}
+
+/**
+ * Reserve one AI image. Unlike the guards around it this fails CLOSED in
+ * production: every call is billed and no sale depends on it, so an unmetered
+ * image is worse than a "try again later". Without KV in dev it passes.
+ */
+export async function reserveFalImage(args: { vendorId: string; plan: Plan }): Promise<GuardResult> {
+  const unavailable: GuardResult = {
+    ok: false,
+    code: "fal_guard_unavailable",
+    message: "Usage metering is unavailable.",
+  };
+  if (!getKv()) return process.env.NODE_ENV === "production" ? unavailable : { ok: true };
+
+  const m = monthKey();
+  const ttl = secondsUntilMonthEnd();
+  const vendorKey = `usage:fal-image:vendor:${args.vendorId}:${m}`;
+  const globalKey = `usage:fal-image:global:${m}`;
+
+  try {
+    const vendorNext = await bumpCounter(vendorKey, 1, ttl);
+    if (vendorNext > FAL_IMAGE_VENDOR_MONTHLY_CAP[args.plan]) {
+      await unbumpCounter(vendorKey, 1);
+      return { ok: false, code: "vendor_fal_image_cap_reached", message: "Monthly AI image cap reached for this plan." };
+    }
+    const globalNext = await bumpCounter(globalKey, 1, ttl);
+    if (globalNext > globalFalImageCap()) {
+      await Promise.all([unbumpCounter(vendorKey, 1), unbumpCounter(globalKey, 1)]);
+      return { ok: false, code: "global_fal_image_cap_reached", message: "Platform AI image cap reached." };
+    }
+    return { ok: true };
+  } catch {
+    return unavailable;
+  }
+}
+
+export async function releaseFalImage(args: { vendorId: string }): Promise<void> {
+  const m = monthKey();
+  await Promise.all([
+    unbumpCounter(`usage:fal-image:vendor:${args.vendorId}:${m}`, 1),
+    unbumpCounter(`usage:fal-image:global:${m}`, 1),
+  ]);
 }
 
 /** Reserve Groq STT usage in whole minutes (rounded up). */

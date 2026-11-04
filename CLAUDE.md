@@ -588,6 +588,17 @@ single-order compound scope, so one stale order never rolls back the rest. Respo
 
 DB-backed drops tests are opt-in: `npm run test:drops:db` (needs a throwaway `DATABASE_URL`).
 
+### AI images (fal)
+
+`lib/ai-image.ts` (server-only) turns a seller's description into a picture with `fal-ai/flux/schnell`,
+for two uses that store nothing themselves. A banner is previewed (`POST /api/vendor/banner/generate`,
+OWNER) and "Use this banner" sends it through the normal upload. A story background is composited on
+`POST` to either story-image route (MANAGER; the tenant check runs first, so a miss never reaches fal).
+`FAL_KEY` never reaches the browser; unset → 503. The controls are hidden until
+`NEXT_PUBLIC_AI_IMAGES_ENABLED=true`. Only the seller's own words go to fal, and the prompt is never logged.
+Every call is billed and nothing retries. `reserveFalImage` (`lib/ai-usage-guard.ts`) caps images per plan
+and fails **closed** in production, unlike the POS guards. `requireActiveBilling` applies.
+
 ### Offers (sales and quantity plans)
 
 An `Offer` is a vendor's sale ("Diwali sale: 10% off everything") or plan ("4+ quiches incl. 1 paneer →

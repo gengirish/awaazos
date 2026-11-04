@@ -205,6 +205,13 @@ test.describe("tenant isolation", () => {
 
     const cross = await pageB.request.get(`/api/drops/${dropA.id}/story-image`);
     expect(cross.status(), "cross-tenant story image must 404").toBe(404);
+
+    // The AI version must miss before anything is spent.
+    const crossAi = await pageB.request.post(`/api/drops/${dropA.id}/story-image`, {
+      data: { prompt: "a wooden table" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(crossAi.status(), "cross-tenant AI story image must 404").toBe(404);
   });
 
   test("vendor B cannot bulk-act on vendor A's storefront order (reported not_found)", async ({ request }) => {

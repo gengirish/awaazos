@@ -1,9 +1,10 @@
 import { ImageResponse } from "next/og";
 import { type NextRequest, NextResponse } from "next/server";
 
+import { aiImagePromptSchema, generateAiImage } from "@/lib/ai-image";
 import { STORY_SIZE } from "@/lib/drop-story-image";
 import { conflict, dropErrorResponse, notFound, withVendorCookie } from "@/lib/drops-api";
-import { requireVendorRole } from "@/lib/rbac";
+import { requireActiveBilling, requireVendorRole } from "@/lib/rbac";
 import { loadStoreStory, StoreStoryCard } from "@/lib/store-story-image";
 
 export const dynamic = "force-dynamic";
@@ -29,5 +30,33 @@ export async function GET(req: NextRequest) {
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {
     return dropErrorResponse(err, "vendor/story-image");
+  }
+}
+
+/**
+ * POST { prompt } — the same image over an AI background. MANAGER, because it
+ * spends money. Nothing is stored; contract in lib/ai-image.ts.
+ */
+export async function POST(req: NextRequest) {
+  try {
+    const ctx = await requireVendorRole("MANAGER", undefined, req);
+    requireActiveBilling(ctx);
+    const story = await loadStoreStory(ctx.vendor.id);
+    if (!story) throw notFound();
+    if (!story.published) throw conflict("store_not_published");
+    if (story.items.length === 0) throw conflict("no_menu_items");
+    const { prompt } = aiImagePromptSchema.parse(await req.json());
+
+    const background = await generateAiImage({ vendorId: ctx.vendor.id, plan: ctx.vendor.plan, prompt, kind: "story" });
+
+    const image = new ImageResponse(
+      <StoreStoryCard story={story} host={req.nextUrl.host} background={background} />,
+      STORY_SIZE,
+    );
+    const res = new NextResponse(image.body, { status: image.status, headers: image.headers });
+    res.headers.set("Cache-Control", "private, no-store");
+    return withVendorCookie(res, ctx.setVendorCookie);
+  } catch (err) {
+    return dropErrorResponse(err, "vendor/story-image/ai");
   }
 }

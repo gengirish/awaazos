@@ -50,6 +50,7 @@ export default function PrivacyPage() {
           model training. Groq is invoked only as a fallback when the primary provider is
           unavailable.
         </li>
+        <li>fal (AI images, when a seller asks for one; only the seller&apos;s description is sent)</li>
         <li>Razorpay (payments and billing subscriptions)</li>
         <li>Gupshup (WhatsApp receipts)</li>
         <li>Sentry (error monitoring, if enabled)</li>
