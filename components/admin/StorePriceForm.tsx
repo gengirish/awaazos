@@ -32,11 +32,7 @@ function confirmText(rupees: number | null): string {
   if (rupees === null) {
     return `They go back to the list price, ${formatINRCompact(LIST_PAISE)} a month + GST, when they next subscribe.`;
   }
-  const paise = rupeesToPaise(rupees);
-  const shown = `${formatINRCompact(paise)} a month + GST`;
-  return paise > LIST_PAISE
-    ? `${shown} is more than the ${formatINRCompact(LIST_PAISE)} on the public pricing page. They will see it on their billing page and in reminder emails.`
-    : `${shown}. They will see it on their billing page and in reminder emails.`;
+  return `${formatINRCompact(rupeesToPaise(rupees))} a month + GST. They will see it on their billing page and in reminder emails.`;
 }
 
 /**
