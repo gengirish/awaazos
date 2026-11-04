@@ -21,12 +21,14 @@ import {
   referStatus,
   setupChecklist,
   storeStatus,
+  surveyStatus,
   offersStatus,
   voiceStatus,
   type SectionStatus,
   type SettingsSnapshot,
 } from "@/lib/settings-overview";
 import { loadRatingSummary } from "@/lib/order-feedback-server";
+import { loadSurveyAnswers } from "@/lib/owner-survey-server";
 import { loadReferralSummary } from "@/lib/referral-server";
 import { fillVocabulary } from "@/lib/store-vocabulary";
 import { hasStoredRazorpayCreds, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
@@ -78,7 +80,8 @@ export default async function SettingsHubPage() {
   const pushConfigured = isPushConfigured();
   const sections = settingsSectionsFor({ isOwner, isDemo: vendor.isDemo });
   const showRefer = sections.some((s) => s.id === "refer");
-  const [settings, availableItemCount, pushDeviceCount, activeOfferCount, dropCount, referral, ratings] = await Promise.all([
+  const showSurvey = sections.some((s) => s.id === "survey");
+  const [settings, availableItemCount, pushDeviceCount, activeOfferCount, dropCount, referral, ratings, surveyAnswers] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: vendor.id },
       select: {
@@ -100,6 +103,7 @@ export default async function SettingsHubPage() {
     prisma.drop.count({ where: { vendorId: vendor.id } }),
     showRefer ? loadReferralSummary(vendor) : Promise.resolve(null),
     loadRatingSummary(vendor.id),
+    showSurvey ? loadSurveyAnswers(vendor.id) : Promise.resolve(null),
   ]);
 
   const snapshot: SettingsSnapshot = {
@@ -140,6 +144,7 @@ export default async function SettingsHubPage() {
     voice: voiceStatus(snapshot),
     billing: planStatus(snapshot),
     refer: referral ? referStatus(referral) : { text: "", on: false },
+    survey: surveyStatus(surveyAnswers !== null),
   };
   // Same rule and card as /orders and /pos: only steps this role can act on.
   const checklist = checklistForRole(

@@ -4,10 +4,12 @@ import { BillingAccessNotice } from "@/components/billing/TrialNotice";
 import { OrdersBoard } from "@/components/drops/orders/OrdersBoard";
 import { InstallBanner } from "@/components/pwa/InstallPrompt";
 import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
+import { OwnerSurveyPrompt } from "@/components/survey/OwnerSurveyPrompt";
 import { parseDeliveryRiders } from "@/lib/delivery-riders";
 import { loadOrdersBoard } from "@/lib/drops-board-server";
 import { getOrderSignal } from "@/lib/drops-signal";
 import { prisma } from "@/lib/prisma";
+import { shouldAskOwnerSurvey } from "@/lib/owner-survey-server";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { loadSetupChecklist } from "@/lib/setup-checklist-server";
 import { storeVocabulary } from "@/lib/store-vocabulary";
@@ -51,7 +53,10 @@ export default async function OrdersPage(props: Props) {
     loadOrdersBoard(ctx.vendor.id, { pinDropId: dropId }),
   ]);
   // Why no orders arrive yet, for staff who can fix it. Nothing once set up.
-  const setup = await loadSetupChecklist({ vendor: ctx.vendor, role: ctx.staff.role, known: { settings } });
+  const [setup, askSurvey] = await Promise.all([
+    loadSetupChecklist({ vendor: ctx.vendor, role: ctx.staff.role, known: { settings } }),
+    shouldAskOwnerSurvey(ctx.vendor, ctx.staff.role),
+  ]);
 
   return (
     <main id="main" className="bg-background p-4 pb-16 md:p-6">
@@ -68,6 +73,7 @@ export default async function OrdersPage(props: Props) {
         className="mx-auto mb-3 max-w-3xl"
       />
       <SetupChecklistCard {...setup} titleAs="p" className="mx-auto mb-3 max-w-3xl" />
+      {askSurvey ? <OwnerSurveyPrompt className="mx-auto mb-3 max-w-3xl" /> : null}
       {/* Same column as the board. Renders nothing once installed or dismissed. */}
       <InstallBanner className="mx-auto mb-3 max-w-3xl" />
       <OrdersBoard

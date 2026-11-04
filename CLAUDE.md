@@ -339,6 +339,15 @@ passes, so Neon can sleep.
   IST, `Authorization: Bearer $CRON_SECRET`; secret unset → 401 and no reminders). It only reads Postgres and
   never changes billing state. When a buyer hits `orders_paused`, the route pushes and emails the store's owners,
   at most once a day, with nothing about the buyer. Each send is claimed in Upstash (`SET NX`); no KV → no alert.
+- **A store's own price:** a platform SUPER_ADMIN sets `Vendor.customPricePaise` on `/admin/vendors`
+  (`PATCH /api/admin/vendors/[id]/price`; whole rupees, ₹49 to ₹4,999 a month before GST; a year is ten
+  months). Rules in `lib/subscription.ts`. Show a seller their price through `storeBasePaise` /
+  `storeChargePaise`, never the list constants; marketing pages keep the list price. Razorpay plans are
+  immutable, so `resolveSubscriptionPlanId` (`lib/custom-subscription-plan.ts`) makes one per price and
+  interval when an owner subscribes, shared through `CustomRazorpayPlan`. A custom plan id is in no env var:
+  `toSubscriptionSnapshot` maps it from the subscription's `notes` (`plan`, `interval`), which
+  `createSubscription` writes. A live subscription keeps its price; a new one applies when they next subscribe.
+  The log line "admin set store price" is the only audit trail.
 - E2E: new vendors are on the trial. Specs that need another state set it in the database with
   `e2e/helpers/billing-db.ts` (local databases only).
 
@@ -614,6 +623,17 @@ sample orders. The seller sees it on the order card and in Settings → Customer
 old orders, so the push links there). Push and logs never carry the comment. The public store gets only
 the average and count, from `PUBLIC_RATING_MIN` (5) ratings, not on demo stores, computed on each render:
 no timers, nothing cached on `Vendor`. There are no per-item ratings.
+
+### Owner survey
+
+Rules in the header of `lib/owner-survey.ts` (pure), database side in `lib/owner-survey-server.ts`. An OWNER
+of a real store answers once, changeably, in Settings → Tell us what's hard (`PUT /api/vendor/survey`,
+`OwnerSurveyResponse`, one row per store): which problems, which hurts most, orders a week, what they would
+pay, an optional comment. `/orders` and `/drops` show a prompt until answered ("Not now" is per device).
+`/admin/survey` (SUPER_ADMIN) ranks the problems to decide what to build; `/admin/vendors` shows one store's
+answers beside its price. Answers never set a price by themselves, and `SURVEY_USE_NOTICE` tells the owner they
+may inform it: keep it on the form. Pain keys are stored, so retire one rather than renaming it. The comment is
+free text: never in a log. Read on page render only: no timers.
 
 ### Referrals ("Refer a seller")
 

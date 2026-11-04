@@ -65,6 +65,7 @@ export async function sendTrialReminders(now: Date = new Date()): Promise<TrialR
       plan: true,
       planExpiresAt: true,
       trialEndsAt: true,
+      customPricePaise: true,
       staff: OWNERS_SELECT,
     },
   });
@@ -94,6 +95,7 @@ export async function sendTrialReminders(now: Date = new Date()): Promise<TrialR
           endsAt: access.endsAt,
           daysLeft: istDaysUntil(access.endsAt, now),
           billingUrl: billingUrl(),
+          customPricePaise: vendor.customPricePaise,
         });
         if (res.delivered) delivered += 1;
       }
@@ -130,7 +132,7 @@ export async function alertSellerStoreLocked(vendorId: string): Promise<void> {
 
     const vendor = await prisma.vendor.findFirst({
       where: { id: vendorId },
-      select: { name: true, staff: OWNERS_SELECT },
+      select: { name: true, customPricePaise: true, staff: OWNERS_SELECT },
     });
 
     let reached = 0;
@@ -143,6 +145,7 @@ export async function alertSellerStoreLocked(vendorId: string): Promise<void> {
         name: owner.name,
         storeName: vendor!.name,
         billingUrl: billingUrl(),
+        customPricePaise: vendor!.customPricePaise,
       });
       if (email.delivered) reached += 1;
     }

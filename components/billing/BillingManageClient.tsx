@@ -5,11 +5,7 @@ import { useState } from "react";
 
 import { formatINR, formatINRCompact } from "@/lib/currency";
 import { loadCheckout, type RazorpaySubscriptionSuccess } from "@/lib/razorpay-checkout";
-import {
-  subscriptionBasePaise,
-  subscriptionChargePaise,
-  type BillingInterval,
-} from "@/lib/subscription";
+import { storeBasePaise, storeChargePaise, type BillingInterval } from "@/lib/subscription";
 import { Button } from "@/components/ui/button";
 
 /**
@@ -47,6 +43,7 @@ export function BillingManageClient({
   cancelAtEnd,
   prefillName,
   prefillEmail,
+  customPricePaise,
 }: {
   /** Not on a paid plan and no subscription already collecting (trial, locked or free). */
   canSubscribe: boolean;
@@ -57,6 +54,8 @@ export function BillingManageClient({
   /** The signed-in owner's own details, sent only to Razorpay Checkout. */
   prefillName?: string | null;
   prefillEmail?: string | null;
+  /** This store's own price (lib/subscription.ts). Null = the list price. */
+  customPricePaise: number | null;
 }) {
   // PRO is not sold (TODO.md §2): only STARTER, monthly or yearly.
   const [pending, setPending] = useState<null | "cancel" | BillingInterval>(null);
@@ -139,7 +138,7 @@ export function BillingManageClient({
         key: data.keyId,
         subscription_id: data.subscriptionId,
         name: "AwaazOS",
-        description: `${INTERVAL_LABEL[interval].button} — ${formatINR(subscriptionChargePaise("STARTER", interval))} incl. GST`,
+        description: `${INTERVAL_LABEL[interval].button} — ${formatINR(storeChargePaise(interval, customPricePaise))} incl. GST`,
         prefill: {
           ...(prefillName ? { name: prefillName } : {}),
           ...(prefillEmail ? { email: prefillEmail } : {}),
@@ -206,9 +205,9 @@ export function BillingManageClient({
             >
               <span>{pending === interval ? "Opening payment…" : INTERVAL_LABEL[interval].button}</span>
               <span className="text-xs font-normal opacity-80">
-                {formatINRCompact(subscriptionBasePaise("STARTER", interval))}
+                {formatINRCompact(storeBasePaise(interval, customPricePaise))}
                 {INTERVAL_LABEL[interval].per} + GST ={" "}
-                {formatINR(subscriptionChargePaise("STARTER", interval))}
+                {formatINR(storeChargePaise(interval, customPricePaise))}
                 {interval === "yearly" ? " · 2 months free" : ""}
               </span>
             </Button>

@@ -2,7 +2,8 @@ import Link from "next/link";
 
 const LINKS = [
   { href: "/admin/metrics", label: "Weekly metrics", superAdminOnly: false, sales: false },
-  { href: "/admin/vendors", label: "Stores and free access", superAdminOnly: true, sales: false },
+  { href: "/admin/vendors", label: "Stores, free access and prices", superAdminOnly: true, sales: false },
+  { href: "/admin/survey", label: "Owner survey", superAdminOnly: true, sales: false },
   { href: "/admin/referrals", label: "Referrals", superAdminOnly: true, sales: false },
   { href: "/admin/demo-stores", label: "Demo-store pipeline", superAdminOnly: false, sales: true },
   { href: "/admin/earnings", label: "Sales earnings", superAdminOnly: true, sales: true },

@@ -3,6 +3,8 @@ import { notFound } from "next/navigation";
 import { AdminNav } from "@/components/admin/AdminNav";
 import { FreeAccessForm } from "@/components/admin/FreeAccessForm";
 import { StoreHealthLine } from "@/components/admin/StoreHealthLine";
+import { StorePriceForm } from "@/components/admin/StorePriceForm";
+import { StoreSurveySummary } from "@/components/admin/StoreSurveySummary";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -14,8 +16,10 @@ import { ADMIN_VENDOR_LIST_LIMIT, listAdminVendors, type AdminVendorRow } from "
 import { PLAN_LIMITS } from "@/lib/constants";
 import { formatIstDate } from "@/lib/datetime";
 import { utcToIstParts } from "@/lib/drops-time";
+import { loadSurveyAnswersFor } from "@/lib/owner-survey-server";
 import { billingAccess, trialDaysLeft } from "@/lib/plan";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
+import { LIVE_SUBSCRIPTION_STATUSES } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Admin stores — AwaazOS" };
@@ -63,10 +67,8 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
 
   const now = new Date();
   const vendors = await listAdminVendors(q);
-  const health = await loadStoreHealth(
-    vendors.map((v) => v.id),
-    now,
-  );
+  const vendorIds = vendors.map((v) => v.id);
+  const [health, surveys] = await Promise.all([loadStoreHealth(vendorIds, now), loadSurveyAnswersFor(vendorIds)]);
   const todayYmd = istTodayYmd(now);
   const maxYmd = freeAccessMaxYmd(now);
 
@@ -79,8 +81,8 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Internal · Platform admin</p>
         <h1 className="mt-1 font-display text-3xl font-bold text-foreground">Stores</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Let a store use AwaazOS free until a date you pick. It keeps Starter features and is not asked to pay
-          before then.
+          Let a store use AwaazOS free until a date you pick, or set its own price using what its owner told us in
+          the survey.
         </p>
         <AdminNav current="/admin/vendors" superAdmin />
       </header>
@@ -135,6 +137,7 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
                     ) : null}
                     <StoreHealthLine health={healthFor(health, vendor.id)} now={now} />
                     {note ? <p className="mt-2 text-sm text-muted-foreground">{note}</p> : null}
+                    <StoreSurveySummary answers={surveys.get(vendor.id) ?? null} />
                     <div className="mt-4">
                       <FreeAccessForm
                         vendorId={vendor.id}
@@ -142,6 +145,16 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
                         currentYmd={currentYmd}
                         todayYmd={todayYmd}
                         maxYmd={maxYmd}
+                      />
+                    </div>
+                    <div className="mt-4 border-t pt-4">
+                      <StorePriceForm
+                        vendorId={vendor.id}
+                        vendorName={vendor.name}
+                        customPricePaise={vendor.customPricePaise}
+                        hasLiveSubscription={LIVE_SUBSCRIPTION_STATUSES.includes(
+                          vendor.settings?.razorpaySubStatus ?? "",
+                        )}
                       />
                     </div>
                   </li>

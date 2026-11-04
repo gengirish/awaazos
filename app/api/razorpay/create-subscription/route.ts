@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { PLAN_RANK } from "@/lib/constants";
+import { resolveSubscriptionPlanId } from "@/lib/custom-subscription-plan";
 import { prisma } from "@/lib/prisma";
 import {
   cancelSubscription,
   createSubscription,
   fetchSubscription,
   getRazorpayKeyId,
-  planFromRazorpayPlanId,
 } from "@/lib/razorpay";
 import { billingRateLimit, tooManyRequests } from "@/lib/ratelimit";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
@@ -103,6 +103,14 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // This store's plan: the list plan, or the one for its custom price. Before
+    // referral months are redeemed, so a Razorpay failure here costs them nothing.
+    const planId = await resolveSubscriptionPlanId({
+      plan: body.plan,
+      interval: body.interval,
+      customPricePaise: ctx.vendor.customPricePaise,
+    });
+
     const now = new Date();
     // Banked referral months (lib/referral.ts) move trialEndsAt forward first,
     // so the first charge below is deferred past them. Nothing banked → null.
@@ -115,14 +123,10 @@ export async function POST(req: NextRequest) {
     if (previousId && previous) {
       try {
         if (previous.status === "created") {
-          const mapped = planFromRazorpayPlanId(previous.plan_id);
+          // Same plan id, not just same plan name: a checkout left over from
+          // before the store's price changed must not be payable at the old price.
           const sameStart = (previous.start_at ?? null) === startAtSec;
-          if (
-            mapped?.plan === body.plan &&
-            mapped.interval === body.interval &&
-            sameStart &&
-            previous.short_url
-          ) {
+          if (previous.plan_id === planId && sameStart && previous.short_url) {
             const res = NextResponse.json({
               subscriptionId: previous.id,
               shortUrl: previous.short_url,
@@ -146,6 +150,7 @@ export async function POST(req: NextRequest) {
     const { subscriptionId, shortUrl } = await createSubscription({
       plan: body.plan,
       interval: body.interval,
+      planId,
       vendorId: ctx.vendor.id,
       startAt,
     });

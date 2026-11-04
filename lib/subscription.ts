@@ -53,6 +53,37 @@ export function subscriptionChargePaise(plan: SubscribablePlan, interval: Billin
   return base + gstPaise(base);
 }
 
+/**
+ * A store's own price (`Vendor.customPricePaise`), set by a platform SUPER_ADMIN
+ * on /admin/vendors. Null means the list price. It is the monthly base before
+ * GST; a year is ten months, the same "2 months free" as the list price.
+ *
+ * Whole rupees only: GST on a whole-rupee base is exact, so `chargeBasePaise`
+ * (lib/sales-earnings.ts) gets the base back from a charge.
+ *
+ * It applies when the owner next subscribes (lib/custom-subscription-plan.ts).
+ * A live subscription keeps the price it was made at.
+ */
+export const CUSTOM_PRICE_MIN_RUPEES = 49;
+export const CUSTOM_PRICE_MAX_RUPEES = 4999;
+const YEARLY_MONTHS = 10;
+
+export function isValidCustomPriceRupees(rupees: number): boolean {
+  return Number.isInteger(rupees) && rupees >= CUSTOM_PRICE_MIN_RUPEES && rupees <= CUSTOM_PRICE_MAX_RUPEES;
+}
+
+/** One cycle's base price for this store, before GST. */
+export function storeBasePaise(interval: BillingInterval, customPricePaise: number | null): number {
+  if (customPricePaise === null) return subscriptionBasePaise("STARTER", interval);
+  return interval === "monthly" ? customPricePaise : customPricePaise * YEARLY_MONTHS;
+}
+
+/** What Razorpay charges this store per cycle: its base + 18% GST. */
+export function storeChargePaise(interval: BillingInterval, customPricePaise: number | null): number {
+  const base = storeBasePaise(interval, customPricePaise);
+  return base + gstPaise(base);
+}
+
 /** Razorpay subscription statuses. `expired` is a `created` sub nobody paid. */
 export type SubscriptionStatus =
   | "created"

@@ -5,6 +5,8 @@ import Razorpay from "razorpay";
 
 import { requireEnv } from "@/lib/env";
 import {
+  BILLING_INTERVALS,
+  SUBSCRIBABLE_PLANS,
   SUBSCRIPTION_TOTAL_COUNT,
   type BillingInterval,
   type SubscribablePlan,
@@ -63,6 +65,19 @@ export function planFromRazorpayPlanId(
   return null;
 }
 
+/**
+ * Our plan from a subscription's `notes`, which only this server writes
+ * (`createSubscription`). A custom-price plan id is in no env var, so without
+ * this a store on one would be charged and get no plan.
+ */
+function planFromNotes(notes: unknown): { plan: Plan; interval: BillingInterval } | null {
+  if (!notes || typeof notes !== "object") return null;
+  const { plan, interval } = notes as Record<string, unknown>;
+  if (!(SUBSCRIBABLE_PLANS as readonly unknown[]).includes(plan)) return null;
+  if (!(BILLING_INTERVALS as readonly unknown[]).includes(interval)) return null;
+  return { plan: plan as SubscribablePlan, interval: interval as BillingInterval };
+}
+
 export function verifyRazorpaySignature(rawBody: string, signature: string | null | undefined): boolean {
   if (!signature) return false;
   const secret = requireEnv("RAZORPAY_WEBHOOK_SECRET");
@@ -77,14 +92,47 @@ export function verifyRazorpaySignature(rawBody: string, signature: string | nul
   }
 }
 
+/** A plan at a custom amount (lib/custom-subscription-plan.ts). Returns its Razorpay id. */
+export async function createRazorpayPlan({
+  plan,
+  interval,
+  basePaise,
+  amountPaise,
+}: {
+  plan: SubscribablePlan;
+  interval: BillingInterval;
+  basePaise: number;
+  amountPaise: number;
+}): Promise<string> {
+  const created = await withTimeout(
+    getRazorpay().plans.create({
+      period: interval,
+      interval: 1,
+      item: {
+        name: `AwaazOS Starter ${interval} (store price)`,
+        amount: amountPaise,
+        currency: "INR",
+        description: `${basePaise / 100} rupees + 18% GST`,
+      },
+      notes: { plan, interval },
+    }),
+    RAZORPAY_API_TIMEOUT_MS,
+    "razorpay.plans.create",
+  );
+  return created.id;
+}
+
 export async function createSubscription({
   plan,
   interval,
+  planId,
   vendorId,
   startAt,
 }: {
   plan: SubscribablePlan;
   interval: BillingInterval;
+  /** From `resolveSubscriptionPlanId`. */
+  planId: string;
   vendorId: string;
   /** First charge date. Set while the vendor is in the trial so they keep all 30 days. */
   startAt?: Date | null;
@@ -92,12 +140,13 @@ export async function createSubscription({
   const rz = getRazorpay();
   const sub = await withTimeout(
     rz.subscriptions.create({
-      plan_id: getRazorpayPlanId(plan, interval),
+      plan_id: planId,
       total_count: SUBSCRIPTION_TOTAL_COUNT[interval],
       customer_notify: 1,
       quantity: 1,
       ...(startAt ? { start_at: Math.floor(startAt.getTime() / 1000) } : {}),
-      notes: { vendorId },
+      // `plan` and `interval` are what planFromNotes reads for a custom-price plan.
+      notes: { vendorId, plan, interval },
     }),
     RAZORPAY_API_TIMEOUT_MS,
     "razorpay.subscriptions.create",
@@ -159,7 +208,7 @@ export function toSubscriptionSnapshot(id: string, entity: Record<string, unknow
   return {
     id,
     status: typeof entity.status === "string" && entity.status ? entity.status : "unknown",
-    mapped: planFromRazorpayPlanId(planId),
+    mapped: planFromRazorpayPlanId(planId) ?? planFromNotes(entity.notes),
     currentEnd: fromUnixSeconds(entity.current_end),
     startAt: fromUnixSeconds(entity.start_at),
     paidCount: typeof entity.paid_count === "number" ? entity.paid_count : null,

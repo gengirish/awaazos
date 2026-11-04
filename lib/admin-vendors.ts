@@ -20,6 +20,7 @@ const ADMIN_VENDOR_SELECT = {
   trialEndsAt: true,
   isActive: true,
   isDemo: true,
+  customPricePaise: true,
   createdAt: true,
 } satisfies Prisma.VendorSelect;
 
@@ -29,6 +30,7 @@ export type AdminVendorRow = Prisma.VendorGetPayload<{ select: typeof ADMIN_VEND
 const ADMIN_VENDOR_LIST_SELECT = {
   ...ADMIN_VENDOR_SELECT,
   referredBy: { select: { slug: true } },
+  settings: { select: { razorpaySubStatus: true } },
 } satisfies Prisma.VendorSelect;
 
 export type AdminVendorListRow = Prisma.VendorGetPayload<{ select: typeof ADMIN_VENDOR_LIST_SELECT }>;
@@ -63,5 +65,26 @@ export async function setVendorFreeUntil(
       select: ADMIN_VENDOR_SELECT,
     });
     return { previousTrialEndsAt: before.trialEndsAt, vendor };
+  });
+}
+
+/**
+ * Set or clear a store's own price (lib/subscription.ts). Only this column: the
+ * price takes effect when the owner next subscribes. Returns the row before and
+ * after, or null for an unknown id.
+ */
+export async function setVendorCustomPrice(
+  vendorId: string,
+  customPricePaise: number | null,
+): Promise<{ previousPricePaise: number | null; vendor: AdminVendorRow } | null> {
+  return prisma.$transaction(async (tx) => {
+    const before = await tx.vendor.findUnique({ where: { id: vendorId }, select: { customPricePaise: true } });
+    if (!before) return null;
+    const vendor = await tx.vendor.update({
+      where: { id: vendorId },
+      data: { customPricePaise },
+      select: ADMIN_VENDOR_SELECT,
+    });
+    return { previousPricePaise: before.customPricePaise, vendor };
   });
 }

@@ -20,11 +20,13 @@ export default async function PosPage() {
   let staffRole: StaffRole;
   let access: BillingAccess;
   let trialEndsAt: Date | null;
+  let customPricePaise: number | null;
   let vocab: StoreVocabulary;
   try {
     const ctx = await requireVendorRole("CASHIER");
     vendorId = ctx.vendor.id;
     trialEndsAt = ctx.vendor.trialEndsAt;
+    customPricePaise = ctx.vendor.customPricePaise;
     vocab = storeVocabulary(ctx.vendor.stallType);
     staffRole = ctx.staff.role;
     access = ctx.access;
@@ -41,7 +43,12 @@ export default async function PosPage() {
   if (access.kind === "locked") {
     return (
       <div data-pos-page="locked">
-        <BillingLockedCard since={access.since} staffRole={staffRole} trialEndsAt={trialEndsAt} />
+        <BillingLockedCard
+          since={access.since}
+          staffRole={staffRole}
+          trialEndsAt={trialEndsAt}
+          customPricePaise={customPricePaise}
+        />
       </div>
     );
   }

@@ -12,6 +12,8 @@ import { BillingAccessNotice } from "@/components/billing/TrialNotice";
 import { CopyDropButton, DropStatusBadge } from "@/components/drops/DropForm";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
 import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
+import { OwnerSurveyPrompt } from "@/components/survey/OwnerSurveyPrompt";
+import { shouldAskOwnerSurvey } from "@/lib/owner-survey-server";
 import { EmptyState } from "@/components/ui/empty-state";
 import { liveDropOrderWhere } from "@/lib/drops-api";
 import { dropOrdersHref } from "@/lib/drops-board";
@@ -141,6 +143,7 @@ export default async function DropsPage() {
             <SetupChecklistCard {...setup} />
           </div>
         )}
+        {(await shouldAskOwnerSurvey(ctx.vendor, ctx.staff.role)) ? <OwnerSurveyPrompt /> : null}
 
         {rows.length === 0 ? (
           <EmptyState

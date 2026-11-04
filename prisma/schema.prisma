@@ -47,6 +47,10 @@ model Vendor {
   // The store whose referral link this store signed up through (lib/referral.ts).
   // Set once at sign-up, never changed. Null = not referred.
   referredByVendorId String?
+  // This store's STARTER price a month in paise, before GST, set by a platform
+  // SUPER_ADMIN on /admin/vendors (lib/subscription.ts). Null = the list price.
+  // Used when the owner next subscribes; a live subscription keeps its price.
+  customPricePaise   Int?
   createdAt          DateTime  @default(now())
   updatedAt          DateTime  @updatedAt
 
@@ -69,6 +73,7 @@ model Vendor {
   referralRewardsEarned ReferralReward[]    @relation("ReferralRewardReferrer")
   referralRewardFrom    ReferralReward?     @relation("ReferralRewardReferred")
   orderFeedback         OrderFeedback[]
+  ownerSurveyResponse   OwnerSurveyResponse?
 
   @@index([slug])
   @@index([referredByVendorId])
@@ -457,6 +462,36 @@ model OrderFeedback {
 
   @@index([vendorId, createdAt])
   @@map("order_feedback")
+}
+
+// One owner's answers per store, changeable (lib/owner-survey.ts). Pain and
+// band values are the keys defined there.
+model OwnerSurveyResponse {
+  id           String   @id @default(cuid())
+  vendorId     String   @unique
+  vendor       Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  pains        String[]
+  topPain      String
+  weeklyOrders String
+  willingToPay String
+  comment      String?  @db.VarChar(500)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([updatedAt])
+  @@map("owner_survey_responses")
+}
+
+// The Razorpay plan behind a custom store price (lib/custom-subscription-plan.ts).
+model CustomRazorpayPlan {
+  id             String   @id @default(cuid())
+  basePaise      Int // Before GST, for one cycle of `interval`
+  interval       String // "monthly" | "yearly"
+  razorpayPlanId String   @unique
+  createdAt      DateTime @default(now())
+
+  @@unique([basePaise, interval])
+  @@map("custom_razorpay_plans")
 }
 
 model OrderItem {

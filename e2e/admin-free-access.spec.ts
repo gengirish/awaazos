@@ -35,7 +35,7 @@ test.describe("admin free access", () => {
 
       const metrics = await page.goto("/admin/metrics");
       expect(metrics?.status()).toBe(200);
-      await expect(page.getByRole("link", { name: /stores and free access/i })).toHaveCount(0);
+      await expect(page.getByRole("link", { name: /stores, free access and prices/i })).toHaveCount(0);
 
       const stores = await page.goto("/admin/vendors");
       expect(stores?.status()).toBe(404);
