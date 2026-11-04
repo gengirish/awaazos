@@ -87,16 +87,16 @@ describe("store price", () => {
   });
 
   it("allows whole rupees in range only", () => {
-    expect(isValidCustomPriceRupees(49)).toBe(true);
-    expect(isValidCustomPriceRupees(4999)).toBe(true);
-    expect(isValidCustomPriceRupees(48)).toBe(false);
-    expect(isValidCustomPriceRupees(5000)).toBe(false);
+    expect(isValidCustomPriceRupees(99)).toBe(true);
+    expect(isValidCustomPriceRupees(299)).toBe(true);
+    expect(isValidCustomPriceRupees(98)).toBe(false);
+    expect(isValidCustomPriceRupees(300)).toBe(false);
     expect(isValidCustomPriceRupees(199.5)).toBe(false);
     expect(isValidCustomPriceRupees(Number.NaN)).toBe(false);
   });
 
   it("gets the exact base back from every charge, for the sales share", () => {
-    for (let rupees = 49; rupees <= 4999; rupees++) {
+    for (let rupees = 99; rupees <= 299; rupees++) {
       const paise = rupees * 100;
       expect(chargeBasePaise(storeChargePaise("monthly", paise))).toBe(paise);
     }

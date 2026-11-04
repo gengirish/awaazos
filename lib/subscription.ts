@@ -63,9 +63,12 @@ export function subscriptionChargePaise(plan: SubscribablePlan, interval: Billin
  *
  * It applies when the owner next subscribes (lib/custom-subscription-plan.ts).
  * A live subscription keeps the price it was made at.
+ *
+ * Never above the list price: an owner must not see more than the public
+ * pricing page says, and answering the owner survey must not risk a higher price.
  */
-export const CUSTOM_PRICE_MIN_RUPEES = 49;
-export const CUSTOM_PRICE_MAX_RUPEES = 4999;
+export const CUSTOM_PRICE_MIN_RUPEES = 99;
+export const CUSTOM_PRICE_MAX_RUPEES = PLAN_PRICES_PAISE.STARTER / 100;
 const YEARLY_MONTHS = 10;
 
 export function isValidCustomPriceRupees(rupees: number): boolean {

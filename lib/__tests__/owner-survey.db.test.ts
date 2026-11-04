@@ -194,7 +194,7 @@ describe.skipIf(!ENABLED)("owner survey and store price — DB integration", () 
 
     it("rejects a price out of range or with paise", async () => {
       const v = await seed();
-      for (const monthlyRupees of [48, 5000, 199.5]) {
+      for (const monthlyRupees of [98, 300, 199.5]) {
         expect((await patchPrice(v.id, { monthlyRupees })).status).toBe(400);
       }
       expect((await prisma.vendor.findUniqueOrThrow({ where: { id: v.id } })).customPricePaise).toBeNull();

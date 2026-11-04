@@ -340,7 +340,7 @@ passes, so Neon can sleep.
   never changes billing state. When a buyer hits `orders_paused`, the route pushes and emails the store's owners,
   at most once a day, with nothing about the buyer. Each send is claimed in Upstash (`SET NX`); no KV → no alert.
 - **A store's own price:** a platform SUPER_ADMIN sets `Vendor.customPricePaise` on `/admin/vendors`
-  (`PATCH /api/admin/vendors/[id]/price`; whole rupees, ₹49 to ₹4,999 a month before GST; a year is ten
+  (`PATCH /api/admin/vendors/[id]/price`; whole rupees, ₹99 up to the ₹299 list price a month before GST; a year is ten
   months). Rules in `lib/subscription.ts`. Show a seller their price through `storeBasePaise` /
   `storeChargePaise`, never the list constants; marketing pages keep the list price. Razorpay plans are
   immutable, so `resolveSubscriptionPlanId` (`lib/custom-subscription-plan.ts`) makes one per price and
