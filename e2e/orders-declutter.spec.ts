@@ -92,11 +92,11 @@ test.describe("orders board layout", () => {
     await expect(survey).toBeVisible();
   });
 
-  test("Share holds every share action; Order settings is in the overflow menu", async ({ page, request, context }, info) => {
+  test("Share holds every share action; Order settings is in the overflow menu", async ({ page, request, context }) => {
     test.slow();
     const store = await storeWithOrder(page, request, "layout-share");
     await placeOrder(request, store, "CASH");
-    if (info.project.name === "chromium") await context.grantPermissions(["clipboard-read", "clipboard-write"]);
+    await context.grantPermissions(["clipboard-read", "clipboard-write"]);
     await page.goto("/orders");
 
     // The old header controls are gone, not just moved aside.
@@ -113,9 +113,7 @@ test.describe("orders board layout", () => {
     // Copy keeps the menu open and says so on the item itself.
     await (await boardMenuItem(page, "Share", "Copy link")).click();
     await expect(page.getByRole("menuitem", { name: "Copied", exact: true })).toBeVisible();
-    if (info.project.name === "chromium") {
-      expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(`/s/${store.slug}`);
-    }
+    expect(await page.evaluate(() => navigator.clipboard.readText())).toContain(`/s/${store.slug}`);
     await closeBoardMenu(page);
 
     // Keyboard: Enter opens, arrows move, Escape closes and returns focus.

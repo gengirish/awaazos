@@ -61,7 +61,7 @@ export function BoardInfoHint({ label, children }: { label: string; children: Re
           <Info aria-hidden />
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="start" className="w-72 max-w-[calc(100vw-2rem)] text-sm">
+      <PopoverContent align="start" collisionPadding={8} className="w-72 max-w-[calc(100vw-2rem)] text-sm">
         {children}
       </PopoverContent>
     </Popover>
@@ -168,7 +168,7 @@ export function BoardShareMenu({
             <ChevronDown aria-hidden />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="end" collisionPadding={8} className="w-56">
           {canShare && (
             <>
               <DropdownMenuItem
@@ -284,7 +284,7 @@ export function BoardOverflowMenu({ links }: { links: OverflowLink[] }) {
           <MoreHorizontal aria-hidden />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-52">
+      <DropdownMenuContent align="end" collisionPadding={8} className="w-52">
         {links.map(({ label, href, icon: Icon }) => (
           <DropdownMenuItem key={href} asChild>
             <Link href={href}>
@@ -337,7 +337,7 @@ export function MenuStatusPill({
         {label}
         <ChevronDown className="h-4 w-4" aria-hidden />
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
+      <DropdownMenuContent align="end" collisionPadding={8} className="w-64">
         <DropdownMenuLabel className="font-normal text-muted-foreground">{modeLabel}</DropdownMenuLabel>
         {canChange ? (
           <>
