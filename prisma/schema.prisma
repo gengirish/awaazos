@@ -484,6 +484,20 @@ model OwnerSurveyResponse {
   @@map("owner_survey_responses")
 }
 
+/// Answers from the public /survey link. Tied to no store or person (lib/owner-survey.ts).
+model PublicSurveyResponse {
+  id           String   @id @default(cuid())
+  pains        String[]
+  topPain      String
+  weeklyOrders String
+  willingToPay String
+  comment      String?  @db.VarChar(500)
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("public_survey_responses")
+}
+
 // The Razorpay plan behind a custom store price (lib/custom-subscription-plan.ts).
 model CustomRazorpayPlan {
   id             String   @id @default(cuid())

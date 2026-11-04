@@ -48,6 +48,15 @@ export async function loadSurveyAnswersFor(vendorIds: string[]): Promise<Map<str
   return new Map(rows.map((row) => [row.vendorId, row]));
 }
 
+/** Answers from the public /survey link, newest first. Tied to no store. */
+export function loadPublicSurveyResponsesForAdmin() {
+  return prisma.publicSurveyResponse.findMany({
+    select: { id: true, createdAt: true, ...ANSWER_SELECT },
+    orderBy: { createdAt: "desc" },
+    take: SURVEY_ADMIN_LIMIT,
+  });
+}
+
 /**
  * Every recent answer, with the store's name and link and nothing else about
  * it. Cross-tenant: the caller must have passed `requirePlatformRole("SUPER_ADMIN")`.
