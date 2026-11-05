@@ -9,6 +9,8 @@ import { dropOrdersHref } from "@/lib/drops-board";
 import { DROP_SHARE_ANCHOR, dropToFormInput } from "@/lib/drops-builder";
 import { effectiveDropStatus, soldQtyByDropItem } from "@/lib/drops";
 import { hasPaymentMethod } from "@/lib/payment-guard";
+import type { PlanFields } from "@/lib/plan";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
@@ -22,12 +24,20 @@ export default async function EditDropPage(props: {
   const params = await props.params;
   // Set by "Save and open orders" on the create page.
   const justOpened = (await props.searchParams).opened === "1";
-  let vendor: { id: string; name: string; slug: string; upiId: string | null };
+  let vendor: PlanFields & { id: string; name: string; slug: string; upiId: string | null };
   let isOwner: boolean;
   let vocab: StoreVocabulary;
   try {
     const ctx = await requireVendorRole("MANAGER");
-    vendor = { id: ctx.vendor.id, name: ctx.vendor.name, slug: ctx.vendor.slug, upiId: ctx.vendor.upiId };
+    vendor = {
+      id: ctx.vendor.id,
+      name: ctx.vendor.name,
+      slug: ctx.vendor.slug,
+      upiId: ctx.vendor.upiId,
+      plan: ctx.vendor.plan,
+      planExpiresAt: ctx.vendor.planExpiresAt,
+      trialEndsAt: ctx.vendor.trialEndsAt,
+    };
     isOwner = ctx.staff.role === "OWNER";
     vocab = storeVocabulary(ctx.vendor.stallType);
   } catch (e) {
@@ -50,7 +60,7 @@ export default async function EditDropPage(props: {
     }),
     soldQtyByDropItem(prisma, drop.id, now),
     prisma.transaction.count({ where: { vendorId: vendor.id, dropId: drop.id, ...liveDropOrderWhere } }),
-    prisma.vendorSettings.findUnique({ where: { vendorId: vendor.id }, select: { acceptMenuOrders: true, voiceLang: true, publishStorefront: true, acceptPayOnDelivery: true } }),
+    prisma.vendorSettings.findUnique({ where: { vendorId: vendor.id }, select: { acceptMenuOrders: true, voiceLang: true, publishStorefront: true, acceptPayOnDelivery: true, ...RAZORPAY_CRED_SELECT } }),
   ]);
 
   const soldByMenuItem: Record<string, number> = {};
@@ -102,6 +112,7 @@ export default async function EditDropPage(props: {
           hasPaymentMethod={hasPaymentMethod({
             upiId: vendor.upiId,
             acceptPayOnDelivery: settings?.acceptPayOnDelivery ?? false,
+            onlinePayment: isOnlinePaymentEnabled(vendor, settings, now),
           })}
           justOpened={justOpened}
           vocab={vocab}

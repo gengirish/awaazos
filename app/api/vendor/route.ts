@@ -23,6 +23,7 @@ import { isValidStoreTagline, normaliseStoreTagline, STORE_TAGLINE_MAX, STORE_TA
 import { STORE_THEMES } from "@/lib/store-theme";
 import { storeNameSchema } from "@/lib/store-name";
 import { buyerWhatsappNumber } from "@/lib/storefront-order";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { UPI_ID_FORMAT_MESSAGE, UPI_ID_PATTERN } from "@/lib/upi";
 
 // Served to cashiers: the encrypted Razorpay secrets must never leave the server
@@ -243,7 +244,9 @@ export async function PATCH(req: NextRequest) {
           where: { id: ctx.vendor.id },
           select: {
             upiId: true,
-            settings: { select: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true } },
+            settings: {
+              select: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true, ...RAZORPAY_CRED_SELECT },
+            },
           },
         });
         // The values this same request leaves behind.
@@ -252,10 +255,11 @@ export async function PATCH(req: NextRequest) {
           upiId: vendorFields.upiId !== undefined ? vendorFields.upiId : current?.upiId,
           acceptPayOnDelivery: vendorFields.acceptPayOnDelivery ?? current?.settings?.acceptPayOnDelivery ?? false,
           acceptMenuOrders: vendorFields.acceptMenuOrders ?? current?.settings?.acceptMenuOrders ?? false,
+          onlinePayment: isOnlinePaymentEnabled(ctx.vendor, current?.settings),
         };
 
         // Turning "order from menu" on needs somewhere to order (a published
-        // storefront) and a way to pay (UPI ID or pay on delivery).
+        // storefront) and a way to pay (Razorpay, UPI ID or pay on delivery).
         if (vendorFields.acceptMenuOrders === true) {
           const blocker = menuOrdersEnableBlocker(after);
           if (blocker) throw new SettingsConflict(blocker);

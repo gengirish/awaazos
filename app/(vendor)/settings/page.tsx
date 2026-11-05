@@ -31,7 +31,7 @@ import { loadRatingSummary } from "@/lib/order-feedback-server";
 import { loadSurveyAnswers } from "@/lib/owner-survey-server";
 import { loadReferralSummary } from "@/lib/referral-server";
 import { fillVocabulary } from "@/lib/store-vocabulary";
-import { hasStoredRazorpayCreds, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
+import { hasStoredRazorpayCreds, isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 
 import { requireSettingsContext } from "./_context";
 
@@ -115,6 +115,7 @@ export default async function SettingsHubPage() {
     acceptPayOnDelivery: settings?.acceptPayOnDelivery ?? true,
     fssaiNumber: settings?.fssaiNumber ?? null,
     razorpayConfigured: hasStoredRazorpayCreds(settings),
+    onlinePayment: isOnlinePaymentEnabled(vendor, settings),
     voiceLang: settings?.voiceLang ?? "en-IN",
     plan: vendor.plan,
     billing:

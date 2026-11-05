@@ -13,6 +13,7 @@ import { StoreThemeClient } from "@/components/settings/StoreThemeClient";
 import { StorefrontClient } from "@/components/settings/StorefrontClient";
 import { listVendorCommunities } from "@/lib/community-server";
 import { prisma } from "@/lib/prisma";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 
 import { requireSettingsContext } from "../_context";
 
@@ -26,7 +27,14 @@ export default async function StoreSettingsPage() {
   const [settings, availableItemCount, communities] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: vendor.id },
-      select: { publishStorefront: true, fssaiNumber: true, instagramHandle: true, theme: true, tagline: true },
+      select: {
+        publishStorefront: true,
+        fssaiNumber: true,
+        instagramHandle: true,
+        theme: true,
+        tagline: true,
+        ...RAZORPAY_CRED_SELECT,
+      },
     }),
     prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
     listVendorCommunities(vendor.id),
@@ -84,7 +92,7 @@ export default async function StoreSettingsPage() {
           <StorefrontClient
             slug={vendor.slug}
             initialPublished={settings?.publishStorefront ?? false}
-            hasUpiId={Boolean(vendor.upiId)}
+            hasUpiId={Boolean(vendor.upiId) || isOnlinePaymentEnabled(vendor, settings)}
             availableItemCount={availableItemCount}
             catalogueTitle={vocab.catalogueTitle}
           />

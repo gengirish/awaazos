@@ -23,6 +23,8 @@ export function storeInfoFacts(input: {
   hasDrops: boolean;
   upi: boolean;
   cod: boolean;
+  /** The store's Razorpay takes the payment, so "Pay online" replaces "Pay by UPI". */
+  online?: boolean;
   fssaiNumber: string | null;
   /** `publicRatingText()`; null until the store has enough ratings. */
   ratingText?: string | null;
@@ -39,7 +41,8 @@ export function storeInfoFacts(input: {
     }
   }
   if (input.menuOrdering || input.hasDrops) {
-    const pay = input.upi && input.cod ? "Pay by UPI or on delivery" : input.upi ? "Pay by UPI" : input.cod ? "Pay on delivery" : null;
+    const payNow = input.online ? "Pay online" : "Pay by UPI";
+    const pay = input.upi && input.cod ? `${payNow} or on delivery` : input.upi ? payNow : input.cod ? "Pay on delivery" : null;
     if (pay) facts.push({ kind: "payment", text: pay });
   }
   const fssai = input.fssaiNumber?.trim();

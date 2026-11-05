@@ -12,12 +12,15 @@ import {
 /**
  * The pay step of an order on a store that takes Razorpay: the Razorpay button,
  * with `directPay` (the UPI options) and `claim` ("Payment done?") kept back until
- * Razorpay fails or the buyer closes its window. Both are server-rendered and passed in.
+ * Razorpay fails or the buyer asks for them after closing its window. Both are
+ * server-rendered and passed in.
  *
  * `startOpen` is for a buyer whose earlier claim the seller answered "Not received":
  * they may have paid directly and must be able to send a reference. A reload keeps
  * the options open through `directPayWasOpened`, read after mount so the server
  * HTML and the first client render match.
+ *
+ * `autoStart` opens Razorpay on arrival from checkout (`?pay=1`), so paying is one tap.
  */
 export function OnlinePayFlow({
   slug,
@@ -27,6 +30,7 @@ export function OnlinePayFlow({
   prefillContact,
   fallback,
   startOpen,
+  autoStart,
   heading,
   directPay,
   claim,
@@ -38,6 +42,7 @@ export function OnlinePayFlow({
   prefillContact?: string | null;
   fallback: DirectPayFallback;
   startOpen: boolean;
+  autoStart: boolean;
   heading: ReactNode;
   directPay: ReactNode;
   claim: ReactNode;
@@ -65,6 +70,8 @@ export function OnlinePayFlow({
           prefillContact={prefillContact}
           fallback={fallback}
           onOfferDirectPay={offerDirectPay}
+          directPayOpen={open}
+          autoStart={autoStart}
         />
         {open && fallback === "upi" ? (
           <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">

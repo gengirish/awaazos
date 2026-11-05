@@ -73,7 +73,7 @@ export type DropOrderProps = {
   pickupNote: string | null;
   /** Fulfilment window label ("Sat, 5 Oct · 5:00 pm – 8:00 pm"), shown with Pickup at checkout. */
   pickupWindow?: string | null;
-  payment: { upi: boolean; cod: boolean };
+  payment: { upi: boolean; cod: boolean; online: boolean };
   /** The store has a usable WhatsApp number (see CheckoutSheet). */
   whatsapp?: boolean;
   /** See CheckoutSheet. */

@@ -32,6 +32,11 @@ const METHODS = {
 };
 
 describe("hasPaymentMethod", () => {
+  it("counts Razorpay, which needs no UPI ID", () => {
+    expect(hasPaymentMethod({ ...METHODS.none, onlinePayment: true })).toBe(true);
+    expect(hasPaymentMethod({ ...METHODS.none, onlinePayment: false })).toBe(false);
+  });
+
   it("UPI ID or pay on delivery counts; blank / whitespace UPI does not", () => {
     expect(hasPaymentMethod(METHODS.upiOnly)).toBe(true);
     expect(hasPaymentMethod(METHODS.podOnly)).toBe(true);

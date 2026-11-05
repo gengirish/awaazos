@@ -1,8 +1,10 @@
 import type { StaffRole, StallType } from "@prisma/client";
 
+import type { PlanFields } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { checklistForRole, setupChecklist, type ChecklistItem } from "@/lib/settings-overview";
 import { storeKind } from "@/lib/store-vocabulary";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 
 // Server only (Prisma): import it from server components and route handlers.
 
@@ -23,7 +25,7 @@ type KnownSettings = {
 
 export type SetupChecklistInput = {
   /** `ctx.vendor` from `requireVendorRole`. */
-  vendor: { id: string; slug: string; name: string; upiId: string | null; stallType: StallType };
+  vendor: PlanFields & { id: string; slug: string; name: string; upiId: string | null; stallType: StallType };
   /** `ctx.staff.role`. */
   role: StaffRole;
   /** Values the page has already read, so they are not read twice. */
@@ -60,12 +62,22 @@ export async function loadSetupChecklist({ vendor, role, known }: SetupChecklist
   ]);
 
   const publishStorefront = settings?.publishStorefront ?? false;
+  const acceptPayOnDelivery = settings?.acceptPayOnDelivery ?? true;
+  // Razorpay only decides the payment step when nothing else satisfies it, so most pages skip this read.
+  const onlinePayment =
+    !vendor.upiId?.trim() &&
+    !acceptPayOnDelivery &&
+    isOnlinePaymentEnabled(
+      vendor,
+      await prisma.vendorSettings.findUnique({ where: { vendorId: vendor.id }, select: RAZORPAY_CRED_SELECT }),
+    );
   const items = checklistForRole(
     setupChecklist({
       availableItemCount,
       publishStorefront,
       upiId: vendor.upiId,
-      acceptPayOnDelivery: settings?.acceptPayOnDelivery ?? true,
+      acceptPayOnDelivery,
+      onlinePayment,
       acceptMenuOrders: settings?.acceptMenuOrders ?? false,
       dropCount,
       fssaiNumber: settings?.fssaiNumber ?? null,
