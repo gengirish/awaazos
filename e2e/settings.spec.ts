@@ -54,6 +54,14 @@ test.describe("settings hub", () => {
     await expect(hubRow(page, "Counter & voice")).toContainText("English");
     await expect(hubRow(page, "Plan & billing")).toContainText("Free trial · 30 days left");
 
+    const hub = page.getByRole("navigation", { name: "Settings sections" });
+    await expect(hub.getByRole("heading", { level: 2 })).toHaveText([
+      "Your store",
+      "Money",
+      "Phone & counter",
+      "Help us improve",
+    ]);
+
     const checklist = page.getByRole("region", { name: /setup checklist/i });
     await expect(checklist).toBeVisible();
     await expect(checklist.getByRole("link", { name: /publish your online store/i })).toBeVisible();
@@ -66,13 +74,9 @@ test.describe("settings hub", () => {
       await hubRow(page, row.title).click();
       await expect(page).toHaveURL(new RegExp(`${row.path}$`));
       await expect(page.getByRole("heading", { level: 1, name: row.heading })).toBeVisible();
-      // Desktop (md+): the sidebar marks the current page. Phones have no sidebar —
-      // they get the "← Settings" back link instead (covered in the phone test).
-      if ((page.viewportSize()?.width ?? 0) >= 768) {
-        await expect(
-          page.getByRole("navigation", { name: "Settings", exact: true }).getByRole("link", { name: row.title }),
-        ).toHaveAttribute("aria-current", "page");
-      }
+      // Same on every screen: no side menu, a back link to the hub.
+      await expect(page.getByRole("navigation", { name: "Settings", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("main").getByRole("link", { name: "Settings", exact: true })).toBeVisible();
     }
 
     // Fix both checklist items through the checklist's own links.
@@ -94,6 +98,27 @@ test.describe("settings hub", () => {
     await expect(checklist.getByRole("link", { name: /UPI ID or allow pay on delivery/i })).toHaveCount(0);
     await expect(checklist.getByRole("link", { name: /create your first drop/i })).toBeVisible();
     await expect(checklist.getByRole("button", { name: "Copy link" })).toBeVisible();
+  });
+
+  test("desktop: the FSSAI reminder strip is on the hub, and the back link is 44 px tall", async ({ page, request }) => {
+    await createVendorSession(page, request, "settings-desktop", "/settings");
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await createMenuItem(page, { name: "Masala Dosa", priceInRupees: 70 });
+    const patched = await page.request.patch("/api/vendor", {
+      data: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true },
+    });
+    expect(patched.status()).toBe(200);
+
+    await page.goto("/settings");
+    await expect(page.getByRole("link", { name: /add your FSSAI number/i })).toBeVisible();
+    await expect(page.getByRole("region", { name: /setup checklist/i })).toHaveCount(0);
+
+    await hubRow(page, "Payments").click();
+    await expect(page.getByRole("heading", { level: 1, name: "Payments" })).toBeVisible();
+    const back = page.getByRole("main").getByRole("link", { name: "Settings", exact: true });
+    expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await back.click();
+    await expect(page).toHaveURL(/\/settings$/);
   });
 
   test("old /settings#anchor links land on the matching section", async ({ page, request }) => {

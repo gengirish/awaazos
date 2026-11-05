@@ -13,6 +13,7 @@ import {
   hasLiveOauthConnection,
   hasOauthConnection,
   hasStoredRazorpayKeys,
+  isOnlinePaymentEnabled,
   RAZORPAY_CRED_SELECT,
   vendorWebhookUrl,
 } from "@/lib/storefront-razorpay";
@@ -57,12 +58,14 @@ export default async function PaymentsSettingsPage(props: { searchParams: Promis
           initialAcceptPayOnDelivery={settings?.acceptPayOnDelivery ?? true}
           isOwner={isOwner}
           storeKind={storeKind}
+          onlinePayment={isOnlinePaymentEnabled(vendor, settings)}
         />
         <SettingsCard
           title="Online payments (Razorpay)"
           description="Let customers pay online for pre-orders, into your own Razorpay account."
         >
           <RazorpayKeysClient
+            storeKind={storeKind}
             initialMethod={method}
             initialKeyIdLast4={razorpayKeyIdLast4}
             accountId={oauth ? settings?.razorpayAccountId ?? null : null}
