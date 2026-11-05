@@ -1,7 +1,7 @@
 # Live subscription check
 
 Run one real subscription on a real store before the first trial ends (9 Nov 2026), so a seller
-isn't the first person to find a problem. This moves real money: ₹299 + 18% GST, plus Razorpay's
+isn't the first person to find a problem. This moves real money: the store's Starter price + 18% GST, plus Razorpay's
 small refundable authorisation if the mandate is taken during a trial.
 
 **Use:** your own test store, signed in as its OWNER, and your own UPI or card.
@@ -14,7 +14,7 @@ day on `/admin/vendors`; the store locks at midnight IST.
 
 | # | Do | Expect |
 |---|---|---|
-| 1 | Open Settings → Billing, choose monthly, pay in Razorpay Checkout | Checkout opens with ₹352.82, the page returns to Billing and shows the plan as active |
+| 1 | Open Settings → Billing, choose monthly, pay in Razorpay Checkout | Checkout opens with ₹765.82 at the list price (₹588.82 for a store that kept ₹499, ₹352.82 for one that kept ₹299), the page returns to Billing and shows the plan as active |
 | 2 | Open the store as a buyer and place an order | The order goes through (no "can't take online orders") |
 | 3 | Razorpay Dashboard → Subscriptions | The subscription is active, with one successful payment |
 | 4 | Razorpay Dashboard → Webhooks | `subscription.charged` delivered with a 200 |
