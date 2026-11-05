@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { markOrderPaid } from "@/lib/drops";
 import { prisma } from "@/lib/prisma";
+import { alertSellerOnlinePaid } from "@/lib/storefront-online-paid";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
 import {
   fetchRazorpayOrder,
@@ -108,6 +109,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
       }),
     );
     if (marked) {
+      await alertSellerOnlinePaid(order.vendorId, order.id);
       console.info(
         JSON.stringify({ event: "storefront_rzp_paid", via: "checkout", vendorId: order.vendorId, transactionId: order.id }),
       );

@@ -6,6 +6,7 @@ import { beginIdempotency, getIdempotencyKey } from "@/lib/idempotency";
 import { orderChannelFor } from "@/lib/order-channel";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { alertSellerOrderCapInBackground, alertSellerStoreLockedInBackground } from "@/lib/trial-alerts-server";
 import { storefrontOrderSchema } from "@/lib/zod-drops";
 
@@ -20,7 +21,8 @@ export const runtime = "nodejs";
  *   - the vendor must exist, be active and have opted in (publishStorefront),
  *     otherwise 404 — never 403;
  *   - the vendor `select` reads only id + plan + the one setting the order path
- *     needs; no contact PII is loaded;
+ *     needs, plus whether Razorpay is set up (who to alert, and when); no contact
+ *     PII is loaded;
  *   - prices are never taken from the client — placeStorefrontOrder re-prices
  *     every line from DropItem rows under a row lock.
  *
@@ -110,7 +112,8 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         plan: true,
         planExpiresAt: true,
         trialEndsAt: true,
-        settings: { select: { acceptPayOnDelivery: true } },
+        // The Razorpay columns are only checked for presence; none of this is returned.
+        settings: { select: { acceptPayOnDelivery: true, ...RAZORPAY_CRED_SELECT } },
       },
     });
     if (!vendor) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -143,6 +146,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         trialEndsAt: vendor.trialEndsAt,
       },
       acceptPayOnDelivery: vendor.settings?.acceptPayOnDelivery ?? false,
+      takesOnlinePayment: isOnlinePaymentEnabled(vendor, vendor.settings),
       dropId: input.dropId,
       items: input.items,
       customerName: input.customerName,

@@ -15,6 +15,9 @@
  *   deliver    PLACED|CONFIRMED → DELIVERED; unpaid CASH is marked paid in the same txn
  *   undeliver  DELIVERED → CONFIRMED (mistake fix; payment untouched)
  *
+ * While a Razorpay store's new order waits for the buyer to pay, only cancel
+ * applies (`isAwaitingOnlinePay`), so a stale board can't make it hold stock for good.
+ *
  * Every read and write is pinned to a compound scope
  * `{ id, vendorId, source: "STOREFRONT", dropId }` — `dropId: null` for a menu
  * order — so a forged id from another tenant, another drop, or a counter sale
@@ -27,10 +30,11 @@
 
 import type { DropStatus, Prisma } from "@prisma/client";
 
-import { cancelOrder, generateOrderToken, markOrderPaid } from "@/lib/drops";
-import { checkOrderAction, type OrderAction } from "@/lib/drops-board";
+import { cancelOrder, generateOrderToken, markOrderPaid, orderDisplayState } from "@/lib/drops";
+import { checkOrderAction, isAwaitingOnlinePay, type OrderAction } from "@/lib/drops-board";
 import { boardOrderSelect, type BoardOrderRow } from "@/lib/drops-board-server";
 import { deletePaymentProofInBackground } from "@/lib/payment-proof";
+import { ONLINE_PAYMENT_VENDOR_SELECT, vendorTakesOnlinePayment } from "@/lib/storefront-razorpay";
 
 export { ORDER_ACTIONS, checkOrderAction, type OrderAction } from "@/lib/drops-board";
 
@@ -97,11 +101,25 @@ export async function applyStorefrontOrderAction(
       fulfilmentType: true,
       riderToken: true,
       paymentProofUrl: true,
+      upiRef: true,
+      paymentClaimedAt: true,
+      createdAt: true,
+      vendor: { select: ONLINE_PAYMENT_VENDOR_SELECT },
     },
   });
   if (!order) throw new OrderActionError(404, "Not found");
 
-  const check = checkOrderAction(action, dropStatus, order);
+  const now = args.now ?? new Date();
+  const check = checkOrderAction(action, dropStatus, {
+    fulfilmentStatus: order.fulfilmentStatus,
+    paymentStatus: order.paymentStatus,
+    fulfilmentType: order.fulfilmentType,
+    awaitingOnlinePay: isAwaitingOnlinePay({
+      displayState: orderDisplayState(order, now),
+      fulfilmentStatus: order.fulfilmentStatus,
+      onlineStore: vendorTakesOnlinePayment(order.vendor, now),
+    }),
+  });
   if (!check.ok) throw new OrderActionError(409, check.error);
 
   let applied = false;

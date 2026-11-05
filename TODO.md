@@ -87,7 +87,10 @@ and approved marketing templates first. The customer-initiated design in 3.2 avo
 `docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md`: new sign-ups get a 30-day free trial with STARTER limits,
 STARTER is unlimited, and one plan is sold (₹299/month or ₹2,990/year, + GST). FREE (50/month)
 remains only for vendors who signed up before the trial. The bullets below are kept as the record
-of why; the staff-invite and "Pro is not sold" items are still open.
+of why; the staff-invite item is still open.
+
+**Since then:** three plans are sold, Lite, Starter and Pro at ₹599, ₹649 and ₹1,149 a month + GST
+(`lib/constants.ts`). The prices in this section are the ones from that time.
 
 **ICP changed 2026-10-09** to Instagram cloud kitchens (`docs/ICP.md`): roughly 10–80 orders per
 batch or day, so STARTER's 500/month now fits and the "10× below the ICP" point below applies only
@@ -113,11 +116,9 @@ Limits live in `PLAN_LIMITS` (`lib/constants.ts`).
   from the copy (`lib/plan-copy.ts`; `lib/__tests__/plan-copy.test.ts` fails if "staff" reappears).
   To ship: StaffMember invite/accept, enforce `PLAN_LIMITS.maxStaff`, add a tenant-isolation e2e
   case — then re-add "staff logins" to the Starter copy and relax that test.
-- **Pro is not sold** — hidden from pricing (`MARKETED_PLANS` in `lib/plan-copy.ts`) and billing,
-  and `POST /api/razorpay/create-subscription` rejects it (`SUBSCRIBABLE_PLANS` is STARTER only).
-  Any vendor on PRO was set manually. Since 2026-10-13 the vendor's own Razorpay keys are a STARTER
-  feature (trial included); what PRO still adds is 365 days of analytics instead of 90 and higher
-  AI rate limits and usage caps (`lib/ratelimit.ts`, `lib/ai-usage-guard.ts`).
+- **Pro was not sold** (resolved 2026-11-04, #132): it is now on the pricing page and in billing.
+  What PRO adds is 365 days of analytics instead of 90 and higher AI rate limits and usage caps
+  (`lib/ratelimit.ts`, `lib/ai-usage-guard.ts`).
 
 **Proposed fix:** time-box the trial instead of transaction-boxing it — 30 days, unlimited, every
 language, WhatsApp on — then one paid tier whose cap is above real usage. Cost is some Sarvam

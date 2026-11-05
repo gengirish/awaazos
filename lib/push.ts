@@ -84,6 +84,25 @@ export function newOrderPayload(o: {
   };
 }
 
+/**
+ * "New paid order": Razorpay took the money, so the order is already confirmed.
+ * Same tag as "New order", so the spoken alert treats them alike (lib/order-voice.ts).
+ * No buyer name/phone/address by design.
+ */
+export function newPaidOrderPayload(o: {
+  billNumber: string;
+  totalPaise: number;
+  itemCount: number;
+  dropId: string | null;
+}): PushPayload {
+  return {
+    title: "💰 New paid order",
+    body: `${o.billNumber} · ${formatINR(o.totalPaise)} · ${plural(o.itemCount, "item", "items")}`,
+    url: o.dropId ? dropOrdersHref(o.dropId) : "/orders",
+    tag: `order-${o.billNumber}`,
+  };
+}
+
 /** Buyer entered a UPI reference — vendor should match it in their UPI app. */
 export function paymentSubmittedPayload(o: {
   billNumber: string;

@@ -87,6 +87,7 @@ export function PipelineClient({ items: serverItems, now, canDelete, sender, hea
   const [done, setDone] = useState(0);
   const [bulkItems, setBulkItems] = useState<PipelineItem[] | null>(null);
   const undoRef = useRef<{ run: () => void; until: number } | null>(null);
+  const requests = useRef(new Map<string, Promise<unknown>>());
   // A link made this visit is used again: each new one emails the seller and voids the last.
   const claimUrls = useRef(new Map<string, string>());
 
@@ -128,9 +129,19 @@ export function PipelineClient({ items: serverItems, now, canDelete, sender, hea
     });
   }, []);
 
+  /** Runs `task` once this store's earlier requests have finished, whether or not they worked. */
+  const inOrder = useCallback(<T,>(id: string, task: () => Promise<T>): Promise<T> => {
+    const run = (requests.current.get(id) ?? Promise.resolve()).then(task, task);
+    requests.current.set(id, run);
+    return run;
+  }, []);
+
   /**
    * One action: show it, send it, roll back and say so if it fails, then offer
-   * Undo for six seconds.
+   * Undo for six seconds. Undo is armed before the request goes out, so a quick U
+   * takes back this action and never the one before it. A store's requests go one
+   * at a time: an undo needs the id its action's answer carries, and it restores a
+   * snapshot, so it must not cross with the next action on that store.
    */
   const act = useCallback(
     async (
@@ -141,39 +152,54 @@ export function PipelineClient({ items: serverItems, now, canDelete, sender, hea
       opts: { quiet?: boolean; queueItem?: boolean } = {},
     ) => {
       const before = overrides.get(item.id);
-      setOverride(item.id, { ...before, ...patch, facts: { ...before?.facts, ...patch.facts } });
+      const applied = { ...before, ...patch, facts: { ...before?.facts, ...patch.facts } };
+      setOverride(item.id, applied);
       if (opts.queueItem) setDone((n) => n + 1);
+
       let eventId: string | undefined;
+      let undone = false;
+      const undo = () => {
+        if (undone) return;
+        undone = true;
+        if (undoRef.current?.run === undo) undoRef.current = null;
+        setOverride(item.id, before);
+        if (opts.queueItem) setDone((n) => n - 1);
+        inOrder(item.id, async () => {
+          // No id: the action itself failed, so there is nothing to take back.
+          if (!eventId || !item.ref) return;
+          await postPipelineAction(item.ref, { action: "undo", event_id: eventId });
+          router.refresh();
+        }).catch((err: unknown) => {
+          setOverride(item.id, applied);
+          if (opts.queueItem) setDone((n) => n + 1);
+          toast.error(err instanceof PipelineApiError ? err.message : "Could not undo.");
+        });
+      };
+      undoRef.current = opts.quiet ? null : { run: undo, until: Date.now() + UNDO_MS };
+
       try {
-        ({ event_id: eventId } = await request());
+        ({ event_id: eventId } = await inOrder(item.id, request));
       } catch (err) {
+        if (undoRef.current?.run === undo) undoRef.current = null;
+        // Taken back already, and it never happened: nothing left to say.
+        if (undone) return;
         setOverride(item.id, before);
         if (opts.queueItem) setDone((n) => n - 1);
         toast.error(err instanceof PipelineApiError ? err.message : "That didn't work. Try again.");
         return;
       }
-      if (opts.quiet || !eventId || !item.ref) return;
-      const ref = item.ref;
-      const undo = () => {
-        undoRef.current = null;
-        setOverride(item.id, before);
-        if (opts.queueItem) setDone((n) => n - 1);
-        postPipelineAction(ref, { action: "undo", event_id: eventId })
-          .then(() => router.refresh())
-          .catch((err: unknown) => {
-            setOverride(item.id, { ...before, ...patch, facts: { ...before?.facts, ...patch.facts } });
-            toast.error(err instanceof PipelineApiError ? err.message : "Could not undo.");
-          });
-      };
-      undoRef.current = { run: undo, until: Date.now() + UNDO_MS };
+      if (undone || opts.quiet || !eventId || !item.ref) return;
+      if (undoRef.current?.run === undo) undoRef.current.until = Date.now() + UNDO_MS;
       toast(message, { duration: UNDO_MS, action: { label: "Undo", onClick: undo } });
     },
-    [overrides, router, setOverride],
+    [inOrder, overrides, router, setOverride],
   );
 
   const handlers: PipelineHandlers = useMemo(
     () => ({
       open: async (item, text) => {
+        // A send is on its way: a quick U mustn't reach back to the action before it.
+        undoRef.current = null;
         const wantsLink = needsClaimLink(text);
         if (!wantsLink) {
           const href = outreachWhatsappUrl(text, item.phone);

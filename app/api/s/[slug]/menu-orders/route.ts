@@ -6,6 +6,7 @@ import { placeMenuOrder } from "@/lib/menu-orders";
 import { orderChannelFor } from "@/lib/order-channel";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { alertSellerOrderCapInBackground, alertSellerStoreLockedInBackground } from "@/lib/trial-alerts-server";
 import { storefrontMenuOrderSchema } from "@/lib/zod-drops";
 
@@ -20,7 +21,8 @@ export const runtime = "nodejs";
  *     (acceptMenuOrders) is a business rule: placeMenuOrder answers
  *     409 menu_orders_disabled, the storefront is already public;
  *   - the vendor `select` is a hand-written allowlist: id + plan + only the
- *     settings placeMenuOrder needs. No contact PII is loaded;
+ *     settings placeMenuOrder needs, plus whether Razorpay is set up (who to
+ *     alert, and when). No contact PII is loaded;
  *   - prices are never taken from the client — placeMenuOrder re-reads every
  *     line from available MenuItem rows of this vendor.
  *
@@ -113,6 +115,8 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
             acceptPayOnDelivery: true,
             menuFulfilmentMode: true,
             menuDeliveryFeePaise: true,
+            // Only checked for presence; none of this is returned or passed on.
+            ...RAZORPAY_CRED_SELECT,
           },
         },
       },
@@ -144,7 +148,13 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         planExpiresAt: vendor.planExpiresAt,
         trialEndsAt: vendor.trialEndsAt,
       },
-      settings: vendor.settings,
+      settings: {
+        acceptMenuOrders: vendor.settings.acceptMenuOrders,
+        acceptPayOnDelivery: vendor.settings.acceptPayOnDelivery,
+        menuFulfilmentMode: vendor.settings.menuFulfilmentMode,
+        menuDeliveryFeePaise: vendor.settings.menuDeliveryFeePaise,
+      },
+      takesOnlinePayment: isOnlinePaymentEnabled(vendor, vendor.settings),
       items: input.items,
       customerName: input.customerName,
       customerPhone: input.customerPhone,

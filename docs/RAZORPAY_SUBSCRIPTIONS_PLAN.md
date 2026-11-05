@@ -27,6 +27,21 @@ Platform SaaS billing: a vendor pays AwaazOS for STARTER through the **platform*
 (`RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`). This is separate from storefront payments, which use
 each vendor's own keys (`lib/storefront-razorpay.ts`) and must stay that way.
 
+## Plans today
+
+This plan was written for one paid plan. Three are sold now (`SUBSCRIBABLE_PLANS`), and the design
+below applies to each of them:
+
+| Plan | Monthly, before GST | Razorpay amount | Yearly, before GST | Razorpay amount |
+| --- | ---: | ---: | ---: | ---: |
+| LITE | ₹599 | ₹706.82 | ₹5,990 | ₹7,068.20 |
+| STARTER | ₹649 | ₹765.82 | ₹6,490 | ₹7,658.20 |
+| PRO | ₹1,149 | ₹1,355.82 | ₹11,490 | ₹13,558.20 |
+
+Limits are in `PLAN_LIMITS` (`lib/constants.ts`). Lite has 50 orders a month and no Razorpay, counter
+billing by voice or CSV export. Stores that signed up at an earlier price keep it through
+`customPricePaise` and are offered Starter only.
+
 ## Decisions
 
 | Question | Decision |

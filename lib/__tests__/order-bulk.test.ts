@@ -31,6 +31,19 @@ const o = (
   totalPaise = 10_000,
 ): O => ({ id, fulfilmentStatus, paymentStatus, paymentMethod, totalPaise });
 
+describe("a Razorpay store's unpaid new order", () => {
+  it("can't be selected: Cancel is its only action and that is never bulk", () => {
+    const order = {
+      fulfilmentStatus: "PLACED" as const,
+      paymentStatus: "PENDING" as const,
+      paymentMethod: "UPI" as const,
+      bucket: "awaiting_online" as const,
+    };
+    expect(bulkActionsFor(order, false)).toEqual([]);
+    expect(isBulkSelectable(order, false)).toBe(false);
+  });
+});
+
 describe("BULK_ORDER_ACTIONS", () => {
   it("is the forward actions only — never cancel or undeliver", () => {
     expect([...BULK_ORDER_ACTIONS]).toEqual(["confirm", "mark_paid", "deliver"]);

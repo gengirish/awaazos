@@ -434,6 +434,13 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   A store with Razorpay shows only "Pay online" on the order page: UPI and "Payment done?" stay hidden (`OnlinePayFlow`,
   `lib/storefront-direct-pay.ts`) until Razorpay fails, its window is closed or the seller answered "Not received", and
   never on `payment_processing`, so nobody is invited to pay twice. Closing Razorpay's window only leaves a quiet "Pay by UPI instead" link. Razorpay counts as a way to pay, so such a store needs no UPI ID (`payment.online`, `hasPaymentMethod`). Checkout sends a Razorpay order to the order page with `?pay=1`, which opens the window once and strips the param (`orderPagePath`).
+- **A Razorpay store's seller hears about paid orders** (`lib/storefront-online-paid.ts`). Placing a UPI order there
+  only moves the board signal; verify or the webhook, whichever wins `markOrderPaid`, sends the one "New paid order" push.
+  On the board a new order the buyer hasn't paid (`isAwaitingOnlinePay`) is bucket `awaiting_online`: listed under All
+  only, not in the summary, no chime, Cancel its only action (`checkOrderAction` agrees, so a stale board can't make it
+  hold stock for good). Stock and prep sheets still count it. A claim or an expired hold puts it back on the normal
+  path, so a direct UPI payment can still be marked paid. `BoardOrder.paidOnline` and the buyer's page say "Paid online"
+  from `razorpayPaymentId`, and the buyer's progress drops Confirmed.
 - **Connect Razorpay** (`lib/razorpay-oauth.ts`, plan in `docs/RAZORPAY_PARTNER_PLAN.md`): the same
   vendor-owned account reached by our Razorpay Technology Partner OAuth app instead of pasted keys
   (`RAZORPAY_OAUTH_CLIENT_ID` / `_SECRET` / `_MODE`). One method per store: connecting clears the keys,
@@ -494,7 +501,7 @@ visible and only while a buyer could order (`boardPollKind`: "order from menu" o
 or about to open), refetching from Postgres only when the counter moves. Keep it above Neon's
 idle timeout — each tick's session check reads Postgres.
 
-**Web Push alerts** (`lib/push.ts`): new storefront orders and submitted UPI references push to the
+**Web Push alerts** (`lib/push.ts`): new storefront orders (on a Razorpay store, once paid) and submitted UPI references push to the
 vendor's opted-in staff devices (`PushSubscription`, one row per device). Event-driven only — never
 add a timer. `notifyVendorInBackground` wraps the send in `waitUntil` so it never blocks a buyer.
 Payloads carry bill number, amount and item count only — **no buyer name, phone or address** (lock

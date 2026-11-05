@@ -56,6 +56,23 @@ export async function setRazorpayKeysBySlug(slug: string): Promise<void> {
   }
 }
 
+/** What verify or the webhook leaves behind when Razorpay has taken the money (no real Razorpay here). */
+export async function markPaidOnlineByOrderId(orderId: string): Promise<void> {
+  const res = await db().transaction.updateMany({
+    where: { id: orderId, paymentStatus: "PENDING" },
+    data: {
+      paymentStatus: "PAID",
+      paidAt: new Date(),
+      fulfilmentStatus: "CONFIRMED",
+      razorpayOrderId: "order_e2e",
+      razorpayPaymentId: "pay_e2e",
+    },
+  });
+  if (res.count !== 1) {
+    throw new Error(`markPaidOnlineByOrderId: expected 1 unpaid order, got ${res.count}`);
+  }
+}
+
 /**
  * Change the role of the staff member registered with `email`. Registration
  * only ever creates an OWNER and there is no staff-invite flow yet, so this is

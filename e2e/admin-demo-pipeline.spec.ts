@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page, type Route } from "@playwright/test";
 
 import { CAN_SET_BILLING, setPlatformRole } from "./helpers/billing-db";
 import { createVendorSession } from "./helpers/vendor";
@@ -33,6 +33,11 @@ test.describe("admin demo-store pipeline", () => {
     await build(page, `Keyboard Two ${tag}`, "two");
     await build(page, `Keyboard Three ${tag}`, "three");
 
+    let undoCount = 0;
+    page.on("request", (req) => {
+      if (req.url().endsWith("/pipeline") && req.postData()?.includes('"undo"')) undoCount += 1;
+    });
+
     await page.goto("/admin/demo-stores");
     const sentTile = page.locator("dl > div").filter({ hasText: "Invite sent" }).locator("dd");
     const before = Number(await sentTile.innerText());
@@ -56,6 +61,36 @@ test.describe("admin demo-store pipeline", () => {
     await page.keyboard.press("u");
     await expect(sentTile).toHaveText(String(before));
     await expect(left).toContainText(String(startLeft));
+    await expect.poll(() => undoCount).toBe(1);
+    const undoBefore = undoCount;
+
+    // U straight after an action, before the server has answered: it undoes that
+    // action, never the one before it.
+    await page.keyboard.press("z");
+    await expect(left).toContainText(String(startLeft - 1));
+    const secondStore = await card.getByRole("heading").innerText();
+    // Only this archive is slow: the undo that follows it goes straight through.
+    let slowArchive = true;
+    await page.route("**/api/admin/demo-stores/*/pipeline", async (route: Route) => {
+      if (slowArchive && route.request().postData()?.includes('"archive"')) {
+        await new Promise((resolve) => setTimeout(resolve, 800));
+      }
+      await route.continue();
+    });
+    const archived = page.waitForResponse("**/api/admin/demo-stores/*/pipeline");
+    await page.keyboard.press("a");
+    await expect(left).toContainText(String(startLeft - 2));
+    await page.keyboard.press("u");
+    await expect(left).toContainText(String(startLeft - 1));
+    await expect(card.getByRole("heading")).toHaveText(secondStore);
+    await archived;
+    slowArchive = false;
+    // The server agrees: only the snooze is left, so the second store still leads after a reload.
+    await expect.poll(() => undoCount, { timeout: 15_000 }).toBeGreaterThan(undoBefore);
+    await page.waitForLoadState("networkidle");
+    await page.reload();
+    await expect(left).toContainText(String(startLeft - 1));
+    await expect(card.getByRole("heading")).toHaveText(secondStore);
 
     // J and K move without changing anything.
     const firstName = await card.getByRole("heading").innerText();
@@ -67,13 +102,14 @@ test.describe("admin demo-store pipeline", () => {
     // Typing in the message never triggers a shortcut.
     await page.getByLabel("Message").focus();
     await page.keyboard.type("z");
-    await expect(left).toContainText(String(startLeft));
+    await expect(left).toContainText(String(startLeft - 1));
     await page.keyboard.press("Escape");
 
     // Clear everything: snooze with Z, archive with A, turn about. Each new card
     // takes the focus, so nothing but the keyboard is needed.
-    for (let i = 0; i < startLeft; i++) {
-      await expect(left).toContainText(String(startLeft - i));
+    const remaining = startLeft - 1; // One was snoozed above.
+    for (let i = 0; i < remaining; i++) {
+      await expect(left).toContainText(String(remaining - i));
       await expect(card.getByRole("heading")).toBeFocused();
       await page.keyboard.press(i % 2 ? "a" : "z");
     }
