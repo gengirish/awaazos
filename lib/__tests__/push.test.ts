@@ -21,6 +21,7 @@ import {
   __resetPushConfigForTest,
   isPushConfigured,
   newOrderPayload,
+  newPaidOrderPayload,
   notifyVendorInBackground,
   paymentSubmittedPayload,
   sendToVendor,
@@ -44,6 +45,15 @@ describe("push payload builders", () => {
     expect(p.body).toContain("1 item");
     expect(p.body).not.toContain("1 items");
     expect(p.url).toBe("/orders?drop=drop_123");
+  });
+
+  it("new paid order: the same alert tag as a new order, and nothing about the buyer", () => {
+    const p = newPaidOrderPayload({ billNumber: "AWZ-7", totalPaise: 12000, itemCount: 2, dropId: "drop_1" });
+    expect(p.title).toContain("New paid order");
+    expect(p.body).toBe("AWZ-7 · ₹120.00 · 2 items");
+    expect(p.url).toBe("/orders?drop=drop_1");
+    expect(p.tag).toBe("order-AWZ-7");
+    expect(newPaidOrderPayload({ billNumber: "AWZ-8", totalPaise: 100, itemCount: 1, dropId: null }).url).toBe("/orders");
   });
 
   it("payment submitted: right URL and tag per event", () => {

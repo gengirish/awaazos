@@ -168,9 +168,9 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "see-orders",
     group: "orders",
     title: "See new online orders",
-    steps: "Every online order is listed here, newest first, whether it came from your everyday {catalogue} or from a drop. If you take both, the picker at the top narrows the list to {lower:catalogueOrders} or to one drop.",
+    steps: "Every online order is listed here, newest first, whether it came from your everyday {catalogue} or from a drop. If you take both, the picker at the top narrows the list to {lower:catalogueOrders} or to one drop. With Razorpay connected, an order paid online reaches you already confirmed, under Confirmed. One not paid yet waits under All, with nothing for you to do.",
     nav: "orders",
-    keywords: "storefront board incoming",
+    keywords: "storefront board incoming razorpay paid online",
   },
   {
     id: "check-payment",

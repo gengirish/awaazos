@@ -32,6 +32,7 @@ import { loadResolvedOffers } from "@/lib/offers-server";
 import { effectivePlan, isBillingLocked } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
+import { alertsAtPlacement } from "@/lib/storefront-online-paid";
 import { generateReceiptToken } from "@/lib/receipt-data";
 
 export type MenuOrderSettings = {
@@ -60,6 +61,8 @@ export type PlaceMenuOrderInput = {
   customerId?: string | null;
   /** lib/order-channel.ts; decided by the route from the request. */
   orderChannel?: "instagram" | null;
+  /** The store takes Razorpay: a UPI order alerts the seller once paid (lib/storefront-online-paid.ts). */
+  takesOnlinePayment?: boolean;
   now?: Date;
 };
 
@@ -264,15 +267,17 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
     });
 
     void bumpOrderSignal(vendorId);
-    notifyVendorInBackground(
-      vendorId,
-      newOrderPayload({
-        billNumber: order.billNumber,
-        totalPaise: order.totalPaise,
-        itemCount: lines.reduce((n, l) => n + l.qty, 0),
-        dropId: null,
-      }),
-    );
+    if (alertsAtPlacement(input.paymentMethod, input.takesOnlinePayment ?? false)) {
+      notifyVendorInBackground(
+        vendorId,
+        newOrderPayload({
+          billNumber: order.billNumber,
+          totalPaise: order.totalPaise,
+          itemCount: lines.reduce((n, l) => n + l.qty, 0),
+          dropId: null,
+        }),
+      );
+    }
     return { ok: true, order };
   } catch (err) {
     if (err instanceof MenuOrderRejected) return { ok: false, error: err.error };

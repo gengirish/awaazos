@@ -166,6 +166,25 @@ export function isOnlinePaymentEnabled(
   return hasStoredRazorpayKeys(s);
 }
 
+/**
+ * Vendor `select` for `vendorTakesOnlinePayment`. It carries the encrypted secrets
+ * (presence is all that's read), so never hand a row with it to a client or a log.
+ */
+export const ONLINE_PAYMENT_VENDOR_SELECT = {
+  plan: true,
+  planExpiresAt: true,
+  trialEndsAt: true,
+  settings: { select: RAZORPAY_CRED_SELECT },
+} as const;
+
+/** `isOnlinePaymentEnabled` for a vendor loaded with `ONLINE_PAYMENT_VENDOR_SELECT`. */
+export function vendorTakesOnlinePayment(
+  vendor: PlanFields & { settings: Partial<CredFields> | null },
+  now: Date = new Date(),
+): boolean {
+  return isOnlinePaymentEnabled(vendor, vendor.settings, now);
+}
+
 /** Renew the access token once it has less than this left. */
 const ACCESS_REFRESH_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 

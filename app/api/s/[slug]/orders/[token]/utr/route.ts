@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { PENDING_HOLD_MINUTES } from "@/lib/drops";
+import { bumpOrderSignal } from "@/lib/drops-signal";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, paymentSubmittedPayload } from "@/lib/push";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
@@ -101,6 +102,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
     }
 
     // Tell the vendor's phones there's a payment to check (no buyer PII, no UTR).
+    void bumpOrderSignal(order.vendorId);
     notifyVendorInBackground(
       order.vendorId,
       paymentSubmittedPayload({ billNumber: order.billNumber, totalPaise: order.totalPaise, dropId: order.dropId }),
