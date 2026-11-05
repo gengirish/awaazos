@@ -300,6 +300,56 @@ test.describe("voice menu builder", () => {
     await expect(grid.getByText("₹22.00").first()).toBeVisible();
   });
 
+  test("the header holds both actions: one row on desktop, stacked on a phone", async ({ page, request }) => {
+    test.setTimeout(120_000);
+    await createVendorSession(page, request, "menuheader", "/menu");
+    const s = Math.random().toString(36).slice(2, 7);
+    await createMenuItem(page, { name: `Poha ${s}`, priceInRupees: 30, category: "Snacks" });
+    await createMenuItem(page, { name: `Upma ${s}`, priceInRupees: 40, category: "Snacks" });
+
+    const add = page.getByRole("banner").getByRole("button", { name: "Add item", exact: true });
+    const voice = page.getByRole("banner").getByRole("button", { name: "Add dishes by voice" });
+    const box = async (locator: typeof add) => {
+      const b = await locator.boundingBox();
+      if (!b) throw new Error("button not laid out");
+      return b;
+    };
+
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await page.goto("/menu");
+    const [addWide, voiceWide] = [await box(add), await box(voice)];
+    expect(addWide.height).toBe(44);
+    expect(voiceWide.height).toBe(44);
+    expect(voiceWide.y).toBe(addWide.y);
+    expect(voiceWide.x).toBeGreaterThan(addWide.x + addWide.width - 1);
+    const heading = await box(page.getByRole("heading", { level: 1 }));
+    expect(addWide.x).toBeGreaterThan(heading.x + heading.width);
+    await page.screenshot({ path: test.info().outputPath("menu-1280.png") });
+
+    await page.setViewportSize({ width: 375, height: 812 });
+    await page.goto("/menu");
+    const [addNarrow, voiceNarrow] = [await box(add), await box(voice)];
+    expect(addNarrow.height).toBeGreaterThanOrEqual(44);
+    expect(voiceNarrow.height).toBeGreaterThanOrEqual(44);
+    expect(voiceNarrow.y).toBeGreaterThanOrEqual(addNarrow.y + addNarrow.height);
+    expect(addNarrow.width).toBe(voiceNarrow.width);
+    const subtitle = await box(page.getByText("Add items, set their order, and mark what is sold out."));
+    expect(addNarrow.y).toBeGreaterThanOrEqual(subtitle.y + subtitle.height);
+    expect(addNarrow.width).toBe(subtitle.width);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await page.screenshot({ path: test.info().outputPath("menu-375.png") });
+
+    // Both still do what they did: Add item opens the form, voice opens the panel on its mic.
+    await add.click();
+    await expect(page.getByRole("dialog", { name: "Add menu item" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await voice.click();
+    const panel = page.getByRole("region", { name: "Add dishes by voice" });
+    await expect(panel.getByRole("button", { name: "Speak your dishes" })).toBeFocused();
+    await expect(voice).toHaveCount(0);
+    await expect(add).toBeVisible();
+  });
+
   test("voice unavailable (503) points to Add item, which still works", async ({ page, request }) => {
     test.setTimeout(120_000);
     await fakeSpeech(page, TRANSCRIPT);
@@ -315,7 +365,7 @@ test.describe("voice menu builder", () => {
     await page.goto("/menu");
     const panel = page.getByRole("region", { name: "Add dishes by voice" });
     await panel.getByRole("button", { name: "Speak your dishes" }).click();
-    await expect(panel.getByRole("alert")).toHaveText("Voice isn't available right now — use “Add item” below.");
+    await expect(panel.getByRole("alert")).toHaveText("Voice isn't available right now — use “Add item”.");
     await expect(panel.getByRole("heading", { name: "Check your dishes" })).toHaveCount(0);
     await expect(panel.getByRole("button", { name: "Speak your dishes" })).toBeEnabled();
 
