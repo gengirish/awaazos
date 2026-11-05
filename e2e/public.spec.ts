@@ -30,7 +30,7 @@ test.describe("public surfaces", () => {
     // Scoped to <main>: the header carries the same call to action.
     await expect(page.getByRole("main").getByRole("link", { name: /start 30 days free/i }).first()).toHaveAttribute(
       "href",
-      /^\/sign-up\?callbackUrl=/,
+      "/sign-up",
     );
     // Copy comes from lib/plan-copy.ts: Starter sells CSV export, and nothing
     // promises staff logins (there is no invite flow — see TODO.md §2).

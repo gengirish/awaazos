@@ -330,7 +330,7 @@ passes, so Neon can sleep.
   `create-subscription`, so neither can offer what the other refuses. Not renewing (cancelled, also at cycle end, halted, expired, none) and paying:
   the same or a lower plan starts at `planExpiresAt` with nothing charged today (`notes.resumesPaidPeriod`: its `authenticated` grants nothing and an
   uncharged cancel takes nothing back); a higher plan starts today. A halted or paused subscription is cancelled first, since Razorpay can charge it again.
-  `/pricing` links carry the pick: `/settings/billing?plan=starter&interval=yearly` (`billingSelectionPath`), through sign-up or sign-in for visitors.
+  `/pricing` links carry the pick: `/settings/billing?plan=starter&interval=yearly` (`billingSelectionPath`), through sign-in for a signed-out seller. Sign-up carries no pick: a new store goes through onboarding first.
   `/pricing` is in its own `(pricing)` route group because its header reads the session; the `(marketing)` layout must stay static.
 - **One write path:** the webhook and verify both go through `recordSubscriptionEvent`
   (`lib/subscription-store.ts`), so whichever lands second changes nothing. Don't write

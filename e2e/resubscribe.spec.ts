@@ -119,22 +119,27 @@ test.describe("with billing state set in the database", () => {
 });
 
 test.describe("signed out", () => {
-  test("the pick survives sign-up's link to sign-in, and signing in lands on it", async ({ page, request }) => {
+  test("a new visitor's card goes to plain sign-up, so onboarding still comes first", async ({ page }) => {
+    await page.goto("/pricing");
+    await expect(page.getByRole("link", { name: "Go to dashboard" })).toHaveCount(0);
+    const cards = page.getByRole("main").getByRole("link", { name: /start 30 days free/i });
+    await expect(cards).toHaveCount(3);
+    for (let i = 0; i < 3; i++) await expect(cards.nth(i)).toHaveAttribute("href", "/sign-up");
+  });
+
+  test("someone with a store signs in from a card and lands on that plan", async ({ page, request }) => {
     const creds = await registerVendor(request, "resub-signed-out");
 
     await page.goto("/pricing");
-    await expect(page.getByRole("link", { name: "Go to dashboard" })).toHaveCount(0);
-
-    await page.getByRole("link", { name: "Start free, then Starter yearly" }).click();
-    await expect(page).toHaveURL(/\/sign-up\?callbackUrl=/);
-    await page.getByRole("link", { name: /^sign in$/i }).last().click();
+    await page.getByRole("link", { name: "Have a store? Sign in to choose Pro" }).click();
     await expect(page).toHaveURL(/\/sign-in\?callbackUrl=/);
 
     await page.getByLabel(/email/i).fill(creds.email);
     await page.getByLabel("Password", { exact: true }).fill(E2E_PASSWORD);
     await page.getByRole("button", { name: /^sign in$/i }).click();
 
-    await page.waitForURL(/\/settings\/billing\?plan=starter&interval=yearly/, { timeout: 45_000 });
-    await expect(page.getByRole("radio", { name: /^yearly/i })).toBeChecked();
+    await page.waitForURL(/\/settings\/billing\?plan=pro&interval=monthly/, { timeout: 45_000 });
+    await expect(page.getByRole("radio", { name: /^pro/i })).toBeChecked();
+    await expect(page.getByRole("radio", { name: /^monthly/i })).toBeChecked();
   });
 });

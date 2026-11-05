@@ -4,16 +4,13 @@ import { Button } from "@/components/ui/button";
 import { billingSelectionPath } from "@/lib/billing-actions";
 import { PLAN_LIMITS } from "@/lib/constants";
 import { PLAN_MARKETING } from "@/lib/plan-copy";
-import type { BillingInterval, SubscribablePlan } from "@/lib/subscription";
-
-function signUpHref(plan: SubscribablePlan, interval: BillingInterval): string {
-  return `/sign-up?callbackUrl=${encodeURIComponent(billingSelectionPath(plan, interval))}`;
-}
+import type { SubscribablePlan } from "@/lib/subscription";
 
 /**
  * Pricing-page call to action. It carries the pick to the billing page, which is
- * the one place a subscription is started. New visitors start the free trial
- * (no card) first and land there afterwards; sign-up keeps the pick through.
+ * the one place a subscription is started. A new visitor starts the free trial
+ * (no card) and goes through onboarding, so sign-up carries no pick; someone who
+ * already has a store signs in and lands on it.
  */
 export function PricingPlanButtons({ signedIn, plan }: { signedIn: boolean; plan: SubscribablePlan }) {
   const label = PLAN_LIMITS[plan].label;
@@ -29,13 +26,14 @@ export function PricingPlanButtons({ signedIn, plan }: { signedIn: boolean; plan
       </div>
     );
   }
+  const signInHref = `/sign-in?callbackUrl=${encodeURIComponent(billingSelectionPath(plan, "monthly"))}`;
   return (
     <div className="flex flex-col gap-2">
       <Button asChild className="min-h-11 w-full">
-        <Link href={signUpHref(plan, "monthly")}>Start {PLAN_MARKETING.STARTER.trial}</Link>
+        <Link href="/sign-up">Start {PLAN_MARKETING.STARTER.trial}</Link>
       </Button>
       <Button asChild variant="ghost" className="min-h-11 w-full">
-        <Link href={signUpHref(plan, "yearly")}>Start free, then {label} yearly</Link>
+        <Link href={signInHref}>Have a store? Sign in to choose {label}</Link>
       </Button>
     </div>
   );

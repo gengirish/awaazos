@@ -126,9 +126,7 @@ export function SignUpForm({
   const searchParams = useSearchParams();
   // A new store still has setup to finish, so the landing resolver sends it
   // to /onboarding (lib/home.ts). An explicit callbackUrl still wins.
-  const explicitCallback = searchParams.get("callbackUrl");
-  const callbackUrl = explicitCallback || HOME_PATH;
-  const signInHref = explicitCallback ? `/sign-in?callbackUrl=${encodeURIComponent(explicitCallback)}` : "/sign-in";
+  const callbackUrl = searchParams.get("callbackUrl") || HOME_PATH;
   const refParam = searchParams.get(REFERRAL_QUERY_PARAM);
 
   const [name, setName] = useState("");
@@ -185,7 +183,7 @@ export function SignUpForm({
         {field === "email" && emailTaken ? (
           <>
             {" "}
-            <Link href={signInHref} className={textLinkClass}>
+            <Link href="/sign-in" className={textLinkClass}>
               Sign in instead
             </Link>
           </>
@@ -469,7 +467,7 @@ export function SignUpForm({
           </p>
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
-            <Link href={signInHref} className={textLinkClass}>
+            <Link href="/sign-in" className={textLinkClass}>
               Sign in
             </Link>
           </p>
