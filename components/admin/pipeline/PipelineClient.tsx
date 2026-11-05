@@ -130,7 +130,9 @@ export function PipelineClient({ items: serverItems, now, canDelete, sender, hea
 
   /**
    * One action: show it, send it, roll back and say so if it fails, then offer
-   * Undo for six seconds.
+   * Undo for six seconds. Undo is armed before the request goes out, so a quick U
+   * takes back this action and never the one before it; the request to undo it
+   * waits for the action's own answer, which carries the id to undo.
    */
   const act = useCallback(
     async (
@@ -141,31 +143,51 @@ export function PipelineClient({ items: serverItems, now, canDelete, sender, hea
       opts: { quiet?: boolean; queueItem?: boolean } = {},
     ) => {
       const before = overrides.get(item.id);
-      setOverride(item.id, { ...before, ...patch, facts: { ...before?.facts, ...patch.facts } });
+      const applied = { ...before, ...patch, facts: { ...before?.facts, ...patch.facts } };
+      setOverride(item.id, applied);
       if (opts.queueItem) setDone((n) => n + 1);
+
       let eventId: string | undefined;
+      let answered = false;
+      let undone = false;
+      const sendUndo = () => {
+        if (!eventId || !item.ref) return;
+        postPipelineAction(item.ref, { action: "undo", event_id: eventId })
+          .then(() => router.refresh())
+          .catch((err: unknown) => {
+            setOverride(item.id, applied);
+            if (opts.queueItem) setDone((n) => n + 1);
+            toast.error(err instanceof PipelineApiError ? err.message : "Could not undo.");
+          });
+      };
+      const undo = () => {
+        if (undone) return;
+        undone = true;
+        if (undoRef.current?.run === undo) undoRef.current = null;
+        setOverride(item.id, before);
+        if (opts.queueItem) setDone((n) => n - 1);
+        if (answered) sendUndo();
+      };
+      undoRef.current = opts.quiet ? null : { run: undo, until: Date.now() + UNDO_MS };
+
       try {
         ({ event_id: eventId } = await request());
       } catch (err) {
+        if (undoRef.current?.run === undo) undoRef.current = null;
+        // Taken back already, and it never happened: nothing left to say.
+        if (undone) return;
         setOverride(item.id, before);
         if (opts.queueItem) setDone((n) => n - 1);
         toast.error(err instanceof PipelineApiError ? err.message : "That didn't work. Try again.");
         return;
       }
+      answered = true;
+      if (undone) {
+        sendUndo();
+        return;
+      }
       if (opts.quiet || !eventId || !item.ref) return;
-      const ref = item.ref;
-      const undo = () => {
-        undoRef.current = null;
-        setOverride(item.id, before);
-        if (opts.queueItem) setDone((n) => n - 1);
-        postPipelineAction(ref, { action: "undo", event_id: eventId })
-          .then(() => router.refresh())
-          .catch((err: unknown) => {
-            setOverride(item.id, { ...before, ...patch, facts: { ...before?.facts, ...patch.facts } });
-            toast.error(err instanceof PipelineApiError ? err.message : "Could not undo.");
-          });
-      };
-      undoRef.current = { run: undo, until: Date.now() + UNDO_MS };
+      if (undoRef.current?.run === undo) undoRef.current.until = Date.now() + UNDO_MS;
       toast(message, { duration: UNDO_MS, action: { label: "Undo", onClick: undo } });
     },
     [overrides, router, setOverride],
@@ -174,6 +196,8 @@ export function PipelineClient({ items: serverItems, now, canDelete, sender, hea
   const handlers: PipelineHandlers = useMemo(
     () => ({
       open: async (item, text) => {
+        // A send is on its way: a quick U mustn't reach back to the action before it.
+        undoRef.current = null;
         const wantsLink = needsClaimLink(text);
         if (!wantsLink) {
           const href = outreachWhatsappUrl(text, item.phone);
