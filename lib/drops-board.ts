@@ -18,6 +18,7 @@ import type {
 } from "@prisma/client";
 
 import type { EffectiveDropStatus, OrderDisplayState } from "@/lib/drops";
+import { issueOffersRefund, type PaymentIssue } from "@/lib/payment-issue";
 
 export const ORDER_DISPLAY_STATES: readonly OrderDisplayState[] = [
   "AWAITING_PAYMENT",
@@ -81,6 +82,10 @@ export type BoardOrder = {
   buyerReceivedAt?: string | null;
   /** The buyer's rating of this order; staff-only, the comment included. */
   feedback?: { rating: number; comment: string | null } | null;
+  /** A Razorpay payment waiting for the seller's answer (lib/payment-issue.ts); absent or null = none. */
+  paymentIssue?: PaymentIssue | null;
+  /** Paid through Razorpay, so cancelling refunds it there. Never the payment id itself. */
+  refundableOnline?: boolean;
   displayState: OrderDisplayState;
   holdsStock: boolean;
   bucket: BoardBucket;
@@ -130,8 +135,11 @@ export function isAwaitingOnlinePay(o: {
 export function boardBucket(o: {
   displayState: OrderDisplayState;
   fulfilmentStatus: FulfilmentStatus | null;
+  paymentIssue?: PaymentIssue | null;
   onlineStore?: boolean;
 }): BoardBucket {
+  // Razorpay has the money, whatever became of the order: even a cancelled one needs an answer.
+  if (o.paymentIssue) return "needs_action";
   if (isAwaitingOnlinePay({ ...o, onlineStore: o.onlineStore ?? false })) return "awaiting_online";
   switch (o.displayState) {
     case "CANCELLED":
@@ -331,6 +339,8 @@ export const ORDER_ACTIONS = [
   "dispatch",
   "deliver",
   "undeliver",
+  "refund_payment_issue",
+  "keep_payment_issue",
 ] as const;
 export type OrderAction = (typeof ORDER_ACTIONS)[number];
 
@@ -341,6 +351,8 @@ const FROZEN_ALLOWED: ReadonlySet<OrderAction> = new Set<OrderAction>([
   "dispatch",
   "deliver",
   "undeliver",
+  "refund_payment_issue",
+  "keep_payment_issue",
 ]);
 
 export type ActionCheck = { ok: true } | { ok: false; error: "drop_frozen" | "invalid_state" };
@@ -360,11 +372,14 @@ export function checkOrderAction(
     fulfilmentStatus: FulfilmentStatus | null;
     paymentStatus: PaymentStatus;
     fulfilmentType?: FulfilmentType | null;
+    paymentIssue?: PaymentIssue | null;
     /** `isAwaitingOnlinePay`: only cancel applies, so nothing holds its stock for good. */
     awaitingOnlinePay?: boolean;
   },
 ): ActionCheck {
-  if ((dropStatus === "FROZEN" || dropStatus === "FULFILLED") && !FROZEN_ALLOWED.has(action)) {
+  // A late payment that oversold a locked list can still come off it: that is the seller's answer.
+  const lateCancel = action === "cancel" && o.paymentIssue === "paid_late_oversold";
+  if ((dropStatus === "FROZEN" || dropStatus === "FULFILLED") && !FROZEN_ALLOWED.has(action) && !lateCancel) {
     return { ok: false, error: "drop_frozen" };
   }
   if (o.awaitingOnlinePay && action !== "cancel") return { ok: false, error: "invalid_state" };
@@ -387,6 +402,10 @@ export function checkOrderAction(
         return fs === "PLACED" || fs === "CONFIRMED";
       case "undeliver":
         return fs === "DELIVERED";
+      case "refund_payment_issue":
+        return issueOffersRefund(o.paymentIssue);
+      case "keep_payment_issue":
+        return !!o.paymentIssue;
     }
   })();
   return ok ? { ok: true } : { ok: false, error: "invalid_state" };
@@ -411,6 +430,7 @@ export function availableOrderActions(
     displayState?: OrderDisplayState;
     fulfilmentType?: FulfilmentType | null;
     outForDeliveryAt?: string | null;
+    paymentIssue?: PaymentIssue | null;
     bucket?: BoardBucket;
   },
   frozen: boolean,
@@ -430,7 +450,9 @@ export function availableOrderActions(
   if (live && o.fulfilmentType === "DELIVERY" && !o.outForDeliveryAt) out.add("dispatch");
   if (live) out.add("deliver");
   if (fs === "DELIVERED") out.add("undeliver");
-  if (live && !frozen) out.add("cancel");
+  if (live && (!frozen || o.paymentIssue === "paid_late_oversold")) out.add("cancel");
+  if (issueOffersRefund(o.paymentIssue)) out.add("refund_payment_issue");
+  if (o.paymentIssue) out.add("keep_payment_issue");
   return out;
 }
 

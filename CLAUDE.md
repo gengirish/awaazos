@@ -434,8 +434,22 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   A store with Razorpay shows only "Pay online" on the order page: UPI and "Payment done?" stay hidden (`OnlinePayFlow`,
   `lib/storefront-direct-pay.ts`) until Razorpay fails, its window is closed or the seller answered "Not received", and
   never on `payment_processing`, so nobody is invited to pay twice. Closing Razorpay's window only leaves a quiet "Pay by UPI instead" link. Razorpay counts as a way to pay, so such a store needs no UPI ID (`payment.online`, `hasPaymentMethod`). Checkout sends a Razorpay order to the order page with `?pay=1`, which opens the window once and strips the param (`orderPagePath`).
+  Checkout closes when the hold ends (`holdSecondsLeft` → its `timeout`).
+- **Payments that land where they shouldn't** (`lib/payment-issue.ts` pure, `lib/storefront-payment-issue.ts`): verify and both
+  webhooks go through `applyRazorpayCapture`, one transaction under the drop's row lock. A capture on a cancelled order
+  (`paid_after_cancel`), another payment on a paid one (`paid_twice`; the same payment id through either event or verify is
+  not), or a late payment that oversells a capped drop item (`paid_late_oversold`; the order stays paid) sets
+  `Transaction.paymentIssue`, pushes bill number and amount, and keeps the order in Needs action until a MANAGER answers,
+  even if cancelled. The payment id stays after the answer so a Razorpay retry can't raise it again.
+- **Refunds** (`lib/storefront-order-refund.ts`, `refundPaymentViaRazorpay`): the store's own Razorpay, MANAGER and up (403
+  `manager_required`). Cancelling a Razorpay-paid order refunds first, outside the database transaction, then
+  `cancelOrder` records `razorpayRefundId`. Razorpay's idempotency key is `receipt` and a repeat answers 400, so existing
+  refunds are read before posting and again after a duplicate, timeout or 5xx: never two refunds. If Razorpay refuses
+  (409 `refund_failed` + `reason`), the order stays paid and live; the dialog then offers `refund: "manual"`, which is the old
+  cancel and says the seller must refund. An order marked paid by hand has no payment id and keeps the old cancel.
+  Refunding a flagged second payment never touches `DailySummary`: it was never credited.
 - **A Razorpay store's seller hears about paid orders** (`lib/storefront-online-paid.ts`). Placing a UPI order there
-  only moves the board signal; verify or the webhook, whichever wins `markOrderPaid`, sends the one "New paid order" push.
+  only moves the board signal; verify or the webhook, whichever wins `markOrderPaid`, sends the one "New paid order" push (a flagged payment sends its issue push instead).
   On the board a new order the buyer hasn't paid (`isAwaitingOnlinePay`) is bucket `awaiting_online`: listed under All
   only, not in the summary, no chime, Cancel its only action (`checkOrderAction` agrees, so a stale board can't make it
   hold stock for good). Stock and prep sheets still count it. A claim or an expired hold puts it back on the normal

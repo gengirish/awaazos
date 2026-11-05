@@ -135,3 +135,18 @@ export async function getVendorReferral(
     select: { id: true, referredByVendorId: true, trialEndsAt: true },
   });
 }
+
+/** Put a storefront order in a state only a real Razorpay payment reaches. Same guard. */
+export async function setOrderPayment(
+  orderId: string,
+  data: {
+    paymentStatus?: "PAID" | "PENDING";
+    fulfilmentStatus?: "CONFIRMED" | "CANCELLED";
+    razorpayPaymentId?: string | null;
+    paymentIssue?: "paid_after_cancel" | "paid_late_oversold" | "paid_twice" | null;
+    paymentIssuePaymentId?: string | null;
+  },
+): Promise<void> {
+  const res = await db().transaction.updateMany({ where: { id: orderId }, data });
+  if (res.count !== 1) throw new Error(`setOrderPayment: no order ${orderId}`);
+}

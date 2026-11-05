@@ -31,6 +31,7 @@ vi.mock("@/lib/rbac", () => {
   }
   return {
     AuthError,
+    staffRoleAtLeast: () => true,
     requireVendorRole: vi.fn(async () => {
       if (!auth.vendor) throw new AuthError(401, "Unauthorized");
       return { user: {}, staff: { role: "OWNER" }, vendor: auth.vendor, setVendorCookie: null };

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { orderHoldsStock } from "@/lib/drops";
+import { orderHoldsStock, PENDING_HOLD_MINUTES } from "@/lib/drops";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
 import { classifyRazorpayRefusal, clearRazorpayIssue, recordRazorpayIssue } from "@/lib/razorpay-issue";
@@ -161,6 +161,11 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         currency: "INR",
         name: order.vendor.name,
         billNumber: order.billNumber,
+        // Checkout closes when the hold ends. A confirmed order keeps its stock: no deadline.
+        holdSecondsLeft:
+          order.fulfilmentStatus === "PLACED"
+            ? Math.ceil((order.createdAt.getTime() + PENDING_HOLD_MINUTES * 60_000 - now.getTime()) / 1000)
+            : null,
       },
     });
   } catch (e) {

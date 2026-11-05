@@ -22,6 +22,7 @@ import {
   type EffectiveDropStatus,
 } from "@/lib/drops";
 import { BOARD_MAX_ORDERS, menuBoardWindowStart } from "@/lib/menu-orders-board";
+import { parsePaymentIssue } from "@/lib/payment-issue";
 import { prisma } from "@/lib/prisma";
 import { ONLINE_PAYMENT_VENDOR_SELECT, vendorTakesOnlinePayment } from "@/lib/storefront-razorpay";
 
@@ -42,6 +43,7 @@ export const boardOrderSelect = {
   paymentClaimedAt: true,
   paymentProofUrl: true,
   razorpayPaymentId: true,
+  paymentIssue: true,
   subtotalPaise: true,
   discountPaise: true,
   offerName: true,
@@ -67,6 +69,7 @@ export type BoardOrderRow = Prisma.TransactionGetPayload<{ select: typeof boardO
 
 export function toBoardOrder(row: BoardOrderRow, now: Date = new Date()): BoardOrder {
   const displayState = orderDisplayState(row, now);
+  const paymentIssue = parsePaymentIssue(row.paymentIssue);
   return {
     id: row.id,
     dropId: row.dropId,
@@ -100,11 +103,14 @@ export function toBoardOrder(row: BoardOrderRow, now: Date = new Date()): BoardO
       : null,
     buyerReceivedAt: row.buyerReceivedAt?.toISOString() ?? null,
     feedback: row.feedback,
+    paymentIssue,
+    refundableOnline: row.paymentStatus === "PAID" && row.razorpayPaymentId !== null,
     displayState,
     holdsStock: orderHoldsStock(row, now),
     bucket: boardBucket({
       displayState,
       fulfilmentStatus: row.fulfilmentStatus,
+      paymentIssue,
       onlineStore: vendorTakesOnlinePayment(row.vendor, now),
     }),
     items: row.orderItems,
@@ -218,7 +224,8 @@ function currentDropWhere(now: Date): Prisma.DropWhereInput {
  *   - placed in the last MENU_BOARD_WINDOW_DAYS IST days, or
  *   - older but still open (PLACED / CONFIRMED) and holding stock — i.e. they
  *     still need the vendor, or
- *   - part of a current drop (see `currentDropWhere`), or of `pinDropId`.
+ *   - part of a current drop (see `currentDropWhere`), or of `pinDropId`, or
+ *   - carrying a payment issue, which stays until the seller answers it.
  * Old expired unpaid UPI orders fall off rather than pile up.
  */
 export function ordersBoardWhere(
@@ -234,6 +241,7 @@ export function ordersBoardWhere(
       { createdAt: { gte: menuBoardWindowStart(now) } },
       { AND: [{ fulfilmentStatus: { in: ["PLACED", "CONFIRMED"] } }, stockHoldingOrderWhere(now)] },
       { drop: currentDropWhere(now) },
+      { paymentIssue: { not: null } },
       ...(pinDropId ? [{ dropId: pinDropId }] : []),
     ],
   };

@@ -18,6 +18,7 @@
 import crypto from "node:crypto";
 
 import { PLAN_LIMITS } from "@/lib/constants";
+import type { RefundFailure } from "@/lib/payment-issue";
 import { effectivePlan, type PlanFields } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import {
@@ -367,6 +368,128 @@ export async function fetchRazorpayOrder(creds: RazorpayCreds, orderId: string):
   return parseOrder(await rzFetchJson(creds, `/orders/${orderId}`, "orders.fetch"));
 }
 
+// ─── Refunds ────────────────────────────────────────────────────────
+
+export class RazorpayRefundError extends Error {
+  constructor(public readonly reason: RefundFailure) {
+    super(`Razorpay refund failed: ${reason}`);
+    this.name = "RazorpayRefundError";
+  }
+}
+
+type RefundRow = { id: string; amount: number; status: string; receipt: string | null };
+
+function parseRefund(json: unknown): RefundRow | null {
+  const r = (json ?? {}) as Record<string, unknown>;
+  if (typeof r.id !== "string" || typeof r.amount !== "number") return null;
+  return {
+    id: r.id,
+    amount: r.amount,
+    status: typeof r.status === "string" ? r.status : "pending",
+    receipt: typeof r.receipt === "string" ? r.receipt : null,
+  };
+}
+
+/** GET /v1/payments/:id/refunds. 5xx or a timeout is "unavailable", anything else "refused". */
+async function listRefunds(creds: RazorpayCreds, paymentId: string): Promise<RefundRow[]> {
+  let res: { status: number; json: unknown };
+  try {
+    res = await rzRequest(creds, `/payments/${paymentId}/refunds?count=100`, "refunds.list", { method: "GET" }, true);
+  } catch {
+    throw new RazorpayRefundError("unavailable");
+  }
+  if (res.status >= 500) throw new RazorpayRefundError("unavailable");
+  if (res.status < 200 || res.status >= 300) throw new RazorpayRefundError("refused");
+  const items = ((res.json ?? {}) as { items?: unknown }).items;
+  return Array.isArray(items) ? items.flatMap((i) => parseRefund(i) ?? []) : [];
+}
+
+/** The newest refund, once refunds that haven't failed cover `amountPaise`. */
+function coveringRefund(refunds: RefundRow[], amountPaise: number): RefundRow | null {
+  const live = refunds.filter((r) => r.status !== "failed");
+  const total = live.reduce((sum, r) => sum + r.amount, 0);
+  return total >= amountPaise ? (live[0] ?? null) : null;
+}
+
+/**
+ * Refund a payment as the vendor, up to `amountPaise` in total. A normal refund
+ * comes out of the vendor's own Razorpay balance. Throws RazorpayRefundError when
+ * no refund was made.
+ *
+ * Never refunds twice. Razorpay has no idempotency header for this call: `receipt`
+ * is its idempotency key, and a repeat answers 400 rather than returning the first
+ * refund. So existing refunds are read first (including one the seller made on the
+ * dashboard), and after a duplicate, a timeout or a 5xx they are read again. A failed
+ * refund uses up its receipt, so a retry after one takes a numbered receipt.
+ */
+export async function refundPaymentViaRazorpay(args: {
+  creds: RazorpayCreds;
+  paymentId: string;
+  amountPaise: number;
+  receipt: string;
+  notes: { transactionId: string };
+}): Promise<{ refundId: string; alreadyRefunded: boolean }> {
+  const { creds, paymentId, amountPaise } = args;
+  if (!/^pay_[A-Za-z0-9]{6,40}$/.test(paymentId) || !Number.isInteger(amountPaise) || amountPaise <= 0) {
+    throw new RazorpayRefundError("refused");
+  }
+
+  const refunds = await listRefunds(creds, paymentId);
+  const existing = coveringRefund(refunds, amountPaise);
+  if (existing) return { refundId: existing.id, alreadyRefunded: true };
+
+  const refunded = refunds.filter((r) => r.status !== "failed").reduce((sum, r) => sum + r.amount, 0);
+  const failedTries = refunds.filter((r) => r.status === "failed" && r.receipt?.startsWith(args.receipt)).length;
+  const receipt = failedTries > 0 ? `${args.receipt}-${failedTries}` : args.receipt;
+
+  const findExisting = async (): Promise<{ refundId: string; alreadyRefunded: boolean } | null> => {
+    const found = coveringRefund(await listRefunds(creds, paymentId), amountPaise);
+    return found ? { refundId: found.id, alreadyRefunded: true } : null;
+  };
+
+  let res: { status: number; json: unknown };
+  try {
+    res = await rzRequest(
+      creds,
+      `/payments/${paymentId}/refund`,
+      "payments.refund",
+      { method: "POST", body: { amount: amountPaise - refunded, receipt, notes: args.notes } },
+      true,
+      true,
+    );
+  } catch {
+    // The request may have reached Razorpay: only its record can say.
+    const found = await findExisting();
+    if (found) return found;
+    throw new RazorpayRefundError("unavailable");
+  }
+
+  if (res.status >= 200 && res.status < 300) {
+    const created = parseRefund(res.json);
+    if (created && created.status !== "failed") return { refundId: created.id, alreadyRefunded: false };
+    if (!created) {
+      const found = await findExisting();
+      if (found) return found;
+    }
+    throw new RazorpayRefundError("refused");
+  }
+  if (res.status >= 500) {
+    const found = await findExisting();
+    if (found) return found;
+    throw new RazorpayRefundError("unavailable");
+  }
+  // Matched only to pick a reason. The text may echo request fields, so it is never kept.
+  const description = String(
+    ((res.json ?? {}) as { error?: { description?: unknown } }).error?.description ?? "",
+  ).toLowerCase();
+  if (description.includes("balance")) throw new RazorpayRefundError("insufficient_balance");
+  if (description.includes("duplicate receipt") || description.includes("already")) {
+    const found = await findExisting();
+    if (found) return found;
+  }
+  throw new RazorpayRefundError("refused");
+}
+
 /**
  * Confirm a key pair works before saving it: GET /v1/orders?count=1.
  * Returns false when Razorpay rejects the keys (401/403); throws on network
@@ -397,6 +520,7 @@ async function rzRequest(
   op: string,
   init: { method: "GET" | "POST"; body?: unknown },
   readBody: boolean,
+  readErrorBody = false,
 ): Promise<{ status: number; json: unknown }> {
   const controller = new AbortController();
   const authorization =
@@ -415,7 +539,7 @@ async function rzRequest(
       cache: "no-store",
     });
     const ok = res.status >= 200 && res.status < 300;
-    const json: unknown = readBody && ok ? await res.json() : null;
+    const json: unknown = readBody && ok ? await res.json() : readErrorBody ? await res.json().catch(() => null) : null;
     return { status: res.status, json };
   };
   try {

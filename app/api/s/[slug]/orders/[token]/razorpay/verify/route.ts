@@ -1,10 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
-import { markOrderPaid } from "@/lib/drops";
 import { prisma } from "@/lib/prisma";
 import { alertSellerOnlinePaid } from "@/lib/storefront-online-paid";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
+import { applyRazorpayCapture } from "@/lib/storefront-payment-issue";
 import {
   fetchRazorpayOrder,
   findStorefrontOrderForPayment,
@@ -24,8 +24,8 @@ export const runtime = "nodejs";
  * the VENDOR's key secret, so only Razorpay could have produced it. With "Connect
  * Razorpay" (OAuth) we hold no secret that signs it, so instead the order is
  * fetched from Razorpay as the vendor and must be `paid` for the full amount.
- * Both checks run before any write. Then `markOrderPaid` (idempotent; credits
- * DailySummary once).
+ * Both checks run before any write. Then `applyRazorpayCapture` (idempotent;
+ * credits DailySummary once, and flags a payment that landed where it shouldn't).
  *
  * The webhooks (per-vendor app/api/webhooks/razorpay-orders/[vendorId], or the
  * partner app/api/webhooks/razorpay-partner for connected stores) do the same
@@ -96,28 +96,23 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
       }
     }
 
-    if (order.paymentStatus === "PAID") {
-      return NextResponse.json({ data: { paid: true } });
-    }
-
-    const marked = await prisma.$transaction((tx) =>
-      markOrderPaid(tx, {
-        vendorId: order.vendorId,
-        transactionId: order.id,
-        razorpayOrderId: orderId,
-        razorpayPaymentId: paymentId,
-      }),
-    );
+    const { marked, issue } = await applyRazorpayCapture({
+      vendorId: order.vendorId,
+      transactionId: order.id,
+      razorpayOrderId: orderId,
+      razorpayPaymentId: paymentId,
+    });
     if (marked) {
-      await alertSellerOnlinePaid(order.vendorId, order.id);
+      // A flagged payment has already sent its own alert: one push per payment.
+      if (!issue) await alertSellerOnlinePaid(order.vendorId, order.id);
       console.info(
         JSON.stringify({ event: "storefront_rzp_paid", via: "checkout", vendorId: order.vendorId, transactionId: order.id }),
       );
       return NextResponse.json({ data: { paid: true } });
     }
 
-    // Lost a race with the webhook (fine) — or the order was cancelled while the
-    // buyer was paying, in which case the vendor must refund from her dashboard.
+    // Lost a race with the webhook (fine), or the order was cancelled while the
+    // buyer was paying: applyRazorpayCapture has put that on the seller's board.
     const current = await prisma.transaction.findFirst({
       where: { id: order.id, vendorId: order.vendorId },
       select: { paymentStatus: true },

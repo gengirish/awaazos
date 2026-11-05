@@ -8,7 +8,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   findFirst: vi.fn(),
   $transaction: vi.fn(),
-  markOrderPaid: vi.fn(),
+  applyRazorpayCapture: vi.fn(),
   bumpOrderSignal: vi.fn(),
   notifyVendorInBackground: vi.fn(),
 }));
@@ -16,7 +16,7 @@ const mocks = vi.hoisted(() => ({
 vi.mock("@/lib/prisma", () => ({
   prisma: { transaction: { findFirst: mocks.findFirst }, $transaction: mocks.$transaction },
 }));
-vi.mock("@/lib/drops", () => ({ markOrderPaid: mocks.markOrderPaid }));
+vi.mock("@/lib/storefront-payment-issue", () => ({ applyRazorpayCapture: mocks.applyRazorpayCapture }));
 vi.mock("@/lib/drops-signal", () => ({ bumpOrderSignal: mocks.bumpOrderSignal }));
 vi.mock("@/lib/push", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/push")>()),
@@ -78,23 +78,23 @@ describe("alertSellerOnlinePaid", () => {
 describe("the webhook alerts once", () => {
   it("when it wins markOrderPaid", async () => {
     mocks.findFirst.mockResolvedValueOnce(WEBHOOK_ROW).mockResolvedValueOnce(ALERT_ROW);
-    mocks.markOrderPaid.mockResolvedValue(true);
+    mocks.applyRazorpayCapture.mockResolvedValue({ marked: true, issue: null });
     await expect(applyRazorpayPaymentEvent(EVENT, SCOPE, "webhook")).resolves.toBe("ack");
     expect(mocks.notifyVendorInBackground).toHaveBeenCalledOnce();
   });
 
   it("not when verify got there first", async () => {
     mocks.findFirst.mockResolvedValueOnce(WEBHOOK_ROW);
-    mocks.markOrderPaid.mockResolvedValue(false);
+    mocks.applyRazorpayCapture.mockResolvedValue({ marked: false, issue: null });
     await expect(applyRazorpayPaymentEvent(EVENT, SCOPE, "webhook")).resolves.toBe("ack");
     expect(mocks.notifyVendorInBackground).not.toHaveBeenCalled();
     expect(mocks.bumpOrderSignal).not.toHaveBeenCalled();
   });
 
-  it("not on a repeat delivery of an order already paid", async () => {
-    mocks.findFirst.mockResolvedValueOnce({ ...WEBHOOK_ROW, paymentStatus: "PAID" });
+  it("not when the payment was flagged: that sends its own alert", async () => {
+    mocks.findFirst.mockResolvedValueOnce(WEBHOOK_ROW);
+    mocks.applyRazorpayCapture.mockResolvedValue({ marked: true, issue: "paid_late_oversold" });
     await expect(applyRazorpayPaymentEvent(EVENT, SCOPE, "webhook")).resolves.toBe("ack");
-    expect(mocks.markOrderPaid).not.toHaveBeenCalled();
     expect(mocks.notifyVendorInBackground).not.toHaveBeenCalled();
   });
 
