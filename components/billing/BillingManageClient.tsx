@@ -113,7 +113,7 @@ export function BillingManageClient({
   customPricePaise: number | null;
 }) {
   const [plan, setPlan] = useState<SubscribablePlan | null>(initialPlan);
-  const [interval, setInterval] = useState<BillingInterval>(initialInterval);
+  const [interval, setBillingInterval] = useState<BillingInterval>(initialInterval);
   const [pending, setPending] = useState<null | "cancel" | Pending>(null);
   const [message, setMessage] = useState<Message | null>(null);
 
@@ -290,7 +290,7 @@ export function BillingManageClient({
                   name="billing-interval"
                   value={i}
                   checked={i === interval}
-                  onChange={() => setInterval(i)}
+                  onChange={() => setBillingInterval(i)}
                   label={INTERVAL_CHOICE[i]}
                 />
               ))}
