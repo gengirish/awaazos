@@ -2,7 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { DropForm } from "@/components/drops/DropForm";
-import { defaultCutoffFor, istTomorrowYmd } from "@/lib/drops-builder";
+import { defaultCutoffFor, istTomorrowYmd, lastDropDefaults } from "@/lib/drops-builder";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
@@ -26,16 +26,27 @@ export default async function NewDropPage() {
     throw e;
   }
 
-  const [menuItems, settings] = await Promise.all([
+  const [menuItems, settings, lastDrop] = await Promise.all([
     prisma.menuItem.findMany({
       where: { vendorId },
       orderBy: { sortOrder: "asc" },
       select: { id: true, name: true, emoji: true, priceInPaise: true, isAvailable: true },
     }),
     prisma.vendorSettings.findUnique({ where: { vendorId }, select: { voiceLang: true, publishStorefront: true } }),
+    prisma.drop.findFirst({
+      where: { vendorId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        fulfilmentMode: true,
+        fulfilmentStartsAt: true,
+        fulfilmentEndsAt: true,
+        pickupNote: true,
+        deliveryFeePaise: true,
+      },
+    }),
   ]);
 
-  // Sensible default: cook tomorrow 5–8 pm, orders close the evening before at
+  // Sensible default: cook tomorrow, handover as last time (else 5–8 pm), orders close the evening before at
   // 9 pm — or the cooking-day morning if that evening is already (nearly) gone.
   // DropForm moves the cut-off along when the vendor changes the cooking day.
   const now = new Date();
@@ -50,6 +61,7 @@ export default async function NewDropPage() {
     fulfilmentEnd: "20:00",
     pickupNote: null,
     deliveryFeePaise: 0,
+    ...(lastDrop ? lastDropDefaults(lastDrop) : {}),
     opensAtDate: null,
     opensAtTime: null,
     closesAtDate: cutoff.closesAtDate,

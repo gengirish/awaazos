@@ -114,6 +114,7 @@ test.describe("voice drop builder", () => {
 
     // Tap fallback untouched before voice: default delivery, nothing selected.
     await expect(page.getByRole("radio", { name: "Delivery" })).toBeChecked();
+    await page.getByText("More options").click();
     const titleBefore = await page.getByLabel("Title").inputValue();
 
     await mic.click();
@@ -172,7 +173,7 @@ test.describe("voice drop builder", () => {
     await expect(panel.getByText("Filled 7 fields and 2 dishes — check and save")).toBeVisible();
     expect(page.url()).toMatch(/\/drops\/new$/);
 
-    await page.getByRole("button", { name: "Create drop" }).click();
+    await page.getByRole("button", { name: "Save draft" }).click();
     await page.waitForURL(/\/drops\/[^/]+\/edit$/, { timeout: 120_000 });
     const dropId = new URL(page.url()).pathname.split("/")[2];
 
@@ -226,6 +227,7 @@ test.describe("voice drop builder", () => {
     await expect(panel.getByRole("button", { name: "Undo voice changes" })).toHaveCount(0);
 
     // Tap fallback: the form is untouched and usable.
+    await page.getByText("More options").click();
     await page.getByLabel("Title").fill("Typed by hand");
     await page.getByRole("checkbox", { name: new RegExp(menu.laddu.name) }).check();
     await expect(page.getByRole("checkbox", { name: new RegExp(menu.laddu.name) })).toBeChecked();

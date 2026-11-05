@@ -12,6 +12,7 @@ import {
   groupDropsByDay,
   istTodayYmd,
   istTomorrowYmd,
+  lastDropDefaults,
   planDropItemRemoval,
   shiftDropSchedule,
   shiftOrderWindowDates,
@@ -174,6 +175,26 @@ describe("duplicateDropFields (copy for tomorrow)", () => {
     expect(out.date.toISOString()).toBe("2026-10-06T00:00:00.000Z");
     expect(out.closesAt).toEqual(istToUtc("2026-10-05", "21:00"));
     expect(Object.keys(out)).not.toContain("status");
+  });
+});
+
+describe("lastDropDefaults", () => {
+  it("keeps how and when buyers got the last drop, in IST", () => {
+    expect(
+      lastDropDefaults({
+        fulfilmentMode: "BOTH",
+        fulfilmentStartsAt: istToUtc("2026-10-10", "18:30"),
+        fulfilmentEndsAt: istToUtc("2026-10-10", "21:00"),
+        pickupNote: "Gate 2",
+        deliveryFeePaise: 3000,
+      }),
+    ).toEqual({
+      fulfilmentMode: "BOTH",
+      fulfilmentStart: "18:30",
+      fulfilmentEnd: "21:00",
+      pickupNote: "Gate 2",
+      deliveryFeePaise: 3000,
+    });
   });
 });
 

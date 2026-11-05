@@ -738,14 +738,10 @@ erDiagram
 stateDiagram-v2
     [*] --> DRAFT
     DRAFT --> OPEN: Open orders (needs publishStorefront + a payment method)
-    OPEN --> DRAFT
     OPEN --> CLOSED: Close now
-    OPEN --> FROZEN
     CLOSED --> OPEN: Reopen (cut-off moved forward)
-    CLOSED --> FROZEN: Lock orders (final cook list)
-    FROZEN --> CLOSED: Unfreeze
-    FROZEN --> FULFILLED
-    FULFILLED --> [*]
+    FROZEN --> CLOSED: Unlock (older rows only)
+    CLOSED --> [*]
 
     state OPEN {
         SCHEDULED: SCHEDULED (computed, now before opensAt)
@@ -756,7 +752,7 @@ stateDiagram-v2
     }
 ```
 
-Only the vendor moves the **stored** status (`ALLOWED_TRANSITIONS` in `lib/drops.ts`). Time-based states are computed on every read by `effectiveDropStatus()` and never written: a stored-OPEN drop shows as SCHEDULED before `opensAt` and as CLOSED after `closesAt`. Transitions are checked against the *effective* status, so an OPEN drop past its cut-off can be frozen directly. FROZEN locks confirm/cancel; payment and handover actions still work.
+Only the vendor moves the **stored** status (`ALLOWED_TRANSITIONS` in `lib/drops.ts`). Time-based states are computed on every read by `effectiveDropStatus()` and never written: a stored-OPEN drop shows as SCHEDULED before `opensAt` and as CLOSED after `closesAt`. Transitions are checked against the *effective* status, so an OPEN drop past its cut-off needs no further tap. Nothing moves a drop into FROZEN or FULFILLED any more; older rows keep those values and stay read-only. FROZEN locks confirm/cancel; payment and handover actions still work.
 
 ### Order flow
 

@@ -68,10 +68,10 @@ describe("canTransition", () => {
   const all: DropStatus[] = ["DRAFT", "OPEN", "CLOSED", "FROZEN", "FULFILLED"];
   const allowed: Record<EffectiveDropStatus, DropStatus[]> = {
     DRAFT: ["OPEN"],
-    OPEN: ["CLOSED", "FROZEN", "DRAFT"],
-    SCHEDULED: ["CLOSED", "FROZEN", "DRAFT"], // a scheduled drop is stored OPEN
-    CLOSED: ["OPEN", "FROZEN"],
-    FROZEN: ["FULFILLED", "CLOSED"],
+    OPEN: ["CLOSED"],
+    SCHEDULED: ["CLOSED"], // a scheduled drop is stored OPEN
+    CLOSED: ["OPEN"],
+    FROZEN: ["CLOSED"], // older rows only: nothing moves a drop into FROZEN now
     FULFILLED: [],
   };
 
@@ -89,7 +89,7 @@ describe("canTransition", () => {
     const eff = effectiveDropStatus(d, new Date(T0.getTime() + MIN));
     expect(eff).toBe("CLOSED");
     expect(canTransition(eff, "OPEN")).toBe(true); // reopen (caller moves closesAt)
-    expect(canTransition(eff, "FROZEN")).toBe(true);
+    expect(canTransition(eff, "FROZEN")).toBe(false);
     expect(canTransition(eff, "DRAFT")).toBe(false); // can't un-publish once orders could exist
   });
 });

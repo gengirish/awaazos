@@ -202,11 +202,21 @@ export type DropFormProps = {
   voiceLang?: string;
   /** Owners can publish the store while opening orders, and get the billing link when voice is paused. */
   isOwner?: boolean;
-  /** Create only: what "Save and open orders" needs to ask an owner about a private store first. */
+  /** A new drop or a draft: what "Open orders" needs to ask an owner about a private store first. Absent = no such button. */
   openFlow?: { storePublished: boolean; storePath: string };
   /** The store's words for its catalogue (lib/store-vocabulary.ts). */
   vocab: StoreVocabulary;
 };
+
+/** The fields under "More options". All have a sensible default, so a seller can ignore them. */
+const MORE_OPTION_FIELDS: (keyof FormState)[] = [
+  "title",
+  "note",
+  "useOpensAt",
+  "opensAtDate",
+  "opensAtTime",
+  "showEverydayMenu",
+];
 
 const MODES: { value: FormState["fulfilmentMode"]; label: string }[] = [
   { value: "DELIVERY", label: "Delivery" },
@@ -239,6 +249,10 @@ export function DropForm({
   // Create: the drop exists from here on, so the form must not create it again.
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [askPublish, setAskPublish] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(() =>
+    Boolean(initial.note?.trim() || (initial.opensAtDate && initial.opensAtTime) || initial.showEverydayMenu),
+  );
+  const [limitShown, setLimitShown] = useState<string[]>([]);
 
   // The menu is state, not the prop: the voice panel can add a dish to it.
   const [menu, setMenu] = useState(menuItems);
@@ -337,6 +351,8 @@ export function DropForm({
     setVoiceMarks((m) => unmarkField(m, "date"));
   };
   const leadDays = cutoffLeadDays(form.date, form.closesAtDate);
+  // Never hide a field with an error, or one voice just filled in for checking.
+  const showMore = moreOpen || MORE_OPTION_FIELDS.some((k) => fieldErrors[k] || fromVoice(k));
   const setRow = (id: string, patch: Partial<Row>) => {
     setRows((r) => ({ ...r, [id]: { ...r[id], ...patch } }));
     setItemErrors((e) => (e[id] ? { ...e, [id]: "" } : e));
@@ -522,11 +538,11 @@ export function DropForm({
   const editHref = (id: string) => `/drops/${id}/edit`;
 
   /**
-   * "Save and open orders", after the drop was created. Whatever happens the
-   * cook lands on the edit page: with orders open, or with the Status
-   * checklist showing what is still missing. The server decides (409).
+   * "Open orders", after the drop was saved. Whatever happens the cook lands on
+   * the edit page: with orders open, or with the Status panel showing what is
+   * still missing. The server decides (409).
    */
-  async function openCreated(id: string, publishStore: boolean) {
+  async function openSaved(id: string, publishStore: boolean) {
     try {
       const res = await fetch(`/api/drops/${id}/status`, {
         method: "PATCH",
@@ -554,7 +570,17 @@ export function DropForm({
       toast.warning("Saved as a draft. Couldn't open orders — try again from this page.");
     }
     setAskPublish(false);
-    router.push(editHref(id));
+    showDraft(id);
+  }
+
+  /** Orders didn't open: stay on, or go to, the draft's edit page with the form usable again. */
+  function showDraft(id: string) {
+    if (dropId) {
+      setCreatedId(null);
+      router.refresh();
+    } else {
+      router.push(editHref(id));
+    }
   }
 
   function save(openAfter: boolean) {
@@ -590,21 +616,21 @@ export function DropForm({
           setFormError(conflictMessage(body, "Could not save this drop."));
           return;
         }
-        if (dropId) {
-          toast.success("Drop saved.");
-          router.refresh();
-        } else if (body.data?.id) {
-          const id = body.data.id;
-          setCreatedId(id);
-          if (!openAfter) {
-            toast.success("Draft saved. It stays hidden until you open orders.");
-            router.push(editHref(id));
-          } else if (isOwner && openFlow && !openFlow.storePublished) {
-            setAskPublish(true);
+        const id = dropId ?? body.data?.id;
+        if (!id) return;
+        if (!openAfter) {
+          toast.success(dropId ? "Drop saved." : "Draft saved. It stays hidden until you open orders.");
+          if (dropId) {
+            router.refresh();
           } else {
-            await openCreated(id, false);
+            setCreatedId(id);
+            router.push(editHref(id));
           }
+          return;
         }
+        setCreatedId(id);
+        if (isOwner && openFlow && !openFlow.storePublished) setAskPublish(true);
+        else await openSaved(id, false);
       } catch {
         setFormError("Network error — please try again.");
       }
@@ -621,7 +647,7 @@ export function DropForm({
     if (!createdId || pending) return;
     setAskPublish(false);
     toast.warning("Saved as a draft. Your store is still private, so orders aren't open.");
-    router.push(editHref(createdId));
+    showDraft(createdId);
   }
 
   const errorCount =
@@ -675,78 +701,6 @@ export function DropForm({
       ) : null}
 
       <fieldset disabled={locked || pending} className="space-y-6">
-        {/* ── Basics ── */}
-        <section aria-labelledby="drop-basics" className="space-y-4 rounded-xl border border-border bg-card p-4">
-          <div className={sectionHeadCls}>
-            <h2 id="drop-basics" className="font-display text-lg font-semibold">
-              Name and day
-            </h2>
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <label htmlFor="drop-title" className="text-sm font-medium">
-                Title
-              </label>
-              <FromVoiceBadge show={fromVoice("title")} />
-            </div>
-            <input
-              id="drop-title"
-              className={inputCls}
-              maxLength={80}
-              placeholder={vocab.dropExample}
-              value={form.title}
-              onChange={(e) => {
-                setTitleAuto(false);
-                set("title", e.target.value);
-              }}
-              {...errProps("title")}
-              aria-describedby={describedBy("title", titleAuto ? "drop-title-hint" : null)}
-            />
-            {titleAuto ? (
-              <p id="drop-title-hint" className="text-xs text-muted-foreground">
-                Named after the {vocab.makeDay.toLowerCase()}. Type your own name to change it.
-              </p>
-            ) : null}
-            {err("title")}
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <label htmlFor="drop-note" className="text-sm font-medium">
-                Note for customers <span className="font-normal text-muted-foreground">(optional)</span>
-              </label>
-              <FromVoiceBadge show={fromVoice("note")} />
-            </div>
-            <textarea
-              id="drop-note"
-              className={`${inputCls} min-h-20 py-2`}
-              maxLength={280}
-              placeholder="Fresh eggless cakes, made to order"
-              value={form.note}
-              onChange={(e) => set("note", e.target.value)}
-              {...errProps("note")}
-            />
-            {err("note")}
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <label htmlFor="drop-date" className="text-sm font-medium">
-                {vocab.makeDay}
-              </label>
-              <FromVoiceBadge show={fromVoice("date")} />
-            </div>
-            <input
-              id="drop-date"
-              type="date"
-              className={pickerCls}
-              value={form.date}
-              onChange={(e) => setCookingDate(e.target.value)}
-              {...errProps("date")}
-            />
-            <p className="text-xs text-muted-foreground">{ymdHint(form.date)}</p>
-            {err("date")}
-          </div>
-        </section>
-
         {/* ── Items ── */}
         <section aria-labelledby="drop-items" className="space-y-4 rounded-xl border border-border bg-card p-4">
           <div className={sectionHeadCls}>
@@ -830,7 +784,8 @@ export function DropForm({
                       {r.selected ? (
                         // Phones: two per row (three 85px inputs cut off "No limit"
                         // and wrap the labels unevenly). `justify-end` keeps the
-                        // inputs level if a label still wraps.
+                        // inputs level if a label still wraps. Most dishes never
+                        // need the per-order limit, so it stays one tap away.
                         <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
                           <div className="flex flex-col justify-end gap-1">
                             <label htmlFor={`price-${id}`} className="text-xs font-medium">
@@ -861,21 +816,35 @@ export function DropForm({
                               aria-describedby={itemErrors[id] ? errorId : undefined}
                             />
                           </div>
-                          <div className="flex flex-col justify-end gap-1">
-                            <label htmlFor={`limit-${id}`} className="text-xs font-medium">
-                              Max per order
-                            </label>
-                            <input
-                              id={`limit-${id}`}
-                              inputMode="numeric"
-                              placeholder="No limit"
-                              className={inputCls}
-                              value={r.perOrderLimit}
-                              onChange={(e) => setRow(id, { perOrderLimit: e.target.value })}
-                              aria-invalid={itemErrors[id] ? true : undefined}
-                              aria-describedby={itemErrors[id] ? errorId : undefined}
-                            />
-                          </div>
+                          {r.perOrderLimit !== "" || limitShown.includes(id) ? (
+                            <div className="flex flex-col justify-end gap-1">
+                              <label htmlFor={`limit-${id}`} className="text-xs font-medium">
+                                Max per order
+                              </label>
+                              <input
+                                id={`limit-${id}`}
+                                inputMode="numeric"
+                                placeholder="No limit"
+                                className={inputCls}
+                                value={r.perOrderLimit}
+                                onChange={(e) => {
+                                  // Stays on screen if the seller clears it to retype.
+                                  setLimitShown((l) => (l.includes(id) ? l : [...l, id]));
+                                  setRow(id, { perOrderLimit: e.target.value });
+                                }}
+                                aria-invalid={itemErrors[id] ? true : undefined}
+                                aria-describedby={itemErrors[id] ? errorId : undefined}
+                              />
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              className="col-span-2 inline-flex min-h-11 items-center justify-start text-sm font-medium text-primary underline underline-offset-2 sm:col-span-1 sm:self-end"
+                              onClick={() => setLimitShown((l) => [...l, id])}
+                            >
+                              Limit per order
+                            </button>
+                          )}
                         </div>
                       ) : null}
                       {itemErrors[id] ? (
@@ -895,9 +864,27 @@ export function DropForm({
         <section aria-labelledby="drop-fulfilment" className="space-y-4 rounded-xl border border-border bg-card p-4">
           <div className={sectionHeadCls}>
             <h2 id="drop-fulfilment" className="font-display text-lg font-semibold">
-              Delivery or pickup
+              When do customers get it?
             </h2>
             <FromVoiceBadge show={fromVoice("fulfilmentMode")} />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="drop-date" className="text-sm font-medium">
+                {vocab.makeDay}
+              </label>
+              <FromVoiceBadge show={fromVoice("date")} />
+            </div>
+            <input
+              id="drop-date"
+              type="date"
+              className={pickerCls}
+              value={form.date}
+              onChange={(e) => setCookingDate(e.target.value)}
+              {...errProps("date")}
+            />
+            <p className="text-xs text-muted-foreground">{ymdHint(form.date)}</p>
+            {err("date")}
           </div>
           <div role="radiogroup" aria-label={`How customers get their ${vocab.goods}`} className="grid grid-cols-3 gap-2">
             {MODES.map((m) => (
@@ -1025,7 +1012,64 @@ export function DropForm({
             {err("closesAtDate")}
             {err("closesAtTime")}
           </fieldset>
+        </section>
 
+        {/* ── Everything with a sensible default ── */}
+        <details
+          open={showMore}
+          onToggle={(e) => setMoreOpen(e.currentTarget.open)}
+          className="rounded-xl border border-border bg-card"
+        >
+          <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl p-4 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring">
+            <span className="font-display text-lg font-semibold">More options</span>
+            <span className="min-w-0 truncate text-sm text-muted-foreground">{form.title.trim()}</span>
+          </summary>
+          <div className="space-y-4 border-t border-border p-4">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="drop-title" className="text-sm font-medium">
+                Title
+              </label>
+              <FromVoiceBadge show={fromVoice("title")} />
+            </div>
+            <input
+              id="drop-title"
+              className={inputCls}
+              maxLength={80}
+              placeholder={vocab.dropExample}
+              value={form.title}
+              onChange={(e) => {
+                setTitleAuto(false);
+                set("title", e.target.value);
+              }}
+              {...errProps("title")}
+              aria-describedby={describedBy("title", titleAuto ? "drop-title-hint" : null)}
+            />
+            {titleAuto ? (
+              <p id="drop-title-hint" className="text-xs text-muted-foreground">
+                Named after the {vocab.makeDay.toLowerCase()}. Type your own name to change it.
+              </p>
+            ) : null}
+            {err("title")}
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="drop-note" className="text-sm font-medium">
+                Note for customers <span className="font-normal text-muted-foreground">(optional)</span>
+              </label>
+              <FromVoiceBadge show={fromVoice("note")} />
+            </div>
+            <textarea
+              id="drop-note"
+              className={`${inputCls} min-h-20 py-2`}
+              maxLength={280}
+              placeholder="Fresh eggless cakes, made to order"
+              value={form.note}
+              onChange={(e) => set("note", e.target.value)}
+              {...errProps("note")}
+            />
+            {err("note")}
+          </div>
           <div className="flex items-center justify-between gap-4">
             <label htmlFor="drop-opens-later" className="text-sm font-medium">
               Start taking orders later, not as soon as I open the drop
@@ -1077,7 +1121,8 @@ export function DropForm({
               aria-describedby="drop-everyday-help"
             />
           </div>
-        </section>
+          </div>
+        </details>
       </fieldset>
 
       {!locked ? (
@@ -1087,7 +1132,7 @@ export function DropForm({
               {saveAlert}
             </Notice>
           ) : null}
-          {dropId ? (
+          {!openFlow ? (
             <Button type="submit" size="lg" className="min-h-12 w-full text-base" disabled={busy}>
               {pending ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
               {pending ? "Saving…" : "Save changes"}
@@ -1096,7 +1141,7 @@ export function DropForm({
             // Enter in a field saves the draft; opening orders is always a deliberate tap.
             <div className="grid grid-cols-2 gap-2">
               <Button type="submit" variant="outline" size="lg" className="min-h-12 px-2 text-base" disabled={busy}>
-                {busy ? "Saving…" : "Create drop"}
+                {busy ? "Saving…" : "Save draft"}
               </Button>
               <Button
                 type="button"
@@ -1106,14 +1151,14 @@ export function DropForm({
                 onClick={() => save(true)}
               >
                 {busy ? <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" /> : null}
-                Save and open orders
+                Open orders
               </Button>
             </div>
           )}
         </div>
       ) : null}
 
-      {/* Create + open, private store: the owner decides before anything goes public. */}
+      {/* Open orders, private store: the owner decides before anything goes public. */}
       <ResponsiveDialog open={askPublish} onOpenChange={(o) => !o && declinePublish()}>
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
@@ -1134,7 +1179,7 @@ export function DropForm({
               className="min-h-11"
               disabled={pending}
               onClick={() => {
-                if (createdId) startTransition(() => openCreated(createdId, true));
+                if (createdId) startTransition(() => openSaved(createdId, true));
               }}
             >
               Publish store and open orders
@@ -1156,36 +1201,16 @@ type Action = {
   help?: string;
 };
 
-function actionFor(from: EffectiveDropStatus, to: DropStatus, vocab: StoreVocabulary): Action {
-  switch (to) {
-    case "OPEN":
-      return { to, label: from === "DRAFT" ? "Open orders" : "Reopen orders", variant: "default" };
-    case "CLOSED":
-      return from === "FROZEN"
-        ? {
-            to,
-            label: "Unlock orders",
-            variant: "outline",
-            help: "Lets you edit this drop again. Customers still can't order.",
-          }
-        : { to, label: "Close orders now", variant: "outline" };
-    case "FROZEN":
-      return {
+function actionFor(from: EffectiveDropStatus, to: DropStatus): Action {
+  if (to === "OPEN") return { to, label: "Reopen orders", variant: "default" };
+  return from === "FROZEN"
+    ? {
         to,
-        label: "Lock orders",
-        variant: "default",
-        help: `Stops new orders and changes, so your ${vocab.making} list is final.`,
-      };
-    case "FULFILLED":
-      return {
-        to,
-        label: "Mark done",
-        variant: "default",
-        help: "For when every order is handed over. This can't be undone.",
-      };
-    case "DRAFT":
-      return { to, label: "Back to draft", variant: "outline" };
-  }
+        label: "Unlock orders",
+        variant: "outline",
+        help: "Lets you edit this drop again. Customers still can't order.",
+      }
+    : { to, label: "Close orders now", variant: "outline" };
 }
 
 /** Toast after orders open. With a later start time the drop is visible but not yet taking orders. */
@@ -1195,33 +1220,23 @@ function openedMessage(effectiveAfter: EffectiveDropStatus | undefined): string 
 
 /** Toast for each status change, in the seller's words (never built from a button label). */
 function changedMessage(from: EffectiveDropStatus, to: DropStatus, effectiveAfter?: EffectiveDropStatus): string {
-  switch (to) {
-    case "OPEN":
-      return openedMessage(effectiveAfter);
-    case "CLOSED":
-      return from === "FROZEN" ? "Orders unlocked. You can edit this drop again." : "Orders closed.";
-    case "FROZEN":
-      return "Orders locked.";
-    case "FULFILLED":
-      return "Drop marked done.";
-    case "DRAFT":
-      return "Back to draft. Customers can't see this drop.";
-  }
+  if (to === "OPEN") return openedMessage(effectiveAfter);
+  return from === "FROZEN" ? "Orders unlocked. You can edit this drop again." : "Orders closed.";
 }
 
 function statusHelp(status: EffectiveDropStatus, vocab: StoreVocabulary): string {
   const food = vocab.kind === "food";
   switch (status) {
     case "DRAFT":
-      return `Only you can see this drop. Open orders when the ${food ? "menu" : "list"} is ready.`;
+      return `Only you can see this drop. Tap Open orders below when the ${food ? "menu" : "list"} is ready.`;
     case "SCHEDULED":
       return "Customers can see this drop. Ordering starts at the time you set.";
     case "OPEN":
       return "Customers can order now, until the cut-off time.";
     case "CLOSED":
-      return `No new orders. Lock orders when you start ${vocab.making} so nobody changes their order.`;
+      return `No new orders. Your ${vocab.making} list is final unless you reopen orders.`;
     case "FROZEN":
-      return `Orders are locked. ${food ? "Cook" : "Pack"}, deliver, then mark the drop done.`;
+      return "Orders are locked. Only payment and delivery can change.";
     case "FULFILLED":
       return "All done. Copy this drop to sell it again.";
   }
@@ -1309,13 +1324,13 @@ export function DropStatusControls({
   const router = useRouter();
   const [pending, startTransition] = useTransition();
   const [problem, setProblem] = useState<{ code: string | null; message: string } | null>(null);
-  const [confirm, setConfirm] = useState<"FROZEN" | "DELETE" | "PUBLISH" | null>(null);
+  const [confirm, setConfirm] = useState<"DELETE" | "PUBLISH" | null>(null);
 
-  // Orders just opened (here, or on the create page): the next job is telling
+  // Orders just opened (here, or from the form's Open orders button): the next job is telling
   // customers, so move to the share block once the refreshed page shows it.
-  const goToShare = useRef(justOpened);
+  const goToShare = useRef(false);
   useEffect(() => {
-    if (!goToShare.current) return;
+    if (!goToShare.current && !justOpened) return;
     if (effectiveStatus !== "OPEN" && effectiveStatus !== "SCHEDULED") return;
     goToShare.current = false;
     const share = document.getElementById(DROP_SHARE_ANCHOR);
@@ -1327,6 +1342,8 @@ export function DropStatusControls({
 
   // What opening orders needs, shown before the tap. The server's 409 still decides.
   const canOpen = allowedTransitions.includes("OPEN");
+  // A draft opens from the form's button, so what's on screen is saved first.
+  const isDraft = effectiveStatus === "DRAFT";
   const checks: OpenCheck[] = [
     itemCount > 0
       ? { key: "items", state: "ok", text: `${itemCount} ${itemCount === 1 ? "item" : "items"} added` }
@@ -1362,10 +1379,13 @@ export function DropStatusControls({
           }
         : { key: "store", state: "todo", text: `Your store is private. ${ASK_OWNER_TO_PUBLISH}` },
   ];
-  const todoCount = checks.filter((c) => c.state === "todo").length;
+  // Only what still needs the seller.
+  const openIssues = checks.filter((c) => c.state !== "ok");
+  const todoCount = openIssues.filter((c) => c.state === "todo").length;
 
-  const actions = allowedTransitions.map((to) => actionFor(effectiveStatus, to, vocab));
-  const publishLabel = `Publish store and ${actionFor(effectiveStatus, "OPEN", vocab).label.toLowerCase()}`;
+  const actions = allowedTransitions
+    .filter((to) => !(isDraft && to === "OPEN"))
+    .map((to) => actionFor(effectiveStatus, to));
 
   /** `publishStore`: the owner confirmed making the store public along with opening orders. */
   function change(to: DropStatus, publishStore = false) {
@@ -1439,11 +1459,11 @@ export function DropStatusControls({
         <p className="text-sm">While this drop is open, your everyday {vocab.catalogue} is hidden from your store.</p>
       ) : null}
 
-      {canOpen ? (
+      {canOpen && openIssues.length ? (
         <div className="space-y-1.5">
           <h3 id="drop-open-checks-title" className="text-sm font-medium">
             {todoCount === 0
-              ? "Ready to open orders"
+              ? "Before you open orders"
               : `${todoCount} ${todoCount === 1 ? "thing" : "things"} to sort out before you open orders`}
           </h3>
           <ul
@@ -1451,7 +1471,7 @@ export function DropStatusControls({
             aria-labelledby="drop-open-checks-title"
             className="divide-y divide-border rounded-md border border-border"
           >
-            {checks.map((c) => (
+            {openIssues.map((c) => (
               <OpenCheckLine key={c.key} check={c} />
             ))}
           </ul>
@@ -1469,13 +1489,15 @@ export function DropStatusControls({
                 className="min-h-11 w-full"
                 disabled={pending}
                 aria-describedby={
-                  [a.to === "OPEN" ? "drop-open-checks-title" : null, a.help ? `drop-action-${a.to}-help` : null]
+                  [
+                    a.to === "OPEN" && openIssues.length ? "drop-open-checks-title" : null,
+                    a.help ? `drop-action-${a.to}-help` : null,
+                  ]
                     .filter(Boolean)
                     .join(" ") || undefined
                 }
                 onClick={() => {
-                  if (a.to === "FROZEN") setConfirm("FROZEN");
-                  else if (a.to === "OPEN" && !storePublished && canPublishStore) setConfirm("PUBLISH");
+                  if (a.to === "OPEN" && !storePublished && canPublishStore) setConfirm("PUBLISH");
                   else change(a.to);
                 }}
               >
@@ -1515,24 +1537,18 @@ export function DropStatusControls({
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
             <ResponsiveDialogTitle>
-              {confirm === "DELETE"
-                ? "Delete this drop?"
-                : confirm === "PUBLISH"
-                  ? "Publish your store too?"
-                  : "Lock orders?"}
+              {confirm === "DELETE" ? "Delete this drop?" : "Publish your store too?"}
             </ResponsiveDialogTitle>
             <ResponsiveDialogDescription>
               {confirm === "DELETE" ? (
                 "The drop and its item list will be removed. This can't be undone."
-              ) : confirm === "PUBLISH" ? (
+              ) : (
                 <>
                   Your store page is private, so customers can&apos;t order from this drop yet. Publishing it lets
                   anyone with the link see your item names and prices at{" "}
                   <span className="break-all font-mono text-foreground">{storePath}</span>. You can make it private
                   again in Settings → Online store.
                 </>
-              ) : (
-                `Customers can no longer change orders. New orders stop too. You'll get the final ${vocab.making} and delivery list.`
               )}
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>
@@ -1547,11 +1563,10 @@ export function DropStatusControls({
               disabled={pending}
               onClick={() => {
                 if (confirm === "DELETE") remove();
-                else if (confirm === "PUBLISH") change("OPEN", true);
-                else change("FROZEN");
+                else change("OPEN", true);
               }}
             >
-              {confirm === "DELETE" ? "Delete" : confirm === "PUBLISH" ? publishLabel : "Lock orders"}
+              {confirm === "DELETE" ? "Delete" : "Publish store and reopen orders"}
             </Button>
           </ResponsiveDialogFooter>
         </ResponsiveDialogContent>
