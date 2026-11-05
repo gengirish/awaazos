@@ -18,13 +18,15 @@ type Props = {
   message: string;
   /** Button text, e.g. "Message on WhatsApp". */
   label: string;
+  /** The admin opened WhatsApp: the pipeline records it (they may still not tap send). */
+  onOpen?: () => void;
 };
 
 /**
  * An editable WhatsApp message and a button that opens the admin's own
  * WhatsApp (wa.me) with it filled in. Nothing is sent until they tap send there.
  */
-export function OutreachWhatsApp({ phone, message, label }: Props) {
+export function OutreachWhatsApp({ phone, message, label, onOpen }: Props) {
   const id = useId();
   const [text, setText] = useState(message);
   const href = outreachWhatsappUrl(text, phone);
@@ -46,7 +48,7 @@ export function OutreachWhatsApp({ phone, message, label }: Props) {
       </p>
       {href ? (
         <Button asChild className="bg-success text-success-foreground hover:bg-success/90">
-          <a href={href} target="_blank" rel="noopener noreferrer">
+          <a href={href} target="_blank" rel="noopener noreferrer" onClick={onOpen}>
             <MessageCircle aria-hidden className="size-4" />
             {label}
           </a>

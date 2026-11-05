@@ -157,6 +157,8 @@ describe.skipIf(!ENABLED)("admin outreach GUI — DB integration", () => {
     expect(((await link.json()) as { data: { claim_url: string } }).data.claim_url).toContain("/claim/");
 
     expect((await store.DELETE(json({}, "DELETE"), ctx({ externalRef: ref("one") }))).status).toBe(200);
+    // Nothing is removed: the page's delete is soft, so it can be undone.
+    expect(await prisma.vendor.count({ where: { demoExternalRef: ref("one"), isActive: false } })).toBe(1);
     const audit = await prisma.demoAuditLog.findMany({ where: { externalRef: ref("one") }, select: { action: true, actor: true } });
     expect(audit.map((r) => r.action).sort()).toEqual(["create", "delete", "handover"]);
     expect(new Set(audit.map((r) => r.actor))).toEqual(new Set([`admin:${a.id}`]));

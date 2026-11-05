@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 
 import { adminRoute } from "@/lib/admin-api";
+import { rememberContactEmail } from "@/lib/demo-pipeline-server";
 import { createHandover } from "@/lib/demo-store";
 import { demoHandoverSchema, externalRefSchema } from "@/lib/demo-store-schema";
 import { sendDemoClaimEmail } from "@/lib/email";
@@ -26,6 +27,7 @@ export const POST = adminRoute<{ externalRef: string }>(
     await assertSalesOwnsDemoStore(user, actor, ref.data);
     const body = demoHandoverSchema.parse(await readJson(req));
     const { claim_url, expires_at, store_name } = await createHandover(ref.data, body.owner_email, actor);
+    await rememberContactEmail(ref.data, body.owner_email);
     const { delivered } = await sendDemoClaimEmail({
       to: body.owner_email,
       storeName: store_name,

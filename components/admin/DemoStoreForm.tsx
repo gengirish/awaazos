@@ -19,6 +19,7 @@ import {
   type DemoStoreFormValues,
 } from "@/lib/demo-store-form";
 import { DEMO_CATEGORIES, DEMO_FULFILMENT, DEMO_LANGUAGES, type DemoLanguage } from "@/lib/demo-store-schema";
+import { postPipelineAction } from "@/components/admin/pipeline/pipeline-api";
 import { outreachIntroMessage } from "@/lib/outreach-message";
 
 const FIELD =
@@ -54,6 +55,7 @@ const ERROR_TEXT: Record<string, string> = {
   payment_details_not_allowed:
     "A field looks like a UPI id, bank detail, payment key or email. Remove it: demo stores always use demo@upi.",
   demo_owner_not_configured: "DEMO_OWNER_EMAIL is not set on the server, so demo stores can't be built.",
+  ref_deleted: "A deleted demo store used this reference. Choose another one.",
   lead_taken: "Someone on the team already has a demo store under this reference. Ask them or an admin before contacting this seller.",
 };
 
@@ -111,6 +113,13 @@ function describeIssues(issues: Issue[] | undefined): string | null {
 }
 
 /** A string field of the pasted payload's profile, or "". */
+/** The owner's name travels with the build, unless pasted JSON already names one. */
+function withContactName(payload: unknown, name: string): unknown {
+  const contact = name.trim();
+  if (!contact || !payload || typeof payload !== "object" || "contact_name" in payload) return payload;
+  return { ...payload, contact_name: contact };
+}
+
 function profileField(payload: unknown, key: string): string {
   if (!payload || typeof payload !== "object" || !("profile" in payload)) return "";
   const profile = (payload as { profile?: Record<string, unknown> }).profile;
@@ -186,7 +195,7 @@ export function DemoStoreForm({ senderName, senderIsFounder }: { senderName: str
       const res = await fetch("/api/admin/demo-stores", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(withContactName(payload, ownerName)),
       });
       const body = (await res.json().catch(() => ({}))) as {
         error?: string;
@@ -270,6 +279,7 @@ export function DemoStoreForm({ senderName, senderIsFounder }: { senderName: str
               storeUrl: created.public_url,
             })}
             label="Message on WhatsApp"
+            onOpen={() => void postPipelineAction(created.external_ref, { action: "sent" }).catch(() => undefined)}
           />
         </section>
         <div className="flex flex-wrap gap-3 border-t pt-4">
@@ -571,7 +581,7 @@ export function DemoStoreForm({ senderName, senderIsFounder }: { senderName: str
           placeholder="Lahari"
         />
         <p className="text-xs text-muted-foreground">
-          Only for the WhatsApp message you send after building. It isn&apos;t saved with the store.
+          Only for your WhatsApp messages to them. It isn&apos;t shown on the store.
         </p>
       </div>
 

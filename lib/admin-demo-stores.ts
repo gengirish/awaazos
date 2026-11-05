@@ -7,7 +7,8 @@
  * `requirePlatformRole("SALES")` first — outreach admins and sales interns work
  * this page, and a SALES caller passes the stores they built. The
  * handover's prospect email is never selected — the stage needs only its dates.
- * The only contact detail read is the seller's public business number.
+ * The contact details read are the seller's public business number and handle,
+ * and the name and email an admin saved for the outreach message.
  *
  * A store belongs here while `demoExternalRef` is set, which outlives the claim
  * (`isDemo` flips to false then). The stage is derived on every read.
@@ -22,12 +23,26 @@ const DEMO_PIPELINE_SELECT = {
   id: true,
   slug: true,
   name: true,
+  city: true,
   isDemo: true,
   demoExternalRef: true,
   createdAt: true,
   // The prospect's public business number (from the create payload), for the
   // admin's wa.me message. Opt-ins are off, so it isn't on their storefront.
-  settings: { select: { whatsappNumber: true } },
+  settings: { select: { whatsappNumber: true, instagramHandle: true } },
+  demoPipeline: {
+    select: {
+      contactName: true,
+      contactEmail: true,
+      inviteSentAt: true,
+      lastNudgeAt: true,
+      nudgeCount: true,
+      snoozedUntil: true,
+      archivedAt: true,
+      archivedReason: true,
+      restoredAt: true,
+    },
+  },
   demoHandovers: {
     select: { createdAt: true, expiresAt: true, usedAt: true },
     orderBy: { createdAt: "desc" },
@@ -37,10 +52,14 @@ const DEMO_PIPELINE_SELECT = {
 
 export type DemoPipelineRow = Prisma.VendorGetPayload<{ select: typeof DEMO_PIPELINE_SELECT }>;
 
-/** Newest demo stores first, claimed ones included. `onlyVendorIds` narrows it to one person's stores. */
+/** Newest demo stores first, claimed ones included, soft-deleted ones not. `onlyVendorIds` narrows it to one person's stores. */
 export function listDemoPipeline(onlyVendorIds?: string[]): Promise<DemoPipelineRow[]> {
   return prisma.vendor.findMany({
-    where: { demoExternalRef: { not: null }, ...(onlyVendorIds ? { id: { in: onlyVendorIds } } : {}) },
+    where: {
+      demoExternalRef: { not: null },
+      OR: [{ demoPipeline: { is: null } }, { demoPipeline: { is: { deletedAt: null } } }],
+      ...(onlyVendorIds ? { id: { in: onlyVendorIds } } : {}),
+    },
     select: DEMO_PIPELINE_SELECT,
     orderBy: { createdAt: "desc" },
     take: DEMO_PIPELINE_LIMIT,

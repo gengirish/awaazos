@@ -46,6 +46,7 @@ The same actions have a GUI for the outreach team; see "Admin GUI" below.
 
 | Request | Stored as |
 | --- | --- |
+| `contact_name` (optional) | `DemoPipeline.contactName`, for outreach messages; never shown on the store |
 | `profile.name` | `Vendor.name` (stored clean; " (DEMO)" is added on display) |
 | `profile.category` | `Vendor.stallType`, shown as the store-type chip: `home_bakery` → HOME_BAKERY ("Home bakery"), likewise `home_kitchen`, `cloud_kitchen`, `cafe`, `sweets`, `catering`; `street_food`; `general` |
 | `profile.area` | `Vendor.city` |

@@ -125,6 +125,8 @@ const orderSchema = z
 export const demoStoreCreateSchema = z
   .object({
     external_ref: externalRefSchema,
+    /** The prospect's first name, kept for the outreach message. Never shown on the store. */
+    contact_name: z.string().trim().min(1).max(40).optional(),
     profile: z
       .object({
         name: z

@@ -123,8 +123,10 @@ export async function createDemoStore(
 ): Promise<DemoStoreSummary> {
   const existing = await prisma.vendor.findUnique({
     where: { demoExternalRef: input.external_ref },
-    select: { id: true, slug: true },
+    select: { id: true, slug: true, isDemo: true, isActive: true },
   });
+  // Soft-deleted (lib/demo-pipeline-server.ts): its link is dead, so don't report it as built.
+  if (existing?.isDemo && !existing.isActive) throw new DemoStoreError(409, "ref_deleted");
   if (existing) return summary(existing, false);
 
   const recent = await prisma.demoAuditLog.count({
@@ -192,6 +194,7 @@ async function writeDemoStore(
         },
       },
       staff: { create: { userId: ownerId, name: "IntelliForge demo", role: "OWNER" } },
+      ...(input.contact_name ? { demoPipeline: { create: { contactName: input.contact_name } } } : {}),
     },
     select: { id: true, slug: true },
   });
@@ -386,9 +389,9 @@ export async function deleteDemoStore(externalRef: string, actor: string): Promi
 export async function createHandover(externalRef: string, email: string, actor: string, now: Date = new Date()) {
   const v = await prisma.vendor.findUnique({
     where: { demoExternalRef: externalRef },
-    select: { id: true, isDemo: true, name: true },
+    select: { id: true, isDemo: true, isActive: true, name: true },
   });
-  if (!v) throw new DemoStoreError(404, "not_found");
+  if (!v || !v.isActive) throw new DemoStoreError(404, "not_found");
   if (!v.isDemo) throw new DemoStoreError(409, "not_a_demo_store");
 
   const token = randomBytes(24).toString("base64url");
@@ -410,9 +413,9 @@ export async function createHandover(externalRef: string, email: string, actor: 
 export async function loadClaim(token: string, now: Date = new Date()) {
   const h = await prisma.demoHandover.findUnique({
     where: { tokenHash: hashClaimToken(token) },
-    select: { email: true, usedAt: true, expiresAt: true, vendor: { select: { name: true, isDemo: true } } },
+    select: { email: true, usedAt: true, expiresAt: true, vendor: { select: { name: true, isDemo: true, isActive: true } } },
   });
-  if (!h || h.usedAt || h.expiresAt <= now || !h.vendor.isDemo) return null;
+  if (!h || h.usedAt || h.expiresAt <= now || !h.vendor.isDemo || !h.vendor.isActive) return null;
   const account = await prisma.user.findUnique({ where: { email: h.email }, select: { id: true } });
   return { email: h.email, storeName: h.vendor.name, hasAccount: account !== null };
 }
@@ -443,12 +446,12 @@ export async function claimDemoStore(input: ClaimInput, now: Date = new Date()):
       vendorId: true,
       usedAt: true,
       expiresAt: true,
-      vendor: { select: { demoExternalRef: true, isDemo: true } },
+      vendor: { select: { demoExternalRef: true, isDemo: true, isActive: true } },
     },
   });
   // Re-checked atomically when the token is burned; this early answer only
   // keeps a used link from reporting "email in use".
-  if (!h || h.usedAt || h.expiresAt <= now || !h.vendor.isDemo) {
+  if (!h || h.usedAt || h.expiresAt <= now || !h.vendor.isDemo || !h.vendor.isActive) {
     throw new DemoStoreError(400, "invalid_or_expired");
   }
 
@@ -477,7 +480,7 @@ export async function claimDemoStore(input: ClaimInput, now: Date = new Date()):
   try {
     return await prisma.$transaction(async (tx) => {
       const burned = await tx.demoHandover.updateMany({
-        where: { id: h.id, usedAt: null, expiresAt: { gt: now }, vendor: { isDemo: true } },
+        where: { id: h.id, usedAt: null, expiresAt: { gt: now }, vendor: { isDemo: true, isActive: true } },
         data: { usedAt: now },
       });
       if (burned.count !== 1) throw new DemoStoreError(400, "invalid_or_expired");
