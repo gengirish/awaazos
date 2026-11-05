@@ -70,6 +70,52 @@ export function outreachClaimMessage(input: {
   ].join("\n\n");
 }
 
+/** The opening line of a template, with the tokens lib/demo-pipeline.ts `fillTemplate` fills. */
+const CLAIM_LINE = `Here is your link to make it yours: {claimUrl}\nIt works once, for ${DEMO_CLAIM_TTL_DAYS} days.`;
+
+/**
+ * The pipeline's message for each moment, with {tokens}. `withClaimLink` adds the
+ * one-time link; only when a seller's email is saved, because the link needs one.
+ * Without it, the pitch asks for the email.
+ */
+export function outreachTemplate(
+  kind: "intro" | "followup_1" | "followup_2" | "orders_waiting" | "going_quiet",
+  input: { senderName?: string | null; senderIsFounder?: boolean; withClaimLink?: boolean },
+): string {
+  const claim = input.withClaimLink ? [CLAIM_LINE] : [];
+  switch (kind) {
+    case "intro":
+      return [
+        outreachIntroMessage({
+          ownerName: "{firstName}",
+          senderName: input.senderName,
+          senderIsFounder: input.senderIsFounder,
+          storeName: "{storeName}",
+          storeUrl: "{storeUrl}",
+        }),
+        ...claim,
+      ].join("\n\n");
+    case "followup_1":
+      return [
+        `Hi {firstName}, did you get a chance to look at the demo store I made for {storeName}? {storeUrl}`,
+        `It's yours free for ${TRIAL_DAYS} days if it looks useful. Would 15 minutes this week work?`,
+        ...claim,
+      ].join("\n\n");
+    case "followup_2":
+      return [
+        `Hi {firstName}, one last note from me about {storeName}: {storeUrl}`,
+        "If now isn't the right time, that's fine. I'd still like to hear what would make it useful for you.",
+        ...claim,
+      ].join("\n\n");
+    case "orders_waiting":
+      return input.withClaimLink
+        ? `Hi {firstName}, someone ordered from your AwaazOS store {storeUrl}. Claim it here to accept the order: {claimUrl}`
+        : `Hi {firstName}, someone ordered from your AwaazOS store {storeUrl}. Send me your email and I'll send you the link that makes the store yours, so you can accept the order.`;
+    case "going_quiet":
+      return `Hi {firstName}, {storeName} has had a quiet week. Want me to set up this week's drop for you?`;
+  }
+}
+
 /**
  * wa.me link for the admin's own WhatsApp. No phone → WhatsApp asks which
  * chat. null when the phone can't be a valid number.

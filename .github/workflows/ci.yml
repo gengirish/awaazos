@@ -80,6 +80,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://ci:ci@localhost:5432/awaazos?schema=public
       DIRECT_URL: postgresql://ci:ci@localhost:5432/awaazos?schema=public
+      # The internal account that owns demo stores (admin-demo-pipeline.spec.ts builds some).
+      DEMO_OWNER_EMAIL: demo-owner@example.test
     steps:
       - name: Checkout
         uses: actions/checkout@v7

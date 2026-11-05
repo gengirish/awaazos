@@ -1,16 +1,23 @@
 "use client";
 
+import { MoreHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
 import { OutreachWhatsApp } from "@/components/admin/OutreachWhatsApp";
 import { formatIstDate } from "@/lib/datetime";
-import { outreachClaimMessage, outreachIntroMessage } from "@/lib/outreach-message";
+import { outreachClaimMessage } from "@/lib/outreach-message";
 
 const ERROR_TEXT: Record<string, string> = {
   not_a_demo_store: "This store has been claimed, so it can't be changed here.",
@@ -20,29 +27,43 @@ const ERROR_TEXT: Record<string, string> = {
 type Props = {
   externalRef: string;
   storeName: string;
-  storeUrl: string;
   /** The seller's business number saved with the store, for wa.me. */
   phone: string | null;
-  /** The signed-in admin, named in the WhatsApp message. */
-  senderName: string | null;
-  /** Only a platform owner introduces themselves as the founder. */
-  senderIsFounder: boolean;
+  /** The message for this store's next send, with its tokens filled in. */
+  message: string;
+  /** Saved earlier, so a new claim link needn't ask again. */
+  contactEmail: string | null;
   /** A SALES user can't delete a store. */
   canDelete: boolean;
+  /** WhatsApp was opened, or the admin says they already messaged the seller. */
+  onSent: (opened: boolean) => void;
+  onArchive: () => void;
+  onDelete: () => void;
 };
 
 /**
  * A demo store's actions on /admin/demo-stores: message the seller on WhatsApp
- * (wa.me from the admin's own phone), email them a claim link (POST …/handover)
- * or delete the store (DELETE). Claimed stores don't get this component. The
- * claim email is the only thing sent from our side.
+ * (wa.me from the admin's own phone, recorded as sent), or email them a claim
+ * link (POST …/handover). Archive and delete sit in the ⋯ menu, away from the
+ * primary action. Claimed stores don't get this component. The claim email is
+ * the only thing sent from our side.
  */
-export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, senderName, senderIsFounder, canDelete }: Props) {
+export function DemoStoreActions({
+  externalRef,
+  storeName,
+  phone,
+  message,
+  contactEmail,
+  canDelete,
+  onSent,
+  onArchive,
+  onDelete,
+}: Props) {
   const router = useRouter();
   const emailId = useId();
   const [open, setOpen] = useState(false);
   const [messaging, setMessaging] = useState(false);
-  const [email, setEmail] = useState("");
+  const [email, setEmail] = useState(contactEmail ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [link, setLink] = useState<{ url: string; expiresAt: string; emailed: boolean } | null>(null);
@@ -74,24 +95,6 @@ export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, send
       }
       setLink({ url: body.data.claim_url, expiresAt: body.data.expires_at, emailed: body.data.emailed });
       setCopied(false);
-      router.refresh();
-    } catch {
-      setError("No connection. Try again.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function remove() {
-    setBusy(true);
-    setError(null);
-    try {
-      const res = await fetch(base, { method: "DELETE" });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => ({}))) as { error?: string };
-        setError(ERROR_TEXT[body.error ?? ""] ?? "Could not delete. Try again.");
-        return;
-      }
       router.refresh();
     } catch {
       setError("No connection. Try again.");
@@ -134,6 +137,7 @@ export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, send
               expiresOn: formatIstDate(new Date(link.expiresAt)),
             })}
             label="Send claim link on WhatsApp"
+            onOpen={() => onSent(true)}
           />
         </div>
       ) : open ? (
@@ -164,11 +168,7 @@ export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, send
         </form>
       ) : messaging ? (
         <div className="space-y-3">
-          <OutreachWhatsApp
-            phone={phone}
-            message={outreachIntroMessage({ senderName, senderIsFounder, storeName, storeUrl })}
-            label="Message on WhatsApp"
-          />
+          <OutreachWhatsApp phone={phone} message={message} label="Message on WhatsApp" onOpen={() => onSent(true)} />
           <Button type="button" size="sm" variant="outline" onClick={() => setMessaging(false)}>
             Close
           </Button>
@@ -181,11 +181,22 @@ export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, send
           <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
             Hand over to the seller
           </Button>
-          {canDelete ? (
-            <Button type="button" size="sm" variant="outline" disabled={busy} onClick={() => setConfirmDelete(true)}>
-              Delete
-            </Button>
-          ) : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button type="button" size="icon" variant="outline" aria-label={`More actions for ${storeName}`}>
+                <MoreHorizontal aria-hidden className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onSelect={() => onSent(false)}>Already messaged them</DropdownMenuItem>
+              <DropdownMenuItem onSelect={onArchive}>Archive</DropdownMenuItem>
+              {canDelete ? (
+                <DropdownMenuItem className="text-destructive" onSelect={() => setConfirmDelete(true)}>
+                  Delete
+                </DropdownMenuItem>
+              ) : null}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       )}
 
@@ -199,10 +210,10 @@ export function DemoStoreActions({ externalRef, storeName, storeUrl, phone, send
         open={confirmDelete}
         onOpenChange={setConfirmDelete}
         title={`Delete ${storeName}?`}
-        description="The demo store, its dishes and sample orders are removed for good, and its link stops working."
+        description="The store leaves this page, and its link and any claim link stop working. You can undo this for a few seconds."
         confirmLabel="Delete store"
         destructive
-        onConfirm={remove}
+        onConfirm={onDelete}
       />
     </div>
   );

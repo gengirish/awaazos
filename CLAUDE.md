@@ -720,6 +720,12 @@ only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts`
   message (`lib/outreach-message.ts`) to the seller's saved business number; nothing is sent server-side.
   Making a claim link here also emails it to the seller (`sendDemoClaimEmail`), and the response says whether it
   went (`emailed`). The internal API's handover still sends nothing.
+- **Outreach pipeline** (`docs/admin-pipeline.md`, `lib/demo-pipeline.ts` pure, `lib/demo-pipeline-server.ts`):
+  `/admin/demo-stores` opens on a Today queue, one store at a time. Status, follow-ups, stale archiving and queue
+  order are derived from `DemoPipeline`'s dates on every read: **no cron**, and a claim stops follow-ups because `isDemo`
+  flips. Every action writes a `DemoAuditLog` row whose payload holds what it replaced (never contact details), which
+  is what Undo restores. The page's delete is soft (`deletedAt` + `Vendor.isActive = false`); only the internal API
+  deletes for real. A claim link needs the seller's saved email, so the first invite carries the store link only.
 - **Sales interns:** platform role `SALES` (`USER < SALES < ADMIN < SUPER_ADMIN`), invited on `/admin/admins`.
   They see only the demo stores they built (`lib/sales-scope.ts`, ownership = the audit "create" row), can't
   delete, and everything at ADMIN or above stays 404. `/admin/earnings` reports their share

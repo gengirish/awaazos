@@ -67,6 +67,7 @@ model Vendor {
   subscriptionEvents    SubscriptionEvent[]
   offers                Offer[]
   demoHandovers         DemoHandover[]
+  demoPipeline          DemoPipeline?
   communities           CommunityMember[]
   referredBy            Vendor?              @relation("VendorReferrals", fields: [referredByVendorId], references: [id], onDelete: SetNull)
   referrals             Vendor[]             @relation("VendorReferrals")
@@ -735,15 +736,52 @@ model DemoHandover {
 // Also the create rate limit ("create" rows per actor in the last 24 h).
 model DemoAuditLog {
   id          String   @id @default(cuid())
-  action      String // create | delete | handover | claim
+  // create | delete | handover | claim, plus the pipeline's (lib/demo-pipeline-server.ts):
+  // invite_sent | nudge_sent | snoozed | archived | restored | contact_saved | undo
+  action      String
   externalRef String
   vendorId    String?
   actor       String // "key:<16 hex of sha256(INTERNAL_API_KEY)>", "admin:<User.id>" or "claim"
+  // Pipeline rows: what the action replaced, so it can be undone. Dates and enums, never contact details.
+  payload     Json?
   createdAt   DateTime @default(now())
 
   @@index([action, createdAt])
   @@index([externalRef])
+  @@index([vendorId, createdAt])
   @@map("demo_audit_logs")
+}
+
+enum DemoArchiveReason {
+  manual
+  stale
+  duplicate
+  test
+}
+
+// The outreach facts for one demo store on /admin/demo-stores. No row = nothing
+// has happened yet. Status, next action and queue position are derived from these
+// dates on every read (lib/demo-pipeline.ts): nothing moves on a timer.
+model DemoPipeline {
+  vendorId       String             @id
+  vendor         Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  // The prospect, for the message and the claim link. Never in a log or an audit payload.
+  contactName    String?            @db.VarChar(40)
+  contactEmail   String?
+  inviteSentAt   DateTime?
+  lastNudgeAt    DateTime?
+  nudgeCount     Int                @default(0)
+  snoozedUntil   DateTime?
+  archivedAt     DateTime?
+  archivedReason DemoArchiveReason?
+  // Restarts the stale clock after a restore.
+  restoredAt     DateTime?
+  // Soft delete. Also sets Vendor.isActive = false, which the public pages check.
+  deletedAt      DateTime?
+  updatedAt      DateTime           @updatedAt
+
+  @@index([deletedAt])
+  @@map("demo_pipeline")
 }
 
 // A one-time link that makes someone a platform ADMIN (outreach only), made by
