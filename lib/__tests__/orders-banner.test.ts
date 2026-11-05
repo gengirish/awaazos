@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { BANNER_SNOOZE_DAYS, isBannerSnoozed, pickOrdersBanner } from "../orders-banner";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const NONE = { reminder: false, install: false, survey: false };
+const NONE = { reminder: false, install: false, survey: false, refer: false };
 
 describe("pickOrdersBanner", () => {
   it("shows nothing when nothing is eligible", () => {
@@ -11,14 +11,15 @@ describe("pickOrdersBanner", () => {
   });
 
   it("puts the FSSAI reminder above install, and install above the survey", () => {
-    expect(pickOrdersBanner({ reminder: true, install: true, survey: true })).toBe("reminder");
-    expect(pickOrdersBanner({ reminder: false, install: true, survey: true })).toBe("install");
-    expect(pickOrdersBanner({ reminder: false, install: false, survey: true })).toBe("survey");
+    expect(pickOrdersBanner({ ...NONE, reminder: true, install: true, survey: true })).toBe("reminder");
+    expect(pickOrdersBanner({ ...NONE, install: true, survey: true })).toBe("install");
+    expect(pickOrdersBanner({ ...NONE, survey: true, refer: true })).toBe("survey");
   });
 
   it("shows a lower banner on its own", () => {
     expect(pickOrdersBanner({ ...NONE, survey: true })).toBe("survey");
     expect(pickOrdersBanner({ ...NONE, install: true })).toBe("install");
+    expect(pickOrdersBanner({ ...NONE, refer: true })).toBe("refer");
   });
 });
 

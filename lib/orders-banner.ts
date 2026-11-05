@@ -7,10 +7,10 @@
  * "Not now" is a snooze, kept per device in localStorage as the time it was
  * tapped, and nothing runs when it ends: the next render just sees it has lapsed.
  */
-export type OrdersBanner = "reminder" | "install" | "survey";
+export type OrdersBanner = "reminder" | "install" | "survey" | "refer";
 
 /** Highest priority first. */
-export const ORDERS_BANNER_PRIORITY: readonly OrdersBanner[] = ["reminder", "install", "survey"];
+export const ORDERS_BANNER_PRIORITY: readonly OrdersBanner[] = ["reminder", "install", "survey", "refer"];
 
 export const BANNER_SNOOZE_DAYS = 7;
 const BANNER_SNOOZE_MS = BANNER_SNOOZE_DAYS * 24 * 60 * 60 * 1000;

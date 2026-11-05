@@ -497,7 +497,7 @@ go to the order's own route family (`orderActionBase` in `lib/drops-board.ts`), 
 compound scope; the frozen rule is per order (`isDropFrozen` on its drop).
 
 **Board layout** (`components/drops/orders/`): at most one banner above the board (`OrdersBannerSlot`, rules in
-`lib/orders-banner.ts`): FSSAI reminder, then install, then the owner survey; "Not now" lasts 7 days per device.
+`lib/orders-banner.ts`): FSSAI reminder, then install, then the owner survey, then "Earn free months" (`shouldAskToRefer`); "Not now" lasts 7 days per device.
 Billing notices and a checklist with open steps sit outside the slot. The header has one Share menu and one "⋯"
 menu (`BoardMenus.tsx`). In menu scope the status pill sets `acceptMenuOrders` for an OWNER through `PATCH
 /api/vendor`; it does not touch drops. Refresh, Sound and phone alerts are in the live sync bar at the bottom.

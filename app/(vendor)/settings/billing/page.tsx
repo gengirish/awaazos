@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { lockReason } from "@/components/billing/BillingLockedCard";
@@ -10,6 +11,7 @@ import { countBillableTxnThisMonth } from "@/lib/drops";
 import { isPlanExpired, isPlanInGrace, planGraceEndsAt, trialDaysLeft } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { canPromoteReferrals, referralPitch } from "@/lib/referral";
 import { LIVE_SUBSCRIPTION_STATUSES, SUBSCRIBABLE_PLANS, type SubscribablePlan } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
@@ -97,6 +99,19 @@ export default async function BillingSettingsPage() {
               </p>
             )}
           </section>
+
+          {canPromoteReferrals({ role: "OWNER", isDemo: vendor.isDemo, access, hasLiveSubscription }) ? (
+            <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
+              <h2 className="font-medium">Earn free months</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{referralPitch()}</p>
+              <Link
+                href="/settings/refer"
+                className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-2"
+              >
+                Invite a seller
+              </Link>
+            </section>
+          ) : null}
 
           <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
             <h2 className="font-medium">Usage this month (IST)</h2>
