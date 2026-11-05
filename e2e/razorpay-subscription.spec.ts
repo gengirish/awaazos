@@ -116,12 +116,9 @@ test.describe("Billing page — subscribe with in-app Checkout", () => {
       await registerOwnerAndSignIn(page, request);
 
       await expect(page.getByRole("heading", { name: /billing/i })).toBeVisible();
-      // The accessible name also carries the price line ("… + GST = ₹765.82").
-      const button = page.getByRole("button", { name: new RegExp(`^starter ${interval}`, "i") });
-      await expect(button).toBeVisible();
-      await expect(button).toContainText("+ GST");
-
-      await button.click();
+      await page.getByRole("radio", { name: new RegExp(`^${interval}`, "i") }).check();
+      await expect(page.getByText(/, exclusive of 18% GST/)).toBeVisible();
+      await page.getByRole("button", { name: new RegExp(`^subscribe — starter ${interval}`, "i") }).click();
 
       await expect.poll(() => createBody, { timeout: 15_000 }).toBeTruthy();
       expect(JSON.parse(createBody!)).toEqual({ plan: "STARTER", interval });
@@ -148,7 +145,8 @@ test.describe("Billing page — subscribe with in-app Checkout", () => {
     await mockCheckout(page, "dismiss");
 
     await registerOwnerAndSignIn(page, request);
-    await page.getByRole("button", { name: /^starter yearly/i }).click();
+    await page.getByRole("radio", { name: /^yearly/i }).check();
+    await page.getByRole("button", { name: /^subscribe — starter yearly/i }).click();
     await expect(page.getByText(/payment cancelled/i)).toBeVisible();
 
     const options = await page.evaluate(
@@ -175,7 +173,7 @@ test.describe("Billing page — subscribe with in-app Checkout", () => {
     });
 
     await registerOwnerAndSignIn(page, request);
-    const button = page.getByRole("button", { name: /^starter monthly/i });
+    const button = page.getByRole("button", { name: /^subscribe — starter monthly/i });
     await button.click();
 
     await expect(page.getByText(/payment cancelled\. nothing was charged/i)).toBeVisible();
@@ -198,7 +196,7 @@ test.describe("Billing page — subscribe with in-app Checkout", () => {
     });
 
     await registerOwnerAndSignIn(page, request);
-    await page.getByRole("button", { name: /^starter monthly/i }).click();
+    await page.getByRole("button", { name: /^subscribe — starter monthly/i }).click();
 
     await expect(page.getByText(/payment received\. your plan will switch on/i)).toBeVisible({ timeout: 20_000 });
     await expect(page.getByText(/please don't pay again/i)).toBeVisible();
@@ -218,7 +216,7 @@ test.describe("Billing page — subscribe with in-app Checkout", () => {
     );
 
     await registerOwnerAndSignIn(page, request);
-    await page.getByRole("button", { name: /^starter monthly/i }).click();
+    await page.getByRole("button", { name: /^subscribe — starter monthly/i }).click();
 
     await expect(page.getByRole("alert").filter({ hasText: /couldn't match that payment/i })).toBeVisible();
   });
@@ -228,7 +226,7 @@ test.describe("Billing page — subscribe with in-app Checkout", () => {
     await page.route(CHECKOUT_JS, (route) => route.abort());
 
     await registerOwnerAndSignIn(page, request);
-    await page.getByRole("button", { name: /^starter monthly/i }).click();
+    await page.getByRole("button", { name: /^subscribe — starter monthly/i }).click();
 
     // The mocked short_url points at /pricing.
     await page.waitForURL(/\/pricing/, { timeout: 15_000 });

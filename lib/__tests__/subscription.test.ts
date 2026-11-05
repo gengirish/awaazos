@@ -175,6 +175,49 @@ describe("applySubscriptionEvent", () => {
     expect(p).toEqual({});
   });
 
+  it("a resubscribe that is cancelled before its first charge leaves the paid period alone", () => {
+    const paid: BillingState = { plan: "STARTER", planExpiresAt: day(5), razorpaySubId: "sub_A" };
+    const p = applySubscriptionEvent(
+      paid,
+      "subscription.cancelled",
+      sub({ status: "cancelled", startAt: day(5), paidCount: 0, resumesPaidPeriod: true }),
+      NOW,
+    );
+    expect(p.vendor).toBeUndefined();
+    expect(p.settings?.razorpaySubId).toBeNull();
+  });
+
+  it("a resubscribe's mandate grants nothing: the old plan runs to its end, a lower one starts at its first charge", () => {
+    const paid: BillingState = { plan: "STARTER", planExpiresAt: day(5), razorpaySubId: "sub_OLD" };
+    const lower = { plan: "LITE" as const, interval: "monthly" as const };
+    const auth = applySubscriptionEvent(
+      paid,
+      "subscription.authenticated",
+      sub({ status: "authenticated", mapped: lower, startAt: day(5), resumesPaidPeriod: true }),
+      NOW,
+    );
+    expect(auth.vendor).toBeUndefined();
+    expect(auth.settings?.razorpaySubId).toBe("sub_A");
+
+    const charged = applySubscriptionEvent(
+      { ...paid, razorpaySubId: "sub_A" },
+      "subscription.charged",
+      sub({ mapped: lower, currentEnd: day(35), resumesPaidPeriod: true }),
+      NOW,
+    );
+    expect(charged.vendor).toEqual({ plan: "LITE", planExpiresAt: day(35) });
+  });
+
+  it("the old sub ending at its cycle end changes nothing once a resubscribe is on file", () => {
+    const p = applySubscriptionEvent(
+      { plan: "STARTER", planExpiresAt: day(5), razorpaySubId: "sub_NEW" },
+      "subscription.cancelled",
+      sub({ status: "cancelled", paidCount: 3 }),
+      NOW,
+    );
+    expect(p).toEqual({});
+  });
+
   it("cancelled for an old sub doesn't clear the current one", () => {
     const p = applySubscriptionEvent(
       { ...free, razorpaySubId: "sub_NEW" },

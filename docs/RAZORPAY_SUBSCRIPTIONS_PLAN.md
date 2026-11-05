@@ -81,7 +81,7 @@ change means new plans and a migration (Phase 0 note).
 | Lazy expiry + 3-day grace | `lib/plan.ts` (`effectivePlan`), applied once in `requireVendorRole` (`lib/rbac.ts:160`) | Good, extend |
 | Sign-up | `app/api/auth/register/route.ts` | Never sets a plan, so every vendor starts FREE |
 | Monthly txn cap | `app/api/transactions/route.ts:195`, `lib/drops.ts:377`, `lib/menu-orders.ts:160` | FREE 50, STARTER 500 |
-| Billing page | `app/(vendor)/settings/billing/page.tsx`, `components/billing/BillingManageClient.tsx` | Upgrade + cancel only |
+| Billing page | `app/(vendor)/settings/billing/page.tsx`, `components/billing/BillingManageClient.tsx` | Plan picker + cancel (`lib/billing-actions.ts`) |
 | Tests | `e2e/razorpay-subscription.spec.ts`, `lib/__tests__/razorpay-signature.test.ts` | Auth + mocked UI only |
 
 ## Bugs in the current subscription code

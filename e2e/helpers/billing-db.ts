@@ -33,11 +33,22 @@ export function daysFromNow(n: number): Date {
 /** Set the billing columns of the vendor registered with `email` (registerVendor's creds). */
 export async function setVendorBilling(
   email: string,
-  data: { trialEndsAt?: Date | null; plan?: Plan; planExpiresAt?: Date | null },
+  data: { trialEndsAt?: Date | null; plan?: Plan; planExpiresAt?: Date | null; customPricePaise?: number | null },
 ): Promise<void> {
   const res = await db().vendor.updateMany({ where: { email }, data });
   if (res.count !== 1) {
     throw new Error(`setVendorBilling: expected 1 vendor for the e2e email, got ${res.count}`);
+  }
+}
+
+/** The subscription on file for the vendor registered with `email`, as the webhook would leave it. */
+export async function setVendorSubscription(
+  email: string,
+  data: { razorpaySubId: string | null; razorpaySubStatus: string | null; razorpaySubCancelAtEnd?: boolean },
+): Promise<void> {
+  const res = await db().vendorSettings.updateMany({ where: { vendor: { email } }, data });
+  if (res.count !== 1) {
+    throw new Error(`setVendorSubscription: expected 1 store for the e2e email, got ${res.count}`);
   }
 }
 

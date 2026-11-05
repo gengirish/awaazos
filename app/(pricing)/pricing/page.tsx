@@ -65,7 +65,7 @@ export default async function PricingPage() {
                 ))}
               </ul>
               <div className="mt-6 flex flex-1 flex-col justify-end gap-4">
-                <PricingPlanButtons signedIn={signedIn} />
+                <PricingPlanButtons signedIn={signedIn} plan={tier} />
               </div>
             </section>
           ))}
