@@ -2,7 +2,7 @@
 
 import { AlertCircle, CheckCircle2, HelpCircle, Loader2, Mic, Plus, RotateCcw, Square, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 
 import { MENU_CHANGED_EVENT } from "@/components/menu/MenuGrid";
 import { defaultEmoji, emojiChoices } from "@/components/menu/MenuItemForm";
@@ -38,9 +38,15 @@ export type VoiceMenuPanelProps = {
   voiceLang: string;
   /** Categories already on this vendor's menu (for the category datalist). */
   categories: string[];
-  /** Items already on the menu. 0 → the panel starts expanded. */
+  /** Items already on the menu. */
   itemCount: number;
-  /** Start expanded even when the menu has items (`/menu?voice=1`). */
+  /** Collapsed, the panel renders nothing: its button is in the page header (MenuScreen). */
+  expanded: boolean;
+  /** Collapse and put focus back on that button. */
+  onCollapse: () => void;
+  /** The mic, so the header's button can focus it on opening. */
+  micRef: RefObject<HTMLButtonElement | null>;
+  /** Opened by `/menu?voice=1`: Cancel leaves it open. */
   defaultOpen?: boolean;
   /** The store's words (lib/store-vocabulary.ts): dishes or products. */
   vocab: StoreVocabulary;
@@ -69,7 +75,7 @@ const GOODS_EXAMPLE: Record<string, string> = {
   "hi-IN": "Ashwagandha powder 250 gram 399, tulsi green tea 100 gram 199 — herbal mein. Coconut oil 500 ml 350.",
 };
 
-const FORM_HINT = "use “Add item” below";
+const FORM_HINT = "use “Add item”";
 
 const ERROR_MESSAGES: Record<string, string> = {
   voice_unavailable: `Voice isn't available right now — ${FORM_HINT}.`,
@@ -130,10 +136,18 @@ function issuesToRowErrors(rows: readonly MenuVoiceRow[], issues: BulkResponse["
   return out;
 }
 
-export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen = false, vocab }: VoiceMenuPanelProps) {
+export function VoiceMenuPanel({
+  voiceLang,
+  categories,
+  itemCount,
+  expanded,
+  onCollapse,
+  micRef,
+  defaultOpen = false,
+  vocab,
+}: VoiceMenuPanelProps) {
   const router = useRouter();
   const uid = useId().replace(/:/g, "");
-  const [expanded, setExpanded] = useState(itemCount === 0 || defaultOpen);
   const [rows, setRows] = useState<MenuVoiceRow[]>([]);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [unparsed, setUnparsed] = useState<string[]>([]);
@@ -146,10 +160,8 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
 
   const takeRef = useRef(0);
   const idemKeyRef = useRef<string>(newIdempotencyKey());
-  const micRef = useRef<HTMLButtonElement>(null);
   const reviewHeadingRef = useRef<HTMLHeadingElement>(null);
   const savedRef = useRef<HTMLParagraphElement>(null);
-  const expandRef = useRef<HTMLButtonElement>(null);
   const focusReview = useRef(false);
   const focusSaved = useRef(false);
 
@@ -267,8 +279,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
     clearReview();
     setSaved(null);
     if (itemCount > 0 && !defaultOpen) {
-      setExpanded(false);
-      requestAnimationFrame(() => expandRef.current?.focus());
+      onCollapse();
     } else {
       micRef.current?.focus();
     }
@@ -365,24 +376,7 @@ export function VoiceMenuPanel({ voiceLang, categories, itemCount, defaultOpen =
   }
 
   // ── Collapsed: the menu already has dishes ──
-  if (!expanded) {
-    return (
-      <Button
-        ref={expandRef}
-        type="button"
-        size="lg"
-        className="min-h-12 w-full gap-2 sm:w-auto"
-        aria-expanded={false}
-        onClick={() => {
-          setExpanded(true);
-          requestAnimationFrame(() => micRef.current?.focus());
-        }}
-      >
-        <Mic className="h-5 w-5" aria-hidden="true" />
-        Add {vocab.items} by voice
-      </Button>
-    );
-  }
+  if (!expanded) return null;
 
   const statusText = offline
     ? `Voice needs internet — ${FORM_HINT}.`
