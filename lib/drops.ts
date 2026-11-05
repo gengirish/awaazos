@@ -584,11 +584,12 @@ export async function markOrderPaid(
 
 /**
  * Cancel a storefront order. A paid order becomes REFUNDED and its revenue is
- * reversed on the day it was credited (the vendor refunds out of band).
+ * reversed on the day it was credited. The refund itself is either Razorpay's, already
+ * accepted (`razorpayRefundId`, lib/storefront-order-refund.ts), or the vendor's out of band.
  */
 export async function cancelOrder(
   tx: Prisma.TransactionClient,
-  args: { vendorId: string; transactionId: string; now?: Date },
+  args: { vendorId: string; transactionId: string; razorpayRefundId?: string; now?: Date },
 ): Promise<boolean> {
   const now = args.now ?? new Date();
   const t = await tx.transaction.findFirst({
@@ -616,6 +617,7 @@ export async function cancelOrder(
       fulfilmentStatus: "CANCELLED",
       cancelledAt: now,
       ...(wasPaid ? { paymentStatus: "REFUNDED" as const } : {}),
+      ...(args.razorpayRefundId ? { razorpayRefundId: args.razorpayRefundId } : {}),
     },
   });
   if (res.count === 0) return false;

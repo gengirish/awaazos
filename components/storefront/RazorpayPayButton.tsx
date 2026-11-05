@@ -43,6 +43,7 @@ type StartPaymentData = {
   currency: string;
   name: string;
   billNumber: string;
+  holdSecondsLeft: number | null;
 };
 
 export function RazorpayPayButton({
@@ -151,6 +152,7 @@ export function RazorpayPayButton({
         name: data.name,
         description: `Order ${data.billNumber}`,
         order_id: data.razorpayOrderId,
+        ...(data.holdSecondsLeft ? { timeout: data.holdSecondsLeft } : {}),
         prefill: {
           ...(prefillName ? { name: prefillName } : {}),
           ...(prefillContact ? { contact: prefillContact } : {}),

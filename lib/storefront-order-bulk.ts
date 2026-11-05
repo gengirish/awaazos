@@ -38,6 +38,9 @@ const FAILURE_CODE: Record<OrderActionErrorCode, BulkFailureCode> = {
   "Not found": "not_found",
   drop_frozen: "drop_frozen",
   invalid_state: "invalid_state",
+  // Neither can happen: money actions never go through bulk.
+  manager_required: "error",
+  refund_failed: "error",
 };
 
 export async function runBulkStorefrontOrderAction(args: {

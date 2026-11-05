@@ -380,6 +380,13 @@ model Transaction {
   upiRef            String? // Customer's UTR reference
   razorpayOrderId   String?
   razorpayPaymentId String?
+  // The last refund Razorpay accepted for this order (lib/storefront-order-refund.ts).
+  razorpayRefundId  String?
+  // A captured payment that needs the seller's answer (lib/payment-issue.ts). The
+  // payment id outlives the answer, so a repeat of that payment isn't flagged again.
+  paymentIssue          String?
+  paymentIssuePaymentId String?
+  paymentIssueAt        DateTime?
   paymentLinkUrl    String? // Razorpay Payment Link URL
   customerPhone     String? // +91 for WhatsApp receipt
   customerName      String?

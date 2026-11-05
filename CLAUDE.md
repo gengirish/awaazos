@@ -434,6 +434,20 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   A store with Razorpay shows only "Pay online" on the order page: UPI and "Payment done?" stay hidden (`OnlinePayFlow`,
   `lib/storefront-direct-pay.ts`) until Razorpay fails, its window is closed or the seller answered "Not received", and
   never on `payment_processing`, so nobody is invited to pay twice. Checkout still needs a UPI ID to reach Razorpay.
+  Checkout closes when the hold ends (`holdSecondsLeft` → its `timeout`).
+- **Payments that land where they shouldn't** (`lib/payment-issue.ts` pure, `lib/storefront-payment-issue.ts`): verify and both
+  webhooks go through `applyRazorpayCapture`, one transaction under the drop's row lock. A capture on a cancelled order
+  (`paid_after_cancel`), another payment on a paid one (`paid_twice`; the same payment id through either event or verify is
+  not), or a late payment that oversells a capped drop item (`paid_late_oversold`; the order stays paid) sets
+  `Transaction.paymentIssue`, pushes bill number and amount, and keeps the order in Needs action until a MANAGER answers,
+  even if cancelled. The payment id stays after the answer so a Razorpay retry can't raise it again.
+- **Refunds** (`lib/storefront-order-refund.ts`, `refundPaymentViaRazorpay`): the store's own Razorpay, MANAGER and up (403
+  `manager_required`). Cancelling a Razorpay-paid order refunds first, outside the database transaction, then
+  `cancelOrder` records `razorpayRefundId`. Razorpay's idempotency key is `receipt` and a repeat answers 400, so existing
+  refunds are read before posting and again after a duplicate, timeout or 5xx: never two refunds. If Razorpay refuses
+  (409 `refund_failed` + `reason`), the order stays paid and live; the dialog then offers `refund: "manual"`, which is the old
+  cancel and says the seller must refund. An order marked paid by hand has no payment id and keeps the old cancel.
+  Refunding a flagged second payment never touches `DailySummary`: it was never credited.
 - **Connect Razorpay** (`lib/razorpay-oauth.ts`, plan in `docs/RAZORPAY_PARTNER_PLAN.md`): the same
   vendor-owned account reached by our Razorpay Technology Partner OAuth app instead of pasted keys
   (`RAZORPAY_OAUTH_CLIENT_ID` / `_SECRET` / `_MODE`). One method per store: connecting clears the keys,

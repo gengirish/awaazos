@@ -23,9 +23,11 @@ import {
 import { useState, type ReactNode } from "react";
 
 import { BuyerWhatsAppLinks } from "@/components/drops/orders/BuyerWhatsAppLinks";
+import { PaymentIssueNotice } from "@/components/drops/orders/PaymentIssueNotice";
 import { RiderHandoffButton } from "@/components/drops/orders/RiderHandoffButton";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Notice } from "@/components/ui/notice";
 import {
   ResponsiveDialog,
   ResponsiveDialogBody,
@@ -39,6 +41,7 @@ import type { DeliveryRider } from "@/lib/delivery-riders";
 import { formatINR } from "@/lib/currency";
 import { discountLabel } from "@/lib/offers";
 import { RATING_WORDS } from "@/lib/order-feedback";
+import { REFUND_MANAGER_ONLY, REFUND_TERMS, refundFailedMessage } from "@/lib/payment-issue";
 import {
   balanceDuePaise,
   availableOrderActions,
@@ -54,6 +57,11 @@ import { cn } from "@/lib/utils";
 /** Where an order came from: the everyday menu, or a drop (label = its title). */
 export type OrderSource = { kind: "menu" | "drop"; label: string };
 
+/** `riderName` goes with "dispatch"; `refund: "manual"` is "Cancel anyway, I'll refund from Razorpay". */
+export type OrderActionOpts = { riderName?: string; refund?: "razorpay" | "manual" };
+/** `refundFailed` is why Razorpay didn't take a refund: the card shows it beside the way out. */
+export type OrderActionResult = { ok: boolean; refundFailed?: string };
+
 type Props = {
   order: BoardOrder;
   vendorName: string;
@@ -66,7 +74,9 @@ type Props = {
   isNew: boolean;
   pendingAction: OrderAction | null;
   /** `riderName` goes with "dispatch" when the order was sent to a saved rider. */
-  onAction: (orderId: string, action: OrderAction, opts?: { riderName?: string }) => void;
+  onAction: (orderId: string, action: OrderAction, opts?: OrderActionOpts) => Promise<OrderActionResult>;
+  /** MANAGER and up: money going back through Razorpay is theirs to send. */
+  canRefund?: boolean;
   /** Offer a selection checkbox (the order has at least one bulk action). */
   selectable?: boolean;
   selected?: boolean;
@@ -118,6 +128,7 @@ export function OrderCard({
   isNew,
   pendingAction,
   onAction,
+  canRefund = false,
   selectable = false,
   selected = false,
   onToggleSelect,
@@ -125,6 +136,7 @@ export function OrderCard({
 }: Props) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmPaid, setConfirmPaid] = useState(false);
+  const [refundFailed, setRefundFailed] = useState<string | null>(null);
   // Orders that need nothing from the vendor right now are a two-line summary
   // until she opens them, so a long Confirmed / Delivered list stays scannable.
   // Per card and on this device only.
@@ -157,7 +169,10 @@ export function OrderCard({
   const receivedAt = order.buyerReceivedAt ? new Date(order.buyerReceivedAt) : null;
   const buyerSaysReceived = receivedAt !== null && (fs === "PLACED" || fs === "CONFIRMED");
   const canUndeliver = actions.has("undeliver");
-  const canCancel = actions.has("cancel");
+  // Cancelling this one sends money back through Razorpay, so it isn't a cashier's to do.
+  const refundsOnline = order.refundableOnline === true;
+  const canCancel = actions.has("cancel") && (!refundsOnline || canRefund);
+  const lateIssue = order.paymentIssue === "paid_late_oversold";
 
   const deliverLabel =
     order.paymentMethod === "CASH" && unpaid
@@ -174,7 +189,7 @@ export function OrderCard({
   const run = (action: OrderAction) => {
     // Money: without a buyer's claim on the card there is nothing to check a stray tap against.
     if (action === "mark_paid" && markPaidNeedsConfirm(order)) setConfirmPaid(true);
-    else onAction(order.id, action);
+    else void onAction(order.id, action);
   };
 
   const BUTTONS: { action: OrderAction; show: boolean; label: string; icon: ReactNode }[] = [
@@ -428,6 +443,23 @@ export function OrderCard({
         </div>
       )}
 
+      {order.paymentIssue && (
+        <PaymentIssueNotice
+          issue={order.paymentIssue}
+          billNumber={order.billNumber}
+          totalPaise={order.totalPaise}
+          canRefund={canRefund}
+          canCancel={lateIssue && canCancel}
+          busy={busy}
+          pendingAction={
+            pendingAction === "refund_payment_issue" || pendingAction === "keep_payment_issue" ? pendingAction : null
+          }
+          onRefund={async () => (await onAction(order.id, "refund_payment_issue")).refundFailed ?? null}
+          onKeep={() => void onAction(order.id, "keep_payment_issue")}
+          onCancelAndRefund={() => setConfirmCancel(true)}
+        />
+      )}
+
       <ul className="mt-3 divide-y text-sm" aria-label="Items">
         {order.items.map((it) => (
           <li key={it.id} className="flex justify-between gap-2 py-1.5">
@@ -533,7 +565,7 @@ export function OrderCard({
           vendorName={vendorName}
           riders={riders}
           // Sending it to a rider is handing it over: the order goes out for delivery.
-          onSendToRider={busy ? undefined : (rider) => onAction(order.id, "dispatch", { riderName: rider.name })}
+          onSendToRider={busy ? undefined : (rider) => void onAction(order.id, "dispatch", { riderName: rider.name })}
           className="mt-2"
         />
       )}
@@ -560,7 +592,14 @@ export function OrderCard({
         start edge: away from the full-width buttons a thumb aims for. Cancel
         still asks before it does anything.
       */}
-      {(canUndeliver || canCancel) && (
+      {refundsOnline && actions.has("cancel") && !canCancel && (
+        <p className="mt-2 border-t pt-2 text-sm text-muted-foreground">
+          To cancel this paid order: {REFUND_MANAGER_ONLY.charAt(0).toLowerCase()}
+          {REFUND_MANAGER_ONLY.slice(1)}
+        </p>
+      )}
+
+      {(canUndeliver || (canCancel && !lateIssue)) && (
         <div className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
           {canUndeliver && (
             <Button
@@ -569,7 +608,7 @@ export function OrderCard({
               className="min-h-11 px-2 text-sm first:-ml-2"
               disabled={busy}
               aria-busy={pendingAction === "undeliver"}
-              onClick={() => onAction(order.id, "undeliver")}
+              onClick={() => void onAction(order.id, "undeliver")}
             >
               {pendingAction === "undeliver" ? (
                 <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
@@ -579,13 +618,16 @@ export function OrderCard({
               {isPickup ? "Undo picked up" : "Undo delivered"}
             </Button>
           )}
-          {canCancel && (
+          {canCancel && !lateIssue && (
             <Button
               type="button"
               variant="ghost"
               className="min-h-11 px-2 text-sm text-destructive first:-ml-2 hover:bg-destructive/10 hover:text-destructive"
               disabled={busy}
-              onClick={() => setConfirmCancel(true)}
+              onClick={() => {
+                setRefundFailed(null);
+                setConfirmCancel(true);
+              }}
             >
               <Ban aria-hidden />
               Cancel order
@@ -609,7 +651,7 @@ export function OrderCard({
         confirmLabel="Yes, mark paid"
         cancelLabel="Go back"
         destructive={false}
-        onConfirm={() => onAction(order.id, "mark_paid")}
+        onConfirm={() => void onAction(order.id, "mark_paid")}
       />
 
       <ResponsiveDialog open={confirmCancel} onOpenChange={setConfirmCancel}>
@@ -617,11 +659,31 @@ export function OrderCard({
           <ResponsiveDialogHeader>
             <ResponsiveDialogTitle>Cancel {order.customerName?.trim() || "this"}&rsquo;s order?</ResponsiveDialogTitle>
             <ResponsiveDialogDescription>
-              {order.billNumber} · {formatINR(order.totalPaise)}. If they paid, refund them from your UPI
-              app. Let them know on WhatsApp.
+              {refundsOnline ? (
+                <>
+                  {order.billNumber} · {formatINR(order.totalPaise)}. This refunds them through Razorpay. {REFUND_TERMS} Let
+                  them know on WhatsApp.
+                </>
+              ) : (
+                <>
+                  {order.billNumber} · {formatINR(order.totalPaise)}. If they paid, refund them from your UPI app. Let
+                  them know on WhatsApp.
+                </>
+              )}
             </ResponsiveDialogDescription>
           </ResponsiveDialogHeader>
-          {order.paymentStatus === "PAID" && (
+          {refundsOnline && refundFailed && (
+            <ResponsiveDialogBody>
+              <Notice tone="danger" role="alert">
+                <p className="font-medium">{refundFailedMessage(refundFailed)}</p>
+                <p className="mt-1">
+                  If you cancel anyway, the customer gets nothing back until you refund them from your Razorpay
+                  dashboard.
+                </p>
+              </Notice>
+            </ResponsiveDialogBody>
+          )}
+          {order.paymentStatus === "PAID" && !refundsOnline && (
             <ResponsiveDialogBody>
               <p className="rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm font-medium">
                 This order is marked paid. Cancelling removes {formatINR(order.totalPaise)} from your sales; you
@@ -633,17 +695,52 @@ export function OrderCard({
             <Button type="button" variant="outline" className="min-h-11" onClick={() => setConfirmCancel(false)}>
               Keep order
             </Button>
-            <Button
-              type="button"
-              variant="destructive"
-              className="min-h-11"
-              onClick={() => {
-                setConfirmCancel(false);
-                onAction(order.id, "cancel");
-              }}
-            >
-              Yes, cancel order
-            </Button>
+            {refundsOnline ? (
+              <>
+                {refundFailed && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11"
+                    disabled={busy}
+                    onClick={() => {
+                      setConfirmCancel(false);
+                      void onAction(order.id, "cancel", { refund: "manual" });
+                    }}
+                  >
+                    Cancel anyway, I&rsquo;ll refund from Razorpay
+                  </Button>
+                )}
+                <Button
+                  type="button"
+                  variant="destructive"
+                  className="min-h-11"
+                  disabled={busy}
+                  aria-busy={pendingAction === "cancel"}
+                  onClick={async () => {
+                    setRefundFailed(null);
+                    const result = await onAction(order.id, "cancel", { refund: "razorpay" });
+                    if (result.refundFailed) setRefundFailed(result.refundFailed);
+                    else setConfirmCancel(false);
+                  }}
+                >
+                  {pendingAction === "cancel" && <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />}
+                  Cancel and refund {formatINR(order.totalPaise)}
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="destructive"
+                className="min-h-11"
+                onClick={() => {
+                  setConfirmCancel(false);
+                  void onAction(order.id, "cancel");
+                }}
+              >
+                Yes, cancel order
+              </Button>
+            )}
           </ResponsiveDialogFooter>
         </ResponsiveDialogContent>
       </ResponsiveDialog>

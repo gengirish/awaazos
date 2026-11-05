@@ -22,6 +22,7 @@ import webpush from "web-push";
 
 import { formatINR } from "@/lib/currency";
 import { dropOrdersHref } from "@/lib/drops-board";
+import { paymentIssueCopy, type PaymentIssue } from "@/lib/payment-issue";
 import { prisma } from "@/lib/prisma";
 
 export type PushPayload = {
@@ -95,6 +96,22 @@ export function paymentSubmittedPayload(o: {
     body: `${o.billNumber} · ${formatINR(o.totalPaise)} — check your UPI app, then tap Payment received`,
     url: o.dropId ? dropOrdersHref(o.dropId) : "/orders",
     tag: `pay-${o.billNumber}`,
+  };
+}
+
+/** A Razorpay payment that needs the seller's answer. Bill number and amount only. */
+export function paymentIssuePayload(o: {
+  billNumber: string;
+  totalPaise: number;
+  dropId: string | null;
+  issue: PaymentIssue;
+}): PushPayload {
+  const amount = formatINR(o.totalPaise);
+  return {
+    title: "Payment needs a look",
+    body: `${o.billNumber} · ${amount} ${paymentIssueCopy(o.issue, amount).pushBody}`,
+    url: o.dropId ? dropOrdersHref(o.dropId) : "/orders",
+    tag: `pay-issue-${o.billNumber}`,
   };
 }
 

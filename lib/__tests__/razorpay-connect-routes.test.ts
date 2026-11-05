@@ -13,7 +13,7 @@ const h = vi.hoisted(() => ({
   updateMany: vi.fn(),
   findFirst: vi.fn(),
   transaction: vi.fn(),
-  markOrderPaid: vi.fn(),
+  applyRazorpayCapture: vi.fn(),
 }));
 
 vi.mock("@/lib/env", () => ({
@@ -51,7 +51,7 @@ vi.mock("@/lib/prisma", () => ({
   },
 }));
 
-vi.mock("@/lib/drops", () => ({ markOrderPaid: h.markOrderPaid }));
+vi.mock("@/lib/storefront-payment-issue", () => ({ applyRazorpayCapture: h.applyRazorpayCapture }));
 
 vi.mock("@/lib/ratelimit", () => ({
   webhookRateLimit: { check: async () => ({ ok: true }) },
@@ -80,7 +80,7 @@ beforeEach(() => {
   vi.stubEnv("RAZORPAY_PARTNER_WEBHOOK_SECRET", "partner-secret");
   vi.stubEnv("PAYMENT_KEYS_ENCRYPTION_KEY", crypto.randomBytes(32).toString("base64"));
   h.memberVendorId = "vendor_a";
-  for (const fn of [h.upsert, h.updateMany, h.findFirst, h.transaction, h.markOrderPaid]) fn.mockReset();
+  for (const fn of [h.upsert, h.updateMany, h.findFirst, h.transaction, h.applyRazorpayCapture]) fn.mockReset();
   h.transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn({}));
 });
 afterEach(() => {
@@ -180,7 +180,7 @@ describe("POST /api/webhooks/razorpay-partner", () => {
 
   it("marks the order paid, matching only within the named Razorpay account", async () => {
     h.findFirst.mockResolvedValue({ id: "txn_1", vendorId: "vendor_a", totalPaise: 25000, paymentStatus: "PENDING" });
-    h.markOrderPaid.mockResolvedValue(true);
+    h.applyRazorpayCapture.mockResolvedValue({ marked: true, issue: null });
     const res = await partnerWebhook(signed(PAID_EVENT));
     expect(res.status).toBe(200);
     expect(h.findFirst.mock.calls[0][0].where).toEqual({
@@ -188,7 +188,7 @@ describe("POST /api/webhooks/razorpay-partner", () => {
       source: "STOREFRONT",
       vendor: { settings: { is: { razorpayAccountId: "acc_Dhk2qDbmu6FwZH" } } },
     });
-    expect(h.markOrderPaid).toHaveBeenCalledWith(expect.anything(), {
+    expect(h.applyRazorpayCapture).toHaveBeenCalledWith({
       vendorId: "vendor_a",
       transactionId: "txn_1",
       razorpayOrderId: "order_XYZ123456",
@@ -199,7 +199,7 @@ describe("POST /api/webhooks/razorpay-partner", () => {
   it("an amount mismatch is acknowledged but not marked paid", async () => {
     h.findFirst.mockResolvedValue({ id: "txn_1", vendorId: "vendor_a", totalPaise: 99900, paymentStatus: "PENDING" });
     expect((await partnerWebhook(signed(PAID_EVENT))).status).toBe(200);
-    expect(h.markOrderPaid).not.toHaveBeenCalled();
+    expect(h.applyRazorpayCapture).not.toHaveBeenCalled();
   });
 
   it("revoke clears the OAuth columns of that account's stores", async () => {

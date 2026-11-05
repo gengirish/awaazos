@@ -9,8 +9,8 @@
  * customer field.
  */
 
-import { markOrderPaid } from "@/lib/drops";
 import { prisma } from "@/lib/prisma";
+import { applyRazorpayCapture } from "@/lib/storefront-payment-issue";
 
 const PAYMENT_EVENTS = new Set(["payment.captured", "order.paid"]);
 
@@ -75,7 +75,7 @@ export async function applyRazorpayPaymentEvent(
               source: "STOREFRONT",
               vendor: { settings: { is: { razorpayAccountId: scope.accountId } } },
             },
-      select: { id: true, vendorId: true, totalPaise: true, paymentStatus: true },
+      select: { id: true, vendorId: true, totalPaise: true },
     });
     if (!txn) {
       console.warn(JSON.stringify({ event: "webhook_rzp_orders_unmatched", via, ...logScope, rzEvent: event }));
@@ -101,16 +101,13 @@ export async function applyRazorpayPaymentEvent(
       );
       return "ack";
     }
-    if (txn.paymentStatus === "PAID") return "ack";
 
-    const marked = await prisma.$transaction((tx) =>
-      markOrderPaid(tx, {
-        vendorId: txn.vendorId,
-        transactionId: txn.id,
-        razorpayOrderId,
-        razorpayPaymentId,
-      }),
-    );
+    const { marked } = await applyRazorpayCapture({
+      vendorId: txn.vendorId,
+      transactionId: txn.id,
+      razorpayOrderId,
+      razorpayPaymentId,
+    });
     console.info(
       JSON.stringify({
         event: marked ? "storefront_rzp_paid" : "storefront_rzp_paid_unapplied",

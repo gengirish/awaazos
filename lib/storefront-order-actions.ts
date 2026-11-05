@@ -14,6 +14,11 @@
  *              stamps outForDeliveryAt (+ riderName). Sending it again restamps.
  *   deliver    PLACED|CONFIRMED → DELIVERED; unpaid CASH is marked paid in the same txn
  *   undeliver  DELIVERED → CONFIRMED (mistake fix; payment untouched)
+ *   refund_payment_issue  Razorpay accepted a refund of the flagged payment: clears the
+ *              issue. Fulfilment and DailySummary are untouched (that payment was never credited).
+ *   keep_payment_issue    the seller keeps the order or sorts it out in Razorpay: clears the issue.
+ *
+ * Money leaving through Razorpay happens before this, in lib/storefront-order-refund.ts.
  *
  * Every read and write is pinned to a compound scope
  * `{ id, vendorId, source: "STOREFRONT", dropId }` — `dropId: null` for a menu
@@ -30,6 +35,7 @@ import type { DropStatus, Prisma } from "@prisma/client";
 import { cancelOrder, generateOrderToken, markOrderPaid } from "@/lib/drops";
 import { checkOrderAction, type OrderAction } from "@/lib/drops-board";
 import { boardOrderSelect, type BoardOrderRow } from "@/lib/drops-board-server";
+import { parsePaymentIssue, type RefundFailure } from "@/lib/payment-issue";
 import { deletePaymentProofInBackground } from "@/lib/payment-proof";
 
 export { ORDER_ACTIONS, checkOrderAction, type OrderAction } from "@/lib/drops-board";
@@ -42,13 +48,20 @@ export type StorefrontOrderScope = {
   dropId: string | null;
 };
 
-export type OrderActionErrorCode = "Not found" | "drop_frozen" | "invalid_state";
+export type OrderActionErrorCode =
+  | "Not found"
+  | "drop_frozen"
+  | "invalid_state"
+  | "manager_required"
+  | "refund_failed";
 
 /** Thrown inside the transaction so it rolls back; routes map it to `{ error: code }`. */
 export class OrderActionError extends Error {
   constructor(
-    public readonly status: 404 | 409,
+    public readonly status: 403 | 404 | 409,
     public readonly code: OrderActionErrorCode,
+    /** refund_failed only: why Razorpay didn't take it (lib/payment-issue.ts). */
+    public readonly reason?: RefundFailure,
   ) {
     super(code);
     this.name = "OrderActionError";
@@ -82,6 +95,10 @@ export async function applyStorefrontOrderAction(
     dropStatus: DropStatus | null;
     /** dispatch only: the saved rider it went with ("Send to Ramesh"); omitted = unnamed. */
     riderName?: string | null;
+    /** A refund Razorpay already accepted for this action (lib/storefront-order-refund.ts). */
+    razorpayRefundId?: string;
+    /** cancel only: the seller chose "Cancel anyway, I'll refund from Razorpay". */
+    manualRefund?: boolean;
     now?: Date;
   },
 ): Promise<BoardOrderRow> {
@@ -97,11 +114,14 @@ export async function applyStorefrontOrderAction(
       fulfilmentType: true,
       riderToken: true,
       paymentProofUrl: true,
+      razorpayPaymentId: true,
+      paymentIssue: true,
     },
   });
   if (!order) throw new OrderActionError(404, "Not found");
 
-  const check = checkOrderAction(action, dropStatus, order);
+  const paymentIssue = parsePaymentIssue(order.paymentIssue);
+  const check = checkOrderAction(action, dropStatus, { ...order, paymentIssue });
   if (!check.ok) throw new OrderActionError(409, check.error);
 
   let applied = false;
@@ -133,7 +153,16 @@ export async function applyStorefrontOrderAction(
       break;
     }
     case "cancel": {
-      applied = await cancelOrder(tx, { vendorId, transactionId, now: args.now });
+      // The buyer's Razorpay payment landed after the refund step looked: the order
+      // must not read "refunded" with the money still in Razorpay. The next tap refunds.
+      if (order.paymentStatus === "PAID" && order.razorpayPaymentId && !args.razorpayRefundId && !args.manualRefund) {
+        throw new OrderActionError(409, "invalid_state");
+      }
+      applied = await cancelOrder(tx, { vendorId, transactionId, razorpayRefundId: args.razorpayRefundId, now: args.now });
+      // Cancelling is the answer to a late payment. A second payment still needs its own.
+      if (applied && paymentIssue === "paid_late_oversold") {
+        await tx.transaction.updateMany({ where: scope, data: { paymentIssue: null, paymentIssueAt: null } });
+      }
       break;
     }
     case "dispatch": {
@@ -165,6 +194,23 @@ export async function applyStorefrontOrderAction(
       const r = await tx.transaction.updateMany({
         where: { ...scope, fulfilmentStatus: "DELIVERED" },
         data: { fulfilmentStatus: "CONFIRMED" },
+      });
+      applied = r.count === 1;
+      break;
+    }
+    case "refund_payment_issue": {
+      if (!args.razorpayRefundId) throw new OrderActionError(409, "invalid_state");
+      const r = await tx.transaction.updateMany({
+        where: { ...scope, paymentIssue: { in: ["paid_after_cancel", "paid_twice"] } },
+        data: { paymentIssue: null, paymentIssueAt: null, razorpayRefundId: args.razorpayRefundId },
+      });
+      applied = r.count === 1;
+      break;
+    }
+    case "keep_payment_issue": {
+      const r = await tx.transaction.updateMany({
+        where: { ...scope, paymentIssue: { not: null } },
+        data: { paymentIssue: null, paymentIssueAt: null },
       });
       applied = r.count === 1;
       break;

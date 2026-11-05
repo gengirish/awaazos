@@ -37,6 +37,8 @@ export type RazorpayOrderOptions = CommonOptions & {
   amount: number;
   currency: string;
   order_id: string;
+  /** Seconds until Checkout stops taking this payment. */
+  timeout?: number;
   handler: (resp: RazorpayOrderSuccess) => void;
 };
 

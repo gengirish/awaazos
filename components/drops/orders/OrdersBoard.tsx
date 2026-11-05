@@ -24,7 +24,7 @@ import { toast } from "sonner";
 
 import type { OverflowLink } from "@/components/drops/orders/BoardMenus";
 import { BulkActionBar } from "@/components/drops/orders/BulkActionBar";
-import { OrderCard, type OrderSource } from "@/components/drops/orders/OrderCard";
+import { OrderCard, type OrderActionOpts, type OrderActionResult, type OrderSource } from "@/components/drops/orders/OrderCard";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
 import { PushAlertsBarButton } from "@/components/push/PushAlertsBarButton";
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,7 @@ import {
   writeOrderSoundPref,
   type PushArrivedDetail,
 } from "@/lib/order-voice";
+import { REFUND_MANAGER_ONLY } from "@/lib/payment-issue";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
@@ -167,6 +168,8 @@ const ACTION_DONE: Record<OrderAction, string> = {
   dispatch: "Marked out for delivery",
   deliver: "Marked delivered",
   undeliver: "Moved back to confirmed",
+  refund_payment_issue: "Refund sent",
+  keep_payment_issue: "Done",
 };
 
 /** Summary tile: one line, label and figure. Four in a row from sm, 2×2 on phones. */
@@ -485,17 +488,21 @@ export function OrdersBoard({
     setAnnouncement("");
   };
 
-  const runAction = async (orderId: string, action: OrderAction, opts?: { riderName?: string }) => {
+  const runAction = async (orderId: string, action: OrderAction, opts?: OrderActionOpts): Promise<OrderActionResult> => {
     const order = ordersRef.current.find((o) => o.id === orderId);
-    if (!order) return;
+    if (!order) return { ok: false };
     setPending({ orderId, action });
     try {
       const res = await fetch(`${orderActionBase(order.dropId)}/${encodeURIComponent(orderId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(opts?.riderName ? { action, riderName: opts.riderName } : { action }),
+        body: JSON.stringify({
+          action,
+          ...(opts?.riderName ? { riderName: opts.riderName } : {}),
+          ...(opts?.refund ? { refund: opts.refund } : {}),
+        }),
       });
-      const body = (await res.json().catch(() => ({}))) as { data?: BoardOrder; error?: string };
+      const body = (await res.json().catch(() => ({}))) as { data?: BoardOrder; error?: string; reason?: string };
       if (res.ok && body.data) {
         const updated = body.data;
         setOrders((prev) => prev.map((o) => (o.id === updated.id ? updated : o)));
@@ -515,12 +522,18 @@ export function OrdersBoard({
           });
         } else if (action === "dispatch" && opts?.riderName) {
           toast.success(`Out for delivery with ${opts.riderName}`);
+        } else if (action === "cancel" && order.refundableOnline && opts?.refund !== "manual") {
+          toast.success("Order cancelled, refund sent");
         } else {
           toast.success(ACTION_DONE[action]);
         }
-        return;
+        return { ok: true };
       }
-      if (body.error === "drop_frozen") {
+      // The card says why, next to what the seller can do about it.
+      if (body.error === "refund_failed") return { ok: false, refundFailed: body.reason ?? "refused" };
+      if (body.error === "manager_required") {
+        toast.error(REFUND_MANAGER_ONLY);
+      } else if (body.error === "drop_frozen") {
         toast.error("Orders are locked. Only payment and delivery can change now.");
       } else if (body.error === "invalid_state") {
         toast.error("This order changed on another device. Refreshed.");
@@ -530,8 +543,10 @@ export function OrdersBoard({
         toast.error("Could not update the order. Try again.");
       }
       await refresh();
+      return { ok: false };
     } catch {
       toast.error("No internet. The order was not changed.");
+      return { ok: false };
     } finally {
       setPending(null);
     }
@@ -1196,6 +1211,7 @@ export function OrdersBoard({
                     isNew={newIds.has(o.id)}
                     pendingAction={pending?.orderId === o.id ? pending.action : null}
                     onAction={runAction}
+                    canRefund={staffRole !== "CASHIER"}
                     selectable={isBulkSelectable(o, isFrozen(o))}
                     selected={activeSelected.has(o.id)}
                     onToggleSelect={toggleSelect}

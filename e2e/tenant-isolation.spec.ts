@@ -257,6 +257,20 @@ test.describe("tenant isolation", () => {
     const proofA = await pageA.request.get(`/api/storefront-orders/${orderId}/payment-proof`);
     expect(proofA.status()).toBe(404);
 
+    // B forges a cancel-and-refund or an answer to a flagged payment: same 404, no Razorpay call.
+    for (const body of [
+      { action: "cancel", refund: "razorpay" },
+      { action: "cancel", refund: "manual" },
+      { action: "refund_payment_issue" },
+      { action: "keep_payment_issue" },
+    ]) {
+      const forged = await pageB.request.patch(`/api/storefront-orders/${orderId}`, {
+        data: body,
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(forged.status(), `cross-tenant ${body.action} must 404, never 403`).toBe(404);
+    }
+
     // B forges a bulk confirm with A's order id: no existence leak, nothing changes.
     const bulkB = await pageB.request.post("/api/storefront-orders/bulk", {
       data: { orderIds: [orderId], action: "confirm" },

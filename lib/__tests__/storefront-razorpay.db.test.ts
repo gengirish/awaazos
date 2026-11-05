@@ -27,7 +27,7 @@ const KEY_SECRET = "unit_test_key_secret_abc";
 const WEBHOOK_SECRET = "unit_test_webhook_secret";
 const hmac = (secret: string, data: string) => crypto.createHmac("sha256", secret).update(data).digest("hex");
 
-describe.skipIf(!ENABLED)("storefront razorpay — DB integration", () => {
+describe.skipIf(!ENABLED)("storefront razorpay — DB integration", { timeout: 30_000 }, () => {
   let prisma: PrismaModule["prisma"];
   let startPayment: Handler;
   let verify: Handler;
@@ -36,6 +36,11 @@ describe.skipIf(!ENABLED)("storefront razorpay — DB integration", () => {
   /** Razorpay orders the fake API knows about: id → amount (paise). */
   const rzOrders = new Map<string, { amount: number; status: string }>();
   let createCalls = 0;
+  /** Refunds the fake API has made, by payment; what it was asked to do; and a refusal to give. */
+  const refunds = new Map<string, { id: string; amount: number; status: string; receipt: string }[]>();
+  const refundsOn = (paymentId: string) => refunds.get(paymentId) ?? [];
+  let refundPosts: { paymentId: string; amount: number }[] = [];
+  let refundRefusal: string | null = null;
 
   beforeAll(async () => {
     const url = process.env.DATABASE_URL ?? "";
@@ -65,6 +70,25 @@ describe.skipIf(!ENABLED)("storefront razorpay — DB integration", () => {
           rzOrders.set(id, { amount: body.amount, status: "created" });
           return Response.json({ id, amount: body.amount, amount_paid: 0, currency: "INR", status: "created" });
         }
+        const listed = /^\/v1\/payments\/(pay_\w+)\/refunds$/.exec(u.pathname);
+        if (listed) {
+          const items = refundsOn(listed[1] ?? "");
+          return Response.json({ entity: "collection", count: items.length, items });
+        }
+        const refunding = /^\/v1\/payments\/(pay_\w+)\/refund$/.exec(u.pathname);
+        if (refunding && init?.method === "POST") {
+          const paymentId = refunding[1] ?? "";
+          const body = JSON.parse(String(init.body)) as { amount: number; receipt: string };
+          refundPosts.push({ paymentId, amount: body.amount });
+          if (refundRefusal) return Response.json({ error: { description: refundRefusal } }, { status: 400 });
+          const rows = refundsOn(paymentId);
+          if (rows.some((r) => r.receipt === body.receipt)) {
+            return Response.json({ error: { description: "Duplicate receipt found for this refund request." } }, { status: 400 });
+          }
+          const row = { id: `rfnd_${crypto.randomBytes(7).toString("hex")}`, amount: body.amount, status: "pending", receipt: body.receipt };
+          refunds.set(paymentId, [...rows, row]);
+          return Response.json(row);
+        }
         const m = /^\/v1\/orders\/(order_\w+)$/.exec(u.pathname);
         if (m) {
           const o = rzOrders.get(m[1] ?? "");
@@ -78,6 +102,8 @@ describe.skipIf(!ENABLED)("storefront razorpay — DB integration", () => {
 
   afterEach(() => {
     createCalls = 0;
+    refundPosts = [];
+    refundRefusal = null;
   });
 
   afterAll(async () => {
@@ -304,5 +330,289 @@ describe.skipIf(!ENABLED)("storefront razorpay — DB integration", () => {
     });
     expect(r.status).toBe(200);
     expect((await prisma.transaction.findUniqueOrThrow({ where: { id: victim.txn.id } })).paymentStatus).toBe("PENDING");
+  });
+
+  // ─── Payments that land where they shouldn't, and refunds ─────────
+
+  /** A signed webhook delivery for one captured payment on this order. */
+  async function capture(s: { vendor: { id: string }; txn: { id: string } }, paymentId: string, event = "payment.captured") {
+    const orderId = `order_${s.txn.id.slice(-12)}`;
+    await prisma.transaction.update({ where: { id: s.txn.id }, data: { razorpayOrderId: orderId } });
+    const row = await prisma.transaction.findUniqueOrThrow({ where: { id: s.txn.id } });
+    const body = JSON.stringify({
+      event,
+      payload: { payment: { entity: { id: paymentId, order_id: orderId, amount: row.totalPaise, currency: "INR" } } },
+    });
+    const r = await webhook(post("http://t/x", body, { "x-razorpay-signature": hmac(WEBHOOK_SECRET, body) }), {
+      params: Promise.resolve({ vendorId: s.vendor.id }),
+    });
+    expect(r.status).toBe(200);
+    return prisma.transaction.findUniqueOrThrow({ where: { id: s.txn.id } });
+  }
+
+  const scopeOf = (s: { vendor: { id: string }; txn: { id: string; dropId?: string | null } }) => ({
+    id: s.txn.id,
+    vendorId: s.vendor.id,
+    source: "STOREFRONT" as const,
+    dropId: s.txn.dropId ?? null,
+  });
+
+  /** The two steps a PATCH route runs for one action, as a MANAGER unless told otherwise. */
+  async function act(
+    s: Parameters<typeof scopeOf>[0],
+    action: "cancel" | "refund_payment_issue" | "keep_payment_issue",
+    opts: { refund?: "razorpay" | "manual"; role?: "CASHIER" | "MANAGER" | "OWNER"; scope?: ReturnType<typeof scopeOf> } = {},
+  ) {
+    const { prepareOrderMoney } = await import("@/lib/storefront-order-refund");
+    const { applyStorefrontOrderAction } = await import("@/lib/storefront-order-actions");
+    const scope = opts.scope ?? scopeOf(s);
+    const money = await prepareOrderMoney({ scope, action, refund: opts.refund, canRefund: (opts.role ?? "MANAGER") !== "CASHIER" });
+    return prisma.$transaction((tx) => applyStorefrontOrderAction(tx, { scope, action, dropStatus: null, ...money }));
+  }
+
+  const failure = (p: Promise<unknown>) =>
+    p.then(
+      () => null,
+      (e: { status?: number; code?: string; reason?: string }) => ({ status: e.status, code: e.code, reason: e.reason }),
+    );
+
+  it("paid after cancel: flags once, stays cancelled, credits nothing, refund clears it for good", async () => {
+    const s = await seed();
+    await prisma.transaction.update({ where: { id: s.txn.id }, data: { fulfilmentStatus: "CANCELLED" } });
+
+    const flagged = await capture(s, "pay_AfterCancel01");
+    expect(flagged).toMatchObject({
+      fulfilmentStatus: "CANCELLED",
+      paymentStatus: "PENDING",
+      paymentIssue: "paid_after_cancel",
+      paymentIssuePaymentId: "pay_AfterCancel01",
+    });
+    const firstAt = flagged.paymentIssueAt;
+    expect(firstAt).not.toBeNull();
+
+    // The same payment again, as the other event: nothing moves.
+    const repeat = await capture(s, "pay_AfterCancel01", "order.paid");
+    expect(repeat.paymentIssueAt).toEqual(firstAt);
+    expect(await summary(s.vendor.id)).toHaveLength(0);
+
+    const { ordersBoardWhere } = await import("@/lib/drops-board-server");
+    const old = new Date(Date.now() + 30 * 86_400_000);
+    expect(await prisma.transaction.count({ where: { ...ordersBoardWhere(s.vendor.id, old), id: s.txn.id } })).toBe(1);
+
+    await act(s, "refund_payment_issue");
+    expect(refundPosts).toEqual([{ paymentId: "pay_AfterCancel01", amount: 24_550 }]);
+    const done = await prisma.transaction.findUniqueOrThrow({ where: { id: s.txn.id } });
+    expect(done).toMatchObject({ fulfilmentStatus: "CANCELLED", paymentStatus: "PENDING", paymentIssue: null });
+    expect(done.razorpayRefundId).toMatch(/^rfnd_/);
+    expect(await summary(s.vendor.id)).toHaveLength(0);
+
+    // Razorpay retries after the answer: it must not come back.
+    expect((await capture(s, "pay_AfterCancel01")).paymentIssue).toBeNull();
+  });
+
+  it("paid twice: flags a second payment only, and its refund leaves the sale alone", async () => {
+    const s = await seed();
+    const { markOrderPaid } = await import("@/lib/drops");
+    // The seller saw a direct UPI payment and marked it paid by hand.
+    await prisma.$transaction((tx) => markOrderPaid(tx, { vendorId: s.vendor.id, transactionId: s.txn.id }));
+    const before = await summary(s.vendor.id);
+
+    const flagged = await capture(s, "pay_SecondPayment1");
+    expect(flagged).toMatchObject({ paymentIssue: "paid_twice", paymentStatus: "PAID", paymentIssuePaymentId: "pay_SecondPayment1" });
+
+    await act(s, "refund_payment_issue");
+    const done = await prisma.transaction.findUniqueOrThrow({ where: { id: s.txn.id } });
+    expect(done).toMatchObject({ paymentIssue: null, paymentStatus: "PAID", fulfilmentStatus: "CONFIRMED" });
+    expect((await summary(s.vendor.id))[0]?.totalRevenuePaise).toBe(before[0]?.totalRevenuePaise);
+  });
+
+  it("the same payment through verify and both webhook events is not paid twice", async () => {
+    const s = await seed();
+    const ctx = { params: Promise.resolve({ slug: s.slug, token: s.token }) };
+    const started = ((await (await startPayment(post("http://t/x"), ctx)).json()) as { data: { razorpayOrderId: string } }).data;
+    const orderId = started.razorpayOrderId;
+    const paymentId = "pay_OnePayment0001";
+    const signed = { razorpay_order_id: orderId, razorpay_payment_id: paymentId, razorpay_signature: hmac(KEY_SECRET, `${orderId}|${paymentId}`) };
+    const results = await Promise.all([
+      verify(post("http://t/x", signed), ctx),
+      verify(post("http://t/x", signed), ctx),
+    ]);
+    for (const r of results) expect(r.status).toBe(200);
+    for (const event of ["payment.captured", "order.paid"]) {
+      const body = JSON.stringify({
+        event,
+        payload: { payment: { entity: { id: paymentId, order_id: orderId, amount: 24_550, currency: "INR" } } },
+      });
+      await webhook(post("http://t/x", body, { "x-razorpay-signature": hmac(WEBHOOK_SECRET, body) }), {
+        params: Promise.resolve({ vendorId: s.vendor.id }),
+      });
+    }
+    const row = await prisma.transaction.findUniqueOrThrow({ where: { id: s.txn.id } });
+    expect(row).toMatchObject({ paymentStatus: "PAID", paymentIssue: null, paymentIssuePaymentId: null });
+    expect((await summary(s.vendor.id))[0]).toMatchObject({ totalRevenuePaise: 24_550, totalTransactions: 1 });
+  });
+
+  it("start: tells Checkout how long the hold has left", async () => {
+    const s = await seed({ minsAgo: 5 });
+    const r = await startPayment(post("http://t/x"), { params: Promise.resolve({ slug: s.slug, token: s.token }) });
+    const { holdSecondsLeft } = ((await r.json()) as { data: { holdSecondsLeft: number } }).data;
+    expect(holdSecondsLeft).toBeGreaterThan(590);
+    expect(holdSecondsLeft).toBeLessThanOrEqual(600);
+  });
+
+  async function seedDrop(s: { vendor: { id: string }; txn: { id: string } }, maxQty: number | null) {
+    const tag = crypto.randomBytes(4).toString("hex");
+    const menuItem = await prisma.menuItem.create({
+      data: { vendorId: s.vendor.id, name: `Laddu ${tag}`, slug: `laddu-${tag}`, priceInPaise: 24_550, category: "Sweets" },
+    });
+    const soon = new Date(Date.now() + 86_400_000);
+    const drop = await prisma.drop.create({
+      data: {
+        vendorId: s.vendor.id,
+        title: "Saturday bakes",
+        date: soon,
+        closesAt: soon,
+        fulfilmentStartsAt: soon,
+        fulfilmentEndsAt: soon,
+        status: "OPEN",
+        items: { create: [{ menuItemId: menuItem.id, priceInPaise: 24_550, maxQty }] },
+      },
+      include: { items: true },
+    });
+    const dropItem = drop.items[0]!;
+    const attach = (id: string) =>
+      prisma.$transaction(async (tx) => {
+        await tx.transaction.update({ where: { id }, data: { dropId: drop.id } });
+        await tx.orderItem.updateMany({ where: { transactionId: id }, data: { dropItemId: dropItem.id, qty: 1 } });
+      });
+    await attach(s.txn.id);
+    return { attach };
+  }
+
+  it("late payment: flags a drop only when it really oversells, and keep or cancel answers it", async () => {
+    const late = await seed({ minsAgo: 40 });
+    const { attach } = await seedDrop(late, 1);
+    // Another buyer took the last one once the hold had lapsed.
+    const taken = await prisma.transaction.create({
+      data: {
+        vendorId: late.vendor.id,
+        billNumber: `AWZ-TAKEN-${late.txn.id.slice(-6)}`,
+        subtotalPaise: 100,
+        totalPaise: 100,
+        paymentMethod: "CASH",
+        source: "STOREFRONT",
+        fulfilmentStatus: "CONFIRMED",
+        fulfilmentType: "PICKUP",
+        orderToken: crypto.randomBytes(24).toString("base64url"),
+        orderItems: { create: [{ name: "Ragi laddu", priceInPaise: 100, qty: 1, totalPaise: 100 }] },
+      },
+    });
+    await attach(taken.id);
+
+    const flagged = await capture(late, "pay_LatePayment001");
+    expect(flagged).toMatchObject({ paymentStatus: "PAID", fulfilmentStatus: "CONFIRMED", paymentIssue: "paid_late_oversold" });
+    const withDrop = { ...late, txn: { ...late.txn, dropId: flagged.dropId } };
+
+    await act(withDrop, "keep_payment_issue");
+    expect((await prisma.transaction.findUniqueOrThrow({ where: { id: late.txn.id } }))).toMatchObject({ paymentIssue: null, paymentStatus: "PAID" });
+    // Answered is answered, whichever event comes next.
+    expect((await capture(late, "pay_LatePayment001", "order.paid")).paymentIssue).toBeNull();
+
+    // Room left on the drop: late, but nobody is short.
+    const roomy = await seed({ minsAgo: 40 });
+    await seedDrop(roomy, 5);
+    expect(await capture(roomy, "pay_LateRoomy00001")).toMatchObject({ paymentStatus: "PAID", paymentIssue: null });
+
+    // A menu order has no stock to oversell.
+    const menu = await seed({ minsAgo: 40 });
+    expect(await capture(menu, "pay_LateMenu000001")).toMatchObject({ paymentStatus: "PAID", paymentIssue: null });
+  });
+
+  it("cancelling a late oversold order refunds it and answers the issue", async () => {
+    const late = await seed({ minsAgo: 40 });
+    await seedDrop(late, 0);
+    const row = await capture(late, "pay_LateCancel0001");
+    expect(row.paymentIssue).toBe("paid_late_oversold");
+    await act({ ...late, txn: { ...late.txn, dropId: row.dropId } }, "cancel");
+    expect(await prisma.transaction.findUniqueOrThrow({ where: { id: late.txn.id } })).toMatchObject({
+      fulfilmentStatus: "CANCELLED",
+      paymentStatus: "REFUNDED",
+      paymentIssue: null,
+    });
+    expect(refundPosts).toHaveLength(1);
+    expect((await summary(late.vendor.id))[0]).toMatchObject({ totalRevenuePaise: 0 });
+  });
+
+  it("cancel and refund: reverses revenue once, and two phones refund once", async () => {
+    const s = await seed();
+    await capture(s, "pay_CancelRefund01");
+    expect((await summary(s.vendor.id))[0]?.totalRevenuePaise).toBe(24_550);
+
+    const results = await Promise.all([failure(act(s, "cancel")), failure(act(s, "cancel"))]);
+    expect(results.filter((r) => r === null)).toHaveLength(1);
+    expect(results.find((r) => r !== null)).toMatchObject({ status: 409 });
+
+    expect(refundsOn("pay_CancelRefund01")).toHaveLength(1);
+    const row = await prisma.transaction.findUniqueOrThrow({ where: { id: s.txn.id } });
+    expect(row).toMatchObject({ fulfilmentStatus: "CANCELLED", paymentStatus: "REFUNDED" });
+    expect(row.razorpayRefundId).toBe(refundsOn("pay_CancelRefund01")[0]?.id);
+    expect((await summary(s.vendor.id))[0]?.totalRevenuePaise).toBe(0);
+  });
+
+  it("a refused refund leaves the order paid and live; cancelling anyway is the seller's call", async () => {
+    const s = await seed();
+    await capture(s, "pay_LowBalance0001");
+    refundRefusal = "Your account does not have enough balance to carry out the refund operation.";
+
+    expect(await failure(act(s, "cancel"))).toEqual({ status: 409, code: "refund_failed", reason: "insufficient_balance" });
+    expect(await prisma.transaction.findUniqueOrThrow({ where: { id: s.txn.id } })).toMatchObject({
+      fulfilmentStatus: "CONFIRMED",
+      paymentStatus: "PAID",
+      razorpayRefundId: null,
+    });
+    expect((await summary(s.vendor.id))[0]?.totalRevenuePaise).toBe(24_550);
+
+    await act(s, "cancel", { refund: "manual" });
+    const row = await prisma.transaction.findUniqueOrThrow({ where: { id: s.txn.id } });
+    expect(row).toMatchObject({ fulfilmentStatus: "CANCELLED", paymentStatus: "REFUNDED", razorpayRefundId: null });
+    expect((await summary(s.vendor.id))[0]?.totalRevenuePaise).toBe(0);
+  });
+
+  it("a payment landing between the refund check and the cancel doesn't read as refunded", async () => {
+    const s = await seed();
+    await capture(s, "pay_RaceCancel0001");
+    const { applyStorefrontOrderAction } = await import("@/lib/storefront-order-actions");
+    const attempt = prisma.$transaction((tx) => applyStorefrontOrderAction(tx, { scope: scopeOf(s), action: "cancel", dropStatus: null }));
+    expect(await failure(attempt)).toMatchObject({ status: 409, code: "invalid_state" });
+    expect((await prisma.transaction.findUniqueOrThrow({ where: { id: s.txn.id } })).paymentStatus).toBe("PAID");
+  });
+
+  it("a cashier can't send money back, and another store's order is a 404 first", async () => {
+    const s = await seed();
+    await capture(s, "pay_Cashier0000001");
+    expect(await failure(act(s, "cancel", { role: "CASHIER" }))).toMatchObject({ status: 403, code: "manager_required" });
+    expect(await failure(act(s, "cancel", { role: "CASHIER", refund: "manual" }))).toMatchObject({ status: 403 });
+    expect(refundPosts).toHaveLength(0);
+
+    const other = await seed();
+    const foreign = { ...scopeOf(s), vendorId: other.vendor.id };
+    for (const action of ["cancel", "refund_payment_issue", "keep_payment_issue"] as const) {
+      expect(await failure(act(s, action, { role: "CASHIER", scope: foreign }))).toMatchObject({ status: 404 });
+    }
+    expect(refundPosts).toHaveLength(0);
+
+    // A cashier still cancels an order with no Razorpay payment, as before.
+    const unpaid = await seed();
+    await act(unpaid, "cancel", { role: "CASHIER" });
+    expect((await prisma.transaction.findUniqueOrThrow({ where: { id: unpaid.txn.id } })).fulfilmentStatus).toBe("CANCELLED");
+  });
+
+  it("an issue never reaches the buyer's lookup", async () => {
+    const { findStorefrontOrderForPayment } = await import("@/lib/storefront-razorpay");
+    const s = await seed();
+    const row = await findStorefrontOrderForPayment(s.slug, s.token);
+    expect(Object.keys(row ?? {})).not.toEqual(expect.arrayContaining(["paymentIssue"]));
+    expect(Object.keys(row ?? {})).not.toEqual(expect.arrayContaining(["razorpayRefundId"]));
+    expect(Object.keys(row ?? {})).not.toEqual(expect.arrayContaining(["paymentIssuePaymentId"]));
   });
 });
