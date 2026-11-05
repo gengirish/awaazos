@@ -433,7 +433,7 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   The other paths are UPI intent + the buyer's "I've paid" claim (vendor verifies) and pay on delivery.
   A store with Razorpay shows only "Pay online" on the order page: UPI and "Payment done?" stay hidden (`OnlinePayFlow`,
   `lib/storefront-direct-pay.ts`) until Razorpay fails, its window is closed or the seller answered "Not received", and
-  never on `payment_processing`, so nobody is invited to pay twice. Checkout still needs a UPI ID to reach Razorpay.
+  never on `payment_processing`, so nobody is invited to pay twice. Closing Razorpay's window only leaves a quiet "Pay by UPI instead" link. Razorpay counts as a way to pay, so such a store needs no UPI ID (`payment.online`, `hasPaymentMethod`). Checkout sends a Razorpay order to the order page with `?pay=1`, which opens the window once and strips the param (`orderPagePath`).
 - **Connect Razorpay** (`lib/razorpay-oauth.ts`, plan in `docs/RAZORPAY_PARTNER_PLAN.md`): the same
   vendor-owned account reached by our Razorpay Technology Partner OAuth app instead of pasted keys
   (`RAZORPAY_OAUTH_CLIENT_ID` / `_SECRET` / `_MODE`). One method per store: connecting clears the keys,

@@ -5,6 +5,9 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { lastPaymentMethodBlockersFrom, lastPaymentMethodMessage } from "@/components/settings/LastPaymentMethodNotice";
+import type { StoreKind } from "@/lib/store-vocabulary";
+
 /**
  * Vendor connects HER OWN Razorpay account so storefront buyers can pay online
  * and orders are marked paid automatically. Money settles into her Razorpay
@@ -23,6 +26,7 @@ import { toast } from "sonner";
 export type RazorpayMethod = "keys" | "oauth" | null;
 
 export type RazorpayKeysClientProps = {
+  storeKind: StoreKind;
   initialMethod: RazorpayMethod;
   initialKeyIdLast4: string | null;
   accountId: string | null;
@@ -67,6 +71,7 @@ const linkBtn =
   "inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
 
 export function RazorpayKeysClient({
+  storeKind,
   initialMethod,
   initialKeyIdLast4,
   accountId,
@@ -176,7 +181,12 @@ export function RazorpayKeysClient({
       try {
         const res = await fetch("/api/vendor/payments", { method: "DELETE", credentials: "include" });
         if (!res.ok) {
-          toast.error("Couldn't disconnect. Please try again.");
+          const data: unknown = await res.json().catch(() => null);
+          toast.error(
+            lastPaymentMethodBlockersFrom(res.status, data)
+              ? lastPaymentMethodMessage(storeKind)
+              : "Couldn't disconnect. Please try again.",
+          );
           return;
         }
         setMethod(null);

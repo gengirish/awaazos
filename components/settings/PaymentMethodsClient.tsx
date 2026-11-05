@@ -18,6 +18,8 @@ export type PaymentMethodsClientProps = {
   initialAcceptPayOnDelivery: boolean;
   isOwner: boolean;
   storeKind: StoreKind;
+  /** Razorpay can take payments, so neither of these is the store's last way to be paid. */
+  onlinePayment: boolean;
 };
 
 export function PaymentMethodsClient({
@@ -26,6 +28,7 @@ export function PaymentMethodsClient({
   initialAcceptPayOnDelivery,
   isOwner,
   storeKind,
+  onlinePayment,
 }: PaymentMethodsClientProps) {
   const [hasUpiId, setHasUpiId] = useState(Boolean(initialUpiId));
   const [payOnDelivery, setPayOnDelivery] = useState(initialAcceptPayOnDelivery);
@@ -40,6 +43,7 @@ export function PaymentMethodsClient({
             initialUpiId={initialUpiId}
             initialUpiName={initialUpiName}
             acceptPayOnDelivery={payOnDelivery}
+            onlinePayment={onlinePayment}
             isOwner={isOwner}
             storeKind={storeKind}
             onSaved={(id) => setHasUpiId(Boolean(id))}
@@ -52,7 +56,7 @@ export function PaymentMethodsClient({
       >
           <PayOnDeliveryClient
             initialAcceptPayOnDelivery={initialAcceptPayOnDelivery}
-            hasUpiId={hasUpiId}
+            hasUpiId={hasUpiId || onlinePayment}
             onChange={setPayOnDelivery}
             storeKind={storeKind}
           />

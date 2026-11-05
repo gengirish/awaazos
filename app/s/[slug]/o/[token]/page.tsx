@@ -47,6 +47,7 @@ import { orderIsOver, planOrderAgain } from "@/lib/order-again";
 import { RATING_WORDS } from "@/lib/order-feedback";
 import { loadOrderableNow } from "@/lib/order-again-server";
 import { paymentProofEnabled } from "@/lib/payment-proof";
+import { PAY_NOW_PARAM } from "@/lib/storefront-direct-pay";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl, isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { qrPngDataUrl, qrSvgDataUrl } from "@/lib/qr";
@@ -84,7 +85,8 @@ export const runtime = "nodejs";
  *
  * When the store has connected its own Razorpay account, "Pay online" is the
  * only option shown; the UPI intent/QR and "Payment done?" wait in `OnlinePayFlow`
- * until Razorpay fails. The buyer's own name and phone are handed to that button
+ * until Razorpay fails or the buyer asks for them after closing its window. `?pay=1`,
+ * set by checkout, opens Razorpay on arrival. The buyer's own name and phone are handed to that button
  * only to prefill Razorpay Checkout. Razorpay
  * credentials are selected for presence checks only — never rendered or passed
  * to a client component.
@@ -259,10 +261,11 @@ const WA_BUTTON =
 
 export default async function StorefrontOrderPage(props: {
   params: Promise<{ slug: string; token: string }>;
-  searchParams: Promise<{ wa?: string | string[] }>;
+  searchParams: Promise<{ wa?: string | string[]; pay?: string | string[] }>;
 }) {
   const params = await props.params;
-  const viaWhatsapp = (await props.searchParams).wa === "1";
+  const searchParams = await props.searchParams;
+  const viaWhatsapp = searchParams.wa === "1";
   const order = await loadOrder(params.slug, params.token);
   if (!order) notFound();
 
@@ -604,6 +607,7 @@ export default async function StorefrontOrderPage(props: {
                 prefillContact={order.customerPhone}
                 fallback={upiLink ? "upi" : waLink ? "message" : null}
                 startOpen={paymentRejected}
+                autoStart={searchParams[PAY_NOW_PARAM] === "1" && !viaWhatsapp && !paymentRejected}
                 heading={payHeading}
                 directPay={directPay}
                 claim={claimSection}

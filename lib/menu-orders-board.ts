@@ -82,14 +82,16 @@ export type MenuOrdersBlocker = "storefront_not_published" | "no_payment_method"
 /**
  * Why "Let customers order from your menu" can't be turned on, or null if it
  * can: buyers need a published storefront to order from, and a way to pay
- * (the vendor's UPI ID, or pay on delivery). Same rule on server and client.
+ * (online through Razorpay, the vendor's UPI ID, or pay on delivery). Same rule
+ * on server and client.
  */
 export function menuOrdersEnableBlocker(s: {
   publishStorefront: boolean;
   upiId: string | null | undefined;
   acceptPayOnDelivery: boolean;
+  onlinePayment?: boolean;
 }): MenuOrdersBlocker | null {
   if (!s.publishStorefront) return "storefront_not_published";
-  if (!s.upiId?.trim() && !s.acceptPayOnDelivery) return "no_payment_method";
+  if (!s.upiId?.trim() && !s.acceptPayOnDelivery && !s.onlinePayment) return "no_payment_method";
   return null;
 }

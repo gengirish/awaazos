@@ -20,6 +20,8 @@ import {
 import { formatINR, sumPaise } from "@/lib/currency";
 import { discountLabel } from "@/lib/offers";
 import { orderSrcFromSearch } from "@/lib/order-channel";
+import { loadCheckout } from "@/lib/razorpay-checkout";
+import { orderPagePath } from "@/lib/storefront-direct-pay";
 import { formatIndianMobile, normaliseIndianMobile } from "@/lib/phone";
 import {
   CHECKOUT_FIELD_MESSAGES,
@@ -373,7 +375,7 @@ export type CheckoutSheetProps = {
   pickupNote: string | null;
   /** When to collect (drops: the fulfilment window label), if known. */
   pickupWindow?: string | null;
-  payment: { upi: boolean; cod: boolean };
+  payment: { upi: boolean; cod: boolean; online: boolean };
   /**
    * The store has a WhatsApp number: also offer the "Also send my order to
    * the store on WhatsApp" checkbox (off by default). Same order, same
@@ -613,6 +615,11 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     return all.length > 0 ? all.join(" ") : undefined;
   }
 
+  // A head start on the Razorpay window, which opens right after this sheet. A failed load is retried there.
+  useEffect(() => {
+    if (open && payment.online) loadCheckout().catch(() => {});
+  }, [open, payment.online]);
+
   const subtotalPaise = sumPaise(lines.map((l) => l.priceInPaise * l.qty));
   const feePaise = fulfilment === "DELIVERY" ? deliveryFeePaise : 0;
   const discountPaise = discount?.discountPaise ?? 0;
@@ -686,9 +693,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
       if (token) {
         // So the store page can point back at it; the order page records it too.
         if (data?.billNumber) rememberRecentOrder(slug, { token, billNumber: data.billNumber, createdAt: Date.now() });
-        router.push(
-          `/s/${encodeURIComponent(slug)}/o/${encodeURIComponent(token)}${viaWhatsapp ? "?wa=1" : ""}`,
-        );
+        router.push(orderPagePath(slug, token, { viaWhatsapp, payNow: method === "UPI" && payment.online }));
         return; // keep the spinner while navigating
       }
     }
@@ -931,7 +936,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
               {onlyPayment ? (
                 <p className="text-sm text-muted-foreground">
                   {onlyPayment === "UPI"
-                    ? "Pay by UPI on the next screen, with any UPI app."
+                    ? payment.online
+                      ? "Pay online by UPI, card or netbanking, secured by Razorpay."
+                      : "Pay by UPI on the next screen, with any UPI app."
                     : fulfilment === "PICKUP"
                       ? "Pay when you collect."
                       : "Pay on delivery, by cash or UPI at the door."}
@@ -946,8 +953,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                       setMethod("UPI");
                       revalidate("payment", { method: "UPI" });
                     }}
-                    label="Pay now by UPI"
-                    hint="Any UPI app, on the next screen"
+                    label={payment.online ? "Pay online" : "Pay now by UPI"}
+                    hint={payment.online ? "UPI, cards or netbanking · secured by Razorpay" : "Any UPI app, on the next screen"}
                     invalid={!!fieldErrors.payment}
                     describedBy={describedBy("payment")}
                   />
@@ -1041,7 +1048,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
               ) : null}
               {submitting
                 ? "Placing order…"
-                : `${method === "UPI" ? "Place order & pay" : "Place order"} · ${formatINR(totalPaise)}`}
+                : method === "UPI" && payment.online
+                  ? `Pay ${formatINR(totalPaise)}`
+                  : `${method === "UPI" ? "Place order & pay" : "Place order"} · ${formatINR(totalPaise)}`}
             </button>
           </ResponsiveDialogFooter>
         </form>

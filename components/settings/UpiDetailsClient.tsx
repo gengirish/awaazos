@@ -23,6 +23,8 @@ export type UpiDetailsClientProps = {
   isOwner: boolean;
   /** Names the everyday-orders setting in the "last way to pay" notice. */
   storeKind: StoreKind;
+  /** Razorpay can take payments, so removing the UPI ID leaves a way to pay. */
+  onlinePayment?: boolean;
   /** Told after a successful save with the stored UPI ID (null when removed). */
   onSaved?: (upiId: string | null) => void;
 };
@@ -36,6 +38,7 @@ export function UpiDetailsClient({
   initialUpiId,
   initialUpiName,
   acceptPayOnDelivery,
+  onlinePayment,
   isOwner,
   storeKind,
   onSaved,
@@ -58,7 +61,7 @@ export function UpiDetailsClient({
   const nextUpiName = upiName.trim();
   const dirty = nextUpiId !== saved.upiId || nextUpiName !== saved.upiName;
   const removing = nextUpiId === "" && saved.upiId !== "";
-  const removeNeedsWarning = removing && !acceptPayOnDelivery;
+  const removeNeedsWarning = removing && !acceptPayOnDelivery && !onlinePayment;
 
   function save() {
     if (!dirty || pending || !isOwner) return;

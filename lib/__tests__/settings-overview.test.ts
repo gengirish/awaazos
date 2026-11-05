@@ -49,6 +49,9 @@ describe("settings hub status lines", () => {
     expect(s.on).toBe(true);
 
     expect(paymentsStatus({ upiId: "  ", acceptPayOnDelivery: false, razorpayConfigured: true }).on).toBe(false);
+    expect(
+      paymentsStatus({ upiId: null, acceptPayOnDelivery: false, razorpayConfigured: true, onlinePayment: true }).on,
+    ).toBe(true);
   });
 
   it("voice: picker labels, legacy codes, and a safe default", () => {
@@ -130,6 +133,7 @@ describe("setupChecklist", () => {
   it("is empty when the stall can take online orders", () => {
     expect(setupChecklist(ready)).toEqual([]);
     expect(setupChecklist({ ...ready, upiId: "a.b@ybl", acceptPayOnDelivery: false })).toEqual([]);
+    expect(setupChecklist({ ...ready, upiId: null, acceptPayOnDelivery: false, onlinePayment: true })).toEqual([]);
   });
 
   it("lists every missing step with where to fix it", () => {

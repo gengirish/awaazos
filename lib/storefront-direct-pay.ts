@@ -55,8 +55,28 @@ export function checkoutLoadFailedMessage(fallback: DirectPayFallback): string {
   return `Couldn't load the payment window. Check your connection${orElse(fallback)}`;
 }
 
-export function checkoutCancelledMessage(fallback: DirectPayFallback): string {
-  return `Payment cancelled. You can try again${orElse(fallback)}`;
+export function checkoutCancelledMessage(): string {
+  return "Payment cancelled. You can try again.";
+}
+
+/** The quiet way out after the buyer closes Razorpay's window; null when the store has none. */
+export function directPayOfferLabel(fallback: DirectPayFallback): string | null {
+  if (fallback === "upi") return "Pay by UPI instead";
+  if (fallback === "message") return "Message the store instead";
+  return null;
+}
+
+/** Added by checkout for a Razorpay order: the order page opens Razorpay on arrival, once. */
+export const PAY_NOW_PARAM = "pay";
+
+/** Where checkout sends the buyer. WhatsApp goes first when asked for, so it wins over paying now. */
+export function orderPagePath(
+  slug: string,
+  token: string,
+  opts: { viaWhatsapp: boolean; payNow: boolean },
+): string {
+  const query = opts.viaWhatsapp ? "?wa=1" : opts.payNow ? `?${PAY_NOW_PARAM}=1` : "";
+  return `/s/${encodeURIComponent(slug)}/o/${encodeURIComponent(token)}${query}`;
 }
 
 /**
