@@ -119,7 +119,8 @@ export const runtime = "nodejs";
  *
  * The open-amount "Scan to pay" QR shows only with a read-only menu. With a
  * cart (menu ordering) or a drop holding the page, checkout gives the buyer an
- * exact UPI amount and no second, open-amount QR is shown.
+ * exact UPI amount and no second, open-amount QR is shown. With no items and no
+ * drops there is nothing to pay for: "Orders will open soon" replaces it.
  *
  * Offers (lib/offers.ts): each orderable section gets the offers live on it,
  * resolved on the server to the item ids that section already shows plus the
@@ -636,7 +637,9 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   // The open-amount "Scan to pay" QR, only for a read-only menu (see #pay below).
   // Rendered here, not by a third-party image URL: no network hop for the buyer,
   // and the payee VPA never leaves our server.
-  const qrLarge = upiLink && !menuOrdering && !menuHidden ? await qrSvgDataUrl(upiLink, 220) : "";
+  // Needs items on the page: with nothing to buy there is nothing to pay for.
+  const showOpenAmountQr = !!upiLink && !menuOrdering && !menuHidden && categories.length > 0;
+  const qrLarge = upiLink && showOpenAmountQr ? await qrSvgDataUrl(upiLink, 220) : "";
   // Everyday-menu rows only take orders (and carry row ids) with menu ordering on.
   const orderableMenuIds = new Set(menuOrdering ? menuItems.map((i) => i.id) : []);
   // One read covers both channels; a store with nothing orderable skips it.
@@ -897,7 +900,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                   Order now
                 </a>
               ) : null
-            ) : upiLink && !menuHidden ? (
+            ) : showOpenAmountQr ? (
               <a
                 href="#pay"
                 className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
@@ -993,7 +996,21 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
               dropViews.length > 0 ? null : (
                 <EmptyState
                   className="rounded-2xl bg-background px-4 py-12"
-                  description="This store has not published any items yet. Please check back soon."
+                  title="Orders will open soon"
+                  titleAs="h3"
+                  description={
+                    whatsappLink
+                      ? `${vendor.name} will start taking orders as soon as they're ready. Message them on WhatsApp to hear when orders open.`
+                      : `${vendor.name} will start taking orders as soon as they're ready. Please check back soon.`
+                  }
+                  action={
+                    whatsappLink ? (
+                      <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>
+                        <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        WhatsApp
+                      </a>
+                    ) : null
+                  }
                 />
               )
             ) : (
@@ -1090,7 +1107,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
 
             <StoreSearchEmpty />
 
-            {upiLink && !menuOrdering && !menuHidden ? (
+            {upiLink && showOpenAmountQr ? (
               <section
                 id="pay"
                 aria-labelledby="pay-heading"

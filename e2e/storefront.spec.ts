@@ -396,6 +396,63 @@ test.describe("public storefront", () => {
     }
   });
 
+  test("a store with nothing available says orders will open soon, with no open-amount QR", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    await createVendorSession(page, request, "storefront-empty", "/menu");
+    const slug = await vendorSlug(page);
+    const item = await createMenuItem(page, { name: "Resting Ragi Laddu", priceInRupees: 30 });
+    const off = await page.request.patch(`/api/menu/${item.id}`, {
+      data: { isAvailable: false },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(off.ok(), "marking the only item unavailable").toBe(true);
+    const upi = await page.request.patch("/api/vendor", {
+      data: { upiId: "e2e-empty@okaxis", upiName: "E2E Empty" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(upi.ok(), "saving a UPI ID").toBe(true);
+    await setPublished(page, true);
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const anonPage = await anon.newPage();
+    const heading = anonPage.getByRole("heading", { name: "Orders will open soon" });
+    const whatsappButton = anonPage.locator("main").getByRole("link", { name: "WhatsApp" });
+    try {
+      await anonPage.goto(`/s/${slug}`);
+      await expect(heading).toBeVisible();
+      await expect(anonPage.getByText(/Please check back soon/)).toBeVisible();
+      await expect(whatsappButton).toHaveCount(0);
+      await expect(anonPage.getByRole("heading", { name: /scan to pay/i })).toHaveCount(0);
+      await expect(anonPage.getByRole("link", { name: /scan & pay/i })).toHaveCount(0);
+      await expect(anonPage.getByRole("img", { name: /UPI QR code/i })).toHaveCount(0);
+
+      // WhatsApp on the store: the message points the buyer at it.
+      const contact = await page.request.patch("/api/vendor", {
+        data: { whatsappNumber: "9848012345", showWhatsappOnStore: true },
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(contact.ok(), "showing WhatsApp on the store").toBe(true);
+      await anonPage.goto(`/s/${slug}`);
+      await expect(anonPage.getByText(/Message them on WhatsApp to hear when orders open/)).toBeVisible();
+      await expect(whatsappButton).toHaveAttribute("href", /^https:\/\/wa\.me\/919848012345/);
+
+      // An item back on sale: the read-only menu keeps its QR.
+      const on = await page.request.patch(`/api/menu/${item.id}`, {
+        data: { isAvailable: true },
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(on.ok(), "marking the item available again").toBe(true);
+      await anonPage.goto(`/s/${slug}`);
+      await expect(heading).toHaveCount(0);
+      await expect(anonPage.getByRole("heading", { name: /scan to pay/i })).toBeVisible();
+    } finally {
+      await anon.close();
+    }
+  });
+
   test("an owner can publish from the Settings UI, not just the API", async ({
     page,
     request,
