@@ -23,9 +23,9 @@ test.describe("public surfaces", () => {
     await expect(page.getByRole("heading", { name: /^lite$/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /^starter$/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /^pro$/i })).toBeVisible();
-    await expect(page.getByText("Best value")).toBeVisible();
+    await expect(page.getByText("Best value", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { level: 1 })).toContainText("30 days free");
-    await expect(page.getByText("₹4,990/yr + GST")).toBeVisible();
+    await expect(page.getByText("₹6,490/yr + GST")).toBeVisible();
     await expect(page.getByText(/2 months free/i).first()).toBeVisible();
     // Scoped to <main>: the header carries the same call to action.
     await expect(page.getByRole("main").getByRole("link", { name: /start 30 days free/i }).first()).toHaveAttribute(
@@ -47,16 +47,20 @@ test.describe("public surfaces", () => {
 
   test("pricing shows whole-rupee prices, all exclusive of GST", async ({ page }) => {
     await page.goto("/pricing");
-    await expect(page.getByText("₹499/mo + GST", { exact: true })).toBeVisible();
+    await expect(page.getByText("₹649/mo + GST", { exact: true })).toBeVisible();
     await expect(page.getByText(/₹\s*299\.00/)).toHaveCount(0);
     await expect(page.getByText(/exclude 18% GST/i)).toBeVisible();
+    await expect(page.getByText(/Save ₹1,298, about ₹541 a month/)).toBeVisible();
+    const compare = page.getByRole("table");
+    await expect(compare.getByRole("row", { name: /^Orders a month/ })).toContainText("Unlimited");
+    await expect(compare.getByRole("row", { name: /^Counter billing by voice/ })).toContainText("No");
   });
 
   test("landing teaser offers the same trial and prices", async ({ page }) => {
     await page.goto("/");
     const teaser = page.getByRole("region", { name: /simple plans/i });
     await expect(teaser).toContainText("30 days free");
-    for (const amount of ["₹449", "₹499", "₹999"]) await expect(teaser).toContainText(amount);
+    for (const amount of ["₹599", "₹649", "₹1,149"]) await expect(teaser).toContainText(amount);
     await expect(teaser).toContainText("Best value");
     await expect(teaser).toContainText("2 months free");
   });

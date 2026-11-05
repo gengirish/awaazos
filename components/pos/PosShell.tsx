@@ -28,7 +28,7 @@ export type PosShellProps = {
     upiName: string | null;
   };
   initialItems: MenuTile[];
-  settings: PosSettings & { voiceLang: string; autoPrintReceipt: boolean };
+  settings: PosSettings & { voiceLang: string; autoPrintReceipt: boolean; voiceBilling: boolean };
   todaysRevenuePaise: number;
   /** ISO time the server rendered this page; shown as "menu as of" when offline. */
   renderedAt: string;
@@ -103,6 +103,7 @@ export function PosShell({
     taxEnabled: settings.taxEnabled,
     taxPercent: settings.taxPercent,
     offers: settings.offers,
+    voiceBilling: settings.voiceBilling,
   };
 
   return (
@@ -135,7 +136,7 @@ export function PosShell({
         className="mt-4 flex flex-col gap-8 md:mt-6 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] md:items-start md:gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]"
       >
         <div className="flex min-w-0 flex-col gap-5 md:gap-8">
-          <VoiceOrderButton voiceLang={settings.voiceLang} />
+          {settings.voiceBilling ? <VoiceOrderButton voiceLang={settings.voiceLang} /> : null}
           <QuickAddGrid items={initialItems} vocab={vocab} />
         </div>
         <div

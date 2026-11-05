@@ -25,6 +25,14 @@ export const PLAN_LIMITS: Record<
     csvExport: boolean;
     sarvamStt: boolean;
     analyticsDays: number;
+    /**
+     * Counter billing by voice: the POS mic and POST /api/ai/parse-order. Web Speech
+     * skips /api/ai/transcribe for en/hi, so that route's plan gate isn't enough.
+     * FREE keeps it: those stores signed up before the trial, when they had it.
+     */
+    voiceBilling: boolean;
+    /** Monthly cap, enforced by `reserveFalImage` (lib/ai-usage-guard.ts). */
+    aiImagesPerMonth: number;
   }
 > = {
   FREE: {
@@ -39,13 +47,15 @@ export const PLAN_LIMITS: Record<
     csvExport: false,
     sarvamStt: false,
     analyticsDays: 7,
+    voiceBilling: true,
+    aiImagesPerMonth: 0,
   },
   // Sold just under Starter and well short of it, so Starter is the easy choice
   // (lib/plan-copy.ts). Ranks below STARTER, so every requirePlan(STARTER) gate
   // already shuts it out; storefront Razorpay reads `razorpayLinks`.
   LITE: {
     label: "Lite",
-    pricePaise: 44900,
+    pricePaise: 59900,
     txnPerMonth: 50,
     maxStaff: 1,
     whatsappReceipts: false,
@@ -55,10 +65,12 @@ export const PLAN_LIMITS: Record<
     csvExport: false,
     sarvamStt: false,
     analyticsDays: 30,
+    voiceBilling: false,
+    aiImagesPerMonth: 0,
   },
   STARTER: {
     label: "Starter",
-    pricePaise: 49900,
+    pricePaise: 64900,
     // Unlimited: STARTER matches the 30-day trial
     // (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md), so converting changes nothing.
     txnPerMonth: null,
@@ -71,10 +83,12 @@ export const PLAN_LIMITS: Record<
     csvExport: true,
     sarvamStt: true,
     analyticsDays: 90,
+    voiceBilling: true,
+    aiImagesPerMonth: 30,
   },
   PRO: {
     label: "Pro",
-    pricePaise: 99900,
+    pricePaise: 114900,
     txnPerMonth: null,
     maxStaff: null,
     whatsappReceipts: true,
@@ -84,6 +98,8 @@ export const PLAN_LIMITS: Record<
     csvExport: true,
     sarvamStt: true,
     analyticsDays: 365,
+    voiceBilling: true,
+    aiImagesPerMonth: 100,
   },
   ENTERPRISE: {
     label: "Enterprise",
@@ -97,6 +113,8 @@ export const PLAN_LIMITS: Record<
     csvExport: true,
     sarvamStt: true,
     analyticsDays: 365,
+    voiceBilling: true,
+    aiImagesPerMonth: 300,
   },
 };
 
@@ -169,9 +187,9 @@ export const BRAND = {
 /** Per-plan SaaS price in paise (monthly). Mirrors `PLAN_LIMITS.*.pricePaise` for gates and marketing. */
 export const PLAN_PRICES_PAISE: Record<Plan, number> = {
   FREE: 0,
-  LITE: 44900,
-  STARTER: 49900,
-  PRO: 99900,
+  LITE: 59900,
+  STARTER: 64900,
+  PRO: 114900,
   ENTERPRISE: 0,
 };
 
@@ -180,9 +198,9 @@ export const PLAN_PRICES_PAISE: Record<Plan, number> = {
  * free). Only plans that can be bought yearly are listed.
  */
 export const PLAN_PRICES_YEARLY_PAISE: Partial<Record<Plan, number>> = {
-  LITE: 449000,
-  STARTER: 499000,
-  PRO: 999000,
+  LITE: 599000,
+  STARTER: 649000,
+  PRO: 1149000,
 };
 
 /**

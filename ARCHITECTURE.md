@@ -510,12 +510,13 @@ Current `requirePlan` call sites, all STARTER: `/api/ai/transcribe`, `/api/recei
 
 `PLAN_LIMITS` table lives in `lib/constants.ts`:
 
-| Plan | Price/mo | monthlyTxnCap | maxStaff | whatsapp | razorpayLinks | sarvamStt | analyticsDays | csvExport |
-| --- | ---: | ---: | ---: | --- | --- | --- | ---: | --- |
-| FREE | ₹0 | 50 | 1 | ❌ | ❌ | ❌ | 7 | ❌ |
-| STARTER | ₹299 (₹2,990/yr) | null (∞) | 3 | ✅ | ✅ | ✅ | 90 | ✅ |
-| PRO | ₹799 | null (∞) | null | ✅ | ✅ | ✅ | 365 | ✅ |
-| ENTERPRISE | custom | null | null | ✅ | ✅ | ✅ | 365 | ✅ |
+| Plan | Price/mo | monthlyTxnCap | maxStaff | whatsapp | razorpayLinks | sarvamStt | voiceBilling | analyticsDays | aiImagesPerMonth | csvExport |
+| --- | ---: | ---: | ---: | --- | --- | --- | --- | ---: | ---: | --- |
+| FREE | ₹0 | 50 | 1 | ❌ | ❌ | ❌ | ✅ | 7 | 0 | ❌ |
+| LITE | ₹599 (₹5,990/yr) | 50 | 1 | ❌ | ❌ | ❌ | ❌ | 30 | 0 | ❌ |
+| STARTER | ₹649 (₹6,490/yr) | null (∞) | 3 | ✅ | ✅ | ✅ | ✅ | 90 | 30 | ✅ |
+| PRO | ₹1,149 (₹11,490/yr) | null (∞) | null | ✅ | ✅ | ✅ | ✅ | 365 | 100 | ✅ |
+| ENTERPRISE | custom | null | null | ✅ | ✅ | ✅ | ✅ | 365 | 300 | ✅ |
 
 Prices exclude 18% GST (`GST_BPS`); the Razorpay plan amount is base + GST (`subscriptionChargePaise`). `txnPerMonth` and `whatsappReceipts` duplicate `monthlyTxnCap` and `whatsapp`. `whatsapp` gates only the dormant automated Gupshup send — wa.me receipts from the vendor's own WhatsApp work on every plan. `razorpayLinks` gates the vendor's own Razorpay keys for storefront payments. `maxStaff` is not read anywhere (there is no staff invite flow). Marketing copy is derived from this table in `lib/plan-copy.ts`, and only STARTER is marketed (`MARKETED_PLANS`); FREE survives only for vendors who signed up before the trial, and PRO and ENTERPRISE stay in the code for the gates.
 

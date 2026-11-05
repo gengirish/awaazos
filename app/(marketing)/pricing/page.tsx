@@ -4,7 +4,7 @@ import Link from "next/link";
 import { PricingPlanButtons } from "@/components/billing/PricingPlanButtons";
 import { auth } from "@/lib/auth";
 import { TRIAL_DAYS } from "@/lib/constants";
-import { MARKETED_PLANS, PLAN_MARKETING } from "@/lib/plan-copy";
+import { MARKETED_PLANS, PLAN_COMPARISON, PLAN_MARKETING, YEARLY_DISCOUNT } from "@/lib/plan-copy";
 
 const starter = PLAN_MARKETING.STARTER;
 
@@ -55,6 +55,9 @@ export default async function PricingPage() {
                 or <span className="font-medium text-foreground">{PLAN_MARKETING[tier].yearlyPrice}</span> —{" "}
                 {PLAN_MARKETING[tier].yearlyNote}
               </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Save {PLAN_MARKETING[tier].yearlySaving}, about {PLAN_MARKETING[tier].yearlyPerMonth} a month.
+              </p>
               <p className="mt-4 text-sm text-muted-foreground">{PLAN_MARKETING[tier].summary}</p>
               <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-foreground">
                 {PLAN_MARKETING[tier].bullets.map((b) => (
@@ -68,8 +71,46 @@ export default async function PricingPage() {
           ))}
         </div>
 
+        <section aria-labelledby="compare-plans-heading" className="mt-12">
+          <h2 id="compare-plans-heading" className="font-display text-2xl font-semibold text-foreground">
+            Compare plans
+          </h2>
+          <div className="mt-4 overflow-x-auto rounded-lg border bg-card">
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th scope="col" className="px-3 py-3 text-left font-medium">
+                    <span className="sr-only">Feature</span>
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left font-medium">
+                    {PLAN_MARKETING.LITE.label}
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left font-semibold text-primary">
+                    {starter.label}
+                  </th>
+                  <th scope="col" className="px-3 py-3 text-left font-medium">
+                    {PLAN_MARKETING.PRO.label}
+                  </th>
+                </tr>
+              </thead>
+              <tbody>
+                {PLAN_COMPARISON.map((row) => (
+                  <tr key={row.label} className="border-b last:border-0">
+                    <th scope="row" className="px-3 py-2.5 text-left font-normal text-muted-foreground">
+                      {row.label}
+                    </th>
+                    <td className="px-3 py-2.5">{row.lite}</td>
+                    <td className="px-3 py-2.5 font-medium">{row.starter}</td>
+                    <td className="px-3 py-2.5">{row.pro}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <p className="mt-6 text-center text-sm text-muted-foreground">
-          Prices exclude 18% GST. Cancel anytime — your plan runs to the end of the period you paid for. See the{" "}
+          Prices exclude 18% GST. Yearly plans get {starter.yearlyNote} ({YEARLY_DISCOUNT}). Cancel anytime — your plan runs to the end of the period you paid for. See the{" "}
           <Link href="/legal/refund" className="underline underline-offset-4">
             refund policy
           </Link>

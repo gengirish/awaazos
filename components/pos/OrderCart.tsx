@@ -13,7 +13,7 @@ import { computeCartTotals, toPayTotals, type PayTotals, type PosTaxSettings } f
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
-export type PosSettings = PosTaxSettings;
+export type PosSettings = PosTaxSettings & { voiceBilling?: boolean };
 
 export type OrderCartProps = {
   settings: PosSettings;
@@ -131,7 +131,7 @@ export function OrderCart({ settings, vocab, onCollectPayment }: OrderCartProps)
       ) : null}
 
       {items.length === 0 ? (
-        <p className="px-4 py-8 text-center text-sm text-muted-foreground">Tap items or use voice to build an order.</p>
+        <p className="px-4 py-8 text-center text-sm text-muted-foreground">{settings.voiceBilling === false ? "Tap items to build an order." : "Tap items or use voice to build an order."}</p>
       ) : (
         <ul className="divide-y">
           {items.map((line) => {

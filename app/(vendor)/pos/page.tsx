@@ -6,6 +6,7 @@ import { TrialNotice } from "@/components/billing/TrialNotice";
 import { PosShell } from "@/components/pos/PosShell";
 import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
 import { getIstTodayStart } from "@/lib/billing-period";
+import { PLAN_LIMITS } from "@/lib/constants";
 import { loadResolvedOffers } from "@/lib/offers-server";
 import { prisma } from "@/lib/prisma";
 import type { BillingAccess } from "@/lib/plan";
@@ -19,6 +20,7 @@ export default async function PosPage() {
   let vendorId: string;
   let staffRole: StaffRole;
   let access: BillingAccess;
+  let voiceBilling: boolean;
   let trialEndsAt: Date | null;
   let customPricePaise: number | null;
   let vocab: StoreVocabulary;
@@ -30,6 +32,7 @@ export default async function PosPage() {
     vocab = storeVocabulary(ctx.vendor.stallType);
     staffRole = ctx.staff.role;
     access = ctx.access;
+    voiceBilling = PLAN_LIMITS[ctx.vendor.plan].voiceBilling;
   } catch (e) {
     if (e instanceof AuthError) {
       redirect("/sign-in");
@@ -99,6 +102,7 @@ export default async function PosPage() {
     taxEnabled: s?.taxEnabled ?? false,
     taxPercent: s?.taxPercent != null ? String(s.taxPercent) : "0",
     autoPrintReceipt: s?.autoPrintReceipt ?? false,
+    voiceBilling,
     offers,
   };
 

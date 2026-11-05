@@ -37,6 +37,17 @@ test.describe("plan gates return structured 402s", () => {
     await expect(page.getByRole("button", { name: /Pro yearly/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /Lite monthly/ })).toHaveCount(0);
     await expect(page.getByText(/ends your current subscription now/)).toBeVisible();
+
+    // Voice billing: Web Speech skips the transcribe gate, so parse-order holds it.
+    const voice = await page.request.post("/api/ai/parse-order", {
+      data: { transcript: "do samosa", lang: "en-IN", sttSource: "webspeech" },
+    });
+    expect(voice.status()).toBe(402);
+    expect((await voice.json()) as PlanGateBody).toMatchObject({ currentPlan: "LITE", feature: "voice_billing" });
+
+    await page.goto("/pos");
+    await expect(page.getByRole("button", { name: /start voice order/i })).toHaveCount(0);
+    await expect(page.getByText("Tap items to build an order.")).toBeVisible();
   });
 
   test("a store on the trial is offered all three plans", async ({ page, request }) => {

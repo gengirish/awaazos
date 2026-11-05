@@ -47,9 +47,9 @@ describe("prices", () => {
 
   it("Razorpay plan amounts are base + GST", () => {
     expect(subscriptionBasePaise("STARTER", "monthly")).toBe(PLAN_PRICES_PAISE.STARTER);
-    expect(subscriptionChargePaise("STARTER", "monthly")).toBe(58882);
-    expect(subscriptionBasePaise("STARTER", "yearly")).toBe(499000);
-    expect(subscriptionChargePaise("STARTER", "yearly")).toBe(588820);
+    expect(subscriptionChargePaise("STARTER", "monthly")).toBe(76582);
+    expect(subscriptionBasePaise("STARTER", "yearly")).toBe(649000);
+    expect(subscriptionChargePaise("STARTER", "yearly")).toBe(765820);
   });
 
   it("yearly is 10× monthly (two months free)", () => {
@@ -220,10 +220,10 @@ describe("Razorpay plan ids", () => {
   });
 
   it("charges each plan its base plus GST, a year being ten months", () => {
-    expect(subscriptionChargePaise("LITE", "monthly")).toBe(52982);
-    expect(subscriptionChargePaise("LITE", "yearly")).toBe(529820);
-    expect(subscriptionChargePaise("PRO", "monthly")).toBe(117882);
-    expect(subscriptionChargePaise("PRO", "yearly")).toBe(1178820);
+    expect(subscriptionChargePaise("LITE", "monthly")).toBe(70682);
+    expect(subscriptionChargePaise("LITE", "yearly")).toBe(706820);
+    expect(subscriptionChargePaise("PRO", "monthly")).toBe(135582);
+    expect(subscriptionChargePaise("PRO", "yearly")).toBe(1355820);
   });
 
   it("keeps crediting retired plans, and ignores entries it can't trust", () => {
