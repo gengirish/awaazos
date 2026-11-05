@@ -3,11 +3,10 @@
 import type { MenuItem } from "@prisma/client";
 import { Package, UtensilsCrossed } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { toast } from "sonner";
 
 import { MenuItemCard, type MenuMoveDirection } from "@/components/menu/MenuItemCard";
-import { MenuItemForm } from "@/components/menu/MenuItemForm";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
@@ -16,9 +15,13 @@ import type { StoreVocabulary } from "@/lib/store-vocabulary";
 export const MENU_CHANGED_EVENT = "awaazos:menu-changed";
 
 type MenuGridProps = {
+  /** The list on screen; MenuScreen owns it because the page header needs it too. */
+  items: MenuItem[];
+  setItems: (items: MenuItem[]) => void;
+  /** What the server last sent: a failed reorder goes back to this. */
   initialItems: MenuItem[];
-  /** Open the add form with this name on first render (`/menu?add=…`). */
-  prefillName?: string;
+  onAdd: () => void;
+  onEdit: (item: MenuItem) => void;
   /** The store's words (lib/store-vocabulary.ts). */
   vocab: StoreVocabulary;
 };
@@ -37,24 +40,14 @@ async function saveOrder(rows: MenuItem[]): Promise<boolean> {
   }
 }
 
-export function MenuGrid({ initialItems, prefillName, vocab }: MenuGridProps) {
+export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }: MenuGridProps) {
   const router = useRouter();
-  const [items, setItems] = useState<MenuItem[]>(initialItems);
-  const [formOpen, setFormOpen] = useState(Boolean(prefillName));
-  const [defaultName, setDefaultName] = useState(prefillName ?? "");
-  const [editing, setEditing] = useState<MenuItem | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   // Reorder saves run one at a time; taps made meanwhile collapse into one more save.
   const savingOrder = useRef(false);
   const queuedOrder = useRef<MenuItem[] | null>(null);
   // The Move button to put focus back on once the cards have swapped places.
   const refocusMove = useRef<{ id: string; direction: MenuMoveDirection } | null>(null);
-
-  const categories = useMemo(() => [...new Set(items.map((i) => i.category).filter(Boolean))], [items]);
-
-  useEffect(() => {
-    setItems(initialItems);
-  }, [initialItems]);
 
   // Moving a card re-inserts its DOM node, which drops focus in some browsers.
   // At an end of the list that button is now disabled, so its twin takes over.
@@ -71,35 +64,6 @@ export function MenuGrid({ initialItems, prefillName, vocab }: MenuGridProps) {
   const refresh = useCallback(() => {
     router.refresh();
   }, [router]);
-
-  // A voice save (VoiceMenuPanel): the list reads the rows itself, because the
-  // router.refresh() fired beside that save was sometimes never applied, which
-  // left new dishes hidden until a reload (e2e/voice-menu.spec.ts caught it).
-  useEffect(() => {
-    async function reload() {
-      try {
-        const res = await fetch("/api/menu", { credentials: "include" });
-        if (!res.ok) return;
-        const body = (await res.json()) as { data?: MenuItem[] };
-        if (body.data) setItems(body.data);
-      } catch {
-        // Offline: the list catches up on the next page load.
-      }
-    }
-    window.addEventListener(MENU_CHANGED_EVENT, reload);
-    return () => window.removeEventListener(MENU_CHANGED_EVENT, reload);
-  }, []);
-
-  function openCreate() {
-    setDefaultName("");
-    setEditing(null);
-    setFormOpen(true);
-  }
-
-  function openEdit(item: MenuItem) {
-    setEditing(item);
-    setFormOpen(true);
-  }
 
   async function applyReorder(next: MenuItem[]) {
     setItems(next);
@@ -173,18 +137,13 @@ export function MenuGrid({ initialItems, prefillName, vocab }: MenuGridProps) {
           title="No items yet"
           description={`Add your first item here, or use Add ${vocab.items} by voice above to say several with their prices.`}
           action={
-            <Button type="button" className="min-h-11" onClick={openCreate}>
+            <Button type="button" className="min-h-11" onClick={onAdd}>
               Add item
             </Button>
           }
         />
       ) : (
         <>
-          <div className="flex justify-end">
-            <Button type="button" className="min-h-11" onClick={openCreate}>
-              Add item
-            </Button>
-          </div>
           {items.length > 1 ? (
             <>
               <p className="text-sm text-muted-foreground pointer-coarse:hidden">
@@ -207,7 +166,7 @@ export function MenuGrid({ initialItems, prefillName, vocab }: MenuGridProps) {
               >
                 <MenuItemCard
                   item={item}
-                  onEdit={openEdit}
+                  onEdit={onEdit}
                   onChanged={refresh}
                   onMove={move}
                   canMoveUp={index > 0}
@@ -218,15 +177,6 @@ export function MenuGrid({ initialItems, prefillName, vocab }: MenuGridProps) {
           </div>
         </>
       )}
-      <MenuItemForm
-        open={formOpen}
-        onOpenChange={setFormOpen}
-        item={editing}
-        onSaved={refresh}
-        defaultName={defaultName}
-        categories={categories}
-        vocab={vocab}
-      />
     </div>
   );
 }
