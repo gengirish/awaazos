@@ -85,19 +85,26 @@ export function allowedFulfilmentTypes(mode: FulfilmentMode): FulfilmentType[] {
   return [mode];
 }
 
-/** Vendor-driven transitions. Time-driven ones (cut-off) are never stored. */
+/**
+ * Vendor-driven transitions. Time-driven ones (cut-off) are never stored, so a
+ * drop needs no further tap once orders close.
+ *
+ * Nothing moves a drop into FROZEN or FULFILLED any more: those are older rows
+ * from when sellers locked a drop and marked it done by hand. They stay read-only
+ * (a locked one can still be unlocked).
+ */
 const ALLOWED_TRANSITIONS: Record<DropStatus, DropStatus[]> = {
   DRAFT: ["OPEN"],
-  OPEN: ["CLOSED", "FROZEN", "DRAFT"],
-  CLOSED: ["OPEN", "FROZEN"],
-  FROZEN: ["FULFILLED", "CLOSED"],
+  OPEN: ["CLOSED"],
+  CLOSED: ["OPEN"],
+  FROZEN: ["CLOSED"],
   FULFILLED: [],
 };
 
 /**
  * Can the vendor move `from` → `to`? Uses the *effective* status as `from`, so
- * an OPEN drop past its cut-off behaves as CLOSED (it can be frozen, or reopened
- * — reopening requires moving closesAt forward, which the caller enforces).
+ * an OPEN drop past its cut-off behaves as CLOSED (it can be reopened, which
+ * requires moving closesAt forward; the caller enforces that).
  */
 export function canTransition(from: EffectiveDropStatus, to: DropStatus): boolean {
   const base: DropStatus = from === "SCHEDULED" ? "OPEN" : from;

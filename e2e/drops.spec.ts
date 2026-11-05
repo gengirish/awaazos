@@ -40,7 +40,7 @@ async function checkoutPickupPayOnDelivery(page: Page) {
 }
 
 test.describe("drops: home-kitchen pre-order day", () => {
-  test("vendor sets up a drop, buyer orders limited stock, vendor fulfils and freezes", async ({
+  test("vendor sets up a drop, buyer orders limited stock, vendor fulfils and closes orders", async ({
     page,
     request,
     browser,
@@ -89,6 +89,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
     // ── Vendor: build the drop ─────────────────────────────────────────
     await page.goto("/drops/new");
     await expect(page.getByRole("heading", { name: "New drop" })).toBeVisible();
+    await page.getByText("More options").click();
     await page.getByLabel("Title").fill(dropTitle);
     await page.getByRole("radio", { name: "Both" }).click();
     await expect(page.getByRole("radio", { name: "Both" })).toBeChecked();
@@ -105,7 +106,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
     const ladduRow = page.getByRole("listitem").filter({ hasText: laddu });
     await ladduRow.getByLabel("How many can you make?").fill("3");
 
-    await page.getByRole("button", { name: "Create drop" }).click();
+    await page.getByRole("button", { name: "Save draft" }).click();
     // Generous: next dev compiles the edit route on first hit.
     await page.waitForURL(/\/drops\/[^/]+\/edit$/, { timeout: 120_000 });
     const dropId = new URL(page.url()).pathname.split("/")[2];
@@ -186,14 +187,11 @@ test.describe("drops: home-kitchen pre-order day", () => {
       await staleCtx.close();
     }
 
-    // ── Vendor: lock orders, then the prep sheet has the right totals ─────────
+    // ── Vendor: close orders, then the prep sheet has the right totals ─────────
     await page.goto(`/drops/${dropId}/edit`);
-    await page.getByRole("button", { name: "Lock orders" }).click();
-    const confirm = page.getByRole("dialog", { name: "Lock orders?" });
-    await confirm.getByRole("button", { name: "Lock orders" }).click();
-    await expect(confirm).toBeHidden();
+    await page.getByRole("button", { name: "Close orders now" }).click();
     await expect(
-      page.getByRole("region", { name: "Status" }).getByText("Orders locked", { exact: true }),
+      page.getByRole("region", { name: "Status" }).getByText("Orders closed", { exact: true }),
     ).toBeVisible();
 
     await page.goto(`/drops/${dropId}/prep`);
@@ -204,7 +202,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
     // Chakli was offered but not ordered, so it is not on the cook list.
     await expect(cook.getByRole("row", { name: new RegExp(chakli) })).toHaveCount(0);
     await expect(cook.getByRole("row", { name: /total items/i }).getByRole("cell")).toHaveText(["2", ""]);
-    // Frozen: no "orders can still change" warning.
+    // Closed: no "orders can still change" warning.
     await expect(page.getByText("Orders can still change")).toHaveCount(0);
   });
 
@@ -245,17 +243,17 @@ test.describe("drops: home-kitchen pre-order day", () => {
 
     await page.goto(`/drops/${drop.id}/edit`);
     const status = page.getByRole("region", { name: "Status" });
-    await status.getByRole("button", { name: "Open orders" }).click();
+    await page.getByRole("button", { name: "Open orders" }).click();
 
     // Nothing is published until the owner says so: backing out leaves it private.
     const confirm = page.getByRole("dialog", { name: "Publish your store too?" });
     await expect(confirm).toContainText(`/s/${slug}`);
-    await confirm.getByRole("button", { name: "Cancel" }).click();
+    await confirm.getByRole("button", { name: "Keep as a draft" }).click();
     await expect(confirm).toBeHidden();
     await expect(status.getByText("Draft", { exact: true })).toBeVisible();
     expect((await page.request.get(`/s/${slug}`)).status()).toBe(404);
 
-    await status.getByRole("button", { name: "Open orders" }).click();
+    await page.getByRole("button", { name: "Open orders" }).click();
     await confirm.getByRole("button", { name: "Publish store and open orders" }).click();
     await expect(confirm).toBeHidden();
     await expect(status.getByText("Taking orders", { exact: true })).toBeVisible();
