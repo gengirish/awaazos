@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { HOME_PATH } from "@/lib/home";
 import { cn } from "@/lib/utils";
 
 // Phone section pills: the link is the 44px hit area, the pill inside it keeps
@@ -15,7 +16,10 @@ const sectionPillClass =
 const navLinkClass =
   "inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-awaaz-charcoal/90 outline-hidden transition-colors hover:text-awaaz-orange focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2";
 
-export function MarketingHeader({ cta }: { cta: string }) {
+const orangeButtonClass =
+  "min-h-11 shrink-0 bg-awaaz-orange font-semibold text-white hover:bg-awaaz-orange/90 focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2";
+
+export function MarketingHeader({ cta, signedIn = false }: { cta: string; signedIn?: boolean }) {
   const [scrolled, setScrolled] = useState(false);
 
   useEffect(() => {
@@ -55,29 +59,39 @@ export function MarketingHeader({ cta }: { cta: string }) {
             <Link href="/pricing" className={navLinkClass}>
               Pricing
             </Link>
-            <Link href="/sign-in" className={navLinkClass}>
-              Sign in
-            </Link>
-            <Button
-              asChild
-              className="ml-2 min-h-11 bg-awaaz-orange px-5 font-semibold text-white hover:bg-awaaz-orange/90 focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
-            >
-              <Link href="/sign-up">{cta}</Link>
-            </Button>
+            {signedIn ? (
+              <Button asChild className={cn(orangeButtonClass, "ml-2 px-5")}>
+                <Link href={HOME_PATH}>Go to dashboard</Link>
+              </Button>
+            ) : (
+              <>
+                <Link href="/sign-in" className={navLinkClass}>
+                  Sign in
+                </Link>
+                <Button asChild className={cn(orangeButtonClass, "ml-2 px-5")}>
+                  <Link href="/sign-up">{cta}</Link>
+                </Button>
+              </>
+            )}
           </nav>
           <div className="flex items-center gap-2 md:hidden">
-            <Link
-              href="/sign-in"
-              className="inline-flex min-h-11 min-w-[44px] items-center justify-center rounded-md border border-awaaz-charcoal/20 px-3 text-sm font-medium text-awaaz-charcoal outline-hidden hover:bg-muted focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
-            >
-              Sign in
-            </Link>
-            <Button
-              asChild
-              className="min-h-11 shrink-0 bg-awaaz-orange px-4 font-semibold text-white hover:bg-awaaz-orange/90 focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
-            >
-              <Link href="/sign-up">{cta}</Link>
-            </Button>
+            {signedIn ? (
+              <Button asChild className={cn(orangeButtonClass, "px-4")}>
+                <Link href={HOME_PATH}>Go to dashboard</Link>
+              </Button>
+            ) : (
+              <>
+                <Link
+                  href="/sign-in"
+                  className="inline-flex min-h-11 min-w-[44px] items-center justify-center rounded-md border border-awaaz-charcoal/20 px-3 text-sm font-medium text-awaaz-charcoal outline-hidden hover:bg-muted focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+                >
+                  Sign in
+                </Link>
+                <Button asChild className={cn(orangeButtonClass, "px-4")}>
+                  <Link href="/sign-up">{cta}</Link>
+                </Button>
+              </>
+            )}
           </div>
         </div>
       </header>

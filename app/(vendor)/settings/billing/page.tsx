@@ -5,14 +5,23 @@ import { redirect } from "next/navigation";
 import { lockReason } from "@/components/billing/BillingLockedCard";
 import { BillingManageClient } from "@/components/billing/BillingManageClient";
 import { SettingsPageHeader } from "@/components/settings/SettingsChrome";
-import { PLAN_LIMITS, PLAN_RANK, TRIAL_DAYS } from "@/lib/constants";
+import {
+  SUBSCRIBE_REFUSAL_MESSAGE,
+  parseBillingSelection,
+  plansOnOffer,
+  preselectedPlan,
+  subscribeDecision,
+  subscriptionRenews,
+  type SubscriptionFacts,
+} from "@/lib/billing-actions";
+import { PLAN_LIMITS, TRIAL_DAYS } from "@/lib/constants";
 import { formatIstDate } from "@/lib/datetime";
 import { countBillableTxnThisMonth } from "@/lib/drops";
 import { isPlanExpired, isPlanInGrace, planGraceEndsAt, trialDaysLeft } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { canPromoteReferrals, referralPitch } from "@/lib/referral";
-import { LIVE_SUBSCRIPTION_STATUSES, SUBSCRIBABLE_PLANS, type SubscribablePlan } from "@/lib/subscription";
+import { LIVE_SUBSCRIPTION_STATUSES } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
 
@@ -22,7 +31,11 @@ function formatDateDdMmYyyyIst(d: Date | null): string {
   return d ? formatIstDate(d) : "—";
 }
 
-export default async function BillingSettingsPage() {
+export default async function BillingSettingsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ plan?: string | string[]; interval?: string | string[] }>;
+}) {
   try {
     // `vendor.plan` is already the effective plan (lib/plan.ts); `storedPlan` is
     // the raw DB value, used only to explain an expiry.
@@ -44,15 +57,19 @@ export default async function BillingSettingsPage() {
     // More than TRIAL_DAYS left means free access granted on /admin/vendors.
     const trialLeft = access.kind === "trial" ? trialDaysLeft(access.endsAt, now) : 0;
     const hasLiveSubscription = LIVE_SUBSCRIPTION_STATUSES.includes(settings?.razorpaySubStatus ?? "");
-    // A store's own price is for Starter alone. Paying: only a step up, which
-    // replaces the subscription. Otherwise anything, unless one is already live.
-    const sellable: readonly SubscribablePlan[] = vendor.customPricePaise === null ? SUBSCRIBABLE_PLANS : ["STARTER"];
-    const plansOnOffer =
-      access.kind === "paid"
-        ? sellable.filter((plan) => PLAN_RANK[plan] > PLAN_RANK[access.plan])
-        : hasLiveSubscription
-          ? []
-          : sellable;
+    const facts: SubscriptionFacts = {
+      access,
+      planExpiresAt: vendor.planExpiresAt,
+      razorpaySubId: settings?.razorpaySubId ?? null,
+      razorpaySubStatus: settings?.razorpaySubStatus ?? null,
+      razorpaySubCancelAtEnd: settings?.razorpaySubCancelAtEnd ?? false,
+      customPricePaise: vendor.customPricePaise,
+    };
+    const offers = plansOnOffer(facts, now);
+    const renews = subscriptionRenews(facts);
+    // The pricing page's link carries the owner's pick (billingSelectionPath).
+    const selection = parseBillingSelection(await searchParams);
+    const refused = selection.plan ? subscribeDecision(facts, selection.plan, now) : null;
 
     return (
       <>
@@ -95,7 +112,8 @@ export default async function BillingSettingsPage() {
               </p>
             ) : (
               <p className="mt-1 text-sm text-muted-foreground">
-                Renews / expires: {formatDateDdMmYyyyIst(vendor.planExpiresAt)}
+                {!renews && vendor.planExpiresAt ? "Paid until" : "Renews / expires"}:{" "}
+                {formatDateDdMmYyyyIst(vendor.planExpiresAt)}
               </p>
             )}
           </section>
@@ -131,8 +149,12 @@ export default async function BillingSettingsPage() {
           <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
             <h2 className="mb-4 font-medium">Actions</h2>
             <BillingManageClient
-              plans={plansOnOffer}
-              isUpgrade={access.kind === "paid"}
+              offers={offers}
+              initialPlan={preselectedPlan(offers, selection.plan)}
+              initialInterval={selection.interval ?? "monthly"}
+              payingForLabel={access.kind === "paid" ? PLAN_LIMITS[access.plan].label : null}
+              paidUntilLabel={vendor.planExpiresAt ? formatIstDate(vendor.planExpiresAt) : null}
+              unavailableNote={refused && !refused.ok ? SUBSCRIBE_REFUSAL_MESSAGE[refused.reason] : null}
               // Live, or a subscription from before the status column existed.
               canCancel={
                 hasLiveSubscription || Boolean(settings?.razorpaySubId && !settings.razorpaySubStatus)

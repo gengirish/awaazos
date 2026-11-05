@@ -326,6 +326,12 @@ passes, so Neon can sleep.
   /api/razorpay/verify-subscription`. Verify never trusts the browser: it checks
   `HMAC(payment_id|subscription_id)` with the platform key secret, requires the subscription to be
   the one on file for the signed-in vendor (else 404), then reads its state from Razorpay.
+- **What can be bought now** is one rule, `subscribeDecision` / `plansOnOffer` in `lib/billing-actions.ts`, used by the billing page and
+  `create-subscription`, so neither can offer what the other refuses. Not renewing (cancelled, also at cycle end, halted, expired, none) and paying:
+  the same or a lower plan starts at `planExpiresAt` with nothing charged today (`notes.resumesPaidPeriod`: its `authenticated` grants nothing and an
+  uncharged cancel takes nothing back); a higher plan starts today. A halted or paused subscription is cancelled first, since Razorpay can charge it again.
+  `/pricing` links carry the pick: `/settings/billing?plan=starter&interval=yearly` (`billingSelectionPath`), through sign-in for a signed-out seller. Sign-up carries no pick: a new store goes through onboarding first.
+  `/pricing` is in its own `(pricing)` route group because its header reads the session; the `(marketing)` layout must stay static.
 - **One write path:** the webhook and verify both go through `recordSubscriptionEvent`
   (`lib/subscription-store.ts`), so whichever lands second changes nothing. Don't write
   `plan` / `planExpiresAt` anywhere else.
@@ -335,7 +341,7 @@ passes, so Neon can sleep.
   cuts a running trial short (`billingAccess`). A store with `customPricePaise` is offered Starter only. Moving up
   goes through `create-subscription`: Razorpay can't move a UPI AutoPay subscription between plans, so it cancels the
   live one first (a failed cancel stops there, so nobody is charged twice), then starts the new one. Moving down is
-  cancel, then subscribe once the old plan ends. Plan ids: `npm run razorpay:create-plans`.
+  cancel, then pick the lower plan: it starts when the paid period ends. Plan ids: `npm run razorpay:create-plans`.
 - **Changing a list price:** Razorpay plan amounts are fixed, so set the new constants, create new plans and put their ids
   on Vercel in the same deploy. Old ids go in `RAZORPAY_RETIRED_PLANS` so existing subscribers stay credited, and
   `resolveSubscriptionPlanId` refuses a list plan whose Razorpay amount differs from `subscriptionChargePaise`.

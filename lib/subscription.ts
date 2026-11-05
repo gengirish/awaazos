@@ -14,6 +14,9 @@
  *   `planExpiresAt`. The one exception: a subscription cancelled before its
  *   first charge (`paid_count` 0) takes back the access its `authenticated`
  *   event granted, since nothing was ever paid.
+ * - A subscription that resumes after a paid period (`resumesPaidPeriod`) grants
+ *   nothing on `authenticated` and takes nothing back: the time left is already
+ *   paid for, on the old plan. Its plan applies from its first charge.
  * - Events for a subscription other than the one on file only touch the
  *   vendor's plan when they carry a payment (`activated` / `charged`); they
  *   never overwrite the status or clear the id of the current one.
@@ -126,6 +129,8 @@ export type SubscriptionSnapshot = {
   currentEnd: Date | null;
   startAt: Date | null;
   paidCount: number | null;
+  /** Made to start when the vendor's paid period ends (`notes.resumesPaidPeriod`). */
+  resumesPaidPeriod?: boolean;
 };
 
 /** The vendor's stored billing state before the event. */
@@ -192,7 +197,7 @@ export function applySubscriptionEvent(
           billingInterval: sub.mapped.interval,
         },
       };
-      if (sub.startAt && sub.startAt.getTime() > now.getTime()) {
+      if (!sub.resumesPaidPeriod && sub.startAt && sub.startAt.getTime() > now.getTime()) {
         patch.vendor = {
           plan: sub.mapped.plan,
           planExpiresAt: laterOf(current.planExpiresAt, sub.startAt),
@@ -215,6 +220,7 @@ export function applySubscriptionEvent(
       // nothing later than its start_at was paid for.
       if (
         event === "subscription.cancelled" &&
+        !sub.resumesPaidPeriod &&
         sub.paidCount === 0 &&
         sub.startAt &&
         current.planExpiresAt &&
