@@ -166,6 +166,7 @@ export async function createSubscription({
   planId,
   vendorId,
   startAt,
+  resumesPaidPeriod,
 }: {
   plan: SubscribablePlan;
   interval: BillingInterval;
@@ -174,6 +175,8 @@ export async function createSubscription({
   vendorId: string;
   /** First charge date. Set while the vendor is in the trial so they keep all 30 days. */
   startAt?: Date | null;
+  /** Starts when a paid period ends: `applySubscriptionEvent` must leave that period alone. */
+  resumesPaidPeriod?: boolean;
 }): Promise<{ subscriptionId: string; shortUrl: string }> {
   const rz = getRazorpay();
   const sub = await withTimeout(
@@ -184,7 +187,7 @@ export async function createSubscription({
       quantity: 1,
       ...(startAt ? { start_at: Math.floor(startAt.getTime() / 1000) } : {}),
       // `plan` and `interval` are what planFromNotes reads for a custom-price plan.
-      notes: { vendorId, plan, interval },
+      notes: { vendorId, plan, interval, ...(resumesPaidPeriod ? { resumesPaidPeriod: "1" } : {}) },
     }),
     RAZORPAY_API_TIMEOUT_MS,
     "razorpay.subscriptions.create",
@@ -249,6 +252,7 @@ export function toSubscriptionSnapshot(id: string, entity: Record<string, unknow
     mapped: planFromRazorpayPlanId(planId) ?? planFromNotes(entity.notes),
     currentEnd: fromUnixSeconds(entity.current_end),
     startAt: fromUnixSeconds(entity.start_at),
+    resumesPaidPeriod: Boolean(entity.notes && (entity.notes as Record<string, unknown>).resumesPaidPeriod),
     paidCount: typeof entity.paid_count === "number" ? entity.paid_count : null,
   };
 }
