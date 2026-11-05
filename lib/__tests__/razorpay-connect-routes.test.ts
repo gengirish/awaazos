@@ -14,6 +14,7 @@ const h = vi.hoisted(() => ({
   findFirst: vi.fn(),
   transaction: vi.fn(),
   applyRazorpayCapture: vi.fn(),
+  alertSellerOnlinePaid: vi.fn(),
 }));
 
 vi.mock("@/lib/env", () => ({
@@ -52,6 +53,7 @@ vi.mock("@/lib/prisma", () => ({
 }));
 
 vi.mock("@/lib/storefront-payment-issue", () => ({ applyRazorpayCapture: h.applyRazorpayCapture }));
+vi.mock("@/lib/storefront-online-paid", () => ({ alertSellerOnlinePaid: h.alertSellerOnlinePaid }));
 
 vi.mock("@/lib/ratelimit", () => ({
   webhookRateLimit: { check: async () => ({ ok: true }) },
@@ -80,7 +82,9 @@ beforeEach(() => {
   vi.stubEnv("RAZORPAY_PARTNER_WEBHOOK_SECRET", "partner-secret");
   vi.stubEnv("PAYMENT_KEYS_ENCRYPTION_KEY", crypto.randomBytes(32).toString("base64"));
   h.memberVendorId = "vendor_a";
-  for (const fn of [h.upsert, h.updateMany, h.findFirst, h.transaction, h.applyRazorpayCapture]) fn.mockReset();
+  for (const fn of [h.upsert, h.updateMany, h.findFirst, h.transaction, h.applyRazorpayCapture, h.alertSellerOnlinePaid]) {
+    fn.mockReset();
+  }
   h.transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => fn({}));
 });
 afterEach(() => {
@@ -194,6 +198,15 @@ describe("POST /api/webhooks/razorpay-partner", () => {
       razorpayOrderId: "order_XYZ123456",
       razorpayPaymentId: "pay_ABC123456",
     });
+    expect(h.alertSellerOnlinePaid).toHaveBeenCalledWith("vendor_a", "txn_1");
+  });
+
+  it("a flagged payment sends its issue alert only, not a second 'new paid order' push", async () => {
+    h.findFirst.mockResolvedValue({ id: "txn_1", vendorId: "vendor_a", totalPaise: 25000, paymentStatus: "PENDING" });
+    h.applyRazorpayCapture.mockResolvedValue({ marked: true, issue: "paid_late_oversold" });
+    const res = await partnerWebhook(signed(PAID_EVENT));
+    expect(res.status).toBe(200);
+    expect(h.alertSellerOnlinePaid).not.toHaveBeenCalled();
   });
 
   it("an amount mismatch is acknowledged but not marked paid", async () => {

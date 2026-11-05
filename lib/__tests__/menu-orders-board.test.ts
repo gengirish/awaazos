@@ -75,6 +75,12 @@ describe("BOARD_POLL_MS", () => {
 });
 
 describe("menuOrdersEnableBlocker", () => {
+  it("accepts Razorpay as the way to pay, but still needs a published store", () => {
+    const razorpayOnly = { upiId: null, acceptPayOnDelivery: false, onlinePayment: true };
+    expect(menuOrdersEnableBlocker({ publishStorefront: true, ...razorpayOnly })).toBeNull();
+    expect(menuOrdersEnableBlocker({ publishStorefront: false, ...razorpayOnly })).toBe("storefront_not_published");
+  });
+
   it("requires a published storefront first", () => {
     expect(menuOrdersEnableBlocker({ publishStorefront: false, upiId: "a@upi", acceptPayOnDelivery: true })).toBe(
       "storefront_not_published",

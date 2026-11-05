@@ -142,6 +142,8 @@ export function OrderCard({
   // Per card and on this device only.
   const [open, setOpen] = useState(false);
   const collapsible = order.bucket !== "needs_action";
+  // A Razorpay store's new order, not paid yet: nothing to do but wait (or cancel it).
+  const awaitingOnline = order.bucket === "awaiting_online";
   const expanded = !collapsible || open;
   const busy = pendingAction !== null || locked;
   const customerLabel = order.customerName?.trim() || "Customer";
@@ -311,7 +313,9 @@ export function OrderCard({
         </div>
         <div className="shrink-0 text-right">
           <p className="font-mono text-lg font-bold tabular-nums">{formatINR(order.totalPaise)}</p>
-          <p className="text-xs text-muted-foreground">{order.paymentMethod === "CASH" ? "Cash" : "UPI"}</p>
+          <p className="text-xs text-muted-foreground">
+            {order.paymentMethod === "CASH" ? "Cash" : order.paidOnline ? "Paid online" : "UPI"}
+          </p>
         </div>
       </header>
 
@@ -397,7 +401,7 @@ export function OrderCard({
                 <StateIcon state={order.displayState} />
                 {stateLabel}
                 {fs === "CONFIRMED" && order.displayState !== "DELIVERED" && " · Confirmed"}
-                {fs === "PLACED" && order.displayState !== "EXPIRED" && " · Not confirmed yet"}
+                {fs === "PLACED" && order.displayState !== "EXPIRED" && !awaitingOnline && " · Not confirmed yet"}
               </p>
               {source && (
                 <p className="inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground">
@@ -411,6 +415,12 @@ export function OrderCard({
                 </p>
               )}
             </div>
+
+            {awaitingOnline && (
+              <p className="mt-3 text-sm text-muted-foreground">
+                The customer hasn&rsquo;t paid yet. Nothing to do: once they pay online, this order is confirmed for you.
+              </p>
+            )}
 
             {order.displayState === "PAYMENT_SUBMITTED" && (
               <div className="mt-3 rounded-md border border-amber-500/60 bg-amber-50 p-3 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
@@ -559,7 +569,7 @@ export function OrderCard({
         </p>
       )}
 
-      {!isPickup && fs !== "CANCELLED" && fs !== "DELIVERED" && (
+      {!isPickup && fs !== "CANCELLED" && fs !== "DELIVERED" && !awaitingOnline && (
         <RiderHandoffButton
           order={order}
           vendorName={vendorName}

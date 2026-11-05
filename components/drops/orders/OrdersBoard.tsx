@@ -49,6 +49,7 @@ import {
   isDropFrozen,
   liveEffectiveStatus,
   newOrderIds,
+  newOrdersTab,
   orderActionBase,
   ordersInScope,
   prepFromOrders,
@@ -669,17 +670,19 @@ export function OrdersBoard({
   };
 
   // "N new orders — show": whatever tab, search or drop she was looking at, land
-  // on the new orders at the top of Needs action.
+  // on the new orders at the top of their tab.
   const showNewOrders = () => {
     const inScope = new Set(scoped.map((o) => o.id));
     if (unseenIds.some((id) => !inScope.has(id))) changeScope("all");
-    changeFilter("needs_action");
+    const unseen = new Set(unseenIds);
+    const tab = newOrdersTab(orders.filter((o) => unseen.has(o.id)));
+    changeFilter(tab);
     setQuery("");
     setSearchOpen(false);
     seenNewOrders();
     rootRef.current?.scrollIntoView({ block: "start" });
     // The button she tapped is gone; keep focus on the list's own tab.
-    tabRefs.current.needs_action?.focus({ preventScroll: true });
+    tabRefs.current[tab]?.focus({ preventScroll: true });
   };
 
   const shareStore = () => {

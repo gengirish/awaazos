@@ -47,6 +47,7 @@ import { orderIsOver, planOrderAgain } from "@/lib/order-again";
 import { RATING_WORDS } from "@/lib/order-feedback";
 import { loadOrderableNow } from "@/lib/order-again-server";
 import { paymentProofEnabled } from "@/lib/payment-proof";
+import { PAY_NOW_PARAM } from "@/lib/storefront-direct-pay";
 import { prisma } from "@/lib/prisma";
 import { appBaseUrl, isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { qrPngDataUrl, qrSvgDataUrl } from "@/lib/qr";
@@ -84,7 +85,8 @@ export const runtime = "nodejs";
  *
  * When the store has connected its own Razorpay account, "Pay online" is the
  * only option shown; the UPI intent/QR and "Payment done?" wait in `OnlinePayFlow`
- * until Razorpay fails. The buyer's own name and phone are handed to that button
+ * until Razorpay fails or the buyer asks for them after closing its window. `?pay=1`,
+ * set by checkout, opens Razorpay on arrival. The buyer's own name and phone are handed to that button
  * only to prefill Razorpay Checkout. Razorpay
  * credentials are selected for presence checks only — never rendered or passed
  * to a client component.
@@ -132,6 +134,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
       paymentClaimedAt: true,
       paymentRejectedAt: true,
       paymentProofUrl: true,
+      razorpayPaymentId: true,
       fulfilmentStatus: true,
       fulfilmentType: true,
       outForDeliveryAt: true,
@@ -211,7 +214,8 @@ type ProgressStep = { key: string; label: string; done: boolean };
 
 /**
  * Placed → Paid → Confirmed → (On the way, deliveries only) → Collected /
- * Delivered (pay on delivery: no Paid step, payment happens at the last one). Static: each step is an icon plus
+ * Delivered (pay on delivery: no Paid step, payment happens at the last one; paid
+ * online: no Confirmed step, being paid is what confirmed it). Static: each step is an icon plus
  * words ("Done" / "Now"), and the step the order is waiting on carries
  * `aria-current`. Colour only repeats what the words say.
  */
@@ -259,10 +263,11 @@ const WA_BUTTON =
 
 export default async function StorefrontOrderPage(props: {
   params: Promise<{ slug: string; token: string }>;
-  searchParams: Promise<{ wa?: string | string[] }>;
+  searchParams: Promise<{ wa?: string | string[]; pay?: string | string[] }>;
 }) {
   const params = await props.params;
-  const viaWhatsapp = (await props.searchParams).wa === "1";
+  const searchParams = await props.searchParams;
+  const viaWhatsapp = searchParams.wa === "1";
   const order = await loadOrder(params.slug, params.token);
   if (!order) notFound();
 
@@ -355,6 +360,8 @@ export default async function StorefrontOrderPage(props: {
     !!waLink && !waFirst && (state === "PAYMENT_SUBMITTED" || state === "EXPIRED" || paymentRejected);
 
   const payOnDelivery = order.paymentMethod === "CASH";
+  // Read as a boolean only; the payment id is never rendered.
+  const paidOnline = order.razorpayPaymentId !== null;
   const isPickup = order.fulfilmentType === "PICKUP";
   const confirmed = order.fulfilmentStatus === "CONFIRMED";
   const handedOver = order.fulfilmentStatus === "DELIVERED";
@@ -368,7 +375,7 @@ export default async function StorefrontOrderPage(props: {
       : [
           { key: "placed", label: "Placed", done: true },
           ...(payOnDelivery ? [] : [{ key: "paid", label: "Paid", done: order.paymentStatus === "PAID" }]),
-          { key: "confirmed", label: "Confirmed", done: confirmed || handedOver },
+          ...(paidOnline ? [] : [{ key: "confirmed", label: "Confirmed", done: confirmed || handedOver }]),
           ...(order.fulfilmentType !== "DELIVERY" ? [] : [{ key: "on-the-way", label: "On the way", done: onTheWay || handedOver }]),
           { key: "handed", label: payOnDelivery ? `${lastStep} · pay then` : lastStep, done: handedOver },
         ];
@@ -604,6 +611,7 @@ export default async function StorefrontOrderPage(props: {
                 prefillContact={order.customerPhone}
                 fallback={upiLink ? "upi" : waLink ? "message" : null}
                 startOpen={paymentRejected}
+                autoStart={searchParams[PAY_NOW_PARAM] === "1" && !viaWhatsapp && !paymentRejected}
                 heading={payHeading}
                 directPay={directPay}
                 claim={claimSection}
@@ -688,7 +696,7 @@ export default async function StorefrontOrderPage(props: {
             </div>
             <div className="flex justify-between text-muted-foreground">
               <dt>Payment</dt>
-              <dd>{payOnDelivery ? payOnDeliveryLabel(order.fulfilmentType) : "UPI"}</dd>
+              <dd>{payOnDelivery ? payOnDeliveryLabel(order.fulfilmentType) : paidOnline ? "Paid online" : "UPI"}</dd>
             </div>
           </dl>
         </section>

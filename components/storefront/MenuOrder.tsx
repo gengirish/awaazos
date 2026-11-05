@@ -70,7 +70,7 @@ export type MenuOrderProps = {
   fulfilmentTypes: FulfilmentType[];
   deliveryFeePaise: number;
   pickupNote: string | null;
-  payment: { upi: boolean; cod: boolean };
+  payment: { upi: boolean; cod: boolean; online: boolean };
   /** The store has a usable WhatsApp number (see CheckoutSheet). */
   whatsapp?: boolean;
   prefill?: BuyerPrefill | null;

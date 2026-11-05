@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import {
+  dropWillTakeOrdersWhere,
+  hasPaymentMethod,
+  LAST_PAYMENT_METHOD_ERROR,
+  lastPaymentMethodBlockers,
+} from "@/lib/payment-guard";
 import { prisma } from "@/lib/prisma";
 import { tooManyRequests, writeRateLimit } from "@/lib/ratelimit";
 import { clearRazorpayIssue } from "@/lib/razorpay-issue";
@@ -182,6 +188,31 @@ export async function PUT(req: NextRequest) {
 export async function DELETE(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("OWNER", undefined, req);
+    // Razorpay can be a store's only way to pay, and the last one can't go while customers can order.
+    const now = new Date();
+    const settings = await prisma.vendorSettings.findUnique({
+      where: { vendorId: ctx.vendor.id },
+      select: { acceptPayOnDelivery: true, acceptMenuOrders: true },
+    });
+    const after = {
+      upiId: ctx.vendor.upiId,
+      acceptPayOnDelivery: settings?.acceptPayOnDelivery ?? false,
+      acceptMenuOrders: settings?.acceptMenuOrders ?? false,
+    };
+    if (!hasPaymentMethod(after)) {
+      const drops = await prisma.drop.findMany({
+        where: { vendorId: ctx.vendor.id, ...dropWillTakeOrdersWhere(now) },
+        select: { status: true, closesAt: true },
+        take: 1,
+      });
+      const blockers = lastPaymentMethodBlockers({ ...after, drops }, now);
+      if (blockers.length) {
+        return withVendorCookie(
+          NextResponse.json({ error: LAST_PAYMENT_METHOD_ERROR, blockers }, { status: 409 }),
+          ctx.setVendorCookie,
+        );
+      }
+    }
     await revokeVendorOauth(ctx.vendor.id);
     await prisma.vendorSettings.updateMany({
       where: { vendorId: ctx.vendor.id },

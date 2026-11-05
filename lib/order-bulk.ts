@@ -12,7 +12,7 @@
  */
 
 import type { FulfilmentStatus, PaymentMethod, PaymentStatus } from "@prisma/client";
-import { availableOrderActions, type OrderAction } from "@/lib/drops-board";
+import { availableOrderActions, type BoardBucket, type OrderAction } from "@/lib/drops-board";
 
 export const BULK_ORDER_ACTIONS = ["confirm", "mark_paid", "deliver"] as const satisfies readonly OrderAction[];
 export type BulkOrderAction = (typeof BULK_ORDER_ACTIONS)[number];
@@ -33,6 +33,7 @@ type ActionableOrder = {
   fulfilmentStatus: FulfilmentStatus | null;
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
+  bucket?: BoardBucket;
 };
 
 /**

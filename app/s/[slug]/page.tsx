@@ -73,6 +73,7 @@ import { qrSvgDataUrl } from "@/lib/qr";
 import { stallTypeLabel } from "@/lib/stall-type";
 import { storeKind, storeVocabulary } from "@/lib/store-vocabulary";
 import { storeInfoFacts, type StoreFactKind } from "@/lib/store-info";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { viewerIsStoreStaff } from "@/lib/storefront-viewer";
 import { buildUpiCollectLink } from "@/lib/upi";
 import { storeThemeAttribute } from "@/lib/store-theme";
@@ -197,8 +198,12 @@ const loadStorefront = cache(async (slug: string) => {
       bannerUrl: true,
       upiId: true,
       upiName: true,
+      plan: true, // these three and the Razorpay columns only decide `payment.online`; only that boolean leaves the server
+      planExpiresAt: true,
+      trialEndsAt: true,
       settings: {
         select: {
+          ...RAZORPAY_CRED_SELECT,
           theme: true,
           tagline: true,
           fssaiNumber: true,
@@ -478,7 +483,7 @@ function DropSection({
 }: {
   view: DropView;
   slug: string;
-  payment: { upi: boolean; cod: boolean };
+  payment: { upi: boolean; cod: boolean; online: boolean };
   whatsapp: boolean;
   now: Date;
   prefill: BuyerPrefill | null;
@@ -664,8 +669,11 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   const nextClosing = dropViews
     .filter((d) => d.visibility === "open" && !d.soldOut)
     .reduce<Date | null>((min, d) => (!min || d.drop.closesAt < min ? d.drop.closesAt : min), null);
+  // `upi` is "can pay now" (paymentMethod UPI): direct to the UPI ID, or through Razorpay, which needs no UPI ID.
+  const online = isOnlinePaymentEnabled(vendor, vendor.settings);
   const payment = {
-    upi: !!vendor.upiId,
+    upi: !!vendor.upiId || online,
+    online,
     cod: vendor.settings?.acceptPayOnDelivery ?? false,
   };
   // Opted in with a usable number → checkout also offers "Also send my order to the store on WhatsApp". Only the boolean reaches the client.
@@ -682,6 +690,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
     hasDrops: dropViews.length > 0,
     upi: payment.upi,
     cod: payment.cod,
+    online: payment.online,
     fssaiNumber: vendor.settings?.fssaiNumber ?? null,
     ratingText: ratings ? publicRatingText(ratings) : null,
   });

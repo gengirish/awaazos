@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { prisma } from "@/lib/prisma";
+import { alertSellerOnlinePaid } from "@/lib/storefront-online-paid";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
 import { applyRazorpayCapture } from "@/lib/storefront-payment-issue";
 import {
@@ -95,13 +96,15 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
       }
     }
 
-    const { marked } = await applyRazorpayCapture({
+    const { marked, issue } = await applyRazorpayCapture({
       vendorId: order.vendorId,
       transactionId: order.id,
       razorpayOrderId: orderId,
       razorpayPaymentId: paymentId,
     });
     if (marked) {
+      // A flagged payment has already sent its own alert: one push per payment.
+      if (!issue) await alertSellerOnlinePaid(order.vendorId, order.id);
       console.info(
         JSON.stringify({ event: "storefront_rzp_paid", via: "checkout", vendorId: order.vendorId, transactionId: order.id }),
       );

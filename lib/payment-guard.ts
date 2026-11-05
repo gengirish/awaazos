@@ -3,7 +3,8 @@ import type { DropStatus } from "@prisma/client";
 /**
  * "Keep at least one way to pay" — pure, client-safe (no Prisma client, no node:*).
  *
- * Storefront buyers pay by the vendor's UPI ID or on delivery. Turning on
+ * Storefront buyers pay online through the store's own Razorpay, by its UPI ID, or
+ * on delivery. Turning on
  * "Order from menu" and opening a drop already require one of them; this is the
  * other direction: the owner may not remove the last method while customers can
  * still order online. PATCH /api/vendor checks it against the values the request
@@ -18,12 +19,14 @@ export type PaymentGuardBlocker = "menu_orders" | "open_drop";
 export type PaymentMethods = {
   upiId: string | null | undefined;
   acceptPayOnDelivery: boolean;
+  /** `isOnlinePaymentEnabled`: the store's Razorpay can take a payment right now. */
+  onlinePayment?: boolean;
 };
 
 type DropState = { status: DropStatus; closesAt: Date };
 
 export function hasPaymentMethod(s: PaymentMethods): boolean {
-  return Boolean(s.upiId?.trim()) || s.acceptPayOnDelivery;
+  return Boolean(s.upiId?.trim()) || s.acceptPayOnDelivery || Boolean(s.onlinePayment);
 }
 
 /**

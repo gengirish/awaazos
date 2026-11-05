@@ -2,12 +2,14 @@
 
 import { CreditCard, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { loadCheckout, type RazorpayOrderSuccess } from "@/lib/razorpay-checkout";
 import {
   checkoutCancelledMessage,
   checkoutLoadFailedMessage,
+  directPayOfferLabel,
+  PAY_NOW_PARAM,
   startErrorMessage,
   startErrorOpensDirectPay,
   type DirectPayFallback,
@@ -29,8 +31,14 @@ import {
  * button (OrderRefresh) rather than told to pay again.
  *
  * `onOfferDirectPay` fires when Razorpay can't take this payment, so the page can
- * show the way to pay without it (lib/storefront-direct-pay.ts). Never once Checkout
+ * show the way to pay without it (lib/storefront-direct-pay.ts). Closing the window
+ * isn't a failure: it only leaves a quiet link to the same place, so a change of mind
+ * doesn't end in a payment the seller has to check by hand. Never once Checkout
  * reports success: the buyer has paid and must not be invited to pay again.
+ *
+ * `autoStart` runs the same `start()` once on arrival from checkout and takes
+ * `?pay=1` out of the address, so a reload or Back never reopens the window. The
+ * button stays usable in case the window doesn't appear (nothing reports that).
  *
  * `prefillName` / `prefillContact` are the buyer's own details on the buyer's
  * own order page; they go only to Razorpay Checkout, never to a log.
@@ -54,6 +62,8 @@ export function RazorpayPayButton({
   prefillContact,
   fallback,
   onOfferDirectPay,
+  directPayOpen,
+  autoStart,
 }: {
   slug: string;
   token: string;
@@ -62,11 +72,15 @@ export function RazorpayPayButton({
   prefillContact?: string | null;
   fallback: DirectPayFallback;
   onOfferDirectPay: () => void;
+  directPayOpen: boolean;
+  autoStart: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | null>(null);
+  const [closedWindow, setClosedWindow] = useState(false);
   const paid = useRef(false);
+  const autoStarted = useRef(false);
 
   const base = `/api/s/${encodeURIComponent(slug)}/orders/${encodeURIComponent(token)}/razorpay`;
 
@@ -112,6 +126,7 @@ export function RazorpayPayButton({
     if (busy) return;
     setBusy(true);
     setMessage(null);
+    setClosedWindow(false);
     try {
       const res = await fetch(base, { method: "POST" });
       const json = (await res.json().catch(() => ({}))) as { data?: StartPaymentData; error?: string };
@@ -165,10 +180,8 @@ export function RazorpayPayButton({
           ondismiss: () => {
             if (paid.current) return;
             setBusy(false);
-            onOfferDirectPay();
-            setMessage((m) =>
-              m?.tone === "error" ? m : { text: checkoutCancelledMessage(fallback), tone: "info" },
-            );
+            setClosedWindow(true);
+            setMessage((m) => (m?.tone === "error" ? m : { text: checkoutCancelledMessage(), tone: "info" }));
           },
         },
       });
@@ -178,12 +191,27 @@ export function RazorpayPayButton({
         onOfferDirectPay();
       });
       rzp.open();
+      // The window covers the button. If it never appeared, the button must still work.
+      if (!paid.current) setBusy(false);
     } catch {
       setMessage({ text: "Couldn't reach the store — check your connection and try again.", tone: "error" });
       onOfferDirectPay();
       setBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (!autoStart || autoStarted.current) return;
+    autoStarted.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.delete(PAY_NOW_PARAM);
+    window.history.replaceState(null, "", url);
+    void start();
+    // Once, on arrival: `start` reads only values that are fixed for this mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const offerLabel = closedWindow && !directPayOpen && !busy ? directPayOfferLabel(fallback) : null;
 
   return (
     <div className="space-y-2">
@@ -212,6 +240,15 @@ export function RazorpayPayButton({
           </p>
         ) : null}
       </div>
+      {offerLabel ? (
+        <button
+          type="button"
+          onClick={onOfferDirectPay}
+          className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold text-primary underline underline-offset-4 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          {offerLabel}
+        </button>
+      ) : null}
     </div>
   );
 }

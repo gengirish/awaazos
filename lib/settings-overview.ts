@@ -24,6 +24,8 @@ export type SettingsSnapshot = {
   upiId: string | null;
   acceptPayOnDelivery: boolean;
   razorpayConfigured: boolean;
+  /** `isOnlinePaymentEnabled`: Razorpay can take a payment right now, which needs no UPI ID. */
+  onlinePayment?: boolean;
   voiceLang: string;
   plan: Plan;
   /**
@@ -110,7 +112,7 @@ export function referStatus(s: { signedUp: number; monthsRedeemed: number; month
 }
 
 export function paymentsStatus(
-  s: Pick<SettingsSnapshot, "upiId" | "acceptPayOnDelivery" | "razorpayConfigured">,
+  s: Pick<SettingsSnapshot, "upiId" | "acceptPayOnDelivery" | "razorpayConfigured" | "onlinePayment">,
 ): SectionStatus {
   const parts: StatusPart[] = [
     { label: "UPI", on: Boolean(s.upiId?.trim()) },
@@ -119,7 +121,7 @@ export function paymentsStatus(
   ];
   return {
     text: parts.map((p) => `${p.label} ${p.on ? "on" : "off"}`).join(" · "),
-    on: parts[0]!.on || parts[1]!.on,
+    on: parts[0]!.on || parts[1]!.on || Boolean(s.onlinePayment),
     parts,
   };
 }
@@ -181,6 +183,7 @@ export type SetupChecklistInput = Pick<
   | "publishStorefront"
   | "upiId"
   | "acceptPayOnDelivery"
+  | "onlinePayment"
   | "acceptMenuOrders"
   | "dropCount"
   | "fssaiNumber"
@@ -212,7 +215,7 @@ export function setupChecklist(s: SetupChecklistInput, kind: StoreKind = "food")
       minRole: "OWNER",
     });
   }
-  if (!s.upiId?.trim() && !s.acceptPayOnDelivery) {
+  if (!s.upiId?.trim() && !s.acceptPayOnDelivery && !s.onlinePayment) {
     items.push({
       id: "payment_method",
       text: "Add a UPI ID or allow pay on delivery",

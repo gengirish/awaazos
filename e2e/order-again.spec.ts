@@ -59,12 +59,14 @@ test.describe("order again", () => {
       await page.getByRole("tab", { name: /^Confirmed/ }).click();
       const confirmed = page.getByRole("article", { name: /Ravi Buyer/ });
       await confirmed.getByRole("button", { name: /show details/i }).click();
-      const update = await confirmed.getByRole("link", { name: "WhatsApp Ravi Buyer" }).getAttribute("href");
-      const text = new URL(update ?? "").searchParams.get("text") ?? "";
-      expect(text).toContain("is confirmed.");
-      expect(text).toContain(orderPath);
-      const ready = await confirmed.getByRole("link", { name: /ready for pickup/i }).getAttribute("href");
-      expect(new URL(ready ?? "").searchParams.get("text")).toContain("is ready for pickup.");
+      // The order link joins the text just after the card mounts, so wait for it.
+      const update = confirmed.getByRole("link", { name: "WhatsApp Ravi Buyer" });
+      const messageIn = async (link: typeof update) =>
+        new URL((await link.getAttribute("href")) ?? "").searchParams.get("text") ?? "";
+      await expect.poll(() => messageIn(update)).toContain(orderPath);
+      expect(await messageIn(update)).toContain("is confirmed.");
+      const ready = confirmed.getByRole("link", { name: /ready for pickup/i });
+      expect(await messageIn(ready)).toContain("is ready for pickup.");
       await confirmed.getByRole("button", { name: /picked up · ₹200\.00 collected/i }).click();
       await page.getByRole("tab", { name: /^Delivered/ }).click();
       await expect(page.getByRole("article", { name: /Ravi Buyer/ }).getByText("Picked up", { exact: true })).toBeVisible();

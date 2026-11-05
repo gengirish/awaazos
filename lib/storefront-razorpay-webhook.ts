@@ -10,6 +10,7 @@
  */
 
 import { prisma } from "@/lib/prisma";
+import { alertSellerOnlinePaid } from "@/lib/storefront-online-paid";
 import { applyRazorpayCapture } from "@/lib/storefront-payment-issue";
 
 const PAYMENT_EVENTS = new Set(["payment.captured", "order.paid"]);
@@ -102,7 +103,7 @@ export async function applyRazorpayPaymentEvent(
       return "ack";
     }
 
-    const { marked } = await applyRazorpayCapture({
+    const { marked, issue } = await applyRazorpayCapture({
       vendorId: txn.vendorId,
       transactionId: txn.id,
       razorpayOrderId,
@@ -117,6 +118,8 @@ export async function applyRazorpayPaymentEvent(
         transactionId: txn.id,
       }),
     );
+    // A flagged payment has already sent its own alert: one push per payment.
+    if (marked && !issue) await alertSellerOnlinePaid(txn.vendorId, txn.id);
     return "ack";
   } catch (e) {
     console.error(

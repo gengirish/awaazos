@@ -10,6 +10,8 @@ vi.mock("@/lib/drops", async (importOriginal) => ({
   cancelOrder: vi.fn(),
 }));
 vi.mock("@/lib/payment-proof", () => ({ deletePaymentProofInBackground: vi.fn() }));
+// lib/env reads the encryption key once at import, so a test can't set it later.
+vi.mock("@/lib/secret-box", () => ({ isSecretBoxConfigured: () => true, decryptSecret: vi.fn(), encryptSecret: vi.fn() }));
 
 import { cancelOrder, markOrderPaid } from "@/lib/drops";
 import { deletePaymentProofInBackground } from "@/lib/payment-proof";
@@ -28,11 +30,19 @@ type OrderState = {
   paymentProofUrl?: string | null;
 };
 
+/** Long past its hold, on a store without Razorpay: the action rules below are about neither. */
+const ROW_DEFAULTS = {
+  upiRef: null,
+  paymentClaimedAt: null,
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
+  vendor: { plan: "FREE", planExpiresAt: null, trialEndsAt: null, settings: null },
+};
+
 /** Minimal fake of the bits of Prisma.TransactionClient the module touches. */
 function fakeTx(order: OrderState | null, updateCount = 1) {
   const tx = {
     transaction: {
-      findFirst: vi.fn().mockResolvedValue(order),
+      findFirst: vi.fn().mockResolvedValue(order && { ...ROW_DEFAULTS, ...order }),
       updateMany: vi.fn().mockResolvedValue({ count: updateCount }),
       findFirstOrThrow: vi.fn().mockResolvedValue({ id: "o1", row: true }),
     },
@@ -60,6 +70,45 @@ beforeEach(() => {
   vi.mocked(markOrderPaid).mockReset().mockResolvedValue(true);
   vi.mocked(cancelOrder).mockReset().mockResolvedValue(true);
   vi.mocked(deletePaymentProofInBackground).mockReset();
+});
+
+describe("a Razorpay store's new order the buyer hasn't paid", () => {
+  const NOW = new Date("2026-10-05T10:00:00.000Z");
+  const placedUnpaid = {
+    ...placedUpi,
+    fulfilmentType: "DELIVERY",
+    createdAt: new Date(NOW.getTime() - 60_000),
+    vendor: {
+      plan: "STARTER",
+      planExpiresAt: new Date("2030-01-01T00:00:00.000Z"),
+      trialEndsAt: null,
+      settings: { razorpayKeyId: "rzp_test_x", razorpayKeySecretEnc: "e", razorpayWebhookSecretEnc: "e" },
+    },
+  };
+
+  it.each(["confirm", "dispatch", "deliver", "mark_paid"] as const)("refuses %s", async (action) => {
+    const { tx, asTx } = fakeTx(placedUnpaid as unknown as OrderState);
+    await expectActionError(
+      applyStorefrontOrderAction(asTx, { scope: scopeMenu, action, dropStatus: null, now: NOW }),
+      409,
+      "invalid_state",
+    );
+    expect(tx.transaction.updateMany).not.toHaveBeenCalled();
+    expect(markOrderPaid).not.toHaveBeenCalled();
+  });
+
+  it("still lets the seller cancel it", async () => {
+    const { asTx } = fakeTx(placedUnpaid as unknown as OrderState);
+    await applyStorefrontOrderAction(asTx, { scope: scopeMenu, action: "cancel", dropStatus: null, now: NOW });
+    expect(cancelOrder).toHaveBeenCalledOnce();
+  });
+
+  it("opens up once its hold lapses, in case the money came by direct UPI", async () => {
+    const later = new Date(NOW.getTime() + 20 * 60_000);
+    const { asTx } = fakeTx(placedUnpaid as unknown as OrderState);
+    await applyStorefrontOrderAction(asTx, { scope: scopeMenu, action: "mark_paid", dropStatus: null, now: later });
+    expect(markOrderPaid).toHaveBeenCalledOnce();
+  });
 });
 
 describe("storefrontOrderScope", () => {

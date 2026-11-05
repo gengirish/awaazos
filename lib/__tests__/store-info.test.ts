@@ -13,6 +13,14 @@ const BASE = {
 };
 
 describe("storeInfoFacts", () => {
+  it("says Pay online for a store that takes Razorpay", () => {
+    const input = { menuOrdering: false, fulfilmentMode: "PICKUP" as const, deliveryFeePaise: 0, hasDrops: true, fssaiNumber: null };
+    expect(storeInfoFacts({ ...input, upi: true, cod: true, online: true })).toEqual([
+      { kind: "payment", text: "Pay online or on delivery" },
+    ]);
+    expect(storeInfoFacts({ ...input, upi: true, cod: false, online: true })).toEqual([{ kind: "payment", text: "Pay online" }]);
+  });
+
   it("lists handover, payment and licence for an ordering menu", () => {
     expect(storeInfoFacts({ ...BASE, fssaiNumber: " 12345678901234 " })).toEqual([
       { kind: "pickup", text: "Pickup" },
