@@ -412,9 +412,17 @@ Three invariants, enforced in `lib/drops.ts` and nowhere else:
 
 A drop is created as `DRAFT` with no storefront check; opening it (`PATCH /api/drops/[id]/status`,
 MANAGER) needs items, a future cut-off, a payment method and a published storefront, else 409.
-Opening never publishes the store by itself: an OWNER confirms "Publish your store too?" on the
-edit page, which sends `publishStorefront: true` and flips the setting in the same transaction as
-the status (a MANAGER sending it gets 403 `owner_required`).
+Opening never publishes the store by itself: an OWNER confirms "Publish your store too?", which
+sends `publishStorefront: true` and flips the setting in the same transaction as the status (a
+MANAGER sending it gets 403 `owner_required`).
+
+**A seller sees three steps: draft, taking orders, orders closed.** A new drop or a draft opens with
+the form's "Open orders" button, which saves what is on screen first; a closed one has "Reopen orders"
+in the Status panel. The cut-off closes a drop by itself and no tap follows it. `FROZEN` and `FULFILLED`
+are older rows only: nothing moves a drop into them now, they stay read-only, and they keep the
+`drop_frozen` / `drop_locked` rules. The form's "More options" holds what has a default (name, note,
+later start, everyday menu), and a new drop takes its handover details from the store's last one
+(`lastDropDefaults`).
 
 Money and plan rules:
 

@@ -112,13 +112,11 @@
           "input[radio] \"Delivery\"": { "count": 1, "size": "93x44" },
           "input[radio] \"Pickup\"": { "count": 1, "size": "93x44" },
           "input[text] \"Delivery fee (₹)\"": { "count": 1, "size": "294x44" },
-          "input[text] \"Title\"": { "count": 1, "size": "294x44" },
+          "input[text] \"Pickup instructions (optional)\"": { "count": 1, "size": "294x44" },
           "input[time] \"From\"": { "count": 1, "size": "141x44" },
           "input[time] \"Order cut-off time\"": { "count": 1, "size": "294x44" },
           "input[time] \"Until\"": { "count": 1, "size": "141x44" },
-          "link \"Cancel\"": { "count": 1, "size": "69x44" },
-          "switch \"Also show my everyday menu while this drop is open\"": { "count": 1, "size": "56x44" },
-          "switch \"Start taking orders later, not as soon as I open the drop\"": { "count": 1, "size": "56x44" }
+          "link \"Cancel\"": { "count": 1, "size": "69x44" }
         }
       },
       "/drops/new@390": {
@@ -136,13 +134,11 @@
           "input[radio] \"Delivery\"": { "count": 1, "size": "103x44" },
           "input[radio] \"Pickup\"": { "count": 1, "size": "103x44" },
           "input[text] \"Delivery fee (₹)\"": { "count": 1, "size": "324x44" },
-          "input[text] \"Title\"": { "count": 1, "size": "324x44" },
+          "input[text] \"Pickup instructions (optional)\"": { "count": 1, "size": "324x44" },
           "input[time] \"From\"": { "count": 1, "size": "156x44" },
           "input[time] \"Order cut-off time\"": { "count": 1, "size": "324x44" },
           "input[time] \"Until\"": { "count": 1, "size": "156x44" },
-          "link \"Cancel\"": { "count": 1, "size": "69x44" },
-          "switch \"Also show my everyday menu while this drop is open\"": { "count": 1, "size": "56x44" },
-          "switch \"Start taking orders later, not as soon as I open the drop\"": { "count": 1, "size": "56x44" }
+          "link \"Cancel\"": { "count": 1, "size": "69x44" }
         }
       },
       "/drops/new@768": {
@@ -160,13 +156,11 @@
           "input[radio] \"Delivery\"": { "count": 1, "size": "189x44" },
           "input[radio] \"Pickup\"": { "count": 1, "size": "189x44" },
           "input[text] \"Delivery fee (₹)\"": { "count": 1, "size": "582x44" },
-          "input[text] \"Title\"": { "count": 1, "size": "582x44" },
+          "input[text] \"Pickup instructions (optional)\"": { "count": 1, "size": "582x44" },
           "input[time] \"From\"": { "count": 1, "size": "285x44" },
           "input[time] \"Order cut-off time\"": { "count": 1, "size": "285x44" },
           "input[time] \"Until\"": { "count": 1, "size": "285x44" },
-          "link \"Cancel\"": { "count": 1, "size": "69x44" },
-          "switch \"Also show my everyday menu while this drop is open\"": { "count": 1, "size": "56x44" },
-          "switch \"Start taking orders later, not as soon as I open the drop\"": { "count": 1, "size": "56x44" }
+          "link \"Cancel\"": { "count": 1, "size": "69x44" }
         }
       },
       "/drops@360": {

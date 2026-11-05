@@ -22,7 +22,7 @@ export default async function EditDropPage(props: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const params = await props.params;
-  // Set by "Save and open orders" on the create page.
+  // Set by the form's "Open orders" button.
   const justOpened = (await props.searchParams).opened === "1";
   let vendor: PlanFields & { id: string; name: string; slug: string; upiId: string | null };
   let isOwner: boolean;
@@ -158,6 +158,11 @@ export default async function EditDropPage(props: {
           voiceLang={settings?.voiceLang ?? "en-IN"}
           isOwner={isOwner}
           vocab={vocab}
+          openFlow={
+            drop.status === "DRAFT"
+              ? { storePublished: settings?.publishStorefront ?? false, storePath: `/s/${vendor.slug}` }
+              : undefined
+          }
         />
       </main>
     </div>

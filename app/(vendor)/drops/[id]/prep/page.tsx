@@ -117,7 +117,8 @@ export default async function DropPrepPage(props: Props) {
   const totalItems = cook.reduce((s, p) => s + p.qtyOrdered, 0);
   const fStart = new Date(drop.fulfilmentStartsAt);
   const fEnd = new Date(drop.fulfilmentEndsAt);
-  const notFrozen = drop.status !== "FROZEN" && drop.status !== "FULFILLED";
+  // Past the cut-off the list is final by itself; there is nothing to lock.
+  const stillOpen = drop.effectiveStatus === "OPEN" || drop.effectiveStatus === "SCHEDULED";
 
   return (
     <main id="main" className="bg-background p-4 pb-16 text-foreground md:p-6 print:p-0">
@@ -142,19 +143,20 @@ export default async function DropPrepPage(props: Props) {
           </p>
         </header>
 
-        {notFrozen && (
+        {stillOpen && (
           <div
             role="note"
             className="mb-4 flex gap-2 rounded-md border border-amber-500/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100 print:border-foreground print:bg-transparent print:text-foreground"
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <p>
-              <span className="font-semibold">Orders can still change</span> — lock orders before you start {vocab.making}.{" "}
+              <span className="font-semibold">Orders can still change</span> until {formatIstDate(new Date(drop.closesAt))},{" "}
+              {formatIstTime(new Date(drop.closesAt))}.{" "}
               <Link
                 href={`/drops/${drop.id}/edit`}
                 className="inline-flex min-h-11 items-center font-semibold underline print:hidden"
               >
-                Lock orders on the edit page
+                Close orders now
               </Link>
             </p>
           </div>

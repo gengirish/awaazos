@@ -50,13 +50,14 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
   // ── Vendor: a drop with exactly one to sell ─────────────────────────
   await page.goto("/drops/new");
   await expect(page.getByRole("heading", { name: "New drop" })).toBeVisible();
+  await page.getByText("More options").click();
   await page.getByLabel("Title").fill(dropTitle);
   await page.getByRole("radio", { name: "Both" }).click();
   // Drops hide the everyday menu by default; this test is about the hand-off to it.
   await page.getByRole("switch", { name: /also show my everyday menu/i }).click();
   await page.getByRole("checkbox", { name: new RegExp(bhel) }).check();
   await page.getByRole("listitem").filter({ hasText: bhel }).getByLabel("How many can you make?").fill("1");
-  await page.getByRole("button", { name: "Create drop" }).click();
+  await page.getByRole("button", { name: "Save draft" }).click();
   await page.waitForURL(/\/drops\/[^/]+\/edit$/, { timeout: 120_000 });
   await page.getByRole("button", { name: "Open orders" }).click();
   await expect(

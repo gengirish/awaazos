@@ -196,6 +196,27 @@ export function dropToFormInput(drop: StoredDropForForm): DropUpsertInput {
   };
 }
 
+/**
+ * What a new drop keeps from the store's last one: how buyers get it and when,
+ * which rarely change between batches. Day, cut-off and items stay fresh, and so
+ * does the everyday-menu choice, which sits out of sight under "More options".
+ */
+export function lastDropDefaults(last: {
+  fulfilmentMode: DropUpsertInput["fulfilmentMode"];
+  fulfilmentStartsAt: Date;
+  fulfilmentEndsAt: Date;
+  pickupNote: string | null;
+  deliveryFeePaise: number;
+}): Pick<DropUpsertInput, "fulfilmentMode" | "fulfilmentStart" | "fulfilmentEnd" | "pickupNote" | "deliveryFeePaise"> {
+  return {
+    fulfilmentMode: last.fulfilmentMode,
+    fulfilmentStart: utcToIstParts(last.fulfilmentStartsAt).hm,
+    fulfilmentEnd: utcToIstParts(last.fulfilmentEndsAt).hm,
+    pickupNote: last.pickupNote,
+    deliveryFeePaise: last.deliveryFeePaise,
+  };
+}
+
 type CopyableDrop = DropSchedule & {
   title: string;
   note: string | null;

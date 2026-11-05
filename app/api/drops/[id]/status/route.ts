@@ -73,8 +73,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     }
 
     const data: Prisma.DropUpdateManyMutationInput = { status: to };
-    if (to === "FROZEN") data.frozenAt = now;
-    else if (drop.status === "FROZEN") data.frozenAt = null;
+    if (drop.status === "FROZEN") data.frozenAt = null;
 
     // One transaction: the store is published only if the drop really opens.
     await prisma.$transaction(async (tx) => {
