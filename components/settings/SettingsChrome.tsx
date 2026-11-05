@@ -5,17 +5,17 @@ import { useId, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 /**
- * Top of every Settings section page: a "Settings" back link on phones (the
- * sidebar does that job on md+), then the page title.
+ * Top of every Settings section page: a "Settings" back link to the hub, then
+ * the page title.
  */
 export function SettingsPageHeader({ title, description }: { title: string; description?: string }) {
   return (
     <header className="mb-4 md:mb-6">
       <Link
         href="/settings"
-        className="-ml-2 mb-1 inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring md:hidden"
+        className="-ml-2 mb-1 inline-flex min-h-11 min-w-11 items-center gap-1 rounded-md px-2 text-base font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <ChevronLeft className="h-4 w-4" aria-hidden="true" />
+        <ChevronLeft className="h-5 w-5" aria-hidden="true" />
         Settings
       </Link>
       <h1 className="font-display text-2xl font-bold text-foreground">{title}</h1>

@@ -4,7 +4,7 @@ import Link from "next/link";
 
 import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
 import { LegacyAnchorRedirect } from "@/components/settings/LegacyAnchorRedirect";
-import { settingsSectionsFor, type SettingsSectionId } from "@/components/settings/sections";
+import { settingsGroupsFor, settingsSectionsFor, type SettingsSectionId } from "@/components/settings/sections";
 import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
 import { trialDaysLeft } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
@@ -167,32 +167,37 @@ export default async function SettingsHubPage() {
         className="mb-4"
       />
 
-      <nav aria-label="Settings sections">
-        <ul className="divide-y divide-border overflow-hidden rounded-lg border bg-card">
-          {sections.map((section) => {
-            const Icon = section.icon;
-            return (
-              <li key={section.id}>
-                <Link
-                  href={section.href}
-                  className="flex min-h-14 items-center gap-3 px-4 py-3 ring-inset transition-colors hover:bg-muted/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Icon className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-semibold text-foreground">{section.title}</span>
-                    <span className="hidden truncate text-xs text-muted-foreground sm:block">{fillVocabulary(section.description, vocab)}</span>
-                    <span className="mt-0.5 block text-sm text-muted-foreground">
-                      <StatusLine status={statuses[section.id]} />
-                    </span>
-                  </span>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+      <nav aria-label="Settings sections" className="space-y-6">
+        {settingsGroupsFor(sections).map((group) => (
+          <div key={group.title}>
+            <h2 className="mb-2 font-display text-base font-semibold text-foreground">{group.title}</h2>
+            <ul className="divide-y divide-border overflow-hidden rounded-lg border bg-card">
+              {group.sections.map((section) => {
+                const Icon = section.icon;
+                return (
+                  <li key={section.id}>
+                    <Link
+                      href={section.href}
+                      className="flex min-h-14 items-center gap-3 px-4 py-3 ring-inset transition-colors hover:bg-muted/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Icon className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold text-foreground">{section.title}</span>
+                        <span className="hidden truncate text-xs text-muted-foreground sm:block">{fillVocabulary(section.description, vocab)}</span>
+                        <span className="mt-0.5 block text-sm text-muted-foreground">
+                          <StatusLine status={statuses[section.id]} />
+                        </span>
+                      </span>
+                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       <section aria-labelledby="account-heading" className="mt-6">
