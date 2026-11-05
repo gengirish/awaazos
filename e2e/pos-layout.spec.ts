@@ -232,11 +232,11 @@ test.describe("app shell navigation", () => {
     await expect(item("Settings")).toHaveAttribute("aria-current", "page");
     await expect(item("Sell")).not.toHaveAttribute("aria-current", "page");
 
-    // A section page inside Settings keeps Settings marked, next to the section sidebar.
+    // A section page inside Settings keeps Settings marked, with a back link to the hub.
     await page.goto("/settings/payments");
     await expect(page.getByRole("heading", { level: 1, name: "Payments" })).toBeVisible();
     await expect(item("Settings")).toHaveAttribute("aria-current", "page");
-    await expect(page.getByRole("navigation", { name: "Settings", exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("link", { name: "Settings", exact: true })).toBeVisible();
   });
 
   test("a cashier sees only Orders, Sell, Settings, Help and Sign out", async ({ page, request }) => {
