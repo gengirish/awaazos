@@ -33,11 +33,11 @@ test.describe("admin pricing calculator", () => {
       await page.getByLabel("Instant settlement fee (%)").fill("0.2");
       await expect(settlementRow).toContainText("₹230");
 
-      // 20 kitchens at ₹499: ₹9,980, less ₹13.88 each to Razorpay.
+      // 20 kitchens at ₹649: ₹12,980, less ₹18.06 each to Razorpay.
       await page.getByRole("tab", { name: "AwaazOS revenue" }).click();
-      await expect(page.getByRole("row", { name: /^Per month/ })).toContainText("₹9,980");
-      await expect(page.getByRole("row", { name: /Razorpay fee on our charges/ })).toContainText("₹277");
-      await expect(page.getByRole("row", { name: /We keep, per month/ })).toContainText("₹9,702");
+      await expect(page.getByRole("row", { name: /^Per month/ })).toContainText("₹12,980");
+      await expect(page.getByRole("row", { name: /Razorpay fee on our charges/ })).toContainText("₹361");
+      await expect(page.getByRole("row", { name: /We keep, per month/ })).toContainText("₹12,618");
 
       // Commission is unknown until it is typed in.
       const commissionRow = page.getByRole("row", { name: /Partner commission/ });

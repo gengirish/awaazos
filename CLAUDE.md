@@ -331,7 +331,7 @@ passes, so Neon can sleep.
   `plan` / `planExpiresAt` anywhere else.
 - Marketing copy (`lib/plan-copy.ts`) and the legal pages read the trial length and prices from
   the constants. FREE is not marketed.
-- **Three plans:** LITE ranks below STARTER, so `requirePlan(STARTER)` gates and `razorpayLinks` shut it out. It never
+- **Three plans:** LITE ranks below STARTER, so `requirePlan(STARTER)` gates and `razorpayLinks` shut it out. Counter billing by voice is off on Lite (`PLAN_LIMITS.voiceBilling`, `POST /api/ai/parse-order`: Web Speech skips the transcribe gate); grandfathered FREE keeps it, and the voice menu and drop builders stay on every plan. The per-plan AI image cap is `PLAN_LIMITS.aiImagesPerMonth`. It never
   cuts a running trial short (`billingAccess`). A store with `customPricePaise` is offered Starter only. Moving up
   goes through `create-subscription`: Razorpay can't move a UPI AutoPay subscription between plans, so it cancels the
   live one first (a failed cancel stops there, so nobody is charged twice), then starts the new one. Moving down is
@@ -339,7 +339,7 @@ passes, so Neon can sleep.
 - **Changing a list price:** Razorpay plan amounts are fixed, so set the new constants, create new plans and put their ids
   on Vercel in the same deploy. Old ids go in `RAZORPAY_RETIRED_PLANS` so existing subscribers stay credited, and
   `resolveSubscriptionPlanId` refuses a list plan whose Razorpay amount differs from `subscriptionChargePaise`.
-  `npm run billing:keep-signup-price` keeps stores that signed up earlier on the price they were told (`customPricePaise`).
+  `npm run billing:keep-signup-price -- --price=<rupees> --before=<time>` keeps stores that signed up earlier on the price they were told (`customPricePaise`).
 - **Free access by hand:** a platform SUPER_ADMIN picks a "free until" day for a store on
   `/admin/vendors` (`PATCH /api/admin/vendors/[id]/free-access`, `lib/admin-free-access.ts`). It only
   moves `trialEndsAt` (23:59 IST that day, today … +24 months), so the store is on the trial for

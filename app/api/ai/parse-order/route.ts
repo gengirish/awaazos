@@ -9,6 +9,7 @@ import {
   parseOrderWithClaude,
 } from "@/lib/anthropic";
 import { reserveAnthropicTokens } from "@/lib/ai-usage-guard";
+import { PLAN_LIMITS } from "@/lib/constants";
 import { getVoiceLogQueue } from "@/lib/queues";
 import {
   alignParsedItemsToMenu,
@@ -16,7 +17,7 @@ import {
 } from "@/lib/parse-order-align";
 import { prisma } from "@/lib/prisma";
 import { getAiLimiterForPlan, tooManyRequests } from "@/lib/ratelimit";
-import { AuthError, requireActiveBilling, requireVendorRole } from "@/lib/rbac";
+import { AuthError, PlanGateError, requireActiveBilling, requirePlan, requireVendorRole } from "@/lib/rbac";
 import { STT_SOURCES } from "@/lib/stt-source";
 
 export const dynamic = "force-dynamic";
@@ -50,6 +51,7 @@ export async function POST(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
     requireActiveBilling(ctx);
+    if (!PLAN_LIMITS[ctx.vendor.plan].voiceBilling) requirePlan(ctx.vendor, "STARTER");
 
     const aiLimiter = getAiLimiterForPlan(ctx.vendor.plan);
     const burst = await aiLimiter.burst.check(ctx.vendor.id);
@@ -174,6 +176,18 @@ export async function POST(req: NextRequest) {
     }
     return res;
   } catch (err) {
+    if (err instanceof PlanGateError) {
+      return NextResponse.json(
+        {
+          error: err.message,
+          code: "plan_upgrade_required",
+          requiredPlan: err.required,
+          currentPlan: err.current,
+          feature: "voice_billing",
+        },
+        { status: 402 },
+      );
+    }
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }

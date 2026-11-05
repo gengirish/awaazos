@@ -1,5 +1,6 @@
 import type { Plan } from "@prisma/client";
 
+import { PLAN_LIMITS } from "@/lib/constants";
 import { getKv } from "@/lib/kv";
 
 type GuardResult = { ok: true } | { ok: false; code: string; message: string };
@@ -47,15 +48,6 @@ const GROQ_STT_VENDOR_MONTHLY_MINUTE_CAP: Record<Plan, number> = {
   STARTER: 2_400,
   PRO: 12_000,
   ENTERPRISE: 40_000,
-};
-
-// AI images for banners and stories. A seller needs a handful, not a stream.
-const FAL_IMAGE_VENDOR_MONTHLY_CAP: Record<Plan, number> = {
-  FREE: 0,
-  LITE: 0,
-  STARTER: 30,
-  PRO: 100,
-  ENTERPRISE: 300,
 };
 
 function globalFalImageCap(): number {
@@ -255,7 +247,7 @@ export async function reserveFalImage(args: { vendorId: string; plan: Plan }): P
 
   try {
     const vendorNext = await bumpCounter(vendorKey, 1, ttl);
-    if (vendorNext > FAL_IMAGE_VENDOR_MONTHLY_CAP[args.plan]) {
+    if (vendorNext > PLAN_LIMITS[args.plan].aiImagesPerMonth) {
       await unbumpCounter(vendorKey, 1);
       return { ok: false, code: "vendor_fal_image_cap_reached", message: "Monthly AI image cap reached for this plan." };
     }

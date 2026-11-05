@@ -116,7 +116,7 @@ test.describe("Billing page — subscribe with in-app Checkout", () => {
       await registerOwnerAndSignIn(page, request);
 
       await expect(page.getByRole("heading", { name: /billing/i })).toBeVisible();
-      // The accessible name also carries the price line ("… + GST = ₹588.82").
+      // The accessible name also carries the price line ("… + GST = ₹765.82").
       const button = page.getByRole("button", { name: new RegExp(`^starter ${interval}`, "i") });
       await expect(button).toBeVisible();
       await expect(button).toContainText("+ GST");
@@ -162,7 +162,7 @@ test.describe("Billing page — subscribe with in-app Checkout", () => {
     });
     expect((options?.prefill as { email?: string }).email).toMatch(/^e2e-rzp-.*@example\.com$/);
     expect(String(options?.description)).toMatch(/starter yearly/i);
-    expect(String(options?.description)).toContain("5,888.20");
+    expect(String(options?.description)).toContain("7,658.20");
   });
 
   test("closing the payment window charges nothing and lets the owner try again", async ({ page, request }) => {
