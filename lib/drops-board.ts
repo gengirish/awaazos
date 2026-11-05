@@ -56,6 +56,8 @@ export type BoardOrder = {
   upiRef: string | null;
   /** Buyer attached a payment screenshot (lib/payment-proof.ts); absent = no. */
   hasPaymentProof?: boolean;
+  /** Razorpay took this payment. Only whether it did: the payment id stays on the server. */
+  paidOnline?: boolean;
   subtotalPaise: number;
   /** Offer discount on this order (lib/offers.ts); absent or 0 when none. */
   discountPaise?: number;
@@ -94,8 +96,9 @@ export function balanceDuePaise(o: Pick<BoardOrder, "paymentStatus" | "totalPais
 
 // ─── Filter buckets ─────────────────────────────────────────────────
 
-export type BoardBucket = "needs_action" | "confirmed" | "delivered" | "closed";
-export type BoardFilter = BoardBucket | "all";
+/** `awaiting_online` has no tab of its own: those orders are only listed under All. */
+export type BoardBucket = "needs_action" | "confirmed" | "delivered" | "closed" | "awaiting_online";
+export type BoardFilter = Exclude<BoardBucket, "awaiting_online"> | "all";
 
 export const BOARD_FILTERS: { id: BoardFilter; label: string }[] = [
   { id: "needs_action", label: "Needs action" },
@@ -106,14 +109,30 @@ export const BOARD_FILTERS: { id: BoardFilter; label: string }[] = [
 ];
 
 /**
+ * A new order on a Razorpay store that the buyer hasn't paid yet. There is nothing
+ * for the seller to do: being paid confirms it by itself, and it lapses by itself.
+ * An order the seller already confirmed isn't one of these, however it got there:
+ * it holds stock until they mark it paid or cancel it, so it keeps its buttons.
+ */
+export function isAwaitingOnlinePay(o: {
+  displayState: OrderDisplayState;
+  fulfilmentStatus: FulfilmentStatus | null;
+  onlineStore: boolean;
+}): boolean {
+  return o.onlineStore && o.displayState === "AWAITING_PAYMENT" && o.fulfilmentStatus === "PLACED";
+}
+
+/**
  * Which tab an order lives under. "Needs action" = the vendor has something to
  * do: accept a new order, or check / chase a UPI payment (even on a confirmed
- * order — she still has to tick "paid").
+ * order — she still has to tick "paid"). `onlineStore`: the store takes Razorpay.
  */
 export function boardBucket(o: {
   displayState: OrderDisplayState;
   fulfilmentStatus: FulfilmentStatus | null;
+  onlineStore?: boolean;
 }): BoardBucket {
+  if (isAwaitingOnlinePay({ ...o, onlineStore: o.onlineStore ?? false })) return "awaiting_online";
   switch (o.displayState) {
     case "CANCELLED":
     case "EXPIRED":
@@ -140,7 +159,7 @@ export function countByFilter(orders: { bucket: BoardBucket }[]): Record<BoardFi
     closed: 0,
     all: orders.length,
   };
-  for (const o of orders) out[o.bucket] += 1;
+  for (const o of orders) if (o.bucket !== "awaiting_online") out[o.bucket] += 1;
   return out;
 }
 
@@ -193,8 +212,10 @@ type SummaryInput = {
   displayState: OrderDisplayState;
   paymentStatus: PaymentStatus;
   totalPaise: number;
+  bucket?: BoardBucket;
 };
 
+/** Money nobody has committed yet isn't "to collect", so `awaiting_online` orders aren't counted. */
 export function summarizeOrders(orders: SummaryInput[]): BoardSummary {
   const counts = Object.fromEntries(ORDER_DISPLAY_STATES.map((s) => [s, 0])) as Record<
     OrderDisplayState,
@@ -204,6 +225,7 @@ export function summarizeOrders(orders: SummaryInput[]): BoardSummary {
   let pendingPaise = 0;
   let activeOrders = 0;
   for (const o of orders) {
+    if (o.bucket === "awaiting_online") continue;
     counts[o.displayState] += 1;
     if (o.displayState === "CANCELLED" || o.displayState === "EXPIRED") continue;
     if (o.displayState !== "DELIVERED") activeOrders += 1;
@@ -338,11 +360,14 @@ export function checkOrderAction(
     fulfilmentStatus: FulfilmentStatus | null;
     paymentStatus: PaymentStatus;
     fulfilmentType?: FulfilmentType | null;
+    /** `isAwaitingOnlinePay`: only cancel applies, so nothing holds its stock for good. */
+    awaitingOnlinePay?: boolean;
   },
 ): ActionCheck {
   if ((dropStatus === "FROZEN" || dropStatus === "FULFILLED") && !FROZEN_ALLOWED.has(action)) {
     return { ok: false, error: "drop_frozen" };
   }
+  if (o.awaitingOnlinePay && action !== "cancel") return { ok: false, error: "invalid_state" };
   const fs = o.fulfilmentStatus;
   const ok = (() => {
     switch (action) {
@@ -374,9 +399,9 @@ export function checkOrderAction(
  * delivered. "Not received" (`reject_payment`) is only offered while the buyer's
  * "I've paid" claim is waiting for an answer, and then "Confirm" is not: being
  * marked paid confirms the order too (`markOrderPaid`), so "Payment received"
- * is the one answer. Bulk selection (lib/order-bulk.ts)
- * builds on the same list, so the card and the bulk bar never disagree about
- * what an order can do.
+ * is the one answer. An `awaiting_online` order offers only Cancel. Bulk selection
+ * (lib/order-bulk.ts) builds on the same list, so the card and the bulk bar never
+ * disagree about what an order can do.
  */
 export function availableOrderActions(
   o: {
@@ -386,12 +411,17 @@ export function availableOrderActions(
     displayState?: OrderDisplayState;
     fulfilmentType?: FulfilmentType | null;
     outForDeliveryAt?: string | null;
+    bucket?: BoardBucket;
   },
   frozen: boolean,
 ): Set<OrderAction> {
   const fs = o.fulfilmentStatus;
   const live = fs === "PLACED" || fs === "CONFIRMED";
   const out = new Set<OrderAction>();
+  if (o.bucket === "awaiting_online") {
+    if (!frozen) out.add("cancel");
+    return out;
+  }
   if (fs === "PLACED" && !frozen && o.displayState !== "PAYMENT_SUBMITTED") out.add("confirm");
   if (fs !== "CANCELLED" && o.paymentStatus !== "PAID" && (o.paymentMethod !== "CASH" || fs === "DELIVERED")) {
     out.add("mark_paid");
@@ -563,10 +593,27 @@ export function boardPollKind(args: {
   return acceptMenuOrders || dropStatuses.includes("OPEN") ? "fallback" : null;
 }
 
-/** Ids present in `next` but not in `prev` — "new order" detection after a refetch. */
-export function newOrderIds(prev: { id: string }[], next: { id: string }[]): string[] {
-  const seen = new Set(prev.map((o) => o.id));
-  return next.filter((o) => !seen.has(o.id)).map((o) => o.id);
+type ArrivingOrder = { id: string; bucket?: BoardBucket };
+
+/**
+ * "New order" detection after a refetch: ids in `next` but not in `prev`. An
+ * `awaiting_online` order hasn't arrived yet. It arrives when it moves on (paid,
+ * or the buyer says they paid), so a chime means money, and it lapsing is no news.
+ */
+export function newOrderIds(prev: ArrivingOrder[], next: ArrivingOrder[]): string[] {
+  const before = new Map(prev.map((o) => [o.id, o.bucket]));
+  return next
+    .filter((o) => {
+      if (o.bucket === "awaiting_online") return false;
+      if (!before.has(o.id)) return true;
+      return before.get(o.id) === "awaiting_online" && o.bucket !== "closed";
+    })
+    .map((o) => o.id);
+}
+
+/** Where "N new orders — show" lands. An order paid online is already confirmed. */
+export function newOrdersTab(unseen: { bucket: BoardBucket }[]): "needs_action" | "confirmed" {
+  return unseen.length > 0 && unseen.every((o) => o.bucket === "confirmed") ? "confirmed" : "needs_action";
 }
 
 export const DISPLAY_STATE_LABEL: Record<OrderDisplayState, string> = {

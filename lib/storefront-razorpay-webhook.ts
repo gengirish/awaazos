@@ -11,6 +11,7 @@
 
 import { markOrderPaid } from "@/lib/drops";
 import { prisma } from "@/lib/prisma";
+import { alertSellerOnlinePaid } from "@/lib/storefront-online-paid";
 
 const PAYMENT_EVENTS = new Set(["payment.captured", "order.paid"]);
 
@@ -120,6 +121,7 @@ export async function applyRazorpayPaymentEvent(
         transactionId: txn.id,
       }),
     );
+    if (marked) await alertSellerOnlinePaid(txn.vendorId, txn.id);
     return "ack";
   } catch (e) {
     console.error(

@@ -132,6 +132,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
       paymentClaimedAt: true,
       paymentRejectedAt: true,
       paymentProofUrl: true,
+      razorpayPaymentId: true,
       fulfilmentStatus: true,
       fulfilmentType: true,
       outForDeliveryAt: true,
@@ -211,7 +212,8 @@ type ProgressStep = { key: string; label: string; done: boolean };
 
 /**
  * Placed → Paid → Confirmed → (On the way, deliveries only) → Collected /
- * Delivered (pay on delivery: no Paid step, payment happens at the last one). Static: each step is an icon plus
+ * Delivered (pay on delivery: no Paid step, payment happens at the last one; paid
+ * online: no Confirmed step, being paid is what confirmed it). Static: each step is an icon plus
  * words ("Done" / "Now"), and the step the order is waiting on carries
  * `aria-current`. Colour only repeats what the words say.
  */
@@ -355,6 +357,8 @@ export default async function StorefrontOrderPage(props: {
     !!waLink && !waFirst && (state === "PAYMENT_SUBMITTED" || state === "EXPIRED" || paymentRejected);
 
   const payOnDelivery = order.paymentMethod === "CASH";
+  // Read as a boolean only; the payment id is never rendered.
+  const paidOnline = order.razorpayPaymentId !== null;
   const isPickup = order.fulfilmentType === "PICKUP";
   const confirmed = order.fulfilmentStatus === "CONFIRMED";
   const handedOver = order.fulfilmentStatus === "DELIVERED";
@@ -368,7 +372,7 @@ export default async function StorefrontOrderPage(props: {
       : [
           { key: "placed", label: "Placed", done: true },
           ...(payOnDelivery ? [] : [{ key: "paid", label: "Paid", done: order.paymentStatus === "PAID" }]),
-          { key: "confirmed", label: "Confirmed", done: confirmed || handedOver },
+          ...(paidOnline ? [] : [{ key: "confirmed", label: "Confirmed", done: confirmed || handedOver }]),
           ...(order.fulfilmentType !== "DELIVERY" ? [] : [{ key: "on-the-way", label: "On the way", done: onTheWay || handedOver }]),
           { key: "handed", label: payOnDelivery ? `${lastStep} · pay then` : lastStep, done: handedOver },
         ];
@@ -688,7 +692,7 @@ export default async function StorefrontOrderPage(props: {
             </div>
             <div className="flex justify-between text-muted-foreground">
               <dt>Payment</dt>
-              <dd>{payOnDelivery ? payOnDeliveryLabel(order.fulfilmentType) : "UPI"}</dd>
+              <dd>{payOnDelivery ? payOnDeliveryLabel(order.fulfilmentType) : paidOnline ? "Paid online" : "UPI"}</dd>
             </div>
           </dl>
         </section>

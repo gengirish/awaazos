@@ -2,6 +2,7 @@ import type { DropStatus, FulfilmentStatus, PaymentMethod, PaymentStatus } from 
 import { describe, expect, it } from "vitest";
 
 import {
+  BOARD_FILTERS,
   availableOrderActions,
   boardBucket,
   boardPollKind,
@@ -17,6 +18,7 @@ import {
   liveEffectiveStatus,
   markPaidNeedsConfirm,
   newOrderIds,
+  newOrdersTab,
   orderActionBase,
   ordersInScope,
   ordersToPack,
@@ -25,6 +27,7 @@ import {
   searchOrders,
   shouldPollForOrders,
   orderStateLabel,
+  type BoardBucket,
   summarizeOrders,
   whatsappHref,
 } from "@/lib/drops-board";
@@ -59,6 +62,84 @@ describe("boardBucket", () => {
     expect(filterOrders(orders, "needs_action").map((o) => o.id)).toEqual(["a", "c"]);
     expect(filterOrders(orders, "all")).toHaveLength(3);
     expect(countByFilter(orders)).toEqual({ needs_action: 2, confirmed: 1, delivered: 0, closed: 0, all: 3 });
+  });
+});
+
+describe("a Razorpay store's unpaid new order (awaiting_online)", () => {
+  const order = {
+    fulfilmentStatus: "PLACED" as const,
+    paymentStatus: "PENDING" as const,
+    paymentMethod: "UPI" as const,
+    fulfilmentType: "DELIVERY" as const,
+    displayState: "AWAITING_PAYMENT" as const,
+    bucket: "awaiting_online" as const,
+  };
+
+  it("only a new, unpaid order on an online store", () => {
+    const bucket = (displayState: OrderDisplayState, fulfilmentStatus: FulfilmentStatus, onlineStore = true) =>
+      boardBucket({ displayState, fulfilmentStatus, onlineStore });
+    expect(bucket("AWAITING_PAYMENT", "PLACED")).toBe("awaiting_online");
+    expect(bucket("AWAITING_PAYMENT", "PLACED", false)).toBe("needs_action");
+    // The seller confirmed it: it holds stock until they answer, so it must stay reachable.
+    expect(bucket("AWAITING_PAYMENT", "CONFIRMED")).toBe("needs_action");
+    // A claim or a lapsed hold: money may have come by direct UPI, so the seller can still mark it paid.
+    expect(bucket("PAYMENT_SUBMITTED", "PLACED")).toBe("needs_action");
+    expect(bucket("EXPIRED", "PLACED")).toBe("closed");
+    expect(bucket("PAY_ON_DELIVERY", "PLACED")).toBe("needs_action");
+    expect(bucket("PAID", "CONFIRMED")).toBe("confirmed");
+  });
+
+  it("is only listed under All", () => {
+    const orders = [{ id: "a", bucket: "awaiting_online" as const }, { id: "b", bucket: "needs_action" as const }];
+    expect(BOARD_FILTERS.map((f) => f.id)).not.toContain("awaiting_online");
+    expect(filterOrders(orders, "needs_action").map((o) => o.id)).toEqual(["b"]);
+    expect(filterOrders(orders, "all").map((o) => o.id)).toEqual(["a", "b"]);
+    expect(countByFilter(orders)).toEqual({ needs_action: 1, confirmed: 0, delivered: 0, closed: 0, all: 2 });
+  });
+
+  it("isn't in the summary", () => {
+    const s = summarizeOrders([
+      { displayState: "AWAITING_PAYMENT", paymentStatus: "PENDING", totalPaise: 12_000, bucket: "awaiting_online" },
+      { displayState: "AWAITING_PAYMENT", paymentStatus: "PENDING", totalPaise: 5_000, bucket: "needs_action" },
+    ]);
+    expect(s.pendingPaise).toBe(5_000);
+    expect(s.activeOrders).toBe(1);
+    expect(s.counts.AWAITING_PAYMENT).toBe(1);
+  });
+
+  it("offers only Cancel, with no next step, and nothing on a frozen drop", () => {
+    expect(Array.from(availableOrderActions(order, false))).toEqual(["cancel"]);
+    expect(Array.from(availableOrderActions(order, true))).toEqual([]);
+    expect(primaryOrderAction(order, false)).toBeNull();
+  });
+
+  it("the server refuses everything else, so a stale board can't hold its stock", () => {
+    const o = { fulfilmentStatus: "PLACED" as const, paymentStatus: "PENDING" as const, fulfilmentType: "DELIVERY" as const };
+    for (const action of ["confirm", "mark_paid", "reject_payment", "dispatch", "deliver", "undeliver"] as const) {
+      expect(checkOrderAction(action, "OPEN", { ...o, awaitingOnlinePay: true })).toEqual({ ok: false, error: "invalid_state" });
+    }
+    expect(checkOrderAction("cancel", "OPEN", { ...o, awaitingOnlinePay: true })).toEqual({ ok: true });
+    expect(checkOrderAction("confirm", "OPEN", o)).toEqual({ ok: true });
+  });
+
+  it("arrives when it moves on, not when it is placed or lapses", () => {
+    const row = (id: string, bucket: BoardBucket) => ({ id, bucket });
+    expect(newOrderIds([], [row("a", "awaiting_online")])).toEqual([]);
+    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "awaiting_online")])).toEqual([]);
+    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "confirmed")])).toEqual(["a"]);
+    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "needs_action")])).toEqual(["a"]);
+    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "closed")])).toEqual([]);
+    // Paid before the board ever saw it.
+    expect(newOrderIds([], [row("a", "confirmed")])).toEqual(["a"]);
+    // An order already on the board moving tabs is not new.
+    expect(newOrderIds([row("a", "needs_action")], [row("a", "confirmed")])).toEqual([]);
+  });
+
+  it("\"N new orders — show\" lands where the new orders are", () => {
+    expect(newOrdersTab([{ bucket: "confirmed" }])).toBe("confirmed");
+    expect(newOrdersTab([{ bucket: "confirmed" }, { bucket: "needs_action" }])).toBe("needs_action");
+    expect(newOrdersTab([{ bucket: "needs_action" }])).toBe("needs_action");
+    expect(newOrdersTab([])).toBe("needs_action");
   });
 });
 

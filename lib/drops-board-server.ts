@@ -23,6 +23,7 @@ import {
 } from "@/lib/drops";
 import { BOARD_MAX_ORDERS, menuBoardWindowStart } from "@/lib/menu-orders-board";
 import { prisma } from "@/lib/prisma";
+import { ONLINE_PAYMENT_VENDOR_SELECT, vendorTakesOnlinePayment } from "@/lib/storefront-razorpay";
 
 export const boardOrderSelect = {
   id: true,
@@ -40,6 +41,7 @@ export const boardOrderSelect = {
   upiRef: true,
   paymentClaimedAt: true,
   paymentProofUrl: true,
+  razorpayPaymentId: true,
   subtotalPaise: true,
   discountPaise: true,
   offerName: true,
@@ -52,7 +54,7 @@ export const boardOrderSelect = {
   riderName: true,
   riderToken: true,
   orderToken: true,
-  vendor: { select: { slug: true } },
+  vendor: { select: { slug: true, ...ONLINE_PAYMENT_VENDOR_SELECT } },
   buyerReceivedAt: true,
   feedback: { select: { rating: true, comment: true } },
   orderItems: {
@@ -81,6 +83,7 @@ export function toBoardOrder(row: BoardOrderRow, now: Date = new Date()): BoardO
     upiRef: row.upiRef,
     // The URL stays on the server; staff open it via /api/storefront-orders/[id]/payment-proof.
     hasPaymentProof: row.paymentProofUrl !== null,
+    paidOnline: row.razorpayPaymentId !== null,
     subtotalPaise: row.subtotalPaise,
     discountPaise: row.discountPaise,
     offerName: row.offerName,
@@ -99,7 +102,11 @@ export function toBoardOrder(row: BoardOrderRow, now: Date = new Date()): BoardO
     feedback: row.feedback,
     displayState,
     holdsStock: orderHoldsStock(row, now),
-    bucket: boardBucket({ displayState, fulfilmentStatus: row.fulfilmentStatus }),
+    bucket: boardBucket({
+      displayState,
+      fulfilmentStatus: row.fulfilmentStatus,
+      onlineStore: vendorTakesOnlinePayment(row.vendor, now),
+    }),
     items: row.orderItems,
   };
 }

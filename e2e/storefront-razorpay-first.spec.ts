@@ -1,6 +1,6 @@
 import { expect, test, type BrowserContext, type Page } from "@playwright/test";
 
-import { CAN_SET_BILLING, setRazorpayKeysBySlug } from "./helpers/billing-db";
+import { CAN_SET_BILLING, markPaidOnlineByOrderId, setRazorpayKeysBySlug } from "./helpers/billing-db";
 import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
@@ -146,6 +146,74 @@ test.describe("Razorpay first on the order page", () => {
       await expect(noUpi.getByRole("heading", { name: "Payment done?" })).toHaveCount(0);
     } finally {
       await Promise.all(contexts.map((c) => c.close()));
+    }
+  });
+
+  test("the seller only has to deal with an order once it is paid", async ({ page, request, browser }) => {
+    test.setTimeout(300_000);
+
+    const item = `Kaju Katli ${Math.random().toString(36).slice(2, 7)}`;
+    await createVendorSession(page, request, "rzppaid", "/menu");
+    const vendorRes = await page.request.get("/api/vendor");
+    const slug = ((await vendorRes.json()) as { vendor: { slug: string } }).vendor.slug;
+    await createMenuItem(page, { name: item, priceInRupees: 120, category: "Sweets" });
+    for (const data of [
+      { upiId: UPI_ID, upiName: "E2E Kitchen" },
+      { publishStorefront: true },
+      { acceptMenuOrders: true },
+    ]) {
+      const res = await page.request.patch("/api/vendor", { data, headers: JSON_HEADERS });
+      expect(res.status(), JSON.stringify(data)).toBe(200);
+    }
+    await setRazorpayKeysBySlug(slug);
+
+    const ctx = await browser.newContext(CONTEXT_OPTIONS);
+    try {
+      const buyer = await ctx.newPage();
+      await placeOrder(buyer, slug, item);
+      await expect(buyer.getByRole("button", { name: PAY_ONLINE })).toBeVisible();
+
+      // ── Not paid: not in Needs action, not counted, under All with only Cancel ──
+      await page.goto("/orders");
+      const card = page.getByRole("article").filter({ hasText: "Online Buyer" });
+      await expect(page.getByRole("tab", { name: /needs action \(0\)/i })).toBeVisible();
+      await expect(card).toHaveCount(0);
+      await page.getByRole("tab", { name: /^all \(1\)/i }).click();
+      await expect(card).toBeVisible();
+      await expect(card.getByText("Awaiting payment")).toBeVisible();
+      await expect(card.getByRole("checkbox")).toHaveCount(0);
+      await card.getByRole("button", { name: /show details/i }).click();
+      await expect(card.getByText(/hasn.t paid yet/i)).toBeVisible();
+      await expect(card.getByRole("button", { name: "Confirm", exact: true })).toHaveCount(0);
+      await expect(card.getByRole("button", { name: /payment received/i })).toHaveCount(0);
+      await expect(card.getByRole("button", { name: /^delivered|^picked up/i })).toHaveCount(0);
+      await expect(card.getByRole("button", { name: /cancel order/i })).toBeVisible();
+
+      // ── A stale board or a direct call can't confirm it either ──
+      const list = (await (await page.request.get("/api/storefront-orders")).json()) as { data: { id: string }[] };
+      const orderId = list.data[0]!.id;
+      const refused = await page.request.patch(`/api/storefront-orders/${orderId}`, {
+        data: { action: "confirm" },
+        headers: JSON_HEADERS,
+      });
+      expect(refused.status()).toBe(409);
+
+      // ── Paid: confirmed for the seller, one next step, and the buyer's page agrees ──
+      await markPaidOnlineByOrderId(orderId);
+      await page.goto("/orders");
+      await expect(page.getByRole("tab", { name: /needs action \(0\)/i })).toBeVisible();
+      await page.getByRole("tab", { name: /confirmed \(1\)/i }).click();
+      await expect(card).toBeVisible();
+      await expect(card.getByText("Paid online")).toBeVisible();
+      await expect(card.getByRole("button", { name: "Picked up" })).toBeVisible();
+
+      await buyer.reload();
+      const progress = buyer.getByRole("list", { name: "Order progress" });
+      await expect(progress.getByText("Paid", { exact: true })).toBeVisible();
+      await expect(progress.getByText("Confirmed", { exact: true })).toHaveCount(0);
+      await expect(buyer.getByText("Paid online")).toBeVisible();
+    } finally {
+      await ctx.close();
     }
   });
 });
