@@ -135,7 +135,7 @@ Three insights, in order of importance:
 
 1. **The interface is the moat — not the AI.** Anyone can call Sarvam + Claude. Almost nobody will get the chai-wala to actually use it. The 80×80 mic button, the six visual states distinguishable beyond color, the saffron palette tested with vendors who have macular issues, the Hindi-language zero-state copy that says "bol bill becho" instead of "create your first transaction" — these are the products. The AI is a commodity.
 2. **You cannot build for Indian micro-merchants from a desk.** Every existing POS came from a founder who had used Square/Toast and assumed Bharat would adopt the same patterns. They didn't. We are designing the POS that fits the way orders ACTUALLY happen at a street stall: verbal, fast, plural ("do samosa aur ek chai"), with code-mixing ("two samosa de do na bhai"), and with the customer present.
-3. **The unit economics work because the vendor never had software.** A Starter plan at ₹299/mo replaces nothing — it's pure incremental spend. But the value (15-20% revenue recovery from accurate billing + insight into best-seller / busy hour) easily covers ₹299. Vendors that pay ₹299 will not churn for ₹0 alternatives because it's not about the price — it's about the workflow already being baked into their evening routine.
+3. **The unit economics work because the vendor never had software.** A Starter plan at ₹649/mo replaces nothing — it's pure incremental spend. But the value (15-20% revenue recovery from accurate billing + insight into best-seller / busy hour) easily covers ₹649. Vendors that pay ₹649 will not churn for ₹0 alternatives because it's not about the price — it's about the workflow already being baked into their evening routine.
 
 ### 13. What's new about what you're making? What substitutes do people resort to because it doesn't exist yet (or they don't know about it)?
 
@@ -156,7 +156,7 @@ Three insights, in order of importance:
 
 SaaS subscription, paid in INR via Razorpay UPI autopay or PhonePe Subscriptions.
 
-**₹299/mo per vendor. FREE for first 50 transactions** as activation funnel. Higher tiers come back when ≥50 vendors are paying.
+**30 days free, then ₹599 to ₹1,149/mo per vendor + GST.** Starter at ₹649/mo is the plan we expect most vendors to choose.
 
 Real CAC, NRPM, LTV will be reported here once we have 30 paying vendors. We refuse to model unit economics from speculation.
 
@@ -285,18 +285,18 @@ The product was literally unbuildable two years ago. The next two years will def
                   ┌─────────────▼──────────────────────┐
                   │  SAM — Voice-language micro-merchants  │
                   │       25M micro-merchants          │
-                  │       at ₹299/mo = ₹9,000 Cr/yr   │
+                  │       at ₹649/mo = ₹19,470 Cr/yr  │
                   └─────────────┬──────────────────────┘
                                 │
                   ┌─────────────▼──────────────────────┐
                   │  SOM — Tier 1+2 vendors year 3     │
                   │       2.5M reachable                │
                   │       10% capture = 250K paying    │
-                  │       ₹90 Cr ARR                    │
+                  │       ₹195 Cr ARR                   │
                   └────────────────────────────────────┘
 ```
 
-Even **1% of SAM** at ₹299/mo = **₹75 Cr ARR** (~$9M).
+Even **1% of SAM** at ₹649/mo = **₹195 Cr ARR** (~$23M).
 
 ---
 
@@ -320,9 +320,11 @@ Even **1% of SAM** at ₹299/mo = **₹75 Cr ARR** (~$9M).
 
 | Plan | Price/mo | Wedge |
 | --- | ---: | --- |
-| STARTER | ₹299 | Single-stall vendor, 100-500 txn/mo |
+| LITE | ₹599 | Smallest sellers, up to 50 orders/mo, no counter voice billing or Razorpay |
+| STARTER | ₹649 | Unlimited orders, online payments marked paid automatically |
+| PRO | ₹1,149 | 365-day analytics and a larger AI voice allowance |
 
-FREE tier (50 txn/mo) exists as activation funnel. Higher tiers come back when ≥50 vendors are paying.
+Prices exclude 18% GST; a year costs ten months. Every new store starts with 30 days free on Starter limits.
 
 Real CAC, NRPM, LTV will be reported here once we have 30 paying vendors. We refuse to model unit economics from speculation.
 
@@ -393,11 +395,11 @@ We will not project ARR or vendor count beyond two weeks out until we have W4 of
 
 **A:** Most micro-merchants are below the ₹40L turnover threshold and stay GST-exempt — that's our wedge cohort. For the ones that aren't, what has shipped is an optional HSN/SAC code per menu item, printed on the WhatsApp receipt, and one flat tax rate the vendor can switch on. Full GST invoicing (CGST/SGST/IGST split, GSTIN on the bill) is not built; we'll add it when paying vendors ask for it.
 
-### Q: Why ₹299, not ₹99?
+### Q: Why ₹649, not ₹99?
 
-**A:** Tested in informal interviews — vendors will pay ₹299 if the value is "you get back 15-20% in lost revenue from disputes". Below ₹299, perceived value drops sharply ("if it's only ₹99 it can't be serious"). Above ₹499, payment friction kicks in. ₹299 is the local maximum.
+**A:** Informal interviews, run when the price was ₹299, found vendors would pay that if the value is "you get back 15-20% in lost revenue from disputes". Below ₹299, perceived value dropped sharply ("if it's only ₹99 it can't be serious"), and above ₹499 payment friction kicked in. ₹649 is above that line and isn't proven yet: the first trials end on 9 Nov 2026, and their conversion will test it.
 
-We will offer FREE for the first 50 monthly transactions to remove activation friction. Conversion to STARTER target: 25% within 60 days.
+Every new store gets 30 days free to remove activation friction. Conversion to a paid plan target: 25% within 60 days.
 
 ### Q: Single founder. Why?
 
@@ -437,7 +439,7 @@ YC has funded plenty of single founders who shipped (Drew at Dropbox, Patrick at
 │  SOLUTION                                                        │
 │  Vendor speaks order in their language → speech-to-text + Claude │
 │  parses against menu → cart fills → UPI QR → WhatsApp receipt    │
-│  → live dashboard. 8 seconds end-to-end. ₹299/mo.                │
+│  → live dashboard. 8 seconds end-to-end. ₹649/mo.                │
 │                                                                  │
 │  WHY NOW                                                         │
 │  Indic voice AI crossed 91% accuracy (2025).                     │
@@ -446,7 +448,7 @@ YC has funded plenty of single founders who shipped (Drew at Dropbox, Patrick at
 │  Two years ago, this product could not exist.                    │
 │                                                                  │
 │  MARKET                                                          │
-│  TAM ₹50K Cr  ·  SAM ₹9K Cr  ·  SOM ₹90 Cr (10% × 2.5M reachable)│
+│  TAM ₹50K Cr · SAM ₹19K Cr · SOM ₹195 Cr (10% × 2.5M reachable)  │
 │                                                                  │
 │  TRACTION                                                        │
 │  Production deployed today (May 2026).                           │
@@ -454,7 +456,7 @@ YC has funded plenty of single founders who shipped (Drew at Dropbox, Patrick at
 │  Weekly numbers update every Monday at /admin/metrics.           │
 │                                                                  │
 │  BUSINESS MODEL                                                  │
-│  ₹299/mo per vendor. FREE for first 50 transactions.             │
+│  ₹599 to ₹1,149/mo per vendor + GST. First 30 days free.         │
 │  Real CAC, NRPM, LTV reported here once 30 vendors are paying.   │
 │                                                                  │
 │  TEAM                                                            │
@@ -520,15 +522,12 @@ On 24 April 2026 (commit `d5a808f`) the public surface was cut down to one wedge
 
 | What | Where | State today |
 | --- | --- | --- |
-| PRO and ENTERPRISE on the pricing page | `app/(marketing)/pricing/page.tsx` | `VISIBLE_TIERS = ["FREE", "STARTER"]`; the four-plan comparison table is commented out. `e2e/public.spec.ts` asserts PRO stays off this page (`433164c`). |
-| PRO tile on the landing page | `components/marketing/PricingTeaser.tsx` | Two tiles, FREE and STARTER. |
-| PRO upgrade in billing settings | `components/billing/BillingManageClient.tsx`, `components/billing/PricingPlanButtons.tsx` | Only "Upgrade to Starter" is shown; the button type allows FREE or STARTER. |
+| ENTERPRISE on the pricing page | `app/(marketing)/pricing/page.tsx` | `VISIBLE_TIERS` is Lite, Starter and Pro. An old comparison table stays commented out there. |
 | Voice languages beyond Hindi and English | `VOICE_LANGUAGES` in `lib/constants.ts` | Picker shows English and Hindi only. Telugu, Kannada and Tamil stay wired in the STT code, and an old stored choice still routes through them. |
-| Plan names in the CSV-export tooltip | `components/transactions/TransactionsTable.tsx` | Says "available on a higher plan" without naming PRO. |
 
-**Restored since:** the `/analytics` chart dashboard, which the cut had replaced with a single hero card, came back in `5718acd` (2 May 2026).
+**Restored since:** the `/analytics` chart dashboard, which the cut had replaced with a single hero card, came back in `5718acd` (2 May 2026). PRO went back on the pricing page, the landing page and billing settings beside Lite and Starter in #132 (4 Nov 2026).
 
-**Kept underneath:** `PLAN_LIMITS` in `lib/constants.ts` still defines PRO at ₹799/mo (unlimited bills, 365-day analytics; its "unlimited staff" is moot — there is no staff invite flow yet) and ENTERPRISE (custom). `POST /api/razorpay/create-subscription` still accepts `PRO`. Because no screen offers PRO, the PRO-gated feature (connecting a vendor's own Razorpay keys for storefront payments) can only be unlocked today by changing a vendor's plan directly.
+**Kept underneath:** `PLAN_LIMITS` in `lib/constants.ts` still defines ENTERPRISE (custom). No screen offers it, and `POST /api/razorpay/create-subscription` doesn't accept it.
 
 ---
 

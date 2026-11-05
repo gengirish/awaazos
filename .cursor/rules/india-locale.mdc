@@ -8,7 +8,7 @@ alwaysApply: true
 ## Money — STRICTLY follow
 
 - Store all amounts in **paise** as **integer** (`Int` in Prisma, `number` in TS).
-  ₹20 = 2000 paise. ₹299 = 29900 paise. ₹799 = 79900 paise.
+  ₹20 = 2000 paise. ₹649 = 64900 paise. ₹1,149 = 114900 paise.
 - NEVER use `Decimal`, `Float`, `Number.toFixed()`, or `parseFloat()` for money math.
 - Convert at the boundary only:
   - From user input (₹) → paise via `rupeesToPaise()` from `lib/currency.ts`

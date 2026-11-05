@@ -40,9 +40,9 @@ export type MarketedPlan = (typeof MARKETED_PLANS)[number];
 export type PlanMarketing = {
   /** Display name, e.g. "Starter". */
   label: string;
-  /** "₹499/mo + GST". */
+  /** "₹649/mo + GST". */
   price: string;
-  /** Just the monthly amount: "₹499". */
+  /** Just the monthly amount: "₹649". */
   amount: string;
   /** Billing period suffix for `amount`. */
   period: "/mo";
@@ -60,7 +60,7 @@ export type PlanMarketing = {
   trial: string;
   /** The one sign-up call to action: "Start 30 days free". */
   cta: string;
-  /** Line shown beside the CTA: "No card needed. Then ₹499/month + GST." */
+  /** Line shown beside the CTA: "No card needed. Then ₹649/month + GST." */
   ctaNote: string;
   /** One line for the landing-page teaser card. */
   teaser: string;
