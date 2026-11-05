@@ -17,7 +17,8 @@ function SignInForm() {
   const searchParams = useSearchParams();
   // An explicit callbackUrl (a deep link, or the page middleware bounced) wins;
   // otherwise the landing resolver picks the screen (lib/home.ts).
-  const callbackUrl = searchParams.get("callbackUrl") || HOME_PATH;
+  const explicitCallback = searchParams.get("callbackUrl");
+  const callbackUrl = explicitCallback || HOME_PATH;
   // ResetPasswordForm sends people here with ?reset=ok.
   const passwordReset = searchParams.get("reset") === "ok";
 
@@ -121,7 +122,9 @@ function SignInForm() {
             {submitting ? "Signing in…" : "Sign in"}
           </Button>
           <Button variant="ghost" asChild className="w-full sm:w-auto">
-            <Link href="/sign-up">Create an account</Link>
+            <Link href={explicitCallback ? `/sign-up?callbackUrl=${encodeURIComponent(explicitCallback)}` : "/sign-up"}>
+              Create an account
+            </Link>
           </Button>
         </CardFooter>
       </form>
