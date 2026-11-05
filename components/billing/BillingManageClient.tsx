@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 
+import type { PlanOffer, SubscribeAction } from "@/lib/billing-actions";
 import { formatINR, formatINRCompact } from "@/lib/currency";
 import { loadCheckout, type RazorpaySubscriptionSuccess } from "@/lib/razorpay-checkout";
 import { PLAN_LIMITS } from "@/lib/constants";
@@ -15,9 +16,11 @@ import {
   type SubscribablePlan,
 } from "@/lib/subscription";
 import { Button } from "@/components/ui/button";
+import { RadioOption } from "@/components/ui/radio-option";
 
 /**
- * Subscribe / cancel controls for the billing page.
+ * Plan picker and cancel control for the billing page. What it may offer comes
+ * from the server (lib/billing-actions.ts), which applies the same rule again.
  *
  * Subscribing (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md, Phase 4):
  *   1. POST /api/razorpay/create-subscription → subscription id + public key id.
@@ -45,7 +48,26 @@ function basePaise(plan: SubscribablePlan, interval: BillingInterval, customPric
   return plan === "STARTER" ? storeBasePaise(interval, customPricePaise) : subscriptionBasePaise(plan, interval);
 }
 
+const ACTION_WORD: Record<SubscribeAction, string> = {
+  subscribe: "Subscribe",
+  resubscribe: "Resubscribe",
+  upgrade: "Upgrade",
+};
+
+const INTERVAL_CHOICE: Record<BillingInterval, string> = {
+  monthly: "Monthly",
+  yearly: "Yearly · 2 months free",
+};
+
 type Pending = { plan: SubscribablePlan; interval: BillingInterval };
+
+/** What to tell the owner when the server won't start a subscription. Never a raw code or a 500's text. */
+function subscribeErrorText(status: number, error: string | undefined): string {
+  if (error === "demo_store_not_billable") return "A demo store can't subscribe. Claim the store first.";
+  if (status === 429) return "Too many tries. Wait a minute and try again.";
+  if (status >= 500 || !error) return "Couldn't start the subscription. Please try again.";
+  return error;
+}
 
 /** Verify attempts after a payment, while Razorpay moves the subscription to active. */
 const VERIFY_ATTEMPTS = 3;
@@ -57,8 +79,12 @@ const STILL_CONFIRMING =
 type Message = { text: string; tone: "error" | "info" };
 
 export function BillingManageClient({
-  plans,
-  isUpgrade,
+  offers,
+  initialPlan,
+  initialInterval,
+  payingForLabel,
+  paidUntilLabel,
+  unavailableNote,
   canCancel,
   cancelAtEnd,
   prefillName,
@@ -66,9 +92,16 @@ export function BillingManageClient({
   customPricePaise,
 }: {
   /** Plans this store can buy now. Empty when paying for the top one, or one is about to start. */
-  plans: readonly SubscribablePlan[];
-  /** Paying for a lower plan: buying one of `plans` replaces that subscription. */
-  isUpgrade: boolean;
+  offers: readonly PlanOffer[];
+  /** Preselected from the pricing page's link, or the default. */
+  initialPlan: SubscribablePlan | null;
+  initialInterval: BillingInterval;
+  /** The plan being paid for right now, if any. */
+  payingForLabel: string | null;
+  /** IST date the paid period ends, if there is one. */
+  paidUntilLabel: string | null;
+  /** The pricing page asked for a plan that isn't on offer: why. */
+  unavailableNote: string | null;
   /** A subscription that is collecting (or about to) is on file. */
   canCancel: boolean;
   /** Cancelled, still paid up until the cycle ends. */
@@ -79,6 +112,8 @@ export function BillingManageClient({
   /** This store's own price (lib/subscription.ts). Null = the list price. */
   customPricePaise: number | null;
 }) {
+  const [plan, setPlan] = useState<SubscribablePlan | null>(initialPlan);
+  const [interval, setInterval] = useState<BillingInterval>(initialInterval);
   const [pending, setPending] = useState<null | "cancel" | Pending>(null);
   const [message, setMessage] = useState<Message | null>(null);
 
@@ -133,7 +168,7 @@ export function BillingManageClient({
         keyId?: string;
       };
       if (!res.ok || !data.subscriptionId) {
-        setMessage({ text: data.error ?? "Couldn't start the subscription. Please try again.", tone: "error" });
+        setMessage({ text: subscribeErrorText(res.status, data.error), tone: "error" });
         setPending(null);
         return;
       }
@@ -211,43 +246,86 @@ export function BillingManageClient({
     }
   }
 
+  const offer = offers.find((o) => o.plan === plan) ?? null;
+  const selectedBase = offer ? basePaise(offer.plan, interval, customPricePaise) : 0;
+  const busy = pending !== null;
+
   return (
-    <div className="flex flex-col gap-3">
-      {plans.map((plan) => (
-        <div key={plan} className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-          {BILLING_INTERVALS.map((interval) => {
-            const base = basePaise(plan, interval, customPricePaise);
-            const isPending =
-              pending !== null && pending !== "cancel" && pending.plan === plan && pending.interval === interval;
-            return (
-              <Button
-                key={interval}
-                type="button"
-                variant={plan === "STARTER" && interval === "monthly" ? "default" : "outline"}
-                className="min-h-11 h-auto flex-col items-start py-2 text-left"
-                disabled={pending !== null}
-                aria-busy={isPending}
-                onClick={() => void subscribe(plan, interval)}
-              >
-                <span>{isPending ? "Opening payment…" : buttonLabel(plan, interval)}</span>
-                <span className="text-xs font-normal opacity-80">
-                  {formatINRCompact(base)}
-                  {INTERVAL_LABEL[interval].per} + GST = {formatINR(base + gstPaise(base))}
-                  {interval === "yearly" ? " · 2 months free" : ""}
-                </span>
-              </Button>
-            );
-          })}
-        </div>
-      ))}
-      {plans.length > 0 && isUpgrade ? (
-        <p className="text-sm text-muted-foreground">
-          Moving up ends your current subscription now and starts the new one, charged today. Time you already paid
-          for isn&apos;t refunded, and your new plan runs for at least that long.
-        </p>
-      ) : null}
-      {plans.length > 0 ? (
-        <p className="text-xs text-muted-foreground">UPI Autopay, cards or netbanking · secured by Razorpay</p>
+    <div className="flex flex-col gap-4">
+      {unavailableNote ? <p className="text-sm text-muted-foreground">{unavailableNote}</p> : null}
+      {offer ? (
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void subscribe(offer.plan, interval);
+          }}
+        >
+          <fieldset className="flex flex-col gap-2" disabled={busy}>
+            <legend className="mb-2 text-sm font-medium">Plan</legend>
+            <div className="grid gap-2 sm:grid-cols-3">
+              {offers.map((o) => {
+                const base = basePaise(o.plan, interval, customPricePaise);
+                return (
+                  <RadioOption
+                    key={o.plan}
+                    name="billing-plan"
+                    value={o.plan}
+                    checked={o.plan === offer.plan}
+                    onChange={() => setPlan(o.plan)}
+                    label={PLAN_LIMITS[o.plan].label}
+                    hint={`${formatINRCompact(base)}${INTERVAL_LABEL[interval].per} + GST`}
+                  />
+                );
+              })}
+            </div>
+          </fieldset>
+          <fieldset className="flex flex-col gap-2" disabled={busy}>
+            <legend className="mb-2 text-sm font-medium">Billed</legend>
+            <div className="grid grid-cols-2 gap-2 sm:max-w-md">
+              {BILLING_INTERVALS.map((i) => (
+                <RadioOption
+                  key={i}
+                  size="compact"
+                  name="billing-interval"
+                  value={i}
+                  checked={i === interval}
+                  onChange={() => setInterval(i)}
+                  label={INTERVAL_CHOICE[i]}
+                />
+              ))}
+            </div>
+          </fieldset>
+          <p className="text-sm text-muted-foreground">
+            {formatINRCompact(selectedBase)}
+            {INTERVAL_LABEL[interval].per}, exclusive of 18% GST. You pay {formatINR(selectedBase + gstPaise(selectedBase))}{" "}
+            with GST.
+          </p>
+          {offer.start === "period_end" ? (
+            <p className="text-sm text-muted-foreground">
+              Nothing is charged today. {payingForLabel} stays on until {paidUntilLabel}, and billing on the new
+              subscription starts then.
+            </p>
+          ) : offer.action === "upgrade" ? (
+            <p className="text-sm text-muted-foreground">
+              Moving up ends your current subscription now and starts the new one, charged today. Time you already paid
+              for isn&apos;t refunded, and your new plan runs for at least that long.
+            </p>
+          ) : payingForLabel ? (
+            <p className="text-sm text-muted-foreground">
+              This starts today and is charged today. Time you already paid for isn&apos;t refunded, and your new plan
+              runs for at least that long.
+            </p>
+          ) : null}
+          <div className="flex flex-col gap-2">
+            <Button type="submit" className="min-h-11 w-full sm:w-auto sm:self-start" disabled={busy} aria-busy={busy && pending !== "cancel"}>
+              {busy && pending !== "cancel"
+                ? "Opening payment…"
+                : `${ACTION_WORD[offer.action]} — ${buttonLabel(offer.plan, interval)}`}
+            </Button>
+            <p className="text-xs text-muted-foreground">UPI Autopay, cards or netbanking · secured by Razorpay</p>
+          </div>
+        </form>
       ) : null}
       <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
         {canCancel && !cancelAtEnd ? (
