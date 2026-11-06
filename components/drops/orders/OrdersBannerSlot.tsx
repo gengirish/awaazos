@@ -7,6 +7,7 @@ import { OWNER_SURVEY_SNOOZE_KEY, OwnerSurveyPrompt } from "@/components/survey/
 import { useBannerSnooze } from "@/hooks/useBannerSnooze";
 import { isInstallBannerEligible, useInstallPrompt } from "@/hooks/useInstallPrompt";
 import { pickOrdersBanner } from "@/lib/orders-banner";
+import type { ReferralDelivery } from "@/lib/referral";
 import type { ChecklistItem } from "@/lib/settings-overview";
 
 const REMINDER_SNOOZE_KEY = "awz_setup_reminder_snoozed";
@@ -24,7 +25,8 @@ export function OrdersBannerSlot({
   /** A setup reminder, when reminders are all that is left of the checklist. */
   reminder: ChecklistItem | null;
   askSurvey: boolean;
-  askRefer: boolean;
+  /** How a referral reward would reach this store, when the prompt is for it. */
+  askRefer: ReferralDelivery | null;
   className?: string;
 }) {
   const install = useInstallPrompt();
@@ -36,7 +38,7 @@ export function OrdersBannerSlot({
     reminder: reminder !== null && !reminderSnooze.snoozed,
     install: isInstallBannerEligible(install),
     survey: askSurvey && !surveySnooze.snoozed,
-    refer: askRefer && !referSnooze.snoozed,
+    refer: askRefer !== null && !referSnooze.snoozed,
   });
 
   if (banner === "reminder" && reminder) {
@@ -44,6 +46,6 @@ export function OrdersBannerSlot({
   }
   if (banner === "install") return <InstallBanner className={className} />;
   if (banner === "survey") return <OwnerSurveyPrompt className={className} />;
-  if (banner === "refer") return <ReferralPrompt className={className} />;
+  if (banner === "refer" && askRefer) return <ReferralPrompt delivery={askRefer} className={className} />;
   return null;
 }

@@ -37,6 +37,8 @@ export type ReferrerRewardGroup = {
   /** Reward rows (one per paying referred store). */
   rewards: number;
   months: number;
+  /** Of `months`, how many refunds of the referrer's own charges used (EARNED rows only). */
+  monthsUsed?: number;
 };
 export type ReferrerStore = { id: string; name: string; slug: string };
 
@@ -81,8 +83,12 @@ export function buildTopReferrers(
     if (!row) continue;
     row.rewarded += g.rewards;
     row.monthsEarned += g.months;
+    const used = g.monthsUsed ?? 0;
     if (g.status === "REDEEMED") row.monthsRedeemed += g.months;
-    else row.monthsBanked += g.months;
+    else {
+      row.monthsRedeemed += used;
+      row.monthsBanked += g.months - used;
+    }
   }
   return [...byId.values()]
     .filter((r) => r.signedUp > 0 || r.rewarded > 0)
@@ -119,7 +125,7 @@ export async function loadTopReferrers(): Promise<TopReferrerRow[]> {
       by: ["referrerVendorId", "status"],
       where: { referrer: REAL_REFERRER },
       _count: { _all: true },
-      _sum: { months: true },
+      _sum: { months: true, monthsUsed: true },
       orderBy: { referrerVendorId: "asc" },
       take: GROUP_READ_LIMIT,
     }),
@@ -133,6 +139,7 @@ export async function loadTopReferrers(): Promise<TopReferrerRow[]> {
     status: g.status,
     rewards: g._count._all,
     months: g._sum.months ?? 0,
+    monthsUsed: g._sum.monthsUsed ?? 0,
   }));
 
   const ids = [...new Set([...signups.map((s) => s.referrerVendorId), ...rewards.map((r) => r.referrerVendorId)])];
@@ -205,4 +212,40 @@ export async function getReferralMetrics(now: Date = new Date()): Promise<Referr
     rewardMonthsEarned: rewards._sum.months ?? 0,
     since,
   };
+}
+
+/** How many refund rows /admin/referrals lists: every pending one, and the newest refunded. */
+export const RECENT_CREDITS_LIMIT = 50;
+
+export type ReferralCreditRow = {
+  id: string;
+  storeName: string;
+  storeSlug: string;
+  chargePaise: number;
+  refundPaise: number;
+  months: number;
+  status: "PENDING" | "REFUNDED";
+  lastError: string | null;
+  createdAt: Date;
+  refundedAt: Date | null;
+};
+
+/** Free-month refunds to paying referrers, pending first, then newest. */
+export async function loadReferralCredits(): Promise<ReferralCreditRow[]> {
+  const rows = await prisma.referralCredit.findMany({
+    orderBy: [{ status: "asc" }, { createdAt: "desc" }],
+    take: RECENT_CREDITS_LIMIT,
+    select: {
+      id: true,
+      chargePaise: true,
+      refundPaise: true,
+      months: true,
+      status: true,
+      lastError: true,
+      createdAt: true,
+      refundedAt: true,
+      vendor: { select: { name: true, slug: true } },
+    },
+  });
+  return rows.map(({ vendor, ...r }) => ({ ...r, storeName: vendor.name, storeSlug: vendor.slug }));
 }

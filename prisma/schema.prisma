@@ -73,6 +73,7 @@ model Vendor {
   referrals             Vendor[]             @relation("VendorReferrals")
   referralRewardsEarned ReferralReward[]     @relation("ReferralRewardReferrer")
   referralRewardFrom    ReferralReward?      @relation("ReferralRewardReferred")
+  referralCredits       ReferralCredit[]
   orderFeedback         OrderFeedback[]
   ownerSurveyResponse   OwnerSurveyResponse?
 
@@ -957,8 +958,10 @@ model ReferralReward {
   referrerVendorId String
   referredVendorId String               @unique
   months           Int // 1, or 2 when the referred store paid yearly
+  // Of `months`, how many a refund of the referrer's own charge has used (ReferralCredit).
+  monthsUsed       Int                  @default(0)
   status           ReferralRewardStatus @default(EARNED)
-  // How it was redeemed: "trial_extension" | "subscribe_start"; null while EARNED.
+  // How it was redeemed: "trial_extension" | "subscribe_start" | "charge_refund"; null while EARNED.
   redeemedVia      String?
   // The referred store's first-charge event (SubscriptionEvent.razorpayEventId).
   sourceEventId    String
@@ -976,4 +979,36 @@ model ReferralReward {
 enum ReferralRewardStatus {
   EARNED // banked, not yet applied
   REDEEMED // applied as free time
+}
+
+/// A paying referrer's free month: one of its own subscription charges, refunded
+/// (lib/referral.ts, "Free months for a paying store"). Written in the charge's
+/// transaction; the Razorpay refund runs after commit (settleReferralCredit).
+model ReferralCredit {
+  id               String               @id @default(cuid())
+  vendorId         String
+  // The charge being refunded. Unique, so one payment is credited once.
+  paymentId        String               @unique
+  // SubscriptionEvent.razorpayEventId of that charge.
+  sourceEventId    String               @unique
+  chargePaise      Int
+  refundPaise      Int
+  months           Int
+  status           ReferralCreditStatus @default(PENDING)
+  razorpayRefundId String?
+  // Razorpay's error description from the last failed attempt; never buyer data.
+  lastError        String?
+  createdAt        DateTime             @default(now())
+  refundedAt       DateTime?
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([vendorId, createdAt])
+  @@map("referral_credits")
+}
+
+enum ReferralCreditStatus {
+  PENDING // recorded, refund not yet confirmed by Razorpay
+  REFUNDED
 }

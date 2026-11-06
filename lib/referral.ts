@@ -29,7 +29,16 @@
  *       (`trialEndsAt` null, never locked) → banked as EARNED and applied at
  *       their next subscribe, which moves `trialEndsAt` forward first so the
  *       existing "first charge at trial end" `start_at` picks it up.
- *   Credit against a live subscription (pausing a paid cycle) is not built.
+ * - **Free months for a paying store** (`creditForCharge`): Razorpay can't skip
+ *   or discount a UPI AutoPay charge (UPI subscriptions can't be updated, and
+ *   an offer must leave more than ₹1), so a banked month is paid back instead.
+ *   The referrer's next `subscription.charged` goes through as usual, uses
+ *   banked months oldest first and is refunded: in full for a monthly charge,
+ *   1/12 of it per month for a yearly one (up to 12). Recorded as a
+ *   `ReferralCredit` in the charge's transaction; the refund itself runs after
+ *   commit and is retried from /admin/referrals if Razorpay refuses it. A
+ *   charge refunded in full is not money in, so it earns no reward for that
+ *   store's own referrer.
  * - Demo and inactive stores never earn, demo stores never give rewards, and a store claimed from a demo
  *   (founder-sourced) is never attributed.
  */
@@ -142,9 +151,23 @@ export function isSelfReferral(
 }
 
 /**
- * Whether to advertise the program to this store: only an OWNER of a real store
- * whose reward would apply at once (`redemptionFor`). A paying store's months
- * only wait for its next subscribe, so "free months" would oversell it.
+ * How this store would receive a reward earned today:
+ * - `free_time`: added to its trial at once (on the trial or locked, nothing live);
+ * - `refund`: it has a live subscription, so its next charge is refunded;
+ * - `next_subscribe`: no charge is coming (grandfathered FREE, or a paid plan
+ *   cancelled at period end), so it waits for the next subscribe.
+ */
+export type ReferralDelivery = "free_time" | "refund" | "next_subscribe";
+
+export function referralDeliveryFor(access: BillingAccess, hasLiveSubscription: boolean): ReferralDelivery {
+  if (hasLiveSubscription) return "refund";
+  return redemptionFor(access, false).kind === "extend_trial" ? "free_time" : "next_subscribe";
+}
+
+/**
+ * Whether to advertise the program to this store: an OWNER of a real store
+ * that would get the reward soon, as free time or as a refund. A store with no
+ * charge coming would only bank months, so "free months" would oversell it.
  */
 export function canPromoteReferrals(input: {
   role: string;
@@ -153,12 +176,56 @@ export function canPromoteReferrals(input: {
   hasLiveSubscription: boolean;
 }): boolean {
   if (input.role !== "OWNER" || input.isDemo) return false;
-  return redemptionFor(input.access, input.hasLiveSubscription).kind === "extend_trial";
+  return referralDeliveryFor(input.access, input.hasLiveSubscription) !== "next_subscribe";
 }
 
 /** The one line that sells the program, wherever it is advertised. */
-export function referralPitch(): string {
-  return `Invite another seller. They get ${REFERRED_TRIAL_DAYS} days free, and you get ${rewardMonthsFor("monthly")} free month when they subscribe.`;
+export function referralPitch(delivery: ReferralDelivery = "free_time"): string {
+  const month = `${rewardMonthsFor("monthly")} free month`;
+  const reward =
+    delivery === "refund" ? `${month} when they subscribe, refunded from your next charge` : `${month} when they subscribe`;
+  return `Invite another seller. They get ${REFERRED_TRIAL_DAYS} days free, and you get ${reward}.`;
+}
+
+/** Most months one yearly charge can pay back: all twelve of them. */
+const MONTHS_PER_YEAR = 12;
+
+/**
+ * What a paying referrer gets back from one of its own charges, given the
+ * months it has banked. Null when nothing is banked or the charge is nothing.
+ * A monthly charge uses one month and is refunded in full; a yearly charge
+ * uses up to 12 and gives back 1/12 of itself per month, rounded down.
+ */
+export function creditForCharge(input: {
+  chargePaise: number;
+  interval: "monthly" | "yearly";
+  monthsBanked: number;
+}): { months: number; refundPaise: number } | null {
+  if (!Number.isInteger(input.chargePaise) || input.chargePaise <= 0 || input.monthsBanked <= 0) return null;
+  if (input.interval === "monthly") return { months: 1, refundPaise: input.chargePaise };
+  const months = Math.min(input.monthsBanked, MONTHS_PER_YEAR);
+  return { months, refundPaise: Math.floor((input.chargePaise * months) / MONTHS_PER_YEAR) };
+}
+
+/**
+ * Takes `wanted` months from banked rewards, oldest first. Returns each touched
+ * reward's new `monthsUsed` and whether it is now used up.
+ */
+export function takeBankedMonths(
+  rewards: readonly { id: string; months: number; monthsUsed: number }[],
+  wanted: number,
+): { id: string; monthsUsed: number; usedUp: boolean }[] {
+  const out: { id: string; monthsUsed: number; usedUp: boolean }[] = [];
+  let left = wanted;
+  for (const r of rewards) {
+    if (left <= 0) break;
+    const take = Math.min(left, Math.max(0, r.months - r.monthsUsed));
+    if (take === 0) continue;
+    left -= take;
+    const monthsUsed = r.monthsUsed + take;
+    out.push({ id: r.id, monthsUsed, usedUp: monthsUsed >= r.months });
+  }
+  return out;
 }
 
 /** What Settings → Refer a seller shows. Counts only; never the referred stores' contact details. */

@@ -50,10 +50,15 @@ export async function loadSalesEarnings(onlyUserId?: string): Promise<RepEarning
   }
   const vendorIds = [...vendorIdsByUser.values()].flat();
 
-  const [events, vendors, users] = await Promise.all([
+  const [events, credits, vendors, users] = await Promise.all([
     prisma.subscriptionEvent.findMany({
       where: { vendorId: { in: vendorIds }, event: "subscription.charged", amountPaise: { gt: 0 } },
       select: { vendorId: true, paymentId: true, amountPaise: true, createdAt: true },
+    }),
+    // Referral free months are refunds of a charge: what was paid back is not revenue.
+    prisma.referralCredit.findMany({
+      where: { vendorId: { in: vendorIds } },
+      select: { paymentId: true, refundPaise: true },
     }),
     prisma.vendor.findMany({ where: { id: { in: vendorIds } }, select: { id: true, name: true } }),
     prisma.user.findMany({
@@ -62,10 +67,12 @@ export async function loadSalesEarnings(onlyUserId?: string): Promise<RepEarning
     }),
   ]);
 
+  const refundedByPayment = new Map(credits.map((c) => [c.paymentId, c.refundPaise]));
   const chargesByVendor = new Map<string, SalesCharge[]>();
   for (const e of events) {
     const charges = chargesByVendor.get(e.vendorId!) ?? [];
-    charges.push({ paymentId: e.paymentId, amountPaise: e.amountPaise!, at: e.createdAt });
+    const refunded = (e.paymentId && refundedByPayment.get(e.paymentId)) || 0;
+    charges.push({ paymentId: e.paymentId, amountPaise: e.amountPaise! - refunded, at: e.createdAt });
     chargesByVendor.set(e.vendorId!, charges);
   }
   const vendorName = new Map(vendors.map((v) => [v.id, v.name]));
