@@ -21,8 +21,25 @@ type GuideElement = HTMLElement & {
   updateComplete: Promise<boolean>;
 };
 
-/** The library defaults to /manifest.json, and refuses to open unless this matches the page's own link. */
+/**
+ * The library defaults to /manifest.json, and refuses to open unless this
+ * matches the page's own link: the seller app's here, a store's own on its
+ * pages (lib/store-app.ts).
+ */
 const MANIFEST_URL = "/manifest.webmanifest";
+
+export type InstallGuideOptions = {
+  /** The page's manifest link. Default: the seller app's. */
+  manifestUrl?: string;
+  /** The line under the app's name in the dialog. Default: INSTALL_COPY.prompt. */
+  description?: string;
+};
+
+/** Set on every open: a client-side navigation can move between the seller app and a store. */
+function applyOptions(element: GuideElement, options: InstallGuideOptions): void {
+  element.setAttribute("manifest-url", options.manifestUrl ?? MANIFEST_URL);
+  element.setAttribute("install-description", options.description ?? INSTALL_COPY.prompt);
+}
 
 /**
  * Its close button is 26 px (42 px from iOS 26). `button.close` is one step more
@@ -48,18 +65,17 @@ function onKeyDown(event: KeyboardEvent): void {
   afterClose();
 }
 
-function mount(): Promise<GuideElement> {
+function mount(options: InstallGuideOptions): Promise<GuideElement> {
   mounting ??= import("@khmyznikov/pwa-install")
     .then(
       () =>
         new Promise<GuideElement>((resolve) => {
           const element = document.createElement("pwa-install") as GuideElement;
-          element.setAttribute("manifest-url", MANIFEST_URL);
+          applyOptions(element, options);
           element.setAttribute("manual-apple", "");
           // Straight to the steps; the manifest has no screenshots to offer first.
           element.setAttribute("manual-how-to", "");
           element.setAttribute("disable-screenshots", "");
-          element.setAttribute("install-description", INSTALL_COPY.prompt);
           // Fired when the close button is tapped.
           element.addEventListener("pwa-user-choice-result-event", afterClose);
           // It hides itself while starting up (manual-apple), so showDialog() has to wait for this.
@@ -75,10 +91,11 @@ function mount(): Promise<GuideElement> {
 }
 
 /** Open the dialog. Call only from a tap. Never throws: the written steps are the fallback. */
-export async function openInstallGuide(): Promise<void> {
+export async function openInstallGuide(options: InstallGuideOptions = {}): Promise<void> {
   const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null;
   try {
-    const element = await mount();
+    const element = await mount(options);
+    applyOptions(element, options);
     element.showDialog(true);
     await element.updateComplete;
 

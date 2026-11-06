@@ -22,6 +22,7 @@ import { OrderAgainButton } from "@/components/storefront/OrderAgainButton";
 import { OrderFeedbackForm } from "@/components/storefront/OrderFeedbackForm";
 import { OnlinePayFlow } from "@/components/storefront/OnlinePayFlow";
 import { OrderLinkActions } from "@/components/storefront/OrderLinkActions";
+import { StoreInstall } from "@/components/storefront/StoreInstall";
 import { OrderRefresh } from "@/components/storefront/OrderRefresh";
 import { OtherCartsNotice } from "@/components/storefront/OtherCartsNotice";
 import { PaidClaimForm } from "@/components/storefront/PaidClaimForm";
@@ -740,6 +741,9 @@ export default async function StorefrontOrderPage(props: {
           createdAt={order.createdAt.toISOString()}
           vendorName={vendor.name}
         />
+
+        {/* After an order is the moment a buyer wants the store one tap away (lib/store-app.ts). */}
+        {vendor.isDemo ? null : <StoreInstall slug={vendor.slug} storeName={vendor.name} />}
       </main>
 
       <footer className="space-y-2 px-4 pb-10 pt-2 text-center text-xs text-muted-foreground">

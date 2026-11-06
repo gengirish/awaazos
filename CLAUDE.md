@@ -275,6 +275,11 @@ Rules every one of them follows:
 - Order pages are keyed on `Transaction.orderToken` alone (192-bit random, `generateOrderToken()`),
   always looked up together with the slug's `vendorId`. Never expose or accept a transaction `id`.
 - Every write is IP rate-limited (`makeLimiter` in `lib/ratelimit.ts`; buyer login also per-email).
+- Each store installs as **its own app** for buyers (`lib/store-app.ts`): `app/s/[slug]/layout.tsx` swaps the root
+  (seller) manifest for `/s/<slug>/manifest.webmanifest` (`id`/`scope`/`start_url` = `/s/<slug>`, store name and
+  colour) and icons from `/s/<slug>/app-icon/<180|192|512>`, both behind the publish gate. `StoreInstall` (store page
+  and order page, not demo stores) is a view over `useInstallPrompt`, with its own per-store close; inside Instagram on
+  Android it offers "Open in Chrome". Never link the root manifest from `/s/**`: buyers would install the seller app.
 - No `loading.tsx` under `app/s` or `app/r`: it streams the page, so `notFound()` would answer 200
   instead of 404. `not-found.tsx` / `error.tsx` there read no data and say the same thing for every miss.
 - The buyer's device remembers recent orders in localStorage (`components/storefront/recent-orders.ts`:
