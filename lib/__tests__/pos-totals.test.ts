@@ -25,6 +25,7 @@ const WEEKLY: ResolvedOffer = {
   requiredItemIds: ["paneer-quiche"],
   requiredQty: 1,
   requiredLabel: "paneer",
+  freeItem: null,
 };
 
 describe("computeCartTotals", () => {

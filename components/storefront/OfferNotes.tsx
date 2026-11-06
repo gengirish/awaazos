@@ -1,6 +1,13 @@
 import { Tag } from "lucide-react";
 
-import { offerNudgeText, offerSummary, type OfferNudge, type ResolvedOffer } from "@/lib/offers";
+import {
+  offerGiftText,
+  offerNudgeText,
+  offerSummary,
+  type OfferGift,
+  type OfferNudge,
+  type ResolvedOffer,
+} from "@/lib/offers";
 
 /**
  * The offers a buyer can earn in this section ("Weekly Plan: 4+ quiche items
@@ -26,9 +33,17 @@ export function OfferChips({ offers }: { offers: readonly ResolvedOffer[] }) {
   );
 }
 
-/** "Weekly Plan applied. Add 1 more item to unlock 15% off (Family Plan)" — or null when there is nothing to say. */
-export function offerCartNoteText(appliedName: string | null, nudge: OfferNudge | null): string | null {
-  const parts = [appliedName ? `${appliedName} applied.` : null, nudge ? offerNudgeText(nudge) : null].filter(Boolean);
+/**
+ * "Weekly Plan applied. Add 1 more item to unlock 15% off (Family Plan)" — or null when there is nothing to say.
+ * A gift reads "Festive gift: free Evil Eye Bracelet added." instead of "applied".
+ */
+export function offerCartNoteText(
+  appliedName: string | null,
+  nudge: OfferNudge | null,
+  gift: OfferGift | null = null,
+): string | null {
+  const applied = gift ? offerGiftText(gift) : appliedName ? `${appliedName} applied.` : null;
+  const parts = [applied, nudge ? offerNudgeText(nudge) : null].filter(Boolean);
   return parts.length > 0 ? parts.join(" ") : null;
 }
 
@@ -42,13 +57,15 @@ export function offerCartNoteText(appliedName: string | null, nudge: OfferNudge 
 export function OfferCartNote({
   appliedName,
   nudge,
+  gift = null,
   inCartBar = false,
 }: {
   appliedName: string | null;
   nudge: OfferNudge | null;
+  gift?: OfferGift | null;
   inCartBar?: boolean;
 }) {
-  const text = offerCartNoteText(appliedName, nudge);
+  const text = offerCartNoteText(appliedName, nudge, gift);
   return (
     <div aria-live="polite" aria-atomic="true" className={inCartBar ? "sr-only" : undefined}>
       {text ? (

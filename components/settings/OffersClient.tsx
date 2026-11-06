@@ -10,6 +10,8 @@ import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Notice } from "@/components/ui/notice";
+import { RadioOption } from "@/components/ui/radio-option";
 import { Switch } from "@/components/ui/switch";
 import {
   ResponsiveDialog,
@@ -22,13 +24,16 @@ import {
 } from "@/components/ui/responsive-dialog";
 import {
   formatPercentBps,
+  freeItemPhrase,
   normaliseTag,
   OFFER_DESCRIPTION_MAX,
   OFFER_MAX_BPS,
+  OFFER_MAX_FREE_QTY,
   OFFER_MAX_QTY,
   OFFER_MIN_BPS,
   OFFER_NAME_MAX,
   OFFER_TAG_MAX,
+  overlappingOffers,
   type OfferEligibilityKind,
 } from "@/lib/offers";
 import type { OfferDto } from "@/lib/offers-server";
@@ -38,8 +43,11 @@ import { cn } from "@/lib/utils";
 
 /**
  * Settings → Offers: the vendor's quantity plans ("4+ quiches incl. 1 paneer →
- * 10% off"). Saves through /api/offers; pricing itself lives in lib/offers.ts.
+ * 10% off", "4+ items → a free bracelet"). Saves through /api/offers; pricing
+ * itself lives in lib/offers.ts.
  */
+
+type Reward = "PERCENT" | "FREE_ITEM";
 
 export type OfferMenuItem = { id: string; name: string; tags: string[] };
 export type OfferDrop = { id: string; title: string; dayLabel: string };
@@ -63,7 +71,10 @@ type FormState = {
   minQty: string;
   requiredTag: string;
   requiredTagQty: string;
+  reward: Reward;
   percent: string;
+  freeItemId: string;
+  freeItemQty: string;
   onMenuOrders: boolean;
   onDrops: boolean;
   onPos: boolean;
@@ -83,7 +94,10 @@ const EMPTY_FORM: FormState = {
   minQty: "",
   requiredTag: "",
   requiredTagQty: "",
+  reward: "PERCENT",
   percent: "",
+  freeItemId: "",
+  freeItemQty: "1",
   onMenuOrders: true,
   onDrops: true,
   onPos: true,
@@ -102,7 +116,10 @@ function toForm(o: OfferDto): FormState {
     minQty: String(o.minQty),
     requiredTag: o.requiredTag ?? "",
     requiredTagQty: o.requiredTagQty > 0 ? String(o.requiredTagQty) : "",
-    percent: percentInputFromBps(o.percentBps),
+    reward: o.discountType === "FREE_ITEM" ? "FREE_ITEM" : "PERCENT",
+    percent: o.discountType === "FREE_ITEM" ? "" : percentInputFromBps(o.percentBps),
+    freeItemId: o.freeItemId ?? "",
+    freeItemQty: String(o.freeItemQty),
     onMenuOrders: o.onMenuOrders,
     onDrops: o.onDrops,
     onPos: o.onPos,
@@ -128,9 +145,15 @@ function validate(f: FormState): { body: OfferUpsertBody } | { errors: FieldErro
   const minQty = parseQty(f.minQty);
   if (minQty === null) errors.minQty = `Enter a number from 1 to ${OFFER_MAX_QTY}`;
 
-  const percentBps = parsePercentInput(f.percent);
-  if (percentBps === null || percentBps < OFFER_MIN_BPS || percentBps > OFFER_MAX_BPS) {
+  const free = f.reward === "FREE_ITEM";
+  const percentBps = free ? 0 : parsePercentInput(f.percent);
+  if (!free && (percentBps === null || percentBps < OFFER_MIN_BPS || percentBps > OFFER_MAX_BPS)) {
     errors.percent = "Enter a percentage from 1 to 90";
+  }
+  if (free && !f.freeItemId) errors.freeItemId = "Pick the item to give free";
+  const freeItemQty = free ? parseQty(f.freeItemQty) : 1;
+  if (free && (freeItemQty === null || freeItemQty > OFFER_MAX_FREE_QTY)) {
+    errors.freeItemQty = `Enter a number from 1 to ${OFFER_MAX_FREE_QTY}`;
   }
 
   if (f.eligibility === "TAG" && !normaliseTag(f.eligibleTag)) errors.eligibleTag = "Enter the tag these items carry";
@@ -147,10 +170,13 @@ function validate(f: FormState): { body: OfferUpsertBody } | { errors: FieldErro
     errors.requiredTag = "Enter the tag that is required";
   }
 
-  if (!f.onMenuOrders && !f.onDrops && !f.onPos) errors.where = "Choose at least one place";
+  // Free items are online only, so the counter doesn't count for them.
+  if (!f.onMenuOrders && !f.onDrops && (free || !f.onPos)) errors.where = "Choose at least one place";
   if (f.startsOn && f.endsOn && f.endsOn < f.startsOn) errors.endsOn = "End date is before the start date";
 
-  if (Object.keys(errors).length > 0 || minQty === null || percentBps === null) return { errors };
+  if (Object.keys(errors).length > 0 || minQty === null || percentBps === null || freeItemQty === null) {
+    return { errors };
+  }
   return {
     body: {
       name,
@@ -161,11 +187,13 @@ function validate(f: FormState): { body: OfferUpsertBody } | { errors: FieldErro
       minQty,
       requiredTag: requiredTag || null,
       requiredTagQty,
-      discountType: "PERCENT",
+      discountType: f.reward,
       percentBps,
+      freeItemId: free ? f.freeItemId : null,
+      freeItemQty,
       onMenuOrders: f.onMenuOrders,
       onDrops: f.onDrops,
-      onPos: f.onPos,
+      onPos: f.onPos && !free,
       dropIds: f.onDrops ? f.dropIds : [],
       startsOn: f.startsOn || null,
       endsOn: f.endsOn || null,
@@ -176,6 +204,7 @@ function validate(f: FormState): { body: OfferUpsertBody } | { errors: FieldErro
 /** Errors that are about another field's value too, cleared along with it. */
 const ERROR_DEPENDENTS: Partial<Record<keyof FormState, (keyof FieldErrors)[]>> = {
   eligibility: ["eligibleTag", "eligibleItemIds"],
+  reward: ["percent", "freeItemId", "freeItemQty", "where"],
   minQty: ["requiredTagQty"],
   requiredTag: ["requiredTagQty"],
   requiredTagQty: ["requiredTag"],
@@ -189,10 +218,11 @@ const ERROR_DEPENDENTS: Partial<Record<keyof FormState, (keyof FieldErrors)[]>> 
 const API_ERRORS: Record<string, string> = {
   unknown_items: "One of the chosen items is no longer on your {catalogue}. Pick the items again.",
   unknown_drops: "One of the chosen drops no longer exists. Pick the drops again.",
+  unknown_free_item: "The free item is no longer on your {catalogue}. Pick it again.",
   offer_limit_reached: "You have reached the limit of 20 offers. Delete one you no longer use.",
 };
 
-function describeOffer(o: OfferDto, itemCount: number): string {
+function describeOffer(o: OfferDto, itemCount: number, giftName: string | null): string {
   const what =
     o.eligibility === "TAG"
       ? `items tagged "${o.eligibleTag}"`
@@ -200,6 +230,10 @@ function describeOffer(o: OfferDto, itemCount: number): string {
         ? `${itemCount} chosen ${itemCount === 1 ? "item" : "items"}`
         : "any items";
   const incl = o.requiredTag && o.requiredTagQty > 0 ? `, including ${o.requiredTagQty} tagged "${o.requiredTag}"` : "";
+  if (o.discountType === "FREE_ITEM") {
+    const gift = giftName ? freeItemPhrase({ name: giftName, qty: o.freeItemQty }) : "a free item no longer listed";
+    return `${gift[0]!.toUpperCase()}${gift.slice(1)} with ${o.minQty} or more ${what}${incl}`;
+  }
   // minQty 1 with no "including" condition is a sale (isSaleOffer in lib/offers.ts).
   if (o.minQty <= 1 && !incl) return `Sale · ${formatPercentBps(o.percentBps)} off ${what}`;
   return `${formatPercentBps(o.percentBps)} off ${o.minQty} or more ${what}${incl}`;
@@ -209,7 +243,7 @@ function whereLabel(o: OfferDto, kind: StoreKind): string {
   const parts = [
     o.onMenuOrders ? (kind === "food" ? "Online menu" : "Online store") : null,
     o.onDrops ? (o.dropIds.length > 0 ? `${o.dropIds.length} chosen ${o.dropIds.length === 1 ? "drop" : "drops"}` : "Drops") : null,
-    o.onPos ? "Counter" : null,
+    o.onPos && o.discountType !== "FREE_ITEM" ? "Counter" : null,
   ].filter(Boolean);
   return parts.join(" · ");
 }
@@ -250,6 +284,8 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
     offer: null,
   });
 
+  const nameById = new Map(menuItems.map((m) => [m.id, m.name]));
+  const overlaps = overlappingOffers(offers);
   const knownTags = Array.from(new Set(menuItems.flatMap((m) => m.tags.map(normaliseTag)).filter(Boolean))).sort();
   const tagListId = `${ids}-tags`;
   const fid = (name: string) => `${ids}-${name}`;
@@ -402,7 +438,9 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
                       {o.name}{" "}
                       <span className="font-normal text-muted-foreground">· {o.isActive ? "On" : "Off"}</span>
                     </p>
-                    <p className="text-sm text-foreground">{describeOffer(o, o.eligibleItemIds.length)}</p>
+                    <p className="text-sm text-foreground">
+                      {describeOffer(o, o.eligibleItemIds.length, o.freeItemId ? (nameById.get(o.freeItemId) ?? null) : null)}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {whereLabel(o, storeKind)}
                       {dates ? ` · ${dates}` : ""}
@@ -443,6 +481,18 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
               );
             })}
           </ul>
+          {overlaps.length > 0 ? (
+            <Notice tone="warning">
+              <p className="font-semibold">Some offers can apply to the same order</p>
+              <ul className="mt-1 list-disc space-y-1 pl-5">
+                {overlaps.map(([a, b]) => (
+                  <li key={`${a.id}-${b.id}`}>
+                    {a.name} and {b.name}: the customer gets whichever saves them more, not both.
+                  </li>
+                ))}
+              </ul>
+            </Notice>
+          ) : null}
           {canEdit ? (
             <Button type="button" variant="outline" className="h-11" onClick={openCreate}>
               <Plus className="mr-1 h-4 w-4" aria-hidden="true" />
@@ -462,7 +512,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
             <ResponsiveDialogHeader>
               <ResponsiveDialogTitle>{editing ? "Edit offer" : "New offer"}</ResponsiveDialogTitle>
               <ResponsiveDialogDescription>
-                A percentage off. With a minimum of 1 it is a sale on each item; with more, a plan for orders with enough of the right items.
+                A percentage off or a free item. A percentage with a minimum of 1 is a sale on each item; with more, a plan for orders with enough of the right items.
               </ResponsiveDialogDescription>
             </ResponsiveDialogHeader>
             <ResponsiveDialogBody>
@@ -552,6 +602,25 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
                   </fieldset>
                 ) : null}
 
+                <fieldset className="space-y-1">
+                  <legend className="text-sm font-medium">Reward</legend>
+                  <RadioOption
+                    name={fid("reward")}
+                    value="PERCENT"
+                    checked={form.reward === "PERCENT"}
+                    onChange={() => set("reward", "PERCENT")}
+                    label="A percentage off"
+                  />
+                  <RadioOption
+                    name={fid("reward")}
+                    value="FREE_ITEM"
+                    checked={form.reward === "FREE_ITEM"}
+                    onChange={() => set("reward", "FREE_ITEM")}
+                    label="A free item"
+                    hint="For example, a free bracelet with 4 or more items"
+                  />
+                </fieldset>
+
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-2">
                     <Label htmlFor={fid("minQty")}>Minimum quantity</Label>
@@ -565,24 +634,67 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
                       {...errProps("minQty")}
                     />
                     {err("minQty")}
-                    <p className="text-xs text-muted-foreground">
-                      1 makes it a sale: your store shows each item&apos;s old price struck out next to the sale price.
-                    </p>
+                    {form.reward === "PERCENT" ? (
+                      <p className="text-xs text-muted-foreground">
+                        1 makes it a sale: your store shows each item&apos;s old price struck out next to the sale price.
+                      </p>
+                    ) : null}
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={fid("percent")}>Discount (%)</Label>
-                    <Input
-                      id={fid("percent")}
-                      value={form.percent}
-                      inputMode="decimal"
-                      placeholder="10"
-                      autoComplete="off"
-                      onChange={(e) => set("percent", e.target.value)}
-                      {...errProps("percent")}
-                    />
-                    {err("percent")}
-                  </div>
+                  {form.reward === "PERCENT" ? (
+                    <div className="space-y-2">
+                      <Label htmlFor={fid("percent")}>Discount (%)</Label>
+                      <Input
+                        id={fid("percent")}
+                        value={form.percent}
+                        inputMode="decimal"
+                        placeholder="10"
+                        autoComplete="off"
+                        onChange={(e) => set("percent", e.target.value)}
+                        {...errProps("percent")}
+                      />
+                      {err("percent")}
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label htmlFor={fid("freeItemQty")}>How many free</Label>
+                      <Input
+                        id={fid("freeItemQty")}
+                        value={form.freeItemQty}
+                        inputMode="numeric"
+                        placeholder="1"
+                        autoComplete="off"
+                        onChange={(e) => set("freeItemQty", e.target.value)}
+                        {...errProps("freeItemQty")}
+                      />
+                      {err("freeItemQty")}
+                    </div>
+                  )}
                 </div>
+
+                {form.reward === "FREE_ITEM" ? (
+                  <div className="space-y-2">
+                    <Label htmlFor={fid("freeItemId")}>Free item</Label>
+                    <select
+                      id={fid("freeItemId")}
+                      className={SELECT}
+                      value={form.freeItemId}
+                      onChange={(e) => set("freeItemId", e.target.value)}
+                      {...errProps("freeItemId")}
+                    >
+                      <option value="">Choose an item</option>
+                      {menuItems.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-muted-foreground">
+                      Added to the order at no charge once it qualifies, and it does not count toward the minimum. On a
+                      drop it must be one of the drop&apos;s items, and it comes out of that item&apos;s stock.
+                    </p>
+                    {err("freeItemId")}
+                  </div>
+                ) : null}
 
                 <fieldset className="space-y-2">
                   <legend className="text-sm font-medium">Must include (optional)</legend>
@@ -641,15 +753,19 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
                     />
                     Drops (pre-orders)
                   </label>
-                  <label className={CHECK_ROW}>
-                    <input
-                      type="checkbox"
-                      className={CHECKBOX}
-                      checked={form.onPos}
-                      onChange={(e) => set("onPos", e.target.checked)}
-                    />
-                    Counter sales
-                  </label>
+                  {form.reward === "PERCENT" ? (
+                    <label className={CHECK_ROW}>
+                      <input
+                        type="checkbox"
+                        className={CHECKBOX}
+                        checked={form.onPos}
+                        onChange={(e) => set("onPos", e.target.checked)}
+                      />
+                      Counter sales
+                    </label>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">Free items are for online orders only, not counter sales.</p>
+                  )}
                   {err("where")}
                 </fieldset>
 

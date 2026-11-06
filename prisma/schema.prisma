@@ -215,7 +215,9 @@ model Offer {
   requiredTag     String? // Optional: at least requiredTagQty of the eligible units carry this tag
   requiredTagQty  Int               @default(0)
   discountType    OfferDiscountType @default(PERCENT)
-  percentBps      Int // 1000 = 10%
+  percentBps      Int // 1000 = 10%; 0 for FREE_ITEM
+  freeItemId      String? // MenuItem given free, when discountType = FREE_ITEM (no FK: a deleted item just stops the offer)
+  freeItemQty     Int               @default(1)
   onMenuOrders    Boolean           @default(true) // Storefront "order from menu"
   onDrops         Boolean           @default(true)
   onPos           Boolean           @default(true)
@@ -529,6 +531,7 @@ model OrderItem {
   qty           Int         @default(1)
   totalPaise    Int // priceInPaise * qty
   discountPaise Int         @default(0) // This line's share of Transaction.discountPaise
+  isGift        Boolean     @default(false) // A FREE_ITEM offer's gift: priced 0, never re-ordered
 
   @@index([transactionId])
   @@map("order_items")
@@ -887,6 +890,7 @@ enum OfferDiscountType {
   PERCENT
   FIXED_AMOUNT // Reserved; not accepted yet
   BUNDLE_PRICE // Reserved; not accepted yet
+  FREE_ITEM // freeItemId given free once the order qualifies (lib/offers.ts)
 }
 
 enum PaymentMethod {

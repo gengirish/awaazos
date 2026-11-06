@@ -53,7 +53,7 @@ import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDro
 import { formatDropDayLabel, formatFulfilmentWindow } from "@/lib/drops-time";
 import { instagramProfileUrl } from "@/lib/instagram";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
-import { offersForItems, resolveOffers, type ResolvedOffer } from "@/lib/offers";
+import { offersForItems, resolveOffers, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
 import { loadOfferRules, type OfferSource } from "@/lib/offers-server";
 import { publicRatingText } from "@/lib/order-feedback";
 import { loadRatingSummary } from "@/lib/order-feedback-server";
@@ -462,9 +462,14 @@ async function buildDropViews(
       const soldOut = visibility === "open" && !dropHasStock(items);
       const offers =
         visibility === "open" && !soldOut
-          ? offersForItems(
-              resolveOffers(offerSource.rules, offerSource.menuItems, { channel: "DROP", dropId: drop.id, now }),
-              drop.items.map((i) => i.menuItemId),
+          ? withGiftsThatFit(
+              offersForItems(
+                resolveOffers(offerSource.rules, offerSource.menuItems, { channel: "DROP", dropId: drop.id, now }),
+                drop.items.map((i) => i.menuItemId),
+              ),
+              // A drop's gift is one of its own items, with stock left.
+              (menuItemId, qty) =>
+                items.some((i) => i.menuItemId === menuItemId && (i.remaining === null || i.remaining >= qty)),
             )
           : [];
       return { drop, visibility, items, soldOut, offers };

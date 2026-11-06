@@ -652,6 +652,14 @@ them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireAc
 - **Plans never stack**, with each other or with sales: the cart gets its sale prices or the one plan
   with the largest discount, whichever saves more (a tie keeps the sale prices). Between plans, ties go
   to the higher `minQty`, then the older offer. Only eligible lines are discounted; delivery fees never are.
+- **Free items** (`discountType` FREE_ITEM, `Offer.freeItemId` / `freeItemQty`): a plan whose reward is one
+  catalogue item the seller picked ("4+ items → free Evil Eye Bracelet"), never a sale. It competes with the other
+  plans and sales at the gift's catalogue value, but takes nothing off: the order gets an extra `OrderItem` at ₹0
+  with `isGift` and the name `giftLineName()` ("… (free gift)"), so subtotal, discount and total are unchanged and
+  every bill, board and receipt shows it as is. The gift doesn't count toward the minimum. Online only (never
+  resolved on POS). On a drop it must be one of the drop's items and comes out of its stock (`withGiftsThatFit`,
+  server and cart alike). Order again skips gift lines. Settings → Offers warns when two switched-on offers, one a
+  plan, can meet in one order (`overlappingOffers`).
 - **One name per bill:** `OffersResult.applied` is what `Transaction.offerId` / `offerName` record (the
   plan, the sale, or several sales as "A + B" / "A + 2 more", ≤ 60 chars). Never read `discounts[0]`.
 - **Rounding:** a plan takes `floor(eligibleSubtotal × bps / 10 000)`, split across eligible lines by
@@ -669,7 +677,7 @@ them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireAc
 - `Transaction.offerName` is a snapshot (`offerId` is set null on delete), so old bills keep their
   line. Receipts, WhatsApp text, boards and the CSV label it with `discountLabel()`.
 - Not built: coupon codes, per-customer limits, fixed amount / bundle price (enum values reserved),
-  buy-X-get-Y, a plan on top of sales, recurring subscriptions. POS item tiles don't show sale prices
+  cheapest-one-free, a buyer choosing the gift, free items at the counter, a plan on top of sales, recurring subscriptions. POS item tiles don't show sale prices
   (the cart's discount row does).
 - Test store data: `npm run seed:quiche-plans -- <slug>` (dry run; `--create` writes).
 

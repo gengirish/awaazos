@@ -27,7 +27,7 @@ import {
   nextBillNumber,
 } from "@/lib/drops";
 import { bumpOrderSignal } from "@/lib/drops-signal";
-import { applyOffers } from "@/lib/offers";
+import { applyOffers, giftLineName } from "@/lib/offers";
 import { loadResolvedOffers } from "@/lib/offers-server";
 import { effectivePlan, isBillingLocked } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
@@ -232,14 +232,30 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
           customerId: input.customerId ?? null,
           orderChannel: input.orderChannel ?? null,
           orderItems: {
-            create: priced.map((p) => ({
-              menuItemId: p.item.id,
-              name: p.item.name, // snapshot
-              priceInPaise: p.item.priceInPaise,
-              qty: p.qty,
-              totalPaise: p.item.priceInPaise * p.qty,
-              discountPaise: discountByLine.get(p.item.id) ?? 0,
-            })),
+            create: [
+              ...priced.map((p) => ({
+                menuItemId: p.item.id,
+                name: p.item.name, // snapshot
+                priceInPaise: p.item.priceInPaise,
+                qty: p.qty,
+                totalPaise: p.item.priceInPaise * p.qty,
+                discountPaise: discountByLine.get(p.item.id) ?? 0,
+              })),
+              // A free-item offer's gift: ₹0, outside every total (lib/offers.ts rule 6).
+              ...(offered.gift
+                ? [
+                    {
+                      menuItemId: offered.gift.menuItemId,
+                      name: giftLineName(offered.gift.name),
+                      priceInPaise: 0,
+                      qty: offered.gift.qty,
+                      totalPaise: 0,
+                      discountPaise: 0,
+                      isGift: true,
+                    },
+                  ]
+                : []),
+            ],
           },
         },
       });

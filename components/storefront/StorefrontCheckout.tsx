@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Clock, Loader2, MapPin, Minus, Plus, ShoppingBag } from "lucide-react";
+import { AlertCircle, Clock, Gift, Loader2, MapPin, Minus, Plus, ShoppingBag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 
@@ -18,7 +18,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { formatINR, sumPaise } from "@/lib/currency";
-import { discountLabel } from "@/lib/offers";
+import { discountLabel, giftLineName } from "@/lib/offers";
 import { orderSrcFromSearch } from "@/lib/order-channel";
 import { loadCheckout } from "@/lib/razorpay-checkout";
 import { orderPagePath } from "@/lib/storefront-direct-pay";
@@ -369,6 +369,8 @@ export type CheckoutSheetProps = {
    * The server prices the order again when it is placed.
    */
   discount?: { name: string; discountPaise: number } | null;
+  /** A free item the cart earns (lib/offers.ts). Shown as a ₹0 line; the server adds it. */
+  gift?: { name: string; qty: number } | null;
   fulfilmentTypes: FulfilmentType[];
   deliveryFeePaise: number;
   /** Where to collect, as the vendor wrote it. Never invented when absent. */
@@ -418,6 +420,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     lines,
     onChangeQty,
     discount,
+    gift,
     fulfilmentTypes,
     deliveryFeePaise,
     pickupNote,
@@ -739,6 +742,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
           <ResponsiveDialogBody className="space-y-5">
             <CartLines
               lines={lines}
+              gift={lines.length > 0 ? (gift ?? null) : null}
               onChangeQty={onChangeQty}
               onAddMore={onChangeQty && !submitting ? () => onOpenChange(false) : undefined}
             />
@@ -1071,10 +1075,12 @@ const EMPTY_CART_COPY = "Your cart is empty. Close this to add items.";
  */
 function CartLines({
   lines,
+  gift,
   onChangeQty,
   onAddMore,
 }: {
   lines: CheckoutLine[];
+  gift: { name: string; qty: number } | null;
   onChangeQty?: (id: string, qty: number) => void;
   /** Closes the sheet so the buyer can pick more from the store page. */
   onAddMore?: () => void;
@@ -1120,6 +1126,14 @@ function CartLines({
             <span className="font-mono tabular-nums">{formatINR(l.priceInPaise * l.qty)}</span>
           </li>
         ))}
+        {gift ? (
+          <li className="flex justify-between gap-3">
+            <span className="min-w-0 truncate">
+              {gift.qty} × {giftLineName(gift.name)}
+            </span>
+            <span className="font-semibold">Free</span>
+          </li>
+        ) : null}
       </ul>
     );
   }
@@ -1148,6 +1162,16 @@ function CartLines({
           </li>
         ))}
       </ul>
+      {gift ? (
+        <p className="flex items-center gap-3 border-t border-border/60 py-2 text-sm">
+          <Gift className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate font-semibold">
+            {gift.qty > 1 ? `${gift.qty} × ` : ""}
+            {giftLineName(gift.name)}
+          </span>
+          <span className="font-semibold">Free</span>
+        </p>
+      ) : null}
       {onAddMore ? (
         <button
           type="button"
