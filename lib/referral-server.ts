@@ -8,15 +8,20 @@ import { billingAccess, type BillingAccess } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import {
   canPromoteReferrals,
+  creditForCharge,
   extendTrialEndsAt,
   isSelfReferral,
   monthsUnderCap,
   parseReferralCode,
   redemptionFor,
+  referralDeliveryFor,
   REFERRAL_REWARD_CAP_PER_YEAR,
   rewardMonthsFor,
+  takeBankedMonths,
+  type ReferralDelivery,
   type ReferralSummary,
 } from "@/lib/referral";
+import { getRazorpay } from "@/lib/razorpay";
 import { LIVE_SUBSCRIPTION_STATUSES, type BillingInterval } from "@/lib/subscription";
 
 type Tx = Prisma.TransactionClient;
@@ -44,8 +49,9 @@ export async function resolveReferrerForSignUp(
 }
 
 /**
- * The orders board's prompt: a store that can use the reward now, has its store
- * published (something to show the seller it invites) and has no invite yet.
+ * The orders board's prompt: a store that would get the reward soon, has its
+ * store published (something to show the seller it invites) and has no invite
+ * yet. Returns how the reward would reach it (for the wording), or null.
  * Read on page render only.
  */
 export async function shouldAskToRefer(input: {
@@ -54,14 +60,143 @@ export async function shouldAskToRefer(input: {
   access: BillingAccess;
   published: boolean;
   razorpaySubStatus: string | null | undefined;
-}): Promise<boolean> {
+}): Promise<ReferralDelivery | null> {
   const hasLiveSubscription = LIVE_SUBSCRIPTION_STATUSES.includes(input.razorpaySubStatus ?? "");
-  if (!input.published) return false;
+  if (!input.published) return null;
   if (!canPromoteReferrals({ role: input.role, isDemo: input.vendor.isDemo, access: input.access, hasLiveSubscription })) {
-    return false;
+    return null;
   }
   const invited = await prisma.vendor.count({ where: { referredByVendorId: input.vendor.id } });
-  return invited === 0;
+  return invited === 0 ? referralDeliveryFor(input.access, hasLiveSubscription) : null;
+}
+
+/**
+ * Called inside `recordSubscriptionEvent`'s transaction (which already holds
+ * the vendor's row lock) for the store's own `subscription.charged`. When it
+ * has banked months, uses them (`creditForCharge`, oldest reward first) and
+ * records the refund owed as a PENDING `ReferralCredit`. Nothing is sent to
+ * Razorpay here; `settleReferralCredit` does that after commit.
+ */
+export async function claimReferralCreditInTx(
+  tx: Tx,
+  input: {
+    vendorId: string;
+    sourceEventId: string;
+    paymentId: string | null | undefined;
+    chargePaise: number;
+    interval: BillingInterval;
+    now?: Date;
+  },
+): Promise<{ creditId: string; refundPaise: number; created: boolean } | null> {
+  if (!input.paymentId) return null;
+  const now = input.now ?? new Date();
+  // Checked first: a second event naming the same payment must not hit the
+  // unique index (which would roll back the whole charge), and must still see
+  // that this payment is being paid back.
+  const existing = await tx.referralCredit.findUnique({
+    where: { paymentId: input.paymentId },
+    select: { id: true, refundPaise: true },
+  });
+  if (existing) return { creditId: existing.id, refundPaise: existing.refundPaise, created: false };
+
+  const banked = await tx.referralReward.findMany({
+    where: { referrerVendorId: input.vendorId, status: "EARNED" },
+    orderBy: { earnedAt: "asc" },
+    select: { id: true, months: true, monthsUsed: true },
+  });
+  const monthsBanked = banked.reduce((n, r) => n + Math.max(0, r.months - r.monthsUsed), 0);
+  const credit = creditForCharge({ chargePaise: input.chargePaise, interval: input.interval, monthsBanked });
+  if (!credit || credit.refundPaise <= 0) return null;
+
+  for (const r of takeBankedMonths(banked, credit.months)) {
+    await tx.referralReward.updateMany({
+      where: { id: r.id, referrerVendorId: input.vendorId, status: "EARNED" },
+      data: r.usedUp
+        ? { monthsUsed: r.monthsUsed, status: "REDEEMED", redeemedVia: "charge_refund", redeemedAt: now }
+        : { monthsUsed: r.monthsUsed },
+    });
+  }
+  const row = await tx.referralCredit.create({
+    data: {
+      vendorId: input.vendorId,
+      paymentId: input.paymentId,
+      sourceEventId: input.sourceEventId,
+      chargePaise: input.chargePaise,
+      refundPaise: credit.refundPaise,
+      months: credit.months,
+      createdAt: now,
+    },
+    select: { id: true },
+  });
+  return { creditId: row.id, refundPaise: credit.refundPaise, created: true };
+}
+
+export type SettleReferralCreditResult =
+  | { kind: "refunded" }
+  | { kind: "not_found" }
+  | { kind: "failed"; error: string };
+
+/** Razorpay's own error text, kept short. It describes the call, never a buyer. */
+function razorpayErrorText(e: unknown): string {
+  const desc = (e as { error?: { description?: unknown } } | null)?.error?.description;
+  const text = typeof desc === "string" ? desc : e instanceof Error ? e.message : "unknown error";
+  return text.slice(0, 200);
+}
+
+/**
+ * Sends the refund for a PENDING credit. Safe to call more than once, and from
+ * two places at the same time: the row is locked for the whole attempt, and a
+ * refund Razorpay already holds for this credit (`notes.referralCreditId`) is
+ * recorded instead of refunding again. Never throws: a refusal (for example a
+ * low Razorpay balance) is kept in `lastError` for /admin/referrals to retry.
+ */
+export async function settleReferralCredit(creditId: string): Promise<SettleReferralCreditResult> {
+  try {
+    return await prisma.$transaction(
+      async (tx) => {
+        const locked = await tx.$queryRaw<{ id: string }[]>`
+          SELECT id FROM referral_credits WHERE id = ${creditId} FOR UPDATE`;
+        if (locked.length === 0) return { kind: "not_found" as const };
+        const credit = await tx.referralCredit.findUniqueOrThrow({
+          where: { id: creditId },
+          select: { id: true, paymentId: true, refundPaise: true, status: true },
+        });
+        if (credit.status === "REFUNDED") return { kind: "refunded" as const };
+
+        const razorpay = getRazorpay();
+        const refunds = await razorpay.payments.fetchMultipleRefund(credit.paymentId, { count: 100 });
+        const earlier = refunds.items.find((r) => r.notes?.referralCreditId === credit.id);
+        const refund =
+          earlier ??
+          (await razorpay.payments.refund(credit.paymentId, {
+            amount: credit.refundPaise,
+            speed: "normal",
+            notes: { referralCreditId: credit.id, reason: "referral_free_month" },
+          }));
+        await tx.referralCredit.update({
+          where: { id: credit.id },
+          data: { status: "REFUNDED", razorpayRefundId: refund.id, refundedAt: new Date(), lastError: null },
+        });
+        return { kind: "refunded" as const };
+      },
+      { timeout: 20_000 },
+    );
+  } catch (e) {
+    const error = razorpayErrorText(e);
+    console.warn("[referral] refund for credit %s failed: %s", creditId, error);
+    await prisma.referralCredit
+      .updateMany({ where: { id: creditId, status: "PENDING" }, data: { lastError: error } })
+      .catch(() => undefined);
+    return { kind: "failed", error };
+  }
+}
+
+/** The webhook's hook: settles the credit a charge event recorded, if any. Never throws. */
+export async function settleReferralCreditForEvent(sourceEventId: string): Promise<void> {
+  const credit = await prisma.referralCredit
+    .findUnique({ where: { sourceEventId }, select: { id: true, status: true } })
+    .catch(() => null);
+  if (credit && credit.status === "PENDING") await settleReferralCredit(credit.id);
 }
 
 export type EarnReferralRewardResult =
@@ -163,10 +298,12 @@ export async function redeemBankedRewardsAtSubscribe(
     await tx.$queryRaw`SELECT id FROM vendors WHERE id = ${vendorId} FOR UPDATE`;
     const banked = await tx.referralReward.findMany({
       where: { referrerVendorId: vendorId, status: "EARNED" },
-      select: { id: true, months: true },
+      select: { id: true, months: true, monthsUsed: true },
     });
     if (banked.length === 0) return null;
-    const months = banked.reduce((n, r) => n + r.months, 0);
+    // Months a refund already used are not given twice.
+    const months = banked.reduce((n, r) => n + Math.max(0, r.months - r.monthsUsed), 0);
+    if (months === 0) return null;
     const vendor = await tx.vendor.findUniqueOrThrow({
       where: { id: vendorId },
       select: { trialEndsAt: true, planExpiresAt: true },
@@ -197,7 +334,7 @@ export async function loadReferralSummary(
     prisma.vendor.count({ where: { referredByVendorId: vendor.id } }),
     prisma.referralReward.findMany({
       where: { referrerVendorId: vendor.id },
-      select: { months: true, status: true, earnedAt: true },
+      select: { months: true, monthsUsed: true, status: true, earnedAt: true },
     }),
   ]);
   let monthsRedeemed = 0;
@@ -206,7 +343,10 @@ export async function loadReferralSummary(
   const yearAgo = now.getTime() - YEAR_MS;
   for (const r of rewards) {
     if (r.status === "REDEEMED") monthsRedeemed += r.months;
-    else monthsBanked += r.months;
+    else {
+      monthsRedeemed += r.monthsUsed;
+      monthsBanked += Math.max(0, r.months - r.monthsUsed);
+    }
     if (r.earnedAt.getTime() >= yearAgo) monthsLastYear += r.months;
   }
   return {

@@ -382,4 +382,107 @@ describe.skipIf(!ENABLED)("offers — DB integration", () => {
     const t = await prisma.transaction.findFirstOrThrow({ where: { orderToken: data.orderToken, vendorId: s.vendor.id } });
     expect(t).toMatchObject({ offerId: null, offerName: "Weekly Plan", discountPaise: 2650, totalPaise: 23850 });
   });
+
+  it("free item: a ₹0 gift line on menu and drop orders, out of the drop's stock, never re-ordered", async () => {
+    const s = await seed();
+    // Only the gift: "4+ snacks or quiches → free Bhel Puri".
+    await prisma.offer.updateMany({ where: { vendorId: s.vendor.id }, data: { isActive: false } });
+    const gift = await prisma.offer.create({
+      data: {
+        vendorId: s.vendor.id,
+        name: "Festive gift",
+        eligibility: "ALL",
+        minQty: 4,
+        discountType: "FREE_ITEM",
+        percentBps: 0,
+        freeItemId: s.bhel.id,
+        onPos: false,
+      },
+    });
+
+    // Menu order: 3 items → no gift; 4 → gift, totals unchanged.
+    const placeMenu = async (qty: number) => {
+      const res = await placeMenuOrderRoute(post("http://t/x", { ...buyer, items: [{ menuItemId: s.pcc.id, qty }] }), {
+        params: Promise.resolve({ slug: s.vendor.slug }),
+      });
+      expect(res.status).toBe(201);
+      const { data } = (await res.json()) as { data: { orderToken: string } };
+      return prisma.transaction.findFirstOrThrow({
+        where: { orderToken: data.orderToken, vendorId: s.vendor.id },
+        include: { orderItems: true },
+      });
+    };
+    const three = await placeMenu(3);
+    expect(three.orderItems.some((i) => i.isGift)).toBe(false);
+    expect(three.offerId).toBeNull();
+
+    const four = await placeMenu(4);
+    expect(four).toMatchObject({ subtotalPaise: 22000, discountPaise: 0, totalPaise: 22000, offerId: gift.id, offerName: "Festive gift" });
+    const giftLine = four.orderItems.find((i) => i.isGift)!;
+    expect(giftLine).toMatchObject({
+      menuItemId: s.bhel.id,
+      name: "Bhel Puri (free gift)",
+      priceInPaise: 0,
+      qty: 1,
+      totalPaise: 0,
+      discountPaise: 0,
+    });
+    const receipt = await receiptData.loadVendorReceipt(s.vendor.id, { transactionId: four.id });
+    const v = receipt!.view;
+    expect(v.items.reduce((sum, i) => sum + i.priceInPaise * i.qty, 0)).toBe(v.subtotalPaise);
+    expect(v.subtotalPaise - v.discountPaise + v.deliveryFeePaise + v.taxPaise).toBe(v.totalPaise);
+
+    const { planOrderAgain } = await import("@/lib/order-again");
+    const again = planOrderAgain(four.orderItems, { menu: new Set([s.pcc.id, s.bhel.id]), drops: [] });
+    expect(again?.lines).toEqual({ [s.pcc.id]: 4 });
+
+    // Drop order: the gift must be a drop item and fit its stock.
+    const now = new Date();
+    const drop = await prisma.drop.create({
+      data: {
+        vendorId: s.vendor.id,
+        title: "Saturday",
+        date: new Date("2026-10-17T00:00:00Z"),
+        fulfilmentMode: "PICKUP",
+        fulfilmentStartsAt: new Date(now.getTime() + 2 * 86_400_000),
+        fulfilmentEndsAt: new Date(now.getTime() + 2 * 86_400_000 + 3_600_000),
+        closesAt: new Date(now.getTime() + 86_400_000),
+        status: "OPEN",
+        items: {
+          create: [
+            { menuItemId: s.pcc.id, priceInPaise: 5000 },
+            { menuItemId: s.bhel.id, priceInPaise: 4000, maxQty: 1 },
+          ],
+        },
+      },
+      include: { items: true },
+    });
+    const pccItem = drop.items.find((i) => i.menuItemId === s.pcc.id)!;
+    const bhelItem = drop.items.find((i) => i.menuItemId === s.bhel.id)!;
+    const orderDrop = () =>
+      drops.placeStorefrontOrder({
+        ...buyer,
+        vendor: { id: s.vendor.id, plan: "PRO" },
+        acceptPayOnDelivery: true,
+        dropId: drop.id,
+        items: [{ dropItemId: pccItem.id, qty: 4 }],
+      });
+
+    const first = await orderDrop();
+    expect(first.ok && first.order).toMatchObject({ subtotalPaise: 20000, discountPaise: 0, totalPaise: 20000 });
+    const firstLines = await prisma.orderItem.findMany({ where: { transactionId: first.ok ? first.order.id : "" } });
+    expect(firstLines.find((i) => i.isGift)).toMatchObject({ dropItemId: bhelItem.id, priceInPaise: 0, qty: 1 });
+    // The gift holds the only Bhel Puri.
+    expect((await drops.soldQtyByDropItem(prisma, drop.id, new Date())).get(bhelItem.id)).toBe(1);
+
+    // Sold out: the next order goes through without a gift and without the offer's name.
+    const second = await orderDrop();
+    expect(second.ok).toBe(true);
+    const secondTx = await prisma.transaction.findFirstOrThrow({
+      where: { id: second.ok ? second.order.id : "", vendorId: s.vendor.id },
+      include: { orderItems: true },
+    });
+    expect(secondTx.orderItems.some((i) => i.isGift)).toBe(false);
+    expect(secondTx.offerId).toBeNull();
+  });
 });

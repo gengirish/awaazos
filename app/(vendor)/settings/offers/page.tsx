@@ -39,7 +39,7 @@ export default async function OffersSettingsPage() {
     <>
       <SettingsPageHeader
         title="Offers"
-        description="Run a sale on some or all items, or give a percentage off when one order has enough of the right items, like a weekly plan."
+        description="Run a sale on some or all items, or reward an order with enough of the right items with a percentage off (a weekly plan) or a free item."
       />
       <SettingsCard
         title="Your offers"

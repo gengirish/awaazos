@@ -4,13 +4,17 @@ import {
   applyOffers,
   discountLabel,
   formatPercentBps,
+  giftLineName,
   isSaleOffer,
   OFFER_NAME_MAX,
+  offerGiftText,
   offerIsLive,
   offerNudgeText,
   offerSummary,
+  overlappingOffers,
   resolveOffers,
   salePriceFor,
+  withGiftsThatFit,
   type OfferLine,
   type OfferRule,
 } from "@/lib/offers";
@@ -39,6 +43,8 @@ function rule(over: Partial<OfferRule> & Pick<OfferRule, "id" | "name">): OfferR
     requiredTagQty: 1,
     discountType: "PERCENT",
     percentBps: 1000,
+    freeItemId: null,
+    freeItemQty: 1,
     onMenuOrders: true,
     onDrops: true,
     onPos: true,
@@ -345,5 +351,176 @@ describe("offer copy", () => {
   it("labels the discount row", () => {
     expect(discountLabel("Weekly Plan")).toBe("Discount (Weekly Plan)");
     expect(discountLabel(null)).toBe("Discount");
+  });
+});
+
+describe("free-item plans", () => {
+  // A wellness store: "4+ items → free Evil Eye Bracelet", beside "5+ items → 20% off".
+  const STORE = [
+    { id: "mala", name: "Karungali Mala", priceInPaise: 79900, tags: [] },
+    { id: "rose", name: "Rose Quartz Bracelet", priceInPaise: 65000, tags: [] },
+    { id: "jasper", name: "Red Jasper", priceInPaise: 45000, tags: [] },
+    { id: "evil", name: "Evil Eye Bracelet", priceInPaise: 25000, tags: [] },
+  ];
+  const GIFT = rule({
+    id: "gift",
+    name: "Festive gift",
+    eligibility: "ALL",
+    eligibleTag: null,
+    requiredTag: null,
+    requiredTagQty: 0,
+    discountType: "FREE_ITEM",
+    percentBps: 0,
+    freeItemId: "evil",
+  });
+  const TWENTY = rule({
+    id: "twenty",
+    name: "Festive offer",
+    eligibility: "ALL",
+    eligibleTag: null,
+    requiredTag: null,
+    requiredTagQty: 0,
+    minQty: 5,
+    percentBps: 2000,
+    createdAt: new Date("2026-10-02T00:00:00Z"),
+  });
+  const resolve = (rules: OfferRule[], channel: "MENU" | "DROP" | "POS" = "MENU") =>
+    resolveOffers(rules, STORE, { channel, now: NOW });
+  const lines = (qtyById: Record<string, number>): OfferLine[] =>
+    Object.entries(qtyById).map(([id, qty]) => ({
+      key: id,
+      menuItemId: id,
+      priceInPaise: STORE.find((m) => m.id === id)!.priceInPaise,
+      qty,
+    }));
+
+  it("adds the gift at 4 items and takes nothing off the bill", () => {
+    const r = applyOffers(lines({ jasper: 4 }), resolve([GIFT]));
+    expect(r.gift).toEqual({
+      offerId: "gift",
+      offerName: "Festive gift",
+      menuItemId: "evil",
+      name: "Evil Eye Bracelet",
+      qty: 1,
+      valuePaise: 25000,
+    });
+    expect(r.subtotalPaise).toBe(180000);
+    expect(r.discountTotalPaise).toBe(0);
+    expect(r.totalPaise).toBe(180000);
+    expect(r.lines.every((l) => l.discountPaise === 0)).toBe(true);
+    expect(r.applied).toMatchObject({ offerId: "gift", name: "Festive gift", discountPaise: 0 });
+  });
+
+  it("does not count the gift toward the minimum", () => {
+    const r = applyOffers(lines({ jasper: 3 }), resolve([GIFT]));
+    expect(r.gift).toBeNull();
+    expect(offerNudgeText(r.nudge!)).toBe("Add 1 more item to get a free Evil Eye Bracelet (Festive gift)");
+  });
+
+  it("counts a paid copy of the gift item like any other item", () => {
+    const r = applyOffers(lines({ evil: 2, jasper: 2 }), resolve([GIFT]));
+    expect(r.gift?.qty).toBe(1);
+    expect(r.totalPaise).toBe(140000);
+  });
+
+  it("never stacks with a percentage plan: the bigger saving wins", () => {
+    // 5 × ₹450 = ₹2,250; 20% = ₹450 beats the ₹250 bracelet.
+    const r = applyOffers(lines({ jasper: 5 }), resolve([GIFT, TWENTY]));
+    expect(r.gift).toBeNull();
+    expect(r.discountTotalPaise).toBe(45000);
+    expect(r.applied?.name).toBe("Festive offer");
+  });
+
+  it("keeps the gift when it is worth more than the percentage", () => {
+    const cheap = rule({ ...TWENTY, id: "five", name: "5% off", percentBps: 500 });
+    // 5% of ₹2,250 = ₹112.50 < ₹250.
+    const r = applyOffers(lines({ jasper: 5 }), resolve([GIFT, cheap]));
+    expect(r.gift?.offerId).toBe("gift");
+    expect(r.discountTotalPaise).toBe(0);
+  });
+
+  it("nudges toward the gift only when it beats what the cart already saves", () => {
+    const sale = rule({ ...TWENTY, id: "sale", name: "Big sale", minQty: 1, percentBps: 5000 });
+    // 3 × ₹450 at 50% saves ₹675, more than the bracelet.
+    const r = applyOffers(lines({ jasper: 3 }), resolve([GIFT, sale]));
+    expect(r.nudge).toBeNull();
+  });
+
+  it("gives several when the seller asks", () => {
+    const two = rule({ ...GIFT, freeItemQty: 2 });
+    const r = applyOffers(lines({ jasper: 4 }), resolve([two]));
+    expect(r.gift).toMatchObject({ qty: 2, valuePaise: 50000 });
+    expect(offerSummary(resolve([two])[0]!)).toBe("Festive gift: 4+ items → 2 free Evil Eye Bracelet");
+  });
+
+  it("is never a sale, even at a minimum of 1", () => {
+    const one = resolve([rule({ ...GIFT, minQty: 1 })])[0]!;
+    expect(isSaleOffer(one)).toBe(false);
+    expect(salePriceFor([one], "jasper", 45000)).toBeNull();
+  });
+
+  it("is left out on the counter and when its item is gone", () => {
+    expect(resolve([GIFT], "POS")).toEqual([]);
+    expect(resolve([rule({ ...GIFT, freeItemId: "deleted" })])).toEqual([]);
+    expect(offerIsLive(GIFT, NOW)).toBe(true);
+  });
+
+  it("drops an offer whose gift does not fit", () => {
+    const resolved = resolve([GIFT, TWENTY]);
+    expect(withGiftsThatFit(resolved, () => false).map((o) => o.id)).toEqual(["twenty"]);
+    expect(withGiftsThatFit(resolved, () => true).map((o) => o.id)).toEqual(["gift", "twenty"]);
+  });
+
+  it("reads as a free item in the chip and the cart", () => {
+    expect(offerSummary(resolve([GIFT])[0]!)).toBe("Festive gift: 4+ items → free Evil Eye Bracelet");
+    const r = applyOffers(lines({ jasper: 4 }), resolve([GIFT]));
+    expect(offerGiftText(r.gift!)).toBe("Festive gift: free Evil Eye Bracelet added.");
+    expect(giftLineName("Evil Eye Bracelet")).toBe("Evil Eye Bracelet (free gift)");
+  });
+});
+
+describe("overlappingOffers", () => {
+  const base = {
+    isActive: true,
+    discountType: "PERCENT" as const,
+    eligibility: "ALL" as const,
+    eligibleItemIds: [],
+    eligibleTag: null,
+    minQty: 5,
+    requiredTagQty: 0,
+    onMenuOrders: true,
+    onDrops: false,
+    onPos: false,
+    dropIds: [],
+    startsOn: null,
+    endsOn: null,
+  };
+  const twenty = { ...base, id: "twenty", name: "Festive offer" };
+  const gift = { ...base, id: "gift", name: "Festive gift", discountType: "FREE_ITEM" as const, minQty: 4 };
+  const names = (pairs: ReturnType<typeof overlappingOffers>) => pairs.map(([a, b]) => `${a.name} + ${b.name}`);
+
+  it("warns when a gift and a percentage plan can meet in one order", () => {
+    expect(names(overlappingOffers([twenty, gift]))).toEqual(["Festive offer + Festive gift"]);
+  });
+
+  it("stays quiet when they cannot", () => {
+    expect(overlappingOffers([twenty, { ...gift, isActive: false }])).toEqual([]);
+    expect(overlappingOffers([twenty, { ...gift, onMenuOrders: false, onDrops: true }])).toEqual([]);
+    expect(overlappingOffers([{ ...twenty, endsOn: "2026-11-01" }, { ...gift, startsOn: "2026-11-02" }])).toEqual([]);
+    expect(
+      overlappingOffers([
+        { ...twenty, eligibility: "TAG", eligibleTag: "malas" },
+        { ...gift, eligibility: "TAG", eligibleTag: "bracelets" },
+      ]),
+    ).toEqual([]);
+    // Two sales: each item takes its deepest, nothing to warn about.
+    expect(overlappingOffers([{ ...twenty, minQty: 1 }, { ...twenty, id: "b", name: "B", minQty: 1 }])).toEqual([]);
+    // A gift is never on the counter, so an overlap only there doesn't count.
+    expect(
+      overlappingOffers([
+        { ...twenty, onMenuOrders: false, onPos: true },
+        { ...gift, onMenuOrders: false, onPos: true },
+      ]),
+    ).toEqual([]);
   });
 });

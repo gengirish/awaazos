@@ -32,6 +32,7 @@ import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
 import { RecentOrderLink } from "@/components/storefront/RecentOrderLink";
 import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import { StoreBackButton } from "@/components/storefront/StoreBackButton";
+import { StoreInstall } from "@/components/storefront/StoreInstall";
 import { StorePageRefresh } from "@/components/storefront/StorePageRefresh";
 import {
   HideWhileSearching,
@@ -52,7 +53,7 @@ import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDro
 import { formatDropDayLabel, formatFulfilmentWindow } from "@/lib/drops-time";
 import { instagramProfileUrl } from "@/lib/instagram";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
-import { offersForItems, resolveOffers, type ResolvedOffer } from "@/lib/offers";
+import { offersForItems, resolveOffers, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
 import { loadOfferRules, type OfferSource } from "@/lib/offers-server";
 import { publicRatingText } from "@/lib/order-feedback";
 import { loadRatingSummary } from "@/lib/order-feedback-server";
@@ -76,6 +77,7 @@ import { storeInfoFacts, type StoreFactKind } from "@/lib/store-info";
 import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { viewerIsStoreStaff } from "@/lib/storefront-viewer";
 import { buildUpiCollectLink } from "@/lib/upi";
+import { storeBackgroundStyle } from "@/lib/store-background";
 import { storeThemeAttribute } from "@/lib/store-theme";
 
 export const dynamic = "force-dynamic";
@@ -197,6 +199,7 @@ const loadStorefront = cache(async (slug: string) => {
       stallTypeOther: true, // the seller's own words for "Other"; shown as the store type
       logoUrl: true,
       bannerUrl: true,
+      backgroundUrl: true,
       upiId: true,
       upiName: true,
       plan: true, // these three and the Razorpay columns only decide `payment.online`; only that boolean leaves the server
@@ -461,9 +464,14 @@ async function buildDropViews(
       const soldOut = visibility === "open" && !dropHasStock(items);
       const offers =
         visibility === "open" && !soldOut
-          ? offersForItems(
-              resolveOffers(offerSource.rules, offerSource.menuItems, { channel: "DROP", dropId: drop.id, now }),
-              drop.items.map((i) => i.menuItemId),
+          ? withGiftsThatFit(
+              offersForItems(
+                resolveOffers(offerSource.rules, offerSource.menuItems, { channel: "DROP", dropId: drop.id, now }),
+                drop.items.map((i) => i.menuItemId),
+              ),
+              // A drop's gift is one of its own items, with stock left.
+              (menuItemId, qty) =>
+                items.some((i) => i.menuItemId === menuItemId && (i.remaining === null || i.remaining >= qty)),
             )
           : [];
       return { drop, visibility, items, soldOut, offers };
@@ -720,7 +728,12 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   }));
 
   return (
-    <div id="store-top" data-theme={theme} className="min-h-screen bg-awaaz-cream/40">
+    <div
+      id="store-top"
+      data-theme={theme}
+      className="min-h-screen bg-awaaz-cream/40"
+      style={storeBackgroundStyle(vendor.backgroundUrl)}
+    >
       <StorePageRefresh />
       <a
         href="#menu"
@@ -1141,6 +1154,11 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                 </div>
               </section>
             ) : null}
+
+            {/* The store's own app (lib/store-app.ts). Demo stores get no app: claiming one changes it. */}
+            {vendor.isDemo ? null : (
+              <StoreInstall slug={vendor.slug} storeName={vendor.name} className="mt-10" />
+            )}
           </main>
 
           <footer className="px-4 pb-10 pt-2 text-center">

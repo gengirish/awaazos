@@ -13,7 +13,8 @@ import type { CartScope } from "@/lib/storefront-order";
  * or an open drop (the menu beats a drop on a tie, then the soonest cut-off).
  */
 
-export type OrderAgainItem = { menuItemId: string | null; name: string; qty: number };
+/** `isGift`: a free-item offer's gift line, never put back in a cart (lib/offers.ts). */
+export type OrderAgainItem = { menuItemId: string | null; name: string; qty: number; isGift?: boolean };
 
 export type OrderableNow = {
   /** Menu item ids orderable from the everyday menu; empty when it takes no orders. */
@@ -52,6 +53,7 @@ export function planOrderAgain(items: readonly OrderAgainItem[], orderable: Orde
     const unavailable: string[] = [];
     let count = 0;
     for (const item of items) {
+      if (item.isGift) continue;
       const id = item.menuItemId ? target.idFor(item.menuItemId) : undefined;
       if (id) {
         lines[id] = (lines[id] ?? 0) + item.qty;

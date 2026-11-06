@@ -8,6 +8,8 @@ import { TRIAL_DAYS } from "@/lib/constants";
 import { REFERRAL_REWARD_CAP_PER_YEAR, REFERRED_TRIAL_DAYS, referralSignUpUrl, rewardMonthsFor } from "@/lib/referral";
 import { loadReferralSummary } from "@/lib/referral-server";
 import { appBaseUrl } from "@/lib/storefront-razorpay";
+import { prisma } from "@/lib/prisma";
+import { LIVE_SUBSCRIPTION_STATUSES } from "@/lib/subscription";
 
 import { requireSettingsContext } from "../_context";
 
@@ -29,7 +31,11 @@ export default async function ReferSettingsPage() {
   // Other staff and demo stores don't see this section; send them to the overview.
   if (!isOwner || vendor.isDemo) redirect("/settings");
 
-  const summary = await loadReferralSummary(vendor);
+  const [summary, settings] = await Promise.all([
+    loadReferralSummary(vendor),
+    prisma.vendorSettings.findUnique({ where: { vendorId: vendor.id }, select: { razorpaySubStatus: true } }),
+  ]);
+  const hasLiveSubscription = LIVE_SUBSCRIPTION_STATUSES.includes(settings?.razorpaySubStatus ?? "");
   const link = referralSignUpUrl(appBaseUrl(), vendor.slug);
   const section = settingsSection("refer");
   const monthly = rewardMonthsFor("monthly");
@@ -62,9 +68,10 @@ export default async function ReferSettingsPage() {
             </li>
           </ol>
           <p className="mt-3 text-sm text-muted-foreground">
-            If you are on your free trial or your plan has ended, free months are added straight away. If you
-            already have a subscription, they are saved and used the next time you subscribe. Rewards are free time
-            only, never cash.
+            If you are on your free trial or your plan has ended, free months are added straight away. If you have
+            a subscription, you are charged as usual and a free month is refunded from your next charge: all of it
+            on a monthly plan, a twelfth of it for each free month on a yearly plan. Refunds reach you in 5 to 7
+            days. Rewards are never paid out as cash.
           </p>
         </SettingsCard>
 
@@ -83,7 +90,10 @@ export default async function ReferSettingsPage() {
           </dl>
           {summary.monthsBanked > 0 ? (
             <p className="mt-3 text-sm text-muted-foreground">
-              {months(summary.monthsBanked)} saved: they are used the next time you subscribe on {settingsSection("billing").title}.
+              {months(summary.monthsBanked)} saved:{" "}
+              {hasLiveSubscription
+                ? "they are refunded from your next charge."
+                : `they are used the next time you subscribe on ${settingsSection("billing").title}.`}
             </p>
           ) : null}
         </SettingsCard>

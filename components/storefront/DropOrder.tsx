@@ -18,7 +18,7 @@ import {
 import { ItemPrice } from "@/components/storefront/ItemPrice";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
-import { applyOffers, salePriceFor, type ResolvedOffer } from "@/lib/offers";
+import { applyOffers, salePriceFor, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
 import {
   cartStorageKey,
   maxOrderableQty,
@@ -154,6 +154,13 @@ export function DropOrder(props: DropOrderProps) {
     .map(([id, qty]) => ({ item: byId.get(id), qty }))
     .filter((l): l is { item: DropOrderItem; qty: number } => !!l.item && l.qty > 0);
   const itemCount = lines.reduce((s, l) => s + l.qty, 0);
+  // Same rule as the server (lib/drops.ts): the gift must still fit in the stock this cart leaves.
+  const giftFits = (menuItemId: string, qty: number) =>
+    items.some((i) => {
+      if (i.menuItemId !== menuItemId) return false;
+      const remaining = remainingFor(i);
+      return remaining === null || remaining - (cart[i.id] ?? 0) >= qty;
+    });
   const offered = applyOffers(
     lines.map((l) => ({
       key: l.item.id,
@@ -161,7 +168,7 @@ export function DropOrder(props: DropOrderProps) {
       priceInPaise: l.item.priceInPaise,
       qty: l.qty,
     })),
-    offers,
+    withGiftsThatFit(offers, giftFits),
   );
   const appliedOffer = offered.applied;
   // What the cart bars show: items less the offer discount (delivery is added at checkout).
@@ -175,7 +182,7 @@ export function DropOrder(props: DropOrderProps) {
     itemCount,
     subtotalPaise: payablePaise,
     canPay,
-    note: offerCartNoteText(appliedOffer?.name ?? null, offered.nudge),
+    note: offerCartNoteText(appliedOffer?.name ?? null, offered.nudge, offered.gift),
     onCheckout: () => setOpen(true),
     enabled: orderable,
   });
@@ -296,7 +303,12 @@ export function DropOrder(props: DropOrderProps) {
       {orderable && !canPay ? <NoPaymentNotice /> : null}
 
       {orderable ? (
-        <OfferCartNote appliedName={appliedOffer?.name ?? null} nudge={offered.nudge} inCartBar={inHub} />
+        <OfferCartNote
+          appliedName={appliedOffer?.name ?? null}
+          nudge={offered.nudge}
+          gift={offered.gift}
+          inCartBar={inHub}
+        />
       ) : null}
 
       {orderable && !inHub ? (
@@ -327,6 +339,7 @@ export function DropOrder(props: DropOrderProps) {
         }))}
         onChangeQty={setQty}
         discount={appliedOffer}
+        gift={offered.gift}
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
         pickupNote={pickupNote}

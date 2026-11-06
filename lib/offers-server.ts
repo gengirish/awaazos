@@ -1,6 +1,12 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
-import { resolveOffers, type OfferChannel, type OfferRule, type ResolvedOffer } from "@/lib/offers";
+import {
+  resolveOffers,
+  type OfferChannel,
+  type OfferMenuItemRef,
+  type OfferRule,
+  type ResolvedOffer,
+} from "@/lib/offers";
 import { offerDatesToDays } from "@/lib/zod-offers";
 
 /**
@@ -25,6 +31,8 @@ export const OFFER_RULE_SELECT = {
   requiredTagQty: true,
   discountType: true,
   percentBps: true,
+  freeItemId: true,
+  freeItemQty: true,
   onMenuOrders: true,
   onDrops: true,
   onPos: true,
@@ -41,7 +49,7 @@ const CHANNEL_WHERE: Record<OfferChannel, Prisma.OfferWhereInput> = {
   POS: { onPos: true },
 };
 
-export type OfferSource = { rules: OfferRule[]; menuItems: { id: string; tags: string[] }[] };
+export type OfferSource = { rules: OfferRule[]; menuItems: OfferMenuItemRef[] };
 
 /**
  * This vendor's active offers on any of `channels`, before the date and drop
@@ -55,9 +63,14 @@ export async function loadOfferRules(db: Db, vendorId: string, channels: OfferCh
   });
   if (rules.length === 0) return { rules, menuItems: [] };
   const needsTags = rules.some((r) => r.eligibility === "TAG" || (r.requiredTag && r.requiredTagQty > 0));
-  const menuItems = needsTags
-    ? await db.menuItem.findMany({ where: { vendorId }, select: { id: true, tags: true } })
-    : [];
+  // A gift needs its name and price; any availability, so a seller can give
+  // away something they don't sell on its own.
+  const giftIds = rules.flatMap((r) => (r.discountType === "FREE_ITEM" && r.freeItemId ? [r.freeItemId] : []));
+  if (!needsTags && giftIds.length === 0) return { rules, menuItems: [] };
+  const menuItems: OfferMenuItemRef[] = await db.menuItem.findMany({
+    where: needsTags ? { vendorId } : { vendorId, id: { in: giftIds } },
+    select: { id: true, tags: true, name: true, priceInPaise: true },
+  });
   return { rules, menuItems };
 }
 
@@ -85,6 +98,8 @@ export function offerToDto(o: OfferRule) {
     requiredTagQty: o.requiredTagQty,
     discountType: o.discountType,
     percentBps: o.percentBps,
+    freeItemId: o.freeItemId,
+    freeItemQty: o.freeItemQty,
     onMenuOrders: o.onMenuOrders,
     onDrops: o.onDrops,
     onPos: o.onPos,
@@ -103,11 +118,15 @@ export type OfferDto = ReturnType<typeof offerToDto>;
 export async function unknownOfferRefs(
   db: Db,
   vendorId: string,
-  refs: { eligibleItemIds: string[]; dropIds: string[] },
-): Promise<"unknown_items" | "unknown_drops" | null> {
+  refs: { eligibleItemIds: string[]; dropIds: string[]; freeItemId?: string | null },
+): Promise<"unknown_items" | "unknown_drops" | "unknown_free_item" | null> {
   if (refs.eligibleItemIds.length) {
     const n = await db.menuItem.count({ where: { vendorId, id: { in: refs.eligibleItemIds } } });
     if (n !== refs.eligibleItemIds.length) return "unknown_items";
+  }
+  if (refs.freeItemId) {
+    const n = await db.menuItem.count({ where: { vendorId, id: refs.freeItemId } });
+    if (n !== 1) return "unknown_free_item";
   }
   if (refs.dropIds.length) {
     const n = await db.drop.count({ where: { vendorId, id: { in: refs.dropIds } } });

@@ -255,7 +255,9 @@ Rules every one of them follows:
   and `/api/vendor/logo` (`lib/store-image.ts`), edited in Settings → Online store. Upload rules (4 MB,
   JPEG/PNG/WebP, validate before Blob) are shared with menu photos in `lib/blob-image.ts`; the browser
   shrinks photos first (`lib/image-downscale.ts`). No Blob token → 503. The banner is decorative
-  (`alt=""`); without one the header keeps its theme gradient.
+  (`alt=""`); without one the header keeps its theme gradient. A background tile
+  (`Vendor.backgroundUrl`, `/api/vendor/background`, same rules, seller's own routes only, not demo stores)
+  repeats across `/s/[slug]` under a wash of the page colour (`storeBackgroundStyle`, `lib/store-background.ts`).
 - Store colour (`VendorSettings.theme`, `lib/store-theme.ts`) and tagline (`VendorSettings.tagline`,
   `lib/store-tagline.ts`) are OWNER settings in Settings → Online store via `PATCH /api/vendor`. The
   tagline is one line under the store name, the link-preview description and a line on the share
@@ -275,6 +277,11 @@ Rules every one of them follows:
 - Order pages are keyed on `Transaction.orderToken` alone (192-bit random, `generateOrderToken()`),
   always looked up together with the slug's `vendorId`. Never expose or accept a transaction `id`.
 - Every write is IP rate-limited (`makeLimiter` in `lib/ratelimit.ts`; buyer login also per-email).
+- Each store installs as **its own app** for buyers (`lib/store-app.ts`): `app/s/[slug]/layout.tsx` swaps the root
+  (seller) manifest for `/s/<slug>/manifest.webmanifest` (`id`/`scope`/`start_url` = `/s/<slug>`, store name and
+  colour) and icons from `/s/<slug>/app-icon/<180|192|512>`, both behind the publish gate. `StoreInstall` (store page
+  and order page, not demo stores) is a view over `useInstallPrompt`, with its own per-store close; inside Instagram on
+  Android it offers "Open in Chrome". Never link the root manifest from `/s/**`: buyers would install the seller app.
 - No `loading.tsx` under `app/s` or `app/r`: it streams the page, so `notFound()` would answer 200
   instead of 404. `not-found.tsx` / `error.tsx` there read no data and say the same thing for every miss.
 - The buyer's device remembers recent orders in localStorage (`components/storefront/recent-orders.ts`:
@@ -647,6 +654,14 @@ them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireAc
 - **Plans never stack**, with each other or with sales: the cart gets its sale prices or the one plan
   with the largest discount, whichever saves more (a tie keeps the sale prices). Between plans, ties go
   to the higher `minQty`, then the older offer. Only eligible lines are discounted; delivery fees never are.
+- **Free items** (`discountType` FREE_ITEM, `Offer.freeItemId` / `freeItemQty`): a plan whose reward is one
+  catalogue item the seller picked ("4+ items → free Evil Eye Bracelet"), never a sale. It competes with the other
+  plans and sales at the gift's catalogue value, but takes nothing off: the order gets an extra `OrderItem` at ₹0
+  with `isGift` and the name `giftLineName()` ("… (free gift)"), so subtotal, discount and total are unchanged and
+  every bill, board and receipt shows it as is. The gift doesn't count toward the minimum. Online only (never
+  resolved on POS). On a drop it must be one of the drop's items and comes out of its stock (`withGiftsThatFit`,
+  server and cart alike). Order again skips gift lines. Settings → Offers warns when two switched-on offers, one a
+  plan, can meet in one order (`overlappingOffers`).
 - **One name per bill:** `OffersResult.applied` is what `Transaction.offerId` / `offerName` record (the
   plan, the sale, or several sales as "A + B" / "A + 2 more", ≤ 60 chars). Never read `discounts[0]`.
 - **Rounding:** a plan takes `floor(eligibleSubtotal × bps / 10 000)`, split across eligible lines by
@@ -664,7 +679,7 @@ them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireAc
 - `Transaction.offerName` is a snapshot (`offerId` is set null on delete), so old bills keep their
   line. Receipts, WhatsApp text, boards and the CSV label it with `discountLabel()`.
 - Not built: coupon codes, per-customer limits, fixed amount / bundle price (enum values reserved),
-  buy-X-get-Y, a plan on top of sales, recurring subscriptions. POS item tiles don't show sale prices
+  cheapest-one-free, a buyer choosing the gift, free items at the counter, a plan on top of sales, recurring subscriptions. POS item tiles don't show sale prices
   (the cart's discount row does).
 - Test store data: `npm run seed:quiche-plans -- <slug>` (dry run; `--create` writes).
 
@@ -710,8 +725,14 @@ Stores refer other stores; buyers are not part of it. Rules in the header of `li
   ≤ 12 months per referrer per rolling year), inside `recordSubscriptionEvent`'s transaction.
 - **No timers.** A referrer on the trial or locked with no live subscription gets `trialEndsAt`
   moved forward at once. Otherwise the reward is banked (`EARNED`) and `create-subscription`
-  redeems it into `trialEndsAt` just before computing `start_at`. Credit against a live paid
-  subscription is not built (it needs Razorpay pause/resume on UPI AutoPay checked first).
+  redeems it into `trialEndsAt` just before computing `start_at`.
+- **A paying referrer's months are refunds.** Razorpay can't skip or discount a UPI AutoPay charge,
+  so the referrer's own next `subscription.charged` uses banked months (`creditForCharge`: monthly
+  refunded in full, yearly 1/12 per month) and records a `ReferralCredit` in the same transaction;
+  the webhook then refunds it on the platform account (`settleReferralCredit`, row-locked, matched
+  by `notes.referralCreditId` so it never refunds twice). A refusal stays PENDING with a retry on
+  `/admin/referrals`; the webhook never 500s over it. A charge refunded in full earns its own
+  referrer nothing, and `/admin/earnings` nets the refund out.
 - Admin: `/admin/referrals` (SUPER_ADMIN) and two figures on `/admin/metrics`.
 - DB tests: `npm run test:referrals:db` (throwaway `DATABASE_URL`).
 

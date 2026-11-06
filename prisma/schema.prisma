@@ -23,6 +23,7 @@ model Vendor {
   upiName            String? // Name shown on UPI screen
   logoUrl            String? // Vercel Blob URL
   bannerUrl          String? // Vercel Blob URL — wide cover photo on /s/[slug] (POST /api/vendor/banner)
+  backgroundUrl      String? // Vercel Blob URL — tile repeated behind /s/[slug] (POST /api/vendor/background, lib/store-background.ts)
   plan               Plan      @default(FREE)
   planExpiresAt      DateTime?
   // End of the 30-day free trial (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md). Set at
@@ -73,6 +74,7 @@ model Vendor {
   referrals             Vendor[]             @relation("VendorReferrals")
   referralRewardsEarned ReferralReward[]     @relation("ReferralRewardReferrer")
   referralRewardFrom    ReferralReward?      @relation("ReferralRewardReferred")
+  referralCredits       ReferralCredit[]
   orderFeedback         OrderFeedback[]
   ownerSurveyResponse   OwnerSurveyResponse?
 
@@ -214,7 +216,9 @@ model Offer {
   requiredTag     String? // Optional: at least requiredTagQty of the eligible units carry this tag
   requiredTagQty  Int               @default(0)
   discountType    OfferDiscountType @default(PERCENT)
-  percentBps      Int // 1000 = 10%
+  percentBps      Int // 1000 = 10%; 0 for FREE_ITEM
+  freeItemId      String? // MenuItem given free, when discountType = FREE_ITEM (no FK: a deleted item just stops the offer)
+  freeItemQty     Int               @default(1)
   onMenuOrders    Boolean           @default(true) // Storefront "order from menu"
   onDrops         Boolean           @default(true)
   onPos           Boolean           @default(true)
@@ -528,6 +532,7 @@ model OrderItem {
   qty           Int         @default(1)
   totalPaise    Int // priceInPaise * qty
   discountPaise Int         @default(0) // This line's share of Transaction.discountPaise
+  isGift        Boolean     @default(false) // A FREE_ITEM offer's gift: priced 0, never re-ordered
 
   @@index([transactionId])
   @@map("order_items")
@@ -886,6 +891,7 @@ enum OfferDiscountType {
   PERCENT
   FIXED_AMOUNT // Reserved; not accepted yet
   BUNDLE_PRICE // Reserved; not accepted yet
+  FREE_ITEM // freeItemId given free once the order qualifies (lib/offers.ts)
 }
 
 enum PaymentMethod {
@@ -957,8 +963,10 @@ model ReferralReward {
   referrerVendorId String
   referredVendorId String               @unique
   months           Int // 1, or 2 when the referred store paid yearly
+  // Of `months`, how many a refund of the referrer's own charge has used (ReferralCredit).
+  monthsUsed       Int                  @default(0)
   status           ReferralRewardStatus @default(EARNED)
-  // How it was redeemed: "trial_extension" | "subscribe_start"; null while EARNED.
+  // How it was redeemed: "trial_extension" | "subscribe_start" | "charge_refund"; null while EARNED.
   redeemedVia      String?
   // The referred store's first-charge event (SubscriptionEvent.razorpayEventId).
   sourceEventId    String
@@ -976,4 +984,36 @@ model ReferralReward {
 enum ReferralRewardStatus {
   EARNED // banked, not yet applied
   REDEEMED // applied as free time
+}
+
+/// A paying referrer's free month: one of its own subscription charges, refunded
+/// (lib/referral.ts, "Free months for a paying store"). Written in the charge's
+/// transaction; the Razorpay refund runs after commit (settleReferralCredit).
+model ReferralCredit {
+  id               String               @id @default(cuid())
+  vendorId         String
+  // The charge being refunded. Unique, so one payment is credited once.
+  paymentId        String               @unique
+  // SubscriptionEvent.razorpayEventId of that charge.
+  sourceEventId    String               @unique
+  chargePaise      Int
+  refundPaise      Int
+  months           Int
+  status           ReferralCreditStatus @default(PENDING)
+  razorpayRefundId String?
+  // Razorpay's error description from the last failed attempt; never buyer data.
+  lastError        String?
+  createdAt        DateTime             @default(now())
+  refundedAt       DateTime?
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([vendorId, createdAt])
+  @@map("referral_credits")
+}
+
+enum ReferralCreditStatus {
+  PENDING // recorded, refund not yet confirmed by Razorpay
+  REFUNDED
 }

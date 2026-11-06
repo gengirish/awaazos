@@ -8,8 +8,9 @@ import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 /**
- * Store banner and logo upload — the handlers behind
- * `/api/vendor/banner` and `/api/vendor/logo` (server-only).
+ * Store banner, logo and background upload — the handlers behind
+ * `/api/vendor/banner`, `/api/vendor/logo` and `/api/vendor/background`
+ * (server-only).
  *
  * POST   multipart/form-data, field `file` → { data: { url } }   200
  * DELETE (no body)                        → { success: true }    200
@@ -19,8 +20,14 @@ import { AuthError, requireVendorRole } from "@/lib/rbac";
  * No Blob token configured → 503 (uploads are a feature-gated integration).
  */
 export type StoreImageKind = "banner" | "logo";
+/** The seller's own routes also take a background tile; demo stores (lib/demo-store-image.ts) don't. */
+export type SellerStoreImageKind = StoreImageKind | "background";
 
-const FIELD = { banner: "bannerUrl", logo: "logoUrl" } as const satisfies Record<StoreImageKind, string>;
+const FIELD = {
+  banner: "bannerUrl",
+  logo: "logoUrl",
+  background: "backgroundUrl",
+} as const satisfies Record<SellerStoreImageKind, string>;
 
 const unavailable = () => NextResponse.json({ error: "Image uploads are not set up" }, { status: 503 });
 
@@ -32,7 +39,7 @@ function errorResponse(err: unknown, tag: string) {
   return NextResponse.json({ error: "Internal server error" }, { status: 500 });
 }
 
-export async function uploadStoreImage(req: NextRequest, kind: StoreImageKind) {
+export async function uploadStoreImage(req: NextRequest, kind: SellerStoreImageKind) {
   const tag = `api/vendor/${kind} POST`;
   const field = FIELD[kind];
   try {
@@ -66,7 +73,7 @@ export async function uploadStoreImage(req: NextRequest, kind: StoreImageKind) {
   }
 }
 
-export async function removeStoreImage(req: NextRequest, kind: StoreImageKind) {
+export async function removeStoreImage(req: NextRequest, kind: SellerStoreImageKind) {
   const tag = `api/vendor/${kind} DELETE`;
   const field = FIELD[kind];
   try {

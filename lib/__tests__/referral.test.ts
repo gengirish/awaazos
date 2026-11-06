@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import type { BillingAccess } from "@/lib/plan";
 import {
   canPromoteReferrals,
+  creditForCharge,
   extendTrialEndsAt,
   isSelfReferral,
   monthsUnderCap,
   parseReferralCode,
   redemptionFor,
+  referralDeliveryFor,
   referralPitch,
   REFERRAL_MONTH_DAYS,
   REFERRAL_REWARD_CAP_PER_YEAR,
@@ -16,6 +18,7 @@ import {
   referralSignUpUrl,
   rewardMonthsFor,
   signUpTrialEndsAt,
+  takeBankedMonths,
 } from "@/lib/referral";
 
 const DAY_MS = 86_400_000;
@@ -188,8 +191,14 @@ describe("canPromoteReferrals", () => {
     expect(canPromoteReferrals({ ...base, access: { kind: "locked", since: NOW } })).toBe(true);
   });
 
-  it("does not advertise months a store could only bank", () => {
-    expect(canPromoteReferrals({ ...base, hasLiveSubscription: true })).toBe(false);
+  it("advertises to a paying store, whose next charge pays the month back", () => {
+    expect(canPromoteReferrals({ ...base, hasLiveSubscription: true })).toBe(true);
+    expect(canPromoteReferrals({ ...base, access: { kind: "paid", plan: "STARTER" }, hasLiveSubscription: true })).toBe(
+      true,
+    );
+  });
+
+  it("does not advertise months a store with no charge coming could only bank", () => {
     expect(canPromoteReferrals({ ...base, access: { kind: "paid", plan: "STARTER" } })).toBe(false);
     expect(canPromoteReferrals({ ...base, access: { kind: "free" } })).toBe(false);
   });
@@ -200,9 +209,80 @@ describe("canPromoteReferrals", () => {
   });
 });
 
+describe("referralDeliveryFor", () => {
+  const trial: BillingAccess = { kind: "trial", endsAt: new Date("2030-01-01T00:00:00.000Z") };
+
+  it("is free time with nothing live, a refund with a live subscription", () => {
+    expect(referralDeliveryFor(trial, false)).toBe("free_time");
+    expect(referralDeliveryFor({ kind: "locked", since: NOW }, false)).toBe("free_time");
+    expect(referralDeliveryFor(trial, true)).toBe("refund");
+    expect(referralDeliveryFor({ kind: "paid", plan: "PRO" }, true)).toBe("refund");
+    expect(referralDeliveryFor({ kind: "free" }, true)).toBe("refund");
+  });
+
+  it("waits for the next subscribe when no charge is coming", () => {
+    expect(referralDeliveryFor({ kind: "paid", plan: "STARTER" }, false)).toBe("next_subscribe");
+    expect(referralDeliveryFor({ kind: "free" }, false)).toBe("next_subscribe");
+  });
+});
+
 describe("referralPitch", () => {
   it("states the trial and the reward from the constants", () => {
     expect(referralPitch()).toContain(`${REFERRED_TRIAL_DAYS} days free`);
     expect(referralPitch()).toContain(`${rewardMonthsFor("monthly")} free month`);
+    expect(referralPitch()).not.toContain("refund");
+  });
+
+  it("tells a paying store the month comes back from its next charge", () => {
+    expect(referralPitch("refund")).toContain("refunded from your next charge");
+  });
+});
+
+describe("creditForCharge", () => {
+  it("refunds a monthly charge in full for one month", () => {
+    expect(creditForCharge({ chargePaise: 76_582, interval: "monthly", monthsBanked: 3 })).toEqual({
+      months: 1,
+      refundPaise: 76_582,
+    });
+  });
+
+  it("gives back a twelfth of a yearly charge per month, up to twelve, rounded down", () => {
+    expect(creditForCharge({ chargePaise: 765_820, interval: "yearly", monthsBanked: 2 })).toEqual({
+      months: 2,
+      refundPaise: Math.floor((765_820 * 2) / 12),
+    });
+    expect(creditForCharge({ chargePaise: 765_820, interval: "yearly", monthsBanked: 15 })).toEqual({
+      months: 12,
+      refundPaise: 765_820,
+    });
+  });
+
+  it("credits nothing without banked months or a real charge", () => {
+    expect(creditForCharge({ chargePaise: 76_582, interval: "monthly", monthsBanked: 0 })).toBeNull();
+    expect(creditForCharge({ chargePaise: 0, interval: "monthly", monthsBanked: 1 })).toBeNull();
+    expect(creditForCharge({ chargePaise: 10.5, interval: "monthly", monthsBanked: 1 })).toBeNull();
+  });
+});
+
+describe("takeBankedMonths", () => {
+  const rewards = [
+    { id: "a", months: 2, monthsUsed: 1 },
+    { id: "b", months: 1, monthsUsed: 0 },
+    { id: "c", months: 2, monthsUsed: 0 },
+  ];
+
+  it("uses the oldest rewards first and marks the used-up ones", () => {
+    expect(takeBankedMonths(rewards, 1)).toEqual([{ id: "a", monthsUsed: 2, usedUp: true }]);
+    expect(takeBankedMonths(rewards, 3)).toEqual([
+      { id: "a", monthsUsed: 2, usedUp: true },
+      { id: "b", monthsUsed: 1, usedUp: true },
+      { id: "c", monthsUsed: 1, usedUp: false },
+    ]);
+  });
+
+  it("never takes more than is left", () => {
+    const taken = takeBankedMonths(rewards, 10);
+    expect(taken.map((r) => r.monthsUsed)).toEqual([2, 1, 2]);
+    expect(takeBankedMonths([{ id: "x", months: 1, monthsUsed: 1 }], 1)).toEqual([]);
   });
 });

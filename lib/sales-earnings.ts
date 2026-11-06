@@ -5,7 +5,8 @@
  * The share is SALES_SHARE_BPS of what a store the intern built pays us,
  * excluding GST, for SALES_SHARE_MONTHS from that store's first charge.
  * Charges come from the `SubscriptionEvent` ledger, whose amounts include GST.
- * The ledger has no refunds, so a refund must be taken off by hand.
+ * Referral free-month refunds (`ReferralCredit`) are taken off by the loader;
+ * the ledger has no other refunds, so any other refund must be taken off by hand.
  */
 import { GST_BPS } from "@/lib/constants";
 import { formatIstDate } from "@/lib/datetime";

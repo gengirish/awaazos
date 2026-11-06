@@ -1,16 +1,20 @@
 import { notFound } from "next/navigation";
 
 import { AdminNav } from "@/components/admin/AdminNav";
+import { RetryRefundButton } from "@/components/admin/RetryRefundButton";
 import { EmptyState } from "@/components/ui/empty-state";
 import {
+  RECENT_CREDITS_LIMIT,
   RECENT_REFERRALS_DAYS,
   RECENT_REFERRALS_LIMIT,
   TOP_REFERRERS_LIMIT,
   loadRecentReferrals,
+  loadReferralCredits,
   loadTopReferrers,
   referralRewardStatus,
   type RecentReferralRow,
 } from "@/lib/admin-referrals";
+import { formatINR } from "@/lib/currency";
 import { formatIstDate } from "@/lib/datetime";
 import { billingAccess } from "@/lib/plan";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
@@ -40,7 +44,11 @@ export default async function AdminReferralsPage() {
   }
 
   const now = new Date();
-  const [top, recent] = await Promise.all([loadTopReferrers(), loadRecentReferrals(now)]);
+  const [top, recent, credits] = await Promise.all([
+    loadTopReferrers(),
+    loadRecentReferrals(now),
+    loadReferralCredits(),
+  ]);
 
   return (
     <div className="min-h-screen bg-background p-4 pb-10 md:p-6">
@@ -179,6 +187,76 @@ export default async function AdminReferralsPage() {
             <p className="mt-2 text-sm text-muted-foreground">
               Showing the newest {RECENT_REFERRALS_LIMIT} referred sign-ups.
             </p>
+          ) : null}
+        </section>
+
+        <section aria-labelledby="credits-heading">
+          <h2 id="credits-heading" className="mb-1 text-lg font-semibold text-foreground">
+            Free-month refunds
+          </h2>
+          <p className="mb-3 text-sm text-muted-foreground">
+            A referrer with a subscription gets its free months as a refund of its next charge. A refund Razorpay
+            refused (often a low balance) stays pending here until it is retried.
+          </p>
+          {credits.length === 0 ? (
+            <EmptyState title="No refunds yet" description="They appear when a paying referrer is next charged." />
+          ) : (
+            <div className="overflow-x-auto rounded-lg border bg-card">
+              <table className="w-full min-w-[40rem] text-sm">
+                <caption className="sr-only">Free-month refunds, pending first</caption>
+                <thead className="border-b">
+                  <tr>
+                    <th scope="col" className={TH}>
+                      Store
+                    </th>
+                    <th scope="col" className={TH}>
+                      Charged on
+                    </th>
+                    <th scope="col" className={TH_NUM}>
+                      Charge
+                    </th>
+                    <th scope="col" className={TH_NUM}>
+                      Refund
+                    </th>
+                    <th scope="col" className={TH}>
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {credits.map((c) => (
+                    <tr key={c.id} className="border-b last:border-0">
+                      <td className={TD}>
+                        <span className="font-medium text-foreground">{c.storeName}</span>
+                        <span className="block text-xs text-muted-foreground">{c.storeSlug}</span>
+                      </td>
+                      <td className={TD}>{formatIstDate(c.createdAt)}</td>
+                      <td className={TD_NUM}>{formatINR(c.chargePaise)}</td>
+                      <td className={TD_NUM}>
+                        {formatINR(c.refundPaise)}
+                        <span className="block text-xs text-muted-foreground">
+                          {c.months} {c.months === 1 ? "month" : "months"}
+                        </span>
+                      </td>
+                      <td className={TD}>
+                        {c.status === "REFUNDED" ? (
+                          `Refunded ${c.refundedAt ? formatIstDate(c.refundedAt) : ""}`.trim()
+                        ) : (
+                          <div className="space-y-1">
+                            <p className="font-medium text-destructive">Pending</p>
+                            {c.lastError ? <p className="text-xs text-muted-foreground">{c.lastError}</p> : null}
+                            <RetryRefundButton creditId={c.id} />
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+          {credits.length === RECENT_CREDITS_LIMIT ? (
+            <p className="mt-2 text-sm text-muted-foreground">Showing {RECENT_CREDITS_LIMIT} refunds, pending first.</p>
           ) : null}
         </section>
       </main>

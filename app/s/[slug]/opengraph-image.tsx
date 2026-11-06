@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { effectiveDropStatus } from "@/lib/drops";
 import { formatFulfilmentWindow, formatIstDayLabel, formatIstTime } from "@/lib/drops-time";
-import { fulfilmentModeLabel, OG_COLORS as C, Price, truncate } from "@/lib/og-parts";
+import { fulfilmentModeLabel, OG_COLORS as C, Price, storeLogoDataUrl, truncate } from "@/lib/og-parts";
 import { prisma } from "@/lib/prisma";
 import { everydayMenuHiddenByDrops, STOREFRONT_MENU_ITEM_WHERE } from "@/lib/storefront-order";
 
@@ -96,32 +96,10 @@ async function loadCard(slug: string, now: Date) {
     name: vendor.name,
     city: vendor.city,
     tagline: vendor.settings?.tagline ?? null,
-    logo: await logoDataUrl(vendor.logoUrl),
+    logo: await storeLogoDataUrl(vendor.logoUrl),
     drop,
     menuOrdering,
   };
-}
-
-const LOGO_MAX_BYTES = 1_500_000;
-
-/**
- * The store logo as a data URL for Satori, or null. Fetched here, inside the
- * card's try/catch, so a slow or missing blob degrades to "no logo" rather than
- * a broken image or a 500 half-way through the render. PNG / JPEG only.
- */
-async function logoDataUrl(url: string | null): Promise<string | null> {
-  if (!url) return null;
-  try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(2500) });
-    if (!res.ok) return null;
-    const type = (res.headers.get("content-type") ?? "").split(";")[0].trim();
-    if (type !== "image/png" && type !== "image/jpeg") return null;
-    const bytes = Buffer.from(await res.arrayBuffer());
-    if (bytes.byteLength === 0 || bytes.byteLength > LOGO_MAX_BYTES) return null;
-    return `data:${type};base64,${bytes.toString("base64")}`;
-  } catch {
-    return null;
-  }
 }
 
 function Brand() {

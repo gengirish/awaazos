@@ -162,7 +162,7 @@ export function MenuOrder(props: MenuOrderProps) {
     itemCount,
     subtotalPaise: payablePaise,
     canPay,
-    note: offerCartNoteText(appliedOffer?.name ?? null, offered.nudge),
+    note: offerCartNoteText(appliedOffer?.name ?? null, offered.nudge, offered.gift),
     onCheckout: () => setOpen(true),
     enabled: true,
   });
@@ -315,7 +315,12 @@ export function MenuOrder(props: MenuOrderProps) {
 
       {!canPay ? <NoPaymentNotice /> : null}
 
-      <OfferCartNote appliedName={appliedOffer?.name ?? null} nudge={offered.nudge} inCartBar={inHub} />
+      <OfferCartNote
+        appliedName={appliedOffer?.name ?? null}
+        nudge={offered.nudge}
+        gift={offered.gift}
+        inCartBar={inHub}
+      />
 
       {inHub ? null : (
         <CartBar
@@ -345,6 +350,7 @@ export function MenuOrder(props: MenuOrderProps) {
         }))}
         onChangeQty={setQty}
         discount={appliedOffer}
+        gift={offered.gift}
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
         pickupNote={pickupNote}
