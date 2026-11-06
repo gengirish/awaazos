@@ -23,9 +23,8 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import {
-  formatPercentBps,
-  freeItemPhrase,
   normaliseTag,
+  offerRuleSummary,
   OFFER_DESCRIPTION_MAX,
   OFFER_MAX_BPS,
   OFFER_MAX_FREE_QTY,
@@ -221,23 +220,6 @@ const API_ERRORS: Record<string, string> = {
   unknown_free_item: "The free item is no longer on your {catalogue}. Pick it again.",
   offer_limit_reached: "You have reached the limit of 20 offers. Delete one you no longer use.",
 };
-
-function describeOffer(o: OfferDto, itemCount: number, giftName: string | null): string {
-  const what =
-    o.eligibility === "TAG"
-      ? `items tagged "${o.eligibleTag}"`
-      : o.eligibility === "ITEMS"
-        ? `${itemCount} chosen ${itemCount === 1 ? "item" : "items"}`
-        : "any items";
-  const incl = o.requiredTag && o.requiredTagQty > 0 ? `, including ${o.requiredTagQty} tagged "${o.requiredTag}"` : "";
-  if (o.discountType === "FREE_ITEM") {
-    const gift = giftName ? freeItemPhrase({ name: giftName, qty: o.freeItemQty }) : "a free item no longer listed";
-    return `${gift[0]!.toUpperCase()}${gift.slice(1)} with ${o.minQty} or more ${what}${incl}`;
-  }
-  // minQty 1 with no "including" condition is a sale (isSaleOffer in lib/offers.ts).
-  if (o.minQty <= 1 && !incl) return `Sale · ${formatPercentBps(o.percentBps)} off ${what}`;
-  return `${formatPercentBps(o.percentBps)} off ${o.minQty} or more ${what}${incl}`;
-}
 
 function whereLabel(o: OfferDto, kind: StoreKind): string {
   const parts = [
@@ -439,7 +421,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
                       <span className="font-normal text-muted-foreground">· {o.isActive ? "On" : "Off"}</span>
                     </p>
                     <p className="text-sm text-foreground">
-                      {describeOffer(o, o.eligibleItemIds.length, o.freeItemId ? (nameById.get(o.freeItemId) ?? null) : null)}
+                      {offerRuleSummary(o, o.freeItemId ? (nameById.get(o.freeItemId) ?? null) : null)}
                     </p>
                     <p className="text-xs text-muted-foreground">
                       {whereLabel(o, storeKind)}
