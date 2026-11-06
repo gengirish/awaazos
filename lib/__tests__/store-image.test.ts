@@ -9,7 +9,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   role: "OWNER" as "OWNER" | "MANAGER" | null,
   token: "blob-token" as string | undefined,
-  vendor: { id: "v_1", bannerUrl: null as string | null, logoUrl: null as string | null },
+  vendor: {
+    id: "v_1",
+    bannerUrl: null as string | null,
+    logoUrl: null as string | null,
+    backgroundUrl: null as string | null,
+  },
   put: vi.fn(),
   del: vi.fn(),
   update: vi.fn(),
@@ -63,7 +68,7 @@ const del = () => new NextRequest("http://localhost/api/vendor/banner", { method
 beforeEach(() => {
   h.role = "OWNER";
   h.token = "blob-token";
-  h.vendor = { id: "v_1", bannerUrl: null, logoUrl: null };
+  h.vendor = { id: "v_1", bannerUrl: null, logoUrl: null, backgroundUrl: null };
   h.put.mockReset().mockResolvedValue({ url: "https://x.public.blob.vercel-storage.com/store/v_1/banner-abc.jpg" });
   h.del.mockReset().mockResolvedValue(undefined);
   h.update.mockReset().mockResolvedValue({});
@@ -87,6 +92,15 @@ describe("uploadStoreImage", () => {
     expect(h.put.mock.calls[0][0]).toBe("store/v_1/logo.png");
     expect(h.update.mock.calls[0][0].data).toHaveProperty("logoUrl");
     expect(h.del).toHaveBeenCalledWith(h.vendor.logoUrl, { token: "blob-token" });
+  });
+
+  it("writes backgroundUrl for the background tile and deletes the previous blob", async () => {
+    h.vendor.backgroundUrl = "https://x.public.blob.vercel-storage.com/old-bg.png";
+    const res = await uploadStoreImage(upload(new Blob([new Uint8Array(4)], { type: "image/png" })), "background");
+    expect(res.status).toBe(200);
+    expect(h.put.mock.calls[0][0]).toBe("store/v_1/background.png");
+    expect(h.update.mock.calls[0][0]).toEqual({ where: { id: "v_1" }, data: { backgroundUrl: expect.any(String) } });
+    expect(h.del).toHaveBeenCalledWith(h.vendor.backgroundUrl, { token: "blob-token" });
   });
 
   it("is owner-only", async () => {
@@ -140,6 +154,12 @@ describe("removeStoreImage", () => {
     expect(await res.json()).toEqual({ success: true });
     expect(h.update).toHaveBeenCalledWith({ where: { id: "v_1" }, data: { bannerUrl: null } });
     expect(h.del).toHaveBeenCalledWith("https://x.public.blob.vercel-storage.com/old.jpg", { token: "blob-token" });
+  });
+
+  it("clears the background tile", async () => {
+    h.vendor.backgroundUrl = "https://x.public.blob.vercel-storage.com/old-bg.jpg";
+    expect((await removeStoreImage(del(), "background")).status).toBe(200);
+    expect(h.update).toHaveBeenCalledWith({ where: { id: "v_1" }, data: { backgroundUrl: null } });
   });
 
   it("is a no-op success when nothing is set, even without a token", async () => {

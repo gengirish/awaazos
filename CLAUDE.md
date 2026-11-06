@@ -255,7 +255,9 @@ Rules every one of them follows:
   and `/api/vendor/logo` (`lib/store-image.ts`), edited in Settings → Online store. Upload rules (4 MB,
   JPEG/PNG/WebP, validate before Blob) are shared with menu photos in `lib/blob-image.ts`; the browser
   shrinks photos first (`lib/image-downscale.ts`). No Blob token → 503. The banner is decorative
-  (`alt=""`); without one the header keeps its theme gradient.
+  (`alt=""`); without one the header keeps its theme gradient. A background tile
+  (`Vendor.backgroundUrl`, `/api/vendor/background`, same rules, seller's own routes only, not demo stores)
+  repeats across `/s/[slug]` under a wash of the page colour (`storeBackgroundStyle`, `lib/store-background.ts`).
 - Store colour (`VendorSettings.theme`, `lib/store-theme.ts`) and tagline (`VendorSettings.tagline`,
   `lib/store-tagline.ts`) are OWNER settings in Settings → Online store via `PATCH /api/vendor`. The
   tagline is one line under the store name, the link-preview description and a line on the share

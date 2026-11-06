@@ -323,7 +323,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "store-look",
     group: "setup",
     title: "Change your store name, tagline, banner, logo or colour",
-    steps: "Edit the name and tagline, upload a banner and logo, and pick a store colour. Customers see them at the top of your store; the colour tints its buttons and links.",
+    steps: "Edit the name and tagline, upload a banner and logo, and pick a store colour. Customers see them at the top of your store; the colour tints its buttons and links. A background pattern repeats a small picture, like a peacock feather, behind your items.",
     nav: "settings",
     href: "/settings/store",
     trail: ["Online store"],
