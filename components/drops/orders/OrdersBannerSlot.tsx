@@ -1,6 +1,7 @@
 "use client";
 
 import { InstallBanner } from "@/components/pwa/InstallPrompt";
+import { REFERRAL_PROMPT_SNOOZE_KEY, ReferralPrompt } from "@/components/referrals/ReferralPrompt";
 import { SetupReminderBanner } from "@/components/setup/SetupChecklistCard";
 import { OWNER_SURVEY_SNOOZE_KEY, OwnerSurveyPrompt } from "@/components/survey/OwnerSurveyPrompt";
 import { useBannerSnooze } from "@/hooks/useBannerSnooze";
@@ -17,21 +18,25 @@ const REMINDER_SNOOZE_KEY = "awz_setup_reminder_snoozed";
 export function OrdersBannerSlot({
   reminder,
   askSurvey,
+  askRefer,
   className,
 }: {
   /** A setup reminder, when reminders are all that is left of the checklist. */
   reminder: ChecklistItem | null;
   askSurvey: boolean;
+  askRefer: boolean;
   className?: string;
 }) {
   const install = useInstallPrompt();
   const reminderSnooze = useBannerSnooze(REMINDER_SNOOZE_KEY);
   const surveySnooze = useBannerSnooze(OWNER_SURVEY_SNOOZE_KEY);
+  const referSnooze = useBannerSnooze(REFERRAL_PROMPT_SNOOZE_KEY);
 
   const banner = pickOrdersBanner({
     reminder: reminder !== null && !reminderSnooze.snoozed,
     install: isInstallBannerEligible(install),
     survey: askSurvey && !surveySnooze.snoozed,
+    refer: askRefer && !referSnooze.snoozed,
   });
 
   if (banner === "reminder" && reminder) {
@@ -39,5 +44,6 @@ export function OrdersBannerSlot({
   }
   if (banner === "install") return <InstallBanner className={className} />;
   if (banner === "survey") return <OwnerSurveyPrompt className={className} />;
+  if (banner === "refer") return <ReferralPrompt className={className} />;
   return null;
 }

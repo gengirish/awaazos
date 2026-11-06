@@ -37,6 +37,13 @@ forward first, and the route's existing "first charge at the trial's end" logic 
 Razorpay `start_at`. A grandfathered FREE store gets a trial end for the first time this way, so if
 it later cancels it locks instead of going back to FREE.
 
+## Where it is advertised
+
+Settings → Refer a seller, Help, and two prompts: a banner on the orders board (last in the one banner
+slot; published store, no invite yet) and a card on Plan & billing. Both are for an OWNER whose reward
+would apply at once (`canPromoteReferrals`): on the trial or locked, with no live subscription. A paying
+store isn't prompted, because its months stay banked until it next subscribes (see below).
+
 ## Not built
 
 - Credit against a live paid subscription. It needs a pause of one billing cycle on Razorpay, and

@@ -4,9 +4,10 @@
  */
 import type { Prisma } from "@prisma/client";
 
-import { billingAccess } from "@/lib/plan";
+import { billingAccess, type BillingAccess } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import {
+  canPromoteReferrals,
   extendTrialEndsAt,
   isSelfReferral,
   monthsUnderCap,
@@ -40,6 +41,27 @@ export async function resolveReferrerForSignUp(
   if (!referrer || !referrer.isActive || referrer.isDemo) return null;
   if (isSelfReferral(referrer, signUp)) return null;
   return { id: referrer.id };
+}
+
+/**
+ * The orders board's prompt: a store that can use the reward now, has its store
+ * published (something to show the seller it invites) and has no invite yet.
+ * Read on page render only.
+ */
+export async function shouldAskToRefer(input: {
+  vendor: { id: string; isDemo: boolean };
+  role: string;
+  access: BillingAccess;
+  published: boolean;
+  razorpaySubStatus: string | null | undefined;
+}): Promise<boolean> {
+  const hasLiveSubscription = LIVE_SUBSCRIPTION_STATUSES.includes(input.razorpaySubStatus ?? "");
+  if (!input.published) return false;
+  if (!canPromoteReferrals({ role: input.role, isDemo: input.vendor.isDemo, access: input.access, hasLiveSubscription })) {
+    return false;
+  }
+  const invited = await prisma.vendor.count({ where: { referredByVendorId: input.vendor.id } });
+  return invited === 0;
 }
 
 export type EarnReferralRewardResult =

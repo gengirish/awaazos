@@ -2,11 +2,13 @@ import { describe, expect, it } from "vitest";
 
 import type { BillingAccess } from "@/lib/plan";
 import {
+  canPromoteReferrals,
   extendTrialEndsAt,
   isSelfReferral,
   monthsUnderCap,
   parseReferralCode,
   redemptionFor,
+  referralPitch,
   REFERRAL_MONTH_DAYS,
   REFERRAL_REWARD_CAP_PER_YEAR,
   REFERRED_TRIAL_DAYS,
@@ -174,5 +176,33 @@ describe("isSelfReferral", () => {
     expect(
       isSelfReferral({ email: null, phone: "+919876543210" }, { email: "b@example.com", phone: undefined }),
     ).toBe(false);
+  });
+});
+
+describe("canPromoteReferrals", () => {
+  const trial: BillingAccess = { kind: "trial", endsAt: new Date("2030-01-01T00:00:00.000Z") };
+  const base = { role: "OWNER", isDemo: false, access: trial, hasLiveSubscription: false };
+
+  it("advertises to an owner whose reward would apply at once", () => {
+    expect(canPromoteReferrals(base)).toBe(true);
+    expect(canPromoteReferrals({ ...base, access: { kind: "locked", since: NOW } })).toBe(true);
+  });
+
+  it("does not advertise months a store could only bank", () => {
+    expect(canPromoteReferrals({ ...base, hasLiveSubscription: true })).toBe(false);
+    expect(canPromoteReferrals({ ...base, access: { kind: "paid", plan: "STARTER" } })).toBe(false);
+    expect(canPromoteReferrals({ ...base, access: { kind: "free" } })).toBe(false);
+  });
+
+  it("skips staff and demo stores", () => {
+    expect(canPromoteReferrals({ ...base, role: "MANAGER" })).toBe(false);
+    expect(canPromoteReferrals({ ...base, isDemo: true })).toBe(false);
+  });
+});
+
+describe("referralPitch", () => {
+  it("states the trial and the reward from the constants", () => {
+    expect(referralPitch()).toContain(`${REFERRED_TRIAL_DAYS} days free`);
+    expect(referralPitch()).toContain(`${rewardMonthsFor("monthly")} free month`);
   });
 });

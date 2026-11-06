@@ -141,6 +141,26 @@ export function isSelfReferral(
   return false;
 }
 
+/**
+ * Whether to advertise the program to this store: only an OWNER of a real store
+ * whose reward would apply at once (`redemptionFor`). A paying store's months
+ * only wait for its next subscribe, so "free months" would oversell it.
+ */
+export function canPromoteReferrals(input: {
+  role: string;
+  isDemo: boolean;
+  access: BillingAccess;
+  hasLiveSubscription: boolean;
+}): boolean {
+  if (input.role !== "OWNER" || input.isDemo) return false;
+  return redemptionFor(input.access, input.hasLiveSubscription).kind === "extend_trial";
+}
+
+/** The one line that sells the program, wherever it is advertised. */
+export function referralPitch(): string {
+  return `Invite another seller. They get ${REFERRED_TRIAL_DAYS} days free, and you get ${rewardMonthsFor("monthly")} free month when they subscribe.`;
+}
+
 /** What Settings → Refer a seller shows. Counts only; never the referred stores' contact details. */
 export type ReferralSummary = {
   slug: string;
