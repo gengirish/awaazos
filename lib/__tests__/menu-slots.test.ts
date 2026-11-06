@@ -91,3 +91,14 @@ describe("labels", () => {
     expect(slotRuleDaysLabel([0, 6])).toBe("Sat, Sun");
   });
 });
+
+describe("menuSlotsSchema (PATCH /api/vendor)", () => {
+  it("accepts valid rules, normalising days, and rejects a bad one", async () => {
+    const { menuSlotsSchema } = await import("@/lib/menu-slots-schema");
+    expect(menuSlotsSchema.parse([{ days: [3, 1, 1], start: "12:00", end: "14:00" }])).toEqual([
+      { days: [1, 3], start: "12:00", end: "14:00" },
+    ]);
+    expect(menuSlotsSchema.safeParse([{ days: [1], start: "14:00", end: "12:00" }]).success).toBe(false);
+    expect(menuSlotsSchema.safeParse(new Array(11).fill(WEEKDAYS_LUNCH)).success).toBe(false);
+  });
+});

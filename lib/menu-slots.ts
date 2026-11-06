@@ -13,8 +13,6 @@
  *
  * No timers: slots are computed from the rules on every read.
  */
-import { z } from "zod";
-
 import { formatIstTime, formatRelativeIstDay, formatWindowWithDay, istToUtc } from "@/lib/drops-time";
 
 export const MAX_MENU_SLOT_RULES = 10;
@@ -37,27 +35,28 @@ export type MenuSlotRule = {
   end: string;
 };
 
-export const menuSlotRuleSchema = z
-  .object({
-    days: z.array(z.number().int().min(0).max(6)).min(1).max(7),
-    start: z.string().regex(HM),
-    end: z.string().regex(HM),
-  })
-  .refine((r) => r.start < r.end, { message: "A slot has to end after it starts", path: ["end"] });
-
-export const menuSlotsSchema = z.array(menuSlotRuleSchema).max(MAX_MENU_SLOT_RULES);
+/**
+ * One rule as entered, or null when it isn't valid: 1–7 weekdays (0–6), "HH:MM"
+ * times, end after start. Hand-written rather than zod so the store page and
+ * the board don't ship zod; `menuSlotsSchema` (lib/menu-slots-schema.ts) wraps it for the API.
+ */
+export function toMenuSlotRule(entry: unknown): MenuSlotRule | null {
+  if (!entry || typeof entry !== "object") return null;
+  const { days, start, end } = entry as Record<string, unknown>;
+  if (!Array.isArray(days) || days.length < 1 || days.length > 7) return null;
+  if (!days.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) return null;
+  if (typeof start !== "string" || typeof end !== "string" || !HM.test(start) || !HM.test(end)) return null;
+  if (start >= end) return null;
+  return { days: [...new Set(days as number[])].sort((a, b) => a - b), start, end };
+}
 
 /** The stored JSON, as rules; anything malformed is dropped rather than thrown. */
 export function parseMenuSlots(raw: unknown): MenuSlotRule[] {
   if (!Array.isArray(raw)) return [];
-  const rules: MenuSlotRule[] = [];
-  for (const entry of raw.slice(0, MAX_MENU_SLOT_RULES)) {
-    const parsed = menuSlotRuleSchema.safeParse(entry);
-    if (parsed.success) {
-      rules.push({ days: [...new Set(parsed.data.days)].sort((a, b) => a - b), start: parsed.data.start, end: parsed.data.end });
-    }
-  }
-  return rules;
+  return raw
+    .slice(0, MAX_MENU_SLOT_RULES)
+    .map(toMenuSlotRule)
+    .filter((r): r is MenuSlotRule => r !== null);
 }
 
 export type MenuSlot = {

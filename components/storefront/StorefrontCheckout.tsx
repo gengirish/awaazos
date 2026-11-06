@@ -9,15 +9,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { RadioOption } from "@/components/ui/radio-option";
 import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   ResponsiveDialog,
   ResponsiveDialogBody,
   ResponsiveDialogContent,
@@ -970,34 +961,32 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
               <div className="space-y-2">
                 <Label htmlFor={ids.slot}>{fulfilment === "DELIVERY" ? "Deliver when?" : "Pick up when?"}</Label>
                 {slots.length > 0 ? (
-                  <Select
+                  // Native, grouped by day: the phone's own picker, and no extra bundle on the store page.
+                  <select
+                    id={ids.slot}
                     value={slot ?? ""}
-                    onValueChange={(v) => {
+                    onChange={(e) => {
+                      const v = e.target.value || null;
                       setSlot(v);
                       revalidate("slot", { slot: v });
                     }}
+                    aria-invalid={fieldErrors.slot ? true : undefined}
+                    aria-describedby={describedBy("slot")}
+                    className="flex h-11 w-full scroll-my-24 rounded-md border border-input bg-background px-3 text-base focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
                   >
-                    <SelectTrigger
-                      id={ids.slot}
-                      aria-invalid={fieldErrors.slot ? true : undefined}
-                      aria-describedby={describedBy("slot")}
-                      className="h-11 scroll-my-24 text-base aria-invalid:border-destructive md:text-sm"
-                    >
-                      <SelectValue placeholder="Choose a day and time" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {slotGroups.map((g) => (
-                        <SelectGroup key={g.day}>
-                          <SelectLabel className="text-sm">{g.day}</SelectLabel>
-                          {g.slots.map((sl) => (
-                            <SelectItem key={sl.key} value={sl.key} className="text-base md:text-sm">
-                              {g.day} · {sl.time}
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    <option value="" disabled>
+                      Choose a day and time
+                    </option>
+                    {slotGroups.map((g) => (
+                      <optgroup key={g.day} label={g.day}>
+                        {g.slots.map((sl) => (
+                          <option key={sl.key} value={sl.key}>
+                            {g.day} · {sl.time}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
                 ) : (
                   <p className="rounded-xl bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
                     No times are open this week. Message the store to arrange a time.

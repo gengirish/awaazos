@@ -10,8 +10,8 @@ import { Label } from "@/components/ui/label";
 import { formatIstTimeRange } from "@/lib/drops-time";
 import {
   MAX_MENU_SLOT_RULES,
-  menuSlotRuleSchema,
   slotRuleDaysLabel,
+  toMenuSlotRule,
   WEEKDAY_NAMES,
   type MenuSlotRule,
 } from "@/lib/menu-slots";
@@ -66,13 +66,13 @@ export function MenuSlotsClient({ initialSlots, isOwner }: { initialSlots: MenuS
   function add(e: React.FormEvent) {
     e.preventDefault();
     if (disabled || full) return;
-    const parsed = menuSlotRuleSchema.safeParse({ days, start, end });
-    if (!parsed.success) {
+    const rule = toMenuSlotRule({ days, start, end });
+    if (!rule) {
       setError(days.length === 0 ? "Pick at least one day." : "The end time has to be after the start time.");
       return;
     }
     setError(null);
-    save([...slots, parsed.data], `${slotRuleDaysLabel(parsed.data.days)} · ${timeRangeLabel(start, end)} added.`);
+    save([...slots, rule], `${slotRuleDaysLabel(rule.days)} · ${timeRangeLabel(start, end)} added.`);
   }
 
   function toggleDay(d: number) {

@@ -4,7 +4,7 @@ import { z } from "zod";
 
 import { SUPPORTED_VOICE_LANGS } from "@/lib/constants";
 import { deliveryRidersSchema } from "@/lib/delivery-riders";
-import { menuSlotsSchema } from "@/lib/menu-slots";
+import { menuSlotsSchema } from "@/lib/menu-slots-schema";
 import { INSTAGRAM_HANDLE_MESSAGE, normaliseInstagramHandle } from "@/lib/instagram";
 import { menuOrdersEnableBlocker, type MenuOrdersBlocker } from "@/lib/menu-orders-board";
 import {
