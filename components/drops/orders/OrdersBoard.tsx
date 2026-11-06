@@ -34,10 +34,10 @@ import { Input } from "@/components/ui/input";
 import { usePushAlerts } from "@/hooks/usePushAlerts";
 import type { DeliveryRider } from "@/lib/delivery-riders";
 import { formatINR } from "@/lib/currency";
+import { dropStateLabel } from "@/lib/drop-state";
 import type { EffectiveDropStatus } from "@/lib/drops";
 import {
   BOARD_FILTERS,
-  DROP_STATUS_LABEL,
   boardPollKind,
   countByFilter,
   dropOrdersHref,
@@ -1411,7 +1411,7 @@ function DropDetails({
         <span
           className={cn(STATUS_BADGE, effective === "OPEN" ? "border-primary bg-primary/10" : "border-border bg-muted")}
         >
-          {DROP_STATUS_LABEL[effective]}
+          {dropStateLabel(drop, new Date())}
         </span>
       </div>
       <dl className="mt-2 grid grid-cols-1 gap-1 text-sm text-muted-foreground sm:grid-cols-2">

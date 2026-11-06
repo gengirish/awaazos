@@ -128,11 +128,20 @@ export function formatIstDeadline(d: Date, now: Date = new Date()): string {
   return `${p.weekday} ${p.dayMonth}, ${p.time}`;
 }
 
-/** "2 h 15 min left" / "45 min left" / null when past or more than 2 days away. */
+/**
+ * "1 day 4 h left" / "2 h 15 min left" / "45 min left"; null when past or more
+ * than a week away. Days drop the minutes: "1 day 4 h", never "1 day 4 h 12 min".
+ */
 export function formatTimeLeft(until: Date, now: Date = new Date()): string | null {
   const ms = until.getTime() - now.getTime();
-  if (ms <= 0 || ms > 48 * 60 * 60 * 1000) return null;
+  if (ms <= 0 || ms > 7 * 24 * 60 * 60 * 1000) return null;
   const totalMin = Math.max(1, Math.ceil(ms / 60_000));
+  if (totalMin >= 24 * 60) {
+    const days = Math.floor(totalMin / (24 * 60));
+    const hours = Math.floor((totalMin % (24 * 60)) / 60);
+    const dayPart = `${days} ${days === 1 ? "day" : "days"}`;
+    return hours === 0 ? `${dayPart} left` : `${dayPart} ${hours} h left`;
+  }
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
   if (h === 0) return `${m} min left`;

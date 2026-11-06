@@ -559,15 +559,6 @@ export function liveEffectiveStatus(
   return "OPEN";
 }
 
-export const DROP_STATUS_LABEL: Record<EffectiveDropStatus, string> = {
-  DRAFT: "Draft",
-  SCHEDULED: "Opens later",
-  OPEN: "Taking orders",
-  CLOSED: "Orders closed",
-  FROZEN: "Orders locked",
-  FULFILLED: "Done",
-};
-
 /** Board polls the KV signal only while a drop can still receive orders. */
 export function shouldPollForOrders(status: EffectiveDropStatus): boolean {
   return status === "OPEN" || status === "SCHEDULED";

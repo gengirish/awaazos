@@ -32,7 +32,7 @@ import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
 import { formatINR, paiseToRupees } from "@/lib/currency";
 import { orderDisplayState, PENDING_HOLD_MINUTES } from "@/lib/drops";
-import { formatFulfilmentWindow, formatIstDate, formatIstTime } from "@/lib/drops-time";
+import { formatFulfilmentWindow, formatIstDate, formatIstTime, formatWindowWithDay } from "@/lib/drops-time";
 import {
   buyerWhatsappNumber,
   formatWhatsAppOrderMessage,
@@ -330,7 +330,9 @@ export default async function StorefrontOrderPage(props: {
   const payBy = formatIstTime(new Date(order.createdAt.getTime() + PENDING_HOLD_MINUTES * 60_000));
   const payOnline = awaitingUpi && minsLeft > 0 && isOnlinePaymentEnabled(vendor, vendor.settings, now);
 
+  // The WhatsApp text is read later, so it keeps the date; the page says "Today" / "Tomorrow".
   const fulfilmentWindow = drop ? formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt) : null;
+  const windowOnPage = drop ? formatWindowWithDay(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt, now) : null;
   const waNumber = buyerWhatsappNumber(vendor.settings);
   const waLink = waNumber
     ? whatsappChatLink(
@@ -523,10 +525,10 @@ export default async function StorefrontOrderPage(props: {
                   : "If you already paid, keep the UPI reference from your payment app — the seller will need it."}
               </p>
             ) : null}
-            {confirmed && (fulfilmentWindow || (isPickup && pickupNote)) ? (
+            {confirmed && (windowOnPage || (isPickup && pickupNote)) ? (
               <p className="text-sm font-semibold">
                 {isPickup ? "Pickup" : "Delivery"}
-                {fulfilmentWindow ? ` · ${fulfilmentWindow}` : ""}
+                {windowOnPage ? ` · ${windowOnPage}` : ""}
                 {isPickup && pickupNote ? ` · ${pickupNote}` : ""}
               </p>
             ) : null}
@@ -710,7 +712,7 @@ export default async function StorefrontOrderPage(props: {
             <MapPin className="h-4 w-4 text-primary" aria-hidden="true" />
             {order.fulfilmentType === "DELIVERY" ? "Delivery" : "Pickup"}
           </h2>
-          {fulfilmentWindow ? <p className="font-semibold">{fulfilmentWindow}</p> : null}
+          {windowOnPage ? <p className="font-semibold">{windowOnPage}</p> : null}
           {order.fulfilmentType === "DELIVERY" && order.deliveryAddress ? (
             <p className="whitespace-pre-line text-muted-foreground">{order.deliveryAddress}</p>
           ) : null}

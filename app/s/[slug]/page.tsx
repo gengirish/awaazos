@@ -50,7 +50,8 @@ import { foodImageFor } from "@/lib/food-images";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { displayStoreName } from "@/lib/demo-store-schema";
 import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
-import { formatDropDayLabel, formatFulfilmentWindow } from "@/lib/drops-time";
+import { dropStateLabel } from "@/lib/drop-state";
+import { formatDropDayLabel, formatWindowWithDay } from "@/lib/drops-time";
 import { instagramProfileUrl } from "@/lib/instagram";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
 import { offersForItems, resolveOffers, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
@@ -510,6 +511,43 @@ function DropSection({
   const types = allowedFulfilmentTypes(drop.fulfilmentMode);
   const orderable = visibility === "open" && !soldOut;
   const timeLeft = orderable ? formatTimeLeft(drop.closesAt, now) : null;
+  const handoverWindow = formatWindowWithDay(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt, now);
+  const handoverKind =
+    types.includes("DELIVERY") && types.includes("PICKUP")
+      ? "Delivery or pickup"
+      : types.includes("DELIVERY")
+        ? "Delivery"
+        : "Pickup";
+
+  // Not open yet: a slim teaser (what, when it opens, when it's handed over), no item list to scroll past.
+  if (visibility === "scheduled") {
+    const names = view.items.map((i) => i.name);
+    return (
+      <section
+        aria-labelledby={headingId}
+        className="rounded-3xl border border-dashed border-primary/40 bg-background px-4 py-4 shadow-xs sm:p-5"
+      >
+        <p className="text-sm font-bold uppercase tracking-wide text-primary">Coming up</p>
+        <h3 id={headingId} className="mt-1 font-display text-xl font-bold leading-tight text-awaaz-charcoal">
+          {drop.title} {drop.opensAt ? (
+            <span className="font-semibold text-primary">— opens {formatIstDeadline(drop.opensAt, now)}</span>
+          ) : null}
+        </h3>
+        <p className="mt-1 flex items-start gap-2 text-sm text-muted-foreground">
+          <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span>
+            {handoverKind} · {handoverWindow}
+          </span>
+        </p>
+        {names.length > 0 ? (
+          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+            {names.slice(0, 3).join(", ")}
+            {names.length > 3 ? ` +${names.length - 3} more` : ""}
+          </p>
+        ) : null}
+      </section>
+    );
+  }
 
   return (
     <section
@@ -528,12 +566,7 @@ function DropSection({
         <li className="flex items-start gap-2">
           <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <span>
-            {types.includes("DELIVERY") && types.includes("PICKUP")
-              ? "Delivery or pickup"
-              : types.includes("DELIVERY")
-                ? "Delivery"
-                : "Pickup"}{" "}
-            · {formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt)}
+            {handoverKind} · {handoverWindow}
           </span>
         </li>
         {types.includes("DELIVERY") ? (
@@ -561,17 +594,14 @@ function DropSection({
             : "mt-3 inline-flex rounded-full bg-muted px-3 py-1 text-sm font-bold text-muted-foreground"
         }
       >
-        {soldOut ? (
-          "Sold out"
-        ) : orderable ? (
+        {orderable ? (
           <>
             <span>Order by {formatIstDeadline(drop.closesAt, now)}</span>
             {timeLeft ? <span className="font-semibold opacity-90">· {timeLeft}</span> : null}
           </>
-        ) : visibility === "scheduled" && drop.opensAt ? (
-          `Orders open ${formatIstDeadline(drop.opensAt, now)}`
         ) : (
-          "Orders closed"
+          // Sold out, or past its cut-off: always with the reason (lib/drop-state.ts).
+          dropStateLabel(drop, now, { soldOut, viewer: "buyer" })
         )}
       </p>
 
@@ -602,7 +632,7 @@ function DropSection({
           fulfilmentTypes={types}
           deliveryFeePaise={drop.deliveryFeePaise}
           pickupNote={drop.pickupNote}
-          pickupWindow={formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt)}
+          pickupWindow={handoverWindow}
           payment={payment}
           whatsapp={whatsapp}
           prefill={prefill}
