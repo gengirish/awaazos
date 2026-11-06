@@ -1,8 +1,10 @@
+import { waitUntil } from "@vercel/functions";
 import { NextRequest, NextResponse } from "next/server";
 
 import { toSubscriptionSnapshot, verifyRazorpaySignature } from "@/lib/razorpay";
 import { getClientIp, tooManyRequests, webhookRateLimit } from "@/lib/ratelimit";
 import { isSubscriptionEvent } from "@/lib/subscription";
+import { settleReferralCreditForEvent } from "@/lib/referral-server";
 import { recordSubscriptionEvent } from "@/lib/subscription-store";
 
 export const dynamic = "force-dynamic";
@@ -124,6 +126,15 @@ export async function POST(req: NextRequest) {
     );
     // Safe to retry: the ledger insert rolled back with everything else.
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+
+  // A paying referrer's free month (lib/referral.ts): refund the charge the
+  // event just recorded a credit for, or one a replay finds still pending.
+  // After the response (two Razorpay calls), and it never fails the webhook:
+  // a refusal stays pending for /admin/referrals, so Razorpay never retries
+  // (or disables) the endpoint over a refund.
+  if (event === "subscription.charged") {
+    waitUntil(settleReferralCreditForEvent(eventId));
   }
 
   return NextResponse.json({ ok: true });

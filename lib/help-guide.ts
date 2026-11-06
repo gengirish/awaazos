@@ -454,7 +454,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "refer-seller",
     group: "setup",
     title: "Invite another seller and earn free months",
-    steps: `Copy your link, or tap Share on WhatsApp or Instagram story. A store that signs up with it gets ${REFERRED_TRIAL_DAYS} days free instead of ${TRIAL_DAYS}. When it pays for its first subscription you get ${rewardMonthsFor("monthly")} free month (${rewardMonthsFor("yearly")} if it pays yearly), up to ${REFERRAL_REWARD_CAP_PER_YEAR} a year.`,
+    steps: `Copy your link, or tap Share on WhatsApp or Instagram story. A store that signs up with it gets ${REFERRED_TRIAL_DAYS} days free instead of ${TRIAL_DAYS}. When it pays for its first subscription you get ${rewardMonthsFor("monthly")} free month (${rewardMonthsFor("yearly")} if it pays yearly), up to ${REFERRAL_REWARD_CAP_PER_YEAR} a year. If you have a subscription, the free month is refunded from your next charge.`,
     nav: "settings",
     href: "/settings/refer",
     trail: ["Refer a seller"],

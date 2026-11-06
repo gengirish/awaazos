@@ -710,8 +710,14 @@ Stores refer other stores; buyers are not part of it. Rules in the header of `li
   ≤ 12 months per referrer per rolling year), inside `recordSubscriptionEvent`'s transaction.
 - **No timers.** A referrer on the trial or locked with no live subscription gets `trialEndsAt`
   moved forward at once. Otherwise the reward is banked (`EARNED`) and `create-subscription`
-  redeems it into `trialEndsAt` just before computing `start_at`. Credit against a live paid
-  subscription is not built (it needs Razorpay pause/resume on UPI AutoPay checked first).
+  redeems it into `trialEndsAt` just before computing `start_at`.
+- **A paying referrer's months are refunds.** Razorpay can't skip or discount a UPI AutoPay charge,
+  so the referrer's own next `subscription.charged` uses banked months (`creditForCharge`: monthly
+  refunded in full, yearly 1/12 per month) and records a `ReferralCredit` in the same transaction;
+  the webhook then refunds it on the platform account (`settleReferralCredit`, row-locked, matched
+  by `notes.referralCreditId` so it never refunds twice). A refusal stays PENDING with a retry on
+  `/admin/referrals`; the webhook never 500s over it. A charge refunded in full earns its own
+  referrer nothing, and `/admin/earnings` nets the refund out.
 - Admin: `/admin/referrals` (SUPER_ADMIN) and two figures on `/admin/metrics`.
 - DB tests: `npm run test:referrals:db` (throwaway `DATABASE_URL`).
 
