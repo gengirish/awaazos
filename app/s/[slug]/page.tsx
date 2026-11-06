@@ -32,6 +32,7 @@ import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
 import { RecentOrderLink } from "@/components/storefront/RecentOrderLink";
 import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import { StoreBackButton } from "@/components/storefront/StoreBackButton";
+import { StoreInstall } from "@/components/storefront/StoreInstall";
 import { StorePageRefresh } from "@/components/storefront/StorePageRefresh";
 import {
   HideWhileSearching,
@@ -1141,6 +1142,11 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                 </div>
               </section>
             ) : null}
+
+            {/* The store's own app (lib/store-app.ts). Demo stores get no app: claiming one changes it. */}
+            {vendor.isDemo ? null : (
+              <StoreInstall slug={vendor.slug} storeName={vendor.name} className="mt-10" />
+            )}
           </main>
 
           <footer className="px-4 pb-10 pt-2 text-center">
