@@ -225,6 +225,12 @@ describe("groupDropsByDay", () => {
     expect(upcoming.map((d) => d.date)).toEqual(["2026-10-05", "2026-10-07"]);
     expect(past.map((d) => d.date)).toEqual(["2026-10-03", "2026-10-01"]);
   });
+
+  it("keeps only the latest two past drops", () => {
+    const drops = [{ date: "2026-09-20" }, { date: "2026-10-03" }, { date: "2026-09-27" }, { date: "2026-10-01" }];
+    const { past } = groupDropsByDay(drops, "2026-10-05");
+    expect(past.map((d) => d.date)).toEqual(["2026-10-03", "2026-10-01"]);
+  });
 });
 
 describe("defaultCutoffFor", () => {
