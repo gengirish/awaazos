@@ -642,6 +642,42 @@ export function offerNudgeText(n: OfferNudge): string {
   return `Add ${n.missingQty} more ${n.eligibleLabel ? `${n.eligibleLabel} ` : ""}${n.missingQty === 1 ? "item" : "items"} ${unlock}`;
 }
 
+/** An offer as Settings lists it: the stored rule, not yet resolved. */
+export type OfferRuleSummaryInput = Pick<
+  OfferRule,
+  "eligibility" | "eligibleItemIds" | "eligibleTag" | "minQty" | "requiredTag" | "requiredTagQty" | "discountType" | "percentBps" | "freeItemQty"
+>;
+
+/**
+ * The seller's one-line summary of an offer in Settings → Offers:
+ * "10% off 4 or more items", "10% off 4 or more items tagged "quiche", including 1 tagged "paneer"",
+ * "10% off 4 or more of 3 chosen items", "Free Evil Eye Bracelet with 4 or more items",
+ * "Sale · 35% off all items". `giftName` is the free item's current name, or null when it is gone.
+ */
+export function offerRuleSummary(o: OfferRuleSummaryInput, giftName: string | null = null): string {
+  const chosen = o.eligibleItemIds.length;
+  const chosenLabel = `${chosen} chosen ${chosen === 1 ? "item" : "items"}`;
+  // "4 or more …": the units that count toward the minimum.
+  const counted =
+    o.eligibility === "TAG"
+      ? `${o.minQty} or more items tagged "${o.eligibleTag}"`
+      : o.eligibility === "ITEMS"
+        ? `${o.minQty} or more of ${chosenLabel}`
+        : `${o.minQty} or more items`;
+  const incl = o.requiredTag && o.requiredTagQty > 0 ? `, including ${o.requiredTagQty} tagged "${o.requiredTag}"` : "";
+  if (o.discountType === "FREE_ITEM") {
+    const gift = giftName ? freeItemPhrase({ name: giftName, qty: o.freeItemQty }) : "a free item no longer listed";
+    return `${gift[0]!.toUpperCase()}${gift.slice(1)} with ${counted}${incl}`;
+  }
+  // minQty 1 with no "including" condition is a sale (isSaleOffer).
+  if (o.minQty <= 1 && !incl) {
+    const onSale =
+      o.eligibility === "TAG" ? `items tagged "${o.eligibleTag}"` : o.eligibility === "ITEMS" ? chosenLabel : "all items";
+    return `Sale · ${formatPercentBps(o.percentBps)} off ${onSale}`;
+  }
+  return `${formatPercentBps(o.percentBps)} off ${counted}${incl}`;
+}
+
 /** The cart's line for a gift it has earned: "Festive gift: free Evil Eye Bracelet added." */
 export function offerGiftText(g: OfferGift): string {
   return `${g.offerName}: ${freeItemPhrase(g)} added.`;

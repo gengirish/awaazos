@@ -10,6 +10,7 @@ import {
   offerGiftText,
   offerIsLive,
   offerNudgeText,
+  offerRuleSummary,
   offerSummary,
   overlappingOffers,
   resolveOffers,
@@ -346,6 +347,23 @@ describe("offer copy", () => {
     expect(offerNudgeText(r.nudge!)).toBe(
       "Add 3 more quiche items, including 1 paneer, to unlock 10% off (Weekly Plan)",
     );
+  });
+
+  it("summarises a stored offer for the Settings list", () => {
+    const all = rule({ id: "a", name: "A", eligibility: "ALL", eligibleTag: null, requiredTag: null, requiredTagQty: 0 });
+    expect(offerRuleSummary(all)).toBe("10% off 4 or more items");
+    expect(offerRuleSummary(WEEKLY)).toBe('10% off 4 or more items tagged "quiche", including 1 tagged "paneer"');
+    expect(offerRuleSummary({ ...all, eligibility: "ITEMS", eligibleItemIds: ["x", "y", "z"] })).toBe(
+      "10% off 4 or more of 3 chosen items",
+    );
+    expect(offerRuleSummary({ ...all, minQty: 1, percentBps: 3500 })).toBe("Sale · 35% off all items");
+    expect(offerRuleSummary({ ...all, minQty: 1, eligibility: "ITEMS", eligibleItemIds: ["x"] })).toBe(
+      "Sale · 10% off 1 chosen item",
+    );
+    const gift = { ...all, minQty: 2, discountType: "FREE_ITEM" as const, percentBps: 0 };
+    expect(offerRuleSummary(gift, "Bhel with Image")).toBe("Free Bhel with Image with 2 or more items");
+    expect(offerRuleSummary({ ...gift, freeItemQty: 2 }, "Bhel")).toBe("2 free Bhel with 2 or more items");
+    expect(offerRuleSummary(gift, null)).toBe("A free item no longer listed with 2 or more items");
   });
 
   it("labels the discount row", () => {
