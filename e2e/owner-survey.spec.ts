@@ -163,7 +163,7 @@ test.describe("a store's own price", () => {
       const ownerContext = await browser.newContext(CONTEXT_OPTIONS);
       const ownerPage = await ownerContext.newPage();
       await signIn(ownerPage, store, "/settings/billing");
-      await expect(ownerPage.getByRole("button", { name: /Starter monthly/ })).toContainText("₹765.82");
+      await expect(ownerPage.getByText(/You pay ₹765.82 with GST/)).toBeVisible();
 
       const saved = await ownerPage.request.put("/api/vendor/survey", {
         data: { ...ANSWERS, comment: "Rider tracking" },
@@ -210,15 +210,16 @@ test.describe("a store's own price", () => {
 
       // The owner's billing page now carries the store's price, both cycles.
       await ownerPage.reload();
-      await expect(ownerPage.getByRole("button", { name: /Starter monthly/ })).toContainText("₹234.82");
-      await expect(ownerPage.getByRole("button", { name: /Starter yearly/ })).toContainText("₹2,348.20");
+      await expect(ownerPage.getByText(/You pay ₹234.82 with GST/)).toBeVisible();
+      await ownerPage.getByRole("radio", { name: /^Yearly/ }).check();
+      await expect(ownerPage.getByText(/You pay ₹2,348.20 with GST/)).toBeVisible();
 
       // And back: the list price again.
       await row.getByRole("button", { name: "Back to list price" }).click();
       await dialog.getByRole("button", { name: "Save price" }).click();
       await expect(row).toContainText("On the list price");
       await ownerPage.reload();
-      await expect(ownerPage.getByRole("button", { name: /Starter monthly/ })).toContainText("₹765.82");
+      await expect(ownerPage.getByText(/You pay ₹765.82 with GST/)).toBeVisible();
 
       await ownerContext.close();
     });
