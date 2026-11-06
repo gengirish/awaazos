@@ -137,7 +137,13 @@ test.describe("public storefront", () => {
     await createVendorSession(page, request, "storefront-search", "/menu");
     const slug = await vendorSlug(page);
     await createMenuItem(page, { name: "Chocolate Truffle Cake", priceInRupees: 650, category: "Cakes" });
-    await createMenuItem(page, { name: "Ragi Laddu", priceInRupees: 25, category: "Sweets" });
+    await createMenuItem(page, {
+      name: "Ragi Laddu",
+      priceInRupees: 25,
+      category: "Sweets",
+      description: "No sugar, made with jaggery",
+      aliasesCsv: "millet ball",
+    });
     await setPublished(page, true);
 
     const anon = await browser.newContext(CONTEXT_OPTIONS);
@@ -152,6 +158,13 @@ test.describe("public storefront", () => {
       await search("choc cake");
       await expect(buyer.getByText("Chocolate Truffle Cake")).toBeVisible();
       await expect(buyer.getByText("Ragi Laddu")).toHaveCount(0);
+      // The description matches; voice aliases stay off the public page.
+      await buyer.getByRole("searchbox", { name: "Search items" }).fill("jaggery");
+      await expect(buyer.getByText("Ragi Laddu").first()).toBeVisible();
+      await expect(buyer.getByText("Chocolate Truffle Cake")).toHaveCount(0);
+      await buyer.getByRole("searchbox", { name: "Search items" }).fill("millet");
+      await expect(buyer.getByText(/No items match/)).toBeVisible();
+      expect(await buyer.content()).not.toContain("millet ball");
       await buyer.getByRole("searchbox", { name: "Search items" }).fill("biryani");
       await expect(buyer.getByText(/No items match/)).toBeVisible();
       await buyer.getByRole("button", { name: "Clear search" }).click();
