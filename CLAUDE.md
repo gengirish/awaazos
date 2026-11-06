@@ -582,6 +582,16 @@ menu orders only), sharing order actions with drops via `lib/storefront-order-ac
 Menu ordering has no cut-off to stop the board polling, so it polls every 6 min — keep it above
 Neon's idle timeout.
 
+**When and where** (`lib/menu-slots.ts`, `lib/delivery-address.ts`): a store can set weekly slots for menu
+orders (`VendorSettings.menuSlots`, Settings → Online orders → Pickup and delivery times). With slots set,
+checkout requires one and `placeMenuOrder` re-derives it from the rules (`slot_required` / `slot_unavailable`),
+storing `fulfilAt` + `fulfilUntil`; the next 7 days, nothing starting within 60 min. Drop orders use the drop's
+one window. A delivery address is a line + locality (required at checkout, optional on the wire so an old page
+still orders), landmark and pincode: `deliveryAddress` keeps the whole address as one text
+(`composeDeliveryAddress`), the parts sit beside it on `Transaction` and `Customer`. Every window a page shows
+goes through `formatWindowWithDay` ("Today · 5–9 pm"); text read later (share, story, WhatsApp) keeps the date.
+Every drop state reads with its reason through `dropStateLabel` (`lib/drop-state.ts`), never a bare "Orders closed".
+
 **Delivery handoff** (`lib/delivery-handoff.ts`, `lib/delivery-riders.ts`): a delivery order's card has
 "Copy for rider" and, for each rider saved in Settings → Online orders (`VendorSettings.deliveryRiders`,
 ≤ 5 `{ name, phone }`, OWNER via `PATCH /api/vendor`), "Send to <name>" — a `wa.me` link to the rider
@@ -773,6 +783,12 @@ only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts`
   delete, and everything at ADMIN or above stays 404. `/admin/earnings` reports their share
   (`lib/sales-earnings.ts`: `SALES_SHARE_BPS` of what the store pays excluding GST, `SALES_SHARE_MONTHS` from
   its first charge, read from `SubscriptionEvent`); it moves no money, records no payouts and doesn't see refunds.
+
+**Fixture demo stores** (`lib/demo-fixture.ts`, `lib/demo-fixture-server.ts`): `npm run seed:demo-store --
+--category=bakery|meals|wellness|crafts --city=<city> [--name=…] [--create] [--allow-remote]` builds a clean
+outreach store through `createDemoStore`, then `applyDemoFixture` adds the tagline, pictures (`public/food`,
+`public/demo`), one open drop (cut-off ~2 days out, one item at 3), a "2+ → free item" plan and slots. Idempotent,
+dry run by default, demo stores only. Decisions and the review it came from: `docs/UX_REVIEW_2026-11.md`.
 
 Also added with it, for real orders too: `MenuItem.unit` ("₹1,200 / kg" on the storefront),
 `Transaction.advancePaidPaise` (order stays PENDING; the board shows "Advance paid · Balance due") and

@@ -15,6 +15,7 @@ export const config = {
     //  - PWA files: the service worker, its offline page, web app manifest and icons
     //    (browsers fetch these without a session; a redirect breaks install/push)
     //  - food/: the dish drawings public store pages show (lib/food-images.ts)
-    "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/health|api/ready|sw.js|offline.html|manifest.webmanifest|icon-192.png|icon-512.png|apple-touch-icon.png|badge-72.png|food/).*)",
+    //  - demo/: product drawings for fixture demo stores (lib/demo-fixture.ts)
+    "/((?!_next/static|_next/image|favicon.ico|api/webhooks|api/health|api/ready|sw.js|offline.html|manifest.webmanifest|icon-192.png|icon-512.png|apple-touch-icon.png|badge-72.png|food/|demo/).*)",
   ],
 };
