@@ -147,7 +147,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
       customerName: true,
       customerPhone: true,
       orderItems: {
-        select: { id: true, menuItemId: true, name: true, qty: true, totalPaise: true },
+        select: { id: true, menuItemId: true, name: true, qty: true, totalPaise: true, isGift: true },
       },
       drop: {
         select: {
@@ -668,7 +668,7 @@ export default async function StorefrontOrderPage(props: {
                 <span>
                   {i.qty} × {i.name}
                 </span>
-                <span className="font-mono tabular-nums">{formatINR(i.totalPaise)}</span>
+                <span className="font-mono tabular-nums">{i.isGift ? "Free" : formatINR(i.totalPaise)}</span>
               </li>
             ))}
           </ul>

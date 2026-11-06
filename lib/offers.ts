@@ -15,6 +15,9 @@
  *     covered by several sales takes the deepest; different items may come from
  *     different sales in one order.
  *   - A **plan** needs a quantity ("4+ quiches incl. 1 paneer").
+ *   - A **free-item plan** (`discountType` FREE_ITEM) gives one catalogue item
+ *     the seller picked ("4+ items → free Evil Eye Bracelet") instead of a
+ *     percentage. It is always a plan, even at a minimum of 1.
  *
  * Rules:
  *
@@ -33,13 +36,23 @@
  *      per unit, so the price on the item card times the quantity is the bill.
  *   5. **No timers.** `startsAt` / `endsAt` are compared with `now` on every
  *      read (`offerIsLive`); nothing is written when a date passes.
+ *   6. **A gift is not a discount.** It competes with the other plans and with
+ *      sales at its catalogue value (price × qty), but when it wins nothing is
+ *      taken off: the order gets one extra line at ₹0 (`OffersResult.gift`,
+ *      stored as an `OrderItem` with `isGift`, named by `giftLineName`). So
+ *      subtotal, discount and total are exactly what they would be without it,
+ *      and the bill records the offer through `applied` (discount 0). The gift
+ *      never counts toward the minimum. Free items are online only: they are
+ *      never resolved on the POS channel. On a drop the caller removes an offer
+ *      whose gift the drop can't hand out (`withGiftsThatFit`).
  *
  * Tax (counter sales only) is charged on `subtotal − discount`, see
  * lib/pos-totals.ts. A bill reconciles as
  * `subtotal − discount + delivery fee + tax = total`.
  *
  * Out of scope, by design: coupon codes, per-customer limits, fixed bundle
- * prices, buy-X-get-Y, stacking a plan on sales, recurring subscriptions.
+ * prices, "cheapest one free", a buyer choosing the gift, stacking a plan on
+ * sales, recurring subscriptions.
  */
 
 export type OfferChannel = "MENU" | "DROP" | "POS";
@@ -57,8 +70,10 @@ export type OfferRule = {
   minQty: number;
   requiredTag: string | null;
   requiredTagQty: number;
-  discountType: "PERCENT" | "FIXED_AMOUNT" | "BUNDLE_PRICE";
+  discountType: "PERCENT" | "FIXED_AMOUNT" | "BUNDLE_PRICE" | "FREE_ITEM";
   percentBps: number;
+  freeItemId: string | null;
+  freeItemQty: number;
   onMenuOrders: boolean;
   onDrops: boolean;
   onPos: boolean;
@@ -87,6 +102,16 @@ export type ResolvedOffer = {
   requiredItemIds: string[] | null;
   requiredQty: number;
   requiredLabel: string | null;
+  /** A free-item plan's gift (`percentBps` is then 0). null = a percentage offer. */
+  freeItem: OfferFreeItem | null;
+};
+
+export type OfferFreeItem = {
+  menuItemId: string;
+  name: string;
+  qty: number;
+  /** One unit's catalogue price: what the gift is worth against other offers. */
+  unitPaise: number;
 };
 
 export type OfferLine = {
@@ -120,6 +145,20 @@ export type OfferNudge = {
   missingRequiredQty: number;
   eligibleLabel: string | null;
   requiredLabel: string | null;
+  /** Set for a free-item plan: what the buyer would get. */
+  freeItem: { name: string; qty: number } | null;
+};
+
+/** The gift line a winning free-item plan adds to the order (priced 0). */
+export type OfferGift = {
+  offerId: string;
+  offerName: string;
+  menuItemId: string;
+  /** The item's own name; the stored line uses `giftLineName(name)`. */
+  name: string;
+  qty: number;
+  /** Catalogue value of the gift (unit price × qty), for display only. */
+  valuePaise: number;
 };
 
 export type OffersResult = {
@@ -138,6 +177,8 @@ export type OffersResult = {
   totalPaise: number;
   /** The closest better offer the cart has not unlocked yet. */
   nudge: OfferNudge | null;
+  /** The free item this order gets, or null. Not part of any total. */
+  gift: OfferGift | null;
 };
 
 export const OFFER_NAME_MAX = 60;
@@ -167,7 +208,7 @@ export function offerIsLive(
   now: Date = new Date(),
 ): boolean {
   if (!offer.isActive) return false;
-  if (offer.discountType !== "PERCENT") return false;
+  if (offer.discountType !== "PERCENT" && offer.discountType !== "FREE_ITEM") return false;
   if (offer.startsAt && now.getTime() < offer.startsAt.getTime()) return false;
   if (offer.endsAt && now.getTime() >= offer.endsAt.getTime()) return false;
   return true;
@@ -184,13 +225,26 @@ function offerOnChannel(
   return offer.dropIds.length === 0 || (!!dropId && offer.dropIds.includes(dropId));
 }
 
+/** At most this many of the gift per order. */
+export const OFFER_MAX_FREE_QTY = 10;
+
+/** A catalogue row as `resolveOffers` needs it. Name and price matter only for a gift. */
+export type OfferMenuItemRef = {
+  id: string;
+  tags: readonly string[];
+  name?: string;
+  priceInPaise?: number;
+};
+
 /**
  * The offers that apply on one channel right now, oldest first, with tags
- * turned into item ids. `menuItems` is the vendor's catalogue (id + tags).
+ * turned into item ids. `menuItems` is the vendor's catalogue (id + tags, and
+ * name + price for every free-item offer's gift; an offer whose gift is
+ * missing is left out, so deleting the item ends the offer).
  */
 export function resolveOffers(
   rules: readonly OfferRule[],
-  menuItems: readonly { id: string; tags: readonly string[] }[],
+  menuItems: readonly OfferMenuItemRef[],
   ctx: { channel: OfferChannel; dropId?: string | null; now?: Date },
 ): ResolvedOffer[] {
   const now = ctx.now ?? new Date();
@@ -203,7 +257,18 @@ export function resolveOffers(
     .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime() || a.id.localeCompare(b.id));
 
   for (const r of live) {
-    if (r.minQty < 1 || r.percentBps < 1 || r.percentBps >= 10_000) continue;
+    if (r.minQty < 1) continue;
+    let freeItem: OfferFreeItem | null = null;
+    if (r.discountType === "FREE_ITEM") {
+      // Online only: the counter prices its own cart offline (lib/pos-offers.ts).
+      if (ctx.channel === "POS") continue;
+      const gift = r.freeItemId ? menuItems.find((m) => m.id === r.freeItemId) : undefined;
+      const qty = Math.min(Math.max(r.freeItemQty, 1), OFFER_MAX_FREE_QTY);
+      if (!gift?.name || gift.priceInPaise === undefined) continue;
+      freeItem = { menuItemId: gift.id, name: gift.name, qty, unitPaise: gift.priceInPaise };
+    } else if (r.percentBps < 1 || r.percentBps >= 10_000) {
+      continue;
+    }
 
     let eligibleItemIds: string[] | null = null;
     let eligibleLabel: string | null = null;
@@ -223,15 +288,34 @@ export function resolveOffers(
       name: r.name,
       description: r.description,
       minQty: r.minQty,
-      percentBps: r.percentBps,
+      percentBps: freeItem ? 0 : r.percentBps,
       eligibleItemIds,
       eligibleLabel,
       requiredItemIds: hasRequired ? idsWithTag(requiredTag) : null,
       requiredQty: hasRequired ? r.requiredTagQty : 0,
       requiredLabel: hasRequired ? requiredTag : null,
+      freeItem,
     });
   }
   return out;
+}
+
+/**
+ * Leave out the free-item offers whose gift can't be handed out with this
+ * order. On a drop the gift must be one of the drop's items with stock left
+ * after the paid lines: `giftFits(menuItemId, qty)` answers that. Menu orders
+ * and pages without stock don't need it.
+ */
+export function withGiftsThatFit(
+  offers: readonly ResolvedOffer[],
+  giftFits: (menuItemId: string, qty: number) => boolean,
+): ResolvedOffer[] {
+  return offers.filter((o) => !o.freeItem || giftFits(o.freeItem.menuItemId, o.freeItem.qty));
+}
+
+/** The stored name of a gift line: a snapshot every bill, board and receipt shows as is. */
+export function giftLineName(name: string): string {
+  return `${name} (free gift)`;
 }
 
 /**
@@ -252,9 +336,11 @@ export function offersForItems(offers: readonly ResolvedOffer[], visibleIds: Ite
   return out;
 }
 
-/** A sale needs no quantity, so one unit already gets it (see the header). */
-export function isSaleOffer(o: Pick<ResolvedOffer, "minQty" | "requiredQty">): boolean {
-  return o.minQty <= 1 && o.requiredQty === 0;
+/** A sale needs no quantity, so one unit already gets it (see the header). A free item is never a sale. */
+export function isSaleOffer(
+  o: Pick<ResolvedOffer, "minQty" | "requiredQty"> & { freeItem?: OfferFreeItem | null },
+): boolean {
+  return o.minQty <= 1 && o.requiredQty === 0 && !o.freeItem;
 }
 
 function saleCovers(o: ResolvedOffer, menuItemId: string | null): boolean {
@@ -366,7 +452,10 @@ function evaluate(lines: readonly OfferLine[], offer: ResolvedOffer, order: numb
     eligibleSubtotalPaise += l.priceInPaise * l.qty;
     if (requiredIds && l.menuItemId !== null && requiredIds.has(l.menuItemId)) requiredQty += l.qty;
   }
-  const discountPaise = Math.floor((eligibleSubtotalPaise * offer.percentBps) / 10_000);
+  // What the buyer saves: the percentage, or the gift's catalogue value.
+  const discountPaise = offer.freeItem
+    ? offer.freeItem.unitPaise * offer.freeItem.qty
+    : Math.floor((eligibleSubtotalPaise * offer.percentBps) / 10_000);
   const qualifies = eligibleQty >= offer.minQty && requiredQty >= offer.requiredQty && discountPaise > 0;
   return { offer, order, eligible, eligibleQty, requiredQty, eligibleSubtotalPaise, discountPaise, qualifies };
 }
@@ -390,13 +479,20 @@ function allocate(lines: readonly OfferLine[], ev: Evaluation): number[] {
   return shares;
 }
 
-/** `appliedBps`: the deepest percentage the cart already gets, or null. */
-function nudgeFor(evals: Evaluation[], appliedBps: number | null): OfferNudge | null {
+/**
+ * `appliedBps`: the deepest percentage the cart already gets, or null.
+ * `savedPaise`: what the cart saves now, a gift counted at its value.
+ */
+function nudgeFor(evals: Evaluation[], appliedBps: number | null, savedPaise: number): OfferNudge | null {
   let best: { ev: Evaluation; missing: number } | null = null;
   for (const ev of evals) {
     if (ev.qualifies || ev.eligibleQty === 0) continue;
     // Not worth mentioning unless it beats what the cart already gets.
-    if (appliedBps !== null && ev.offer.percentBps <= appliedBps) continue;
+    if (ev.offer.freeItem) {
+      if (ev.discountPaise <= savedPaise) continue;
+    } else if (appliedBps !== null && ev.offer.percentBps <= appliedBps) {
+      continue;
+    }
     const missing = Math.max(ev.offer.minQty - ev.eligibleQty, ev.offer.requiredQty - ev.requiredQty, 0);
     if (missing === 0) continue;
     if (
@@ -417,6 +513,7 @@ function nudgeFor(evals: Evaluation[], appliedBps: number | null): OfferNudge | 
     missingRequiredQty: Math.max(ev.offer.requiredQty - ev.requiredQty, 0),
     eligibleLabel: ev.offer.eligibleLabel,
     requiredLabel: ev.offer.requiredLabel,
+    freeItem: ev.offer.freeItem ? { name: ev.offer.freeItem.name, qty: ev.offer.freeItem.qty } : null,
   };
 }
 
@@ -454,7 +551,21 @@ export function applyOffers(lines: readonly OfferLine[], offers: readonly Resolv
 
   let shares: number[];
   let discounts: AppliedDiscount[];
-  if (plan) {
+  let gift: OfferGift | null = null;
+  if (plan?.offer.freeItem) {
+    // Rule 6: the gift is an extra ₹0 line, not money off the paid ones.
+    const f = plan.offer.freeItem;
+    shares = lines.map(() => 0);
+    discounts = [{ offerId: plan.offer.id, name: plan.offer.name, percentBps: 0, discountPaise: 0 }];
+    gift = {
+      offerId: plan.offer.id,
+      offerName: plan.offer.name,
+      menuItemId: f.menuItemId,
+      name: f.name,
+      qty: f.qty,
+      valuePaise: plan.discountPaise,
+    };
+  } else if (plan) {
     shares = allocate(lines, plan);
     discounts = [
       { offerId: plan.offer.id, name: plan.offer.name, percentBps: plan.offer.percentBps, discountPaise: plan.discountPaise },
@@ -484,7 +595,12 @@ export function applyOffers(lines: readonly OfferLine[], offers: readonly Resolv
     subtotalPaise,
     discountTotalPaise,
     totalPaise: subtotalPaise - discountTotalPaise,
-    nudge: nudgeFor(evals, summary?.percentBps ?? null),
+    nudge: nudgeFor(
+      evals,
+      gift ? null : (summary?.percentBps ?? null),
+      gift ? gift.valuePaise : discountTotalPaise,
+    ),
+    gift,
   };
 }
 
@@ -503,12 +619,20 @@ export function offerSummary(o: ResolvedOffer): string {
   }
   const need = `${o.minQty}+ ${o.eligibleLabel ? `${o.eligibleLabel} ` : ""}items`;
   const incl = o.requiredQty > 0 && o.requiredLabel ? ` incl. ${o.requiredQty} ${o.requiredLabel}` : "";
-  return `${o.name}: ${need}${incl} → ${formatPercentBps(o.percentBps)} off`;
+  const reward = o.freeItem ? freeItemPhrase(o.freeItem) : `${formatPercentBps(o.percentBps)} off`;
+  return `${o.name}: ${need}${incl} → ${reward}`;
 }
 
-/** "Add 1 more quiche item to unlock 10% off (Weekly Plan)". */
+/** "free Evil Eye Bracelet", "2 free Evil Eye Bracelet". */
+export function freeItemPhrase(f: { name: string; qty: number }): string {
+  return f.qty > 1 ? `${f.qty} free ${f.name}` : `free ${f.name}`;
+}
+
+/** "Add 1 more quiche item to unlock 10% off (Weekly Plan)"; a gift reads "… to get a free Evil Eye Bracelet (Festive gift)". */
 export function offerNudgeText(n: OfferNudge): string {
-  const unlock = `to unlock ${formatPercentBps(n.percentBps)} off (${n.name})`;
+  const unlock = n.freeItem
+    ? `to get ${n.freeItem.qty > 1 ? "" : "a "}${freeItemPhrase(n.freeItem)} (${n.name})`
+    : `to unlock ${formatPercentBps(n.percentBps)} off (${n.name})`;
   if (n.missingRequiredQty > 0 && n.missingRequiredQty >= n.missingQty) {
     return `Add ${itemsPhrase(n.missingRequiredQty, n.requiredLabel, n.eligibleLabel)} ${unlock}`;
   }
@@ -516,6 +640,79 @@ export function offerNudgeText(n: OfferNudge): string {
     return `Add ${n.missingQty} more ${n.eligibleLabel ? `${n.eligibleLabel} ` : ""}items, including ${n.missingRequiredQty} ${n.requiredLabel ?? "required"}, ${unlock}`;
   }
   return `Add ${n.missingQty} more ${n.eligibleLabel ? `${n.eligibleLabel} ` : ""}${n.missingQty === 1 ? "item" : "items"} ${unlock}`;
+}
+
+/** The cart's line for a gift it has earned: "Festive gift: free Evil Eye Bracelet added." */
+export function offerGiftText(g: OfferGift): string {
+  return `${g.offerName}: ${freeItemPhrase(g)} added.`;
+}
+
+// ─── Overlapping plans (seller-side warning) ────────────────────────
+
+/** The fields `overlappingOffers` reads: an `OfferDto` fits, days as YYYY-MM-DD. */
+export type OfferOverlapInput = {
+  id: string;
+  name: string;
+  isActive: boolean;
+  discountType: OfferRule["discountType"];
+  eligibility: OfferEligibilityKind;
+  eligibleItemIds: string[];
+  eligibleTag: string | null;
+  minQty: number;
+  requiredTagQty: number;
+  onMenuOrders: boolean;
+  onDrops: boolean;
+  onPos: boolean;
+  dropIds: string[];
+  startsOn: string | null;
+  endsOn: string | null;
+};
+
+function isPlanRule(o: OfferOverlapInput): boolean {
+  return o.discountType === "FREE_ITEM" || o.minQty > 1 || o.requiredTagQty > 0;
+}
+
+function sameOrderPossible(a: OfferOverlapInput, b: OfferOverlapInput): boolean {
+  const aPos = a.onPos && a.discountType !== "FREE_ITEM";
+  const bPos = b.onPos && b.discountType !== "FREE_ITEM";
+  const drops =
+    a.onDrops &&
+    b.onDrops &&
+    (a.dropIds.length === 0 || b.dropIds.length === 0 || a.dropIds.some((id) => b.dropIds.includes(id)));
+  return (a.onMenuOrders && b.onMenuOrders) || drops || (aPos && bPos);
+}
+
+/** Can one item count toward both? Item lists against a tag can't be told apart here, so they count as overlapping. */
+function itemsOverlap(a: OfferOverlapInput, b: OfferOverlapInput): boolean {
+  if (a.eligibility === "ALL" || b.eligibility === "ALL") return true;
+  if (a.eligibility === "TAG" && b.eligibility === "TAG") return normaliseTag(a.eligibleTag) === normaliseTag(b.eligibleTag);
+  if (a.eligibility === "ITEMS" && b.eligibility === "ITEMS") return a.eligibleItemIds.some((id) => b.eligibleItemIds.includes(id));
+  return true;
+}
+
+function datesOverlap(a: OfferOverlapInput, b: OfferOverlapInput): boolean {
+  if (a.startsOn && b.endsOn && a.startsOn > b.endsOn) return false;
+  if (b.startsOn && a.endsOn && b.startsOn > a.endsOn) return false;
+  return true;
+}
+
+/**
+ * Pairs of switched-on offers, at least one of them a plan, that one order can
+ * qualify for. Plans never stack (rule 1), so the seller is told the buyer gets
+ * whichever saves more. Two sales are not a pair: each item takes its deepest.
+ */
+export function overlappingOffers(offers: readonly OfferOverlapInput[]): [OfferOverlapInput, OfferOverlapInput][] {
+  const on = offers.filter((o) => o.isActive);
+  const pairs: [OfferOverlapInput, OfferOverlapInput][] = [];
+  for (let i = 0; i < on.length; i++) {
+    for (let j = i + 1; j < on.length; j++) {
+      const a = on[i]!;
+      const b = on[j]!;
+      if (!isPlanRule(a) && !isPlanRule(b)) continue;
+      if (sameOrderPossible(a, b) && itemsOverlap(a, b) && datesOverlap(a, b)) pairs.push([a, b]);
+    }
+  }
+  return pairs;
 }
 
 /** Label for the discount row on carts, bills and receipts. */

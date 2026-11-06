@@ -99,7 +99,7 @@ export default async function StorefrontAccountPage(
           fulfilmentType: true,
           outForDeliveryAt: true,
           drop: { select: { title: true } },
-          orderItems: { select: { menuItemId: true, name: true, qty: true }, orderBy: { id: "asc" } },
+          orderItems: { select: { menuItemId: true, name: true, qty: true, isGift: true }, orderBy: { id: "asc" } },
           feedback: { select: { rating: true } },
         },
       })

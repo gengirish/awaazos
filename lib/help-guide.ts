@@ -379,11 +379,11 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     group: "setup",
     title: "Give a discount on bigger orders",
     steps:
-      "Create an offer with a minimum quantity and a percentage off. A minimum of 1 makes it a sale: your store shows each item's old price struck out next to the sale price. Tag items on the {catalogueTitle} page to choose which ones count. The discount is applied for you in your online store, in drops and at the counter.",
+      "Create an offer with a minimum quantity and a percentage off. A minimum of 1 makes it a sale: your store shows each item's old price struck out next to the sale price. Tag items on the {catalogueTitle} page to choose which ones count. The discount is applied for you in your online store, in drops and at the counter. To give something away instead, pick A free item: once an order has enough items, the item you chose is added to it at no charge (online orders only).",
     nav: "settings",
     href: "/settings/offers",
     trail: ["Offers"],
-    keywords: "discount plan combo bundle weekly percent off tag",
+    keywords: "discount plan combo bundle weekly percent off tag free gift item",
   },
   {
     id: "payment-setup",

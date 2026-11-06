@@ -79,6 +79,29 @@ describe("offerUpsertSchema", () => {
     expect(data.dropIds).toEqual([]);
   });
 
+  it("accepts a free item, stores no percentage and keeps it off the counter", () => {
+    const gift = { ...weekly, discountType: "FREE_ITEM", percentBps: undefined, freeItemId: "evil" };
+    const data = offerInputToData(offerUpsertSchema.parse(gift));
+    expect(data).toMatchObject({
+      discountType: "FREE_ITEM",
+      percentBps: 0,
+      freeItemId: "evil",
+      freeItemQty: 1,
+      onPos: false,
+    });
+    const bad = (over: Record<string, unknown>) => offerUpsertSchema.safeParse({ ...gift, ...over }).success;
+    expect(bad({ freeItemId: null })).toBe(false);
+    expect(bad({ freeItemQty: 0 })).toBe(false);
+    expect(bad({ freeItemQty: 11 })).toBe(false);
+    // The counter alone is not a place a free item applies.
+    expect(bad({ onMenuOrders: false, onDrops: false, onPos: true })).toBe(false);
+  });
+
+  it("forgets the free item on a percentage offer", () => {
+    const data = offerInputToData(offerUpsertSchema.parse({ ...weekly, freeItemId: "evil", freeItemQty: 3 }));
+    expect(data).toMatchObject({ discountType: "PERCENT", freeItemId: null, freeItemQty: 1 });
+  });
+
   it("the switch accepts isActive alone", () => {
     expect(offerToggleSchema.safeParse({ isActive: false }).success).toBe(true);
     expect(offerToggleSchema.safeParse({ isActive: false, percentBps: 9000 }).success).toBe(false);

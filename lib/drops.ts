@@ -41,7 +41,7 @@ import { formatBillDateYYYYMMDD, getIstMonthStart, getIstTodayStart } from "@/li
 import { PLAN_LIMITS } from "@/lib/constants";
 import { sumPaise } from "@/lib/currency";
 import { bumpOrderSignal } from "@/lib/drops-signal";
-import { applyOffers } from "@/lib/offers";
+import { applyOffers, giftLineName, withGiftsThatFit } from "@/lib/offers";
 import { loadResolvedOffers } from "@/lib/offers-server";
 import { effectivePlan, isBillingLocked } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
@@ -424,7 +424,19 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
 
       // Offers are priced here, from this vendor's rows, inside the same
       // transaction: the buyer's browser never sends a price or a discount.
-      const offers = await loadResolvedOffers(tx, vendorId, { channel: "DROP", dropId: drop.id, now });
+      // A gift comes out of this drop's stock, so it has to be one of its items
+      // with enough left after the paid lines (lib/offers.ts rule 6).
+      const giftItemFor = (menuItemId: string) => drop.items.find((i) => i.menuItemId === menuItemId);
+      const offers = withGiftsThatFit(
+        await loadResolvedOffers(tx, vendorId, { channel: "DROP", dropId: drop.id, now }),
+        (menuItemId, qty) => {
+          const item = giftItemFor(menuItemId);
+          if (!item) return false;
+          const remaining = remainingQty(item.maxQty, sold.get(item.id) ?? 0);
+          const paid = priced.reduce((n, p) => n + (p.item.id === item.id ? p.qty : 0), 0);
+          return remaining === null || remaining - paid >= qty;
+        },
+      );
       const offered = applyOffers(
         priced.map((p) => ({
           key: p.item.id,
@@ -437,6 +449,7 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
       const discountByLine = new Map(offered.lines.map((l) => [l.key, l.discountPaise]));
       const appliedOffer = offered.applied;
       const discountPaise = offered.discountTotalPaise;
+      const giftItem = offered.gift ? giftItemFor(offered.gift.menuItemId) : undefined;
 
       const deliveryFeePaise = input.fulfilmentType === "DELIVERY" ? drop.deliveryFeePaise : 0;
       const { subtotalPaise, totalPaise } = computeOrderTotals(
@@ -474,15 +487,32 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
           customerId: input.customerId ?? null,
           orderChannel: input.orderChannel ?? null,
           orderItems: {
-            create: priced.map((p) => ({
-              menuItemId: p.item.menuItemId,
-              dropItemId: p.item.id,
-              name: p.item.menuItem.name, // snapshot
-              priceInPaise: p.item.priceInPaise,
-              qty: p.qty,
-              totalPaise: p.item.priceInPaise * p.qty,
-              discountPaise: discountByLine.get(p.item.id) ?? 0,
-            })),
+            create: [
+              ...priced.map((p) => ({
+                menuItemId: p.item.menuItemId,
+                dropItemId: p.item.id,
+                name: p.item.menuItem.name, // snapshot
+                priceInPaise: p.item.priceInPaise,
+                qty: p.qty,
+                totalPaise: p.item.priceInPaise * p.qty,
+                discountPaise: discountByLine.get(p.item.id) ?? 0,
+              })),
+              // The gift: ₹0 and outside every total, but it holds stock like any line.
+              ...(offered.gift && giftItem
+                ? [
+                    {
+                      menuItemId: offered.gift.menuItemId,
+                      dropItemId: giftItem.id,
+                      name: giftLineName(offered.gift.name),
+                      priceInPaise: 0,
+                      qty: offered.gift.qty,
+                      totalPaise: 0,
+                      discountPaise: 0,
+                      isGift: true,
+                    },
+                  ]
+                : []),
+            ],
           },
         },
       });

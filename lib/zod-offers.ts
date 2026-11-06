@@ -4,6 +4,7 @@ import { istToUtc, utcToIstParts } from "@/lib/drops-time";
 import {
   OFFER_DESCRIPTION_MAX,
   OFFER_MAX_BPS,
+  OFFER_MAX_FREE_QTY,
   OFFER_MAX_QTY,
   OFFER_MIN_BPS,
   OFFER_NAME_MAX,
@@ -38,8 +39,11 @@ export const offerUpsertSchema = z
     requiredTag: tag.nullish(),
     requiredTagQty: z.number().int().min(0).max(OFFER_MAX_QTY).default(0),
     // Fixed amount and bundle price are in the enum for later; not accepted yet.
-    discountType: z.literal("PERCENT").default("PERCENT"),
-    percentBps: z.number().int().min(OFFER_MIN_BPS).max(OFFER_MAX_BPS),
+    discountType: z.enum(["PERCENT", "FREE_ITEM"]).default("PERCENT"),
+    // Checked against discountType below: a free item stores 0.
+    percentBps: z.number().int().min(0).max(OFFER_MAX_BPS).default(0),
+    freeItemId: z.string().min(1).nullish(),
+    freeItemQty: z.number().int().min(1).max(OFFER_MAX_FREE_QTY).default(1),
     onMenuOrders: z.boolean().default(true),
     onDrops: z.boolean().default(true),
     onPos: z.boolean().default(true),
@@ -49,6 +53,12 @@ export const offerUpsertSchema = z
     endsOn: ymd.nullish(),
   })
   .superRefine((v, ctx) => {
+    if (v.discountType === "PERCENT" && v.percentBps < OFFER_MIN_BPS) {
+      ctx.addIssue({ code: "custom", path: ["percentBps"], message: "Enter a percentage from 1 to 90" });
+    }
+    if (v.discountType === "FREE_ITEM" && !v.freeItemId) {
+      ctx.addIssue({ code: "custom", path: ["freeItemId"], message: "Pick the item to give free" });
+    }
     if (v.eligibility === "TAG" && !normaliseTag(v.eligibleTag)) {
       ctx.addIssue({ code: "custom", path: ["eligibleTag"], message: "Enter the tag these items carry" });
     }
@@ -69,7 +79,9 @@ export const offerUpsertSchema = z
         message: "This is more than the minimum quantity",
       });
     }
-    if (!v.onMenuOrders && !v.onDrops && !v.onPos) {
+    // Free items are online only (lib/offers.ts rule 6), so the counter doesn't count here.
+    const onPos = v.onPos && v.discountType !== "FREE_ITEM";
+    if (!v.onMenuOrders && !v.onDrops && !onPos) {
       ctx.addIssue({ code: "custom", path: ["onMenuOrders"], message: "Choose where this offer applies" });
     }
     const start = v.startsOn ? istDayStart(v.startsOn) : null;
@@ -91,6 +103,7 @@ export const offerToggleSchema = z.object({ isActive: z.boolean() }).strict();
 /** Validated input → Prisma column values (tags normalised, days → UTC instants). */
 export function offerInputToData(v: OfferUpsertInput) {
   const required = normaliseTag(v.requiredTag);
+  const free = v.discountType === "FREE_ITEM";
   const end = v.endsOn ? istDayStart(v.endsOn) : null;
   return {
     name: v.name,
@@ -102,10 +115,12 @@ export function offerInputToData(v: OfferUpsertInput) {
     requiredTag: required || null,
     requiredTagQty: required ? v.requiredTagQty : 0,
     discountType: v.discountType,
-    percentBps: v.percentBps,
+    percentBps: free ? 0 : v.percentBps,
+    freeItemId: free ? (v.freeItemId ?? null) : null,
+    freeItemQty: free ? v.freeItemQty : 1,
     onMenuOrders: v.onMenuOrders,
     onDrops: v.onDrops,
-    onPos: v.onPos,
+    onPos: v.onPos && !free,
     dropIds: v.onDrops ? Array.from(new Set(v.dropIds)) : [],
     isActive: v.isActive,
     startsAt: v.startsOn ? istDayStart(v.startsOn) : null,
