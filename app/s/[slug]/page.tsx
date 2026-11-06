@@ -77,6 +77,7 @@ import { storeInfoFacts, type StoreFactKind } from "@/lib/store-info";
 import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { viewerIsStoreStaff } from "@/lib/storefront-viewer";
 import { buildUpiCollectLink } from "@/lib/upi";
+import { storeBackgroundStyle } from "@/lib/store-background";
 import { storeThemeAttribute } from "@/lib/store-theme";
 
 export const dynamic = "force-dynamic";
@@ -198,6 +199,7 @@ const loadStorefront = cache(async (slug: string) => {
       stallTypeOther: true, // the seller's own words for "Other"; shown as the store type
       logoUrl: true,
       bannerUrl: true,
+      backgroundUrl: true,
       upiId: true,
       upiName: true,
       plan: true, // these three and the Razorpay columns only decide `payment.online`; only that boolean leaves the server
@@ -721,7 +723,12 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   }));
 
   return (
-    <div id="store-top" data-theme={theme} className="min-h-screen bg-awaaz-cream/40">
+    <div
+      id="store-top"
+      data-theme={theme}
+      className="min-h-screen bg-awaaz-cream/40"
+      style={storeBackgroundStyle(vendor.backgroundUrl)}
+    >
       <StorePageRefresh />
       <a
         href="#menu"

@@ -23,6 +23,7 @@ model Vendor {
   upiName            String? // Name shown on UPI screen
   logoUrl            String? // Vercel Blob URL
   bannerUrl          String? // Vercel Blob URL — wide cover photo on /s/[slug] (POST /api/vendor/banner)
+  backgroundUrl      String? // Vercel Blob URL — tile repeated behind /s/[slug] (POST /api/vendor/background, lib/store-background.ts)
   plan               Plan      @default(FREE)
   planExpiresAt      DateTime?
   // End of the 30-day free trial (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md). Set at

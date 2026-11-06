@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { AiImagePromptForm } from "@/components/ai/AiImagePromptForm";
 import { AI_IMAGES_ENABLED, aiImageErrorMessage, dataUriToFile } from "@/lib/ai-image-types";
 import { downscaleImage, type DownscaleOptions } from "@/lib/image-downscale";
+import { storeBackgroundStyle } from "@/lib/store-background";
 import { cn } from "@/lib/utils";
 
 /**
@@ -18,6 +19,8 @@ import { cn } from "@/lib/utils";
  * `endpointBase` points the same controls at another store's routes: the admin
  * demo-store screen uses /api/admin/demo-stores/<ref>. An AI banner (only on the
  * seller's own routes) is a preview until "Use this banner" uploads it the same way.
+ * `StoreBackgroundClient` is the same control for the background tile
+ * (`Vendor.backgroundUrl`, /api/vendor/background, lib/store-background.ts).
  */
 export type StoreImagesClientProps = {
   storeName: string;
@@ -27,19 +30,29 @@ export type StoreImagesClientProps = {
   endpointBase?: string;
 };
 
-type Kind = "banner" | "logo";
+type Kind = "banner" | "logo" | "background";
 
-const SPEC: Record<Kind, { label: string; hint: string; downscale: DownscaleOptions }> = {
+const SPEC: Record<Kind, { label: string; hint: string; downscale: (picked: File) => DownscaleOptions }> = {
   banner: {
     label: "Banner",
     hint: "A wide photo across the top of your store page. Landscape works best; the middle stays visible on phones.",
-    downscale: { maxWidth: 1600, maxHeight: 1600, type: "image/jpeg", quality: 0.85 },
+    downscale: () => ({ maxWidth: 1600, maxHeight: 1600, type: "image/jpeg", quality: 0.85 }),
   },
   logo: {
     label: "Logo",
     hint: "A square picture next to your store name. Without one, customers see the first letter of the name.",
     // PNG keeps a transparent background; at 512 px it stays small.
-    downscale: { maxWidth: 512, maxHeight: 512, type: "image/png" },
+    downscale: () => ({ maxWidth: 512, maxHeight: 512, type: "image/png" }),
+  },
+  background: {
+    label: "Background",
+    hint: "One small picture, like a peacock feather or a block print, repeated across and down the page. It is shown faded so your items stay easy to read; a picture whose edges match up repeats without seams.",
+    // Shown about 200 px wide, so 600 px stays sharp on any phone. A PNG keeps
+    // its transparency (a cut-out feather over the page colour); photos go JPEG.
+    downscale: (picked) =>
+      picked.type === "image/png"
+        ? { maxWidth: 600, maxHeight: 600, type: "image/png" }
+        : { maxWidth: 600, maxHeight: 600, type: "image/jpeg", quality: 0.85 },
   },
 };
 
@@ -76,7 +89,7 @@ function ImageField({
     setBusy("upload");
     setStatus(`Uploading ${spec.label.toLowerCase()}…`);
     try {
-      const file = await downscaleImage(picked, spec.downscale);
+      const file = await downscaleImage(picked, spec.downscale(picked));
       const body = new FormData();
       body.append("file", file);
       const res = await fetch(`${endpointBase}/${kind}`, { method: "POST", body, credentials: "include" });
@@ -155,7 +168,20 @@ function ImageField({
     <div className="space-y-2">
       <p className="text-sm font-medium">{spec.label}</p>
 
-      {kind === "banner" ? (
+      {kind === "background" ? (
+        url ? (
+          <div
+            role="img"
+            aria-label={`Current background pattern for ${storeName}`}
+            className="h-40 w-full rounded-lg border bg-awaaz-cream/40"
+            style={storeBackgroundStyle(url)}
+          />
+        ) : (
+          <div className="flex h-40 w-full items-center justify-center rounded-lg border bg-awaaz-cream/40">
+            <p className="text-sm text-muted-foreground">No background yet</p>
+          </div>
+        )
+      ) : kind === "banner" ? (
         <div className="relative aspect-[8/3] w-full overflow-hidden rounded-lg border bg-linear-to-b from-primary/20 to-background">
           {url ? (
             <Image src={url} alt={`Current banner for ${storeName}`} fill sizes="(min-width: 640px) 600px, 100vw" className="object-cover" />
@@ -294,6 +320,24 @@ export function StoreImagesClient({
       {!isOwner && <p className="text-sm text-muted-foreground">Only the owner can change these.</p>}
       <ImageField kind="banner" storeName={storeName} initialUrl={initialBannerUrl} isOwner={isOwner} endpointBase={endpointBase} />
       <ImageField kind="logo" storeName={storeName} initialUrl={initialLogoUrl} isOwner={isOwner} endpointBase={endpointBase} />
+    </div>
+  );
+}
+
+/** The background tile for the store page; the seller's own routes only. */
+export function StoreBackgroundClient({
+  storeName,
+  initialUrl,
+  isOwner,
+}: {
+  storeName: string;
+  initialUrl: string | null;
+  isOwner: boolean;
+}) {
+  return (
+    <div className="space-y-6">
+      {!isOwner && <p className="text-sm text-muted-foreground">Only the owner can change this.</p>}
+      <ImageField kind="background" storeName={storeName} initialUrl={initialUrl} isOwner={isOwner} endpointBase="/api/vendor" />
     </div>
   );
 }

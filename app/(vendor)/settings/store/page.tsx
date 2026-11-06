@@ -6,7 +6,7 @@ import { InstagramHandleClient } from "@/components/settings/InstagramHandleClie
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { StoreDetailsClient } from "@/components/settings/StoreDetailsClient";
 import { StoreHandleClient } from "@/components/settings/StoreHandleClient";
-import { StoreImagesClient } from "@/components/settings/StoreImagesClient";
+import { StoreBackgroundClient, StoreImagesClient } from "@/components/settings/StoreImagesClient";
 import { StoreNameClient } from "@/components/settings/StoreNameClient";
 import { StoreTaglineClient } from "@/components/settings/StoreTaglineClient";
 import { StoreThemeClient } from "@/components/settings/StoreThemeClient";
@@ -84,6 +84,12 @@ export default async function StoreSettingsPage() {
             initialLogoUrl={vendor.logoUrl}
             isOwner={isOwner}
           />
+        </SettingsCard>
+        <SettingsCard
+          title="Background pattern"
+          description="A small picture repeated across and down your store page, behind your items."
+        >
+          <StoreBackgroundClient storeName={vendor.name} initialUrl={vendor.backgroundUrl} isOwner={isOwner} />
         </SettingsCard>
         <SettingsCard title="Store colour" description="Tints the buttons and links on your store page.">
           <StoreThemeClient initialTheme={settings?.theme} isOwner={isOwner} />
