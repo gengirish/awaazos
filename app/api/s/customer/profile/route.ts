@@ -1,7 +1,9 @@
+import type { Prisma } from "@prisma/client";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 
 import { getCurrentCustomer } from "@/lib/customer-auth";
+import { ADDRESS_LINE_MAX, isValidPincode, LANDMARK_MAX, LOCALITY_MAX, normalisePincode } from "@/lib/delivery-address";
 import { prisma } from "@/lib/prisma";
 import { makeLimiter, tooManyRequests } from "@/lib/ratelimit";
 import { indianPhoneE164 } from "@/lib/zod-drops";
@@ -33,12 +35,29 @@ const patchSchema = z.object({
     .union([z.literal(""), indianPhoneE164])
     .transform((v) => v || null)
     .nullish(),
-  savedAddress: optionalText(500),
+  savedAddress: optionalText(ADDRESS_LINE_MAX),
+  savedLocality: optionalText(LOCALITY_MAX),
+  savedLandmark: optionalText(LANDMARK_MAX),
+  savedPincode: z
+    .string()
+    .trim()
+    .transform((v) => normalisePincode(v) || null)
+    .refine((v) => v === null || isValidPincode(v), "A pincode has 6 digits")
+    .nullish(),
 });
 
 const writeLimit = makeLimiter({ name: "customer-profile", windowMs: 60_000, max: 20 });
 
-const PROFILE_SELECT = { id: true, email: true, name: true, phone: true, savedAddress: true } as const;
+const PROFILE_SELECT = {
+  id: true,
+  email: true,
+  name: true,
+  phone: true,
+  savedAddress: true,
+  savedLocality: true,
+  savedLandmark: true,
+  savedPincode: true,
+} as const;
 
 export async function GET() {
   try {
@@ -72,10 +91,13 @@ export async function PATCH(req: Request) {
       return NextResponse.json({ error: "Invalid input", issues: parsed.error.issues }, { status: 400 });
     }
 
-    const data: { name?: string | null; phone?: string | null; savedAddress?: string | null } = {};
+    const data: Prisma.CustomerUpdateInput = {};
     if (parsed.data.name !== undefined) data.name = parsed.data.name;
     if (parsed.data.phone !== undefined) data.phone = parsed.data.phone;
     if (parsed.data.savedAddress !== undefined) data.savedAddress = parsed.data.savedAddress;
+    if (parsed.data.savedLocality !== undefined) data.savedLocality = parsed.data.savedLocality;
+    if (parsed.data.savedLandmark !== undefined) data.savedLandmark = parsed.data.savedLandmark;
+    if (parsed.data.savedPincode !== undefined) data.savedPincode = parsed.data.savedPincode;
 
     const updated = await prisma.customer.update({
       where: { id: customer.id },

@@ -26,7 +26,9 @@ import {
   generateOrderToken,
   nextBillNumber,
 } from "@/lib/drops";
+import { deliveryFields } from "@/lib/delivery-address";
 import { bumpOrderSignal } from "@/lib/drops-signal";
+import { findMenuSlot, parseMenuSlots, type MenuSlot } from "@/lib/menu-slots";
 import { applyOffers, giftLineName } from "@/lib/offers";
 import { loadResolvedOffers } from "@/lib/offers-server";
 import { effectivePlan, isBillingLocked } from "@/lib/plan";
@@ -40,6 +42,8 @@ export type MenuOrderSettings = {
   acceptPayOnDelivery: boolean;
   menuFulfilmentMode: FulfilmentMode;
   menuDeliveryFeePaise: number;
+  /** VendorSettings.menuSlots, raw JSON (lib/menu-slots.ts). Omitted = no slots. */
+  menuSlots?: unknown;
 };
 
 export type PlaceMenuOrderInput = {
@@ -56,6 +60,12 @@ export type PlaceMenuOrderInput = {
   customerPhone: string; // E.164, already validated
   fulfilmentType: FulfilmentType;
   deliveryAddress?: string | null;
+  /** Address parts beside the line (lib/delivery-address.ts); older checkouts send none. */
+  deliveryLocality?: string | null;
+  deliveryLandmark?: string | null;
+  deliveryPincode?: string | null;
+  /** Start of the picked slot (lib/menu-slots.ts); required when the store has slots. */
+  slotStart?: string | null;
   notes?: string | null;
   paymentMethod: "UPI" | "CASH";
   customerId?: string | null;
@@ -72,6 +82,8 @@ export type PlaceMenuOrderError =
   | { code: "item_not_found"; menuItemId: string }
   | { code: "fulfilment_unavailable" }
   | { code: "address_required" }
+  | { code: "slot_required" }
+  | { code: "slot_unavailable" }
   | { code: "pay_on_delivery_disabled" }
   | { code: "monthly_txn_cap_reached" }
   | { code: "orders_paused" };
@@ -140,9 +152,17 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
   if (!allowedFulfilmentTypes(settings.menuFulfilmentMode).includes(input.fulfilmentType)) {
     return { ok: false, error: { code: "fulfilment_unavailable" } };
   }
-  const address = input.deliveryAddress?.trim() || null;
-  if (input.fulfilmentType === "DELIVERY" && !address) {
+  const delivery = deliveryFields(input);
+  if (input.fulfilmentType === "DELIVERY" && !delivery.deliveryAddress) {
     return { ok: false, error: { code: "address_required" } };
+  }
+  // "When": with slots configured the buyer must pick one that is still offered.
+  const slotRules = parseMenuSlots(settings.menuSlots);
+  let slot: MenuSlot | null = null;
+  if (slotRules.length > 0) {
+    if (!input.slotStart) return { ok: false, error: { code: "slot_required" } };
+    slot = findMenuSlot(slotRules, input.slotStart, now);
+    if (!slot) return { ok: false, error: { code: "slot_unavailable" } };
   }
 
   const lines = mergeMenuLines(input.items);
@@ -225,7 +245,9 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
           dropId: null,
           fulfilmentStatus: "PLACED",
           fulfilmentType: input.fulfilmentType,
-          deliveryAddress: input.fulfilmentType === "DELIVERY" ? address : null,
+          ...(input.fulfilmentType === "DELIVERY" ? delivery : {}),
+          fulfilAt: slot?.start ?? null,
+          fulfilUntil: slot?.end ?? null,
           orderToken,
           // The rider's "Delivered" link (app/d/[token]); deliveries only.
           riderToken: input.fulfilmentType === "DELIVERY" ? generateOrderToken() : null,

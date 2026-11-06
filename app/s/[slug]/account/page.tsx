@@ -249,6 +249,9 @@ export default async function StorefrontAccountPage(
                 name={customer.name}
                 phone={customer.phone}
                 savedAddress={customer.savedAddress}
+                savedLocality={customer.savedLocality}
+                savedLandmark={customer.savedLandmark}
+                savedPincode={customer.savedPincode}
               />
             </section>
 

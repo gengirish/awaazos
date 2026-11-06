@@ -8,6 +8,7 @@
 import type { FulfilmentStatus } from "@prisma/client";
 
 import { formatINR } from "@/lib/currency";
+import { isValidPincode } from "@/lib/delivery-address";
 import { discountLabel } from "@/lib/offers";
 
 const IST = "Asia/Kolkata";
@@ -320,7 +321,11 @@ export function sameCartLines(a: Record<string, number>, b: Record<string, numbe
 export type SavedBuyer = {
   name: string;
   phone: string;
+  /** The address line (older entries: the whole address). */
   address: string;
+  locality: string;
+  landmark: string;
+  pincode: string;
   fulfilment: "DELIVERY" | "PICKUP" | null;
   /** ms epoch of the last save; 0 for entries written before it existed. */
   savedAt: number;
@@ -342,6 +347,9 @@ export function parseSavedBuyer(raw: string | null): SavedBuyer | null {
     name: str(o.name),
     phone: str(o.phone),
     address: str(o.address),
+    locality: str(o.locality),
+    landmark: str(o.landmark),
+    pincode: str(o.pincode),
     fulfilment: o.fulfilment === "DELIVERY" || o.fulfilment === "PICKUP" ? o.fulfilment : null,
     savedAt: typeof o.savedAt === "number" && Number.isFinite(o.savedAt) ? o.savedAt : 0,
   };
@@ -349,16 +357,27 @@ export function parseSavedBuyer(raw: string | null): SavedBuyer | null {
 
 // ─── Checkout validation ────────────────────────────────────────────
 
-export type CheckoutField = "name" | "phone" | "address" | "payment";
+export type CheckoutField = "name" | "phone" | "slot" | "address" | "locality" | "pincode" | "payment";
 export type CheckoutFieldErrors = Partial<Record<CheckoutField, string>>;
 
 /** Visual order of the fields in the checkout sheet — first invalid one gets focus. */
-export const CHECKOUT_FIELD_ORDER: readonly CheckoutField[] = ["name", "phone", "address", "payment"];
+export const CHECKOUT_FIELD_ORDER: readonly CheckoutField[] = [
+  "name",
+  "phone",
+  "slot",
+  "address",
+  "locality",
+  "pincode",
+  "payment",
+];
 
 export const CHECKOUT_FIELD_MESSAGES: Record<CheckoutField, string> = {
   name: "Please enter your name.",
   phone: "Enter a valid 10-digit +91 mobile number.",
-  address: "Please enter a delivery address.",
+  slot: "Please choose when you want it.",
+  address: "Please enter your house or flat and street.",
+  locality: "Please enter your area or locality.",
+  pincode: "A pincode has 6 digits.",
   payment: "Please choose how you'll pay.",
 };
 
@@ -372,9 +391,15 @@ export function looksLikeIndianMobile(raw: string): boolean {
 export type CheckoutInput = {
   name: string;
   phone: string;
+  /** The address line. */
   address: string;
+  locality: string;
+  pincode: string;
   fulfilment: "DELIVERY" | "PICKUP";
   method: "UPI" | "CASH" | null;
+  /** The store has menu slots (lib/menu-slots.ts), so one must be picked. */
+  slotRequired: boolean;
+  slot: string | null;
 };
 
 /** One field's client-side error, or null when it is valid (address only counts for delivery). */
@@ -384,8 +409,16 @@ export function validateCheckoutField(field: CheckoutField, input: CheckoutInput
       return input.name.trim() ? null : CHECKOUT_FIELD_MESSAGES.name;
     case "phone":
       return looksLikeIndianMobile(input.phone) ? null : CHECKOUT_FIELD_MESSAGES.phone;
+    case "slot":
+      return !input.slotRequired || input.slot ? null : CHECKOUT_FIELD_MESSAGES.slot;
     case "address":
       return input.fulfilment !== "DELIVERY" || input.address.trim() ? null : CHECKOUT_FIELD_MESSAGES.address;
+    case "locality":
+      return input.fulfilment !== "DELIVERY" || input.locality.trim() ? null : CHECKOUT_FIELD_MESSAGES.locality;
+    case "pincode":
+      return input.fulfilment !== "DELIVERY" || !input.pincode.trim() || isValidPincode(input.pincode)
+        ? null
+        : CHECKOUT_FIELD_MESSAGES.pincode;
     case "payment":
       return input.method ? null : CHECKOUT_FIELD_MESSAGES.payment;
   }
@@ -416,6 +449,9 @@ export function checkoutFieldForErrorCode(code: string): CheckoutField | null {
   switch (code) {
     case "address_required":
       return "address";
+    case "slot_required":
+    case "slot_unavailable":
+      return "slot";
     case "pay_on_delivery_disabled":
       return "payment";
     default:
@@ -427,6 +463,9 @@ const ISSUE_PATH_FIELD: Record<string, CheckoutField> = {
   customerName: "name",
   customerPhone: "phone",
   deliveryAddress: "address",
+  deliveryLocality: "locality",
+  deliveryPincode: "pincode",
+  slotStart: "slot",
   paymentMethod: "payment",
 };
 
@@ -484,6 +523,10 @@ export function orderErrorMessage(err: OrderApiError, itemName?: string): string
       return "Everyday items are paused while a pre-order is open. Order from the pre-order above.";
     case "address_required":
       return "Please enter a delivery address.";
+    case "slot_required":
+      return "Please choose when you want your order.";
+    case "slot_unavailable":
+      return "That time is no longer available. Please pick another.";
     case "fulfilment_unavailable":
       return "That delivery option isn't available for this order. Please pick another.";
     case "pay_on_delivery_disabled":

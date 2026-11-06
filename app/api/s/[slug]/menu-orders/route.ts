@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { backfillCustomerProfile } from "@/lib/customer-backfill";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { beginIdempotency, getIdempotencyKey } from "@/lib/idempotency";
 import { placeMenuOrder } from "@/lib/menu-orders";
@@ -39,46 +40,6 @@ const menuOrderRateLimit = makeLimiter({
   max: 10,
 });
 
-/**
- * Fill only the customer's empty name / phone / savedAddress from a placed
- * order. Conditional `updateMany` per field (`field: null`), so a concurrent
- * profile edit is never clobbered. Best-effort: the order already committed.
- */
-async function backfillCustomerProfile(
-  customer: { id: string; name: string | null; phone: string | null; savedAddress: string | null },
-  from: { name: string; phone: string; address: string | null },
-): Promise<void> {
-  try {
-    const writes = [];
-    if (!customer.name && from.name) {
-      writes.push(
-        prisma.customer.updateMany({ where: { id: customer.id, name: null }, data: { name: from.name } }),
-      );
-    }
-    if (!customer.phone && from.phone) {
-      writes.push(
-        prisma.customer.updateMany({ where: { id: customer.id, phone: null }, data: { phone: from.phone } }),
-      );
-    }
-    if (!customer.savedAddress && from.address) {
-      writes.push(
-        prisma.customer.updateMany({
-          where: { id: customer.id, savedAddress: null },
-          data: { savedAddress: from.address },
-        }),
-      );
-    }
-    if (writes.length) await Promise.all(writes);
-  } catch (err) {
-    console.error(
-      JSON.stringify({
-        event: "storefront_customer_backfill_failed",
-        error: err instanceof Error ? err.name : "unknown",
-      }),
-    );
-  }
-}
-
 export async function POST(req: Request, props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
   try {
@@ -115,6 +76,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
             acceptPayOnDelivery: true,
             menuFulfilmentMode: true,
             menuDeliveryFeePaise: true,
+            menuSlots: true,
             // Only checked for presence; none of this is returned or passed on.
             ...RAZORPAY_CRED_SELECT,
           },
@@ -153,6 +115,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         acceptPayOnDelivery: vendor.settings.acceptPayOnDelivery,
         menuFulfilmentMode: vendor.settings.menuFulfilmentMode,
         menuDeliveryFeePaise: vendor.settings.menuDeliveryFeePaise,
+        menuSlots: vendor.settings.menuSlots,
       },
       takesOnlinePayment: isOnlinePaymentEnabled(vendor, vendor.settings),
       items: input.items,
@@ -160,6 +123,10 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
       customerPhone: input.customerPhone,
       fulfilmentType: input.fulfilmentType,
       deliveryAddress: input.deliveryAddress ?? null,
+      deliveryLocality: input.deliveryLocality ?? null,
+      deliveryLandmark: input.deliveryLandmark ?? null,
+      deliveryPincode: input.deliveryPincode ?? null,
+      slotStart: input.slotStart ?? null,
       notes: input.notes ?? null,
       paymentMethod: input.paymentMethod,
       customerId: customer?.id ?? null,
@@ -171,6 +138,9 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         name: input.customerName,
         phone: input.customerPhone,
         address: input.fulfilmentType === "DELIVERY" ? (input.deliveryAddress ?? null) : null,
+        locality: input.deliveryLocality,
+        landmark: input.deliveryLandmark,
+        pincode: input.deliveryPincode,
       });
     }
 

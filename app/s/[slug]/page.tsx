@@ -51,6 +51,7 @@ import { getCurrentCustomer } from "@/lib/customer-auth";
 import { displayStoreName } from "@/lib/demo-store-schema";
 import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
 import { dropStateLabel } from "@/lib/drop-state";
+import { menuSlotLabel, parseMenuSlots, upcomingMenuSlots } from "@/lib/menu-slots";
 import { formatDropDayLabel, formatWindowWithDay } from "@/lib/drops-time";
 import { instagramProfileUrl } from "@/lib/instagram";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
@@ -222,6 +223,7 @@ const loadStorefront = cache(async (slug: string) => {
           menuFulfilmentMode: true,
           menuDeliveryFeePaise: true,
           menuPickupNote: true,
+          menuSlots: true,
         },
       },
       drops: {
@@ -676,6 +678,9 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
   const layout: CatalogueLayout = storeKind(vendor.stallType) === "goods" ? "gallery" : "list";
 
   const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
+  // "When": the store's weekly slots for menu orders, and the first one open now.
+  const menuSlotRules = menuOrdering ? parseMenuSlots(vendor.settings?.menuSlots) : [];
+  const nextMenuSlot = upcomingMenuSlots(menuSlotRules, now)[0] ?? null;
   // The open-amount "Scan to pay" QR, only for a read-only menu (see #pay below).
   // Rendered here, not by a third-party image URL: no network hop for the buyer,
   // and the payee VPA never leaves our server.
@@ -708,7 +713,14 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
     vendor.isDemo ? null : loadRatingSummary(vendor.id),
   ]);
   const prefill: BuyerPrefill | null = customer
-    ? { name: customer.name, phone: customer.phone, address: customer.savedAddress }
+    ? {
+        name: customer.name,
+        phone: customer.phone,
+        address: customer.savedAddress,
+        locality: customer.savedLocality,
+        landmark: customer.savedLandmark,
+        pincode: customer.savedPincode,
+      }
     : null;
   // The drop a buyer has least time left to order from drives the header CTA.
   const nextClosing = dropViews
@@ -1115,6 +1127,8 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                     fulfilmentTypes={allowedFulfilmentTypes(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}
                     deliveryFeePaise={vendor.settings?.menuDeliveryFeePaise ?? 0}
                     pickupNote={vendor.settings?.menuPickupNote ?? null}
+                    slotRules={menuSlotRules}
+                    nextSlotLabel={nextMenuSlot ? menuSlotLabel(nextMenuSlot, now) : null}
                     payment={payment}
                     whatsapp={whatsapp}
                     prefill={prefill}

@@ -33,6 +33,7 @@ import { UpiQrImage } from "@/components/storefront/UpiQrImage";
 import { formatINR, paiseToRupees } from "@/lib/currency";
 import { orderDisplayState, PENDING_HOLD_MINUTES } from "@/lib/drops";
 import { formatFulfilmentWindow, formatIstDate, formatIstTime, formatWindowWithDay } from "@/lib/drops-time";
+import { orderSlotLabel } from "@/lib/menu-slots";
 import {
   buyerWhatsappNumber,
   formatWhatsAppOrderMessage,
@@ -143,6 +144,8 @@ const loadOrder = cache(async (slug: string, token: string) => {
       isSample: true,
       feedback: { select: { rating: true } },
       deliveryAddress: true,
+      fulfilAt: true,
+      fulfilUntil: true,
       notes: true,
       customerName: true,
       customerPhone: true,
@@ -331,8 +334,15 @@ export default async function StorefrontOrderPage(props: {
   const payOnline = awaitingUpi && minsLeft > 0 && isOnlinePaymentEnabled(vendor, vendor.settings, now);
 
   // The WhatsApp text is read later, so it keeps the date; the page says "Today" / "Tomorrow".
-  const fulfilmentWindow = drop ? formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt) : null;
-  const windowOnPage = drop ? formatWindowWithDay(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt, now) : null;
+  // A menu order's window is the slot the buyer picked (lib/menu-slots.ts), if the store has slots.
+  const fulfilmentWindow = drop
+    ? formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt)
+    : order.fulfilAt
+      ? formatFulfilmentWindow(order.fulfilAt, order.fulfilUntil ?? order.fulfilAt)
+      : null;
+  const windowOnPage = drop
+    ? formatWindowWithDay(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt, now)
+    : orderSlotLabel(order.fulfilAt, order.fulfilUntil, now);
   const waNumber = buyerWhatsappNumber(vendor.settings);
   const waLink = waNumber
     ? whatsappChatLink(
