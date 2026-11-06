@@ -76,6 +76,7 @@ export default async function PosPage() {
         priceInPaise: true,
         isPopular: true,
         category: true,
+        aliases: true,
       },
     }),
     prisma.vendor.findUnique({
@@ -116,6 +117,7 @@ export default async function PosPage() {
     priceInPaise: it.priceInPaise,
     isPopular: it.isPopular,
     category: it.category,
+    aliases: it.aliases,
   }));
 
   return (

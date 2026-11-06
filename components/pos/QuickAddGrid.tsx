@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
+import { STAFF_SEARCH_MIN_ITEMS, itemSearchText, matchesSearch, searchTerms } from "@/lib/store-search";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
@@ -22,6 +23,8 @@ export type MenuTile = {
   category: string;
   /** Optional photo. Absent (or null) falls back to `emoji`. */
   imageUrl?: string | null;
+  /** Voice spellings ("bhel" for "Bhel Puri"); the search matches them too. */
+  aliases?: string[];
 };
 
 export type QuickAddGridProps = {
@@ -34,8 +37,6 @@ type ItemGroup = { category: string | null; items: MenuTile[] };
 
 /** Group tiles by category above this many items (unchanged from before). */
 const GROUP_THRESHOLD = 8;
-/** Category chips and search only earn their space on a long menu. */
-const SEARCH_THRESHOLD = 15;
 /** Hold this long on a tile to take one off instead of adding one. */
 const LONG_PRESS_MS = 500;
 /** A finger drifting further than this is a scroll, not a press. */
@@ -69,7 +70,8 @@ export function QuickAddGrid({ items, vocab }: QuickAddGridProps) {
     return m;
   }, [cartItems]);
 
-  const searchable = items.length > SEARCH_THRESHOLD;
+  // Category chips and search only earn their space on a long menu.
+  const searchable = items.length > STAFF_SEARCH_MIN_ITEMS;
   const grouped = items.length > GROUP_THRESHOLD;
 
   // Stable DOM ids per category, from the full menu so they don't shift while filtering.
@@ -82,14 +84,13 @@ export function QuickAddGrid({ items, vocab }: QuickAddGridProps) {
     return ids;
   }, [items]);
 
-  const needle = searchable ? query.trim().toLowerCase() : "";
+  // Same matcher as the store page and /menu (lib/store-search.ts): every word, any order.
+  const terms = useMemo(() => (searchable ? searchTerms(query) : []), [searchable, query]);
 
   const visibleItems = useMemo(() => {
-    if (!needle) return items;
-    return items.filter(
-      (it) => it.name.toLowerCase().includes(needle) || categoryOf(it).toLowerCase().includes(needle),
-    );
-  }, [items, needle]);
+    if (terms.length === 0) return items;
+    return items.filter((it) => matchesSearch(itemSearchText(it, categoryOf(it)), terms));
+  }, [items, terms]);
 
   const groups = useMemo((): ItemGroup[] => {
     if (!grouped) return [{ category: null, items: visibleItems }];

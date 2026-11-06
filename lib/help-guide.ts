@@ -266,6 +266,14 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     keywords: "unavailable hide out of stock availability",
   },
   {
+    id: "find-item",
+    group: "menu",
+    title: "Find a {item} on a long {catalogue}",
+    steps: "Once you have more than 15 {items}, the {catalogueTitle} screen has a search box: type any word of the name, description or category. Choose Sold out to see only what is switched off. Clear the search to move {items} up or down again.",
+    nav: "menu",
+    keywords: "search filter look up sold out",
+  },
+  {
     id: "find-bill",
     group: "records",
     title: "Find an old bill",

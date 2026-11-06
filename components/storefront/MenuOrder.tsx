@@ -20,6 +20,7 @@ import { ItemPrice } from "@/components/storefront/ItemPrice";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { formatINRCompact } from "@/lib/currency";
 import { applyOffers, salePriceFor, type ResolvedOffer } from "@/lib/offers";
+import { itemSearchText } from "@/lib/store-search";
 import {
   cartStorageKey,
   fulfilmentOptionsLabel,
@@ -119,7 +120,7 @@ export function MenuOrder(props: MenuOrderProps) {
   const visibleCategories = useMemo(
     () =>
       categories
-        .map((c) => ({ ...c, items: c.items.filter((i) => matchesSearch(`${i.name} ${c.category}`)) }))
+        .map((c) => ({ ...c, items: c.items.filter((i) => matchesSearch(itemSearchText({ name: i.name, description: i.description }, c.category))) }))
         .filter((c) => c.items.length > 0),
     [categories, matchesSearch],
   );

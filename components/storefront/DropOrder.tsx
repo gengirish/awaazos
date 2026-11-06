@@ -19,6 +19,7 @@ import { ItemPrice } from "@/components/storefront/ItemPrice";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
 import { applyOffers, salePriceFor, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
+import { itemSearchText } from "@/lib/store-search";
 import {
   cartStorageKey,
   maxOrderableQty,
@@ -120,7 +121,7 @@ export function DropOrder(props: DropOrderProps) {
   // The store page's search hides rows; the cart keeps what was added.
   const matchesSearch = useStoreSearchMatch();
   const visibleItems = useMemo(
-    () => items.filter((i) => matchesSearch(`${i.name} ${dropTitle}`)),
+    () => items.filter((i) => matchesSearch(itemSearchText({ name: i.name, description: i.description }, dropTitle))),
     [items, dropTitle, matchesSearch],
   );
 

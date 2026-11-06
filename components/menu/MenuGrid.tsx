@@ -1,14 +1,24 @@
 "use client";
 
 import type { MenuItem } from "@prisma/client";
-import { Package, UtensilsCrossed } from "lucide-react";
+import { Package, Search, UtensilsCrossed } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 import { MenuItemCard, type MenuMoveDirection } from "@/components/menu/MenuItemCard";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { RadioOption } from "@/components/ui/radio-option";
+import {
+  MENU_STATUS_FILTERS,
+  MENU_STATUS_LABELS,
+  isMenuFilterEmpty,
+  menuItemMatches,
+  type MenuStatusFilter,
+} from "@/lib/menu-search";
+import { STAFF_SEARCH_MIN_ITEMS, searchTerms } from "@/lib/store-search";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
 
 /** Fired by VoiceMenuPanel after it saves rows. */
@@ -48,6 +58,26 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
   const queuedOrder = useRef<MenuItem[] | null>(null);
   // The Move button to put focus back on once the cards have swapped places.
   const refocusMove = useRef<{ id: string; direction: MenuMoveDirection } | null>(null);
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<MenuStatusFilter>("all");
+
+  // Search and the Selling / Sold out filter only earn their space on a long
+  // list (lib/menu-search.ts). They hide cards; `items` stays the whole menu.
+  const searchable = items.length > STAFF_SEARCH_MIN_ITEMS;
+  const filter = useMemo(
+    () => (searchable ? { terms: searchTerms(query), status } : { terms: [], status: "all" as const }),
+    [searchable, query, status],
+  );
+  const filtering = !isMenuFilterEmpty(filter);
+  const visibleItems = useMemo(
+    () => (filtering ? items.filter((item) => menuItemMatches(item, filter)) : items),
+    [items, filter, filtering],
+  );
+
+  function clearFilter() {
+    setQuery("");
+    setStatus("all");
+  }
 
   // Moving a card re-inserts its DOM node, which drops focus in some browsers.
   // At an end of the list that button is now disabled, so its twin takes over.
@@ -144,7 +174,54 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
         />
       ) : (
         <>
-          {items.length > 1 ? (
+          {searchable ? (
+            <div className="space-y-2">
+              <div>
+                <label htmlFor="menu-search" className="mb-1 block text-xs font-medium text-muted-foreground">
+                  Search {vocab.catalogue}
+                </label>
+                <div className="relative">
+                  <Search
+                    className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    id="menu-search"
+                    type="search"
+                    inputMode="search"
+                    enterKeyHint="search"
+                    autoComplete="off"
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Escape") setQuery("");
+                    }}
+                    className="h-11 pl-9"
+                  />
+                </div>
+              </div>
+              <div role="radiogroup" aria-label="Show" className="grid max-w-sm grid-cols-3 gap-2">
+                {MENU_STATUS_FILTERS.map((value) => (
+                  <RadioOption
+                    key={value}
+                    size="compact"
+                    name="menu-status"
+                    value={value}
+                    label={MENU_STATUS_LABELS[value]}
+                    checked={status === value}
+                    onChange={() => setStatus(value)}
+                  />
+                ))}
+              </div>
+              <p aria-live="polite" className="sr-only">
+                {filtering ? (visibleItems.length === 1 ? "1 item shown" : `${visibleItems.length} items shown`) : ""}
+              </p>
+            </div>
+          ) : null}
+          {filtering ? (
+            // A move between two visible cards would jump over hidden ones.
+            <p className="text-sm text-muted-foreground">Clear the search to change the order.</p>
+          ) : items.length > 1 ? (
             <>
               <p className="text-sm text-muted-foreground pointer-coarse:hidden">
                 Drag cards to reorder. Order is saved when you drop.
@@ -154,27 +231,40 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
               </p>
             </>
           ) : null}
-          <div ref={gridRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {items.map((item, index) => (
-              <div
-                key={item.id}
-                draggable
-                onDragStart={(e) => onDragStart(e, item.id)}
-                onDragOver={onDragOver}
-                onDrop={(e) => onDrop(e, item.id)}
-                className="pointer-fine:cursor-grab pointer-fine:active:cursor-grabbing"
-              >
-                <MenuItemCard
-                  item={item}
-                  onEdit={onEdit}
-                  onChanged={refresh}
-                  onMove={move}
-                  canMoveUp={index > 0}
-                  canMoveDown={index < items.length - 1}
-                />
-              </div>
-            ))}
-          </div>
+          {visibleItems.length === 0 ? (
+            <EmptyState
+              role="status"
+              title={query.trim() ? `No items match “${query.trim()}”` : `No ${MENU_STATUS_LABELS[status].toLowerCase()} items`}
+              description="Try another word, or clear the search to see everything."
+              action={
+                <Button type="button" variant="outline" className="min-h-11" onClick={clearFilter}>
+                  Clear search
+                </Button>
+              }
+            />
+          ) : (
+            <div ref={gridRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {visibleItems.map((item, index) => (
+                <div
+                  key={item.id}
+                  draggable={!filtering}
+                  onDragStart={filtering ? undefined : (e) => onDragStart(e, item.id)}
+                  onDragOver={filtering ? undefined : onDragOver}
+                  onDrop={filtering ? undefined : (e) => onDrop(e, item.id)}
+                  className={filtering ? undefined : "pointer-fine:cursor-grab pointer-fine:active:cursor-grabbing"}
+                >
+                  <MenuItemCard
+                    item={item}
+                    onEdit={onEdit}
+                    onChanged={refresh}
+                    onMove={filtering ? undefined : move}
+                    canMoveUp={index > 0}
+                    canMoveDown={index < items.length - 1}
+                  />
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
     </div>

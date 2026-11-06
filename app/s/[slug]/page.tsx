@@ -72,6 +72,7 @@ import {
 } from "@/lib/storefront-order";
 import { qrSvgDataUrl } from "@/lib/qr";
 import { stallTypeLabel } from "@/lib/stall-type";
+import { itemSearchText } from "@/lib/store-search";
 import { storeKind, storeVocabulary } from "@/lib/store-vocabulary";
 import { storeInfoFacts, type StoreFactKind } from "@/lib/store-info";
 import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
@@ -323,14 +324,17 @@ function groupByCategory(items: StorefrontItems): [string, StorefrontItems][] {
   return Array.from(groups.entries());
 }
 
-/** What the search bar matches for an everyday-menu row: name and category. */
-function menuItemSearchText(item: { name: string }, category: string): string {
-  return `${item.name} ${category}`;
+/**
+ * What the search bar matches for an everyday-menu row: name, description and
+ * category. No aliases: the index goes to every visitor (lib/store-search.ts).
+ */
+function menuItemSearchText(item: { name: string; description?: string | null }, category: string): string {
+  return itemSearchText({ name: item.name, description: item.description }, category);
 }
 
-/** A drop row: its name and the drop's title ("Saturday bakes"). */
-function dropItemSearchText(item: { name: string }, dropTitle: string): string {
-  return `${item.name} ${dropTitle}`;
+/** A drop row: its name, description and the drop's title ("Saturday bakes"). */
+function dropItemSearchText(item: { name: string; description?: string | null }, dropTitle: string): string {
+  return itemSearchText({ name: item.name, description: item.description }, dropTitle);
 }
 
 /** Category names are vendor-authored free text; anchors must survive spaces and `&`. */
