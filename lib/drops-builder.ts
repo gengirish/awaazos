@@ -260,13 +260,22 @@ export function planDropItemRemoval(
   };
 }
 
-/** Upcoming = cooking day today or later (nearest first); past = earlier (newest first). */
+/** How many past drops `/drops` lists: enough to copy last week's, no long history. */
+export const PAST_DROPS_SHOWN = 2;
+
+/**
+ * Upcoming = cooking day today or later (nearest first); past = earlier (newest first),
+ * only the latest `PAST_DROPS_SHOWN`.
+ */
 export function groupDropsByDay<T extends { date: string }>(
   drops: T[],
   todayYmd: string,
 ): { upcoming: T[]; past: T[] } {
   const upcoming = drops.filter((d) => d.date >= todayYmd).sort((a, b) => a.date.localeCompare(b.date));
-  const past = drops.filter((d) => d.date < todayYmd).sort((a, b) => b.date.localeCompare(a.date));
+  const past = drops
+    .filter((d) => d.date < todayYmd)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, PAST_DROPS_SHOWN);
   return { upcoming, past };
 }
 
