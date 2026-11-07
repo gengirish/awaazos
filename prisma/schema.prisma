@@ -456,6 +456,11 @@ model Transaction {
   customer         Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   cancelledAt      DateTime?
 
+  // Counter cash sale: what the customer handed over and the change returned
+  // (lib/cash-tender.ts). Null when the vendor didn't enter it, and for UPI.
+  cashReceivedPaise Int?
+  changeGivenPaise  Int?
+
   // POS offline outbox (docs/PWA_OFFLINE_PLAN.md): device-generated uuid for a
   // counter sale. Dedupes replays for as long as the row exists, unlike the
   // 24 h Upstash idempotency record. Null for storefront orders and old rows.

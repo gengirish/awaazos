@@ -401,6 +401,15 @@ them) and 404s for an unknown token or an inactive vendor. `VendorSettings.autoP
 the print page in a hidden iframe after a POS sale, on desktop only. Settings → Receipts edits the
 footer, GSTIN, paper width and auto-print.
 
+**Undo a counter sale** (`lib/pos-undo.ts`): "Mark as paid" commits at once, then the toast and the receipt sheet
+offer Undo for 5 s (`POS_UNDO_TOAST_MS`, a UI timer only). Undo is a real revert, not a deferred commit:
+`undoSale()` (`lib/pos-outbox.ts`) drops the outbox copy, then `POST /api/transactions/undo { clientRef }` (CASHIER,
+`{ vendorId, clientRef }`, never STOREFRONT, within 2 min of the receipt row's `createdAt`, else 409) deletes the row
+(items and receipt cascade) and decrements its DailySummary in one `$transaction`. The bill number is not handed
+back (it may be printed already), so a day's numbering can have a gap. A cash sale stores what was handed over
+(`cashReceivedPaise`, CASH only, ≥ total, else 400) and the server-derived `changeGivenPaise`; a short tender can't be
+marked paid. The payment sheet's U / C / Enter shortcuts are `lib/pay-sheet-keys.ts`.
+
 `OrderItem.name` and `priceInPaise` are snapshots, not joins. Renaming or deleting a menu item must
 not mutate historical bills.
 
@@ -883,7 +892,7 @@ phones validated as +91 10-digit and stored E.164 via `libphonenumber-js`. Use t
 rather than local copies: `lib/datetime.ts` (`formatIstDate`, `formatIstDateTime`), `lib/phone.ts`
 (`normaliseIndianMobile`, `formatIndianMobile`, `lastFourDigits`).
 
-Accessibility is POS-critical, not decorative: 44×44 px minimum tap targets (mic button 80×80),
+Accessibility is POS-critical, not decorative: 44×44 px minimum tap targets (mic button 80×80 on phones, 48×48 from md),
 voice states distinguishable beyond color, `aria-live` on cart and voice status, and **every
 voice-only path needs a tap fallback** (`QuickAddGrid`).
 

@@ -23,7 +23,8 @@ Every voice-only path MUST have a tap fallback (`QuickAddGrid`).
   `SelectTrigger`, `SelectItem` and the Dialog / Sheet close buttons are 44 px on
   coarse pointers (see `design-system.mdc`, "Touch defaults"). Hand-rolled
   `<button>` / `<a>` elements still need `min-h-11` (+ `min-w-11` when icon-only).
-- Mic button: **80×80 px** (per spec) — must be reachable in single-handed thumb arc.
+- Mic button: **80×80 px** on phones (per spec) — must be reachable in single-handed thumb arc.
+  From `md` (counter computer, mouse) it is a compact 48×48 inline control.
 - Cart qty +/- buttons: 44×44 px minimum, with 8 px spacing.
 - Disable tap-highlight only after replacing with a custom focus ring.
 

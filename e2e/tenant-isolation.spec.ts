@@ -152,6 +152,42 @@ test.describe("tenant isolation", () => {
     expect(bodyB.total).toBe(0);
   });
 
+  test("vendor B cannot undo vendor A's sale (404, not 403)", async () => {
+    const itemA = await createMenuItem(pageA, { name: "A Undo Poha", priceInRupees: 25 });
+    const clientRef = crypto.randomUUID();
+    const saleA = await pageA.request.post("/api/transactions", {
+      data: {
+        items: [{ menuItemId: itemA.id, name: itemA.name, priceInPaise: itemA.priceInPaise, qty: 1 }],
+        subtotalPaise: 2500,
+        discountPaise: 0,
+        taxPaise: 0,
+        totalPaise: 2500,
+        paymentMethod: "CASH",
+        source: "MANUAL",
+        clientRef,
+      },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(saleA.status()).toBe(201);
+
+    const undoB = await pageB.request.post("/api/transactions/undo", {
+      data: { clientRef },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(undoB.status(), "cross-tenant undo must 404").toBe(404);
+
+    // A's sale is untouched, and A can still undo it.
+    const listA = (await (await pageA.request.get("/api/transactions")).json()) as { total: number };
+    expect(listA.total).toBe(1);
+    const undoA = await pageA.request.post("/api/transactions/undo", {
+      data: { clientRef },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(undoA.status()).toBe(200);
+    const after = (await (await pageA.request.get("/api/transactions")).json()) as { total: number };
+    expect(after.total).toBe(0);
+  });
+
   test("vendor B cannot read vendor A's receipt (404, not 403)", async () => {
     const itemA = await createMenuItem(pageA, { name: "A Receipt Idli", priceInRupees: 30 });
     const saleA = await pageA.request.post("/api/transactions", {

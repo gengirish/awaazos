@@ -2,6 +2,7 @@ import { Prisma, type PaymentMethod, type PaymentStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getIstTodayStart, formatBillDateYYYYMMDD } from "@/lib/billing-period";
+import { changeGivenPaise } from "@/lib/cash-tender";
 import { PLAN_LIMITS } from "@/lib/constants";
 import { countBillableTxnThisMonth } from "@/lib/drops";
 import { beginIdempotency, getIdempotencyKey } from "@/lib/idempotency";
@@ -191,6 +192,15 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: totals.code, code: totals.code }, { status: 400 });
     }
 
+    // Cash handed over: only on a cash sale, and it has to cover the bill.
+    const cashReceivedPaise = body.cashReceivedPaise ?? null;
+    if (
+      cashReceivedPaise !== null &&
+      (body.paymentMethod !== "CASH" || changeGivenPaise(body.totalPaise, cashReceivedPaise) === null)
+    ) {
+      return NextResponse.json({ error: "cash_received_invalid", code: "cash_received_invalid" }, { status: 400 });
+    }
+
     const saleTime = resolveSaleTime(body);
     if (!saleTime.ok) {
       return NextResponse.json({ error: saleTime.code, code: saleTime.code }, { status: 422 });
@@ -368,6 +378,8 @@ async function createSale(args: {
         paymentMethod: body.paymentMethod,
         paymentStatus,
         upiRef: body.upiRef?.trim() || null,
+        cashReceivedPaise: body.cashReceivedPaise ?? null,
+        changeGivenPaise: changeGivenPaise(body.totalPaise, body.cashReceivedPaise),
         customerPhone: body.customerPhone?.trim() || null,
         customerName: body.customerName?.trim() || null,
         voiceTranscript: body.voiceTranscript ?? null,

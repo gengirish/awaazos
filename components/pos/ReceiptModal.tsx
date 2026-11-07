@@ -38,6 +38,12 @@ export type ReceiptModalProps = {
   queued: { localNo: number; needsSignIn: boolean } | null;
   /** VendorSettings.autoPrintReceipt — counter computers only (see useAutoPrintReceipt). */
   autoPrint: boolean;
+  /**
+   * Set for the few seconds the sale can still be undone (lib/pos-undo.ts).
+   * Mirrors the toast's Undo: this sheet traps focus, so a keyboard can't
+   * reach the toast while it is open.
+   */
+  undo: { busy: boolean; onUndo: () => void } | null;
   onCloseAll: () => void;
 };
 
@@ -50,6 +56,7 @@ export function ReceiptModal({
   paymentMethod,
   queued,
   autoPrint,
+  undo,
   onCloseAll,
 }: ReceiptModalProps) {
   const router = useRouter();
@@ -99,11 +106,30 @@ export function ReceiptModal({
     if (navigator.onLine) router.refresh();
   }
 
+  // Top right of the bill box, so it vanishing never moves the buttons below.
+  const undoButton = undo ? (
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      className="shrink-0"
+      disabled={undo.busy}
+      onClick={undo.onUndo}
+    >
+      {undo.busy ? "Undoing…" : "Undo payment"}
+    </Button>
+  ) : null;
+
   const body = queued ? (
     <div className="space-y-4">
       <div className="rounded-lg bg-muted/50 px-4 py-3">
-        <p className="text-xs text-muted-foreground">Saved on this phone</p>
-        <p className="font-mono text-lg font-semibold tabular-nums text-foreground">Offline #{queued.localNo}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-xs text-muted-foreground">Saved on this phone</p>
+            <p className="font-mono text-lg font-semibold tabular-nums text-foreground">Offline #{queued.localNo}</p>
+          </div>
+          {undoButton}
+        </div>
         <p className="mt-2 text-sm text-muted-foreground">
           Paid {formatINR(totalPaise)} via {methodLabel}
         </p>
@@ -120,8 +146,13 @@ export function ReceiptModal({
   ) : (
     <div className="space-y-4">
       <div className="rounded-lg bg-muted/50 px-4 py-3">
-        <p className="text-xs text-muted-foreground">Bill number</p>
-        <p className="font-mono text-lg font-semibold tabular-nums text-foreground">{billNumber}</p>
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="text-xs text-muted-foreground">Bill number</p>
+            <p className="font-mono text-lg font-semibold tabular-nums text-foreground">{billNumber}</p>
+          </div>
+          {undoButton}
+        </div>
         <p className="mt-2 text-sm text-muted-foreground">
           Paid {formatINR(totalPaise)} via {methodLabel}
         </p>

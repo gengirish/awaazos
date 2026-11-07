@@ -40,6 +40,8 @@ type CartState = {
   undoRemove: () => void;
   /** Empties the cart and every voice / undo marker that refers to it. */
   clearCart: () => void;
+  /** Put back the lines of a sale that was undone (lib/pos-undo.ts). */
+  restoreItems: (items: CartLine[]) => void;
   setVoiceReview: (review: VoiceReview | null) => void;
   setItemsFromVoice: (parsed: VoiceCartItem[]) => void;
   getSubtotalPaise: () => number;
@@ -131,6 +133,9 @@ export const useCartStore = create<CartState>((set, get) => ({
   },
 
   clearCart: () => set({ items: [], voiceAddedIds: [], voiceReview: null, lastRemoved: null }),
+
+  restoreItems: (items) =>
+    set({ items: items.map((l) => ({ ...l })), voiceAddedIds: [], voiceReview: null, lastRemoved: null }),
 
   setVoiceReview: (review) => set({ voiceReview: review }),
 

@@ -24,7 +24,7 @@ async function ringUpForty(page: Page) {
 }
 
 test.describe("POS payment sheet", () => {
-  test("no UPI ID: cash is the default, change calculator is informational, receipt reads 'Cash'", async ({
+  test("no UPI ID: cash is the default, change calculator blocks a short tender, receipt reads 'Cash'", async ({
     page,
     request,
   }) => {
@@ -50,10 +50,10 @@ test.describe("POS payment sheet", () => {
     await expect(dialog).toContainText("Change to return");
     await expect(dialog).toContainText("₹60.00");
 
-    // Short is shown but does not block the sale.
+    // Short blocks the sale until the rest is handed over.
     await received.fill("30");
-    await expect(dialog.getByText(/₹10\.00 short/)).toBeVisible();
-    await expect(markPaid).toBeEnabled();
+    await expect(dialog.getByText(/Short by ₹10\.00/)).toBeVisible();
+    await expect(markPaid).toBeDisabled();
 
     await dialog.getByRole("button", { name: "Exact" }).click();
     await expect(received).toHaveValue("40");
@@ -124,6 +124,91 @@ test.describe("POS payment sheet", () => {
     await expect(reopened.getByRole("button", { name: "Add UPI reference (optional)" })).toBeVisible();
 
     await reopened.getByRole("button", { name: /Mark as paid/ }).click();
+    await expect(page.getByText(/Paid ₹40\.00 via UPI/)).toBeVisible({ timeout: 20_000 });
+  });
+
+  test("undo: the sale is reverted, the cart comes back and the sheet reopens", async ({ page, request }) => {
+    await createVendorSession(page, request, "pospay-undo");
+    const dialog = await ringUpForty(page);
+
+    await dialog.getByRole("button", { name: "₹100", exact: true }).click();
+    await expect(dialog).toContainText("Return ₹60.00");
+    await dialog.getByRole("button", { name: /Mark as paid/ }).click();
+
+    await expect(page.getByText(/AWZ-\d{8}-\d{4}/)).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByText("Payment recorded · ₹40.00 Cash")).toBeVisible();
+    // The sale is on the books, with what was handed over.
+    const before = (await (await page.request.get("/api/transactions")).json()) as { total: number };
+    expect(before.total).toBe(1);
+
+    // Undo from the receipt sheet (the toast offers the same).
+    await page.getByRole("button", { name: "Undo payment" }).click();
+    await expect(page.getByText("Payment undone")).toBeVisible({ timeout: 20_000 });
+    // The receipt sheet may still be animating out, so name the dialog.
+    const reopened = page.getByRole("dialog", { name: "Collect payment" });
+    await expect(reopened).toBeVisible();
+    await expect(reopened).toContainText("₹40.00");
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("region", { name: "Cart" })).toContainText("₹40.00");
+
+    const after = (await (await page.request.get("/api/transactions")).json()) as { total: number };
+    expect(after.total).toBe(0);
+  });
+
+  test("undo disappears after its window", async ({ page, request }) => {
+    await createVendorSession(page, request, "pospay-undo-late");
+    const dialog = await ringUpForty(page);
+    await dialog.getByRole("button", { name: /Mark as paid/ }).click();
+    const undo = page.getByRole("button", { name: "Undo payment" });
+    await expect(undo).toBeVisible({ timeout: 20_000 });
+    await expect(undo).toBeHidden({ timeout: 10_000 });
+  });
+
+  test("with a UPI ID: payee line, full-screen QR keeps the sheet's state, keyboard shortcuts", async ({
+    page,
+    request,
+  }) => {
+    await createVendorSession(page, request, "pospay-qr");
+    const patch = await page.request.patch("/api/vendor", {
+      data: { upiId: "e2e-qr@okaxis", upiName: "Sam Store" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(patch.ok(), "saving a UPI ID").toBe(true);
+
+    const dialog = await ringUpForty(page);
+    await expect(dialog.getByText(/Paying\s*Sam Store/)).toBeVisible();
+    await expect(dialog.getByRole("button", { name: "Copy UPI ID" })).toBeVisible();
+
+    await dialog.getByRole("button", { name: "Add UPI reference (optional)" }).click();
+    await dialog.getByLabel(/UPI Reference/).fill("123456789012");
+
+    await dialog.getByRole("button", { name: "Show to customer" }).click();
+    const full = page.getByRole("dialog", { name: /UPI QR code to pay ₹40\.00 to Sam Store/ });
+    await expect(full).toBeVisible();
+    await expect(full).toContainText("Scan with any UPI app");
+    await page.keyboard.press("Escape");
+    await expect(full).toBeHidden();
+    // Esc closed only the full-screen layer; the sheet kept what was typed.
+    await expect(page.getByRole("dialog", { name: "Collect payment" })).toBeVisible();
+    await expect(page.getByLabel(/UPI Reference/)).toHaveValue("123456789012");
+
+    // Tap outside the QR closes it too.
+    await page.getByRole("button", { name: "Show to customer" }).click();
+    await expect(full).toBeVisible();
+    await full.getByText("Scan with any UPI app").click();
+    await expect(full).toBeHidden();
+
+    // Shortcuts: not while typing in a field, yes once focus leaves it.
+    const sheet = page.getByRole("dialog", { name: "Collect payment" });
+    await sheet.getByLabel(/UPI Reference/).press("c");
+    await expect(sheet.getByRole("radio", { name: "UPI QR" })).toBeChecked();
+    await sheet.getByRole("radio", { name: "UPI QR" }).focus();
+    await page.keyboard.press("c");
+    await expect(sheet.getByRole("radio", { name: "Cash" })).toBeChecked();
+    await page.keyboard.press("u");
+    await expect(sheet.getByRole("radio", { name: "UPI QR" })).toBeChecked();
+    await expect(sheet.getByRole("button", { name: /Mark as paid/ })).toHaveAttribute("aria-keyshortcuts", "Enter");
+    await page.keyboard.press("Enter");
     await expect(page.getByText(/Paid ₹40\.00 via UPI/)).toBeVisible({ timeout: 20_000 });
   });
 });
