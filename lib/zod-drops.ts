@@ -1,6 +1,7 @@
 import { parsePhoneNumberFromString } from "libphonenumber-js";
 import { z } from "zod";
 
+import { isValidPincode, LANDMARK_MAX, LOCALITY_MAX } from "@/lib/delivery-address";
 import { PER_ORDER_OVER_MAX } from "@/lib/drops-builder";
 import { istToUtc, ymdToDbDate } from "@/lib/drops-time";
 import { INSTAGRAM_SRC } from "@/lib/order-channel";
@@ -150,6 +151,21 @@ export const indianPhoneE164 = z
     return parsed.number; // E.164
   });
 
+/**
+ * The parts of a delivery address (lib/delivery-address.ts) beside the address
+ * line. Optional on the wire so a checkout loaded before they existed still
+ * places its order; the checkout itself requires the locality.
+ */
+const deliveryAddressPartsShape = {
+  deliveryLocality: z.string().trim().max(LOCALITY_MAX).nullish(),
+  deliveryLandmark: z.string().trim().max(LANDMARK_MAX).nullish(),
+  deliveryPincode: z
+    .string()
+    .trim()
+    .nullish()
+    .refine((v) => !v || isValidPincode(v), "A pincode has 6 digits"),
+};
+
 /** Public storefront order body. Prices are never accepted from the client. */
 export const storefrontOrderSchema = z.object({
   dropId: z.string().min(1),
@@ -161,6 +177,7 @@ export const storefrontOrderSchema = z.object({
   customerPhone: indianPhoneE164,
   fulfilmentType: z.enum(["DELIVERY", "PICKUP"]),
   deliveryAddress: z.string().trim().max(500).nullish(),
+  ...deliveryAddressPartsShape,
   notes: z.string().trim().max(280).nullish(),
   paymentMethod: z.enum(["UPI", "CASH"]),
   src: z.literal(INSTAGRAM_SRC).optional(),
@@ -194,9 +211,12 @@ export const storefrontMenuOrderSchema = z.object({
   customerPhone: indianPhoneE164,
   fulfilmentType: z.enum(["DELIVERY", "PICKUP"]),
   deliveryAddress: z.string().trim().max(500).nullish(),
+  ...deliveryAddressPartsShape,
   notes: z.string().trim().max(280).nullish(),
   paymentMethod: z.enum(["UPI", "CASH"]),
   src: z.literal(INSTAGRAM_SRC).optional(),
+  /** Start of the picked slot (lib/menu-slots.ts `MenuSlot.key`); the server re-derives the slot. */
+  slotStart: z.string().datetime().nullish(),
 });
 
 export type StorefrontMenuOrderInput = z.infer<typeof storefrontMenuOrderSchema>;

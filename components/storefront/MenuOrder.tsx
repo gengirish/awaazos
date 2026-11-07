@@ -1,6 +1,6 @@
 "use client";
 
-import { MapPin, ShoppingBag, Sparkles, Truck } from "lucide-react";
+import { CalendarClock, MapPin, ShoppingBag, Sparkles, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
@@ -19,6 +19,7 @@ import {
 import { ItemPrice } from "@/components/storefront/ItemPrice";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { formatINRCompact } from "@/lib/currency";
+import type { MenuSlotRule } from "@/lib/menu-slots";
 import { applyOffers, salePriceFor, type ResolvedOffer } from "@/lib/offers";
 import { itemSearchText } from "@/lib/store-search";
 import {
@@ -71,6 +72,10 @@ export type MenuOrderProps = {
   fulfilmentTypes: FulfilmentType[];
   deliveryFeePaise: number;
   pickupNote: string | null;
+  /** The store's weekly pickup / delivery slots (lib/menu-slots.ts); empty = checkout asks no "when". */
+  slotRules?: MenuSlotRule[];
+  /** "Tomorrow · 12–2 pm": the first slot open now, worked out on the server render. */
+  nextSlotLabel?: string | null;
   payment: { upi: boolean; cod: boolean; online: boolean };
   /** The store has a usable WhatsApp number (see CheckoutSheet). */
   whatsapp?: boolean;
@@ -94,6 +99,8 @@ export function MenuOrder(props: MenuOrderProps) {
     fulfilmentTypes,
     deliveryFeePaise,
     pickupNote,
+    slotRules,
+    nextSlotLabel,
     payment,
     whatsapp,
     prefill,
@@ -235,6 +242,12 @@ export function MenuOrder(props: MenuOrderProps) {
               <span>Pickup: {pickupNote}</span>
             </li>
           ) : null}
+          {nextSlotLabel ? (
+            <li className="flex items-start gap-2">
+              <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span>Next slot: {nextSlotLabel}</span>
+            </li>
+          ) : null}
           <li>Tap + to add items, then check out.</li>
         </ul>
       </div>
@@ -356,6 +369,7 @@ export function MenuOrder(props: MenuOrderProps) {
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
         pickupNote={pickupNote}
+        slotRules={slotRules}
         payment={payment}
         whatsapp={whatsapp}
         prefill={prefill}

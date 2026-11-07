@@ -6,6 +6,7 @@ import { useState } from "react";
 
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { ADDRESS_LINE_MAX, LANDMARK_MAX, LOCALITY_MAX } from "@/lib/delivery-address";
 import { formatIndianMobile, normaliseIndianMobile } from "@/lib/phone";
 
 
@@ -14,6 +15,9 @@ export type CustomerProfileProps = {
   name: string | null;
   phone: string | null;
   savedAddress: string | null;
+  savedLocality: string | null;
+  savedLandmark: string | null;
+  savedPincode: string | null;
 };
 
 /** Signed-in buyer's own details. Saved to their Customer row only. */
@@ -22,6 +26,9 @@ export function CustomerProfile(props: CustomerProfileProps) {
   const [name, setName] = useState(props.name ?? "");
   const [phone, setPhone] = useState(formatIndianMobile(props.phone));
   const [address, setAddress] = useState(props.savedAddress ?? "");
+  const [locality, setLocality] = useState(props.savedLocality ?? "");
+  const [landmark, setLandmark] = useState(props.savedLandmark ?? "");
+  const [pincode, setPincode] = useState(props.savedPincode ?? "");
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState<{ kind: "ok" | "error"; text: string } | null>(null);
 
@@ -34,7 +41,14 @@ export function CustomerProfile(props: CustomerProfileProps) {
       const res = await fetch("/api/s/customer/profile", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, phone: normaliseIndianMobile(phone), savedAddress: address }),
+        body: JSON.stringify({
+          name,
+          phone: normaliseIndianMobile(phone),
+          savedAddress: address,
+          savedLocality: locality,
+          savedLandmark: landmark,
+          savedPincode: pincode,
+        }),
       });
       if (res.ok) {
         setStatus({ kind: "ok", text: "Saved." });
@@ -96,18 +110,56 @@ export function CustomerProfile(props: CustomerProfileProps) {
         </div>
       </div>
 
-      <div className="space-y-2">
-        <Label htmlFor="profile-address">Delivery address</Label>
-        <textarea
-          id="profile-address"
-          autoComplete="street-address"
-          value={address}
-          onChange={(e) => setAddress(e.target.value)}
-          maxLength={500}
-          rows={3}
-          className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        />
-      </div>
+      <fieldset className="space-y-3">
+        <legend className="text-sm font-medium">Delivery address</legend>
+        <div className="space-y-2">
+          <Label htmlFor="profile-address">House or flat, building, street</Label>
+          <textarea
+            id="profile-address"
+            autoComplete="street-address"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            maxLength={ADDRESS_LINE_MAX}
+            rows={2}
+            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="profile-locality">Area or locality</Label>
+          <Input
+            id="profile-locality"
+            autoComplete="address-level3"
+            value={locality}
+            onChange={(e) => setLocality(e.target.value)}
+            maxLength={LOCALITY_MAX}
+            className="h-11"
+          />
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_9rem]">
+          <div className="space-y-2">
+            <Label htmlFor="profile-landmark">Landmark (optional)</Label>
+            <Input
+              id="profile-landmark"
+              value={landmark}
+              onChange={(e) => setLandmark(e.target.value)}
+              maxLength={LANDMARK_MAX}
+              className="h-11"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="profile-pincode">Pincode (optional)</Label>
+            <Input
+              id="profile-pincode"
+              inputMode="numeric"
+              autoComplete="postal-code"
+              value={pincode}
+              onChange={(e) => setPincode(e.target.value)}
+              maxLength={7}
+              className="h-11 font-mono"
+            />
+          </div>
+        </div>
+      </fieldset>
 
       <div aria-live="polite" className="min-h-5">
         {status ? (

@@ -40,6 +40,7 @@ import { Prisma } from "@prisma/client";
 import { formatBillDateYYYYMMDD, getIstMonthStart, getIstTodayStart } from "@/lib/billing-period";
 import { PLAN_LIMITS } from "@/lib/constants";
 import { sumPaise } from "@/lib/currency";
+import { deliveryFields } from "@/lib/delivery-address";
 import { bumpOrderSignal } from "@/lib/drops-signal";
 import { applyOffers, giftLineName, withGiftsThatFit } from "@/lib/offers";
 import { loadResolvedOffers } from "@/lib/offers-server";
@@ -306,6 +307,10 @@ export type PlaceOrderInput = {
   customerPhone: string; // E.164, already validated
   fulfilmentType: FulfilmentType;
   deliveryAddress?: string | null;
+  /** Address parts beside the line (lib/delivery-address.ts); older checkouts send none. */
+  deliveryLocality?: string | null;
+  deliveryLandmark?: string | null;
+  deliveryPincode?: string | null;
   notes?: string | null;
   paymentMethod: "UPI" | "CASH";
   /** Signed-in storefront customer, if any (lib/customer-auth.ts). */
@@ -381,8 +386,8 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
       if (!allowedFulfilmentTypes(drop.fulfilmentMode).includes(input.fulfilmentType)) {
         throw new OrderRejected({ code: "fulfilment_unavailable" });
       }
-      const address = input.deliveryAddress?.trim() || null;
-      if (input.fulfilmentType === "DELIVERY" && !address) {
+      const delivery = deliveryFields(input);
+      if (input.fulfilmentType === "DELIVERY" && !delivery.deliveryAddress) {
         throw new OrderRejected({ code: "address_required" });
       }
 
@@ -480,7 +485,7 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
           dropId: drop.id,
           fulfilmentStatus: "PLACED",
           fulfilmentType: input.fulfilmentType,
-          deliveryAddress: input.fulfilmentType === "DELIVERY" ? address : null,
+          ...(input.fulfilmentType === "DELIVERY" ? delivery : {}),
           orderToken,
           // The rider's "Delivered" link (app/d/[token]); deliveries only.
           riderToken: input.fulfilmentType === "DELIVERY" ? generateOrderToken() : null,

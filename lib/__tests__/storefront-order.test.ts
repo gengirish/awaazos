@@ -64,7 +64,13 @@ describe("formatTimeLeft", () => {
 
   it("returns null when past or far away", () => {
     expect(formatTimeLeft(new Date(NOW.getTime() - 1), NOW)).toBeNull();
-    expect(formatTimeLeft(new Date(NOW.getTime() + 49 * 3600_000), NOW)).toBeNull();
+    expect(formatTimeLeft(new Date(NOW.getTime() + 8 * 24 * 3600_000), NOW)).toBeNull();
+  });
+
+  it("counts days past 24 hours", () => {
+    expect(formatTimeLeft(new Date(NOW.getTime() + 28 * 3600_000 + 12 * 60_000), NOW)).toBe("1 day 4 h left");
+    expect(formatTimeLeft(new Date(NOW.getTime() + 48 * 3600_000), NOW)).toBe("2 days left");
+    expect(formatTimeLeft(new Date(NOW.getTime() + 49 * 3600_000), NOW)).toBe("2 days 1 h left");
   });
 });
 

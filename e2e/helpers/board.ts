@@ -12,9 +12,13 @@ export type BoardMenu = "Share" | "More actions";
 /** An item of a header menu by exact name, opening that menu unless it is already open. */
 export async function boardMenuItem(page: Page, menu: BoardMenu, name: string): Promise<Locator> {
   const trigger = page.locator("#main").getByRole("button", { name: menu, exact: true });
-  if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
   const item = page.getByRole("menu").getByRole("menuitem", { name, exact: true });
-  await expect(item).toBeVisible();
+  // The menus load after the board (next/dynamic), so a click can land on the
+  // server-rendered button before React handles it. Click until the menu is open.
+  await expect(async () => {
+    if ((await trigger.getAttribute("aria-expanded")) !== "true") await trigger.click();
+    await expect(item).toBeVisible({ timeout: 2_000 });
+  }).toPass({ timeout: 15_000 });
   return item;
 }
 

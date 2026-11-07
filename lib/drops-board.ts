@@ -18,6 +18,7 @@ import type {
 } from "@prisma/client";
 
 import type { EffectiveDropStatus, OrderDisplayState } from "@/lib/drops";
+import { formatFulfilmentWindow } from "@/lib/drops-time";
 
 export const ORDER_DISPLAY_STATES: readonly OrderDisplayState[] = [
   "AWAITING_PAYMENT",
@@ -50,6 +51,8 @@ export type BoardOrder = {
   fulfilmentType: FulfilmentType | null;
   fulfilmentStatus: FulfilmentStatus | null;
   deliveryAddress: string | null;
+  /** The area part of the address (lib/delivery-address.ts); null on older orders. */
+  deliveryLocality?: string | null;
   notes: string | null;
   paymentMethod: PaymentMethod;
   paymentStatus: PaymentStatus;
@@ -66,8 +69,13 @@ export type BoardOrder = {
   totalPaise: number;
   /** Paid up front while the order is still unpaid; absent or 0 when none. */
   advancePaidPaise?: number;
-  /** When the buyer wants it (ISO), for a menu order that has a date; null = none. */
+  /**
+   * When the buyer wants it (ISO), for a menu order: the start of the slot they
+   * picked (lib/menu-slots.ts), with `fulfilUntil` its end; a demo order may have
+   * a single time. Null = none chosen. Drop orders use the drop's window.
+   */
   fulfilAt?: string | null;
+  fulfilUntil?: string | null;
   /** A demo store's sample order (lib/demo-store.ts). */
   isSample?: boolean;
   /** Handed to a rider (ISO), and who it went with; absent or null when not yet. */
@@ -525,7 +533,8 @@ export function whatsappHref(phoneE164: string, text?: string): string {
  * for the seller to finish, so it carries no link.
  */
 export function buyerUpdateMessage(
-  o: Pick<BoardOrder, "billNumber" | "customerName" | "fulfilmentType" | "fulfilmentStatus" | "outForDeliveryAt">,
+  o: Pick<BoardOrder, "billNumber" | "customerName" | "fulfilmentType" | "fulfilmentStatus" | "outForDeliveryAt"> &
+    Partial<Pick<BoardOrder, "fulfilAt" | "fulfilUntil">>,
   vendorName: string,
   orderUrl: string | null,
   ready = false,
@@ -539,7 +548,12 @@ export function buyerUpdateMessage(
     return withLink(`${order} was ${o.fulfilmentType === "PICKUP" ? "picked up" : "delivered"}. Thank you!`);
   }
   if (o.fulfilmentStatus === "CONFIRMED") {
-    return withLink(`${order} ${o.outForDeliveryAt ? "is on the way" : "is confirmed"}.`);
+    if (o.outForDeliveryAt) return withLink(`${order} is on the way.`);
+    // A menu order's slot, with its date: the buyer reads this later.
+    const when = o.fulfilAt
+      ? ` for ${formatFulfilmentWindow(new Date(o.fulfilAt), new Date(o.fulfilUntil ?? o.fulfilAt))}`
+      : "";
+    return withLink(`${order} is confirmed${when}.`);
   }
   return `Hi ${name}, about your order ${o.billNumber} from ${vendorName}: `;
 }
@@ -558,15 +572,6 @@ export function liveEffectiveStatus(
   if (drop.opensAt && now.getTime() < new Date(drop.opensAt).getTime()) return "SCHEDULED";
   return "OPEN";
 }
-
-export const DROP_STATUS_LABEL: Record<EffectiveDropStatus, string> = {
-  DRAFT: "Draft",
-  SCHEDULED: "Opens later",
-  OPEN: "Taking orders",
-  CLOSED: "Orders closed",
-  FROZEN: "Orders locked",
-  FULFILLED: "Done",
-};
 
 /** Board polls the KV signal only while a drop can still receive orders. */
 export function shouldPollForOrders(status: EffectiveDropStatus): boolean {

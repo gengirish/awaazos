@@ -83,3 +83,52 @@ export function formatDropDayLabel(d: Date): string {
 export function formatFulfilmentWindow(start: Date, end: Date): string {
   return `${formatIstDayLabel(start)} · ${formatIstTime(start)} – ${formatIstTime(end)}`;
 }
+
+const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+
+/** IST wall clock of an instant, by arithmetic (no ICU, so every runtime prints the same). */
+function istClock(d: Date): { ymd: string; weekday: number; day: number; month: number; h: number; m: number } {
+  const s = new Date(d.getTime() + IST_OFFSET_MS);
+  return {
+    ymd: s.toISOString().slice(0, 10),
+    weekday: s.getUTCDay(),
+    day: s.getUTCDate(),
+    month: s.getUTCMonth(),
+    h: s.getUTCHours(),
+    m: s.getUTCMinutes(),
+  };
+}
+
+function clockTime(h: number, m: number, withMeridiem: boolean): string {
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  const base = m === 0 ? `${h12}` : `${h12}:${String(m).padStart(2, "0")}`;
+  return withMeridiem ? `${base} ${h < 12 ? "am" : "pm"}` : base;
+}
+
+/**
+ * The day an instant falls on, relative to `now` (IST): "Today", "Tomorrow",
+ * else "Sat 8 Nov". For pages read at the moment they render; text that is
+ * shared and read later (share message, story image) keeps absolute dates.
+ */
+export function formatRelativeIstDay(d: Date, now: Date = new Date()): string {
+  const c = istClock(d);
+  if (c.ymd === istClock(now).ymd) return "Today";
+  if (c.ymd === istClock(new Date(now.getTime() + 24 * 60 * 60 * 1000)).ymd) return "Tomorrow";
+  return `${WEEKDAYS[c.weekday]} ${c.day} ${MONTHS[c.month]}`;
+}
+
+/** "5–9 pm", "5:30–9 pm", "11 am – 2 pm" (IST). */
+export function formatIstTimeRange(start: Date, end: Date): string {
+  const a = istClock(start);
+  const b = istClock(end);
+  const sameHalf = a.h < 12 === b.h < 12 && a.ymd === b.ymd;
+  return sameHalf
+    ? `${clockTime(a.h, a.m, false)}–${clockTime(b.h, b.m, true)}`
+    : `${clockTime(a.h, a.m, true)} – ${clockTime(b.h, b.m, true)}`;
+}
+
+/** Every handover window a buyer sees: "Today · 5–9 pm", "Tomorrow · …", "Sat 8 Nov · …". */
+export function formatWindowWithDay(start: Date, end: Date, now: Date = new Date()): string {
+  return `${formatRelativeIstDay(start, now)} · ${formatIstTimeRange(start, end)}`;
+}
