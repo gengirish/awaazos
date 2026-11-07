@@ -301,9 +301,12 @@ export function OrderCard({
         </div>
         <div className="shrink-0 text-right">
           <p className="font-mono text-lg font-bold tabular-nums">{formatINR(order.totalPaise)}</p>
-          <p className="text-xs text-muted-foreground">
-            {order.paymentMethod === "CASH" ? "Cash" : order.paidOnline ? "Paid online" : "UPI"}
-          </p>
+          {/* The status pill already says "Pay on delivery"; "Cash" under the amount would say it twice. */}
+          {order.displayState !== "PAY_ON_DELIVERY" && (
+            <p className="text-xs text-muted-foreground">
+              {order.paymentMethod === "CASH" ? "Cash" : order.paidOnline ? "Paid online" : "UPI"}
+            </p>
+          )}
         </div>
       </header>
 

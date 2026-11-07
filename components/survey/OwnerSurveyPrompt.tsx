@@ -4,18 +4,20 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { useBannerSnooze } from "@/hooks/useBannerSnooze";
+import { SURVEY_SNOOZE_DAYS } from "@/lib/orders-banner";
 import { cn } from "@/lib/utils";
 
 /** Holds the time of the last "Not now" (lib/orders-banner.ts). */
 export const OWNER_SURVEY_SNOOZE_KEY = "awz_owner_survey_prompt_hidden";
 
 /**
- * Asks an owner who hasn't answered to take the survey. The server decides who
- * sees it (`shouldAskOwnerSurvey`); "Not now" snoozes it on this device for 7
- * days, and Settings still lists the survey.
+ * Asks an owner who hasn't answered to take the survey, on the orders board
+ * only. The server decides who sees it (`shouldAskOwnerSurvey`); "Not now"
+ * snoozes it on this device for `SURVEY_SNOOZE_DAYS`, it shows once per browser
+ * session (OrdersBannerSlot), and Settings and Help still list the survey.
  */
 export function OwnerSurveyPrompt({ className }: { className?: string }) {
-  const { snoozed, snooze } = useBannerSnooze(OWNER_SURVEY_SNOOZE_KEY);
+  const { snoozed, snooze } = useBannerSnooze(OWNER_SURVEY_SNOOZE_KEY, SURVEY_SNOOZE_DAYS);
   if (snoozed) return null;
   return (
     <aside

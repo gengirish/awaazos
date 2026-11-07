@@ -119,7 +119,7 @@ test.describe("menu orders: order straight from the everyday menu", () => {
 
     // The live sync bar. Sound is on unless turned off, and waits for the first tap.
     await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible();
-    await expect(page.getByRole("button", { name: "Sound on — tap to enable", exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Order sounds on — tap once to allow", exact: true })).toBeVisible();
     await expect(await boardMenuItem(page, "More actions", "Order settings")).toHaveAttribute("href", "/settings/orders");
     await closeBoardMenu(page);
 

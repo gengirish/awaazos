@@ -11,6 +11,7 @@ import { prisma } from "@/lib/prisma";
 import { shouldAskOwnerSurvey } from "@/lib/owner-survey-server";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { shouldAskToRefer } from "@/lib/referral-server";
+import { loadStorePolishNudge } from "@/lib/store-polish-server";
 import { loadSetupChecklist } from "@/lib/setup-checklist-server";
 import { storeVocabulary } from "@/lib/store-vocabulary";
 
@@ -49,12 +50,13 @@ export default async function OrdersPage(props: Props) {
         fssaiNumber: true,
         deliveryRiders: true,
         razorpaySubStatus: true,
+        tagline: true,
       },
     }),
     loadOrdersBoard(ctx.vendor.id, { pinDropId: dropId }),
   ]);
   // Why no orders arrive yet, for staff who can fix it. Nothing once set up.
-  const [setup, askSurvey, askRefer] = await Promise.all([
+  const [setup, askSurvey, askRefer, polish] = await Promise.all([
     loadSetupChecklist({ vendor: ctx.vendor, role: ctx.staff.role, known: { settings } }),
     shouldAskOwnerSurvey(ctx.vendor, ctx.staff.role),
     shouldAskToRefer({
@@ -64,10 +66,15 @@ export default async function OrdersPage(props: Props) {
       published: settings?.publishStorefront ?? false,
       razorpaySubStatus: settings?.razorpaySubStatus,
     }),
+    loadStorePolishNudge(ctx.vendor, ctx.staff.role, {
+      published: settings?.publishStorefront ?? false,
+      tagline: settings?.tagline ?? null,
+    }),
   ]);
   // Steps still open keep the checklist. Once only reminders are left, the
   // first of them competes for the one banner slot with the other prompts.
   const remindersOnly = setup.items.every((item) => item.reminder);
+  const vocab = storeVocabulary(ctx.vendor.stallType);
 
   return (
     <main id="main" className="bg-background p-4 pb-16 md:p-6">
@@ -86,6 +93,8 @@ export default async function OrdersPage(props: Props) {
       {remindersOnly ? null : <SetupChecklistCard {...setup} titleAs="p" className="mx-auto mb-3 max-w-3xl" />}
       <OrdersBannerSlot
         reminder={remindersOnly ? (setup.items[0] ?? null) : null}
+        polish={polish}
+        catalogue={vocab.catalogue}
         askSurvey={askSurvey}
         askRefer={askRefer}
         className="mx-auto mb-3 max-w-3xl"
@@ -100,7 +109,7 @@ export default async function OrdersPage(props: Props) {
         initialDropId={dropId}
         initialSignal={signal}
         staffRole={ctx.staff.role}
-        vocab={storeVocabulary(ctx.vendor.stallType)}
+        vocab={vocab}
         riders={parseDeliveryRiders(settings?.deliveryRiders)}
       />
     </main>
