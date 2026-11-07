@@ -2,7 +2,7 @@
 
 import { AlertCircle, Clock, Gift, Loader2, MapPin, Minus, Plus, ShoppingBag } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { rememberRecentOrder } from "@/components/storefront/recent-orders";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,9 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { formatINR, sumPaise } from "@/lib/currency";
+import { ADDRESS_LINE_MAX, composeDeliveryAddress, LANDMARK_MAX, LOCALITY_MAX } from "@/lib/delivery-address";
+import { formatIstTimeRange, formatRelativeIstDay } from "@/lib/drops-time";
+import { upcomingMenuSlots, type MenuSlotRule } from "@/lib/menu-slots";
 import { discountLabel, giftLineName } from "@/lib/offers";
 import { orderSrcFromSearch } from "@/lib/order-channel";
 import { loadCheckout } from "@/lib/razorpay-checkout";
@@ -69,7 +72,11 @@ export type BuyerPrefill = {
   name: string | null;
   /** E.164 as stored (+91XXXXXXXXXX). */
   phone: string | null;
+  /** The saved address line, and its parts (lib/delivery-address.ts). */
   address: string | null;
+  locality?: string | null;
+  landmark?: string | null;
+  pincode?: string | null;
 };
 
 export type CheckoutLine = {
@@ -90,9 +97,15 @@ export type CheckoutDetails = {
   /** Normalised to E.164 when it looks like an Indian mobile; else as typed. */
   customerPhone: string;
   fulfilmentType: FulfilmentType;
+  /** The address line; the server joins it with the parts (lib/delivery-address.ts). */
   deliveryAddress: string | null;
+  deliveryLocality: string | null;
+  deliveryLandmark: string | null;
+  deliveryPincode: string | null;
   notes: string | null;
   paymentMethod: PaymentMethod;
+  /** Menu orders with slots: the picked slot's start (lib/menu-slots.ts). */
+  slotStart?: string | null;
 };
 
 const STORAGE_KEY = "awz:storefront:buyer:v1";
@@ -375,8 +388,16 @@ export type CheckoutSheetProps = {
   deliveryFeePaise: number;
   /** Where to collect, as the vendor wrote it. Never invented when absent. */
   pickupNote: string | null;
-  /** When to collect (drops: the fulfilment window label), if known. */
+  /**
+   * Drops: the one handover window ("Tomorrow · 5–9 pm"), shown read-only for
+   * pickup and delivery alike. A drop has a single slot, so there is nothing to pick.
+   */
   pickupWindow?: string | null;
+  /**
+   * Menu orders: the store's weekly slots (lib/menu-slots.ts). Non-empty → the
+   * buyer must pick one; the server checks it is still offered.
+   */
+  slotRules?: MenuSlotRule[];
   payment: { upi: boolean; cod: boolean; online: boolean };
   /**
    * The store has a WhatsApp number: also offer the "Also send my order to
@@ -425,6 +446,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     deliveryFeePaise,
     pickupNote,
     pickupWindow,
+    slotRules,
     payment,
     whatsapp = false,
     prefill,
@@ -440,6 +462,10 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [locality, setLocality] = useState("");
+  const [landmark, setLandmark] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [slot, setSlot] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
   const [remember, setRemember] = useState(true);
   /** Name and phone are already known: show them as one card with "Change". */
@@ -463,16 +489,57 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     phone: `${idPrefix}-phone`,
     phoneHint: `${idPrefix}-phone-hint`,
     address: `${idPrefix}-address`,
+    locality: `${idPrefix}-locality`,
+    landmark: `${idPrefix}-landmark`,
+    pincode: `${idPrefix}-pincode`,
+    slot: `${idPrefix}-slot`,
     payment: `${idPrefix}-payment`,
     error: (f: CheckoutField) => `${idPrefix}-${f}-error`,
   };
 
-  const input: CheckoutInput = { name, phone, address, fulfilment, method };
+  // The slots offered right now, worked out when the sheet opens (never on a timer);
+  // the server re-checks the pick, so a sheet left open can't book a past slot.
+  const slotRulesKey = JSON.stringify(slotRules ?? []);
+  const slots = useMemo(
+    () => (open && slotRules && slotRules.length > 0 ? upcomingMenuSlots(slotRules, new Date()) : []),
+    // slotRulesKey stands in for the array, which callers may rebuild each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [open, slotRulesKey],
+  );
+  const slotRequired = (slotRules?.length ?? 0) > 0;
+  const slotGroups = useMemo(() => {
+    const now = new Date();
+    const groups: { day: string; slots: { key: string; time: string }[] }[] = [];
+    for (const sl of slots) {
+      const day = formatRelativeIstDay(sl.start, now);
+      const time = formatIstTimeRange(sl.start, sl.end);
+      const last = groups[groups.length - 1];
+      if (last && last.day === day) last.slots.push({ key: sl.key, time });
+      else groups.push({ day, slots: [{ key: sl.key, time }] });
+    }
+    return groups;
+  }, [slots]);
+  // A pick that is no longer offered (the sheet reopened later) is cleared.
+  useEffect(() => {
+    if (slot && open && !slots.some((sl) => sl.key === slot)) setSlot(null);
+  }, [slot, slots, open]);
+
+  const input: CheckoutInput = {
+    name,
+    phone,
+    address,
+    locality,
+    pincode,
+    fulfilment,
+    method,
+    slotRequired,
+    slot,
+  };
 
   // ── Remember my details ─────────────────────────────────────────────
   // Latest values for timers / event handlers that outlive a render.
-  const latestRef = useRef({ name, phone, address, fulfilment, remember });
-  latestRef.current = { name, phone, address, fulfilment, remember };
+  const latestRef = useRef({ name, phone, address, locality, landmark, pincode, fulfilment, remember });
+  latestRef.current = { name, phone, address, locality, landmark, pincode, fulfilment, remember };
   const fulfilmentTypesRef = useRef(fulfilmentTypes);
   fulfilmentTypesRef.current = fulfilmentTypes;
   const loadedRef = useRef(false);
@@ -487,6 +554,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
       name: v.name,
       phone: v.phone,
       address: v.address,
+      locality: v.locality,
+      landmark: v.landmark,
+      pincode: v.pincode,
       fulfilment: v.fulfilment,
       savedAt: Date.now(),
     });
@@ -494,13 +564,25 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
   }, []);
 
   const applySaved = useCallback(
-    (saved: { name: string; phone: string; address: string; fulfilment: FulfilmentType | null }) => {
+    (saved: {
+      name: string;
+      phone: string;
+      address: string;
+      locality: string;
+      landmark: string;
+      pincode: string;
+      fulfilment: FulfilmentType | null;
+    }) => {
       setName(saved.name);
       setPhone(saved.phone);
       setAddress(saved.address);
+      setLocality(saved.locality);
+      setLandmark(saved.landmark);
+      setPincode(saved.pincode);
       const usable = savedContactUsable(saved.name, saved.phone);
       setContactFolded(usable);
-      setAddressFolded(usable && saved.address.trim() !== "");
+      // An address saved before it had parts has no locality: open it so the buyer adds one.
+      setAddressFolded(usable && saved.address.trim() !== "" && saved.locality.trim() !== "");
       if (saved.fulfilment && fulfilmentTypesRef.current.includes(saved.fulfilment)) {
         setFulfilment(saved.fulfilment);
       }
@@ -516,10 +598,15 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     mountedAtRef.current = Date.now();
     const saved = parseSavedBuyer(readSavedBuyerRaw());
     const p = prefillRef.current;
+    // The address line and its parts come from one source, so they never mix.
+    const fromAccount = !!p?.address;
     applySaved({
       name: p?.name || saved?.name || "",
       phone: formatIndianMobile(p?.phone ?? null) || saved?.phone || "",
-      address: p?.address || saved?.address || "",
+      address: (fromAccount ? p?.address : saved?.address) || "",
+      locality: (fromAccount ? p?.locality : saved?.locality) || "",
+      landmark: (fromAccount ? p?.landmark : saved?.landmark) || "",
+      pincode: (fromAccount ? p?.pincode : saved?.pincode) || "",
       fulfilment: saved?.fulfilment ?? null,
     });
     loadedRef.current = true;
@@ -530,7 +617,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     if (!loadedRef.current || !remember) return;
     const t = window.setTimeout(persistDetails, SAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(t);
-  }, [remember, name, phone, address, fulfilment, persistDetails]);
+  }, [remember, name, phone, address, locality, landmark, pincode, fulfilment, persistDetails]);
 
   // Flush the pending debounce when the tab is hidden or unloaded.
   useEffect(() => {
@@ -589,7 +676,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
   function showFieldErrors(errors: CheckoutFieldErrors) {
     setFieldErrors(errors);
     if (errors.name || errors.phone) setContactFolded(false);
-    if (errors.address) setAddressFolded(false);
+    if (errors.address || errors.locality || errors.pincode) setAddressFolded(false);
     const first = firstInvalidField(errors);
     if (first) setFocusRequest((r) => ({ field: first, n: (r?.n ?? 0) + 1 }));
   }
@@ -667,8 +754,12 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
             customerPhone: normaliseIndianMobile(phone),
             fulfilmentType: fulfilment,
             deliveryAddress: fulfilment === "DELIVERY" ? address.trim() : null,
+            deliveryLocality: fulfilment === "DELIVERY" ? locality.trim() || null : null,
+            deliveryLandmark: fulfilment === "DELIVERY" ? landmark.trim() || null : null,
+            deliveryPincode: fulfilment === "DELIVERY" ? pincode.trim() || null : null,
             notes: notes.trim() || null,
             paymentMethod: method ?? "UPI",
+            ...(slotRequired ? { slotStart: slot } : {}),
           }),
           src: orderSrcFromSearch(window.location.search),
         }),
@@ -715,6 +806,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     const message = onRejected(err);
     const field = checkoutFieldForErrorCode(err.error);
     if (field && (field !== "address" || fulfilment === "DELIVERY")) {
+      if (field === "slot") setSlot(null);
       return showFieldErrors({ ...fieldErrors, [field]: message });
     }
     setFormError(message);
@@ -755,7 +847,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                     {formatIndianMobile(normaliseIndianMobile(phone))}
                   </span>
                   {fulfilment === "DELIVERY" && addressFolded ? (
-                    <span className="mt-1 block whitespace-pre-line break-words text-muted-foreground">{address}</span>
+                    <span className="mt-1 block whitespace-pre-line break-words text-muted-foreground">
+                      {composeDeliveryAddress({ line: address, locality, landmark, pincode })}
+                    </span>
                   ) : null}
                 </span>
                 <button
@@ -846,6 +940,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                       onChange={() => {
                         setFulfilment(t);
                         revalidate("address", { fulfilment: t });
+                        revalidate("locality", { fulfilment: t });
+                        revalidate("pincode", { fulfilment: t });
                       }}
                       label={
                         t === "DELIVERY"
@@ -860,29 +956,131 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
               </fieldset>
             ) : null}
 
-            {fulfilment === "DELIVERY" && addressFolded ? null : fulfilment === "DELIVERY" ? (
+            {/* When: a drop's one window, read-only; or a menu slot the buyer picks. */}
+            {slotRequired ? (
               <div className="space-y-2">
-                <Label htmlFor={ids.address}>Delivery address</Label>
-                <textarea
-                  id={ids.address}
-                  autoComplete="street-address"
-                  value={address}
-                  onChange={(e) => {
-                    setAddress(e.target.value);
-                    revalidate("address", { address: e.target.value });
-                  }}
-                  maxLength={500}
-                  rows={3}
-                  required
-                  placeholder="Flat, building, street, landmark"
-                  aria-invalid={fieldErrors.address ? true : undefined}
-                  aria-describedby={describedBy("address")}
-                  className="flex w-full scroll-my-24 rounded-md border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
-                />
-                <FieldError id={ids.error("address")} message={fieldErrors.address} />
+                <Label htmlFor={ids.slot}>{fulfilment === "DELIVERY" ? "Deliver when?" : "Pick up when?"}</Label>
+                {slots.length > 0 ? (
+                  // Native, grouped by day: the phone's own picker, and no extra bundle on the store page.
+                  <select
+                    id={ids.slot}
+                    value={slot ?? ""}
+                    onChange={(e) => {
+                      const v = e.target.value || null;
+                      setSlot(v);
+                      revalidate("slot", { slot: v });
+                    }}
+                    aria-invalid={fieldErrors.slot ? true : undefined}
+                    aria-describedby={describedBy("slot")}
+                    className="flex h-11 w-full scroll-my-24 rounded-md border border-input bg-background px-3 text-base focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
+                  >
+                    <option value="" disabled>
+                      Choose a day and time
+                    </option>
+                    {slotGroups.map((g) => (
+                      <optgroup key={g.day} label={g.day}>
+                        {g.slots.map((sl) => (
+                          <option key={sl.key} value={sl.key}>
+                            {g.day} · {sl.time}
+                          </option>
+                        ))}
+                      </optgroup>
+                    ))}
+                  </select>
+                ) : (
+                  <p className="rounded-xl bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
+                    No times are open this week. Message the store to arrange a time.
+                  </p>
+                )}
+                <FieldError id={ids.error("slot")} message={fieldErrors.slot} />
               </div>
+            ) : pickupWindow ? (
+              <p className="flex items-start gap-2 rounded-xl bg-muted/50 px-3 py-2 text-sm">
+                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                <span>
+                  <span className="font-semibold">{fulfilment === "DELIVERY" ? "Delivery: " : "Pickup: "}</span>
+                  {pickupWindow}
+                </span>
+              </p>
+            ) : null}
+
+            {fulfilment === "DELIVERY" && addressFolded ? null : fulfilment === "DELIVERY" ? (
+              <fieldset className="space-y-3">
+                <legend className="text-sm font-medium">Delivery address</legend>
+                <div className="space-y-2">
+                  <Label htmlFor={ids.address}>House or flat, building, street</Label>
+                  <textarea
+                    id={ids.address}
+                    autoComplete="street-address"
+                    value={address}
+                    onChange={(e) => {
+                      setAddress(e.target.value);
+                      revalidate("address", { address: e.target.value });
+                    }}
+                    maxLength={ADDRESS_LINE_MAX}
+                    rows={2}
+                    required
+                    placeholder="Flat 302, Lake View Apartments, 4th Cross"
+                    aria-invalid={fieldErrors.address ? true : undefined}
+                    aria-describedby={describedBy("address")}
+                    className="flex w-full scroll-my-24 rounded-md border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
+                  />
+                  <FieldError id={ids.error("address")} message={fieldErrors.address} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor={ids.locality}>Area or locality</Label>
+                  <Input
+                    id={ids.locality}
+                    autoComplete="address-level3"
+                    value={locality}
+                    onChange={(e) => {
+                      setLocality(e.target.value);
+                      revalidate("locality", { locality: e.target.value });
+                    }}
+                    maxLength={LOCALITY_MAX}
+                    required
+                    placeholder="Kondapur"
+                    aria-invalid={fieldErrors.locality ? true : undefined}
+                    aria-describedby={describedBy("locality")}
+                    className="h-11 scroll-my-24 aria-invalid:border-destructive"
+                  />
+                  <FieldError id={ids.error("locality")} message={fieldErrors.locality} />
+                </div>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_9rem]">
+                  <div className="space-y-2">
+                    <Label htmlFor={ids.landmark}>Landmark (optional)</Label>
+                    <Input
+                      id={ids.landmark}
+                      value={landmark}
+                      onChange={(e) => setLandmark(e.target.value)}
+                      maxLength={LANDMARK_MAX}
+                      placeholder="Near Ganesh temple"
+                      className="h-11"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor={ids.pincode}>Pincode (optional)</Label>
+                    <Input
+                      id={ids.pincode}
+                      inputMode="numeric"
+                      autoComplete="postal-code"
+                      value={pincode}
+                      onChange={(e) => {
+                        setPincode(e.target.value);
+                        revalidate("pincode", { pincode: e.target.value });
+                      }}
+                      maxLength={7}
+                      placeholder="500084"
+                      aria-invalid={fieldErrors.pincode ? true : undefined}
+                      aria-describedby={describedBy("pincode")}
+                      className="h-11 scroll-my-24 font-mono aria-invalid:border-destructive"
+                    />
+                    <FieldError id={ids.error("pincode")} message={fieldErrors.pincode} />
+                  </div>
+                </div>
+              </fieldset>
             ) : (
-              <div className="space-y-1.5 rounded-xl bg-muted/50 px-3 py-2 text-sm">
+              <div className="rounded-xl bg-muted/50 px-3 py-2 text-sm">
                 <p className="flex items-start gap-2">
                   <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                   {pickupNote ? (
@@ -894,15 +1092,6 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                     <span>{PICKUP_FALLBACK}</span>
                   )}
                 </p>
-                {pickupWindow ? (
-                  <p className="flex items-start gap-2">
-                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                    <span>
-                      <span className="font-semibold">When: </span>
-                      {pickupWindow}
-                    </span>
-                  </p>
-                ) : null}
               </div>
             )}
 

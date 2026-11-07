@@ -18,13 +18,14 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { liveDropOrderWhere } from "@/lib/drops-api";
 import { dropOrdersHref } from "@/lib/drops-board";
 import { groupDropsByDay, istTodayYmd } from "@/lib/drops-builder";
-import { effectiveDropStatus, type EffectiveDropStatus } from "@/lib/drops";
+import { dropStateKind, dropStateLabel, type DropStateKind } from "@/lib/drop-state";
+import { effectiveDropStatus, remainingQty, soldQtyByDropItem, type EffectiveDropStatus } from "@/lib/drops";
 import {
   dbDateToYmd,
   formatDropDayLabel,
-  formatFulfilmentWindow,
   formatIstDate,
   formatIstTime,
+  formatWindowWithDay,
   utcToIstParts,
 } from "@/lib/drops-time";
 import { prisma } from "@/lib/prisma";
@@ -40,6 +41,9 @@ type Row = {
   date: string;
   dateObj: Date;
   effectiveStatus: EffectiveDropStatus;
+  /** Why it is or isn't taking orders (lib/drop-state.ts). */
+  stateKind: DropStateKind;
+  stateLabel: string;
   window: string;
   closesAt: Date;
   fulfilmentStartsAt: Date;
@@ -83,7 +87,7 @@ export default async function DropsPage() {
         // Names only, for the share message on an open drop's card.
         items: {
           orderBy: { sortOrder: "asc" },
-          select: { menuItem: { select: { name: true } } },
+          select: { id: true, maxQty: true, menuItem: { select: { name: true } } },
         },
         _count: { select: { transactions: { where: liveDropOrderWhere } } },
       },
@@ -91,13 +95,29 @@ export default async function DropsPage() {
     loadSetupChecklist({ vendor: ctx.vendor, role: ctx.staff.role }),
   ]);
 
+  // Sold out is the one reason that needs stock: count it for open drops only.
+  const soldOutIds = new Set(
+    (
+      await Promise.all(
+        drops
+          .filter((d) => effectiveDropStatus(d, now) === "OPEN" && d.items.length > 0 && d.items.every((i) => i.maxQty !== null))
+          .map(async (d) => {
+            const sold = await soldQtyByDropItem(prisma, d.id, now);
+            return d.items.every((i) => remainingQty(i.maxQty, sold.get(i.id) ?? 0) === 0) ? d.id : null;
+          }),
+      )
+    ).filter((id): id is string => id !== null),
+  );
+
   const rows: Row[] = drops.map((d) => ({
     id: d.id,
     title: d.title,
     date: dbDateToYmd(d.date),
     dateObj: d.date,
     effectiveStatus: effectiveDropStatus(d, now),
-    window: formatFulfilmentWindow(d.fulfilmentStartsAt, d.fulfilmentEndsAt),
+    stateKind: dropStateKind(d, now, soldOutIds.has(d.id)),
+    stateLabel: dropStateLabel(d, now, { soldOut: soldOutIds.has(d.id) }),
+    window: formatWindowWithDay(d.fulfilmentStartsAt, d.fulfilmentEndsAt, now),
     closesAt: d.closesAt,
     fulfilmentStartsAt: d.fulfilmentStartsAt,
     fulfilmentEndsAt: d.fulfilmentEndsAt,
@@ -161,10 +181,10 @@ export default async function DropsPage() {
         ) : null}
 
         {upcoming.length ? (
-          <DropSection title="Upcoming" rows={upcoming} store={store} />
+          <DropSection title="Upcoming" rows={upcoming} store={store} past={false} />
         ) : null}
         {past.length ? (
-          <DropSection title="Past" rows={past} store={store} />
+          <DropSection title="Past" rows={past} store={store} past />
         ) : null}
       </main>
     </div>
@@ -172,10 +192,11 @@ export default async function DropsPage() {
 }
 
 /**
- * The card's main button is the next step for that drop: finish a draft, share
- * one that is taking orders, sell a finished one again. The rest stay beside it.
+ * The card's main button is the next step for that drop: open orders on an
+ * upcoming one that isn't taking them, share one that is, sell a past one again.
+ * "Copy for tomorrow" is the main button only on past drops.
  */
-function DropActions({ d, store }: { d: Row; store: Store }) {
+function DropActions({ d, store, past }: { d: Row; store: Store; past: boolean }) {
   const edit = (
     <Link
       href={`/drops/${d.id}/edit`}
@@ -186,15 +207,24 @@ function DropActions({ d, store }: { d: Row; store: Store }) {
       Edit
     </Link>
   );
-  if (d.effectiveStatus === "DRAFT") {
+  if (past) {
+    return (
+      <div className="mt-3 flex flex-wrap gap-2">
+        <CopyDropButton dropId={d.id} title={d.title} />
+        {edit}
+      </div>
+    );
+  }
+  // Upcoming, not taking orders: the edit page saves and opens it (or reopens a closed one).
+  if (d.stateKind === "draft" || d.stateKind === "cutoff_passed" || d.stateKind === "closed_by_seller") {
     return (
       <div className="mt-3 flex flex-wrap gap-2">
         <Link
           href={`/drops/${d.id}/edit`}
           className={`${primaryLinkBtn} flex-1`}
-          aria-label={`Finish and open ${d.title}`}
+          aria-label={`Open orders for ${d.title}`}
         >
-          Finish and open
+          Open orders
           <ChevronRight className="h-4 w-4" aria-hidden="true" />
         </Link>
         <CopyDropButton dropId={d.id} title={d.title} secondary />
@@ -225,8 +255,8 @@ function DropActions({ d, store }: { d: Row; store: Store }) {
   }
   return (
     <div className="mt-3 flex flex-wrap gap-2">
-      <CopyDropButton dropId={d.id} title={d.title} />
       {edit}
+      <CopyDropButton dropId={d.id} title={d.title} secondary />
     </div>
   );
 }
@@ -235,10 +265,12 @@ function DropSection({
   title,
   rows,
   store,
+  past,
 }: {
   title: string;
   rows: Row[];
   store: Store;
+  past: boolean;
 }) {
   const id = `drops-${title.toLowerCase()}`;
   return (
@@ -278,7 +310,7 @@ function DropSection({
                 </p>
               </div>
               <div className="flex shrink-0 flex-col items-end gap-2">
-                <DropStatusBadge status={d.effectiveStatus} />
+                <DropStatusBadge status={d.effectiveStatus} label={d.stateLabel} />
                 <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
                   <ClipboardList className="h-4 w-4" aria-hidden="true" />
                   Orders
@@ -286,7 +318,7 @@ function DropSection({
                 </span>
               </div>
             </Link>
-            <DropActions d={d} store={store} />
+            <DropActions d={d} store={store} past={past} />
           </li>
         ))}
       </ul>

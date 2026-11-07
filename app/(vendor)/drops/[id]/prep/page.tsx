@@ -79,6 +79,7 @@ function HandoverTable({
                 </p>
                 <DueCell order={o} />
               </div>
+              {showAddress && o.deliveryLocality && <p className="mt-1 font-semibold">{o.deliveryLocality}</p>}
               {showAddress && o.deliveryAddress && (
                 <p className="mt-1 whitespace-pre-wrap text-muted-foreground print:text-foreground">{o.deliveryAddress}</p>
               )}

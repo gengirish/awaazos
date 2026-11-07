@@ -1284,6 +1284,8 @@ function OpenCheckLine({ check }: { check: OpenCheck }) {
 export type DropStatusControlsProps = {
   dropId: string;
   effectiveStatus: EffectiveDropStatus;
+  /** Why it is or isn't taking orders: "Cut-off passed (Fri 9:00 pm)" (lib/drop-state.ts). */
+  stateLabel?: string;
   allowedTransitions: DropStatus[];
   orderCount: number;
   /** True when this open drop hides the vendor's "Order from menu" everyday menu. */
@@ -1309,6 +1311,7 @@ export type DropStatusControlsProps = {
 export function DropStatusControls({
   dropId,
   effectiveStatus,
+  stateLabel,
   allowedTransitions,
   orderCount,
   hidesEverydayMenu = false,
@@ -1452,7 +1455,7 @@ export function DropStatusControls({
         <h2 id="drop-status" className="font-display text-lg font-semibold">
           Status
         </h2>
-        <DropStatusBadge status={effectiveStatus} />
+        <DropStatusBadge status={effectiveStatus} label={stateLabel} />
       </div>
       <p className="text-sm text-muted-foreground">{statusHelp(effectiveStatus, vocab)}</p>
       {effectiveStatus === "OPEN" && hidesEverydayMenu ? (
@@ -1587,12 +1590,12 @@ const BADGE_TONE: Record<EffectiveDropStatus, string> = {
 };
 
 /** Text first, colour second — readable without colour vision. */
-export function DropStatusBadge({ status }: { status: EffectiveDropStatus }) {
+export function DropStatusBadge({ status, label }: { status: EffectiveDropStatus; label?: string }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${BADGE_TONE[status]}`}
+      className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-sm font-semibold ${BADGE_TONE[status]}`}
     >
-      {DROP_STATUS_LABEL[status]}
+      {label ?? DROP_STATUS_LABEL[status]}
     </span>
   );
 }

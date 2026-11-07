@@ -4,9 +4,11 @@ import Link from "next/link";
 
 import { DeliveryRidersClient } from "@/components/settings/DeliveryRidersClient";
 import { MenuOrdersClient } from "@/components/settings/MenuOrdersClient";
+import { MenuSlotsClient } from "@/components/settings/MenuSlotsClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { WhatsappOrdersClient } from "@/components/settings/WhatsappOrdersClient";
 import { parseDeliveryRiders } from "@/lib/delivery-riders";
+import { parseMenuSlots } from "@/lib/menu-slots";
 import { prisma } from "@/lib/prisma";
 
 import { requireSettingsContext } from "../_context";
@@ -29,6 +31,7 @@ export default async function OrdersSettingsPage() {
       acceptWhatsappOrders: true,
       showWhatsappOnStore: true,
       deliveryRiders: true,
+      menuSlots: true,
     },
   });
 
@@ -58,6 +61,13 @@ export default async function OrdersSettingsPage() {
             initialShowOnStore={settings?.showWhatsappOnStore ?? false}
             isOwner={isOwner}
           />
+        </SettingsCard>
+
+        <SettingsCard
+          title="Pickup and delivery times"
+          description={`When customers can get an order from your everyday ${vocab.catalogue}. With times set, checkout asks them to pick one, and the time shows on the order. Drops keep their own handover time.`}
+        >
+          <MenuSlotsClient initialSlots={parseMenuSlots(settings?.menuSlots)} isOwner={isOwner} />
         </SettingsCard>
 
         <SettingsCard

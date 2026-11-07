@@ -191,7 +191,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
     await page.goto(`/drops/${dropId}/edit`);
     await page.getByRole("button", { name: "Close orders now" }).click();
     await expect(
-      page.getByRole("region", { name: "Status" }).getByText("Orders closed", { exact: true }),
+      page.getByRole("region", { name: "Status" }).getByText("Closed by you", { exact: true }),
     ).toBeVisible();
 
     await page.goto(`/drops/${dropId}/prep`);
@@ -250,7 +250,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
     await expect(confirm).toContainText(`/s/${slug}`);
     await confirm.getByRole("button", { name: "Keep as a draft" }).click();
     await expect(confirm).toBeHidden();
-    await expect(status.getByText("Draft", { exact: true })).toBeVisible();
+    await expect(status.getByText("Draft · not open yet", { exact: true })).toBeVisible();
     expect((await page.request.get(`/s/${slug}`)).status()).toBe(404);
 
     await page.getByRole("button", { name: "Open orders" }).click();

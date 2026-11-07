@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { SUPPORTED_VOICE_LANGS } from "@/lib/constants";
 import { deliveryRidersSchema } from "@/lib/delivery-riders";
+import { menuSlotsSchema } from "@/lib/menu-slots-schema";
 import { INSTAGRAM_HANDLE_MESSAGE, normaliseInstagramHandle } from "@/lib/instagram";
 import { menuOrdersEnableBlocker, type MenuOrdersBlocker } from "@/lib/menu-orders-board";
 import {
@@ -101,6 +102,8 @@ const patchSchema = z.object({
   // The seller's own delivery people (Settings → Online orders). The whole
   // list is replaced; [] removes every rider.
   deliveryRiders: deliveryRidersSchema.optional(),
+  // Weekly pickup / delivery slots for menu orders (lib/menu-slots.ts); [] = checkout asks no "when".
+  menuSlots: menuSlotsSchema.optional(),
   menuItems: z
     .array(
       z.object({
@@ -359,6 +362,9 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.deliveryRiders !== undefined) {
         settingsUpdate.deliveryRiders = vendorFields.deliveryRiders;
+      }
+      if (vendorFields.menuSlots !== undefined) {
+        settingsUpdate.menuSlots = vendorFields.menuSlots;
       }
       if (vendorFields.onboardingDone === true && vendorFields.whatsappNumber) {
         settingsUpdate.sendWhatsappReceipt = true;

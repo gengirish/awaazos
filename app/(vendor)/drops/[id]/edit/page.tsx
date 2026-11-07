@@ -7,7 +7,8 @@ import { ShareDropButton } from "@/components/drops/ShareDropButton";
 import { allowedTransitions, liveDropOrderWhere } from "@/lib/drops-api";
 import { dropOrdersHref } from "@/lib/drops-board";
 import { DROP_SHARE_ANCHOR, dropToFormInput } from "@/lib/drops-builder";
-import { effectiveDropStatus, soldQtyByDropItem } from "@/lib/drops";
+import { dropStateLabel } from "@/lib/drop-state";
+import { effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
 import { hasPaymentMethod } from "@/lib/payment-guard";
 import type { PlanFields } from "@/lib/plan";
 import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
@@ -70,6 +71,9 @@ export default async function EditDropPage(props: {
   }
 
   const effectiveStatus = effectiveDropStatus(drop, now);
+  const soldOut =
+    drop.items.length > 0 && drop.items.every((i) => remainingQty(i.maxQty, sold.get(i.id) ?? 0) === 0);
+  const stateLabel = dropStateLabel(drop, now, { soldOut });
   const locked = drop.status === "FROZEN" || drop.status === "FULFILLED";
   const itemNames = [...drop.items].sort((a, b) => a.sortOrder - b.sortOrder).map((i) => i.menuItem.name);
 
@@ -101,6 +105,7 @@ export default async function EditDropPage(props: {
         <DropStatusControls
           dropId={drop.id}
           effectiveStatus={effectiveStatus}
+          stateLabel={stateLabel}
           allowedTransitions={allowedTransitions(drop, now)}
           orderCount={orderCount}
           hidesEverydayMenu={!drop.showEverydayMenu && Boolean(settings?.acceptMenuOrders)}

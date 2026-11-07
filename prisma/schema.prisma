@@ -113,6 +113,10 @@ model VendorSettings {
   menuFulfilmentMode       FulfilmentMode @default(PICKUP)
   menuDeliveryFeePaise     Int            @default(0)
   menuPickupNote           String?
+  // Weekly pickup / delivery slots for menu orders: [{ days: [0..6], start: "HH:MM", end: "HH:MM" }]
+  // (IST, 0 = Sunday). Empty = no slots, checkout asks no "when". Read only through
+  // parseMenuSlots (lib/menu-slots.ts).
+  menuSlots                Json           @default("[]")
   // The seller's own delivery people: [{ name, phone (E.164) }], at most
   // MAX_DELIVERY_RIDERS. Read only through parseDeliveryRiders (lib/delivery-riders.ts).
   deliveryRiders           Json           @default("[]")
@@ -297,13 +301,16 @@ model DropItem {
 // Tokens and session ids are stored only as SHA-256 hashes.
 
 model Customer {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String?
-  phone        String? // E.164; PII
-  savedAddress String? // PII
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  phone         String? // E.164; PII
+  savedAddress  String? // PII. The address line; locality / landmark / pincode beside it.
+  savedLocality String? // PII
+  savedLandmark String? // PII
+  savedPincode  String?  @db.VarChar(6) // PII
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   sessions     CustomerSession[]
   loginTokens  CustomerLoginToken[]
@@ -405,6 +412,9 @@ model Transaction {
   // When the buyer wants it (cake for a party): a menu order's own date. Drop
   // orders use the drop's window instead. Null = as soon as ready.
   fulfilAt          DateTime?
+  // End of the slot the buyer picked (lib/menu-slots.ts); fulfilAt is its start.
+  // Null with fulfilAt = a single time (demo orders), both null = no slot chosen.
+  fulfilUntil       DateTime?
   // Demo-store sample order (lib/demo-store.ts). On handover they are archived
   // (archivedAt set, hidden from every list) or deleted.
   isSample          Boolean       @default(false)
@@ -417,7 +427,11 @@ model Transaction {
   drop             Drop?             @relation(fields: [dropId], references: [id], onDelete: SetNull)
   fulfilmentStatus FulfilmentStatus?
   fulfilmentType   FulfilmentType?
-  deliveryAddress  String? // PII — never logged, never sent to an LLM
+  deliveryAddress  String? // PII — never logged, never sent to an LLM. The full address as one text (lib/delivery-address.ts).
+  // Its parts, from checkouts since 2026-11 (older orders have deliveryAddress only).
+  deliveryLocality String? // PII
+  deliveryLandmark String? // PII
+  deliveryPincode  String?           @db.VarChar(6) // PII
   deliveryFeePaise Int               @default(0)
   orderToken       String?           @unique // Unguessable handle for the buyer's order page
   // A delivery order handed to a rider ("Out for delivery"). A stamp, not a

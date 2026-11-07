@@ -4,7 +4,7 @@
   "sharedKb": 176,
   "anyRouteKb": 304,
   "routesKb": {
-    "/s/[slug]": 231,
+    "/s/[slug]": 254,
     "/s/[slug]/o/[token]": 208,
     "/": 194,
     "/sign-in": 197,

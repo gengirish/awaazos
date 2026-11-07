@@ -49,6 +49,7 @@ import {
   type OrderAction,
 } from "@/lib/drops-board";
 import { formatIstDate, formatIstDayLabel, formatIstTime, utcToIstParts } from "@/lib/drops-time";
+import { orderSlotLabel } from "@/lib/menu-slots";
 import { cn } from "@/lib/utils";
 
 /** Where an order came from: the everyday menu, or a drop (label = its title). */
@@ -143,7 +144,9 @@ export function OrderCard({
   const detailsId = `order-${order.id}-details`;
   const itemCount = order.items.reduce((sum, it) => sum + it.qty, 0);
   const balanceDue = balanceDuePaise(order);
-  const fulfilAt = order.fulfilAt ? new Date(order.fulfilAt) : null;
+  // When it's wanted: the slot a menu order picked (lib/menu-slots.ts). Drop orders show the drop's window above the board.
+  const slotLabel = orderSlotLabel(order.fulfilAt, order.fulfilUntil, new Date());
+  const isMenuOrder = order.dropId === null;
   const firstItem = order.items[0];
   const stateLabel = orderStateLabel(order);
 
@@ -331,6 +334,8 @@ export function OrderCard({
                     : outForDelivery
                       ? `Out for delivery${order.riderName ? ` with ${order.riderName}` : ""}`
                       : "Delivery"}
+                  {!isPickup && order.deliveryLocality ? ` · ${order.deliveryLocality}` : ""}
+                  {slotLabel ? ` · ${slotLabel}` : ""}
                 </span>
                 {buyerSaysReceived && <span className="font-semibold">· Customer got it</span>}
                 {order.feedback && <span className="font-semibold">· Rated {order.feedback.rating} of 5</span>}
@@ -487,11 +492,13 @@ export function OrderCard({
         )}
         <p>
           <span className="font-semibold">{isPickup ? "Pickup" : "Delivery"}</span>
-          {fulfilAt && (
-            <span className="text-muted-foreground">
-              {" "}
-              · for {formatIstDate(fulfilAt)} {formatIstTime(fulfilAt)}
-            </span>
+          {slotLabel ? (
+            <span className="font-semibold"> · {slotLabel}</span>
+          ) : isMenuOrder ? (
+            <span className="text-muted-foreground"> · No slot selected</span>
+          ) : null}
+          {!isPickup && order.deliveryLocality && (
+            <span className="block font-semibold">{order.deliveryLocality}</span>
           )}
           {!isPickup && order.deliveryAddress && (
             <span className="block whitespace-pre-wrap text-muted-foreground">{order.deliveryAddress}</span>
