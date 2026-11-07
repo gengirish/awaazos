@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Clock, Gift, Loader2, MapPin, Minus, Plus, ShoppingBag } from "lucide-react";
+import { AlertCircle, Clock, Gift, Loader2, MapPin, Minus, Plus, ShieldCheck, ShoppingBag, Smartphone } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -370,6 +370,8 @@ export type CheckoutSheetProps = {
   /** Unique per page — prefixes form control ids. */
   idPrefix: string;
   description: string;
+  /** Named in the "you pay the store directly" line under the form. */
+  storeName?: string;
   lines: CheckoutLine[];
   /**
    * Lets the buyer change quantities (and remove lines, at 0) from the cart
@@ -445,6 +447,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     endpoint,
     idPrefix,
     description,
+    storeName,
     lines,
     onChangeQty,
     discount,
@@ -734,6 +737,13 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
   // One way to pay needs no choice. Two radios only when there are two.
   const onlyPayment = payment.upi && payment.cod ? null : payment.upi ? "UPI" : payment.cod ? "CASH" : null;
   const showBreakdown = discountPaise > 0 || fulfilment === "DELIVERY";
+  /** What sits between the cart lines and the total, for the line under the footer total. */
+  const totalNote = [
+    discountPaise > 0 ? `${formatINR(discountPaise)} off` : null,
+    fulfilment === "DELIVERY" ? (feePaise > 0 ? `incl. ${formatINR(feePaise)} delivery` : "free delivery") : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
   function changeDetails() {
     setContactFolded(false);
@@ -831,9 +841,10 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
 
   return (
     <ResponsiveDialog open={open} onOpenChange={(v) => !submitting && onOpenChange(v)}>
-      {/* Header (title + close) and footer (total + Place order) stay put; only the fields scroll. */}
+      {/* Header (title + close) and footer (total + Place order) stay put; only the cards scroll. */}
       <ResponsiveDialogContent
         data-theme={theme}
+        className="bg-muted"
         onCloseAutoFocus={(e) => {
           const target = returnFocusRef?.current;
           if (target && target.isConnected) {
@@ -848,402 +859,451 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
         </ResponsiveDialogHeader>
 
         <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col" noValidate>
-          <ResponsiveDialogBody className="space-y-5">
-            <CartLines
-              lines={lines}
-              gift={lines.length > 0 ? (gift ?? null) : null}
-              onChangeQty={onChangeQty}
-              onAddMore={onChangeQty && !submitting ? () => onOpenChange(false) : undefined}
-            />
-
-            {contactFolded ? (
-              <div className="flex items-start gap-3 rounded-xl border border-border/70 px-3 py-2 text-sm">
-                <span className="min-w-0 flex-1 py-1">
-                  <span className="block truncate font-semibold">{name}</span>
-                  <span className="block font-mono text-xs tabular-nums text-muted-foreground">
-                    {formatIndianMobile(normaliseIndianMobile(phone))}
-                  </span>
-                  {fulfilment === "DELIVERY" && addressFolded ? (
-                    <span className="mt-1 block whitespace-pre-line break-words text-muted-foreground">
-                      {composeDeliveryAddress({ line: address, locality, landmark, pincode })}
-                    </span>
-                  ) : null}
-                </span>
-                <button
-                  type="button"
-                  onClick={changeDetails}
-                  className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg px-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                >
-                  Change
-                  <span className="sr-only"> your details</span>
-                </button>
-              </div>
-            ) : (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor={ids.name}>Your name</Label>
-                  <Input
-                    id={ids.name}
-                    autoComplete="name"
-                    value={name}
-                    onChange={(e) => {
-                      setName(e.target.value);
-                      revalidate("name", { name: e.target.value });
-                    }}
-                    maxLength={80}
-                    required
-                    aria-invalid={fieldErrors.name ? true : undefined}
-                    aria-describedby={describedBy("name")}
-                    className="h-11 scroll-my-24 aria-invalid:border-destructive"
-                  />
-                  <FieldError id={ids.error("name")} message={fieldErrors.name} />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor={ids.phone}>Mobile number</Label>
-                  <div className="flex items-center gap-2">
-                    <span
-                      className="inline-flex h-11 items-center rounded-md border border-input bg-muted px-3 font-mono text-sm text-muted-foreground"
-                      aria-hidden="true"
-                    >
-                      +91
-                    </span>
-                    <Input
-                      id={ids.phone}
-                      type="tel"
-                      inputMode="tel"
-                      autoComplete="tel-national"
-                      placeholder="98765 43210"
-                      value={phone}
-                      onChange={(e) => {
-                        setPhone(e.target.value);
-                        revalidate("phone", { phone: e.target.value });
-                      }}
-                      maxLength={16}
-                      required
-                      aria-invalid={fieldErrors.phone ? true : undefined}
-                      aria-describedby={describedBy("phone", ids.phoneHint)}
-                      className="h-11 scroll-my-24 aria-invalid:border-destructive"
-                    />
+          <ResponsiveDialogBody className="space-y-4">
+            <CheckoutCard title="Your order">
+              <CartLines
+                lines={lines}
+                gift={lines.length > 0 ? (gift ?? null) : null}
+                onChangeQty={onChangeQty}
+                onAddMore={onChangeQty && !submitting ? () => onOpenChange(false) : undefined}
+              />
+              {/* The lines show list prices: what comes off and what delivery costs sit right under them. */}
+              {showBreakdown && lines.length > 0 ? (
+                <dl className="mt-1 space-y-1 border-t border-border/60 pt-3 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Items</dt>
+                    <dd className="font-mono tabular-nums">{formatINR(subtotalPaise)}</dd>
                   </div>
-                  <FieldError id={ids.error("phone")} message={fieldErrors.phone} />
-                  <p id={ids.phoneHint} className="text-xs text-muted-foreground">
-                    The store uses this to reach you about this order.
-                  </p>
-                </div>
+                  {discount && discountPaise > 0 ? (
+                    <div className="flex justify-between gap-3 font-semibold text-primary">
+                      <dt className="min-w-0 break-words">{discountLabel(discount.name)}</dt>
+                      <dd className="shrink-0 font-mono tabular-nums">−{formatINR(discountPaise)}</dd>
+                    </div>
+                  ) : null}
+                  {fulfilment === "DELIVERY" ? (
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Delivery fee</dt>
+                      <dd className="font-mono tabular-nums">{feePaise > 0 ? formatINR(feePaise) : "Free"}</dd>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between pt-1 text-base font-bold">
+                    <dt>Total</dt>
+                    <dd className="font-mono tabular-nums">{formatINR(totalPaise)}</dd>
+                  </div>
+                </dl>
+              ) : null}
+            </CheckoutCard>
 
-                <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
-                  <input
-                    type="checkbox"
-                    checked={remember}
-                    onChange={(e) => onRememberChange(e.target.checked)}
-                    className="h-5 w-5 accent-[hsl(var(--primary))]"
-                  />
-                  Remember my details on this device
-                </label>
-              </>
-            )}
-
-            {fulfilmentTypes.length > 1 ? (
-              <fieldset className="space-y-2">
-                <legend className="text-sm font-medium">Delivery or pickup</legend>
-                <div className="grid grid-cols-2 gap-2">
-                  {fulfilmentTypes.map((t) => (
-                    <RadioOption
-                      key={t}
-                      name={`${idPrefix}-fulfilment`}
-                      value={t}
-                      checked={fulfilment === t}
-                      onChange={() => {
-                        setFulfilment(t);
-                        revalidate("address", { fulfilment: t });
-                        revalidate("locality", { fulfilment: t });
-                        revalidate("pincode", { fulfilment: t });
-                      }}
-                      label={
-                        t === "DELIVERY"
-                          ? deliveryLabelFee > 0
-                            ? `Delivery (+${formatINR(deliveryLabelFee)})`
-                            : "Delivery"
-                          : "Pickup"
-                      }
-                    />
-                  ))}
-                </div>
-              </fieldset>
-            ) : null}
-
-            {/* When: a drop's one window, read-only; or a menu slot the buyer picks. */}
-            {slotRequired ? (
-              <div className="space-y-2">
-                <Label htmlFor={ids.slot}>{fulfilment === "DELIVERY" ? "Deliver when?" : "Pick up when?"}</Label>
-                {slots.length > 0 ? (
-                  // Native, grouped by day: the phone's own picker, and no extra bundle on the store page.
-                  <select
-                    id={ids.slot}
-                    value={slot ?? ""}
-                    onChange={(e) => {
-                      const v = e.target.value || null;
-                      setSlot(v);
-                      revalidate("slot", { slot: v });
-                    }}
-                    aria-invalid={fieldErrors.slot ? true : undefined}
-                    aria-describedby={describedBy("slot")}
-                    className="flex h-11 w-full scroll-my-24 rounded-md border border-input bg-background px-3 text-base focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
+            <CheckoutCard title="Your details">
+              {contactFolded ? (
+                <div className="flex items-start gap-3 text-sm">
+                  <Smartphone className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 py-1">
+                    <span className="block truncate font-semibold">{name}</span>
+                    <span className="block font-mono text-xs tabular-nums text-muted-foreground">
+                      {formatIndianMobile(normaliseIndianMobile(phone))}
+                    </span>
+                    {fulfilment === "DELIVERY" && addressFolded ? (
+                      <span className="mt-1 block whitespace-pre-line break-words text-muted-foreground">
+                        {composeDeliveryAddress({ line: address, locality, landmark, pincode })}
+                      </span>
+                    ) : null}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={changeDetails}
+                    className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg px-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   >
-                    <option value="" disabled>
-                      Choose a day and time
-                    </option>
-                    {slotGroups.map((g) => (
-                      <optgroup key={g.day} label={g.day}>
-                        {g.slots.map((sl) => (
-                          <option key={sl.key} value={sl.key}>
-                            {g.day} · {sl.time}
-                          </option>
-                        ))}
-                      </optgroup>
-                    ))}
-                  </select>
-                ) : (
-                  <p className="rounded-xl bg-muted/50 px-3 py-2 text-sm text-muted-foreground">
-                    No times are open this week. Message the store to arrange a time.
-                  </p>
-                )}
-                <FieldError id={ids.error("slot")} message={fieldErrors.slot} />
-              </div>
-            ) : pickupWindow ? (
-              <p className="flex items-start gap-2 rounded-xl bg-muted/50 px-3 py-2 text-sm">
-                <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                <span>
-                  <span className="font-semibold">{fulfilment === "DELIVERY" ? "Delivery: " : "Pickup: "}</span>
-                  {pickupWindow}
-                </span>
-              </p>
-            ) : null}
-
-            {fulfilment === "DELIVERY" && addressFolded ? null : fulfilment === "DELIVERY" ? (
-              <fieldset className="space-y-3">
-                <legend className="text-sm font-medium">Delivery address</legend>
-                <div className="space-y-2">
-                  <Label htmlFor={ids.address}>House or flat, building, street</Label>
-                  <textarea
-                    id={ids.address}
-                    autoComplete="street-address"
-                    value={address}
-                    onChange={(e) => {
-                      setAddress(e.target.value);
-                      revalidate("address", { address: e.target.value });
-                    }}
-                    maxLength={ADDRESS_LINE_MAX}
-                    rows={2}
-                    required
-                    placeholder="Flat 302, Lake View Apartments, 4th Cross"
-                    aria-invalid={fieldErrors.address ? true : undefined}
-                    aria-describedby={describedBy("address")}
-                    className="flex w-full scroll-my-24 rounded-md border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
-                  />
-                  <FieldError id={ids.error("address")} message={fieldErrors.address} />
+                    Change
+                    <span className="sr-only"> your details</span>
+                  </button>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor={ids.locality}>{areas.length > 0 ? "Area" : "Area or locality"}</Label>
-                  {areas.length > 0 ? (
-                    <>
-                      {/* The store delivers only here (lib/delivery-areas.ts): a list, so there is no typo to refuse. */}
-                      <select
-                        id={ids.locality}
-                        value={area?.name ?? ""}
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor={ids.name}>Your name</Label>
+                    <Input
+                      id={ids.name}
+                      autoComplete="name"
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        revalidate("name", { name: e.target.value });
+                      }}
+                      maxLength={80}
+                      required
+                      aria-invalid={fieldErrors.name ? true : undefined}
+                      aria-describedby={describedBy("name")}
+                      className="h-12 scroll-my-24 rounded-xl aria-invalid:border-destructive"
+                    />
+                    <FieldError id={ids.error("name")} message={fieldErrors.name} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={ids.phone}>Mobile number</Label>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-flex h-12 items-center rounded-xl border border-input bg-muted px-3 font-mono text-sm text-muted-foreground"
+                        aria-hidden="true"
+                      >
+                        +91
+                      </span>
+                      <Input
+                        id={ids.phone}
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel-national"
+                        placeholder="98765 43210"
+                        value={phone}
                         onChange={(e) => {
-                          setLocality(e.target.value);
-                          revalidate("locality", { locality: e.target.value });
+                          setPhone(e.target.value);
+                          revalidate("phone", { phone: e.target.value });
                         }}
+                        maxLength={16}
                         required
-                        aria-invalid={fieldErrors.locality ? true : undefined}
-                        aria-describedby={describedBy("locality", ids.areaHint)}
-                        className="flex h-11 w-full scroll-my-24 rounded-md border border-input bg-background px-3 text-base focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
+                        aria-invalid={fieldErrors.phone ? true : undefined}
+                        aria-describedby={describedBy("phone", ids.phoneHint)}
+                        className="h-12 scroll-my-24 rounded-xl aria-invalid:border-destructive"
+                      />
+                    </div>
+                    <FieldError id={ids.error("phone")} message={fieldErrors.phone} />
+                    <p id={ids.phoneHint} className="text-xs text-muted-foreground">
+                      The store uses this to reach you about this order.
+                    </p>
+                  </div>
+
+                  <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={remember}
+                      onChange={(e) => onRememberChange(e.target.checked)}
+                      className="h-5 w-5 accent-[hsl(var(--primary))]"
+                    />
+                    Remember my details on this device
+                  </label>
+                </div>
+              )}
+            </CheckoutCard>
+
+            <CheckoutCard
+              title={fulfilmentTypes.length > 1 ? "Pickup or delivery" : fulfilment === "DELIVERY" ? "Delivery" : "Pickup"}
+            >
+              <div className="space-y-3">
+                {fulfilmentTypes.length > 1 ? (
+                  <fieldset>
+                    <legend className="sr-only">Delivery or pickup</legend>
+                    {/* A segmented control made of native radios: arrow keys and the checked state come free. */}
+                    <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
+                      {fulfilmentTypes.map((t) => (
+                        <RadioOption
+                          key={t}
+                          name={`${idPrefix}-fulfilment`}
+                          value={t}
+                          checked={fulfilment === t}
+                          onChange={() => {
+                            setFulfilment(t);
+                            revalidate("address", { fulfilment: t });
+                            revalidate("locality", { fulfilment: t });
+                            revalidate("pincode", { fulfilment: t });
+                          }}
+                          size="compact"
+                          className={cn(
+                            "rounded-lg border-transparent",
+                            fulfilment === t ? "bg-background shadow-sm" : "bg-transparent text-muted-foreground",
+                          )}
+                          inputClassName="sr-only"
+                          label={
+                            t === "DELIVERY"
+                              ? deliveryLabelFee > 0
+                                ? `Delivery (+${formatINR(deliveryLabelFee)})`
+                                : "Delivery"
+                              : "Pickup"
+                          }
+                        />
+                      ))}
+                    </div>
+                  </fieldset>
+                ) : null}
+
+                {/* When: a drop's one window, read-only; or a menu slot the buyer picks. */}
+                {slotRequired ? (
+                  <div className="space-y-2">
+                    <Label htmlFor={ids.slot}>{fulfilment === "DELIVERY" ? "Deliver when?" : "Pick up when?"}</Label>
+                    {slots.length > 0 ? (
+                      // Native, grouped by day: the phone's own picker, and no extra bundle on the store page.
+                      <select
+                        id={ids.slot}
+                        value={slot ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value || null;
+                          setSlot(v);
+                          revalidate("slot", { slot: v });
+                        }}
+                        aria-invalid={fieldErrors.slot ? true : undefined}
+                        aria-describedby={describedBy("slot")}
+                        className="flex h-12 w-full scroll-my-24 rounded-xl border border-input bg-background px-3 text-base focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
                       >
                         <option value="" disabled>
-                          Choose your area
+                          Choose a day and time
                         </option>
-                        {areas.map((a) => {
-                          const fee = areaFeePaise(a, deliveryFeePaise);
-                          return (
-                            <option key={a.name} value={a.name}>
-                              {areaFees.size > 1 ? `${a.name} (${fee > 0 ? `+${formatINRCompact(fee)}` : "free"})` : a.name}
-                            </option>
-                          );
-                        })}
+                        {slotGroups.map((g) => (
+                          <optgroup key={g.day} label={g.day}>
+                            {g.slots.map((sl) => (
+                              <option key={sl.key} value={sl.key}>
+                                {g.day} · {sl.time}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
                       </select>
-                      <p id={ids.areaHint} className="text-sm text-muted-foreground">
-                        The store delivers only to these areas. Somewhere else? Choose pickup, or message the store.
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No times are open this week. Message the store to arrange a time.
                       </p>
-                    </>
-                  ) : (
-                    <Input
-                      id={ids.locality}
-                      autoComplete="address-level3"
-                      value={locality}
-                      onChange={(e) => {
-                        setLocality(e.target.value);
-                        revalidate("locality", { locality: e.target.value });
-                      }}
-                      maxLength={LOCALITY_MAX}
-                      required
-                      placeholder="Kondapur"
-                      aria-invalid={fieldErrors.locality ? true : undefined}
-                      aria-describedby={describedBy("locality")}
-                      className="h-11 scroll-my-24 aria-invalid:border-destructive"
-                    />
-                  )}
-                  <FieldError id={ids.error("locality")} message={fieldErrors.locality} />
-                </div>
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_9rem]">
-                  <div className="space-y-2">
-                    <Label htmlFor={ids.landmark}>Landmark (optional)</Label>
-                    <Input
-                      id={ids.landmark}
-                      value={landmark}
-                      onChange={(e) => setLandmark(e.target.value)}
-                      maxLength={LANDMARK_MAX}
-                      placeholder="Near Ganesh temple"
-                      className="h-11"
-                    />
+                    )}
+                    <FieldError id={ids.error("slot")} message={fieldErrors.slot} />
                   </div>
-                  <div className="space-y-2">
-                    <Label htmlFor={ids.pincode}>Pincode (optional)</Label>
-                    <Input
-                      id={ids.pincode}
-                      inputMode="numeric"
-                      autoComplete="postal-code"
-                      value={pincode}
-                      onChange={(e) => {
-                        setPincode(e.target.value);
-                        revalidate("pincode", { pincode: e.target.value });
-                      }}
-                      maxLength={7}
-                      placeholder="500084"
-                      aria-invalid={fieldErrors.pincode ? true : undefined}
-                      aria-describedby={describedBy("pincode")}
-                      className="h-11 scroll-my-24 font-mono aria-invalid:border-destructive"
-                    />
-                    <FieldError id={ids.error("pincode")} message={fieldErrors.pincode} />
-                  </div>
-                </div>
-              </fieldset>
-            ) : (
-              <div className="rounded-xl bg-muted/50 px-3 py-2 text-sm">
-                <p className="flex items-start gap-2">
-                  <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                  {pickupNote ? (
+                ) : pickupWindow ? (
+                  <p className="flex items-start gap-2 text-sm">
+                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                     <span>
-                      <span className="font-semibold">Pickup: </span>
-                      {pickupNote}
+                      <span className="font-semibold">{fulfilment === "DELIVERY" ? "Delivery: " : "Pickup: "}</span>
+                      {pickupWindow}
                     </span>
-                  ) : (
-                    <span>{PICKUP_FALLBACK}</span>
-                  )}
-                </p>
-              </div>
-            )}
+                  </p>
+                ) : null}
 
-            {notesOpen ? (
-              <div className="space-y-2">
-                <Label htmlFor={`${idPrefix}-notes`}>Note for the store (optional)</Label>
-                <Input
-                  id={`${idPrefix}-notes`}
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  maxLength={280}
-                  placeholder={notesExample}
-                  autoFocus
-                  className="h-11"
-                />
+                {fulfilment === "DELIVERY" && addressFolded ? null : fulfilment === "DELIVERY" ? (
+                  <fieldset className="space-y-3">
+                    <legend className="mb-2 text-sm font-medium">Delivery address</legend>
+                    <div className="space-y-2">
+                      <Label htmlFor={ids.address}>House or flat, building, street</Label>
+                      <textarea
+                        id={ids.address}
+                        autoComplete="street-address"
+                        value={address}
+                        onChange={(e) => {
+                          setAddress(e.target.value);
+                          revalidate("address", { address: e.target.value });
+                        }}
+                        maxLength={ADDRESS_LINE_MAX}
+                        rows={2}
+                        required
+                        placeholder="Flat 302, Lake View Apartments, 4th Cross"
+                        aria-invalid={fieldErrors.address ? true : undefined}
+                        aria-describedby={describedBy("address")}
+                        className="flex w-full scroll-my-24 rounded-xl border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
+                      />
+                      <FieldError id={ids.error("address")} message={fieldErrors.address} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={ids.locality}>{areas.length > 0 ? "Area" : "Area or locality"}</Label>
+                      {areas.length > 0 ? (
+                        <>
+                          {/* The store delivers only here (lib/delivery-areas.ts): a list, so there is no typo to refuse. */}
+                          <select
+                            id={ids.locality}
+                            value={area?.name ?? ""}
+                            onChange={(e) => {
+                              setLocality(e.target.value);
+                              revalidate("locality", { locality: e.target.value });
+                            }}
+                            required
+                            aria-invalid={fieldErrors.locality ? true : undefined}
+                            aria-describedby={describedBy("locality", ids.areaHint)}
+                            className="flex h-12 w-full scroll-my-24 rounded-xl border border-input bg-background px-3 text-base focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
+                          >
+                            <option value="" disabled>
+                              Choose your area
+                            </option>
+                            {areas.map((a) => {
+                              const fee = areaFeePaise(a, deliveryFeePaise);
+                              return (
+                                <option key={a.name} value={a.name}>
+                                  {areaFees.size > 1 ? `${a.name} (${fee > 0 ? `+${formatINRCompact(fee)}` : "free"})` : a.name}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <p id={ids.areaHint} className="text-sm text-muted-foreground">
+                            The store delivers only to these areas. Somewhere else? Choose pickup, or message the store.
+                          </p>
+                        </>
+                      ) : (
+                        <Input
+                          id={ids.locality}
+                          autoComplete="address-level3"
+                          value={locality}
+                          onChange={(e) => {
+                            setLocality(e.target.value);
+                            revalidate("locality", { locality: e.target.value });
+                          }}
+                          maxLength={LOCALITY_MAX}
+                          required
+                          placeholder="Kondapur"
+                          aria-invalid={fieldErrors.locality ? true : undefined}
+                          aria-describedby={describedBy("locality")}
+                          className="h-12 scroll-my-24 rounded-xl aria-invalid:border-destructive"
+                        />
+                      )}
+                      <FieldError id={ids.error("locality")} message={fieldErrors.locality} />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_9rem]">
+                      <div className="space-y-2">
+                        <Label htmlFor={ids.landmark}>Landmark (optional)</Label>
+                        <Input
+                          id={ids.landmark}
+                          value={landmark}
+                          onChange={(e) => setLandmark(e.target.value)}
+                          maxLength={LANDMARK_MAX}
+                          placeholder="Near Ganesh temple"
+                          className="h-12 rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={ids.pincode}>Pincode (optional)</Label>
+                        <Input
+                          id={ids.pincode}
+                          inputMode="numeric"
+                          autoComplete="postal-code"
+                          value={pincode}
+                          onChange={(e) => {
+                            setPincode(e.target.value);
+                            revalidate("pincode", { pincode: e.target.value });
+                          }}
+                          maxLength={7}
+                          placeholder="500084"
+                          aria-invalid={fieldErrors.pincode ? true : undefined}
+                          aria-describedby={describedBy("pincode")}
+                          className="h-12 scroll-my-24 rounded-xl font-mono aria-invalid:border-destructive"
+                        />
+                        <FieldError id={ids.error("pincode")} message={fieldErrors.pincode} />
+                      </div>
+                    </div>
+                  </fieldset>
+                ) : (
+                  <p className="flex items-start gap-2 text-sm">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    {pickupNote ? (
+                      <span>
+                        <span className="font-semibold">Pickup: </span>
+                        {pickupNote}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">{PICKUP_FALLBACK}</span>
+                    )}
+                  </p>
+                )}
+
+                {notesOpen ? (
+                  <div className="space-y-2">
+                    <Label htmlFor={`${idPrefix}-notes`}>Note for the store (optional)</Label>
+                    <Input
+                      id={`${idPrefix}-notes`}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      maxLength={280}
+                      placeholder={notesExample}
+                      autoFocus
+                      className="h-12 rounded-xl"
+                    />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setNotesOpen(true)}
+                    className="-mx-1 inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  >
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    Add a note for the store
+                  </button>
+                )}
               </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setNotesOpen(true)}
-                className="-mx-1 inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            </CheckoutCard>
+
+            <section className="space-y-3 rounded-2xl border border-border bg-card p-4 text-card-foreground">
+              <fieldset
+                id={ids.payment}
+                aria-invalid={fieldErrors.payment ? true : undefined}
+                aria-describedby={describedBy("payment")}
+                className="space-y-2"
               >
-                <Plus className="h-4 w-4" aria-hidden="true" />
-                Add a note for the store
-              </button>
-            )}
-
-            <fieldset
-              id={ids.payment}
-              aria-invalid={fieldErrors.payment ? true : undefined}
-              aria-describedby={describedBy("payment")}
-              className="space-y-2"
-            >
-              <legend className="text-sm font-medium">Payment</legend>
-              {onlyPayment ? (
-                <p className="text-sm text-muted-foreground">
-                  {onlyPayment === "UPI"
-                    ? payment.online
-                      ? "Pay online by UPI, card or netbanking, secured by Razorpay."
-                      : "Pay by UPI on the next screen, with any UPI app."
-                    : fulfilment === "PICKUP"
-                      ? "Pay when you collect."
-                      : "Pay on delivery, by cash or UPI at the door."}
-                </p>
-              ) : null}
-              <div className={cn("grid gap-2 sm:grid-cols-2", onlyPayment && "hidden")}>
-                {payment.upi ? (
-                  <PaymentOption
-                    name={`${idPrefix}-payment`}
-                    checked={method === "UPI"}
-                    onSelect={() => {
-                      setMethod("UPI");
-                      revalidate("payment", { method: "UPI" });
-                    }}
-                    label={payment.online ? "Pay online" : "Pay now by UPI"}
-                    hint={payment.online ? "UPI, cards or netbanking · secured by Razorpay" : "Any UPI app, on the next screen"}
-                    invalid={!!fieldErrors.payment}
-                    describedBy={describedBy("payment")}
-                  />
+                <legend className="mb-2 text-base font-semibold">Payment</legend>
+                {onlyPayment ? (
+                  <p className="text-sm text-muted-foreground">
+                    {onlyPayment === "UPI"
+                      ? payment.online
+                        ? "Pay online by UPI, card or netbanking, secured by Razorpay."
+                        : "Pay by UPI on the next screen, with any UPI app."
+                      : fulfilment === "PICKUP"
+                        ? "Pay when you collect."
+                        : "Pay on delivery, by cash or UPI at the door."}
+                  </p>
                 ) : null}
-                {payment.cod ? (
-                  <PaymentOption
-                    name={`${idPrefix}-payment`}
-                    checked={method === "CASH"}
-                    onSelect={() => {
-                      setMethod("CASH");
-                      // A pay_on_delivery_disabled rejection stays until they pick UPI.
-                      setFieldErrors((prev) => {
-                        if (prev.payment !== CHECKOUT_FIELD_MESSAGES.payment) return prev;
-                        const next = { ...prev };
-                        delete next.payment;
-                        return next;
-                      });
-                    }}
-                    label="Pay on delivery"
-                    hint={fulfilment === "PICKUP" ? "Pay when you collect" : "Cash or UPI at the door"}
-                    invalid={!!fieldErrors.payment}
-                    describedBy={describedBy("payment")}
-                  />
-                ) : null}
-              </div>
-              <FieldError id={ids.error("payment")} message={fieldErrors.payment} />
-            </fieldset>
+                <div className={cn("grid gap-2 sm:grid-cols-2", onlyPayment && "hidden")}>
+                  {payment.upi ? (
+                    <PaymentOption
+                      name={`${idPrefix}-payment`}
+                      checked={method === "UPI"}
+                      onSelect={() => {
+                        setMethod("UPI");
+                        revalidate("payment", { method: "UPI" });
+                      }}
+                      label={payment.online ? "Pay online" : "Pay now by UPI"}
+                      hint={payment.online ? "UPI, cards or netbanking · secured by Razorpay" : "Any UPI app, on the next screen"}
+                      invalid={!!fieldErrors.payment}
+                      describedBy={describedBy("payment")}
+                    />
+                  ) : null}
+                  {payment.cod ? (
+                    <PaymentOption
+                      name={`${idPrefix}-payment`}
+                      checked={method === "CASH"}
+                      onSelect={() => {
+                        setMethod("CASH");
+                        // A pay_on_delivery_disabled rejection stays until they pick UPI.
+                        setFieldErrors((prev) => {
+                          if (prev.payment !== CHECKOUT_FIELD_MESSAGES.payment) return prev;
+                          const next = { ...prev };
+                          delete next.payment;
+                          return next;
+                        });
+                      }}
+                      label="Pay on delivery"
+                      hint={fulfilment === "PICKUP" ? "Pay when you collect" : "Cash or UPI at the door"}
+                      invalid={!!fieldErrors.payment}
+                      describedBy={describedBy("payment")}
+                    />
+                  ) : null}
+                </div>
+                <FieldError id={ids.error("payment")} message={fieldErrors.payment} />
+              </fieldset>
 
-            {whatsapp ? (
-              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
-                <input
-                  type="checkbox"
-                  checked={sendOnWhatsapp}
-                  onChange={(e) => setSendOnWhatsapp(e.target.checked)}
-                  disabled={submitting}
-                  aria-describedby={`${idPrefix}-wa-hint`}
-                  className="mt-0.5 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
-                />
-                <span>
-                  Also send my order to the store on WhatsApp
-                  <span id={`${idPrefix}-wa-hint`} className="block text-muted-foreground">
-                    So the store sees it instantly.
+              {whatsapp ? (
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={sendOnWhatsapp}
+                    onChange={(e) => setSendOnWhatsapp(e.target.checked)}
+                    disabled={submitting}
+                    aria-describedby={`${idPrefix}-wa-hint`}
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                  />
+                  <span>
+                    Also send my order to the store on WhatsApp
+                    <span id={`${idPrefix}-wa-hint`} className="block text-muted-foreground">
+                      So the store sees it instantly.
+                    </span>
                   </span>
-                </span>
-              </label>
-            ) : null}
+                </label>
+              ) : null}
+            </section>
+
+            {/* True on every path: UPI goes to the store's own UPI ID, "Pay online" to its own Razorpay account. */}
+            <p className="flex items-start gap-2.5 px-1 text-sm leading-snug text-muted-foreground">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span>You pay {storeName || "the store"} directly. AwaazOS never holds your money.</span>
+            </p>
           </ResponsiveDialogBody>
 
           {/* Order-level problems only (stock, cut-off, network); field problems sit under their field.
@@ -1258,39 +1318,21 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
           </div>
 
           <ResponsiveDialogFooter className="flex-col gap-2 md:flex-col md:border-t md:pb-4 md:pt-3">
-            {/* In the fixed footer: the cart lines show list prices, so what comes off
-                and what delivery costs must be in view next to the total. */}
-            {showBreakdown ? (
-              <dl className="space-y-0.5 text-sm">
-                <div className="flex justify-between">
-                  <dt>Items</dt>
-                  <dd className="font-mono tabular-nums">{formatINR(subtotalPaise)}</dd>
-                </div>
-                {discount && discountPaise > 0 ? (
-                  <div className="flex justify-between gap-3 font-semibold text-primary">
-                    <dt className="min-w-0 break-words">{discountLabel(discount.name)}</dt>
-                    <dd className="shrink-0 font-mono tabular-nums">−{formatINR(discountPaise)}</dd>
-                  </div>
-                ) : null}
-                {fulfilment === "DELIVERY" ? (
-                  <div className="flex justify-between">
-                    <dt>Delivery fee</dt>
-                    <dd className="font-mono tabular-nums">{feePaise > 0 ? formatINR(feePaise) : "Free"}</dd>
-                  </div>
-                ) : null}
-              </dl>
-            ) : null}
-            <p className="flex justify-between text-base font-bold">
-              <span>Total</span>
-              <span className="font-mono tabular-nums" aria-live="polite">
-                {formatINR(totalPaise)}
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-sm text-muted-foreground">Total</span>
+              <span className="flex flex-col items-end">
+                <span className="font-mono text-xl font-bold tabular-nums" aria-live="polite">
+                  {formatINR(totalPaise)}
+                </span>
+                {/* The footer stays put while the breakdown scrolls away: say what changed the total. */}
+                {totalNote && lines.length > 0 ? <span className="text-xs text-muted-foreground">{totalNote}</span> : null}
               </span>
-            </p>
+            </div>
             <button
               type="submit"
               disabled={submitting || lines.length === 0}
               aria-busy={submitting}
-              className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
+              className="inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
             >
               {submitting ? (
                 <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
@@ -1305,6 +1347,16 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
         </form>
       </ResponsiveDialogContent>
     </ResponsiveDialog>
+  );
+}
+
+/** One white card of the checkout sheet, under its own heading. */
+function CheckoutCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 text-card-foreground">
+      <h3 className="mb-3 text-base font-semibold">{title}</h3>
+      {children}
+    </section>
   );
 }
 
@@ -1362,7 +1414,7 @@ function CartLines({
 
   if (!onChangeQty) {
     return (
-      <ul className="space-y-1 rounded-xl bg-muted/50 px-3 py-2 text-sm">
+      <ul className="space-y-1 text-sm">
         {lines.map((l) => (
           <li key={l.id} className="flex justify-between gap-3">
             <span className="min-w-0 truncate">
@@ -1384,7 +1436,7 @@ function CartLines({
   }
 
   return (
-    <div className="rounded-xl bg-muted/50 px-3 py-1">
+    <div className="-mt-2">
       <ul ref={listRef} aria-label="Items in your cart" className="divide-y divide-border/60">
         {lines.map((l, index) => (
           <li key={l.id} className="flex items-center gap-3 py-2">
