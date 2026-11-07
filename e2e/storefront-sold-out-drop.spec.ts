@@ -91,8 +91,8 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
     const sheet = buyer.getByRole("dialog", { name: "Checkout" });
     await sheet.getByLabel("Your name").fill("Priya Buyer");
     await sheet.getByLabel("Mobile number").fill("98480 12345");
-    // The radio is visually hidden inside its card: tap the card, as a buyer does.
-    await sheet.getByText("Pickup", { exact: true }).click();
+    // The invisible radio covers its whole option, so a buyer's tap lands on it.
+    await sheet.getByRole("radio", { name: "Pickup" }).click();
     await expect(sheet.getByRole("radio", { name: "Pickup" })).toBeChecked();
     await sheet.getByRole("button", { name: /place order/i }).click();
     await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });

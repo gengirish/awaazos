@@ -5,7 +5,7 @@
   "anyRouteKb": 304,
   "routesKb": {
     "/s/[slug]": 254,
-    "/s/[slug]/o/[token]": 208,
+    "/s/[slug]/o/[token]": 212,
     "/": 194,
     "/sign-in": 197,
     "/orders": 268,
