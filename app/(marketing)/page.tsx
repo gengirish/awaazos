@@ -4,6 +4,7 @@ import { Hero } from "@/components/marketing/Hero";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { OnlinePayments } from "@/components/marketing/OnlinePayments";
 import { PricingTeaser } from "@/components/marketing/PricingTeaser";
+import { ProofStories } from "@/components/marketing/ProofStories";
 
 export default function MarketingHomePage() {
   return (
@@ -12,6 +13,7 @@ export default function MarketingHomePage() {
       <HowItWorks />
       <OnlinePayments />
       <Features />
+      <ProofStories />
       <PricingTeaser />
       <CtaBanner />
     </>

@@ -812,6 +812,13 @@ The page shows a store only while it is accepted, active, `publishStorefront` an
 the storefront header allowlist (name, type, city, logo, slug). Pre-order state comes from the drops'
 times on each render — no timers. `noindex`: it names a residential society.
 
+### Landing page (`/`)
+
+`components/marketing/`. Prices and the "from ₹X" anchor come from `lib/plan-copy.ts` (`TRIAL_THEN_NOTE`), never a
+literal. Customer stories come from `lib/proof-stories.ts` and render only with `permission: true` (the owner agreed in
+writing). The WhatsApp button needs `NEXT_PUBLIC_SUPPORT_WHATSAPP` (build time). `e2e/contrast.spec.ts` runs axe's
+contrast rule here, on a store page and on checkout. The `(marketing)` layout must stay static.
+
 ### In-app Help (`/help`)
 
 A self-help guide to getting around, linked from the shell (the "More" sheet on phones, the rail from

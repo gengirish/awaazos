@@ -6,6 +6,8 @@ import {
   MARKETED_PLANS,
   PLAN_COMPARISON,
   PLAN_MARKETING,
+  PLANS_FROM,
+  TRIAL_THEN_NOTE,
   YEARLY_DISCOUNT,
   YEARLY_MONTHS_FREE,
   type MarketedPlan,
@@ -140,5 +142,13 @@ describe("plan marketing copy", () => {
 
   it("Starter mentions CSV iff PLAN_LIMITS.STARTER.csvExport", () => {
     expect(/csv/i.test(allCopy("STARTER"))).toBe(PLAN_LIMITS.STARTER.csvExport);
+  });
+});
+
+describe("TRIAL_THEN_NOTE", () => {
+  it("anchors on the cheapest plan, not Starter", () => {
+    const cheapest = Math.min(...MARKETED_PLANS.map((p) => PLAN_PRICES_PAISE[p]));
+    expect(PLANS_FROM).toBe(formatINRCompact(cheapest));
+    expect(TRIAL_THEN_NOTE).toBe(`No card needed. Then plans from ${formatINRCompact(cheapest)}/month + GST.`);
   });
 });

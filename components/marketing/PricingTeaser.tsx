@@ -30,7 +30,7 @@ export function PricingTeaser() {
             >
               <CardHeader>
                 {tier.badge ? (
-                  <p className="text-xs font-semibold uppercase tracking-wider text-primary">{tier.badge}</p>
+                  <p className="text-sm font-semibold uppercase tracking-wider text-primary">{tier.badge}</p>
                 ) : null}
                 <CardTitle className="font-display text-lg text-awaaz-charcoal">{tier.label}</CardTitle>
                 <p className="mt-2 font-display text-3xl font-bold text-awaaz-charcoal">

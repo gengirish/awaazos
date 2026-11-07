@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 const sectionLinkClass =
   "inline-flex min-h-11 shrink-0 items-center rounded-full outline-hidden focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2";
 const sectionPillClass =
-  "rounded-full bg-muted px-3 py-2 text-xs font-medium text-foreground";
+  "rounded-full bg-muted px-3 py-2 text-sm font-medium text-foreground";
 
 const navLinkClass =
   "inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-awaaz-charcoal/90 outline-hidden transition-colors hover:text-awaaz-orange focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2";

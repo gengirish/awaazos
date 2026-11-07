@@ -2,6 +2,7 @@ import type { ReactNode } from "react";
 
 import { MarketingFooter } from "@/components/marketing/MarketingFooter";
 import { MarketingHeader } from "@/components/marketing/MarketingHeader";
+import { SupportWhatsappButton } from "@/components/marketing/SupportWhatsapp";
 import { PLAN_MARKETING } from "@/lib/plan-copy";
 
 export function MarketingChrome({ children, signedIn = false }: { children: ReactNode; signedIn?: boolean }) {
@@ -19,6 +20,7 @@ export function MarketingChrome({ children, signedIn = false }: { children: Reac
         {children}
       </main>
       <MarketingFooter />
+      <SupportWhatsappButton />
     </div>
   );
 }

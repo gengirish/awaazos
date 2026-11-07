@@ -72,6 +72,8 @@
 
   --animate-accordion-down: accordion-down 0.2s ease-out;
   --animate-accordion-up: accordion-up 0.2s ease-out;
+  /* Landing hero: three example stores take turns, 5 s each (components/marketing/Hero.tsx). */
+  --animate-hero-store: hero-store 15s infinite;
 
   @keyframes accordion-down {
     from {
@@ -79,6 +81,19 @@
     }
     to {
       height: var(--radix-accordion-content-height);
+    }
+  }
+  @keyframes hero-store {
+    0%,
+    30% {
+      opacity: 1;
+    }
+    33.3%,
+    97% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
     }
   }
   @keyframes accordion-up {
@@ -188,7 +203,7 @@
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
     --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted-foreground: 215.4 16.3% 44%; /* 4.8:1 on --muted, 5.3:1 on white (WCAG AA for 14px grey copy) */
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
     --destructive: 0 84.2% 60.2%;

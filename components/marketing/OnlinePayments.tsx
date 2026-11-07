@@ -1,17 +1,13 @@
-import { BadgeCheck, CheckCircle2, CreditCard, Landmark, UserPlus } from "lucide-react";
+import { CheckCircle2, CreditCard, Landmark, UserPlus, Wallet } from "lucide-react";
 
+// The one payment story of the landing page (the feature grid doesn't repeat it).
 // Only what ships (lib/razorpay-oauth.ts, Settings → Payments). The money settles
 // into the seller's own Razorpay account: never say we collect it or pay it out.
 const points = [
   {
     icon: CreditCard,
-    title: "Buyers pay online",
-    description: "UPI, card or netbanking, right on your store page.",
-  },
-  {
-    icon: BadgeCheck,
-    title: "Orders mark themselves paid",
-    description: "The order turns paid and confirmed on your board. No screenshots to check, no tapping.",
+    title: "UPI, card or netbanking",
+    description: "Right on your store page. The order turns paid and confirmed on your board: no screenshots to check.",
   },
   {
     icon: Landmark,
@@ -23,6 +19,11 @@ const points = [
     title: "No Razorpay account yet?",
     description:
       "Tap Connect Razorpay and create one on the next screen. Razorpay checks your KYC (PAN, bank account). No API keys to copy.",
+  },
+  {
+    icon: Wallet,
+    title: "Prefer your own UPI ID or cash?",
+    description: "That works too. Buyers pay you directly or on delivery, and you mark the order paid.",
   },
 ] as const;
 
@@ -44,7 +45,7 @@ function PaidOrderMockup() {
         <CheckCircle2 className="h-5 w-5 shrink-0" />
         Paid online · Confirmed
       </div>
-      <p className="mt-3 text-center text-xs text-muted-foreground">Nothing for you to tap.</p>
+      <p className="mt-3 text-center text-sm text-muted-foreground">Nothing for you to tap.</p>
     </div>
   );
 }
@@ -62,10 +63,10 @@ export function OnlinePayments() {
             id="online-payments-heading"
             className="font-display text-3xl font-bold text-balance text-awaaz-charcoal sm:text-4xl"
           >
-            Get paid online, straight into your own Razorpay account
+            Buyers pay online. Orders mark themselves paid.
           </h2>
           <p className="mt-3 max-w-2xl text-awaaz-charcoal/85">
-            Connect Razorpay in a few taps from Settings, and every online payment confirms its own order.
+            Connect Razorpay in a few taps from Settings. The money goes straight into your own account.
           </p>
           <ul className="mt-8 grid gap-6 sm:grid-cols-2">
             {points.map((p) => {
