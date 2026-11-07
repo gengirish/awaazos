@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import {
   ArrowLeft,
   Check,
-  CheckCircle2,
   ChevronDown,
   Circle,
   CircleDot,
@@ -201,17 +200,31 @@ export async function generateMetadata(
 }
 
 const TONE_CLASS: Record<StatusTone, string> = {
-  success: "border-green-600/30 bg-green-600/10 text-green-800",
+  success: "border-primary/25 bg-background",
   warning: "border-amber-500/40 bg-amber-500/10 text-amber-900",
   danger: "border-destructive/30 bg-destructive/10 text-destructive",
-  neutral: "border-border bg-muted text-foreground",
+  neutral: "border-border/60 bg-background",
+};
+
+/** The round badge over the status heading. Each tone has its own icon, so colour is never the only signal. */
+const TONE_BADGE: Record<StatusTone, string> = {
+  success: "bg-primary text-primary-foreground",
+  warning: "bg-amber-500/20 text-amber-800",
+  danger: "bg-destructive/15 text-destructive",
+  neutral: "bg-muted text-muted-foreground",
 };
 
 function ToneIcon({ tone }: { tone: StatusTone }) {
-  const cls = "h-5 w-5 shrink-0";
-  if (tone === "success") return <CheckCircle2 className={cls} aria-hidden="true" />;
-  if (tone === "danger") return <XCircle className={cls} aria-hidden="true" />;
-  return <Clock className={cls} aria-hidden="true" />;
+  const cls = "h-8 w-8";
+  const Icon = tone === "success" ? Check : tone === "danger" ? XCircle : Clock;
+  return (
+    <span
+      className={cn("inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full", TONE_BADGE[tone])}
+      aria-hidden="true"
+    >
+      <Icon className={cls} strokeWidth={tone === "success" ? 2.5 : 2} />
+    </span>
+  );
 }
 
 type ProgressStep = { key: string; label: string; done: boolean };
@@ -259,6 +272,16 @@ function OrderProgress({ steps }: { steps: ProgressStep[] }) {
         );
       })}
     </ol>
+  );
+}
+
+/** One label / value line of the order details card. */
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-4 py-3">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-words text-right font-semibold">{children}</dd>
+    </div>
   );
 }
 
@@ -395,9 +418,14 @@ export default async function StorefrontOrderPage(props: {
   const storeHref = `/s/${slug}`;
 
   const payHeading = (
-    <h2 id="pay-heading" className="font-display text-xl font-bold text-awaaz-charcoal">
-      Pay {formatINR(order.totalPaise)}
-    </h2>
+    <div className="space-y-1">
+      <h2 id="pay-heading" className="font-display text-2xl font-bold text-awaaz-charcoal">
+        Pay {formatINR(order.totalPaise)}
+      </h2>
+      <p className="text-sm text-muted-foreground">
+        to {payeeName} · ref <span className="font-mono">{order.billNumber}</span>
+      </p>
+    </div>
   );
   // What a buyer can do without Razorpay. With Razorpay it stays hidden until Razorpay fails.
   const directPay = upiLink ? (
@@ -419,10 +447,7 @@ export default async function StorefrontOrderPage(props: {
           </div>
         ) : null}
       </UpiPayOptions>
-      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-        Paying {payeeName} · ref {order.billNumber}
-      </p>
-      <details className="group overflow-hidden rounded-xl border border-border/60 text-left">
+      <details className="group overflow-hidden rounded-xl border border-dashed border-border text-left">
         <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm font-semibold text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
           <QrCode className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
           <span className="flex-1">Paying from another phone? Show QR</span>
@@ -499,11 +524,14 @@ export default async function StorefrontOrderPage(props: {
       <main id="main" className="mx-auto max-w-xl space-y-5 px-4 py-6 sm:px-6">
         <section
           aria-labelledby="status-heading"
-          className={cn("flex items-start gap-3 rounded-2xl border px-4 py-3", TONE_CLASS[status.tone])}
+          className={cn(
+            "flex flex-col items-center gap-3 rounded-2xl border px-4 py-6 text-center shadow-xs",
+            TONE_CLASS[status.tone],
+          )}
         >
           <ToneIcon tone={status.tone} />
-          <div className="min-w-0 flex-1 space-y-1">
-            <h2 id="status-heading" className="text-base font-bold">
+          <div className="w-full min-w-0 space-y-1.5">
+            <h2 id="status-heading" className="font-display text-2xl font-bold leading-tight">
               {status.label}
             </h2>
             {status.hint ? <p className="text-sm">{status.hint}</p> : null}
@@ -542,7 +570,7 @@ export default async function StorefrontOrderPage(props: {
                 {isPickup && pickupNote ? ` · ${pickupNote}` : ""}
               </p>
             ) : null}
-            <div className="flex flex-wrap items-center gap-2 pt-1 empty:hidden">
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-2 empty:hidden">
               {state === "EXPIRED" || state === "CANCELLED" ? (
                 <Link
                   href={storeHref}
@@ -562,7 +590,7 @@ export default async function StorefrontOrderPage(props: {
             <OrderRefresh
               auto={!handedOver && state !== "CANCELLED"}
               checkedAt={formatIstTime(now)}
-              className="pt-1"
+              className="justify-center pt-2"
             />
           </div>
         </section>
@@ -707,40 +735,55 @@ export default async function StorefrontOrderPage(props: {
               <dt>Total</dt>
               <dd className="font-mono tabular-nums">{formatINR(order.totalPaise)}</dd>
             </div>
-            <div className="flex justify-between text-muted-foreground">
-              <dt>Payment</dt>
-              <dd>{payOnDelivery ? payOnDeliveryLabel(order.fulfilmentType) : paidOnline ? "Paid online" : "UPI"}</dd>
-            </div>
           </dl>
         </section>
 
         <section
           aria-labelledby="fulfil-heading"
-          className="space-y-2 rounded-2xl border border-border/60 bg-background p-4 text-sm shadow-xs"
+          className="rounded-2xl border border-border/60 bg-background text-sm shadow-xs"
         >
-          <h2 id="fulfil-heading" className="flex items-center gap-2 font-display text-base font-bold">
+          <h2
+            id="fulfil-heading"
+            className="flex items-center gap-2 border-b border-border/50 px-4 py-3 font-display text-base font-bold"
+          >
             <MapPin className="h-4 w-4 text-primary" aria-hidden="true" />
             {order.fulfilmentType === "DELIVERY" ? "Delivery" : "Pickup"}
           </h2>
-          {windowOnPage ? <p className="font-semibold">{windowOnPage}</p> : null}
-          {order.fulfilmentType === "DELIVERY" && order.deliveryAddress ? (
-            <p className="whitespace-pre-line text-muted-foreground">{order.deliveryAddress}</p>
-          ) : null}
-          {order.fulfilmentType === "PICKUP" && pickupNote ? (
-            <p className="text-muted-foreground">{pickupNote}</p>
-          ) : null}
-          {order.notes ? (
-            <p>
-              <span className="font-semibold">Your note: </span>
-              {order.notes}
-            </p>
-          ) : null}
+          <dl className="divide-y divide-border/50 px-4">
+            <DetailRow label="Order">
+              <span className="font-mono">{order.billNumber}</span>
+            </DetailRow>
+            {windowOnPage ? <DetailRow label="When">{windowOnPage}</DetailRow> : null}
+            {order.fulfilmentType === "DELIVERY" && order.deliveryAddress ? (
+              <DetailRow label="Where">
+                <span className="whitespace-pre-line font-normal">{order.deliveryAddress}</span>
+              </DetailRow>
+            ) : null}
+            {order.fulfilmentType === "PICKUP" && pickupNote ? (
+              <DetailRow label="Where">
+                <span className="font-normal">{pickupNote}</span>
+              </DetailRow>
+            ) : null}
+            <DetailRow label="Payment">
+              {payOnDelivery ? payOnDeliveryLabel(order.fulfilmentType) : paidOnline ? "Paid online" : "UPI"}
+            </DetailRow>
+            {order.notes ? (
+              <DetailRow label="Your note">
+                <span className="font-normal">{order.notes}</span>
+              </DetailRow>
+            ) : null}
+          </dl>
         </section>
 
         <OtherCartsNotice slug={slug} vendorName={vendor.name} />
 
         {waLink && !waFirst && !waInStatus ? (
-          <a href={waLink} target="_blank" rel="noopener noreferrer" className={cn(WA_BUTTON, "min-h-12 w-full px-6")}>
+          <a
+            href={waLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className={cn(WA_BUTTON, "min-h-14 w-full rounded-2xl px-6 text-base")}
+          >
             <MessageCircle className="h-5 w-5" aria-hidden="true" />
             Message the store on WhatsApp
           </a>

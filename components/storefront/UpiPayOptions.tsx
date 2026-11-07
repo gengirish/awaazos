@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, Copy } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Copy, MoreHorizontal } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { copyText } from "@/lib/clipboard";
@@ -14,8 +14,8 @@ import { cn } from "@/lib/utils";
  *
  * - Android: the generic `upi://pay` button opens the system chooser. Kept first.
  * - iPhone/iPad: `upi://` has no chooser and often opens nothing or a random
- *   app, so one button per app (`upiAppLinks`, same params) leads and the
- *   generic link drops to "Other UPI app".
+ *   app, so one row per app (`upiAppLinks`, same params) leads and the
+ *   generic link is the last row, "Other UPI app".
  * - Everywhere: "Copy UPI ID" / "Copy amount" and a one-line manual route, the
  *   fallback that works with every UPI app. `foldFallback` tucks these (and
  *   `children`, more fallbacks) under one line, so the pay button stands alone.
@@ -90,34 +90,52 @@ export function UpiPayOptions({
       className={cn(
         "inline-flex min-h-12 w-full items-center justify-center rounded-xl px-6 text-base font-bold",
         FOCUS,
-        emphasis === "primary" && !ios ? filled : outlined,
+        emphasis === "primary" ? filled : outlined,
       )}
     >
-      {ios ? "Other UPI app" : genericLabel}
+      {genericLabel}
     </a>
   );
 
+  // One row per app, as a picker: the app's initial in a tile, its name, a chevron.
+  const appRowClass = cn(
+    "flex min-h-14 w-full items-center gap-3 rounded-xl border bg-card px-3 text-left text-base font-semibold text-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 motion-reduce:transition-none",
+    emphasis === "primary" ? "border-primary/30" : "border-border",
+    FOCUS,
+  );
+  const appTile =
+    "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-sm font-bold text-foreground";
+
   const appButtons = ios && apps.length > 0 ? (
-    <div className="space-y-2">
-      <p className="text-sm font-semibold text-foreground">
+    <div className="space-y-2 text-left">
+      <p className="text-sm font-semibold text-muted-foreground">
         {hasAmount ? `Pay ${amountLabel} with` : "Open"}
       </p>
-      <ul className="grid grid-cols-3 gap-2">
+      <ul className="space-y-2">
         {apps.map((app) => (
           <li key={app.id}>
             <a
               href={app.href}
               aria-label={hasAmount ? `Pay ${amountLabel} with ${app.label}` : `Open ${app.label} to pay`}
-              className={cn(
-                "inline-flex min-h-12 w-full items-center justify-center rounded-xl px-2 text-sm font-bold",
-                FOCUS,
-                emphasis === "primary" ? filled : outlined,
-              )}
+              className={appRowClass}
             >
-              {app.label}
+              <span className={appTile} aria-hidden="true">
+                {app.label.charAt(0)}
+              </span>
+              <span className="flex-1">{app.label}</span>
+              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
             </a>
           </li>
         ))}
+        <li>
+          <a href={upiLink} className={appRowClass}>
+            <span className={appTile} aria-hidden="true">
+              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+            </span>
+            <span className="flex-1">Other UPI app</span>
+            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+          </a>
+        </li>
       </ul>
     </div>
   ) : null;
@@ -167,8 +185,7 @@ export function UpiPayOptions({
   return (
     <div className={cn("space-y-3", className)}>
       <div className={cn("space-y-3", linksMobileOnly && "sm:hidden")}>
-        {appButtons}
-        {genericButton}
+        {appButtons ?? genericButton}
       </div>
 
       {foldFallback ? (
