@@ -100,3 +100,37 @@ targets Telugu, Kannada and Marathi markets.
   golden fixtures already in the repo; Marathi has neither. Telugu is the
   cheapest to revive (Hyderabad is the first market).
 - Lead with tap ordering in those markets and keep voice for English and Hindi.
+
+## Phase 3: landing page
+
+| Item | What shipped | Where |
+| --- | --- | --- |
+| 3.1 Hero | "Bol. Bill. Becho." is a 20–24 px brand line. One 24-word line replaces the 66-word paragraph: "Tell AwaazOS what you're making this Saturday, by voice or by typing. It builds your store link, takes the orders and gets you paid." Install app moved to the footer. The mockup shows quantities ("1 × Sourdough loaf"). | `components/marketing/Hero.tsx` |
+| 3.2 One payment story | The payments section leads with "Buyers pay online. Orders mark themselves paid." and closes with "Prefer your own UPI ID or cash? That works too." The "UPI, confirmed by you" feature card is gone. | `components/marketing/OnlinePayments.tsx` |
+| 3.3 Feature hierarchy | Three large cards (Drops with a cut-off, No overselling, Bills at the counter too) and the other six as a compact list. | `components/marketing/Features.tsx` |
+| 3.4 Proof | `lib/proof-stories.ts` holds store, category, city, screenshot, quote, attribution and a `permission` flag. The section renders only entries with `permission: true`; it ships with one hidden placeholder. Screenshots go in `public/proof/`. | `components/marketing/ProofStories.tsx` |
+| 3.5 WhatsApp | A floating "Chat with us on WhatsApp" button on the marketing pages, and "or WhatsApp us" after the support email in the footer, both from `NEXT_PUBLIC_SUPPORT_WHATSAPP`. Unset → neither shows. | `lib/support-whatsapp.ts`, `components/marketing/SupportWhatsapp.tsx` |
+| 3.6 Audience | The hero mockup rotates a bakery, a herbal-tea store and a candle studio (5 s each, CSS only; reduced motion shows the bakery). Meta description says "home businesses". | `app/globals.css` (`hero-store`), `app/layout.tsx` |
+| 3.7 Accessibility | 12 px text on the marketing pages raised to 14 px. `e2e/contrast.spec.ts` runs axe's contrast rule on the landing page, a store page and checkout. It found two failures: white/90 text on the orange banner (4.25:1, now solid white) and grey text on the checkout sheet's grey (4.34:1); `--muted-foreground` went from 46.9% to 44% lightness (4.8:1 on `--muted`, 5.3:1 on white) for every screen. | `app/globals.css`, `components/marketing/CtaBanner.tsx` |
+
+The open decisions, as chosen on 2026-11-07:
+
+- **Lite pricing, option D (copy only).** Prices stay. The anchor beside the
+  sign-up button reads "No card needed. Then plans from ₹599/month + GST."
+  (`TRIAL_THEN_NOTE` in `lib/plan-copy.ts`, from the cheapest marketed plan), on
+  the landing page, the closing banner and the sign-up form.
+- **Regional voice, options A and C.** Settings → Voice says more languages are
+  coming and that every voice step has a tap way. The landing page leads with
+  typing as much as voice ("by voice or by typing", "Tap the items, or speak the
+  order in English or Hindi (more languages are coming)"). Telugu stays dormant.
+
+### Phase 3 decisions
+
+16. **The brief's draft line said AwaazOS "collects the money".** It doesn't: the
+    money goes to the seller's own Razorpay account or UPI ID, and saying
+    otherwise reads as a payment aggregator. The line says "gets you paid".
+17. **No WhatsApp number was given**, so the button is wired to an env var and
+    stays hidden until `NEXT_PUBLIC_SUPPORT_WHATSAPP` is set on Vercel.
+18. **The rotation is CSS, not a timer in JavaScript.** Nothing runs on the
+    server and the page stays static.
+
