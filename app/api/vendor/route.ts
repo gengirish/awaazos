@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import { SUPPORTED_VOICE_LANGS } from "@/lib/constants";
 import { deliveryRidersSchema } from "@/lib/delivery-riders";
+import { deliveryAreasSchema } from "@/lib/delivery-areas-schema";
 import { menuSlotsSchema } from "@/lib/menu-slots-schema";
 import { INSTAGRAM_HANDLE_MESSAGE, normaliseInstagramHandle } from "@/lib/instagram";
 import { menuOrdersEnableBlocker, type MenuOrdersBlocker } from "@/lib/menu-orders-board";
@@ -104,6 +105,8 @@ const patchSchema = z.object({
   deliveryRiders: deliveryRidersSchema.optional(),
   // Weekly pickup / delivery slots for menu orders (lib/menu-slots.ts); [] = checkout asks no "when".
   menuSlots: menuSlotsSchema.optional(),
+  // Where the store delivers (lib/delivery-areas.ts); [] = anywhere.
+  deliveryAreas: deliveryAreasSchema.optional(),
   menuItems: z
     .array(
       z.object({
@@ -365,6 +368,9 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.menuSlots !== undefined) {
         settingsUpdate.menuSlots = vendorFields.menuSlots;
+      }
+      if (vendorFields.deliveryAreas !== undefined) {
+        settingsUpdate.deliveryAreas = vendorFields.deliveryAreas;
       }
       if (vendorFields.onboardingDone === true && vendorFields.whatsappNumber) {
         settingsUpdate.sendWhatsappReceipt = true;

@@ -9,6 +9,7 @@ import type { FulfilmentStatus } from "@prisma/client";
 
 import { formatINR } from "@/lib/currency";
 import { isValidPincode } from "@/lib/delivery-address";
+import { findDeliveryArea, type DeliveryArea } from "@/lib/delivery-areas";
 import { discountLabel } from "@/lib/offers";
 
 const IST = "Asia/Kolkata";
@@ -400,7 +401,12 @@ export type CheckoutInput = {
   /** The store has menu slots (lib/menu-slots.ts), so one must be picked. */
   slotRequired: boolean;
   slot: string | null;
+  /** The store's delivery areas (lib/delivery-areas.ts): non-empty → the locality must be one of them. */
+  areas?: readonly DeliveryArea[];
 };
+
+/** The locality error when the store delivers only to its listed areas. */
+export const CHOOSE_AREA_MESSAGE = "Please choose your area.";
 
 /** One field's client-side error, or null when it is valid (address only counts for delivery). */
 export function validateCheckoutField(field: CheckoutField, input: CheckoutInput): string | null {
@@ -414,7 +420,11 @@ export function validateCheckoutField(field: CheckoutField, input: CheckoutInput
     case "address":
       return input.fulfilment !== "DELIVERY" || input.address.trim() ? null : CHECKOUT_FIELD_MESSAGES.address;
     case "locality":
-      return input.fulfilment !== "DELIVERY" || input.locality.trim() ? null : CHECKOUT_FIELD_MESSAGES.locality;
+      if (input.fulfilment !== "DELIVERY") return null;
+      if (input.areas && input.areas.length > 0) {
+        return findDeliveryArea(input.areas, input.locality) ? null : CHOOSE_AREA_MESSAGE;
+      }
+      return input.locality.trim() ? null : CHECKOUT_FIELD_MESSAGES.locality;
     case "pincode":
       return input.fulfilment !== "DELIVERY" || !input.pincode.trim() || isValidPincode(input.pincode)
         ? null
@@ -449,6 +459,8 @@ export function checkoutFieldForErrorCode(code: string): CheckoutField | null {
   switch (code) {
     case "address_required":
       return "address";
+    case "outside_delivery_area":
+      return "locality";
     case "slot_required":
     case "slot_unavailable":
       return "slot";
@@ -523,6 +535,8 @@ export function orderErrorMessage(err: OrderApiError, itemName?: string): string
       return "Everyday items are paused while a pre-order is open. Order from the pre-order above.";
     case "address_required":
       return "Please enter a delivery address.";
+    case "outside_delivery_area":
+      return "The store doesn't deliver to that area. Pick one of its areas, or choose pickup.";
     case "slot_required":
       return "Please choose when you want your order.";
     case "slot_unavailable":

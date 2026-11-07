@@ -77,6 +77,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
             menuFulfilmentMode: true,
             menuDeliveryFeePaise: true,
             menuSlots: true,
+            deliveryAreas: true,
             // Only checked for presence; none of this is returned or passed on.
             ...RAZORPAY_CRED_SELECT,
           },
@@ -116,6 +117,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         menuFulfilmentMode: vendor.settings.menuFulfilmentMode,
         menuDeliveryFeePaise: vendor.settings.menuDeliveryFeePaise,
         menuSlots: vendor.settings.menuSlots,
+        deliveryAreas: vendor.settings.deliveryAreas,
       },
       takesOnlinePayment: isOnlinePaymentEnabled(vendor, vendor.settings),
       items: input.items,

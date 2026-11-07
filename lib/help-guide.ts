@@ -372,6 +372,18 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     keywords: "whatsapp pickup delivery fee",
   },
   {
+    id: "delivery-areas",
+    group: "setup",
+    title: "Choose where you deliver",
+    steps:
+      "Add the localities you deliver to, each with its own fee if you like: 0 for free delivery, or leave it empty for your usual fee. Customers then pick one of them at checkout, and your store page lists them. With no areas, you deliver anywhere at your usual fee.",
+    nav: "settings",
+    href: "/settings/orders",
+    trail: ["Online orders"],
+    ownerOnly: true,
+    keywords: "delivery area locality radius free delivery fee zone where",
+  },
+  {
     id: "delivery-riders",
     group: "setup",
     title: "Save your delivery riders",

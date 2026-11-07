@@ -74,7 +74,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         planExpiresAt: true,
         trialEndsAt: true,
         // The Razorpay columns are only checked for presence; none of this is returned.
-        settings: { select: { acceptPayOnDelivery: true, ...RAZORPAY_CRED_SELECT } },
+        settings: { select: { acceptPayOnDelivery: true, deliveryAreas: true, ...RAZORPAY_CRED_SELECT } },
       },
     });
     if (!vendor) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -107,6 +107,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         trialEndsAt: vendor.trialEndsAt,
       },
       acceptPayOnDelivery: vendor.settings?.acceptPayOnDelivery ?? false,
+      deliveryAreas: vendor.settings?.deliveryAreas,
       takesOnlinePayment: isOnlinePaymentEnabled(vendor, vendor.settings),
       dropId: input.dropId,
       items: input.items,

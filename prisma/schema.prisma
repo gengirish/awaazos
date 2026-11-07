@@ -117,6 +117,10 @@ model VendorSettings {
   // (IST, 0 = Sunday). Empty = no slots, checkout asks no "when". Read only through
   // parseMenuSlots (lib/menu-slots.ts).
   menuSlots                Json           @default("[]")
+  // Where the store delivers: [{ name, feePaise (null = the usual fee) }], at most
+  // MAX_DELIVERY_AREAS. Empty = anywhere. Read only through parseDeliveryAreas
+  // (lib/delivery-areas.ts); drops and menu orders both use it.
+  deliveryAreas            Json           @default("[]")
   // The seller's own delivery people: [{ name, phone (E.164) }], at most
   // MAX_DELIVERY_RIDERS. Read only through parseDeliveryRiders (lib/delivery-riders.ts).
   deliveryRiders           Json           @default("[]")

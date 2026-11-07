@@ -51,6 +51,7 @@ import { getCurrentCustomer } from "@/lib/customer-auth";
 import { displayStoreName } from "@/lib/demo-store-schema";
 import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
 import { dropStateLabel } from "@/lib/drop-state";
+import { deliveryAreaSummary, parseDeliveryAreas, type DeliveryArea } from "@/lib/delivery-areas";
 import { menuSlotLabel, parseMenuSlots, upcomingMenuSlots } from "@/lib/menu-slots";
 import { formatDropDayLabel, formatWindowWithDay } from "@/lib/drops-time";
 import { instagramProfileUrl } from "@/lib/instagram";
@@ -224,6 +225,7 @@ const loadStorefront = cache(async (slug: string) => {
           menuDeliveryFeePaise: true,
           menuPickupNote: true,
           menuSlots: true,
+          deliveryAreas: true,
         },
       },
       drops: {
@@ -496,6 +498,7 @@ function DropSection({
   menuOrdering,
   theme,
   notesExample,
+  deliveryAreas,
 }: {
   view: DropView;
   slug: string;
@@ -507,6 +510,8 @@ function DropSection({
   menuOrdering: boolean;
   theme: string | undefined;
   notesExample: string;
+  /** The store's delivery areas (lib/delivery-areas.ts); empty = anywhere. */
+  deliveryAreas: DeliveryArea[];
 }) {
   const { drop, visibility, soldOut } = view;
   const headingId = `drop-${drop.id}`;
@@ -575,9 +580,10 @@ function DropSection({
           <li className="flex items-start gap-2">
             <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
             <span>
-              {drop.deliveryFeePaise > 0
-                ? `Delivery fee ${formatINRCompact(drop.deliveryFeePaise)}`
-                : "Free delivery"}
+              {deliveryAreaSummary(deliveryAreas, drop.deliveryFeePaise) ??
+                (drop.deliveryFeePaise > 0
+                  ? `Delivery fee ${formatINRCompact(drop.deliveryFeePaise)}`
+                  : "Free delivery")}
             </span>
           </li>
         ) : null}
@@ -633,6 +639,7 @@ function DropSection({
           orderable={orderable}
           fulfilmentTypes={types}
           deliveryFeePaise={drop.deliveryFeePaise}
+          deliveryAreas={deliveryAreas}
           pickupNote={drop.pickupNote}
           pickupWindow={handoverWindow}
           payment={payment}
@@ -679,6 +686,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
 
   const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
   // "When": the store's weekly slots for menu orders, and the first one open now.
+  const deliveryAreas = parseDeliveryAreas(vendor.settings?.deliveryAreas);
   const menuSlotRules = menuOrdering ? parseMenuSlots(vendor.settings?.menuSlots) : [];
   const nextMenuSlot = upcomingMenuSlots(menuSlotRules, now)[0] ?? null;
   // The open-amount "Scan to pay" QR, only for a read-only menu (see #pay below).
@@ -723,6 +731,8 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
       }
     : null;
   // The drop a buyer has least time left to order from drives the header CTA.
+  // The sticky category bar (Top, Pre-order, categories, search, Share).
+  const hasJumpBar = categories.length + dropViews.length > 0;
   const nextClosing = dropViews
     .filter((d) => d.visibility === "open" && !d.soldOut)
     .reduce<Date | null>((min, d) => (!min || d.drop.closesAt < min ? d.drop.closesAt : min), null);
@@ -822,7 +832,8 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
               right-aligned pills: nothing else moves. */}
           <StoreBackButton />
           <RecentOrderLink slug={vendor.slug} />
-          <ShareStoreButton vendorName={vendor.name} slug={vendor.slug} />
+          {/* With a category bar, Share rides in it and stays on screen while scrolling. */}
+          {hasJumpBar ? null : <ShareStoreButton vendorName={vendor.name} slug={vendor.slug} />}
           {isStaff ? (
             // The seller (or their staff) looking at their own store: they are
             // signed in to AwaazOS, not as a buyer, so offer the way back in.
@@ -975,12 +986,12 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
       <StoreSearchProvider index={searchIndex}>
         {/* Category jump bar — a long mela menu on a phone is unusable without it.
             Its search button swaps the pills for a search field (StoreSearch). */}
-        {categories.length + dropViews.length > 0 ? (
+        {hasJumpBar ? (
           <nav
             aria-label="Categories"
             className="sticky top-0 z-20 border-b border-border/50 bg-background/85 backdrop-blur-sm supports-backdrop-filter:bg-background/70"
           >
-            <StoreSearchBar>
+            <StoreSearchBar trailing={<ShareStoreButton vendorName={vendor.name} slug={vendor.slug} compact />}>
               <ul className="flex gap-2 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
                 {/* "Home": back to the store's header from anywhere down the menu. */}
                 <li className="shrink-0">
@@ -1039,6 +1050,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                       menuOrdering={menuOrdering}
                       theme={theme}
                       notesExample={orderNoteExample}
+                      deliveryAreas={deliveryAreas}
                     />
                   </Searchable>
                 ))}
@@ -1126,6 +1138,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                     layout={layout}
                     fulfilmentTypes={allowedFulfilmentTypes(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}
                     deliveryFeePaise={vendor.settings?.menuDeliveryFeePaise ?? 0}
+                    deliveryAreas={deliveryAreas}
                     pickupNote={vendor.settings?.menuPickupNote ?? null}
                     slotRules={menuSlotRules}
                     nextSlotLabel={nextMenuSlot ? menuSlotLabel(nextMenuSlot, now) : null}

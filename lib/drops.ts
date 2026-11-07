@@ -41,6 +41,7 @@ import { formatBillDateYYYYMMDD, getIstMonthStart, getIstTodayStart } from "@/li
 import { PLAN_LIMITS } from "@/lib/constants";
 import { sumPaise } from "@/lib/currency";
 import { deliveryFields } from "@/lib/delivery-address";
+import { deliveryFeeFor, parseDeliveryAreas } from "@/lib/delivery-areas";
 import { bumpOrderSignal } from "@/lib/drops-signal";
 import { applyOffers, giftLineName, withGiftsThatFit } from "@/lib/offers";
 import { loadResolvedOffers } from "@/lib/offers-server";
@@ -311,6 +312,8 @@ export type PlaceOrderInput = {
   deliveryLocality?: string | null;
   deliveryLandmark?: string | null;
   deliveryPincode?: string | null;
+  /** VendorSettings.deliveryAreas, raw JSON (lib/delivery-areas.ts). Omitted = anywhere. */
+  deliveryAreas?: unknown;
   notes?: string | null;
   paymentMethod: "UPI" | "CASH";
   /** Signed-in storefront customer, if any (lib/customer-auth.ts). */
@@ -330,6 +333,7 @@ export type PlaceOrderError =
   | { code: "per_order_limit"; dropItemId: string; limit: number }
   | { code: "fulfilment_unavailable" }
   | { code: "address_required" }
+  | { code: "outside_delivery_area" }
   | { code: "pay_on_delivery_disabled" }
   | { code: "monthly_txn_cap_reached" }
   | { code: "orders_paused" };
@@ -389,6 +393,11 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
       const delivery = deliveryFields(input);
       if (input.fulfilmentType === "DELIVERY" && !delivery.deliveryAddress) {
         throw new OrderRejected({ code: "address_required" });
+      }
+      // The store's delivery areas set the fee, and a locality outside them is refused.
+      const areaFee = deliveryFeeFor(parseDeliveryAreas(input.deliveryAreas), input.deliveryLocality, drop.deliveryFeePaise);
+      if (input.fulfilmentType === "DELIVERY" && !areaFee.ok) {
+        throw new OrderRejected({ code: "outside_delivery_area" });
       }
 
       const byId = new Map(drop.items.map((i) => [i.id, i]));
@@ -456,7 +465,7 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
       const discountPaise = offered.discountTotalPaise;
       const giftItem = offered.gift ? giftItemFor(offered.gift.menuItemId) : undefined;
 
-      const deliveryFeePaise = input.fulfilmentType === "DELIVERY" ? drop.deliveryFeePaise : 0;
+      const deliveryFeePaise = input.fulfilmentType === "DELIVERY" && areaFee.ok ? areaFee.feePaise : 0;
       const { subtotalPaise, totalPaise } = computeOrderTotals(
         priced.map((p) => ({ priceInPaise: p.item.priceInPaise, qty: p.qty })),
         deliveryFeePaise,

@@ -17,8 +17,9 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
-import { formatINR, sumPaise } from "@/lib/currency";
+import { formatINR, formatINRCompact, sumPaise } from "@/lib/currency";
 import { ADDRESS_LINE_MAX, composeDeliveryAddress, LANDMARK_MAX, LOCALITY_MAX } from "@/lib/delivery-address";
+import { areaFeePaise, findDeliveryArea, type DeliveryArea } from "@/lib/delivery-areas";
 import { formatIstTimeRange, formatRelativeIstDay } from "@/lib/drops-time";
 import { upcomingMenuSlots, type MenuSlotRule } from "@/lib/menu-slots";
 import { discountLabel, giftLineName } from "@/lib/offers";
@@ -398,10 +399,16 @@ export type CheckoutSheetProps = {
    * buyer must pick one; the server checks it is still offered.
    */
   slotRules?: MenuSlotRule[];
+  /**
+   * The store's delivery areas (lib/delivery-areas.ts). Non-empty → the buyer
+   * picks one instead of typing a locality, and its fee replaces `deliveryFeePaise`.
+   */
+  deliveryAreas?: DeliveryArea[];
   payment: { upi: boolean; cod: boolean; online: boolean };
   /**
    * The store has a WhatsApp number: also offer the "Also send my order to
-   * the store on WhatsApp" checkbox (off by default). Same order, same
+   * the store on WhatsApp" checkbox (ticked by default unless the store takes
+   * online payment). Same order, same
    * endpoint — the order page then leads with a wa.me link carrying the whole
    * order (`?wa=1`).
    */
@@ -447,6 +454,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     pickupNote,
     pickupWindow,
     slotRules,
+    deliveryAreas,
     payment,
     whatsapp = false,
     prefill,
@@ -478,7 +486,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     payment.upi ? "UPI" : payment.cod ? "CASH" : null,
   );
   const [submitting, setSubmitting] = useState(false);
-  const [sendOnWhatsapp, setSendOnWhatsapp] = useState(false);
+  // Ticked by default, except where the buyer pays online: WhatsApp first would hold back the Razorpay window.
+  const [sendOnWhatsapp, setSendOnWhatsapp] = useState(!payment.online);
   const [fieldErrors, setFieldErrors] = useState<CheckoutFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ field: CheckoutField; n: number } | null>(null);
@@ -490,6 +499,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     phoneHint: `${idPrefix}-phone-hint`,
     address: `${idPrefix}-address`,
     locality: `${idPrefix}-locality`,
+    areaHint: `${idPrefix}-area-hint`,
     landmark: `${idPrefix}-landmark`,
     pincode: `${idPrefix}-pincode`,
     slot: `${idPrefix}-slot`,
@@ -524,6 +534,12 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     if (slot && open && !slots.some((sl) => sl.key === slot)) setSlot(null);
   }, [slot, slots, open]);
 
+  const areas = deliveryAreas ?? [];
+  const area = findDeliveryArea(areas, locality);
+  // One fee for every area reads as the delivery fee; different fees go beside each area.
+  const areaFees = new Set(areas.map((a) => areaFeePaise(a, deliveryFeePaise)));
+  const deliveryLabelFee = areas.length === 0 ? deliveryFeePaise : areaFees.size === 1 ? [...areaFees][0]! : 0;
+
   const input: CheckoutInput = {
     name,
     phone,
@@ -534,6 +550,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     method,
     slotRequired,
     slot,
+    areas,
   };
 
   // ── Remember my details ─────────────────────────────────────────────
@@ -711,7 +728,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
   }, [open, payment.online]);
 
   const subtotalPaise = sumPaise(lines.map((l) => l.priceInPaise * l.qty));
-  const feePaise = fulfilment === "DELIVERY" ? deliveryFeePaise : 0;
+  const feePaise = fulfilment === "DELIVERY" ? (area ? areaFeePaise(area, deliveryFeePaise) : deliveryFeePaise) : 0;
   const discountPaise = discount?.discountPaise ?? 0;
   const totalPaise = subtotalPaise - discountPaise + feePaise;
   // One way to pay needs no choice. Two radios only when there are two.
@@ -945,8 +962,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                       }}
                       label={
                         t === "DELIVERY"
-                          ? deliveryFeePaise > 0
-                            ? `Delivery (+${formatINR(deliveryFeePaise)})`
+                          ? deliveryLabelFee > 0
+                            ? `Delivery (+${formatINR(deliveryLabelFee)})`
                             : "Delivery"
                           : "Pickup"
                       }
@@ -1028,22 +1045,55 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                   <FieldError id={ids.error("address")} message={fieldErrors.address} />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor={ids.locality}>Area or locality</Label>
-                  <Input
-                    id={ids.locality}
-                    autoComplete="address-level3"
-                    value={locality}
-                    onChange={(e) => {
-                      setLocality(e.target.value);
-                      revalidate("locality", { locality: e.target.value });
-                    }}
-                    maxLength={LOCALITY_MAX}
-                    required
-                    placeholder="Kondapur"
-                    aria-invalid={fieldErrors.locality ? true : undefined}
-                    aria-describedby={describedBy("locality")}
-                    className="h-11 scroll-my-24 aria-invalid:border-destructive"
-                  />
+                  <Label htmlFor={ids.locality}>{areas.length > 0 ? "Area" : "Area or locality"}</Label>
+                  {areas.length > 0 ? (
+                    <>
+                      {/* The store delivers only here (lib/delivery-areas.ts): a list, so there is no typo to refuse. */}
+                      <select
+                        id={ids.locality}
+                        value={area?.name ?? ""}
+                        onChange={(e) => {
+                          setLocality(e.target.value);
+                          revalidate("locality", { locality: e.target.value });
+                        }}
+                        required
+                        aria-invalid={fieldErrors.locality ? true : undefined}
+                        aria-describedby={describedBy("locality", ids.areaHint)}
+                        className="flex h-11 w-full scroll-my-24 rounded-md border border-input bg-background px-3 text-base focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
+                      >
+                        <option value="" disabled>
+                          Choose your area
+                        </option>
+                        {areas.map((a) => {
+                          const fee = areaFeePaise(a, deliveryFeePaise);
+                          return (
+                            <option key={a.name} value={a.name}>
+                              {areaFees.size > 1 ? `${a.name} (${fee > 0 ? `+${formatINRCompact(fee)}` : "free"})` : a.name}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <p id={ids.areaHint} className="text-sm text-muted-foreground">
+                        The store delivers only to these areas. Somewhere else? Choose pickup, or message the store.
+                      </p>
+                    </>
+                  ) : (
+                    <Input
+                      id={ids.locality}
+                      autoComplete="address-level3"
+                      value={locality}
+                      onChange={(e) => {
+                        setLocality(e.target.value);
+                        revalidate("locality", { locality: e.target.value });
+                      }}
+                      maxLength={LOCALITY_MAX}
+                      required
+                      placeholder="Kondapur"
+                      aria-invalid={fieldErrors.locality ? true : undefined}
+                      aria-describedby={describedBy("locality")}
+                      className="h-11 scroll-my-24 aria-invalid:border-destructive"
+                    />
+                  )}
                   <FieldError id={ids.error("locality")} message={fieldErrors.locality} />
                 </div>
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_9rem]">
@@ -1177,15 +1227,21 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
             </fieldset>
 
             {whatsapp ? (
-              <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+              <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
                 <input
                   type="checkbox"
                   checked={sendOnWhatsapp}
                   onChange={(e) => setSendOnWhatsapp(e.target.checked)}
                   disabled={submitting}
-                  className="h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                  aria-describedby={`${idPrefix}-wa-hint`}
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
                 />
-                Also send my order to the store on WhatsApp
+                <span>
+                  Also send my order to the store on WhatsApp
+                  <span id={`${idPrefix}-wa-hint`} className="block text-muted-foreground">
+                    So the store sees it instantly.
+                  </span>
+                </span>
               </label>
             ) : null}
           </ResponsiveDialogBody>

@@ -2,11 +2,13 @@ import { CalendarClock, ChevronRight } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { DeliveryAreasClient } from "@/components/settings/DeliveryAreasClient";
 import { DeliveryRidersClient } from "@/components/settings/DeliveryRidersClient";
 import { MenuOrdersClient } from "@/components/settings/MenuOrdersClient";
 import { MenuSlotsClient } from "@/components/settings/MenuSlotsClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { WhatsappOrdersClient } from "@/components/settings/WhatsappOrdersClient";
+import { parseDeliveryAreas } from "@/lib/delivery-areas";
 import { parseDeliveryRiders } from "@/lib/delivery-riders";
 import { parseMenuSlots } from "@/lib/menu-slots";
 import { prisma } from "@/lib/prisma";
@@ -32,6 +34,7 @@ export default async function OrdersSettingsPage() {
       showWhatsappOnStore: true,
       deliveryRiders: true,
       menuSlots: true,
+      deliveryAreas: true,
     },
   });
 
@@ -68,6 +71,16 @@ export default async function OrdersSettingsPage() {
           description={`When customers can get an order from your everyday ${vocab.catalogue}. With times set, checkout asks them to pick one, and the time shows on the order. Drops keep their own handover time.`}
         >
           <MenuSlotsClient initialSlots={parseMenuSlots(settings?.menuSlots)} isOwner={isOwner} />
+        </SettingsCard>
+
+        <SettingsCard
+          title="Delivery areas"
+          description="The localities you deliver to, each with its own fee if you like. With areas set, customers pick one at checkout, and the store page lists them. Leave it empty to deliver anywhere."
+        >
+          <DeliveryAreasClient
+            initialAreas={parseDeliveryAreas(settings?.deliveryAreas)}
+            isOwner={isOwner}
+          />
         </SettingsCard>
 
         <SettingsCard
