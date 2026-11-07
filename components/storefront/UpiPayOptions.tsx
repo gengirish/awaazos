@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronDown, ChevronRight, Copy, MoreHorizontal } from "lucide-react";
+import { Check, ChevronDown, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { copyText } from "@/lib/clipboard";
@@ -123,17 +123,17 @@ export function UpiPayOptions({
                 {app.label.charAt(0)}
               </span>
               <span className="flex-1">{app.label}</span>
-              <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-muted-foreground" aria-hidden="true" />
             </a>
           </li>
         ))}
         <li>
           <a href={upiLink} className={appRowClass}>
             <span className={appTile} aria-hidden="true">
-              <MoreHorizontal className="h-4 w-4 text-muted-foreground" />
+              <span className="text-muted-foreground">⋯</span>
             </span>
             <span className="flex-1">Other UPI app</span>
-            <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+            <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-muted-foreground" aria-hidden="true" />
           </a>
         </li>
       </ul>
