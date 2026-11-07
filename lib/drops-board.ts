@@ -33,10 +33,14 @@ export const ORDER_DISPLAY_STATES: readonly OrderDisplayState[] = [
 export type BoardOrderItem = {
   id: string;
   dropItemId: string | null;
+  /** The catalogue item; null once it was deleted (the line keeps its snapshot name). */
+  menuItemId?: string | null;
   name: string;
   qty: number;
   priceInPaise: number;
   totalPaise: number;
+  /** A free-item offer's ₹0 gift line (lib/offers.ts). */
+  isGift?: boolean;
 };
 
 /** One storefront order as the vendor board sees it (JSON-safe: dates are ISO strings). */
@@ -256,7 +260,10 @@ export type PrepRow = {
   dropItemId: string;
   name: string;
   emoji: string | null;
+  /** Paid and free together: everything to cook. */
   qtyOrdered: number;
+  /** How many of `qtyOrdered` are free-item gifts (lib/offers.ts). */
+  qtyFree: number;
   maxQty: number | null;
   /** null = unlimited. Same rule as `remainingQty` in lib/drops.ts (never negative). */
   remaining: number | null;
@@ -265,22 +272,25 @@ export type PrepRow = {
 type PrepOrderInput = {
   holdsStock: boolean;
   displayState: OrderDisplayState;
-  items: { dropItemId: string | null; qty: number }[];
+  items: { dropItemId: string | null; qty: number; isGift?: boolean }[];
 };
 
 /**
  * Quantity to cook per drop item: only orders that hold stock and are not
- * cancelled. Mirrors `soldQtyByDropItem`, so "remaining" here matches what the
+ * cancelled. A free-item gift is a line on the gift's own drop item, so it
+ * counts in `qtyOrdered` and again in `qtyFree`. Mirrors `soldQtyByDropItem`, so "remaining" here matches what the
  * storefront is enforcing. Order lines whose drop item was deleted are skipped
  * (they still appear on the packing list via the order itself).
  */
 export function prepFromOrders(dropItems: PrepDropItem[], orders: PrepOrderInput[]): PrepRow[] {
   const qty = new Map<string, number>();
+  const free = new Map<string, number>();
   for (const o of orders) {
     if (!o.holdsStock || o.displayState === "CANCELLED") continue;
     for (const it of o.items) {
       if (!it.dropItemId) continue;
       qty.set(it.dropItemId, (qty.get(it.dropItemId) ?? 0) + it.qty);
+      if (it.isGift) free.set(it.dropItemId, (free.get(it.dropItemId) ?? 0) + it.qty);
     }
   }
   return dropItems.map((d) => {
@@ -290,6 +300,7 @@ export function prepFromOrders(dropItems: PrepDropItem[], orders: PrepOrderInput
       name: d.name,
       emoji: d.emoji,
       qtyOrdered: ordered,
+      qtyFree: free.get(d.id) ?? 0,
       maxQty: d.maxQty,
       remaining: d.maxQty === null ? null : Math.max(0, d.maxQty - ordered),
     };

@@ -188,10 +188,25 @@ describe("prepFromOrders", () => {
       { holdsStock: true, displayState: "PAID", items: [{ dropItemId: null, qty: 7 }] },
     ]);
     expect(rows).toEqual([
-      { dropItemId: "laddu", name: "Besan laddu", emoji: null, qtyOrdered: 7, maxQty: 10, remaining: 3 },
-      { dropItemId: "cake", name: "Eggless cake", emoji: null, qtyOrdered: 1, maxQty: null, remaining: null },
-      { dropItemId: "chakli", name: "Chakli", emoji: null, qtyOrdered: 0, maxQty: 5, remaining: 5 },
+      { dropItemId: "laddu", name: "Besan laddu", emoji: null, qtyOrdered: 7, qtyFree: 0, maxQty: 10, remaining: 3 },
+      { dropItemId: "cake", name: "Eggless cake", emoji: null, qtyOrdered: 1, qtyFree: 0, maxQty: null, remaining: null },
+      { dropItemId: "chakli", name: "Chakli", emoji: null, qtyOrdered: 0, qtyFree: 0, maxQty: 5, remaining: 5 },
     ]);
+  });
+
+  it("counts a free gift in the item's total and in qtyFree", () => {
+    const [laddu] = prepFromOrders([items[0]!], [
+      {
+        holdsStock: true,
+        displayState: "PAID",
+        items: [
+          { dropItemId: "laddu", qty: 3 },
+          { dropItemId: "laddu", qty: 1, isGift: true },
+        ],
+      },
+      { holdsStock: false, displayState: "CANCELLED", items: [{ dropItemId: "laddu", qty: 1, isGift: true }] },
+    ]);
+    expect(laddu).toMatchObject({ qtyOrdered: 4, qtyFree: 1, remaining: 6 });
   });
 
   it("never reports negative remaining when capacity was lowered below sold", () => {

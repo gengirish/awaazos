@@ -12,6 +12,7 @@
 import type { FulfilmentStatus } from "@prisma/client";
 
 import type { OrderDisplayState } from "@/lib/drops";
+import { giftBaseName } from "@/lib/offers";
 
 // ─── Load window ────────────────────────────────────────────────────
 
@@ -36,28 +37,43 @@ export function menuBoardWindowStart(now: Date = new Date(), days: number = MENU
 
 // ─── "To make" strip ────────────────────────────────────────────────
 
-export type ToMakeRow = { name: string; qty: number };
+/** `qty` counts paid and free together; `free` is how many of them are gifts. */
+export type ToMakeRow = { name: string; qty: number; free: number };
 
 type ToMakeOrderInput = {
   fulfilmentStatus: FulfilmentStatus | null;
   holdsStock: boolean;
   displayState: OrderDisplayState;
-  items: { name: string; qty: number }[];
+  items: { name: string; qty: number; menuItemId?: string | null; isGift?: boolean }[];
 };
 
 /**
  * Items × qty still to prepare: PLACED / CONFIRMED orders that hold stock
  * (so an expired unpaid UPI order doesn't make the vendor cook for nobody).
- * Grouped by the snapshot line name; biggest first, then A–Z.
+ * Grouped by menu item, or by the snapshot name for a line whose item is gone.
+ * A free-item gift ("Bhel (free gift)") joins its item's row and is counted in
+ * `free`, so the strip reads "2 × Bhel (1 free)". The row takes a paid line's
+ * name when it has one. Biggest first, then A–Z.
  */
 export function toMakeFromOrders(orders: ToMakeOrderInput[]): ToMakeRow[] {
-  const qty = new Map<string, number>();
+  const rows = new Map<string, ToMakeRow & { named: boolean }>();
   for (const o of orders) {
     if (o.fulfilmentStatus !== "PLACED" && o.fulfilmentStatus !== "CONFIRMED") continue;
     if (!o.holdsStock || o.displayState === "CANCELLED") continue;
-    for (const it of o.items) qty.set(it.name, (qty.get(it.name) ?? 0) + it.qty);
+    for (const it of o.items) {
+      const name = it.isGift ? giftBaseName(it.name) : it.name;
+      const key = it.menuItemId ? `id:${it.menuItemId}` : `name:${name}`;
+      const row = rows.get(key) ?? { name, qty: 0, free: 0, named: false };
+      row.qty += it.qty;
+      if (it.isGift) row.free += it.qty;
+      else if (!row.named) {
+        row.name = it.name;
+        row.named = true;
+      }
+      rows.set(key, row);
+    }
   }
-  return Array.from(qty, ([name, q]) => ({ name, qty: q })).sort(
+  return Array.from(rows.values(), ({ name, qty, free }) => ({ name, qty, free })).sort(
     (a, b) => b.qty - a.qty || a.name.localeCompare(b.name),
   );
 }

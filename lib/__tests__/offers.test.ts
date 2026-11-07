@@ -4,6 +4,7 @@ import {
   applyOffers,
   discountLabel,
   formatPercentBps,
+  giftBaseName,
   giftLineName,
   isSaleOffer,
   OFFER_NAME_MAX,
@@ -494,6 +495,8 @@ describe("free-item plans", () => {
     const r = applyOffers(lines({ jasper: 4 }), resolve([GIFT]));
     expect(offerGiftText(r.gift!)).toBe("Festive gift: free Evil Eye Bracelet added.");
     expect(giftLineName("Evil Eye Bracelet")).toBe("Evil Eye Bracelet (free gift)");
+    expect(giftBaseName(giftLineName("Evil Eye Bracelet"))).toBe("Evil Eye Bracelet");
+    expect(giftBaseName("Bhel")).toBe("Bhel");
   });
 });
 
