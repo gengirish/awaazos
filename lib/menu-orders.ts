@@ -27,6 +27,7 @@ import {
   nextBillNumber,
 } from "@/lib/drops";
 import { deliveryFields } from "@/lib/delivery-address";
+import { deliveryFeeFor, parseDeliveryAreas } from "@/lib/delivery-areas";
 import { bumpOrderSignal } from "@/lib/drops-signal";
 import { findMenuSlot, parseMenuSlots, type MenuSlot } from "@/lib/menu-slots";
 import { applyOffers, giftLineName } from "@/lib/offers";
@@ -44,6 +45,8 @@ export type MenuOrderSettings = {
   menuDeliveryFeePaise: number;
   /** VendorSettings.menuSlots, raw JSON (lib/menu-slots.ts). Omitted = no slots. */
   menuSlots?: unknown;
+  /** VendorSettings.deliveryAreas, raw JSON (lib/delivery-areas.ts). Omitted = anywhere. */
+  deliveryAreas?: unknown;
 };
 
 export type PlaceMenuOrderInput = {
@@ -82,6 +85,7 @@ export type PlaceMenuOrderError =
   | { code: "item_not_found"; menuItemId: string }
   | { code: "fulfilment_unavailable" }
   | { code: "address_required" }
+  | { code: "outside_delivery_area" }
   | { code: "slot_required" }
   | { code: "slot_unavailable" }
   | { code: "pay_on_delivery_disabled" }
@@ -156,6 +160,15 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
   if (input.fulfilmentType === "DELIVERY" && !delivery.deliveryAddress) {
     return { ok: false, error: { code: "address_required" } };
   }
+  // The store's delivery areas set the fee, and a locality outside them is refused.
+  const areaFee = deliveryFeeFor(
+    parseDeliveryAreas(settings.deliveryAreas),
+    input.deliveryLocality,
+    settings.menuDeliveryFeePaise,
+  );
+  if (input.fulfilmentType === "DELIVERY" && !areaFee.ok) {
+    return { ok: false, error: { code: "outside_delivery_area" } };
+  }
   // "When": with slots configured the buyer must pick one that is still offered.
   const slotRules = parseMenuSlots(settings.menuSlots);
   let slot: MenuSlot | null = null;
@@ -216,7 +229,7 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
       const appliedOffer = offered.applied;
       const discountPaise = offered.discountTotalPaise;
 
-      const deliveryFeePaise = input.fulfilmentType === "DELIVERY" ? settings.menuDeliveryFeePaise : 0;
+      const deliveryFeePaise = input.fulfilmentType === "DELIVERY" && areaFee.ok ? areaFee.feePaise : 0;
       const { subtotalPaise, totalPaise } = computeOrderTotals(
         priced.map((p) => ({ priceInPaise: p.item.priceInPaise, qty: p.qty })),
         deliveryFeePaise,

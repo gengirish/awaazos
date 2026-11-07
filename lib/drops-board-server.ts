@@ -60,7 +60,16 @@ export const boardOrderSelect = {
   buyerReceivedAt: true,
   feedback: { select: { rating: true, comment: true } },
   orderItems: {
-    select: { id: true, dropItemId: true, name: true, qty: true, priceInPaise: true, totalPaise: true },
+    select: {
+      id: true,
+      dropItemId: true,
+      menuItemId: true,
+      name: true,
+      qty: true,
+      priceInPaise: true,
+      totalPaise: true,
+      isGift: true,
+    },
     orderBy: { id: "asc" },
   },
 } satisfies Prisma.TransactionSelect;

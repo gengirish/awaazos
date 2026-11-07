@@ -193,7 +193,14 @@ export default async function DropPrepPage(props: Props) {
                       {p.emoji && <span aria-hidden>{p.emoji} </span>}
                       {p.name}
                     </td>
-                    <td className="py-2 text-right font-mono text-xl font-bold tabular-nums">{p.qtyOrdered}</td>
+                    <td className="py-2 text-right font-mono text-xl font-bold tabular-nums">
+                      {p.qtyOrdered}
+                      {p.qtyFree > 0 && (
+                        <span className="block text-sm font-medium text-muted-foreground print:text-foreground">
+                          {p.qtyFree} free
+                        </span>
+                      )}
+                    </td>
                     <td className="py-2 text-right font-mono tabular-nums text-muted-foreground print:text-foreground">
                       {p.maxQty === null ? "—" : `${p.qtyOrdered}/${p.maxQty}`}
                     </td>

@@ -36,7 +36,7 @@ describe("menuBoardWindowStart", () => {
 describe("toMakeFromOrders", () => {
   const order = (
     fulfilmentStatus: "PLACED" | "CONFIRMED" | "DELIVERED" | "CANCELLED",
-    items: { name: string; qty: number }[],
+    items: { name: string; qty: number; menuItemId?: string | null; isGift?: boolean }[],
     holdsStock = true,
     displayState: "PAID" | "EXPIRED" | "CANCELLED" | "PAY_ON_DELIVERY" = "PAID",
   ) => ({ fulfilmentStatus, holdsStock, displayState, items });
@@ -51,10 +51,47 @@ describe("toMakeFromOrders", () => {
       order("PLACED", [{ name: "Bun maska", qty: 1 }]),
     ]);
     expect(rows).toEqual([
-      { name: "Samosa", qty: 5 },
-      { name: "Bun maska", qty: 1 },
-      { name: "Chai", qty: 1 },
+      { name: "Samosa", qty: 5, free: 0 },
+      { name: "Bun maska", qty: 1, free: 0 },
+      { name: "Chai", qty: 1, free: 0 },
     ]);
+  });
+
+  it("merges a free gift into its item's row: 2 × Bhel (1 free)", () => {
+    const rows = toMakeFromOrders([
+      order("PLACED", [
+        { name: "Bhel", qty: 1, menuItemId: "bhel" },
+        { name: "Bhel (free gift)", qty: 1, menuItemId: "bhel", isGift: true },
+      ]),
+      order("CONFIRMED", [{ name: "Pani puri", qty: 1, menuItemId: "pp" }]),
+    ]);
+    expect(rows).toEqual([
+      { name: "Bhel", qty: 2, free: 1 },
+      { name: "Pani puri", qty: 1, free: 0 },
+    ]);
+  });
+
+  it("names a gift-only row after the item, and a renamed item's lines stay together", () => {
+    const rows = toMakeFromOrders([
+      order("PLACED", [{ name: "Evil Eye Bracelet (free gift)", qty: 1, menuItemId: "eye", isGift: true }]),
+      order("PLACED", [{ name: "Chai", qty: 2, menuItemId: "chai" }]),
+      // Renamed after this order: same item, so one row, under the paid line's name.
+      order("PLACED", [{ name: "Masala chai", qty: 1, menuItemId: "chai" }]),
+    ]);
+    expect(rows).toEqual([
+      { name: "Chai", qty: 3, free: 0 },
+      { name: "Evil Eye Bracelet", qty: 1, free: 1 },
+    ]);
+  });
+
+  it("groups lines whose item was deleted by name, gift and paid together", () => {
+    const rows = toMakeFromOrders([
+      order("PLACED", [
+        { name: "Kulfi", qty: 2, menuItemId: null },
+        { name: "Kulfi (free gift)", qty: 1, menuItemId: null, isGift: true },
+      ]),
+    ]);
+    expect(rows).toEqual([{ name: "Kulfi", qty: 3, free: 1 }]);
   });
 
   it("skips delivered, cancelled and expired (non-holding) orders", () => {

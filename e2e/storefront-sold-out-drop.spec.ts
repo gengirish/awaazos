@@ -91,7 +91,9 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
     const sheet = buyer.getByRole("dialog", { name: "Checkout" });
     await sheet.getByLabel("Your name").fill("Priya Buyer");
     await sheet.getByLabel("Mobile number").fill("98480 12345");
-    await sheet.getByRole("radio", { name: "Pickup" }).check();
+    // The radio is visually hidden inside its card: tap the card, as a buyer does.
+    await sheet.getByText("Pickup", { exact: true }).click();
+    await expect(sheet.getByRole("radio", { name: "Pickup" })).toBeChecked();
     await sheet.getByRole("button", { name: /place order/i }).click();
     await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
     // The menu cart was left behind — the order page says so.

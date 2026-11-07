@@ -18,6 +18,7 @@ import {
 import { ItemPrice } from "@/components/storefront/ItemPrice";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
+import type { DeliveryArea } from "@/lib/delivery-areas";
 import { applyOffers, salePriceFor, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
 import { itemSearchText } from "@/lib/store-search";
 import {
@@ -73,6 +74,8 @@ export type DropOrderProps = {
   orderable: boolean;
   fulfilmentTypes: FulfilmentType[];
   deliveryFeePaise: number;
+  /** The store's delivery areas (lib/delivery-areas.ts); see CheckoutSheet. */
+  deliveryAreas?: DeliveryArea[];
   pickupNote: string | null;
   /** Fulfilment window label ("Sat, 5 Oct · 5:00 pm – 8:00 pm"), shown with Pickup at checkout. */
   pickupWindow?: string | null;
@@ -103,6 +106,7 @@ export function DropOrder(props: DropOrderProps) {
     orderable,
     fulfilmentTypes,
     deliveryFeePaise,
+    deliveryAreas,
     pickupNote,
     pickupWindow,
     payment,
@@ -347,6 +351,7 @@ export function DropOrder(props: DropOrderProps) {
         gift={offered.gift}
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
+        deliveryAreas={deliveryAreas}
         pickupNote={pickupNote}
         pickupWindow={pickupWindow}
         payment={payment}

@@ -103,7 +103,7 @@ const ICON_BUTTON =
  * The sticky bar's row: a search button, then `children` (the Top link and
  * category pills). Open, the row is the search field and a close button.
  */
-export function StoreSearchBar({ children }: { children: ReactNode }) {
+export function StoreSearchBar({ children, trailing }: { children: ReactNode; trailing?: ReactNode }) {
   const ctx = useContext(StoreSearchContext);
   const rowRef = useRef<HTMLDivElement>(null);
   if (!ctx) return <>{children}</>;
@@ -152,6 +152,7 @@ export function StoreSearchBar({ children }: { children: ReactNode }) {
             <Search className="h-4 w-4" aria-hidden="true" />
           </button>
           <div className="min-w-0 flex-1">{children}</div>
+          {trailing}
         </>
       )}
       <p aria-live="polite" className="sr-only">

@@ -50,7 +50,7 @@ async function offerInstall(page: Page) {
 }
 
 test.describe("orders board layout", () => {
-  test("one banner at a time, in priority order; the survey's Not now lasts 7 days", async ({ page, request }) => {
+  test("one banner at a time, in priority order; the survey's Not now lasts 14 days", async ({ page, request }) => {
     test.slow();
     await storeWithOrder(page, request, "layout-banner");
     await page.goto("/orders");
@@ -58,6 +58,8 @@ test.describe("orders board layout", () => {
     const fssai = page.getByRole("link", { name: /Add your FSSAI number/ });
     const install = page.getByTestId("install-banner");
     const survey = page.getByRole("complementary", { name: "Owner survey" });
+    // A new store has no tagline yet: the one-time store polish nudge comes after the FSSAI reminder.
+    const polish = page.getByRole("complementary", { name: "Store check" });
 
     await expect(fssai).toBeVisible();
     await expect(page.getByText(/^Last checked/)).toBeVisible();
@@ -67,6 +69,10 @@ test.describe("orders board layout", () => {
 
     await page.getByRole("button", { name: "Dismiss for now" }).click();
     await expect(fssai).toHaveCount(0);
+    await expect(polish).toContainText("Your store has no tagline yet");
+    await expect(polish.getByRole("link", { name: "Add a tagline" })).toHaveAttribute("href", "/settings/store");
+    await polish.getByRole("button", { name: "Got it" }).click();
+    await expect(polish).toHaveCount(0);
     await expect(async () => {
       await offerInstall(page);
       await expect(install).toBeVisible({ timeout: 1_000 });
@@ -82,14 +88,21 @@ test.describe("orders board layout", () => {
     await expect(page.getByText(/^Last checked/)).toBeVisible();
     await expect(survey).toHaveCount(0);
 
-    // Six days on it is still snoozed; a little past seven it is back.
-    await page.evaluate(([key, at]) => localStorage.setItem(key as string, String(at)), [SURVEY_KEY, Date.now() - 6 * DAY_MS]);
+    // Thirteen days on it is still snoozed; a little past fourteen it is back, in a new browser
+    // session (it shows once per session, so the one it was dismissed in keeps it away).
+    await page.evaluate(([key, at]) => localStorage.setItem(key as string, String(at)), [SURVEY_KEY, Date.now() - 13 * DAY_MS]);
     await page.reload();
     await expect(page.getByText(/^Last checked/)).toBeVisible();
     await expect(survey).toHaveCount(0);
-    await page.evaluate(([key, at]) => localStorage.setItem(key as string, String(at)), [SURVEY_KEY, Date.now() - 7 * DAY_MS - 1000]);
+    await page.evaluate(([key, at]) => localStorage.setItem(key as string, String(at)), [SURVEY_KEY, Date.now() - 14 * DAY_MS - 1000]);
+    await page.reload();
+    await expect(page.getByText(/^Last checked/)).toBeVisible();
+    await expect(survey).toHaveCount(0);
+    await page.evaluate(() => sessionStorage.clear());
     await page.reload();
     await expect(survey).toBeVisible();
+    // The polish nudge was dismissed for good: it does not come back with the survey.
+    await expect(polish).toHaveCount(0);
   });
 
   test("Share holds every share action; Order settings is in the overflow menu", async ({ page, request, context }) => {
@@ -198,8 +211,8 @@ test.describe("orders board layout", () => {
 
     // Sound toggles from the bar and says so.
     const bar = page.getByRole("group", { name: "Live updates" });
-    await bar.getByRole("button", { name: /^Sound on/ }).click();
-    await expect(bar.getByRole("button", { name: /^Sound o/ })).toHaveAttribute("aria-pressed", /true|false/);
+    await bar.getByRole("button", { name: /^Order sounds on/ }).click();
+    await expect(bar.getByRole("button", { name: /^Order sounds o/ })).toHaveAttribute("aria-pressed", /true|false/);
 
     // Alerts: a labelled control until this device is subscribed, whichever browser this is.
     if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY) {

@@ -313,9 +313,16 @@ export function withGiftsThatFit(
   return offers.filter((o) => !o.freeItem || giftFits(o.freeItem.menuItemId, o.freeItem.qty));
 }
 
+const GIFT_LINE_SUFFIX = " (free gift)";
+
 /** The stored name of a gift line: a snapshot every bill, board and receipt shows as is. */
 export function giftLineName(name: string): string {
-  return `${name} (free gift)`;
+  return `${name}${GIFT_LINE_SUFFIX}`;
+}
+
+/** The item's own name from a gift line's stored name: the inverse of `giftLineName`. */
+export function giftBaseName(lineName: string): string {
+  return lineName.endsWith(GIFT_LINE_SUFFIX) ? lineName.slice(0, -GIFT_LINE_SUFFIX.length) : lineName;
 }
 
 /**

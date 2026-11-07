@@ -19,6 +19,7 @@ import {
 import { ItemPrice } from "@/components/storefront/ItemPrice";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { formatINRCompact } from "@/lib/currency";
+import { deliveryAreaSummary, type DeliveryArea } from "@/lib/delivery-areas";
 import type { MenuSlotRule } from "@/lib/menu-slots";
 import { applyOffers, salePriceFor, type ResolvedOffer } from "@/lib/offers";
 import { itemSearchText } from "@/lib/store-search";
@@ -71,6 +72,8 @@ export type MenuOrderProps = {
   categories: MenuOrderCategory[];
   fulfilmentTypes: FulfilmentType[];
   deliveryFeePaise: number;
+  /** The store's delivery areas (lib/delivery-areas.ts); see CheckoutSheet. */
+  deliveryAreas?: DeliveryArea[];
   pickupNote: string | null;
   /** The store's weekly pickup / delivery slots (lib/menu-slots.ts); empty = checkout asks no "when". */
   slotRules?: MenuSlotRule[];
@@ -98,6 +101,7 @@ export function MenuOrder(props: MenuOrderProps) {
     categories,
     fulfilmentTypes,
     deliveryFeePaise,
+    deliveryAreas = [],
     pickupNote,
     slotRules,
     nextSlotLabel,
@@ -232,7 +236,8 @@ export function MenuOrder(props: MenuOrderProps) {
             <li className="flex items-start gap-2">
               <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
               <span>
-                {deliveryFeePaise > 0 ? `Delivery fee ${formatINRCompact(deliveryFeePaise)}` : "Free delivery"}
+                {deliveryAreaSummary(deliveryAreas, deliveryFeePaise) ??
+                  (deliveryFeePaise > 0 ? `Delivery fee ${formatINRCompact(deliveryFeePaise)}` : "Free delivery")}
               </span>
             </li>
           ) : null}
@@ -368,6 +373,7 @@ export function MenuOrder(props: MenuOrderProps) {
         gift={offered.gift}
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
+        deliveryAreas={deliveryAreas}
         pickupNote={pickupNote}
         slotRules={slotRules}
         payment={payment}

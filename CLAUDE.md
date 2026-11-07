@@ -510,7 +510,9 @@ go to the order's own route family (`orderActionBase` in `lib/drops-board.ts`), 
 compound scope; the frozen rule is per order (`isDropFrozen` on its drop).
 
 **Board layout** (`components/drops/orders/`): at most one banner above the board (`OrdersBannerSlot`, rules in
-`lib/orders-banner.ts`): FSSAI reminder, then install, then the owner survey, then "Earn free months" (`shouldAskToRefer`); "Not now" lasts 7 days per device.
+`lib/orders-banner.ts`): FSSAI reminder, then the one-time store polish nudge (published stores: test-named items, else no tagline;
+`storePolishNudge`, "Got it" hides that reason for good), then install, then the owner survey, then "Earn free months"
+(`shouldAskToRefer`); "Not now" lasts 7 days per device (the survey: 14 days, and once per browser session).
 Billing notices and a checklist with open steps sit outside the slot. The header has one Share menu and one "⋯"
 menu (`BoardMenus.tsx`). In menu scope the status pill sets `acceptMenuOrders` for an OWNER through `PATCH
 /api/vendor`; it does not touch drops. Refresh, Sound and phone alerts are in the live sync bar at the bottom.
@@ -588,7 +590,11 @@ checkout requires one and `placeMenuOrder` re-derives it from the rules (`slot_r
 storing `fulfilAt` + `fulfilUntil`; the next 7 days, nothing starting within 60 min. Drop orders use the drop's
 one window. A delivery address is a line + locality (required at checkout, optional on the wire so an old page
 still orders), landmark and pincode: `deliveryAddress` keeps the whole address as one text
-(`composeDeliveryAddress`), the parts sit beside it on `Transaction` and `Customer`. Every window a page shows
+(`composeDeliveryAddress`), the parts sit beside it on `Transaction` and `Customer`. A store can also list where it delivers
+(`VendorSettings.deliveryAreas`, `lib/delivery-areas.ts`, Settings → Online orders → Delivery areas: localities, each with an
+optional fee replacing the drop's or menu's): with areas set, checkout offers the list instead of a free-text locality, both
+order paths refuse any other (`outside_delivery_area`) and charge that area's fee, and the store page says "Free delivery in …".
+No radius: orders carry no coordinates. Every window a page shows
 goes through `formatWindowWithDay` ("Today · 5–9 pm"); text read later (share, story, WhatsApp) keeps the date.
 Every drop state reads with its reason through `dropStateLabel` (`lib/drop-state.ts`), never a bare "Orders closed".
 
@@ -708,7 +714,7 @@ no timers, nothing cached on `Vendor`. There are no per-item ratings.
 Rules in the header of `lib/owner-survey.ts` (pure), database side in `lib/owner-survey-server.ts`. An OWNER
 of a real store answers once, changeably, in Settings → Tell us what's hard (`PUT /api/vendor/survey`,
 `OwnerSurveyResponse`, one row per store): which problems, which hurts most, orders a week, the most they can handle, what they would
-pay, an optional comment. `/orders` and `/drops` show a prompt until answered ("Not now" snoozes it for 7 days on that device).
+pay, an optional comment. `/orders` shows a prompt until answered, once per browser session ("Not now" snoozes it for 14 days on that device); Help lists it too.
 `/admin/survey` (SUPER_ADMIN) ranks the problems to decide what to build; `/admin/vendors` shows one store's
 answers beside its price. Answers never set a price by themselves, and `SURVEY_USE_NOTICE` tells the owner they
 may inform it: keep it on the form. Pain keys are stored, so retire one rather than renaming it. The comment is

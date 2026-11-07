@@ -34,7 +34,9 @@ async function checkoutPickupPayOnDelivery(page: Page) {
   await expect(sheet).toBeVisible();
   await sheet.getByLabel("Your name").fill("Priya Buyer");
   await sheet.getByLabel("Mobile number").fill("98480 12345");
-  await sheet.getByRole("radio", { name: "Pickup" }).check();
+  // The radio is visually hidden inside its card: tap the card, as a buyer does.
+  await sheet.getByText("Pickup", { exact: true }).click();
+  await expect(sheet.getByRole("radio", { name: "Pickup" })).toBeChecked();
   await sheet.getByRole("radio", { name: /pay on delivery/i }).check();
   return sheet;
 }

@@ -292,4 +292,30 @@ describe.skipIf(!ENABLED)("menu orders — DB integration", () => {
     // No slots set: no "when" on the order.
     expect(t.fulfilAt).toBeNull();
   });
+  it("with delivery areas, charges the area's fee and refuses other localities; pickup is untouched", async () => {
+    const { vendor, bhel } = await seed();
+    const areas = [
+      { name: "Kondapur", feePaise: 0 },
+      { name: "Madhapur", feePaise: null },
+    ];
+    const withAreas = { ...base(vendor), settings: { ...settings, deliveryAreas: areas } };
+    const items = [{ menuItemId: bhel.id, qty: 1 }];
+    const deliver = { fulfilmentType: "DELIVERY" as const, deliveryAddress: "Flat 2" };
+
+    expect(await mo.placeMenuOrder({ ...withAreas, ...deliver, deliveryLocality: "Miyapur", items })).toEqual({
+      ok: false,
+      error: { code: "outside_delivery_area" },
+    });
+    expect(await mo.placeMenuOrder({ ...withAreas, ...deliver, items })).toEqual({
+      ok: false,
+      error: { code: "outside_delivery_area" },
+    });
+
+    const free = await mo.placeMenuOrder({ ...withAreas, ...deliver, deliveryLocality: " kondapur", items });
+    expect(free.ok && free.order.deliveryFeePaise).toBe(0);
+    const usual = await mo.placeMenuOrder({ ...withAreas, ...deliver, deliveryLocality: "Madhapur", items });
+    expect(usual.ok && usual.order.deliveryFeePaise).toBe(2000);
+    const pickup = await mo.placeMenuOrder({ ...withAreas, items });
+    expect(pickup.ok).toBe(true);
+  });
 });

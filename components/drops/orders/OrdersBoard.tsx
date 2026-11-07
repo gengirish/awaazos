@@ -781,7 +781,12 @@ export function OrdersBoard({
         ? "Checks every few minutes. Turn on phone alerts to see orders instantly."
         : "Checks every few minutes. Tap Refresh to check now.";
 
-  const soundLabel = soundOn ? "Sound on" : soundPending ? "Sound on — tap to enable" : "Sound off";
+  // Pending: the seller left sound on, but the browser plays nothing until one tap on this page.
+  const soundLabel = soundOn
+    ? "Order sounds on"
+    : soundPending
+      ? "Order sounds on — tap once to allow"
+      : "Order sounds off — tap to turn on";
 
   const dropTitles = useMemo(() => new Map(drops.map((d) => [d.id, d.title])), [drops]);
   // Only worth saying where an order came from while the list mixes sources.
@@ -994,7 +999,10 @@ export function OrdersBoard({
           <p className="mt-2 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">{vocab.toPrepare}: </span>
             {toCook
-              .map((p) => `${p.name} ${p.qtyOrdered}${p.maxQty !== null ? `/${p.maxQty}` : ""}`)
+              .map(
+                (p) =>
+                  `${p.name} ${p.qtyOrdered}${p.maxQty !== null ? `/${p.maxQty}` : ""}${p.qtyFree > 0 ? ` (${p.qtyFree} free)` : ""}`,
+              )
               .join(" · ")}
           </p>
         )}
@@ -1021,6 +1029,7 @@ export function OrdersBoard({
                   >
                     <span className="font-mono font-bold tabular-nums">{r.qty} ×</span>
                     <span>{r.name}</span>
+                    {r.free > 0 && <span className="text-muted-foreground">({r.free} free)</span>}
                   </li>
                 ))}
               </ul>
