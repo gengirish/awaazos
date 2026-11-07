@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { PLAN_MARKETING } from "@/lib/plan-copy";
+import { PLAN_MARKETING, TRIAL_THEN_NOTE } from "@/lib/plan-copy";
 
 export function CtaBanner() {
   return (
@@ -10,8 +10,8 @@ export function CtaBanner() {
           <h2 id="cta-heading" className="font-display text-2xl font-bold text-balance text-white sm:text-3xl">
             Run your next drop on AwaazOS
           </h2>
-          <p className="mt-2 max-w-xl text-white/90">
-            Set up your store, share the link, and stop tracking orders in DMs and WhatsApp chats. {PLAN_MARKETING.STARTER.ctaNote}
+          <p className="mt-2 max-w-xl text-white">
+            Set up your store, share the link, and stop tracking orders in DMs and WhatsApp chats. {TRIAL_THEN_NOTE}
           </p>
         </div>
         <Button

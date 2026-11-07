@@ -214,3 +214,15 @@ export const PLAN_COMPARISON: ComparisonRow[] = [
   comparisonRow("Counter billing by voice", (plan) => yesNo(PLAN_LIMITS[plan].voiceBilling)),
   comparisonRow("CSV export", (plan) => yesNo(PLAN_LIMITS[plan].csvExport)),
 ];
+
+/** The cheapest marketed plan's monthly price before GST, for "from ₹X" lines. */
+export const PLANS_FROM = formatINRCompact(
+  Math.min(...MARKETED_PLANS.map((plan) => subscriptionBasePaise(plan, "monthly"))),
+);
+
+/**
+ * Beside the sign-up call to action on the landing page and the sign-up form:
+ * "No card needed. Then plans from ₹599/month + GST." The trial runs on Starter,
+ * then the seller picks any plan, so the anchor is the cheapest one, not Starter.
+ */
+export const TRIAL_THEN_NOTE = `No card needed. Then plans from ${PLANS_FROM}/month + GST.`;

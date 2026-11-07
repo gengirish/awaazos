@@ -75,8 +75,11 @@ export function VoiceLanguageClient({ initialVoiceLang }: VoiceLanguageClientPro
             ))}
           </SelectContent>
         </Select>
-        <p className="text-xs text-muted-foreground">
+        <p className="text-sm text-muted-foreground">
           {VOICE_LANG_HINT[voiceLang] ?? "Speech-to-text language used by the POS mic button."}
+        </p>
+        <p className="text-sm text-muted-foreground">
+          More languages are coming. Until then, tap items to add them: every voice step has a tap way too.
         </p>
       </div>
       <div className="flex items-center gap-3">
