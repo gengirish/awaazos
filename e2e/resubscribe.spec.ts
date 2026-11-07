@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { CAN_SET_BILLING, daysFromNow, setVendorBilling, setVendorSubscription } from "./helpers/billing-db";
-import { createVendorSession, E2E_PASSWORD, registerVendor } from "./helpers/vendor";
+import { createVendorSession, E2E_PASSWORD, registerVendor, signIn } from "./helpers/vendor";
 
 /**
  * The way back from a cancelled subscription (lib/billing-actions.ts). Before
@@ -127,8 +127,15 @@ test.describe("signed out", () => {
     for (let i = 0; i < 3; i++) await expect(cards.nth(i)).toHaveAttribute("href", "/sign-up");
   });
 
-  test("someone with a store signs in from a card and lands on that plan", async ({ page, request }) => {
+  test("someone with a store signs in from a card and lands on that plan", async ({ page, request, browser }) => {
     const creds = await registerVendor(request, "resub-signed-out");
+    // A store that has been set up: an unfinished one is sent to /onboarding from every vendor page.
+    const setup = await browser.newContext();
+    try {
+      await signIn(await setup.newPage(), creds);
+    } finally {
+      await setup.close();
+    }
 
     await page.goto("/pricing");
     await page.getByRole("link", { name: "Have a store? Sign in to choose Pro" }).click();

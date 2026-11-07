@@ -57,6 +57,8 @@ test.describe("landing screen", () => {
   });
 
   test("a store that has not finished setup lands on onboarding", async ({ page, request, browser }) => {
+    // Two sign-ins and five page loads.
+    test.slow();
     const creds = await registerVendor(request, "home-setup");
 
     const fresh = await signInWithNoCallback(browser, creds);
