@@ -66,6 +66,8 @@ export type DropOrderProps = {
   slug: string;
   dropId: string;
   dropTitle: string;
+  /** The store's name, for the checkout's "you pay the store directly" line. */
+  storeName?: string;
   items: DropOrderItem[];
   /** false → read-only preview (scheduled or closed drop) */
   orderable: boolean;
@@ -96,6 +98,7 @@ export function DropOrder(props: DropOrderProps) {
     slug,
     dropId,
     dropTitle,
+    storeName,
     items,
     orderable,
     fulfilmentTypes,
@@ -331,6 +334,7 @@ export function DropOrder(props: DropOrderProps) {
         endpoint={`/api/s/${encodeURIComponent(slug)}/orders`}
         idPrefix={dropId}
         description={dropTitle}
+        storeName={storeName}
         lines={lines.map((l) => ({
           id: l.item.id,
           name: l.item.name,

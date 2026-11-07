@@ -486,6 +486,7 @@ async function buildDropViews(
 function DropSection({
   view,
   slug,
+  storeName,
   payment,
   whatsapp,
   now,
@@ -496,6 +497,7 @@ function DropSection({
 }: {
   view: DropView;
   slug: string;
+  storeName: string;
   payment: { upi: boolean; cod: boolean; online: boolean };
   whatsapp: boolean;
   now: Date;
@@ -597,6 +599,7 @@ function DropSection({
           slug={slug}
           dropId={drop.id}
           dropTitle={drop.title}
+          storeName={storeName}
           items={view.items}
           orderable={orderable}
           fulfilmentTypes={types}
@@ -990,6 +993,7 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
                     <DropSection
                       view={view}
                       slug={vendor.slug}
+                      storeName={vendor.name}
                       payment={payment}
                       whatsapp={whatsapp}
                       now={now}

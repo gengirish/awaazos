@@ -342,6 +342,7 @@ export function MenuOrder(props: MenuOrderProps) {
         endpoint={`/api/s/${encodeURIComponent(slug)}/menu-orders`}
         idPrefix="menu"
         description={vendorName}
+        storeName={vendorName}
         lines={lines.map((l) => ({
           id: l.item.id,
           name: l.item.name,
