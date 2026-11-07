@@ -45,7 +45,7 @@ export default async function PricingPage() {
               }`}
             >
               {PLAN_MARKETING[tier].badge ? (
-                <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-primary">
+                <p className="mb-1 text-sm font-semibold uppercase tracking-wider text-primary">
                   {PLAN_MARKETING[tier].badge}
                 </p>
               ) : null}

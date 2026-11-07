@@ -71,9 +71,12 @@ Every voice-only path MUST have a tap fallback (`QuickAddGrid`).
 
 ## Testing
 
-- No automated axe audit exists: `@axe-core/playwright` is not installed and
-  Vitest runs in a `node` environment (no DOM). Don't write axe calls until
-  someone adds the package and wires it into `npm run e2e`.
+- Colour contrast is checked by axe in `e2e/contrast.spec.ts`
+  (`@axe-core/playwright`, `color-contrast` rule only) on the landing page, a
+  store page and its checkout, on both Playwright projects. axe reads computed
+  colours, so the HSL tokens resolve as on a phone. `aria-hidden` mockups are
+  left out. Add a page there when you build one buyers or new sellers meet.
+  Vitest runs in a `node` environment (no DOM), so axe lives in Playwright only.
 - `e2e/accessibility.spec.ts` (Playwright) asserts the measurable rules: 44×44 /
   80×80 tap targets, the mic's state-driven `aria-label`, the cart live region,
   the QuickAddGrid tap fallback, skip links and labelled sign-in fields.
