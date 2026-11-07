@@ -5,31 +5,55 @@ import {
   initialStateName,
   isBlankDraft,
   ONBOARDING_STEPS,
+  progressAfter,
   resumeStep,
   stepDescription,
   validateItemDraft,
 } from "./onboarding-steps";
 
 describe("resumeStep", () => {
-  it("opens on step 1 until the store details are saved, whatever the tab remembers", () => {
+  it("opens on step 1 until the store details are saved, whatever was recorded", () => {
     expect(resumeStep({ city: null, upiId: null, itemCount: 0 })).toBe(1);
-    expect(resumeStep({ city: "  ", upiId: "a@okaxis", itemCount: 3, storedStep: 4 })).toBe(1);
+    expect(resumeStep({ city: "  ", upiId: "a@okaxis", itemCount: 3, savedStep: 3 })).toBe(1);
   });
 
-  it("trusts the tab's step once step 1 is saved, so a skipped step stays skipped", () => {
-    expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, storedStep: 3 })).toBe(3);
-    expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, storedStep: 4 })).toBe(4);
+  it("opens after the highest step done, so a skipped step stays skipped", () => {
+    expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, savedStep: 1 })).toBe(2);
+    expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, savedStep: 2 })).toBe(3);
+    expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, savedStep: 3 })).toBe(4);
   });
 
-  it("ignores a step outside the wizard", () => {
-    expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, storedStep: 9 })).toBe(2);
-    expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, storedStep: 1.5 })).toBe(2);
+  it("never opens past the last step", () => {
+    expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, savedStep: 4 })).toBe(4);
   });
 
-  it("without a remembered step, opens on the first step with nothing saved", () => {
+  it("ignores a recorded step outside the wizard", () => {
+    expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, savedStep: 9 })).toBe(2);
+    expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, savedStep: 1.5 })).toBe(2);
+  });
+
+  it("without a recorded step (setup started before it existed), opens on the first step with nothing saved", () => {
     expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0 })).toBe(2);
     expect(resumeStep({ city: "Pune", upiId: "a@okaxis", itemCount: 0 })).toBe(3);
     expect(resumeStep({ city: "Pune", upiId: "a@okaxis", itemCount: 2 })).toBe(4);
+  });
+});
+
+describe("progressAfter", () => {
+  it("records a step the server doesn't have yet", () => {
+    expect(progressAfter(null, 1)).toBe(1);
+    expect(progressAfter(1, 2)).toBe(2);
+    expect(progressAfter(1, 3)).toBe(3);
+  });
+
+  it("only moves forward, so Back then Next records nothing", () => {
+    expect(progressAfter(3, 2)).toBeNull();
+    expect(progressAfter(2, 2)).toBeNull();
+  });
+
+  it("ignores a step outside the wizard", () => {
+    expect(progressAfter(null, 0)).toBeNull();
+    expect(progressAfter(null, 9)).toBeNull();
   });
 });
 
