@@ -1008,10 +1008,11 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                           }}
                           size="compact"
                           className={cn(
-                            "rounded-lg border-transparent",
+                            "relative rounded-lg border-transparent",
                             fulfilment === t ? "bg-background shadow-sm" : "bg-transparent text-muted-foreground",
                           )}
-                          inputClassName="sr-only"
+                          // Invisible but covering the whole option, so a tap or click lands on the radio itself.
+                          inputClassName="absolute inset-0 m-0 h-full w-full cursor-pointer appearance-none opacity-0"
                           label={
                             t === "DELIVERY"
                               ? deliveryLabelFee > 0
