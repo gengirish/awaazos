@@ -1,6 +1,8 @@
 import Link from "next/link";
 
 import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
+import { InstallAppButton } from "@/components/marketing/InstallAppButton";
+import { SupportWhatsappLink } from "@/components/marketing/SupportWhatsapp";
 
 export function MarketingFooter() {
   return (
@@ -11,8 +13,12 @@ export function MarketingFooter() {
           {/* The shared link is a bare <a>: the 44px hit area is added here. */}
           <p className="[&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center [&_a]:font-medium [&_a]:text-awaaz-charcoal [&_a]:underline [&_a]:underline-offset-4 [&_a]:outline-hidden [&_a]:hover:text-awaaz-orange [&_a]:focus-visible:ring-2 [&_a]:focus-visible:ring-awaaz-orange [&_a]:focus-visible:ring-offset-2">
             Need help? Email <SupportEmailLink />
+            <SupportWhatsappLink />
           </p>
-          <p className="text-xs text-muted-foreground">
+          <div>
+            <InstallAppButton />
+          </div>
+          <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} AwaazOS. All rights reserved.
           </p>
         </div>
