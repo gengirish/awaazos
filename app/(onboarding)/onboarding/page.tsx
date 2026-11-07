@@ -36,6 +36,7 @@ import {
   isBlankDraft,
   MAX_DRAFT_ITEMS,
   ONBOARDING_STEPS,
+  progressAfter,
   resumeStep,
   STEP_COUNT,
   stepDescription,
@@ -53,22 +54,21 @@ type FieldErrors = Record<string, string>;
 type Phase = "loading" | "load-failed" | "form" | "done";
 
 /**
- * Per-tab note of where the seller is (step number and the "speak my menu"
- * choice only — every answer is saved on the server when they tap Next). It
- * lets a reload reopen a step that was skipped rather than the one before it.
+ * Per-tab note of the "speak my menu" choice, which is not saved anywhere else
+ * until Finish. The step itself is on the server (`Vendor.onboardingStep`).
  */
 const progressKey = (vendorId: string) => `awz_onboarding_v1:${vendorId}`;
 
-function readProgress(vendorId: string): { step?: number; speakMenu?: boolean } {
+function readProgress(vendorId: string): { speakMenu?: boolean } {
   try {
     const raw = window.sessionStorage.getItem(progressKey(vendorId));
-    return raw ? (JSON.parse(raw) as { step?: number; speakMenu?: boolean }) : {};
+    return raw ? (JSON.parse(raw) as { speakMenu?: boolean }) : {};
   } catch {
     return {};
   }
 }
 
-function writeProgress(vendorId: string, value: { step: number; speakMenu: boolean } | null) {
+function writeProgress(vendorId: string, value: { speakMenu: boolean } | null) {
   try {
     if (value) window.sessionStorage.setItem(progressKey(vendorId), JSON.stringify(value));
     else window.sessionStorage.removeItem(progressKey(vendorId));
@@ -172,6 +172,8 @@ export default function OnboardingPage() {
 
   const [vendorId, setVendorId] = useState("");
   const [slug, setSlug] = useState("");
+  /** `Vendor.onboardingStep` as the server holds it. */
+  const [savedStep, setSavedStep] = useState<number | null>(null);
 
   const [city, setCity] = useState("");
   const [stateName, setStateName] = useState("");
@@ -232,7 +234,8 @@ export default function OnboardingPage() {
         setSavedWhatsapp(v.settings?.whatsappNumber ?? "");
         setSavedItems(menu.map((m) => ({ id: m.id, name: m.name, priceInPaise: m.priceInPaise })));
         setSpeakMenu(progress.speakMenu === true);
-        setStep(resumeStep({ city: v.city, upiId: v.upiId, itemCount: menu.length, storedStep: progress.step }));
+        setSavedStep(v.onboardingStep);
+        setStep(resumeStep({ city: v.city, upiId: v.upiId, itemCount: menu.length, savedStep: v.onboardingStep }));
         setPhase("form");
       } catch {
         if (!cancelled) setPhase("load-failed");
@@ -267,12 +270,30 @@ export default function OnboardingPage() {
 
   const qrSrc = useQrDataUrl(previewLink, 220);
 
-  function goTo(nextStep: number, speak = speakMenu) {
+  function goTo(nextStep: number) {
     setErrors({});
     setFormError(null);
     focusHeading.current = true;
     setStep(nextStep);
-    if (vendorId) writeProgress(vendorId, { step: nextStep, speakMenu: speak });
+  }
+
+  /**
+   * Note on the server that `done` is finished, so setup reopens after it.
+   * Best effort: if it fails, a reload reopens an earlier step, nothing worse.
+   */
+  async function recordProgress(done: number) {
+    const value = progressAfter(savedStep, done);
+    if (value == null) return;
+    try {
+      const res = await fetch("/api/vendor", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ onboardingStep: value }),
+      });
+      if (res.ok) setSavedStep(value);
+    } catch {
+      /* offline: the answers themselves are saved */
+    }
   }
 
   /** Show the errors under their fields and put the cursor in the first one. */
@@ -403,13 +424,18 @@ export default function OnboardingPage() {
     setSaving(true);
     setFormError(null);
     const ok = step === 1 ? await saveStore() : step === 2 ? await savePayment() : await saveItems();
+    if (ok) await recordProgress(step);
     setSaving(false);
     if (ok) goTo(step + 1);
   }
 
   /** Steps 2 and 3 only: move on without saving or checking what is typed. */
-  function skip() {
+  async function skip() {
     if (saving) return;
+    // Awaited like Next, so this note can't land after the next step's and move it back.
+    setSaving(true);
+    await recordProgress(step);
+    setSaving(false);
     goTo(step + 1);
   }
 
@@ -459,7 +485,7 @@ export default function OnboardingPage() {
     setErrors({});
     setFormError(null);
     setSpeakMenu(on);
-    if (vendorId) writeProgress(vendorId, { step, speakMenu: on });
+    if (vendorId) writeProgress(vendorId, { speakMenu: on });
   }
 
   if (phase === "loading") return <LoadingSkeleton />;

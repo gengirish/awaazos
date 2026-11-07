@@ -557,7 +557,10 @@ first membership otherwise). UPI QRs are rendered locally by `lib/qr.ts` — no 
 the manifest `start_url` all point at `/home` (`app/home/page.tsx`, Node, redirect only), which is the
 one place the rule lives: setup unfinished → `/onboarding`, `publishStorefront` → `/orders`, otherwise
 `/pos`. An explicit `callbackUrl` never goes through it. Never decide this in middleware (it needs
-Postgres). `public/sw.js` repeats the `/home` literal: with no network it answers that navigation
+Postgres). Setup is also a gate: every `(vendor)` page sends a store without `onboardingDone` to
+`/onboarding` (`getShellContext`, no exceptions), where non-owners get a waiting screen; resume uses
+`Vendor.onboardingStep`. Plan for the step-by-step setup: `docs/ONBOARDING_PLAN.md`. E2E `signIn()` finishes
+setup through the API unless `finishSetup: false`. `public/sw.js` repeats the `/home` literal: with no network it answers that navigation
 with a redirect to `/pos` when a cached `/pos` exists, so the Home Screen icon still opens the offline
 till. Manifest `id` stays `"/"`. Install affordances (`components/pwa/InstallPrompt.tsx`) and every
 copy of the phone-alerts opt-in (`components/push/PushAlertsButton.tsx`) are views over module-level

@@ -40,6 +40,10 @@ model Vendor {
   gstin              String? // 15-char GST identifier (optional)
   isActive           Boolean   @default(true)
   onboardingDone     Boolean   @default(false)
+  // Highest first-run setup step saved (app/(onboarding)/onboarding), so a
+  // reload or another phone reopens the right one. Null before step 1 and
+  // again once onboardingDone is set.
+  onboardingStep     Int?
   // Internal demo store built for a prospect by POST /api/internal/demo-stores
   // (lib/demo-store.ts). Owned by the internal demo account until the prospect
   // claims it; excluded from platform metrics and subscriptions; noindex.

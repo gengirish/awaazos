@@ -26,23 +26,33 @@ export type ShellContext = {
  * `requireVendorRole(minRole)`. The user and membership reads behind that call
  * are request-cached in lib/rbac.ts, so the layout and the page share them;
  * the only read the shell adds is the one `publishStorefront` column below.
+ *
+ * It is also the setup gate: a store that hasn't finished first-run setup
+ * (`Vendor.onboardingDone`) is sent to /onboarding from every page here, so a
+ * deep link or a push notification can't skip it. Nothing is exempt: setup
+ * saves through routes that never check billing, so even a locked trial can
+ * finish it and then reach Billing. Staff other than the owner see a waiting
+ * screen there (app/(onboarding)/layout.tsx).
  */
 export const getShellContext = cache(async (): Promise<ShellContext> => {
+  let ctx: Awaited<ReturnType<typeof requireVendorRole>>;
   try {
-    const ctx = await requireVendorRole("CASHIER");
-    const settings = await prisma.vendorSettings.findUnique({
-      where: { vendorId: ctx.vendor.id },
-      select: { publishStorefront: true },
-    });
-    return {
-      // "Prankie's Bakery (DEMO)" while it is an internal demo store (lib/demo-store.ts).
-      vendor: { id: ctx.vendor.id, name: displayStoreName(ctx.vendor) },
-      role: ctx.staff.role,
-      storePath: settings?.publishStorefront ? `/s/${encodeURIComponent(ctx.vendor.slug)}` : null,
-      storeKind: storeKind(ctx.vendor.stallType),
-    };
+    ctx = await requireVendorRole("CASHIER");
   } catch (e) {
     if (e instanceof AuthError) redirect("/sign-in");
     throw e;
   }
+  if (!ctx.vendor.onboardingDone) redirect("/onboarding");
+
+  const settings = await prisma.vendorSettings.findUnique({
+    where: { vendorId: ctx.vendor.id },
+    select: { publishStorefront: true },
+  });
+  return {
+    // "Prankie's Bakery (DEMO)" while it is an internal demo store (lib/demo-store.ts).
+    vendor: { id: ctx.vendor.id, name: displayStoreName(ctx.vendor) },
+    role: ctx.staff.role,
+    storePath: settings?.publishStorefront ? `/s/${encodeURIComponent(ctx.vendor.slug)}` : null,
+    storeKind: storeKind(ctx.vendor.stallType),
+  };
 });

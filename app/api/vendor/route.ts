@@ -57,6 +57,8 @@ const patchSchema = z.object({
     .nullable(),
   upiName: z.string().trim().max(120).optional().nullable(),
   onboardingDone: z.boolean().optional(),
+  // Highest first-run step saved (resumeStep in app/(onboarding)/onboarding/onboarding-steps.ts).
+  onboardingStep: z.number().int().min(1).max(20).optional(),
   whatsappNumber: z.string().trim().max(20).optional().nullable(),
   // Show whatsappNumber to storefront buyers (wa.me links). Off by default.
   acceptWhatsappOrders: z.boolean().optional(),
@@ -301,7 +303,10 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.upiId !== undefined) data.upiId = vendorFields.upiId || null;
       if (vendorFields.upiName !== undefined) data.upiName = vendorFields.upiName || null;
+      if (vendorFields.onboardingStep !== undefined) data.onboardingStep = vendorFields.onboardingStep;
       if (vendorFields.onboardingDone !== undefined) data.onboardingDone = vendorFields.onboardingDone;
+      // Finished: nothing left to resume.
+      if (vendorFields.onboardingDone === true) data.onboardingStep = null;
       if (vendorFields.gstin !== undefined) data.gstin = vendorFields.gstin || null;
 
       if (Object.keys(data).length) {

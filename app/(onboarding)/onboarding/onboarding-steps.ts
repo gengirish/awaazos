@@ -6,10 +6,13 @@ import type { StoreKind } from "@/lib/store-vocabulary";
  * are unit-tested. Client-safe: no Prisma, no React.
  *
  * Each step is saved when the seller taps Next, through the endpoints the rest
- * of the app uses (PATCH /api/vendor, POST /api/menu/bulk). Nothing marks "you
- * were on step N" in the database, so the step to reopen on is worked out from
- * what is saved (`resumeStep`), helped by a per-tab note in sessionStorage for
- * the steps a seller may skip.
+ * of the app uses (PATCH /api/vendor, POST /api/menu/bulk). After each step,
+ * Next or Skip, `Vendor.onboardingStep` records the highest step done, so a
+ * reload or another phone reopens the right one (`resumeStep`), even when the
+ * answer looks like the default (a skipped UPI ID).
+ *
+ * Every vendor page sends a store here until `onboardingDone`
+ * (app/(vendor)/_shell-context.ts). Plan and decisions: docs/ONBOARDING_PLAN.md.
  */
 
 /**
@@ -44,24 +47,35 @@ export type OnboardingResumeInput = {
   upiId: string | null;
   /** Menu items the store already has. */
   itemCount: number;
-  /** The step this tab last showed (sessionStorage), if any. */
-  storedStep?: number | null;
+  /** `Vendor.onboardingStep`: the highest step done, if any. */
+  savedStep?: number | null;
 };
+
+function isStepNumber(n: number | null | undefined): n is number {
+  return n != null && Number.isInteger(n) && n >= 1 && n <= STEP_COUNT;
+}
 
 /**
  * The step to open on. Step 1 is the only one that cannot be skipped, so an
- * unsaved step 1 always wins. Past it, the tab's own note is trusted (it tells
- * "skipped UPI" from "not there yet"); without one, the first step with
- * nothing saved.
+ * unsaved step 1 always wins. Past it, the step after the highest one done
+ * (it tells "skipped UPI" from "not there yet"). A store that started setup
+ * before `onboardingStep` existed has none: the first step with nothing saved.
  */
-export function resumeStep({ city, upiId, itemCount, storedStep }: OnboardingResumeInput): number {
+export function resumeStep({ city, upiId, itemCount, savedStep }: OnboardingResumeInput): number {
   if (!city?.trim()) return 1;
-  if (storedStep != null && Number.isInteger(storedStep) && storedStep >= 1 && storedStep <= STEP_COUNT) {
-    return storedStep;
-  }
+  if (isStepNumber(savedStep)) return Math.min(savedStep + 1, STEP_COUNT);
   if (!upiId?.trim()) return 2;
   if (itemCount <= 0) return 3;
   return 4;
+}
+
+/**
+ * What to record after finishing `step`, or null when the saved value already
+ * covers it. Only moves forward: going Back and Next again records nothing.
+ */
+export function progressAfter(savedStep: number | null | undefined, step: number): number | null {
+  if (!isStepNumber(step)) return null;
+  return isStepNumber(savedStep) && savedStep >= step ? null : step;
 }
 
 /**

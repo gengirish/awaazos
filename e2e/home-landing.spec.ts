@@ -57,6 +57,8 @@ test.describe("landing screen", () => {
   });
 
   test("a store that has not finished setup lands on onboarding", async ({ page, request, browser }) => {
+    // Two sign-ins and five page loads.
+    test.slow();
     const creds = await registerVendor(request, "home-setup");
 
     const fresh = await signInWithNoCallback(browser, creds);
@@ -68,9 +70,20 @@ test.describe("landing screen", () => {
     }
 
     // The same answer straight from the resolver (the Home Screen icon).
-    await signIn(page, creds, "/menu");
+    await signIn(page, creds, "/menu", { finishSetup: false });
     await page.goto("/home");
     await expect(page).toHaveURL(/\/onboarding$/);
+
+    // A deep link (a push, a bookmark) can't skip setup either: every vendor page sends it back.
+    for (const path of ["/orders", "/settings/payments", "/menu"]) {
+      await page.goto(path);
+      await expect(page, `${path} while setup is unfinished`).toHaveURL(/\/onboarding$/);
+    }
+
+    // Once it's finished, the onboarding page itself sends the seller home.
+    await patchVendor(page, { onboardingDone: true });
+    await page.goto("/onboarding");
+    await expect(page).not.toHaveURL(/\/onboarding/);
   });
 
   test("a counter-only store lands on the POS", async ({ page, request, browser }) => {

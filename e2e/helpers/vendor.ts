@@ -81,11 +81,19 @@ export async function registerVendor(
   return { email, password: E2E_PASSWORD, stallName };
 }
 
-/** Sign in through the UI so the browser context carries the Auth.js session cookie. */
+/**
+ * Sign in through the UI so the browser context carries the Auth.js session cookie.
+ *
+ * Every vendor page sends a store that hasn't finished first-run setup to
+ * /onboarding (app/(vendor)/_shell-context.ts). Specs are about a set-up store,
+ * so unless `finishSetup: false` (or the callback is /onboarding itself), setup
+ * is marked done through the API and the browser is sent on to `callbackUrl`.
+ */
 export async function signIn(
   page: Page,
   creds: VendorCreds,
   callbackUrl = "/menu",
+  { finishSetup = true }: { finishSetup?: boolean } = {},
 ): Promise<void> {
   await page.addInitScript(() => {
     window.localStorage.setItem("awz_cookie_pref_v1", "accepted");
@@ -95,6 +103,19 @@ export async function signIn(
   await page.getByLabel("Password", { exact: true }).fill(creds.password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL((u) => !u.pathname.includes("/sign-in"), { timeout: 45_000 });
+
+  if (!finishSetup || callbackUrl.startsWith("/onboarding")) return;
+  // Platform admins have no store: 401, nothing to finish.
+  const me = await page.request.get("/api/vendor", { failOnStatusCode: false });
+  if (!me.ok()) return;
+  const { vendor } = (await me.json()) as { vendor: { onboardingDone: boolean } };
+  if (vendor.onboardingDone) return;
+  const done = await page.request.patch("/api/vendor", {
+    data: { onboardingDone: true },
+    headers: { "Content-Type": "application/json" },
+  });
+  expect(done.ok(), "finishing setup for the spec's store").toBe(true);
+  await page.goto(callbackUrl);
 }
 
 /**

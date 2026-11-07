@@ -12,6 +12,9 @@
  * of onboarding, the manifest's `start_url` — points at HOME_PATH instead. An
  * explicit `callbackUrl` or deep link never goes through here, so it still wins.
  *
+ * The first line is enforced beyond landings too: every vendor page sends an
+ * unfinished store to /onboarding (app/(vendor)/_shell-context.ts).
+ *
  * Not routed through here: the "a cashier can't open this page" bounces on the
  * drops pages. Those are permission fallbacks, not landings, and stay on /pos
  * (a page every role can open, whatever the store's setup state).
