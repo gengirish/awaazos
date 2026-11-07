@@ -6,10 +6,11 @@ import type { StoreKind } from "@/lib/store-vocabulary";
  * are unit-tested. Client-safe: no Prisma, no React.
  *
  * Each step is saved when the seller taps Next, through the endpoints the rest
- * of the app uses (PATCH /api/vendor, POST /api/menu/bulk). After each step,
- * Next or Skip, `Vendor.onboardingStep` records the highest step done, so a
- * reload or another phone reopens the right one (`resumeStep`), even when the
- * answer looks like the default (a skipped UPI ID).
+ * of the app uses (PATCH /api/vendor, POST /api/menu/bulk). Every step needs an
+ * answer: a way to get paid (`paymentChoiceProblem`), at least one item. After
+ * each Next, `Vendor.onboardingStep` records the highest step done, so a reload
+ * or another phone reopens the right one (`resumeStep`), even when the answer
+ * looks like the default (pay on delivery only, no UPI ID).
  *
  * Every vendor page sends a store here until `onboardingDone`
  * (app/(vendor)/_shell-context.ts). Plan and decisions: docs/ONBOARDING_PLAN.md.
@@ -25,11 +26,14 @@ export const ONBOARDING_STEPS: readonly { title: string; description: string; go
     description: "Where you cook and sell from. You can change this later.",
     goodsDescription: "Where you sell from. You can change this later.",
   },
-  { title: "Getting paid", description: "Customers pay straight to your UPI ID. AwaazOS never holds your money." },
+  {
+    title: "Getting paid",
+    description: "Choose at least one way customers can pay. The money comes straight to you: AwaazOS never holds it.",
+  },
   {
     title: "What you sell",
-    description: "One item with a price is enough to start. Add the rest later in Menu.",
-    goodsDescription: "One product with a price is enough to start. Add the rest later in Products.",
+    description: "Add at least one item with its price. Add the rest later in Menu.",
+    goodsDescription: "Add at least one product with its price. Add the rest later in Products.",
   },
   { title: "Order alerts", description: "Hear about a new order the moment it comes in." },
 ];
@@ -56,10 +60,10 @@ function isStepNumber(n: number | null | undefined): n is number {
 }
 
 /**
- * The step to open on. Step 1 is the only one that cannot be skipped, so an
- * unsaved step 1 always wins. Past it, the step after the highest one done
- * (it tells "skipped UPI" from "not there yet"). A store that started setup
- * before `onboardingStep` existed has none: the first step with nothing saved.
+ * The step to open on. An unsaved step 1 always wins. Past it, the step after
+ * the highest one done (it tells "pay on delivery only" from "not there yet").
+ * A store that started setup before `onboardingStep` existed has none: the
+ * first step with nothing saved.
  */
 export function resumeStep({ city, upiId, itemCount, savedStep }: OnboardingResumeInput): number {
   if (!city?.trim()) return 1;
@@ -76,6 +80,35 @@ export function resumeStep({ city, upiId, itemCount, savedStep }: OnboardingResu
 export function progressAfter(savedStep: number | null | undefined, step: number): number | null {
   if (!isStepNumber(step)) return null;
   return isStepNumber(savedStep) && savedStep >= step ? null : step;
+}
+
+/** Step 2's ticks. `online`: the store's own Razorpay can already take a payment. */
+export type PaymentChoice = { upi: boolean; upiId: string; payOnDelivery: boolean; online: boolean };
+
+/**
+ * The ticks step 2 opens with. A step answered before (or a Connect Razorpay
+ * round trip, which saves the ticks first) shows what is saved. A first visit
+ * starts on UPI alone: `acceptPayOnDelivery` defaults to true in the database,
+ * so a saved true there says nothing about what the seller wants.
+ */
+export function initialPaymentChoice(input: {
+  upiId: string | null;
+  acceptPayOnDelivery: boolean;
+  answered: boolean;
+}): { upi: boolean; payOnDelivery: boolean } {
+  if (input.answered) return { upi: Boolean(input.upiId?.trim()), payOnDelivery: input.acceptPayOnDelivery };
+  return { upi: true, payOnDelivery: false };
+}
+
+/**
+ * Why step 2 can't be saved yet, or null. A ticked UPI needs its ID; with
+ * nothing ticked and no Razorpay, customers would have no way to pay.
+ * (The ID's format is checked separately, with `isValidUpiId`.)
+ */
+export function paymentChoiceProblem(c: PaymentChoice): "upi_missing" | "choose_one" | null {
+  if (c.upi && !c.upiId.trim()) return "upi_missing";
+  if (!c.upi && !c.payOnDelivery && !c.online) return "choose_one";
+  return null;
 }
 
 /**

@@ -6,6 +6,7 @@ import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { lastPaymentMethodBlockersFrom, lastPaymentMethodMessage } from "@/components/settings/LastPaymentMethodNotice";
+import { connectOutcomeMessage, razorpayConnectHref } from "@/lib/razorpay-connect";
 import type { StoreKind } from "@/lib/store-vocabulary";
 
 /**
@@ -44,22 +45,9 @@ export type RazorpayKeysClientProps = {
   isOwner: boolean;
 };
 
-const CONNECT_HREF = "/api/vendor/payments/razorpay/connect";
+const CONNECT_HREF = razorpayConnectHref();
 
 const KEY_ID = /^rzp_(live|test)_[A-Za-z0-9]{8,32}$/;
-
-const OUTCOMES: Record<string, { text: string; ok: boolean }> = {
-  connected: { text: "Razorpay connected. Customers can now pay online.", ok: true },
-  denied: { text: "You cancelled on Razorpay, so nothing changed.", ok: false },
-  expired: {
-    text: "That link expired or was opened in another browser. Tap Connect Razorpay again.",
-    ok: false,
-  },
-  upgrade: { text: "Online payments are on the Starter plan.", ok: false },
-  owner_only: { text: "Only the owner of this store can connect Razorpay.", ok: false },
-  unavailable: { text: "Connect Razorpay isn't switched on for AwaazOS yet. Please use API keys.", ok: false },
-  error: { text: "Couldn't connect to Razorpay. Please try again in a minute.", ok: false },
-};
 
 const inputClass =
   "flex min-h-11 w-full rounded-md border border-input bg-background px-3 font-mono text-base ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
@@ -109,7 +97,7 @@ export function RazorpayKeysClient({
           ? `Razorpay stopped accepting AwaazOS's access to your account on ${issue.at}. Tap Reconnect Razorpay.`
           : `Razorpay rejected your saved keys on ${issue.at}. They may have been regenerated — tap Replace keys and paste the new ones.`
       : null;
-  const outcomeMsg = outcomeShown ? OUTCOMES[outcomeShown] ?? OUTCOMES.error : null;
+  const outcomeMsg = outcomeShown ? connectOutcomeMessage(outcomeShown) : null;
 
   async function copyWebhook() {
     try {

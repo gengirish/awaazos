@@ -4,13 +4,13 @@ import { AlertCircle, CheckCircle2, HelpCircle, Loader2, Mic, Plus, RotateCcw, S
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 
-import { MENU_CHANGED_EVENT } from "@/components/menu/MenuGrid";
 import { defaultEmoji, emojiChoices } from "@/components/menu/MenuItemForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useOnline } from "@/hooks/useOnline";
 import { useVoiceDictation, type DictationError } from "@/hooks/useVoiceDictation";
 import { formatINRCompact } from "@/lib/currency";
+import { MENU_CHANGED_EVENT } from "@/lib/menu-events";
 import { MENU_UNIT_MAX } from "@/lib/menu-unit";
 import {
   appendRows,
@@ -50,6 +50,8 @@ export type VoiceMenuPanelProps = {
   defaultOpen?: boolean;
   /** The store's words (lib/store-vocabulary.ts): dishes or products. */
   vocab: StoreVocabulary;
+  /** How the messages name the tap fallback, when it isn't the menu's "Add item" (setup: "Type instead"). */
+  formHint?: string;
 };
 
 const LANG_LABEL: Record<string, string> = {
@@ -75,27 +77,39 @@ const GOODS_EXAMPLE: Record<string, string> = {
   "hi-IN": "Ashwagandha powder 250 gram 399, tulsi green tea 100 gram 199 — herbal mein. Coconut oil 500 ml 350.",
 };
 
+/** The tap fallback the messages point at: the menu screen's "Add item" button. */
 const FORM_HINT = "use “Add item”";
 
-const ERROR_MESSAGES: Record<string, string> = {
-  voice_unavailable: `Voice isn't available right now — ${FORM_HINT}.`,
-  ai_limit: `Voice limit reached for your plan — ${FORM_HINT}.`,
-  rate_limited: `Too many voice tries — wait a minute, or ${FORM_HINT}.`,
-  not_allowed: `Voice isn't available for your account here — ${FORM_HINT}.`,
-  mic_denied: `Microphone blocked — allow mic access, or ${FORM_HINT}.`,
-  stt_unsupported: `This browser can't take voice input — ${FORM_HINT}.`,
-  lang_not_supported_stt: `This browser can't hear your language — try Chrome, or ${FORM_HINT}.`,
-  unsupported_lang: `Voice isn't set up for your language — ${FORM_HINT}.`,
-  use_webspeech: `Voice isn't set up for your language — ${FORM_HINT}.`,
-  network_error: `No internet for voice — check your connection, or ${FORM_HINT}.`,
-  empty_transcript: `Didn't hear anything — tap the mic and speak, or ${FORM_HINT}.`,
-  no_speech_detected: `Didn't hear anything — tap the mic and speak, or ${FORM_HINT}.`,
-};
-const DEFAULT_ERROR = `Couldn't understand — try again, or ${FORM_HINT}.`;
-
-function errorMessage(code: DictationError | null, vocab: StoreVocabulary): string {
-  if (code === "nothing_found") return `Couldn't find any ${vocab.items} in that — try again, or ${FORM_HINT}.`;
-  return (code && ERROR_MESSAGES[code]) || DEFAULT_ERROR;
+/** What to tell the seller about `code`; `hint` names this screen's tap fallback. */
+function errorMessage(code: DictationError | null, vocab: StoreVocabulary, hint: string): string {
+  switch (code) {
+    case "nothing_found":
+      return `Couldn't find any ${vocab.items} in that — try again, or ${hint}.`;
+    case "voice_unavailable":
+      return `Voice isn't available right now — ${hint}.`;
+    case "ai_limit":
+      return `Voice limit reached for your plan — ${hint}.`;
+    case "rate_limited":
+      return `Too many voice tries — wait a minute, or ${hint}.`;
+    case "not_allowed":
+      return `Voice isn't available for your account here — ${hint}.`;
+    case "mic_denied":
+      return `Microphone blocked — allow mic access, or ${hint}.`;
+    case "stt_unsupported":
+      return `This browser can't take voice input — ${hint}.`;
+    case "lang_not_supported_stt":
+      return `This browser can't hear your language — try Chrome, or ${hint}.`;
+    case "unsupported_lang":
+    case "use_webspeech":
+      return `Voice isn't set up for your language — ${hint}.`;
+    case "network_error":
+      return `No internet for voice — check your connection, or ${hint}.`;
+    case "empty_transcript":
+    case "no_speech_detected":
+      return `Didn't hear anything — tap the mic and speak, or ${hint}.`;
+    default:
+      return `Couldn't understand — try again, or ${hint}.`;
+  }
 }
 
 /** parse-menu HTTP status → panel error code (same shapes as /api/ai/parse-drop). */
@@ -145,6 +159,7 @@ export function VoiceMenuPanel({
   micRef,
   defaultOpen = false,
   vocab,
+  formHint = FORM_HINT,
 }: VoiceMenuPanelProps) {
   const router = useRouter();
   const uid = useId().replace(/:/g, "");
@@ -379,13 +394,13 @@ export function VoiceMenuPanel({
   if (!expanded) return null;
 
   const statusText = offline
-    ? `Voice needs internet — ${FORM_HINT}.`
+    ? `Voice needs internet — ${formHint}.`
     : state === "listening"
       ? "Listening… tap stop when you're done."
       : busy
         ? "Working it out…"
         : state === "error"
-          ? errorMessage(error, vocab)
+          ? errorMessage(error, vocab, formHint)
           : reviewing
             ? `Check the ${vocab.items} below, then save.`
             : vocab.foodArt
@@ -579,7 +594,7 @@ export function VoiceMenuPanel({
                   </li>
                 ))}
               </ul>
-              <p className="mt-1 text-xs text-muted-foreground">Speak them again, or {FORM_HINT}.</p>
+              <p className="mt-1 text-xs text-muted-foreground">Speak them again, or {formHint}.</p>
             </div>
           ) : null}
 

@@ -1,6 +1,7 @@
 # Onboarding consolidation plan
 
-Status: decided 2026-11-07 (see "Decisions"). PR 1 (gate, `onboardingStep`) in progress; PRs 2–4 not started.
+Status: decided 2026-11-07 (see "Decisions"). PR 1 (gate, `onboardingStep`) merged as #168; PR 2 (payments and items
+required) in progress; PRs 3–4 not started.
 
 ## The problem
 
@@ -54,14 +55,17 @@ accepted by `PATCH /api/vendor` (see `patchSchema` in `app/api/vendor/route.ts`)
 
 Notes on the steps:
 
-- **Step 2, Razorpay**: Connect Razorpay leaves the site. The OAuth callback today always returns to
-  Settings → Payments (`backToPayments` in `app/api/vendor/payments/razorpay/_redirect.ts`). It needs to
-  carry a `return=/onboarding` the callback checks against an allowlist, never a free URL (open redirect).
-  Pasting keys stays in Settings only: it is too much for a first run.
-- **Step 3, speaking the list**: today "speak your whole menu" leaves onboarding for `/menu?voice=1`, which
-  would bypass the item requirement. Load the voice menu builder (`POST /api/ai/parse-menu`) inside the step
-  with `next/dynamic` on tap, so its code stays out of the step's first load. Typing stays the fallback
-  (every voice path needs a tap fallback).
+- **Step 2, Razorpay** (PR 2): Connect Razorpay leaves the site. The connect link carries `?return=onboarding`,
+  a fixed name kept in a cookie beside the OAuth nonce, and the callback sends the seller back to step 2 with
+  the usual `?razorpay=<outcome>` (`lib/razorpay-connect.ts`). Never a free URL (open redirect). The ticks on
+  screen are saved before leaving. Pasting keys stays in Settings only: it is too much for a first run. The
+  connect block shows only when Connect is configured and the plan includes online payments (a trial does).
+- **Step 2, defaults** (PR 2): a first visit opens with UPI ticked and pay on delivery not ticked, because
+  `acceptPayOnDelivery` defaults to `true` in the database and says nothing about what the seller wants.
+- **Step 3, speaking the list** (PR 2): "Speak your whole menu" opens the voice menu builder
+  (`POST /api/ai/parse-menu`) inside the step, loaded with `next/dynamic` on tap, so its code stays out of the
+  step's first load. It saves its own rows; the step re-reads the menu on `MENU_CHANGED_EVENT`. "Type instead"
+  is the tap fallback. Nothing sends the seller to `/menu?voice=1` any more.
 - **Step 4 wording**: the choice is described in the store's words (`storeVocabulary()`: "Order from menu"
   vs "Order any time"). Choosing Drops creates nothing. It decides what the done screen offers.
 - **Step 5** writes the menu fulfilment fields. Drops keep their own per-drop handover, and `lastDropDefaults`

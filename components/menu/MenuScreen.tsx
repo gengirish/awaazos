@@ -5,10 +5,11 @@ import { Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { MENU_CHANGED_EVENT, MenuGrid } from "@/components/menu/MenuGrid";
+import { MenuGrid } from "@/components/menu/MenuGrid";
 import { MenuItemForm } from "@/components/menu/MenuItemForm";
 import { VoiceMenuPanel } from "@/components/menu/VoiceMenuPanel";
 import { Button } from "@/components/ui/button";
+import { MENU_CHANGED_EVENT } from "@/lib/menu-events";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
 
 type MenuScreenProps = {

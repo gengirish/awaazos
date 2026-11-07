@@ -6,6 +6,7 @@ import { SettingsCard, SettingsPageHeader } from "@/components/settings/Settings
 import { PLAN_LIMITS } from "@/lib/constants";
 import { formatIstDateTime } from "@/lib/datetime";
 import { prisma } from "@/lib/prisma";
+import { CONNECT_OUTCOME_RE } from "@/lib/razorpay-connect";
 import { getRazorpayIssue } from "@/lib/razorpay-issue";
 import { isRazorpayOauthConfigured, publicTokenMode } from "@/lib/razorpay-oauth";
 import { isSecretBoxConfigured } from "@/lib/secret-box";
@@ -24,13 +25,10 @@ export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = { title: "Payments · Settings · AwaazOS" };
 
-/** Outcome codes the Connect Razorpay callback redirects back with. */
-const OUTCOME_RE = /^[a-z_]{1,24}$/;
-
 export default async function PaymentsSettingsPage(props: { searchParams: Promise<{ razorpay?: string | string[] }> }) {
   const { vendor, isOwner, storeKind } = await requireSettingsContext();
   const rawOutcome = (await props.searchParams).razorpay;
-  const outcome = typeof rawOutcome === "string" && OUTCOME_RE.test(rawOutcome) ? rawOutcome : null;
+  const outcome = typeof rawOutcome === "string" && CONNECT_OUTCOME_RE.test(rawOutcome) ? rawOutcome : null;
 
   const settings = await prisma.vendorSettings.findUnique({
     where: { vendorId: vendor.id },

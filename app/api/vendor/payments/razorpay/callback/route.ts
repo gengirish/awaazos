@@ -14,7 +14,7 @@ import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/
 import { isSecretBoxConfigured } from "@/lib/secret-box";
 import { appBaseUrl, CLEARED_KEY_COLUMNS, oauthColumnsFromTokens } from "@/lib/storefront-razorpay";
 
-import { backToPayments, toSignIn } from "../_redirect";
+import { backToPayments as backTo, connectReturnFrom, toSignIn } from "../_redirect";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -30,10 +30,13 @@ export const runtime = "nodejs";
  * Only then is the code exchanged and the tokens stored, encrypted.
  *
  * Connecting replaces pasted API keys, so a store has one way in at a time.
- * Every outcome is a redirect to Settings → Payments with a code; the code,
- * state and tokens are never logged.
+ * Every outcome is a redirect with a code to the page that started Connect
+ * (Settings → Payments, or setup: the return cookie the connect route set); the
+ * code, state and tokens are never logged.
  */
 export async function GET(req: NextRequest) {
+  const ret = connectReturnFrom(req, "cookie");
+  const backToPayments = (outcome: string) => backTo(outcome, ret);
   const params = req.nextUrl.searchParams;
   const vendorId = readOauthState(params.get("state"), req.cookies.get(OAUTH_STATE_COOKIE)?.value);
   if (!vendorId) return backToPayments("expired");
@@ -61,7 +64,7 @@ export async function GET(req: NextRequest) {
     return backToPayments("connected");
   } catch (err) {
     if (err instanceof PlanGateError) return backToPayments("upgrade");
-    if (err instanceof AuthError) return err.status === 401 ? toSignIn() : backToPayments("owner_only");
+    if (err instanceof AuthError) return err.status === 401 ? toSignIn(ret) : backToPayments("owner_only");
     console.error(
       JSON.stringify({
         event: "razorpay_connect_callback_failed",

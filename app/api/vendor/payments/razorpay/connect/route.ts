@@ -13,25 +13,29 @@ import { AuthError, PlanGateError, requirePlan, requireVendorRole } from "@/lib/
 import { isSecretBoxConfigured } from "@/lib/secret-box";
 import { appBaseUrl } from "@/lib/storefront-razorpay";
 
-import { backToPayments, OAUTH_COOKIE_PATH, toSignIn } from "../_redirect";
+import { backToPayments, connectReturnFrom, OAUTH_COOKIE_PATH, OAUTH_RETURN_COOKIE, toSignIn } from "../_redirect";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
  * "Connect Razorpay", step 1: the seller's browser lands here from Settings →
- * Payments and is sent to Razorpay's consent page. OWNER + STARTER, the same gate
+ * Payments (or from setup, with `?return=onboarding`) and is sent to Razorpay's
+ * consent page. OWNER + STARTER, the same gate
  * as saving API keys (PUT /api/vendor/payments).
  *
  * The signed `state` names the active vendor; its nonce also goes in an httpOnly
  * cookie scoped to the callback, so the flow can only finish in this browser.
+ * The page to come back to rides in a second cookie beside it: a fixed name
+ * checked against lib/razorpay-connect.ts, never a URL.
  */
 export async function GET(req: NextRequest) {
+  const ret = connectReturnFrom(req, "query");
   try {
     const ctx = await requireVendorRole("OWNER", undefined, req);
     requirePlan(ctx.vendor, "STARTER");
     const cfg = razorpayOauthConfig();
-    if (!cfg || !isSecretBoxConfigured()) return backToPayments("unavailable");
+    if (!cfg || !isSecretBoxConfigured()) return backToPayments("unavailable", ret);
 
     const rl = await writeRateLimit.check(`razorpay-connect:${ctx.vendor.id}`);
     if (!rl.ok) return tooManyRequests(rl, "razorpay-connect");
@@ -46,6 +50,17 @@ export async function GET(req: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       maxAge: OAUTH_STATE_MAX_AGE_S,
     });
+    const returnCookie = { path: OAUTH_COOKIE_PATH, httpOnly: true, sameSite: "lax" as const };
+    if (ret) {
+      res.cookies.set(OAUTH_RETURN_COOKIE, ret, {
+        ...returnCookie,
+        secure: process.env.NODE_ENV === "production",
+        maxAge: OAUTH_STATE_MAX_AGE_S,
+      });
+    } else {
+      // A Connect started from Settings must not inherit an older setup round trip.
+      res.cookies.set(OAUTH_RETURN_COOKIE, "", { ...returnCookie, maxAge: 0 });
+    }
     if (ctx.setVendorCookie) {
       res.cookies.set("awz_vendor", ctx.setVendorCookie, {
         path: "/",
@@ -56,9 +71,9 @@ export async function GET(req: NextRequest) {
     }
     return res;
   } catch (err) {
-    if (err instanceof PlanGateError) return backToPayments("upgrade");
-    if (err instanceof AuthError) return err.status === 401 ? toSignIn() : backToPayments("owner_only");
+    if (err instanceof PlanGateError) return backToPayments("upgrade", ret);
+    if (err instanceof AuthError) return err.status === 401 ? toSignIn(ret) : backToPayments("owner_only", ret);
     console.error(JSON.stringify({ event: "razorpay_connect_failed", error: err instanceof Error ? err.name : "unknown" }));
-    return backToPayments("error");
+    return backToPayments("error", ret);
   }
 }
