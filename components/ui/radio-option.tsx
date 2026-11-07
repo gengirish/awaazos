@@ -26,9 +26,11 @@ export const RadioOption = React.forwardRef<HTMLInputElement, RadioOptionProps>(
   ({ label, hint, size = "default", invalid, className, inputClassName, checked, ...inputProps }, ref) => {
     const compact = size === "compact";
     return (
+      // `relative`: a visually hidden input (`inputClassName="sr-only"`) is placed inside the label,
+      // not wherever the nearest positioned ancestor is, so focus and taps never scroll the page away.
       <label
         className={cn(
-          "flex min-h-11 cursor-pointer rounded-xl border text-sm has-focus-visible:ring-2 has-focus-visible:ring-ring has-disabled:cursor-not-allowed has-disabled:opacity-50",
+          "relative flex min-h-11 cursor-pointer rounded-xl border text-sm has-focus-visible:ring-2 has-focus-visible:ring-ring has-disabled:cursor-not-allowed has-disabled:opacity-50",
           compact ? "items-center justify-center gap-1.5 px-1.5 py-1" : "gap-3 px-3 py-2.5",
           !compact && (hint ? "items-start" : "items-center"),
           checked ? "border-primary bg-primary/10 font-semibold" : invalid ? "border-destructive" : "border-input bg-background",
