@@ -184,8 +184,11 @@ test.describe("orders board layout", () => {
     });
     expect(buyer.ok(), "a paused store takes no menu orders").toBe(false);
 
-    await paused.click();
-    await page.getByRole("menuitemradio", { name: "Taking orders" }).click();
+    // The board refreshes after the pause and can close a menu opened mid-refresh: open it again if so.
+    await expect(async () => {
+      if (!(await page.getByRole("menu").isVisible())) await paused.click();
+      await page.getByRole("menuitemradio", { name: "Taking orders" }).click({ timeout: 3_000 });
+    }).toPass({ timeout: 30_000 });
     await expect(pill).toBeVisible();
     await placeOrder(request, store, "CASH");
   });
