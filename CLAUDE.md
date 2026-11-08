@@ -100,7 +100,7 @@ BullMQ queues in production.
   Used on Vercel for rate limiting, idempotency, circuit breakers, AI usage caps, `/api/ready`.
   Serverless can't hold TCP, so anything running in an API route uses this.
 - `REDIS_URL` (TCP `rediss://`) → `lib/queues.ts` (ioredis + BullMQ), the only TCP Redis client.
-  Workers on Fly consume; API routes on Vercel enqueue (`voice-parse-log`, admin retention runs,
+  Workers on Fly consume; API routes on Vercel enqueue (`voice-parse-log` and
   the dormant Gupshup receipt path). Without it on Vercel those enqueues fail; voice telemetry is
   dropped silently.
   On Vercel it must be a **public** endpoint — Fly `*.internal` hostnames are unreachable from Vercel.
@@ -359,7 +359,7 @@ passes, so Neon can sleep.
   longer; `plan` / `planExpiresAt` are untouched. Anyone else gets 404. The log line
   "admin granted free access" is the only audit trail.
 - **Seller alerts** (`lib/trial-alerts.ts`, `lib/trial-alerts-server.ts`): reminder emails 5 and 1 IST days
-  before `trialEndsAt`, from the project's one cron, `GET /api/cron/trial-reminders` (`vercel.json`, daily 09:00
+  before `trialEndsAt`, from a daily cron, `GET /api/cron/trial-reminders` (`vercel.json`, 09:00
   IST, `Authorization: Bearer $CRON_SECRET`; secret unset → 401 and no reminders). It only reads Postgres and
   never changes billing state. When a buyer hits `orders_paused` or `monthly_txn_cap_reached`, the route pushes and
   emails the store's owners, at most once a day, with nothing about the buyer. Each send is claimed in Upstash (`SET NX`); no KV → no alert.
@@ -880,6 +880,12 @@ Full template and status-code table in `.cursor/rules/api-routes.mdc`. Essential
 `Transaction.customerPhone`, customer name, and UPI UTR stay in Postgres for resend/reconciliation.
 They must never reach Anthropic, an STT provider, `VoiceParseLog`, Sentry, or any log line. CSV
 exports and log lines carry last-4 only. Audio bytes are streamed and discarded, never stored.
+
+**Retention** (`lib/retention.ts`, `lib/retention-server.ts`): `VoiceParseLog` rows go after 90 days and
+receipts after 7 years, the numbers the Privacy page promises. The daily Vercel Cron
+`GET /api/cron/retention` (`vercel.json`, 09:05 IST, five minutes after trial-reminders so Neon is already awake;
+`Bearer $CRON_SECRET`) deletes them in the request, no queue or worker; `POST /api/admin/retention/run`
+(platform ADMIN) runs the same code by hand. Keep it daily: it touches Neon.
 
 ## Project rules
 

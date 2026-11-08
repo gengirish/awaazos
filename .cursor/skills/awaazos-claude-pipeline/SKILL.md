@@ -145,7 +145,7 @@ try {
 ```
 
 `workers/voiceLog.worker.ts` inserts (`create`) into `VoiceParseLog`.
-90-day retention via `workers/retention.worker.ts`.
+90-day retention via the daily cron `GET /api/cron/retention` (`lib/retention.ts`).
 NEVER log customer phone, name, or audio bytes.
 
 ## 8. Parse fixtures (ALL must pass before merge)

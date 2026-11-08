@@ -90,7 +90,7 @@ Tool use guarantees well-formed output and lets the cart UI stream item-by-item.
   inside a `try/catch` that logs and swallows. The cashier never waits on logging.
 - Log to `VoiceParseLog`: `{vendorId, transcript, lang, sttSource, modelUsed,
   itemCount, confidence, unmatched, latencyMs, escalated}`
-- 90-day retention via `workers/retention.worker.ts`
+- 90-day retention via the daily cron `GET /api/cron/retention` (`lib/retention.ts`)
 - **NEVER log:** `customerPhone`, `customerName`, payment data, audio bytes,
   vendor menu prices, UTR refs
 
