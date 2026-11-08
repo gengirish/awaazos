@@ -3,7 +3,9 @@
  *
  * Deliberately cross-tenant: these queries carry no `vendorId` scope, so every
  * caller must have passed `requirePlatformRole("SUPER_ADMIN")` first. The
- * select is an allowlist — no owner name, phone or email leaves this file.
+ * selects are allowlists. Owners' contact details (sign-up phone and email,
+ * business WhatsApp, owner account names and emails) are in the list select
+ * only, for the admin to ask for feedback; the write paths return none of them.
  */
 import { Prisma } from "@prisma/client";
 
@@ -26,21 +28,38 @@ const ADMIN_VENDOR_SELECT = {
 
 export type AdminVendorRow = Prisma.VendorGetPayload<{ select: typeof ADMIN_VENDOR_SELECT }>;
 
-/** The list also says which store referred this one (slug only, lib/referral.ts). */
+/**
+ * The list also says which store referred this one (slug only, lib/referral.ts)
+ * and how to reach its owners (lib/store-contact.ts).
+ */
 const ADMIN_VENDOR_LIST_SELECT = {
   ...ADMIN_VENDOR_SELECT,
+  phone: true,
+  email: true,
   referredBy: { select: { slug: true } },
-  settings: { select: { razorpaySubStatus: true } },
+  settings: { select: { razorpaySubStatus: true, whatsappNumber: true } },
+  staff: {
+    where: { role: "OWNER", isActive: true },
+    orderBy: { createdAt: "asc" },
+    select: { name: true, user: { select: { name: true, email: true } } },
+  },
 } satisfies Prisma.VendorSelect;
 
 export type AdminVendorListRow = Prisma.VendorGetPayload<{ select: typeof ADMIN_VENDOR_LIST_SELECT }>;
 
-/** Newest stores first, optionally narrowed to a name or slug match. */
+/** Newest stores first, optionally narrowed to a name, slug or owner email match. */
 export function listAdminVendors(query: string): Promise<AdminVendorListRow[]> {
   const q = query.trim();
   return prisma.vendor.findMany({
     where: q
-      ? { OR: [{ name: { contains: q, mode: "insensitive" } }, { slug: { contains: q, mode: "insensitive" } }] }
+      ? {
+          OR: [
+            { name: { contains: q, mode: "insensitive" } },
+            { slug: { contains: q, mode: "insensitive" } },
+            { email: { contains: q, mode: "insensitive" } },
+            { staff: { some: { role: "OWNER", user: { email: { contains: q, mode: "insensitive" } } } } },
+          ],
+        }
       : undefined,
     select: ADMIN_VENDOR_LIST_SELECT,
     orderBy: { createdAt: "desc" },
