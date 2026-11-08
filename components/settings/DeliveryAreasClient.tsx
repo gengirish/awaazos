@@ -7,33 +7,15 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { formatINRCompact, rupeesToPaise } from "@/lib/currency";
 import {
+  deliveryAreaFeeLabel,
   deliveryAreaKey,
+  deliveryFeeInputToPaise,
   DELIVERY_AREA_NAME_MAX,
-  MAX_DELIVERY_AREA_FEE_PAISE,
   MAX_DELIVERY_AREAS,
   toDeliveryArea,
   type DeliveryArea,
 } from "@/lib/delivery-areas";
-
-/** "" → the usual fee (null); "30" / "12.50" / "0" → paise; anything else → undefined (invalid). */
-function feeInputToPaise(raw: string): number | null | undefined {
-  const t = raw.trim();
-  if (t === "") return null;
-  if (!/^\d{1,4}(\.\d{1,2})?$/.test(t)) return undefined;
-  try {
-    const p = rupeesToPaise(Number(t));
-    return p <= MAX_DELIVERY_AREA_FEE_PAISE ? p : undefined;
-  } catch {
-    return undefined;
-  }
-}
-
-function areaFeeLabel(area: DeliveryArea): string {
-  if (area.feePaise === null) return "Usual delivery fee";
-  return area.feePaise === 0 ? "Free delivery" : `${formatINRCompact(area.feePaise)} delivery`;
-}
 
 /**
  * Settings → Online orders → Delivery areas: the localities a store delivers to
@@ -76,7 +58,8 @@ export function DeliveryAreasClient({ initialAreas, isOwner }: { initialAreas: D
   function add(e: React.FormEvent) {
     e.preventDefault();
     if (disabled || full) return;
-    const feePaise = feeInputToPaise(fee);
+    // Empty: the usual fee.
+    const feePaise = deliveryFeeInputToPaise(fee);
     if (feePaise === undefined) {
       setError("Enter a fee up to ₹1,000, like 30 or 0 for free. Leave it empty for your usual fee.");
       return;
@@ -105,7 +88,7 @@ export function DeliveryAreasClient({ initialAreas, isOwner }: { initialAreas: D
             <li key={a.name} className="flex items-center justify-between gap-3 px-3 py-2">
               <p className="min-w-0 text-sm">
                 <span className="font-medium">{a.name}</span>
-                <span className="text-muted-foreground"> · {areaFeeLabel(a)}</span>
+                <span className="text-muted-foreground"> · {deliveryAreaFeeLabel(a)}</span>
               </p>
               {isOwner ? (
                 <Button

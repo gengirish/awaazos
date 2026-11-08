@@ -5,6 +5,7 @@ import { z } from "zod";
 import { SUPPORTED_VOICE_LANGS } from "@/lib/constants";
 import { deliveryRidersSchema } from "@/lib/delivery-riders";
 import { deliveryAreasSchema } from "@/lib/delivery-areas-schema";
+import { FSSAI_NUMBER_MESSAGE, FSSAI_NUMBER_PATTERN } from "@/lib/fssai";
 import { menuSlotsSchema } from "@/lib/menu-slots-schema";
 import { INSTAGRAM_HANDLE_MESSAGE, normaliseInstagramHandle } from "@/lib/instagram";
 import { menuOrdersEnableBlocker, type MenuOrdersBlocker } from "@/lib/menu-orders-board";
@@ -81,7 +82,7 @@ const patchSchema = z.object({
   publishStorefront: z.boolean().optional(),
   // FSSAI registration/licence numbers are exactly 14 digits. "" clears it.
   fssaiNumber: z
-    .union([z.string().trim().regex(/^\d{14}$/, "FSSAI number must be exactly 14 digits"), z.literal("")])
+    .union([z.string().trim().regex(FSSAI_NUMBER_PATTERN, FSSAI_NUMBER_MESSAGE), z.literal("")])
     .optional()
     .nullable(),
   acceptPayOnDelivery: z.boolean().optional(),
@@ -268,8 +269,14 @@ export async function PATCH(req: NextRequest) {
 
         // Turning "order from menu" on needs somewhere to order (a published
         // storefront) and a way to pay (Razorpay, UPI ID or pay on delivery).
+        // First-run setup asks how the store takes orders before it asks to
+        // publish (docs/ONBOARDING_PLAN.md, step 4), so an unfinished store
+        // may save the answer early: its storefront stays a 404 until published.
         if (vendorFields.acceptMenuOrders === true) {
-          const blocker = menuOrdersEnableBlocker(after);
+          const blocker = menuOrdersEnableBlocker({
+            ...after,
+            publishStorefront: after.publishStorefront || !ctx.vendor.onboardingDone,
+          });
           if (blocker) throw new SettingsConflict(blocker);
         }
 

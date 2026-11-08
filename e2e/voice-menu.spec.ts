@@ -420,7 +420,7 @@ test.describe("voice menu builder", () => {
     await expect(page.getByText(`Masala Chai ${s}`)).toBeVisible();
 
     await page.getByRole("button", { name: "Next", exact: true }).click();
-    await expect(page.getByRole("heading", { name: "Order alerts" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "How you take orders" })).toBeVisible();
     const menu = await menuByName(page);
     expect([...menu.keys()]).toEqual([`Masala Chai ${s}`]);
   });

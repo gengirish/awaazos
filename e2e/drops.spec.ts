@@ -100,6 +100,8 @@ test.describe("drops: home-kitchen pre-order day", () => {
     await expect(page.getByRole("radio", { name: "Pickup" })).toBeChecked();
     await page.keyboard.press("ArrowRight");
     await expect(page.getByRole("radio", { name: "Both" })).toBeChecked();
+    // The store never chose pickup or delivery, so the drop started on pickup: delivery asks for its fee.
+    await page.getByLabel("Delivery fee (₹)").fill("0");
 
     // The form defaults the cut-off to tonight 21:00 (or tomorrow 10:00 if it's
     // already late), cooking day tomorrow — always in the future.

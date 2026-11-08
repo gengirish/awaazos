@@ -444,7 +444,7 @@ in the Status panel. The cut-off closes a drop by itself and no tap follows it. 
 are older rows only: nothing moves a drop into them now, they stay read-only, and they keep the
 `drop_frozen` / `drop_locked` rules. The form's "More options" holds what has a default (name, note,
 later start, everyday menu), and a new drop takes its handover details from the store's last one
-(`lastDropDefaults`).
+(`lastDropDefaults`), or for a first drop from its menu pickup / delivery answer (`storeHandoverDefaults`).
 
 Money and plan rules:
 
@@ -570,8 +570,10 @@ one place the rule lives: setup unfinished → `/onboarding`, `publishStorefront
 `/pos`. An explicit `callbackUrl` never goes through it. Never decide this in middleware (it needs
 Postgres). Setup is also a gate: every `(vendor)` page sends a store without `onboardingDone` to
 `/onboarding` (`getShellContext`, no exceptions), where non-owners get a waiting screen; resume uses
-`Vendor.onboardingStep`. Every step needs an answer (≥ 1 way to get paid, ≥ 1 item; voice loads inside the
-step). Plan for the step-by-step setup: `docs/ONBOARDING_PLAN.md`. E2E `signIn()` finishes
+`Vendor.onboardingStep`. Every step needs an answer (≥ 1 way to get paid, ≥ 1 item, drops / menu orders /
+both, pickup / delivery; voice loads inside the step), and each saves on Next with its own fields, not the
+Settings widgets (those save themselves and toast). An unfinished store may turn `acceptMenuOrders` on before
+publishing. Plan for the step-by-step setup: `docs/ONBOARDING_PLAN.md`. E2E `signIn()` finishes
 setup through the API unless `finishSetup: false`. `public/sw.js` repeats the `/home` literal: with no network it answers that navigation
 with a redirect to `/pos` when a cached `/pos` exists, so the Home Screen icon still opens the offline
 till. Manifest `id` stays `"/"`. Install affordances (`components/pwa/InstallPrompt.tsx`) and every

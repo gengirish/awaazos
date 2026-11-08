@@ -217,6 +217,23 @@ export function lastDropDefaults(last: {
   };
 }
 
+/**
+ * A store's first drop, with no last one to copy: how buyers get it comes from
+ * the store's own answer for menu orders (first-run setup step 5, Settings →
+ * Online orders), so it isn't asked twice. The handover times stay the form's.
+ */
+export function storeHandoverDefaults(settings: {
+  menuFulfilmentMode: DropUpsertInput["fulfilmentMode"];
+  menuPickupNote: string | null;
+  menuDeliveryFeePaise: number;
+}): Pick<DropUpsertInput, "fulfilmentMode" | "pickupNote" | "deliveryFeePaise"> {
+  return {
+    fulfilmentMode: settings.menuFulfilmentMode,
+    pickupNote: settings.menuPickupNote,
+    deliveryFeePaise: settings.menuDeliveryFeePaise,
+  };
+}
+
 type CopyableDrop = DropSchedule & {
   title: string;
   note: string | null;

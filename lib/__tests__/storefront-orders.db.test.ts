@@ -85,6 +85,7 @@ describe.skipIf(!ENABLED)("storefront (menu) orders — vendor side, DB integrat
         ownerName: "Test Owner",
         plan: "PRO",
         upiId,
+        onboardingDone: true,
         settings: {
           create: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true, ...settings },
         },
@@ -449,5 +450,18 @@ describe.skipIf(!ENABLED)("storefront (menu) orders — vendor side, DB integrat
       acceptMenuOrders: false,
       menuPickupNote: null,
     });
+  });
+
+  it("settings PATCH: a store still in first-run setup may turn menu orders on before publishing, not without a way to pay", async () => {
+    const d = await seedVendor({ publishStorefront: false, acceptPayOnDelivery: false, acceptMenuOrders: false }, null);
+    as(await prisma.vendor.update({ where: { id: d.id }, data: { onboardingDone: false } }));
+
+    const noPay = await patchVendor({ acceptMenuOrders: true });
+    expect(noPay.status).toBe(409);
+    expect(await noPay.json()).toEqual({ error: "no_payment_method" });
+
+    expect((await patchVendor({ acceptMenuOrders: true, acceptPayOnDelivery: true })).status).toBe(200);
+    const s = await prisma.vendorSettings.findUniqueOrThrow({ where: { vendorId: d.id } });
+    expect(s).toMatchObject({ acceptMenuOrders: true, publishStorefront: false });
   });
 });

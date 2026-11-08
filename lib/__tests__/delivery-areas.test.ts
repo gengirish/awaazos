@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 
 import { deliveryAreasSchema } from "@/lib/delivery-areas-schema";
 import {
+  deliveryAreaFeeLabel,
   deliveryAreaKey,
+  deliveryFeeInputToPaise,
   deliveryAreaSummary,
   deliveryFeeFor,
   findDeliveryArea,
@@ -110,5 +112,30 @@ describe("checkout with areas", () => {
 
   it("puts the server's refusal on the locality field", () => {
     expect(checkoutFieldForErrorCode("outside_delivery_area")).toBe("locality");
+  });
+});
+
+describe("deliveryFeeInputToPaise", () => {
+  it("reads rupees up to ₹1,000 as paise, empty as nothing entered", () => {
+    expect(deliveryFeeInputToPaise("")).toBeNull();
+    expect(deliveryFeeInputToPaise("  ")).toBeNull();
+    expect(deliveryFeeInputToPaise("0")).toBe(0);
+    expect(deliveryFeeInputToPaise("30")).toBe(3000);
+    expect(deliveryFeeInputToPaise("12.50")).toBe(1250);
+    expect(deliveryFeeInputToPaise("1000")).toBe(100_000);
+  });
+
+  it("refuses anything else", () => {
+    for (const raw of ["1000.01", "-5", "12.345", "abc", "1e3", "10000"]) {
+      expect(deliveryFeeInputToPaise(raw)).toBeUndefined();
+    }
+  });
+});
+
+describe("deliveryAreaFeeLabel", () => {
+  it("names the usual fee, free delivery and an area's own fee", () => {
+    expect(deliveryAreaFeeLabel({ name: "Kondapur", feePaise: null })).toBe("Usual delivery fee");
+    expect(deliveryAreaFeeLabel({ name: "Kondapur", feePaise: 0 })).toBe("Free delivery");
+    expect(deliveryAreaFeeLabel({ name: "Kondapur", feePaise: 4000 })).toBe("₹40 delivery");
   });
 });

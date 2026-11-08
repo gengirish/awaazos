@@ -53,6 +53,8 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
   await page.getByText("More options").click();
   await page.getByLabel("Title").fill(dropTitle);
   await page.getByRole("radio", { name: "Both" }).click();
+  // A first drop starts on the store's saved mode (pickup here): delivery asks for its fee.
+  await page.getByLabel("Delivery fee (₹)").fill("0");
   // Drops hide the everyday menu by default; this test is about the hand-off to it.
   await page.getByRole("switch", { name: /also show my everyday menu/i }).click();
   await page.getByRole("checkbox", { name: new RegExp(bhel) }).check();
