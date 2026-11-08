@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 
+import { BUSINESS_NAME, BusinessDetails } from "@/components/legal/BusinessDetails";
 import { TRIAL_DAYS } from "@/lib/constants";
 import { PLAN_MARKETING } from "@/lib/plan-copy";
+import { REFERRED_TRIAL_DAYS } from "@/lib/referral";
 
 export const metadata: Metadata = {
   title: "Terms of Service — AwaazOS",
@@ -14,10 +16,14 @@ export default function TermsPage() {
   return (
     <>
       <h1>Terms of Service</h1>
-      <p>Last updated: 10 October 2026</p>
+      <p>Last updated: 08 November 2026</p>
 
       <h2>Acceptance</h2>
       <p>By using AwaazOS, you agree to these Terms.</p>
+
+      <h2>Who we are</h2>
+      <p>AwaazOS is provided by:</p>
+      <BusinessDetails />
 
       <h2>Account responsibilities</h2>
       <ul>
@@ -34,8 +40,8 @@ export default function TermsPage() {
       <h2>Billing and subscriptions</h2>
       <ul>
         <li>
-          New accounts get a {TRIAL_DAYS}-day free trial with every feature of the {starter.label} plan. No card is
-          needed to start it.
+          New accounts get a {TRIAL_DAYS}-day free trial ({REFERRED_TRIAL_DAYS} days when another seller referred
+          you) with every feature of the {starter.label} plan. No card is needed to start it.
         </li>
         <li>
           After the trial, creating new bills and taking new orders needs a paid subscription: {PLAN_MARKETING.LITE.label}{" "}
@@ -64,6 +70,14 @@ export default function TermsPage() {
         </li>
       </ul>
 
+      <h2>Orders placed with sellers</h2>
+      <p>
+        Kitchens, shops and other sellers that use AwaazOS sell to their own customers. Each seller is responsible
+        for its products, prices, taxes, delivery, cancellations and refunds. AwaazOS provides the software only: it
+        is not a party to the sale and does not collect, hold or settle buyers’ payments. A buyer pays the seller
+        directly: by UPI, through the seller’s own Razorpay account, or in cash on delivery.
+      </p>
+
       <h2>Service availability</h2>
       <p>
         We target high availability but do not guarantee uninterrupted service. Planned maintenance and third-party
@@ -72,8 +86,8 @@ export default function TermsPage() {
 
       <h2>Limitation of liability</h2>
       <p>
-        To the maximum extent permitted by law, AwaazOS is provided on an “as is” basis and IntelliForge AI is not
-        liable for indirect, incidental, or consequential damages.
+        To the maximum extent permitted by law, AwaazOS is provided on an “as is” basis and {BUSINESS_NAME} is
+        not liable for indirect, incidental, or consequential damages.
       </p>
 
       <h2>Termination</h2>
