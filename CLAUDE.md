@@ -483,7 +483,9 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   finished), the buyer gets `online_payment_unavailable` (pay by UPI) and `lib/razorpay-issue.ts`
   keeps the reason in Upstash (30-day TTL, fail-open) for Settings → Payments; the next accepted order,
   a reconnect, new keys or a disconnect clears it. Sellers without a Razorpay account sign up inside the
-  Connect flow (Razorpay's co-branded onboarding), so there is no separate referral link.
+  Connect flow (Razorpay's co-branded onboarding), so there is no separate referral link. Connect starts
+  from Settings → Payments or from setup's payment step and comes back to the one it started from: a fixed
+  name (`?return=onboarding`, then a cookie scoped to the callback), never a URL (`lib/razorpay-connect.ts`).
 - **"I've paid" never marks an order paid.** The buyer sees "Payment done?" with a screenshot picker
   (`PaidClaimForm`), or one "Payment done" button with no private Blob store. A direct UPI payment is
   invisible to us, so this signal stays: it is what keeps a drop's stock held. `POST /api/s/[slug]/orders/[token]/utr` records
@@ -568,7 +570,8 @@ one place the rule lives: setup unfinished → `/onboarding`, `publishStorefront
 `/pos`. An explicit `callbackUrl` never goes through it. Never decide this in middleware (it needs
 Postgres). Setup is also a gate: every `(vendor)` page sends a store without `onboardingDone` to
 `/onboarding` (`getShellContext`, no exceptions), where non-owners get a waiting screen; resume uses
-`Vendor.onboardingStep`. Plan for the step-by-step setup: `docs/ONBOARDING_PLAN.md`. E2E `signIn()` finishes
+`Vendor.onboardingStep`. Every step needs an answer (≥ 1 way to get paid, ≥ 1 item; voice loads inside the
+step). Plan for the step-by-step setup: `docs/ONBOARDING_PLAN.md`. E2E `signIn()` finishes
 setup through the API unless `finishSetup: false`. `public/sw.js` repeats the `/home` literal: with no network it answers that navigation
 with a redirect to `/pos` when a cached `/pos` exists, so the Home Screen icon still opens the offline
 till. Manifest `id` stays `"/"`. Install affordances (`components/pwa/InstallPrompt.tsx`) and every

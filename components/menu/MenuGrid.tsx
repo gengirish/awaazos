@@ -21,8 +21,6 @@ import {
 import { STAFF_SEARCH_MIN_ITEMS, searchTerms } from "@/lib/store-search";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
 
-/** Fired by VoiceMenuPanel after it saves rows. */
-export const MENU_CHANGED_EVENT = "awaazos:menu-changed";
 
 type MenuGridProps = {
   /** The list on screen; MenuScreen owns it because the page header needs it too. */

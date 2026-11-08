@@ -10,7 +10,7 @@ export default async function MenuPage(props: {
   searchParams: Promise<{ add?: string | string[]; voice?: string | string[] }>;
 }) {
   // `?add=<name>` (from the voice drop builder's "Add to menu") opens the add form pre-filled.
-  // `?voice=1` (from onboarding's "Speak your whole menu") opens the voice panel.
+  // `?voice=1` opens the voice panel: a link straight to it.
   const { add, voice } = await props.searchParams;
   const prefillName = typeof add === "string" ? add.trim().slice(0, 80) : "";
   const voiceOpen = voice === "1";

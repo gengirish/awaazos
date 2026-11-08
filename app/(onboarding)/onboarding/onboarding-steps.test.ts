@@ -2,9 +2,11 @@ import { describe, expect, it } from "vitest";
 
 import {
   draftToBulkItem,
+  initialPaymentChoice,
   initialStateName,
   isBlankDraft,
   ONBOARDING_STEPS,
+  paymentChoiceProblem,
   progressAfter,
   resumeStep,
   stepDescription,
@@ -107,5 +109,37 @@ describe("stepDescription", () => {
     expect(stepDescription(ONBOARDING_STEPS[0]!, "goods")).toBe("Where you sell from. You can change this later.");
     expect(stepDescription(ONBOARDING_STEPS[2]!, "goods")).toContain("in Products");
     expect(stepDescription(ONBOARDING_STEPS[1]!, "goods")).toBe(ONBOARDING_STEPS[1]!.description);
+  });
+});
+
+describe("payment step", () => {
+  it("opens a first visit on UPI alone, whatever the database default says", () => {
+    expect(initialPaymentChoice({ upiId: null, acceptPayOnDelivery: true, answered: false })).toEqual({
+      upi: true,
+      payOnDelivery: false,
+    });
+  });
+
+  it("shows what was saved once the step has been answered", () => {
+    expect(initialPaymentChoice({ upiId: null, acceptPayOnDelivery: true, answered: true })).toEqual({
+      upi: false,
+      payOnDelivery: true,
+    });
+    expect(initialPaymentChoice({ upiId: "a@okaxis", acceptPayOnDelivery: false, answered: true })).toEqual({
+      upi: true,
+      payOnDelivery: false,
+    });
+  });
+
+  it("needs at least one way to pay", () => {
+    const none = { upi: false, upiId: "", payOnDelivery: false, online: false };
+    expect(paymentChoiceProblem(none)).toBe("choose_one");
+    expect(paymentChoiceProblem({ ...none, payOnDelivery: true })).toBeNull();
+    expect(paymentChoiceProblem({ ...none, online: true })).toBeNull();
+    expect(paymentChoiceProblem({ ...none, upi: true, upiId: "a@okaxis" })).toBeNull();
+  });
+
+  it("asks for the ID when UPI is ticked, even with another way to pay", () => {
+    expect(paymentChoiceProblem({ upi: true, upiId: "  ", payOnDelivery: true, online: true })).toBe("upi_missing");
   });
 });
