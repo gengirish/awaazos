@@ -12,11 +12,10 @@
  */
 import { Sentry } from "./sentry";
 import { logger } from "@/lib/logger";
-import { retentionWorker } from "./retention.worker";
 import { receiptWorker } from "./receipt.worker";
 import { voiceLogWorker } from "./voiceLog.worker";
 
-const ALL_WORKERS = [voiceLogWorker, receiptWorker, retentionWorker];
+const ALL_WORKERS = [voiceLogWorker, receiptWorker];
 
 logger.info(
   {

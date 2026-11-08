@@ -23,7 +23,7 @@ flowchart LR
     end
 
     subgraph Fly[Fly.io · BOM region]
-        Workers[BullMQ Workers<br/>voice-parse-log · send-receipt · retention-maintenance<br/>Node 20 alpine · 512MB]
+        Workers[BullMQ Workers<br/>voice-parse-log · send-receipt<br/>Node 20 alpine · 512MB]
         Whisper[awaazos-whisper-stt<br/>optional self-hosted ASR<br/>services/whisper-stt]
         Redis[(Redis TCP<br/>REDIS_URL<br/>BullMQ queues)]
     end
@@ -549,18 +549,15 @@ flowchart LR
         TxAPI[POST /api/transactions]
         ParseAPI[POST /api/ai/parse-order]
         ReceiptAPI[POST /api/receipts/send]
-        AdminRet[POST /api/admin/retention/run]
         KvV[lib/kv.ts<br/>Upstash HTTP]
     end
     subgraph RedisTCP[Redis TCP · REDIS_URL]
         QSendReceipt[(send-receipt)]
         QVoiceLog[(voice-parse-log)]
-        QRetention[(retention-maintenance)]
     end
     subgraph Fly[Fly worker · BOM]
         WorkerSend[receipt.worker.ts]
         WorkerLog[voiceLog.worker.ts]
-        WorkerRet[retention.worker.ts]
     end
     subgraph External
         Gup[Gupshup WhatsApp]
@@ -569,20 +566,17 @@ flowchart LR
 
     TxAPI --> KvV
     ParseAPI --> KvV
-    AdminRet -->|enqueue| QRetention
     TxAPI -.->|post-commit enqueue,<br/>only if customerPhone sent| QSendReceipt
     ReceiptAPI -.->|enqueue · not called by UI| QSendReceipt
     ParseAPI -->|enqueue telemetry| QVoiceLog
     QSendReceipt --> WorkerSend
     QVoiceLog --> WorkerLog
-    QRetention --> WorkerRet
     WorkerSend --> Gup
     WorkerSend --> DB
     WorkerLog --> DB
-    WorkerRet --> DB
 ```
 
-Dotted edges are the legacy Gupshup receipt path, which stays wired but which the POS UI no longer triggers (receipts go out via `wa.me`, see §4). Nothing in this diagram runs on a timer: retention runs only when an admin calls `POST /api/admin/retention/run`.
+Dotted edges are the legacy Gupshup receipt path, which stays wired but which the POS UI no longer triggers (receipts go out via `wa.me`, see §4). Nothing in this diagram runs on a timer. Retention is not a queue: the daily Vercel Cron `GET /api/cron/retention` (`lib/retention-server.ts`) deletes in the request, and `POST /api/admin/retention/run` (platform ADMIN) runs the same code by hand.
 
 ### Worker contracts
 
@@ -592,9 +586,8 @@ Payload types live in `lib/queues.ts`. `DEFAULT_JOB_OPTS` there is 5 attempts wi
 | --- | --- | --- | --- |
 | `send-receipt` | `{ transactionId, vendorId, customerPhone }` | early-return if `Receipt.whatsappSent === true` | 3 attempts, exponential from 5 s (both enqueue sites) |
 | `voice-parse-log` | `{ vendorId, transcript, lang, sttSource, modelUsed, latencyMs, itemCount, confidence, unmatched, escalated }` | n/a (write-only telemetry) | 1 attempt, no retry |
-| `retention-maintenance` | `{ requestedBy: "admin", requestedByUserId? }` | jobId `retention:<UTC day>` dedupes a day's runs | `DEFAULT_JOB_OPTS` |
 
-The retention worker deletes `VoiceParseLog` rows older than 90 days and receipts older than 7 years.
+Retention (`lib/retention.ts`) deletes `VoiceParseLog` rows older than 90 days and receipts older than 7 years, once a day from the cron.
 
 ### Web Push (not a queue)
 
@@ -658,7 +651,7 @@ The Playwright job is still defined (Postgres 15 service, `prisma db push`, chro
 - **Neon over Supabase** — chose Neon for branchable databases + serverless-first pricing. We lose Supabase's bundled storage / auth / realtime, but we gain simpler bill-of-materials (one provider per concern) and full Auth.js v5 freedom. Storage moved to Vercel Blob.
 - **Auth.js v5 over Clerk** — Clerk is faster to integrate but expensive at scale (~$25/mo per 1000 MAU after 10K) and has India-specific friction (no native +91 OTP without Twilio Verify integration cost). Auth.js + Prisma adapter is free and gives us full control of the User schema for multi-tenant `StaffMember` joins.
 - **Two-tier Claude over single Sonnet** — saves ~70% on inference cost for what is essentially the per-transaction unit cost of the product. Justifies the added escalation logic complexity.
-- **Self-hosted BullMQ over Vercel Cron** — Cron is fine for scheduled work; for retry-with-backoff on a per-job basis (what Business-API WhatsApp delivery needed), BullMQ wins. POS receipts have since moved to `wa.me` links, so today the queues carry voice telemetry, admin-triggered retention, and the unused Gupshup path. Cost: one Fly machine ($0/mo on shared-cpu-1x free tier as of 2026) + Upstash Redis ($0 baseline + $0.20 per 100K commands).
+- **Self-hosted BullMQ over Vercel Cron** — Cron is fine for scheduled work; for retry-with-backoff on a per-job basis (what Business-API WhatsApp delivery needed), BullMQ wins. POS receipts have since moved to `wa.me` links, so today the queues carry voice telemetry and the unused Gupshup path; retention moved to a daily Vercel Cron, since it needs no retries and the Fly worker doesn't exist. Cost: one Fly machine ($0/mo on shared-cpu-1x free tier as of 2026) + Upstash Redis ($0 baseline + $0.20 per 100K commands).
 - **Server-side recompute of totals** — we throw 400 if `subtotalPaise + taxPaise - discountPaise !== totalPaise` from the client. Costs nothing, prevents an entire class of "client tampered with cart" bugs.
 - **Snapshotted `OrderItem.name` and `priceInPaise`** — denormalized, but historical bills don't break when a vendor renames or deletes a menu item.
 - **Minimal GST support** — most home kitchens and micro-merchants don't have a GSTIN. What has shipped: an optional `Vendor.gstin` (format-checked, Settings → Receipts) printed on every receipt, an optional HSN/SAC code per menu item (`MenuItem.hsnCode`) printed on the WhatsApp receipt text, and one flat tax rate (`taxEnabled` + `taxPercent`, applied in basis points). `VendorSettings.hsnDefault` exists in the schema but nothing reads it. Not built: a CGST/SGST/IGST split or GST-formatted invoices.

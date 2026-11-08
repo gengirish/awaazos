@@ -54,8 +54,9 @@ There are two log styles in the codebase, and a drain filter has to account for 
 password, session and cookie/authorization fields are redacted. Used by:
 
 - the Fly workers (`workers/*.ts`): events such as `workers_started`, `job_failed`,
-  `worker_error`, `retention_run_complete`, `retention_failed`, `shutdown_*`;
-- `POST /api/admin/retention/run`, `POST /api/auth/forgot-password`,
+  `worker_error`, `shutdown_*`;
+- `lib/retention-server.ts` (`retention_run_complete`, from the daily cron and `POST /api/admin/retention/run`),
+  `POST /api/auth/forgot-password`,
   `POST /api/auth/reset-password`, `DELETE /api/me`, and `lib/email.ts`.
 
 `lib/logger.ts` also exports `requestLogger()` / `newRequestId()` for per-request correlation, but

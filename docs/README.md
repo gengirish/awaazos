@@ -65,7 +65,7 @@ A map of the hardening already in the code, so you can find it rather than re-ad
 | Legal pages | `app/legal/{privacy,terms,refund,dpdp-rights}` |
 | Cookie consent banner | `components/legal/CookieConsentBanner.tsx` |
 | Self-service account deletion (DSR) | `DELETE /api/me` |
-| Retention (voice logs 90 days, receipts 7 years) | `workers/retention.worker.ts`; enqueued only by `POST /api/admin/retention/run`, see TODO.md |
+| Retention (voice logs 90 days, receipts 7 years) | `lib/retention-server.ts`, daily from the Vercel Cron `GET /api/cron/retention`; by hand via `POST /api/admin/retention/run` |
 | CI, Dependabot, pre-commit | `.github/workflows/ci.yml`, `.github/dependabot.yml`, `.husky/` + `lint-staged` |
 | Billing lock (no new sales, orders or AI spend after an unpaid trial) | `billingAccess()` in `lib/plan.ts`, `requireActiveBilling` |
 

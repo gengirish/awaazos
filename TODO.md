@@ -35,8 +35,8 @@ actually arriving, and any one of them is sufficient to mean it never does:
 3. **Worker — confirmed missing (2026-10-05).** `workers/receipt.worker.ts` has to be running on
    Fly to drain the `send-receipt` queue. `fly deploy -a awaazos-workers` returns **"app not
    found"**: the app named in `fly.toml` (generated 2026-04-23) no longer exists on the logged-in
-   account. Nothing drains *any* BullMQ queue in production — receipts, `voice-parse-log`
-   telemetry and retention jobs all pile up in Redis unprocessed. Sales are unaffected (enqueue
+   account. Nothing drains *any* BullMQ queue in production — receipts and `voice-parse-log`
+   telemetry pile up in Redis unprocessed (retention no longer uses a queue: see §5). Sales are unaffected (enqueue
    failures are swallowed by design).
 
    **To revive (future work, deliberately parked):**
@@ -310,12 +310,6 @@ decide per field (drop, or build the feature) rather than in bulk. Re-run the gr
   `https://awaazos.intelliforge.tech`; README.md, PITCH.md and `docs/DEMO_GUIDE.md` use
   `https://awaazos.vercel.app`. Pick one (cleanup plan decision D5), then update `AUTH_URL`,
   `fly.toml` and the docs to match.
-- **Retention never runs on a schedule.** `workers/retention.worker.ts` deletes `VoiceParseLog` rows
-  older than 90 days and `Receipt` rows older than 7 years, but the only trigger is
-  `POST /api/admin/retention/run` (platform ADMIN session). There is no cron and no UI button, so
-  it runs only when someone POSTs by hand, and it also needs the Fly worker running (1.1 gate 3).
-  If a cron is added, run it at most once a day: the job touches Neon, which scales to zero, and the
-  route's per-UTC-day `jobId` already makes repeat calls the same day a no-op.
 - **`AUTH_URL` is unset on Vercel.** Reset links are correct anyway via the
   `VERCEL_PROJECT_PRODUCTION_URL` fallback, but Auth.js also uses `AUTH_URL` for callback URLs.
   Set it to the production domain once that is decided (see above).

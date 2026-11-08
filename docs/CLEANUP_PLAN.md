@@ -119,7 +119,7 @@ sub-exports.
 - [ ] **te/kn/ta (D3).** `VOICE_LANGUAGES` (`lib/constants.ts:97`) offers only en-IN and hi-IN. The
       Sarvam branch is reachable only through legacy rows or a direct PATCH to `/api/vendor`. If you
       cut them, also remove 11 parse-order and 6 STT golden fixtures.
-- [ ] **Retention never runs automatically.** `app/api/admin/retention/run/route.ts:17` says "Vercel
+- [x] **Retention never runs automatically.** Done 2026-11-08: daily Vercel Cron `GET /api/cron/retention`. `app/api/admin/retention/run/route.ts:17` said "Vercel
       Cron (once daily)", but there is no cron config. The route is POST and needs an ADMIN session,
       and nothing in the UI calls it. Either wire a once-daily trigger or correct the comment and
       `requestedBy: "cron"` (`lib/queues.ts:52`). It touches Neon, so run it no more often than daily.

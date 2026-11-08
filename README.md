@@ -127,7 +127,7 @@ _Also planned, not shipped:_ automated accessibility audits in CI (`@axe-core/pl
 | **ORM** | Prisma | Type-safe, `$transaction` for atomicity, `upsert` for idempotency |
 | **AI / Voice** | Anthropic Claude Haiku 4.5 (primary) + Sonnet 4.5 (fallback), tool-use, prompt caching | Best Indic instruction-following at lowest cost |
 | **STT** | Web Speech API (en/hi, in-browser) + server cascade: OpenAI `gpt-4o-mini-transcribe`, Groq `whisper-large-v3-turbo`, Sarvam Saaras v3 (dormant te/kn/ta), self-hosted Whisper on Fly | Web Speech is free and needs no server call from us; the cascade covers the opt-in server path, each hop behind its own circuit breaker |
-| **Background jobs** | BullMQ + Redis (Fly.io workers) | Voice telemetry, retention runs, retries with backoff |
+| **Background jobs** | BullMQ + Redis (Fly.io workers) | Voice telemetry, retries with backoff |
 | **Serverless KV** | [@upstash/redis](https://github.com/upstash/redis-js) HTTP on Vercel | Rate limits, idempotency keys, AI usage caps; no TCP from serverless |
 | **Payments** | Razorpay subscriptions (platform) · UPI deep link + QR (POS) · vendor's own Razorpay keys (storefront) | India-first; storefront money goes to the vendor, never through the platform |
 | **Messaging** | `wa.me` links from the vendor's own WhatsApp · Web Push (`web-push`, VAPID) · AgentMail (password-reset and buyer magic-link email) | No WhatsApp Business API or templates needed |
@@ -163,7 +163,7 @@ npx prisma db push
 npm run dev
 # → http://localhost:3000
 
-# 5. (Optional) Run BullMQ workers locally (voice telemetry, retention)
+# 5. (Optional) Run BullMQ workers locally (voice telemetry)
 docker run -d --name awaazos-redis -p 6379:6379 redis:7-alpine
 npm run worker  # or: npx tsx workers/index.ts
 ```
@@ -206,7 +206,7 @@ The app is deployed across these services:
 | Service | Host | What runs there |
 | --- | --- | --- |
 | **Web** | Vercel (`awaazos.vercel.app`) | Next.js App Router, all `/api/*` routes, marketing + vendor pages |
-| **Workers** | Fly.io `awaazos-workers` (BOM region) | BullMQ workers for `voice-parse-log`, `send-receipt` (dormant Gupshup path) and retention. **The Fly app does not currently exist**; see TODO.md 1.1 |
+| **Workers** | Fly.io `awaazos-workers` (BOM region) | BullMQ workers for `voice-parse-log`, `send-receipt` (dormant Gupshup path). **The Fly app does not currently exist**; see TODO.md 1.1 |
 | **Whisper STT** | Fly.io (`services/whisper-stt`) | Optional self-hosted last-resort ASR |
 | **Redis (HTTP)** | Upstash REST (`UPSTASH_REDIS_*` on Vercel) | Rate limiting, idempotency, circuit breakers, monthly AI caps, `/api/ready` Redis probe |
 | **Redis (TCP)** | `REDIS_URL`, a public `rediss://` endpoint | BullMQ: Vercel routes enqueue, Fly workers consume |
@@ -309,7 +309,7 @@ awaazos/
 │                            POS outbox, voice dictation, install-prompt and push-alert stores
 ├── lib/                     domain + integration modules (currency, upi, rbac, anthropic, STT
 │                            clients, drops, offers, receipt, push, kv, queues, datetime, phone, …) and __tests__/
-├── workers/                 BullMQ workers (voice-parse-log, receipt, retention) for Fly
+├── workers/                 BullMQ workers (voice-parse-log, receipt) for Fly
 ├── prisma/schema.prisma     data model (applied with `prisma db push`; no migrations)
 ├── public/                  service worker (sw.js: push + offline /pos), offline.html, PWA icons
 ├── services/whisper-stt/    optional self-hosted Whisper ASR (Python, own Fly app)
