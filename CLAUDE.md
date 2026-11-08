@@ -353,6 +353,11 @@ passes, so Neon can sleep.
   on Vercel in the same deploy. Old ids go in `RAZORPAY_RETIRED_PLANS` so existing subscribers stay credited, and
   `resolveSubscriptionPlanId` refuses a list plan whose Razorpay amount differs from `subscriptionChargePaise`.
   `npm run billing:keep-signup-price -- --price=<rupees> --before=<time>` keeps stores that signed up earlier on the price they were told (`customPricePaise`).
+- **Owner contacts:** `/admin/vendors` (SUPER_ADMIN only) shows each real store's owners: account names and
+  emails, sign-up phone and email, business WhatsApp (`lib/store-contact.ts`), with a feedback and testimonial
+  ask that opens the admin's own email (mailto) or WhatsApp (wa.me); nothing is sent from the server. Demo stores
+  show none (their owner is the internal account). Search also matches owner emails. A quote goes on the site
+  only with the owner's written yes (`lib/proof-stories.ts`).
 - **Free access by hand:** a platform SUPER_ADMIN picks a "free until" day for a store on
   `/admin/vendors` (`PATCH /api/admin/vendors/[id]/free-access`, `lib/admin-free-access.ts`). It only
   moves `trialEndsAt` (23:59 IST that day, today … +24 months), so the store is on the trial for

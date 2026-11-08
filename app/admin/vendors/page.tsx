@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 
 import { AdminNav } from "@/components/admin/AdminNav";
 import { FreeAccessForm } from "@/components/admin/FreeAccessForm";
+import { StoreContactCard } from "@/components/admin/StoreContactCard";
 import { StoreHealthLine } from "@/components/admin/StoreHealthLine";
 import { StorePriceForm } from "@/components/admin/StorePriceForm";
 import { StoreSurveySummary } from "@/components/admin/StoreSurveySummary";
@@ -19,6 +20,7 @@ import { utcToIstParts } from "@/lib/drops-time";
 import { loadSurveyAnswersFor } from "@/lib/owner-survey-server";
 import { billingAccess, trialDaysLeft } from "@/lib/plan";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
+import { storeContact } from "@/lib/store-contact";
 import { LIVE_SUBSCRIPTION_STATUSES } from "@/lib/subscription";
 
 export const dynamic = "force-dynamic";
@@ -55,8 +57,9 @@ function describeBilling(vendor: AdminVendorRow, now: Date): { status: string; n
 export default async function AdminVendorsPage(props: { searchParams: Promise<{ q?: string | string[] }> }) {
   // Same rule as /admin/metrics: role read from the database, and 404 rather
   // than 403 so the page does not disclose that it exists.
+  let admin: Awaited<ReturnType<typeof requirePlatformRole>>["user"];
   try {
-    await requirePlatformRole("SUPER_ADMIN");
+    ({ user: admin } = await requirePlatformRole("SUPER_ADMIN"));
   } catch (err) {
     if (err instanceof AuthError) notFound();
     throw err;
@@ -81,8 +84,8 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Internal · Platform admin</p>
         <h1 className="mt-1 font-display text-3xl font-bold text-foreground">Stores</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Let a store use AwaazOS free until a date you pick, or set its own price using what its owner told us in
-          the survey.
+          Let a store use AwaazOS free until a date you pick, set its own price using what its owner told us in
+          the survey, or ask its owner for feedback.
         </p>
         <AdminNav current="/admin/vendors" superAdmin />
       </header>
@@ -90,7 +93,7 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
       <main id="main" className="mx-auto max-w-3xl">
         <form method="get" role="search" className="mb-6 flex flex-wrap items-end gap-3">
           <div className="min-w-0 flex-1">
-            <Label htmlFor="store-search">Search by store name or link</Label>
+            <Label htmlFor="store-search">Search by store name, link or owner email</Label>
             <Input id="store-search" name="q" type="search" defaultValue={q} className="mt-1" />
           </div>
           <Button type="submit" variant="outline">
@@ -106,7 +109,7 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
             <EmptyState
               role={q ? "status" : undefined}
               title={q ? "No store matches that search" : "No stores yet"}
-              description={q ? "Try part of the store name or its link." : "Stores appear here once someone signs up."}
+              description={q ? "Try part of the store name, its link or the owner's email." : "Stores appear here once someone signs up."}
             />
           ) : (
             <ul className="space-y-4">
@@ -138,6 +141,19 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
                     <StoreHealthLine health={healthFor(health, vendor.id)} now={now} />
                     {note ? <p className="mt-2 text-sm text-muted-foreground">{note}</p> : null}
                     <StoreSurveySummary answers={surveys.get(vendor.id) ?? null} />
+                    {/* A demo store's owner is our internal account; its seller is on /admin/demo-stores. */}
+                    {vendor.isDemo ? null : (
+                      <StoreContactCard
+                        storeName={vendor.name}
+                        senderName={admin.name}
+                        contact={storeContact({
+                          phone: vendor.phone,
+                          email: vendor.email,
+                          whatsappNumber: vendor.settings?.whatsappNumber ?? null,
+                          owners: vendor.staff.map((s) => ({ name: s.user.name ?? s.name, email: s.user.email })),
+                        })}
+                      />
+                    )}
                     <div className="mt-4">
                       <FreeAccessForm
                         vendorId={vendor.id}

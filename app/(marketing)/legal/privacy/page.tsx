@@ -63,6 +63,10 @@ export default function PrivacyPage() {
       <ul>
         <li>To run the service: billing, orders, payments, receipts, alerts, and analytics for the seller.</li>
         <li>To send the emails you need: sign-in links, password resets, and billing notices.</li>
+        <li>
+          To contact sellers about their store: to help, and to ask how AwaazOS is working for them. We quote a seller
+          on our website only after they agree in writing.
+        </li>
         <li>To secure accounts and prevent fraud and abuse.</li>
         <li>To improve speech recognition, order understanding, and product reliability.</li>
       </ul>
