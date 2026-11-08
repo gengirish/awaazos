@@ -5,14 +5,15 @@ import { registerVendor, signIn } from "./helpers/vendor";
 /**
  * First-run setup asks for an answer on every step (docs/ONBOARDING_PLAN.md):
  * a way to get paid, at least one item, how orders come in, pickup or
- * delivery; the contact step is optional but checked. Writes real rows
- * (vendors, menu items): throwaway Postgres only (CLAUDE.md).
+ * delivery; the contact step is optional but checked; the last step shows
+ * every answer and publishes the store, or finishes without publishing.
+ * Writes real rows (vendors, menu items): throwaway Postgres only (CLAUDE.md).
  */
 
 const NEXT = { name: "Next", exact: true } as const;
 
 test.describe("setup steps", () => {
-  test("every step needs its answer, nothing is skippable, and Finish saves them all", async ({
+  test("every step needs its answer, nothing is skippable, and Publish ends on a live store", async ({
     page,
     request,
   }) => {
@@ -108,41 +109,103 @@ test.describe("setup steps", () => {
     await expect(page.getByRole("heading", { name: "Contact and alerts" })).toBeVisible();
     await page.getByLabel("WhatsApp number (optional)").fill("");
     await page.getByRole("switch", { name: "Show a WhatsApp button on your store page" }).click();
-    await page.getByRole("button", { name: "Finish setup" }).click();
+    await page.getByRole("button", NEXT).click();
     await expect(page.getByText("Add your WhatsApp number, or turn off the switches below.")).toBeVisible();
     await page.getByLabel("WhatsApp number (optional)").fill("98765 43210");
     await page.getByLabel("Instagram username (optional)").fill("@E2E.Kitchen");
     await page.getByLabel("FSSAI number (optional)").fill("123");
-    await page.getByRole("button", { name: "Finish setup" }).click();
+    await page.getByRole("button", NEXT).click();
     await expect(page.getByText("FSSAI number must be exactly 14 digits.")).toBeVisible();
     await page.getByLabel("FSSAI number (optional)").fill("12345678901234");
-    await page.getByRole("button", { name: "Finish setup" }).click();
+    await page.getByRole("button", NEXT).click();
 
-    // Menu orders only: the next thing to do is publish, not a drop.
-    await expect(page.getByRole("heading", { name: "Your store is ready" })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Publish your store" })).toBeVisible();
+    // ── Check and publish: every answer, each with a way back ──
+    await expect(page.getByRole("heading", { name: "Check and publish" })).toBeVisible();
+    await expect(page.getByText("UPI to", { exact: false })).toHaveCount(0);
+    await expect(page.getByText("Pay on delivery", { exact: true })).toBeVisible();
+    await expect(page.getByText(/^1 dish$/)).toBeVisible();
+    await expect(page.getByText("Order from menu: your menu any time")).toBeVisible();
+    await expect(page.getByText("Delivery fee ₹30")).toBeVisible();
+    await expect(page.getByText("Delivers to Kondapur")).toBeVisible();
+    await expect(page.getByText("WhatsApp 98765 43210, shown on your store page")).toBeVisible();
+    await expect(page.getByText("Instagram @e2e.kitchen")).toBeVisible();
+
+    // "Change" opens that step; saving it comes straight back here.
+    await page.getByRole("button", { name: "Change Pickup or delivery" }).click();
+    await expect(page.getByRole("heading", { name: "Pickup or delivery" })).toBeVisible();
+    await page.getByLabel("Delivery fee (₹)").fill("40");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Check and publish" })).toBeVisible();
+    await expect(page.getByText("Delivery fee ₹40")).toBeVisible();
+
+    await page.getByRole("button", { name: "Publish my store" }).click();
+
+    // Menu orders only, live: the next place is the orders board, and the link is ready to share.
+    await expect(page.getByRole("heading", { name: "Your store is live" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Go to your orders" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Copy link" })).toBeVisible();
 
     const after = (await (await page.request.get("/api/vendor")).json()) as {
-      vendor: { onboardingDone: boolean; onboardingStep: number | null; settings: Record<string, unknown> };
+      vendor: { slug: string; onboardingDone: boolean; onboardingStep: number | null; settings: Record<string, unknown> };
     };
     expect(after.vendor.onboardingDone).toBe(true);
     expect(after.vendor.onboardingStep).toBeNull();
     expect(after.vendor.settings).toMatchObject({
-      publishStorefront: false,
+      publishStorefront: true,
       acceptMenuOrders: true,
       menuFulfilmentMode: "DELIVERY",
-      menuDeliveryFeePaise: 3000,
+      menuDeliveryFeePaise: 4000,
       deliveryAreas: [{ name: "Kondapur", feePaise: 0 }],
       whatsappNumber: "+919876543210",
       acceptWhatsappOrders: false,
       showWhatsappOnStore: true,
+      sendWhatsappReceipt: true,
       instagramHandle: "e2e.kitchen",
       fssaiNumber: "12345678901234",
     });
 
+    // The store page is public now.
+    await page.goto(`/s/${after.vendor.slug}`);
+    await expect(page.getByText("Puran Poli").first()).toBeVisible();
+
     // A first drop starts from the pickup / delivery answer instead of asking again.
     await page.goto("/drops/new");
     await expect(page.getByRole("radio", { name: "Delivery" })).toBeChecked();
+  });
+
+  test("the last step can finish without publishing, and the store stays hidden", async ({ page, request }) => {
+    test.setTimeout(120_000);
+    const creds = await registerVendor(request, "onb-nopub");
+    await signIn(page, creds, "/onboarding");
+    await expect(page.getByRole("heading", { name: "Your store", exact: true })).toBeVisible();
+
+    // Steps 1–6 answered through the same endpoints the steps use.
+    const patch = (data: Record<string, unknown>) => page.request.patch("/api/vendor", { data });
+    expect((await patch({ city: "Pune", state: "Maharashtra", stallType: "HOME_KITCHEN" })).ok()).toBe(true);
+    expect((await patch({ upiId: "e2e@okaxis", upiName: "E2E Kitchen", acceptPayOnDelivery: false })).ok()).toBe(true);
+    const bulk = await page.request.post("/api/menu/bulk", { data: { items: [{ name: "Modak", priceInPaise: 2500 }] } });
+    expect(bulk.ok()).toBe(true);
+    expect((await patch({ acceptMenuOrders: false, menuFulfilmentMode: "PICKUP", menuPickupNote: "Gate 2" })).ok()).toBe(true);
+    expect((await patch({ onboardingStep: 6 })).ok()).toBe(true);
+
+    await page.reload();
+    await expect(page.getByRole("heading", { name: "Check and publish" })).toBeVisible();
+    await expect(page.getByText("UPI to e2e@okaxis")).toBeVisible();
+    await expect(page.getByText("Drops, each with a cut-off")).toBeVisible();
+    await expect(page.getByText("Pickup: Gate 2")).toBeVisible();
+    await expect(page.getByText("Nothing added")).toBeVisible();
+
+    await page.getByRole("button", { name: "Finish without publishing" }).click();
+    await expect(page.getByRole("heading", { name: "Setup is done" })).toBeVisible();
+    await expect(page.getByText(/This link is not public yet/)).toBeVisible();
+    await expect(page.getByRole("link", { name: "Create your first drop" })).toBeVisible();
+
+    const { vendor } = (await (await page.request.get("/api/vendor")).json()) as {
+      vendor: { slug: string; onboardingDone: boolean; settings: { publishStorefront: boolean } };
+    };
+    expect(vendor.onboardingDone).toBe(true);
+    expect(vendor.settings.publishStorefront).toBe(false);
+    expect((await page.request.get(`/s/${vendor.slug}`)).status()).toBe(404);
   });
 
   test("Connect Razorpay comes back to setup, and only to setup or Settings", async ({ page, request }) => {

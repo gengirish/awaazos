@@ -358,6 +358,9 @@ describe.skipIf(!ENABLED)("internal demo-store API — DB integration", () => {
     });
     expect(v.isDemo).toBe(false);
     expect(v.upiId).toBeNull();
+    // The new owner goes through setup.
+    expect(v.onboardingDone).toBe(false);
+    expect(v.onboardingStep).toBeNull();
     expect(v.email).toBe(email);
     expect(v.trialEndsAt!.getTime()).toBeGreaterThan(Date.now() + 29 * 24 * 3600_000);
     expect(v.staff).toHaveLength(1);

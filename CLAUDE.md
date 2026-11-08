@@ -573,7 +573,8 @@ Postgres). Setup is also a gate: every `(vendor)` page sends a store without `on
 `Vendor.onboardingStep`. Every step needs an answer (≥ 1 way to get paid, ≥ 1 item, drops / menu orders /
 both, pickup / delivery; voice loads inside the step), and each saves on Next with its own fields, not the
 Settings widgets (those save themselves and toast). An unfinished store may turn `acceptMenuOrders` on before
-publishing. Plan for the step-by-step setup: `docs/ONBOARDING_PLAN.md`. E2E `signIn()` finishes
+publishing. The last step lists every answer with a Change link and publishes in the same PATCH that sets
+`onboardingDone` ("Finish without publishing" leaves it hidden). Plan for the step-by-step setup: `docs/ONBOARDING_PLAN.md`. E2E `signIn()` finishes
 setup through the API unless `finishSetup: false`. `public/sw.js` repeats the `/home` literal: with no network it answers that navigation
 with a redirect to `/pos` when a cached `/pos` exists, so the Home Screen icon still opens the offline
 till. Manifest `id` stays `"/"`. Install affordances (`components/pwa/InstallPrompt.tsx`) and every
@@ -784,7 +785,8 @@ only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts`
 - Display only: "(DEMO)" via `displayStoreName()` (storefront, app shell), `noindex` on `/s/[slug]`.
 - Handover stores a SHA-256 claim token (7 days); `/claim/[token]` → `POST /api/demo-claim` creates the
   prospect's User (or, if the email already has an account, adds the store to it after checking that
-  account's password), moves OWNER, flips `isDemo`, clears `upiId`, starts the trial, and archives
+  account's password), moves OWNER, flips `isDemo`, clears `upiId`, starts the trial, sends the owner through setup
+  (`onboardingDone: false`), and archives
   (`archivedAt`, hidden from board / transactions / CSV) or deletes the samples.
 - Every create, delete, handover and claim writes `DemoAuditLog`; its "create" rows are the 20/day limit.
 - **Admin GUI:** the same create / claim link / delete on `/admin/demo-stores` (+ `/new`), for any

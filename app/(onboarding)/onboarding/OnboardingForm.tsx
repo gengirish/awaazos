@@ -8,6 +8,8 @@ import { useRouter } from "next/navigation";
 import { Check, CheckCircle2, Keyboard, Mic, Plus, Trash2, X } from "lucide-react";
 
 import { PushAlertsButton } from "@/components/push/PushAlertsButton";
+import { CopyStoreLinkButton } from "@/components/setup/CopyStoreLinkButton";
+import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -48,7 +50,9 @@ import type { StallType, Vendor, VendorSettings } from "@prisma/client";
 import {
   contactPatch,
   contactProblems,
+  doneNextAction,
   draftToBulkItem,
+  finishPatch,
   handoverProblems,
   initialFeeInput,
   initialHandoverMode,
@@ -63,6 +67,7 @@ import {
   paymentChoiceProblem,
   progressAfter,
   resumeStep,
+  reviewRows,
   STEP_COUNT,
   stepDescription,
   takesMenuOrders,
@@ -146,7 +151,7 @@ function StepProgress({ step }: { step: number }) {
                 Step {n}: {s.title}
                 {done ? " (done)" : current ? " (current step)" : " (not started)"}
               </span>
-              {/* Six names don't fit a phone's width: there, the heading and "Step n of 6" say it. */}
+              {/* Seven names don't fit a phone's width: there, the heading and "Step n of 7" say it. */}
               <span
                 aria-hidden="true"
                 className={cn(
@@ -202,6 +207,11 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
   const [formError, setFormError] = useState<string | null>(null);
 
   const [slug, setSlug] = useState("");
+  const [storeName, setStoreName] = useState("");
+  /** `publishStorefront` as saved: a claimed demo store is live before setup ends. */
+  const [published, setPublished] = useState(false);
+  /** Set by a "Change" on the last step: Next on that step goes back to the summary. */
+  const [returnToReview, setReturnToReview] = useState(false);
   /** `Vendor.onboardingStep` as the server holds it. */
   const [savedStep, setSavedStep] = useState<number | null>(null);
 
@@ -273,6 +283,8 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
           return;
         }
         setSlug(v.slug);
+        setStoreName(v.name);
+        setPublished(v.settings?.publishStorefront ?? false);
         setCity(v.city ?? "");
         setStateName(initialStateName(v.city, v.state));
         setStallType(v.stallType);
@@ -598,6 +610,27 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
     document.getElementById("area-name")?.focus();
   }
 
+  async function saveContact(): Promise<boolean> {
+    const contact = {
+      whatsapp,
+      acceptWhatsappOrders,
+      showWhatsappOnStore,
+      instagram,
+      fssai: vocabKind === "food" ? fssai : "",
+    };
+    const found = contactProblems(contact);
+    if (Object.keys(found).length) {
+      reject(found as FieldErrors);
+      return false;
+    }
+    const body = contactPatch(contact, { whatsapp: savedWhatsapp, instagram: savedInstagram, fssai: savedFssai }, vocabKind);
+    if (!(await patchVendor(body))) return false;
+    if ("whatsappNumber" in body) setSavedWhatsapp((body.whatsappNumber as string | null) ?? "");
+    if ("instagramHandle" in body) setSavedInstagram(body.instagramHandle as string);
+    if ("fssaiNumber" in body) setSavedFssai(body.fssaiNumber as string);
+    return true;
+  }
+
   async function next() {
     if (saving) return;
     setSaving(true);
@@ -611,10 +644,25 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
             ? await saveItems()
             : step === 4
               ? await saveOrderMode()
-              : await saveHandover();
+              : step === 5
+                ? await saveHandover()
+                : await saveContact();
     if (ok) await recordProgress(step);
     setSaving(false);
-    if (ok) goTo(step + 1);
+    if (!ok) return;
+    if (returnToReview) {
+      setReturnToReview(false);
+      goTo(STEP_COUNT);
+    } else {
+      goTo(step + 1);
+    }
+  }
+
+  /** "Change" on the summary: open that step; its Next comes back here. */
+  function change(target: number) {
+    if (saving) return;
+    setReturnToReview(true);
+    goTo(target);
   }
 
   function back() {
@@ -622,32 +670,23 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
     goTo(Math.max(step - 1, 1));
   }
 
-  async function finish() {
+  /** End setup, publishing the store in the same request when `publish` (a live store stays live). */
+  async function finish(publish: boolean) {
     if (saving) return;
-    const contact = { whatsapp, acceptWhatsappOrders, showWhatsappOnStore, instagram, fssai: vocabKind === "food" ? fssai : "" };
-    const found = contactProblems(contact);
-    if (Object.keys(found).length) {
-      reject(found as FieldErrors);
-      return;
-    }
-    const body: Record<string, unknown> = {
-      ...contactPatch(contact, { whatsapp: savedWhatsapp, instagram: savedInstagram, fssai: savedFssai }, vocabKind),
-      onboardingDone: true,
-    };
-
+    const live = publish || published;
     setSaving(true);
     setFormError(null);
-    const ok = await patchVendor(body);
-    if (!ok) {
-      setSaving(false);
-      return;
-    }
+    const ok = await patchVendor(finishPatch(live, savedWhatsapp));
     setSaving(false);
+    if (!ok) return;
+    setPublished(live);
     focusHeading.current = true;
     setPhase("done");
   }
 
-  const vocabKind = storeVocabulary(stallType).kind;
+  // Follows the "What do you sell?" pick on step 1, so changing it there re-words the rest.
+  const vocab = storeVocabulary(stallType);
+  const vocabKind = vocab.kind;
 
   function updateDraft(key: string, patch: Partial<ItemDraft>) {
     setDrafts((prev) => prev.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -678,7 +717,17 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
 
   if (phase === "done") {
     const storePath = `/s/${encodeURIComponent(slug)}`;
-    const vocabularyKindCatalogue = storeVocabulary(stallType).catalogue;
+    const action = doneNextAction(orderMode, published);
+    const primary =
+      action === "first-drop"
+        ? { href: "/drops/new", label: "Create your first drop" }
+        : action === "orders"
+          ? { href: "/orders", label: "Go to your orders" }
+          : { href: "/settings/store", label: "Publish your store" };
+    const secondary =
+      action === "first-drop" && published
+        ? { href: "/orders", label: "Go to your orders" }
+        : { href: "/pos", label: "Go to the counter" };
     return (
       <main id="main" className="mx-auto flex min-h-screen max-w-lg flex-col gap-6 p-4 pb-12 pt-8">
         <div>
@@ -688,43 +737,46 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
             tabIndex={-1}
             className="mt-3 font-display text-3xl font-bold text-primary focus-visible:outline-hidden"
           >
-            Your store is ready
+            {published ? "Your store is live" : "Setup is done"}
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            {orderMode === "menu"
-              ? `Next, publish your store so customers can order from your ${vocabularyKindCatalogue}.`
-              : "Next, put up a drop: what you're making, how many, and when orders close."}
+            {action === "first-drop"
+              ? published
+                ? "Next, put up a drop: what you're making, how many, and when orders close."
+                : "Next, put up a drop: what you're making, how many, and when orders close. You'll be asked to publish your store when you open it."
+              : action === "orders"
+                ? `Customers can order from your ${vocab.catalogue} now. New orders show up in Orders.`
+                : `Publish your store when you're ready, so customers can order from your ${vocab.catalogue}.`}
           </p>
         </div>
 
         <section aria-labelledby="store-link-heading" className="rounded-lg border bg-card p-4">
           <h2 id="store-link-heading" className="text-sm font-semibold">
-            Your store link
+            {published ? "Put your store link in your Instagram bio" : "Your store link"}
           </h2>
           <p className="mt-1 break-all font-mono text-sm">
             {window.location.host}
             {storePath}
           </p>
-          <p className="mt-2 text-sm text-muted-foreground">
-            {orderMode === "menu"
-              ? "This link is not public yet. Nobody can open it until you publish your store in Settings → Online store. After that, put it in your Instagram bio."
-              : "This link is not public yet. Nobody can open it until you publish your store. You'll be asked when you open your first drop, or you can publish it in Settings → Online store. After that, put it in your Instagram bio."}
-          </p>
+          {published ? (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <CopyStoreLinkButton slug={slug} />
+              <ShareStoreButton vendorName={storeName} slug={slug} />
+            </div>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              This link is not public yet. Nobody can open it until you publish your store in Settings → Online
+              store.
+            </p>
+          )}
         </section>
 
         <div className="flex flex-col gap-3">
           <Button asChild className="w-full">
-            {orderMode === "menu" ? (
-              <Link href="/settings/store">Publish your store</Link>
-            ) : (
-              <Link href="/drops/new">Create your first drop</Link>
-            )}
+            <Link href={primary.href}>{primary.label}</Link>
           </Button>
           <Button asChild variant="outline" className="w-full">
-            {/* /home only redirects (lib/home.ts): nothing to prefetch. */}
-            <Link href={HOME_PATH} prefetch={false}>
-              Go to the counter
-            </Link>
+            <Link href={secondary.href}>{secondary.label}</Link>
           </Button>
         </div>
       </main>
@@ -733,8 +785,6 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
 
   const current = ONBOARDING_STEPS[step - 1]!;
   const lastStep = step === STEP_COUNT;
-  // Follows the "What do you sell?" pick on step 1, so changing it there re-words the rest.
-  const vocab = storeVocabulary(stallType);
   const outcomeMsg = razorpay.outcome ? connectOutcomeMessage(razorpay.outcome) : null;
 
   return (
@@ -1409,6 +1459,94 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
             </>
           )}
 
+          {step === 7 && (
+            <>
+              <ul className="divide-y rounded-lg border">
+                {reviewRows(
+                  {
+                    store: {
+                      typeLabel:
+                        stallType === "OTHER"
+                          ? stallTypeOther.trim() || "Other"
+                          : (STALL_TYPES.find((t) => t.value === stallType)?.label ?? ""),
+                      city,
+                      state: stateName,
+                    },
+                    payment: { upiId: savedUpiId, payOnDelivery, online: razorpay.connected },
+                    items: savedItems,
+                    orderMode,
+                    handover: {
+                      mode: handover,
+                      pickupNote,
+                      feePaise: deliveryFeeInputToPaise(feeInput) ?? null,
+                      areas,
+                    },
+                    contact: {
+                      whatsapp: savedWhatsapp,
+                      acceptWhatsappOrders,
+                      showWhatsappOnStore,
+                      instagram: savedInstagram,
+                      fssai: savedFssai,
+                    },
+                  },
+                  vocab,
+                ).map((r) => (
+                  <li key={r.step} className="flex items-start justify-between gap-3 p-3">
+                    <div className="min-w-0 space-y-0.5">
+                      <h3 className="text-sm font-semibold">{r.title}</h3>
+                      {r.lines.map((line) => (
+                        <p key={line} className="break-words text-sm text-muted-foreground">
+                          {line}
+                        </p>
+                      ))}
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0"
+                      aria-label={`Change ${r.title}`}
+                      onClick={() => change(r.step)}
+                      disabled={saving}
+                    >
+                      Change
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+
+              <section aria-labelledby="review-link-heading" className="space-y-1">
+                <h3 id="review-link-heading" className="text-sm font-semibold">
+                  Your store link
+                </h3>
+                <p className="break-all font-mono text-sm">
+                  {window.location.host}/s/{encodeURIComponent(slug)}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {published
+                    ? "Your store is already online at this link."
+                    : "Publishing makes this link public: anyone who opens it can see your store and order."}
+                </p>
+              </section>
+
+              {!published ? (
+                <p className="text-sm text-muted-foreground">
+                  Not ready for customers yet?{" "}
+                  <Button
+                    type="button"
+                    variant="link"
+                    className="h-auto min-h-11 px-0 align-baseline"
+                    onClick={() => void finish(false)}
+                    disabled={saving}
+                  >
+                    Finish without publishing
+                  </Button>{" "}
+                  You can publish later in Settings → Online store.
+                </p>
+              ) : null}
+            </>
+          )}
+
           {formError ? (
             <Notice tone="danger" role="alert">
               {formError}
@@ -1421,12 +1559,12 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
           </Button>
           <div className="flex flex-wrap justify-end gap-2">
             {lastStep ? (
-              <Button type="button" onClick={finish} disabled={saving}>
-                {saving ? "Saving…" : "Finish setup"}
+              <Button type="button" onClick={() => void finish(true)} disabled={saving}>
+                {saving ? "Saving…" : published ? "Finish setup" : "Publish my store"}
               </Button>
             ) : (
               <Button type="button" onClick={next} disabled={saving}>
-                {saving ? "Saving…" : "Next"}
+                {saving ? "Saving…" : returnToReview ? "Save" : "Next"}
               </Button>
             )}
           </div>

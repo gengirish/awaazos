@@ -1,8 +1,9 @@
-import { paiseToRupees, rupeesToPaise } from "@/lib/currency";
+import { formatINRCompact, paiseToRupees, rupeesToPaise } from "@/lib/currency";
+import type { DeliveryArea } from "@/lib/delivery-areas";
 import { FSSAI_NUMBER_MESSAGE, FSSAI_NUMBER_PATTERN } from "@/lib/fssai";
 import { INSTAGRAM_HANDLE_MESSAGE, normaliseInstagramHandle } from "@/lib/instagram";
-import { normaliseIndianMobile } from "@/lib/phone";
-import type { StoreKind } from "@/lib/store-vocabulary";
+import { formatIndianMobile, normaliseIndianMobile } from "@/lib/phone";
+import type { StoreKind, StoreVocabulary } from "@/lib/store-vocabulary";
 
 /**
  * Pure rules of the first-run setup (page.tsx), kept out of the page so they
@@ -12,7 +13,9 @@ import type { StoreKind } from "@/lib/store-vocabulary";
  * of the app uses (PATCH /api/vendor, POST /api/menu/bulk). Every step needs an
  * answer: a way to get paid (`paymentChoiceProblem`), at least one item, how
  * orders come in (`OrderMode`), pickup or delivery (`handoverProblems`); the
- * contact step is optional and checks what is typed (`contactProblems`). After
+ * contact step is optional and checks what is typed (`contactProblems`); the
+ * last step shows every answer (`reviewRows`) and publishes the store, or
+ * finishes without publishing (`finishPatch`). After
  * each Next, `Vendor.onboardingStep` records the highest step done, so a reload
  * or another phone reopens the right one (`resumeStep`), even when the answer
  * looks like the default (pay on delivery only, no UPI ID).
@@ -27,7 +30,7 @@ import type { StoreKind } from "@/lib/store-vocabulary";
  */
 export const ONBOARDING_STEPS: readonly {
   title: string;
-  /** A shorter name for the progress row, where six titles share a phone's width. */
+  /** A shorter name for the progress row, where seven titles share a phone's width. */
   short: string;
   description: string;
   goodsDescription?: string;
@@ -63,6 +66,11 @@ export const ONBOARDING_STEPS: readonly {
     title: "Contact and alerts",
     short: "Contact",
     description: "How customers reach you, and how you hear about a new order. All optional.",
+  },
+  {
+    title: "Check and publish",
+    short: "Publish",
+    description: "Check your answers, then put your store online. Tap Change to fix anything.",
   },
 ];
 
@@ -316,4 +324,123 @@ export function validateItemDraft(d: Pick<ItemDraft, "name" | "priceRupees">): I
 /** Body rows for POST /api/menu/bulk. Call only on drafts that passed `validateItemDraft`. */
 export function draftToBulkItem(d: Pick<ItemDraft, "name" | "priceRupees">): { name: string; priceInPaise: number } {
   return { name: d.name.trim(), priceInPaise: rupeesToPaise(Number(d.priceRupees.trim())) };
+}
+
+// ── Step 7: check and publish ──
+
+/** What the seller answered, as the form holds it, for the summary on the last step. */
+export type ReviewInput = {
+  store: { typeLabel: string; city: string; state: string };
+  payment: { upiId: string; payOnDelivery: boolean; online: boolean };
+  items: readonly { name: string; priceInPaise: number }[];
+  orderMode: OrderMode | null;
+  handover: { mode: HandoverMode | null; pickupNote: string; feePaise: number | null; areas: readonly DeliveryArea[] };
+  /** `whatsapp` as saved (E.164) or "". `fssai` is "" for a store that doesn't sell food. */
+  contact: { whatsapp: string; acceptWhatsappOrders: boolean; showWhatsappOnStore: boolean; instagram: string; fssai: string };
+};
+
+/** One summary card: the step it came from (its "Change" goes back there) and what was answered. */
+export type ReviewRow = { step: number; title: string; lines: string[] };
+
+/** "A", "A and B", "A, B and C", "A, B, C and 2 more". */
+function listSome(names: readonly string[], shown = 3): string {
+  if (names.length > shown) return `${names.slice(0, shown).join(", ")} and ${names.length - shown} more`;
+  if (names.length <= 1) return names[0] ?? "";
+  return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+const HANDOVER_LABEL: Record<HandoverMode, string> = {
+  PICKUP: "Pickup",
+  DELIVERY: "Delivery",
+  BOTH: "Pickup or delivery, customers choose",
+};
+
+/** The last step's cards, one per earlier step, in the store's own words. */
+export function reviewRows(
+  input: ReviewInput,
+  vocab: Pick<StoreVocabulary, "kind" | "catalogue" | "catalogueOrdersTitle" | "item" | "items">,
+): ReviewRow[] {
+  const where = [input.store.city.trim(), input.store.state.trim()].filter(Boolean).join(", ");
+  const store = [input.store.typeLabel, where].filter(Boolean);
+
+  const pay: string[] = [];
+  if (input.payment.upiId.trim()) pay.push(`UPI to ${input.payment.upiId.trim()}`);
+  if (input.payment.payOnDelivery) pay.push("Pay on delivery");
+  if (input.payment.online) pay.push("Online with your Razorpay");
+
+  const n = input.items.length;
+  const items = n
+    ? [`${n} ${n === 1 ? vocab.item : vocab.items}`, listSome(input.items.map((i) => `${i.name} ${formatINRCompact(i.priceInPaise)}`))]
+    : [];
+
+  const orders =
+    input.orderMode === "drops"
+      ? ["Drops, each with a cut-off"]
+      : input.orderMode === "menu"
+        ? [`${vocab.catalogueOrdersTitle}: your ${vocab.catalogue} any time`]
+        : input.orderMode === "both"
+          ? [`Drops, and your ${vocab.catalogue} any time`]
+          : [];
+
+  const h = input.handover;
+  const handover: string[] = [];
+  if (h.mode) {
+    handover.push(HANDOVER_LABEL[h.mode]);
+    if (offersPickup(h.mode) && h.pickupNote.trim()) handover.push(`Pickup: ${h.pickupNote.trim()}`);
+    if (offersDelivery(h.mode) && h.feePaise != null) {
+      handover.push(h.feePaise === 0 ? "Free delivery" : `Delivery fee ${formatINRCompact(h.feePaise)}`);
+    }
+    if (offersDelivery(h.mode) && h.areas.length) handover.push(`Delivers to ${listSome(h.areas.map((a) => a.name))}`);
+  }
+
+  const c = input.contact;
+  const contact: string[] = [];
+  if (c.whatsapp) {
+    const who = c.showWhatsappOnStore
+      ? "shown on your store page"
+      : c.acceptWhatsappOrders
+        ? "shown to customers who order"
+        : "not shown to customers";
+    contact.push(`WhatsApp ${formatIndianMobile(c.whatsapp)}, ${who}`);
+  }
+  if (c.instagram) contact.push(`Instagram @${c.instagram}`);
+  if (vocab.kind === "food" && c.fssai) contact.push(`FSSAI ${c.fssai}`);
+
+  const row = (step: number, lines: string[], none = "Not answered yet"): ReviewRow => ({
+    step,
+    title: ONBOARDING_STEPS[step - 1]!.title,
+    lines: lines.length ? lines : [none],
+  });
+  return [
+    row(1, store),
+    row(2, pay),
+    row(3, items),
+    row(4, orders),
+    row(5, handover),
+    row(6, contact, "Nothing added"),
+  ];
+}
+
+/**
+ * The last PATCH /api/vendor of setup. `publish` puts `publishStorefront` in
+ * the same request, so a store is never finished but half published. A saved
+ * WhatsApp number is sent again: the server turns WhatsApp receipts on only
+ * when setup finishes with a number in the request.
+ */
+export function finishPatch(publish: boolean, savedWhatsapp: string): Record<string, unknown> {
+  return {
+    onboardingDone: true,
+    ...(publish ? { publishStorefront: true } : {}),
+    ...(savedWhatsapp ? { whatsappNumber: savedWhatsapp } : {}),
+  };
+}
+
+/**
+ * The done screen's main button. Drops chosen: the first drop, live or not
+ * (opening it asks to publish). Menu only: the orders board once live, else
+ * publishing.
+ */
+export function doneNextAction(orderMode: OrderMode | null, published: boolean): "first-drop" | "orders" | "publish" {
+  if (orderMode === "menu") return published ? "orders" : "publish";
+  return "first-drop";
 }

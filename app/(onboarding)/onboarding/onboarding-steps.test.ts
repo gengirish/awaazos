@@ -1,9 +1,13 @@
 import { describe, expect, it } from "vitest";
 
+import { storeVocabulary } from "@/lib/store-vocabulary";
+
 import {
   contactPatch,
   contactProblems,
+  doneNextAction,
   draftToBulkItem,
+  finishPatch,
   handoverProblems,
   indianMobileE164,
   initialFeeInput,
@@ -16,10 +20,12 @@ import {
   paymentChoiceProblem,
   progressAfter,
   resumeStep,
+  reviewRows,
   STEP_COUNT,
   stepDescription,
   takesMenuOrders,
   validateItemDraft,
+  type ReviewInput,
 } from "./onboarding-steps";
 
 describe("resumeStep", () => {
@@ -37,6 +43,7 @@ describe("resumeStep", () => {
   it("goes on through the later steps and never opens past the last one", () => {
     expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, savedStep: 4 })).toBe(5);
     expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, savedStep: 5 })).toBe(6);
+    expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, savedStep: 6 })).toBe(7);
     expect(resumeStep({ city: "Pune", upiId: null, itemCount: 0, savedStep: STEP_COUNT })).toBe(STEP_COUNT);
   });
 
@@ -108,7 +115,7 @@ describe("menu item drafts", () => {
 });
 
 describe("step copy", () => {
-  it("has six steps and never says stall", () => {
+  it("has seven steps and never says stall", () => {
     expect(ONBOARDING_STEPS.map((s) => s.title)).toEqual([
       "Your store",
       "Getting paid",
@@ -116,6 +123,7 @@ describe("step copy", () => {
       "How you take orders",
       "Pickup or delivery",
       "Contact and alerts",
+      "Check and publish",
     ]);
     for (const s of ONBOARDING_STEPS) expect(`${s.title} ${s.description}`.toLowerCase()).not.toContain("stall");
   });
@@ -257,5 +265,101 @@ describe("contact step", () => {
 
   it("never sends an FSSAI number for a store that doesn't sell food", () => {
     expect(contactPatch({ ...blank, fssai: "12345678901234" }, nothingSaved, "goods")).not.toHaveProperty("fssaiNumber");
+  });
+});
+
+describe("check and publish step", () => {
+  const food = storeVocabulary("HOME_KITCHEN");
+  const goods = storeVocabulary("CLOTHING");
+  const answers: ReviewInput = {
+    store: { typeLabel: "Home kitchen", city: "Pune", state: "Maharashtra" },
+    payment: { upiId: "amma@okaxis", payOnDelivery: true, online: false },
+    items: [
+      { name: "Puran Poli", priceInPaise: 6000 },
+      { name: "Modak", priceInPaise: 2500 },
+      { name: "Thalipeeth", priceInPaise: 8000 },
+      { name: "Chakli", priceInPaise: 15000 },
+    ],
+    orderMode: "both",
+    handover: { mode: "BOTH", pickupNote: "Gate 2", feePaise: 3000, areas: [{ name: "Kothrud", feePaise: null }] },
+    contact: {
+      whatsapp: "+919876543210",
+      acceptWhatsappOrders: true,
+      showWhatsappOnStore: false,
+      instagram: "amma.kitchen",
+      fssai: "12345678901234",
+    },
+  };
+
+  it("has one card per earlier step, each going back to its own step", () => {
+    const rows = reviewRows(answers, food);
+    expect(rows.map((r) => r.step)).toEqual([1, 2, 3, 4, 5, 6]);
+    expect(rows.map((r) => r.title)).toEqual(ONBOARDING_STEPS.slice(0, 6).map((s) => s.title));
+  });
+
+  it("says what was answered, in a kitchen's words", () => {
+    expect(reviewRows(answers, food).map((r) => r.lines)).toEqual([
+      ["Home kitchen", "Pune, Maharashtra"],
+      ["UPI to amma@okaxis", "Pay on delivery"],
+      ["4 dishes", "Puran Poli ₹60, Modak ₹25, Thalipeeth ₹80 and 1 more"],
+      ["Drops, and your menu any time"],
+      ["Pickup or delivery, customers choose", "Pickup: Gate 2", "Delivery fee ₹30", "Delivers to Kothrud"],
+      ["WhatsApp 98765 43210, shown to customers who order", "Instagram @amma.kitchen", "FSSAI 12345678901234"],
+    ]);
+  });
+
+  it("uses a goods store's words and never shows it an FSSAI line", () => {
+    const rows = reviewRows(
+      { ...answers, items: [answers.items[0]!], orderMode: "menu", contact: { ...answers.contact, showWhatsappOnStore: true } },
+      goods,
+    );
+    expect(rows[2]!.lines).toEqual(["1 product", "Puran Poli ₹60"]);
+    expect(rows[3]!.lines).toEqual(["Order any time: your product list any time"]);
+    expect(rows[5]!.lines).toEqual(["WhatsApp 98765 43210, shown on your store page", "Instagram @amma.kitchen"]);
+  });
+
+  it("reads free delivery, pickup without a note and online payment", () => {
+    const rows = reviewRows(
+      {
+        ...answers,
+        payment: { upiId: "", payOnDelivery: false, online: true },
+        handover: { mode: "DELIVERY", pickupNote: "Gate 2", feePaise: 0, areas: [] },
+      },
+      food,
+    );
+    expect(rows[1]!.lines).toEqual(["Online with your Razorpay"]);
+    expect(rows[4]!.lines).toEqual(["Delivery", "Free delivery"]);
+  });
+
+  it("marks a step with nothing in it, and an empty contact step as nothing added", () => {
+    const rows = reviewRows(
+      {
+        store: { typeLabel: "", city: "", state: "" },
+        payment: { upiId: "", payOnDelivery: false, online: false },
+        items: [],
+        orderMode: null,
+        handover: { mode: null, pickupNote: "", feePaise: null, areas: [] },
+        contact: { whatsapp: "", acceptWhatsappOrders: false, showWhatsappOnStore: false, instagram: "", fssai: "" },
+      },
+      food,
+    );
+    expect(rows.slice(0, 5).every((r) => r.lines[0] === "Not answered yet")).toBe(true);
+    expect(rows[5]!.lines).toEqual(["Nothing added"]);
+  });
+
+  it("finishes and publishes in one request, or finishes alone", () => {
+    expect(finishPatch(true, "")).toEqual({ onboardingDone: true, publishStorefront: true });
+    expect(finishPatch(false, "")).toEqual({ onboardingDone: true });
+  });
+
+  it("sends a saved WhatsApp number again, so receipts turn on", () => {
+    expect(finishPatch(false, "+919876543210")).toEqual({ onboardingDone: true, whatsappNumber: "+919876543210" });
+  });
+
+  it("leads the done screen with the first drop, the orders board or publishing", () => {
+    expect(doneNextAction("drops", true)).toBe("first-drop");
+    expect(doneNextAction("both", false)).toBe("first-drop");
+    expect(doneNextAction("menu", true)).toBe("orders");
+    expect(doneNextAction("menu", false)).toBe("publish");
   });
 });

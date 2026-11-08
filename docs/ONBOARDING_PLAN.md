@@ -1,7 +1,7 @@
 # Onboarding consolidation plan
 
 Status: decided 2026-11-07 (see "Decisions"). PR 1 (gate, `onboardingStep`) merged as #168; PR 2 (payments and items
-required) merged as #170; PR 3 (steps 4–6) in progress; PR 4 not started.
+required) merged as #170; PR 3 (steps 4–6) merged as #171; PR 4 (step 7, done screen) in progress.
 
 ## The problem
 
@@ -80,14 +80,25 @@ Notes on the steps:
 - **Step 5** writes the menu fulfilment fields. Drops keep their own per-drop handover; with no last drop to
   copy, `/drops/new` now starts from these answers (`storeHandoverDefaults` in `lib/drops-builder.ts`, PR 3).
   For an existing store with no drop yet, that is its saved menu mode (pickup by default) instead of delivery.
+- **Step 7, the summary** (PR 4): one card per step (`reviewRows`), each with a Change button. Change opens that
+  step with a "Save" button, which saves and comes straight back to the summary. No store-page preview link: an
+  unpublished store is a 404 for its owner too, and a preview mode is more than this PR.
+- **Step 7, one request** (PR 4): Publish sends `publishStorefront: true` with `onboardingDone: true`
+  (`finishPatch`), so a store is never finished but half published. A saved WhatsApp number is sent again in that
+  request, because `PATCH /api/vendor` turns WhatsApp receipts on only when setup finishes with a number in it
+  (step 6 now saves on Next instead of finishing).
+- **Step 7, a store that is already live** (PR 4): a claimed demo store is published before its setup ends. Its
+  button reads "Finish setup", keeps it live, and there is no "Finish without publishing": taking a store down
+  stays in Settings.
 - **Step 7, publishing**: Publish is the primary action. A secondary "Finish without publishing" stays for
   sellers who are not ready to go public (see open decision 1). Publishing a store whose only answer in step 4
   is Drops gives the existing "Orders open soon" store page until the first drop opens, which is fine.
 
-Done screen (replaces "Your store is ready"):
+Done screen (replaces "Your store is ready"; PR 4, `doneNextAction`):
 
 - The store link with Copy and Share, and the Instagram bio link (`?src=ig`, as the setup card already does).
-- Drops chosen → "Create your first drop" (primary). Menu orders only → "Go to your orders".
+- Drops chosen → "Create your first drop" (primary). Menu orders only → "Go to your orders", or "Publish your
+  store" (Settings → Online store) when they finished without publishing.
 - The copy is true now: the store is live (or the screen says plainly that it is not, if they finished
   without publishing).
 
@@ -112,8 +123,10 @@ Neon **before** merging.
 
 **Existing stores.** Every existing store already has `onboardingDone: true`, so none is forced back through.
 The setup checklist card stays as their path, with its links pointing at the matching Settings sections as
-today. Demo stores (`lib/demo-store.ts`) keep `onboardingDone: true`. The demo claim flow should send the new
-owner through steps 2 and 7 only, since the fixture fills the rest (see open decision 3).
+today. Demo stores (`lib/demo-store.ts`) keep `onboardingDone: true`. The demo claim sets `onboardingDone:
+false` and clears `onboardingStep` (PR 4, decision 3): setup opens on step 2, since the claim clears the demo UPI ID,
+and the steps show what the demo filled in. Steps 4 and 5 ask again: with no `onboardingStep` their saved values
+can't be told from defaults, and each is one tap.
 
 **One source of truth.** Shared rules stay in their libs (`isValidUpiId`, `lib/delivery-areas.ts` including the
 fee parser `deliveryFeeInputToPaise`, `lib/instagram.ts`, `lib/fssai.ts`, `storeVocabulary()`), used by Settings,
@@ -135,7 +148,7 @@ already done.
 3. **Orders, handover, contact.** Steps 4–6 (own fields on the shared rules, see "One source of truth"), the
    `lastDropDefaults` fallback. Until PR 4 the last step is 6 and its Finish ends setup without publishing; the
    done screen leads with "Publish your store" for a menu-only store, "Create your first drop" otherwise.
-4. **Check & publish + done screen.** Step 7, the new done screen, Help guide copy.
+4. **Check & publish + done screen.** Step 7, the new done screen, the demo claim through setup, Help guide copy.
 
 ## Tests
 

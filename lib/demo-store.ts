@@ -506,6 +506,10 @@ export async function claimDemoStore(input: ClaimInput, now: Date = new Date()):
           // The placeholder must not take a real buyer's money: the owner adds
           // their own UPI id in Settings before taking payments.
           upiId: null,
+          // The new owner goes through setup (docs/ONBOARDING_PLAN.md, decision 3):
+          // what the demo filled in shows on each step, and payment needs their own answer.
+          onboardingDone: false,
+          onboardingStep: null,
           trialEndsAt: current.trialEndsAt && current.trialEndsAt > trialEnd ? current.trialEndsAt : trialEnd,
         },
         select: { slug: true },

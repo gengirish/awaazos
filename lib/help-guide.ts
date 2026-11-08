@@ -309,7 +309,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "publish-store",
     group: "setup",
     title: "Put your store online and get its link",
-    steps: "Turn the online store on, then tap Copy link and paste it in your Instagram bio.",
+    steps: "The last step of setup puts your store online when you tap Publish my store. If you finished without publishing, turn the online store on here. Then tap Copy link and paste it in your Instagram bio.",
     nav: "settings",
     href: "/settings/store",
     trail: ["Online store"],
