@@ -60,6 +60,9 @@ type Menu = { laddu: MenuItemRow; thepla: MenuItemRow; chakli: MenuItemRow };
 async function setUpVendor(page: Page, request: Parameters<typeof createVendorSession>[1], label: string) {
   const suffix = Math.random().toString(36).slice(2, 7);
   await createVendorSession(page, request, label, "/menu");
+  // A first drop starts from the store's pickup / delivery answer (storeHandoverDefaults):
+  // delivery here, so the spoken "pickup" is a change the form marks.
+  expect((await page.request.patch("/api/vendor", { data: { menuFulfilmentMode: "DELIVERY" } })).status()).toBe(200);
   const menu: Menu = {
     laddu: await createMenuItem(page, { name: `Ragi Laddu ${suffix}`, priceInRupees: 120, category: "Sweets" }),
     thepla: await createMenuItem(page, { name: `Methi Thepla ${suffix}`, priceInRupees: 40, category: "Snacks" }),

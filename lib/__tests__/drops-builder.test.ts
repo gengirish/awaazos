@@ -16,6 +16,7 @@ import {
   planDropItemRemoval,
   shiftDropSchedule,
   shiftOrderWindowDates,
+  storeHandoverDefaults,
 } from "@/lib/drops-builder";
 import { istToUtc, ymdToDbDate } from "@/lib/drops-time";
 import { dropInputToData, dropUpsertSchema } from "@/lib/zod-drops";
@@ -195,6 +196,14 @@ describe("lastDropDefaults", () => {
       pickupNote: "Gate 2",
       deliveryFeePaise: 3000,
     });
+  });
+});
+
+describe("storeHandoverDefaults", () => {
+  it("starts a store's first drop from its own pickup / delivery answer", () => {
+    expect(
+      storeHandoverDefaults({ menuFulfilmentMode: "BOTH", menuPickupNote: "Gate 2", menuDeliveryFeePaise: 4000 }),
+    ).toEqual({ fulfilmentMode: "BOTH", pickupNote: "Gate 2", deliveryFeePaise: 4000 });
   });
 });
 

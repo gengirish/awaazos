@@ -1,7 +1,7 @@
 # Onboarding consolidation plan
 
 Status: decided 2026-11-07 (see "Decisions"). PR 1 (gate, `onboardingStep`) merged as #168; PR 2 (payments and items
-required) in progress; PRs 3–4 not started.
+required) merged as #170; PR 3 (steps 4–6) in progress; PR 4 not started.
 
 ## The problem
 
@@ -68,8 +68,18 @@ Notes on the steps:
   is the tap fallback. Nothing sends the seller to `/menu?voice=1` any more.
 - **Step 4 wording**: the choice is described in the store's words (`storeVocabulary()`: "Order from menu"
   vs "Order any time"). Choosing Drops creates nothing. It decides what the done screen offers.
-- **Step 5** writes the menu fulfilment fields. Drops keep their own per-drop handover, and `lastDropDefaults`
-  should fall back to these answers for a store's first drop so they are not asked again.
+- **Step 4 before publishing** (PR 3): `PATCH /api/vendor` refuses `acceptMenuOrders: true` on an unpublished
+  store (`storefront_not_published`), and publishing is step 7. While `onboardingDone` is false the server
+  skips that half of the check (the payment half stays), so the answer is saved where it lives; the store page
+  stays a 404 until published. Nothing to migrate.
+- **Step 4 read back** (PR 3): nothing tells "menu only" from "both" once saved (both are `acceptMenuOrders:
+  true`), so after a reload a saved "on" shows as Both. It only changes which button the done screen leads with.
+- **Steps 4 and 5 start unpicked** (PR 3): `acceptMenuOrders: false` and `menuFulfilmentMode: PICKUP` are column
+  defaults, not answers, so until `onboardingStep` says the step is done nothing is pre-selected. The delivery
+  fee starts empty for the same reason (free delivery has to be typed as 0).
+- **Step 5** writes the menu fulfilment fields. Drops keep their own per-drop handover; with no last drop to
+  copy, `/drops/new` now starts from these answers (`storeHandoverDefaults` in `lib/drops-builder.ts`, PR 3).
+  For an existing store with no drop yet, that is its saved menu mode (pickup by default) instead of delivery.
 - **Step 7, publishing**: Publish is the primary action. A secondary "Finish without publishing" stays for
   sellers who are not ready to go public (see open decision 1). Publishing a store whose only answer in step 4
   is Drops gives the existing "Orders open soon" store page until the first drop opens, which is fine.
@@ -105,10 +115,12 @@ The setup checklist card stays as their path, with its links pointing at the mat
 today. Demo stores (`lib/demo-store.ts`) keep `onboardingDone: true`. The demo claim flow should send the new
 owner through steps 2 and 7 only, since the fixture fills the rest (see open decision 3).
 
-**One source of truth.** Where a Settings section already has a client form for the same fields (delivery
-areas, WhatsApp switches, Instagram, FSSAI), the step renders that component, not a copy, so the validation and
-wording can't drift. Shared rules stay in their libs (`isValidUpiId`, `lib/delivery-areas.ts`,
-`lib/instagram.ts`, `storeVocabulary()`).
+**One source of truth.** Shared rules stay in their libs (`isValidUpiId`, `lib/delivery-areas.ts` including the
+fee parser `deliveryFeeInputToPaise`, `lib/instagram.ts`, `lib/fssai.ts`, `storeVocabulary()`), used by Settings,
+setup and `PATCH /api/vendor` alike. Changed in PR 3: the steps do **not** render the Settings components. Those
+save themselves (a Save button per field, switches that save on tap) and report through toasts, and setup has no
+Toaster; in a step whose Next saves everything, a typed number nobody pressed Save on would be lost. Each step
+has its own fields and one PATCH on Next.
 
 **Checklist after onboarding.** For a store that finished the new flow, the card only has the first drop left (if
 Drops was chosen) and the FSSAI reminder. No change to `setupChecklist()` rules is needed: the steps are simply
@@ -120,8 +132,10 @@ already done.
    page, `resumeStep()` reading the column, the step list generalised to N steps. Steps stay as today.
 2. **Payments and items mandatory.** Step 2 with the three methods (+ Razorpay return to onboarding), step 3 with
    ≥ 1 item and voice inside the step.
-3. **Orders, handover, contact.** Steps 4–6, reusing the Settings forms.
-4. **Check & publish + done screen.** Step 7, the new done screen, `lastDropDefaults` fallback, Help guide copy.
+3. **Orders, handover, contact.** Steps 4–6 (own fields on the shared rules, see "One source of truth"), the
+   `lastDropDefaults` fallback. Until PR 4 the last step is 6 and its Finish ends setup without publishing; the
+   done screen leads with "Publish your store" for a menu-only store, "Create your first drop" otherwise.
+4. **Check & publish + done screen.** Step 7, the new done screen, Help guide copy.
 
 ## Tests
 

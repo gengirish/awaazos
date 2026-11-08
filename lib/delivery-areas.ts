@@ -21,7 +21,7 @@
  * There is no radius: an order has no coordinates to measure, only a locality.
  */
 
-import { formatINRCompact } from "@/lib/currency";
+import { formatINRCompact, rupeesToPaise } from "@/lib/currency";
 
 export const MAX_DELIVERY_AREAS = 20;
 export const DELIVERY_AREA_NAME_MAX = 40;
@@ -29,6 +29,30 @@ export const DELIVERY_AREA_NAME_MAX = 40;
 export const MAX_DELIVERY_AREA_FEE_PAISE = 100_000;
 
 export type DeliveryArea = { name: string; feePaise: number | null };
+
+/**
+ * A fee typed in rupees, as Settings → Online orders and setup read it:
+ * "" → null (nothing entered); "30" / "12.50" / "0" → paise up to ₹1,000
+ * (`MAX_DELIVERY_AREA_FEE_PAISE`, also the menu fee's ceiling); anything else
+ * → undefined (invalid). Callers decide what an empty field means.
+ */
+export function deliveryFeeInputToPaise(raw: string): number | null | undefined {
+  const t = raw.trim();
+  if (t === "") return null;
+  if (!/^\d{1,4}(\.\d{1,2})?$/.test(t)) return undefined;
+  try {
+    const p = rupeesToPaise(Number(t));
+    return p <= MAX_DELIVERY_AREA_FEE_PAISE ? p : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** An area's fee as a list shows it: "Usual delivery fee", "Free delivery", "₹40 delivery". */
+export function deliveryAreaFeeLabel(area: DeliveryArea): string {
+  if (area.feePaise === null) return "Usual delivery fee";
+  return area.feePaise === 0 ? "Free delivery" : `${formatINRCompact(area.feePaise)} delivery`;
+}
 
 /** The comparison key for an area or a buyer's locality (rule 3). */
 export function deliveryAreaKey(name: string): string {

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { FSSAI_NUMBER_MESSAGE, FSSAI_NUMBER_PATTERN } from "@/lib/fssai";
 import type { StoreKind } from "@/lib/store-vocabulary";
 
 /** The FSSAI number shown to buyers on the storefront. */
@@ -10,8 +11,6 @@ export type FssaiNumberClientProps = {
   initialFssaiNumber: string | null;
   storeKind: StoreKind;
 };
-
-const FSSAI = /^\d{14}$/;
 
 export function FssaiNumberClient({ initialFssaiNumber, storeKind }: FssaiNumberClientProps) {
   const [fssai, setFssai] = useState(initialFssaiNumber ?? "");
@@ -48,8 +47,8 @@ export function FssaiNumberClient({ initialFssaiNumber, storeKind }: FssaiNumber
 
   function saveFssai() {
     const value = fssai.trim();
-    if (value && !FSSAI.test(value)) {
-      setFssaiError("FSSAI number must be exactly 14 digits.");
+    if (value && !FSSAI_NUMBER_PATTERN.test(value)) {
+      setFssaiError(FSSAI_NUMBER_MESSAGE);
       return;
     }
     setFssaiError(null);

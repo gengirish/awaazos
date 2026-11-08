@@ -9,7 +9,8 @@ import { toast } from "sonner";
 import { Notice } from "@/components/ui/notice";
 import { RadioOption } from "@/components/ui/radio-option";
 import { Switch } from "@/components/ui/switch";
-import { paiseToRupees, rupeesToPaise } from "@/lib/currency";
+import { paiseToRupees } from "@/lib/currency";
+import { deliveryFeeInputToPaise } from "@/lib/delivery-areas";
 import type { MenuOrdersBlocker } from "@/lib/menu-orders-board";
 import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
@@ -36,9 +37,6 @@ const MODES: { id: FulfilmentMode; label: string }[] = [
   { id: "BOTH", label: "Both" },
 ];
 
-/** Max delivery fee the API accepts: ₹1,000 (100000 paise). */
-const MAX_FEE_PAISE = 100_000;
-
 const BLOCKER_COPY: Record<MenuOrdersBlocker, { text: string; href: string; link: string }> = {
   storefront_not_published: {
     text: "Publish your store first, so customers have a page to order from.",
@@ -62,14 +60,7 @@ function feeToInput(paise: number, mode: FulfilmentMode): string {
 
 /** "30" / "12.50" / "0" → paise, anything else (empty too) → null (invalid). */
 function feeInputToPaise(raw: string): number | null {
-  const t = raw.trim();
-  if (!/^\d{1,4}(\.\d{1,2})?$/.test(t)) return null;
-  try {
-    const p = rupeesToPaise(Number(t));
-    return p <= MAX_FEE_PAISE ? p : null;
-  } catch {
-    return null;
-  }
+  return deliveryFeeInputToPaise(raw) ?? null;
 }
 
 export function MenuOrdersClient({

@@ -5,8 +5,7 @@ import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { parsePhoneNumberFromString } from "libphonenumber-js";
-import { Check, CheckCircle2, Keyboard, Mic, Plus, X } from "lucide-react";
+import { Check, CheckCircle2, Keyboard, Mic, Plus, Trash2, X } from "lucide-react";
 
 import { PushAlertsButton } from "@/components/push/PushAlertsButton";
 import { Button } from "@/components/ui/button";
@@ -14,6 +13,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/co
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
+import { RadioOption } from "@/components/ui/radio-option";
 import {
   Select,
   SelectContent,
@@ -21,10 +21,22 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { useQrDataUrl } from "@/hooks/useQrDataUrl";
 import { STALL_TYPES } from "@/lib/constants";
 import { formatINR } from "@/lib/currency";
+import {
+  deliveryAreaFeeLabel,
+  deliveryAreaKey,
+  deliveryFeeInputToPaise,
+  DELIVERY_AREA_NAME_MAX,
+  MAX_DELIVERY_AREAS,
+  parseDeliveryAreas,
+  toDeliveryArea,
+  type DeliveryArea,
+} from "@/lib/delivery-areas";
 import { HOME_PATH } from "@/lib/home";
+import { formatIndianMobile } from "@/lib/phone";
 import { MENU_CHANGED_EVENT } from "@/lib/menu-events";
 import { connectOutcomeMessage, razorpayConnectHref } from "@/lib/razorpay-connect";
 import { STALL_TYPE_OTHER_MAX, STALL_TYPE_OTHER_MESSAGE, stallTypeOtherSchema } from "@/lib/stall-type";
@@ -34,19 +46,30 @@ import { cn } from "@/lib/utils";
 import type { StallType, Vendor, VendorSettings } from "@prisma/client";
 
 import {
+  contactPatch,
+  contactProblems,
   draftToBulkItem,
+  handoverProblems,
+  initialFeeInput,
+  initialHandoverMode,
+  initialOrderMode,
   initialPaymentChoice,
   initialStateName,
   isBlankDraft,
   MAX_DRAFT_ITEMS,
+  offersDelivery,
+  offersPickup,
   ONBOARDING_STEPS,
   paymentChoiceProblem,
   progressAfter,
   resumeStep,
   STEP_COUNT,
   stepDescription,
+  takesMenuOrders,
   validateItemDraft,
+  type HandoverMode,
   type ItemDraft,
+  type OrderMode,
 } from "./onboarding-steps";
 
 type VendorPayload = Vendor & { settings: VendorSettings | null };
@@ -119,18 +142,20 @@ function StepProgress({ step }: { step: number }) {
                 aria-hidden="true"
                 className={cn("block h-1.5 rounded-full", done || current ? "bg-primary" : "bg-muted")}
               />
+              <span className="sr-only">
+                Step {n}: {s.title}
+                {done ? " (done)" : current ? " (current step)" : " (not started)"}
+              </span>
+              {/* Six names don't fit a phone's width: there, the heading and "Step n of 6" say it. */}
               <span
+                aria-hidden="true"
                 className={cn(
-                  "mt-1.5 flex items-start gap-1 text-xs",
+                  "mt-1.5 hidden items-start gap-1 text-xs sm:flex",
                   current ? "font-bold text-foreground" : "text-muted-foreground",
                 )}
               >
-                {done ? <Check className="mt-0.5 h-3 w-3 shrink-0" aria-hidden="true" /> : null}
-                <span>
-                  <span className="sr-only">Step {n}: </span>
-                  {s.title}
-                  <span className="sr-only">{done ? " (done)" : current ? " (current step)" : " (not started)"}</span>
-                </span>
+                {done ? <Check className="mt-0.5 h-3 w-3 shrink-0" /> : null}
+                <span className="min-w-0 break-words">{s.short}</span>
               </span>
             </li>
           );
@@ -202,8 +227,25 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
   const micRef = useRef<HTMLButtonElement>(null);
   const voiceToggleRef = useRef<HTMLButtonElement>(null);
 
+  /** Step 4. Null until the seller picks one. */
+  const [orderMode, setOrderMode] = useState<OrderMode | null>(null);
+
+  /** Step 5. Null until the seller picks one. */
+  const [handover, setHandover] = useState<HandoverMode | null>(null);
+  const [feeInput, setFeeInput] = useState("");
+  const [pickupNote, setPickupNote] = useState("");
+  const [areas, setAreas] = useState<DeliveryArea[]>([]);
+  const [areaName, setAreaName] = useState("");
+  const [areaFee, setAreaFee] = useState("");
+
   const [whatsapp, setWhatsapp] = useState("");
   const [savedWhatsapp, setSavedWhatsapp] = useState("");
+  const [acceptWhatsappOrders, setAcceptWhatsappOrders] = useState(false);
+  const [showWhatsappOnStore, setShowWhatsappOnStore] = useState(false);
+  const [instagram, setInstagram] = useState("");
+  const [savedInstagram, setSavedInstagram] = useState("");
+  const [fssai, setFssai] = useState("");
+  const [savedFssai, setSavedFssai] = useState("");
 
   const headingRef = useRef<HTMLHeadingElement>(null);
   /** Set when the screen changes because of a tap, so focus follows; never on first paint. */
@@ -247,8 +289,23 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
         setUpiChosen(choice.upi);
         setPayOnDelivery(choice.payOnDelivery);
         setVoiceLang(v.settings?.voiceLang ?? "en-IN");
-        setWhatsapp(v.settings?.whatsappNumber ?? v.phone ?? "");
-        setSavedWhatsapp(v.settings?.whatsappNumber ?? "");
+        const st = v.settings;
+        const done = v.onboardingStep ?? 0;
+        setOrderMode(initialOrderMode({ acceptMenuOrders: st?.acceptMenuOrders ?? false, answered: done >= 4 }));
+        const mode = st?.menuFulfilmentMode ?? "PICKUP";
+        setHandover(initialHandoverMode({ mode, answered: done >= 5 }));
+        setFeeInput(initialFeeInput(st?.menuDeliveryFeePaise ?? 0, mode, done >= 5));
+        setPickupNote(st?.menuPickupNote ?? "");
+        setAreas(parseDeliveryAreas(st?.deliveryAreas));
+        // The sign-up phone is a suggestion here; it is saved only on Finish.
+        setWhatsapp(formatIndianMobile(st?.whatsappNumber ?? v.phone ?? null));
+        setSavedWhatsapp(st?.whatsappNumber ?? "");
+        setAcceptWhatsappOrders(st?.acceptWhatsappOrders ?? false);
+        setShowWhatsappOnStore(st?.showWhatsappOnStore ?? false);
+        setInstagram(st?.instagramHandle ?? "");
+        setSavedInstagram(st?.instagramHandle ?? "");
+        setFssai(st?.fssaiNumber ?? "");
+        setSavedFssai(st?.fssaiNumber ?? "");
         setSavedItems(menu.map(toSavedItem));
         setSavedStep(v.onboardingStep);
         const resume = resumeStep({ city: v.city, upiId: v.upiId, itemCount: menu.length, savedStep: v.onboardingStep });
@@ -491,11 +548,70 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
     }
   }
 
+  async function saveOrderMode(): Promise<boolean> {
+    if (!orderMode) {
+      reject({ "order-mode-drops": "Choose how customers order from you." });
+      return false;
+    }
+    return patchVendor({ acceptMenuOrders: takesMenuOrders(orderMode) });
+  }
+
+  async function saveHandover(): Promise<boolean> {
+    const feePaise = offersDelivery(handover) ? deliveryFeeInputToPaise(feeInput) : null;
+    const problems = handoverProblems({ mode: handover, feePaise });
+    if (problems.mode || problems.fee) {
+      reject(problems.mode ? { "handover-PICKUP": problems.mode } : { "delivery-fee": problems.fee! });
+      return false;
+    }
+    if (!handover) return false;
+    const body: Record<string, unknown> = { menuFulfilmentMode: handover };
+    if (offersPickup(handover)) body.menuPickupNote = pickupNote.trim();
+    if (offersDelivery(handover)) {
+      body.menuDeliveryFeePaise = feePaise;
+      body.deliveryAreas = areas;
+    }
+    return patchVendor(body);
+  }
+
+  /** Put a typed area on the list. It is saved with the rest of the step on Next. */
+  function addArea() {
+    if (areas.length >= MAX_DELIVERY_AREAS) return;
+    const feePaise = deliveryFeeInputToPaise(areaFee);
+    if (feePaise === undefined) {
+      reject({ "area-fee": "Enter a fee up to ₹1,000, like 30 or 0 for free. Leave it empty for your usual fee." });
+      return;
+    }
+    const area = toDeliveryArea({ name: areaName, feePaise });
+    if (!area) {
+      reject({ "area-name": "Enter the area's name, like Kondapur." });
+      return;
+    }
+    if (areas.some((a) => deliveryAreaKey(a.name) === deliveryAreaKey(area.name))) {
+      reject({ "area-name": `${area.name} is already on the list.` });
+      return;
+    }
+    setAreas((prev) => [...prev, area]);
+    setAreaName("");
+    setAreaFee("");
+    clearError("area-name");
+    clearError("area-fee");
+    document.getElementById("area-name")?.focus();
+  }
+
   async function next() {
     if (saving) return;
     setSaving(true);
     setFormError(null);
-    const ok = step === 1 ? await saveStore() : step === 2 ? await savePayment() : await saveItems();
+    const ok =
+      step === 1
+        ? await saveStore()
+        : step === 2
+          ? await savePayment()
+          : step === 3
+            ? await saveItems()
+            : step === 4
+              ? await saveOrderMode()
+              : await saveHandover();
     if (ok) await recordProgress(step);
     setSaving(false);
     if (ok) goTo(step + 1);
@@ -508,18 +624,16 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
 
   async function finish() {
     if (saving) return;
-    const raw = whatsapp.trim();
-    const body: Record<string, unknown> = { onboardingDone: true };
-    if (raw) {
-      const parsed = parsePhoneNumberFromString(raw, "IN");
-      if (!parsed?.isValid() || parsed.country !== "IN") {
-        reject({ wa: "Enter a valid Indian mobile number, or leave this empty." });
-        return;
-      }
-      body.whatsappNumber = parsed.format("E.164");
-    } else if (savedWhatsapp) {
-      body.whatsappNumber = null;
+    const contact = { whatsapp, acceptWhatsappOrders, showWhatsappOnStore, instagram, fssai: vocabKind === "food" ? fssai : "" };
+    const found = contactProblems(contact);
+    if (Object.keys(found).length) {
+      reject(found as FieldErrors);
+      return;
     }
+    const body: Record<string, unknown> = {
+      ...contactPatch(contact, { whatsapp: savedWhatsapp, instagram: savedInstagram, fssai: savedFssai }, vocabKind),
+      onboardingDone: true,
+    };
 
     setSaving(true);
     setFormError(null);
@@ -532,6 +646,8 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
     focusHeading.current = true;
     setPhase("done");
   }
+
+  const vocabKind = storeVocabulary(stallType).kind;
 
   function updateDraft(key: string, patch: Partial<ItemDraft>) {
     setDrafts((prev) => prev.map((row) => (row.key === key ? { ...row, ...patch } : row)));
@@ -562,6 +678,7 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
 
   if (phase === "done") {
     const storePath = `/s/${encodeURIComponent(slug)}`;
+    const vocabularyKindCatalogue = storeVocabulary(stallType).catalogue;
     return (
       <main id="main" className="mx-auto flex min-h-screen max-w-lg flex-col gap-6 p-4 pb-12 pt-8">
         <div>
@@ -574,7 +691,9 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
             Your store is ready
           </h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Next, put up a drop: what you&apos;re making, how many, and when orders close.
+            {orderMode === "menu"
+              ? `Next, publish your store so customers can order from your ${vocabularyKindCatalogue}.`
+              : "Next, put up a drop: what you're making, how many, and when orders close."}
           </p>
         </div>
 
@@ -587,15 +706,19 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
             {storePath}
           </p>
           <p className="mt-2 text-sm text-muted-foreground">
-            This link is not public yet. Nobody can open it until you publish your store. You&apos;ll be asked when
-            you open your first drop, or you can publish it in Settings → Online store. After that, put it in your
-            Instagram bio.
+            {orderMode === "menu"
+              ? "This link is not public yet. Nobody can open it until you publish your store in Settings → Online store. After that, put it in your Instagram bio."
+              : "This link is not public yet. Nobody can open it until you publish your store. You'll be asked when you open your first drop, or you can publish it in Settings → Online store. After that, put it in your Instagram bio."}
           </p>
         </section>
 
         <div className="flex flex-col gap-3">
           <Button asChild className="w-full">
-            <Link href="/drops/new">Create your first drop</Link>
+            {orderMode === "menu" ? (
+              <Link href="/settings/store">Publish your store</Link>
+            ) : (
+              <Link href="/drops/new">Create your first drop</Link>
+            )}
           </Button>
           <Button asChild variant="outline" className="w-full">
             {/* /home only redirects (lib/home.ts): nothing to prefetch. */}
@@ -951,9 +1074,330 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
           )}
 
           {step === 4 && (
+            <fieldset className="space-y-2">
+              <legend className="sr-only">How customers order from you</legend>
+              <RadioOption
+                id="order-mode-drops"
+                name="order-mode"
+                value="drops"
+                checked={orderMode === "drops"}
+                onChange={() => {
+                  setOrderMode("drops");
+                  clearError("order-mode-drops");
+                }}
+                invalid={Boolean(errors["order-mode-drops"])}
+                aria-describedby={errors["order-mode-drops"] ? "order-mode-drops-error" : undefined}
+                label="Drops"
+                hint={`Batches you announce, like “${vocab.dropExample}”. Customers order until a cut-off you set.`}
+              />
+              <RadioOption
+                name="order-mode"
+                value="menu"
+                checked={orderMode === "menu"}
+                onChange={() => {
+                  setOrderMode("menu");
+                  clearError("order-mode-drops");
+                }}
+                invalid={Boolean(errors["order-mode-drops"])}
+                label={vocab.catalogueOrdersTitle}
+                hint={`Customers order from your ${vocab.catalogue} any time, with no cut-off.`}
+              />
+              <RadioOption
+                name="order-mode"
+                value="both"
+                checked={orderMode === "both"}
+                onChange={() => {
+                  setOrderMode("both");
+                  clearError("order-mode-drops");
+                }}
+                invalid={Boolean(errors["order-mode-drops"])}
+                label="Both"
+                hint={`Drops for special batches, and your ${vocab.catalogue} the rest of the time.`}
+              />
+              <FieldError id="order-mode-drops" message={errors["order-mode-drops"]} />
+            </fieldset>
+          )}
+
+          {step === 5 && (
+            <div className="space-y-4">
+              <fieldset className="space-y-2">
+                <legend className="sr-only">How customers get their order</legend>
+                {(
+                  [
+                    { id: "PICKUP", label: "Pickup", hint: "Customers collect from you." },
+                    { id: "DELIVERY", label: "Delivery", hint: "You, or someone you send, take it to them." },
+                    { id: "BOTH", label: "Both", hint: "Customers choose at checkout." },
+                  ] as const
+                ).map((m, i) => (
+                  <RadioOption
+                    key={m.id}
+                    id={`handover-${m.id}`}
+                    name="handover"
+                    value={m.id}
+                    checked={handover === m.id}
+                    onChange={() => {
+                      setHandover(m.id);
+                      clearError("handover-PICKUP");
+                    }}
+                    invalid={Boolean(errors["handover-PICKUP"])}
+                    aria-describedby={i === 0 && errors["handover-PICKUP"] ? "handover-PICKUP-error" : undefined}
+                    label={m.label}
+                    hint={m.hint}
+                  />
+                ))}
+                <FieldError id="handover-PICKUP" message={errors["handover-PICKUP"]} />
+              </fieldset>
+
+              {offersPickup(handover) ? (
+                <div className="space-y-2">
+                  <Label htmlFor="pickup-note">Pickup note (optional)</Label>
+                  <textarea
+                    id="pickup-note"
+                    rows={2}
+                    maxLength={200}
+                    value={pickupNote}
+                    onChange={(e) => setPickupNote(e.target.value)}
+                    aria-describedby="pickup-note-hint"
+                    className="flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  />
+                  <p id="pickup-note-hint" className="text-sm text-muted-foreground">
+                    Where and when to collect, like &ldquo;Gate 2, Sunrise Apartments · 5–8 pm&rdquo;. Customers see it at
+                    checkout.
+                  </p>
+                </div>
+              ) : null}
+
+              {offersDelivery(handover) ? (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="delivery-fee">Delivery fee (₹)</Label>
+                    <Input
+                      id="delivery-fee"
+                      inputMode="decimal"
+                      autoComplete="off"
+                      placeholder="30"
+                      className="max-w-40 font-mono"
+                      value={feeInput}
+                      onChange={(e) => {
+                        setFeeInput(e.target.value.replace(/[^\d.]/g, ""));
+                        clearError("delivery-fee");
+                      }}
+                      {...fieldAria("delivery-fee", errors, "delivery-fee-hint")}
+                    />
+                    <FieldError id="delivery-fee" message={errors["delivery-fee"]} />
+                    <p id="delivery-fee-hint" className="text-sm text-muted-foreground">
+                      Added to delivery orders only. Enter 0 for free delivery.
+                    </p>
+                  </div>
+
+                  <section aria-labelledby="areas-heading" className="space-y-3 rounded-lg border p-3">
+                    <div>
+                      <h3 id="areas-heading" className="text-sm font-medium">
+                        Delivery areas (optional)
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        List the localities you deliver to, each with its own fee if you like, and customers pick one at
+                        checkout. Leave it empty to deliver anywhere at the fee above.
+                      </p>
+                    </div>
+                    {areas.length > 0 ? (
+                      <ul className="divide-y rounded-md border" aria-label="Delivery areas">
+                        {areas.map((a) => (
+                          <li key={a.name} className="flex items-center justify-between gap-3 px-3 py-1">
+                            <p className="min-w-0 text-sm">
+                              <span className="font-medium">{a.name}</span>
+                              <span className="text-muted-foreground"> · {deliveryAreaFeeLabel(a)}</span>
+                            </p>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              aria-label={`Remove ${a.name}`}
+                              onClick={() => setAreas((prev) => prev.filter((x) => x.name !== a.name))}
+                            >
+                              <Trash2 aria-hidden="true" />
+                            </Button>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                    {areas.length < MAX_DELIVERY_AREAS ? (
+                      <>
+                        <div className="grid gap-3 sm:grid-cols-[minmax(0,1fr)_8rem]">
+                          <div className="space-y-1">
+                            <Label htmlFor="area-name">Area</Label>
+                            <Input
+                              id="area-name"
+                              placeholder="Kondapur"
+                              maxLength={DELIVERY_AREA_NAME_MAX}
+                              value={areaName}
+                              onChange={(e) => {
+                                setAreaName(e.target.value);
+                                clearError("area-name");
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") {
+                                  e.preventDefault();
+                                  addArea();
+                                }
+                              }}
+                              {...fieldAria("area-name", errors)}
+                            />
+                            <FieldError id="area-name" message={errors["area-name"]} />
+                          </div>
+                          <div className="space-y-1">
+                            <Label htmlFor="area-fee">Fee in ₹ (optional)</Label>
+                            <Input
+                              id="area-fee"
+                              inputMode="decimal"
+                              placeholder="0"
+                              className="font-mono"
+                              value={areaFee}
+                              onChange={(e) => {
+                                setAreaFee(e.target.value);
+                                clearError("area-fee");
+                              }}
+                              {...fieldAria("area-fee", errors, "area-fee-hint")}
+                            />
+                            <FieldError id="area-fee" message={errors["area-fee"]} />
+                          </div>
+                        </div>
+                        <p id="area-fee-hint" className="text-sm text-muted-foreground">
+                          0 is free delivery to that area. Empty uses the fee above.
+                        </p>
+                        <Button type="button" variant="outline" onClick={addArea} disabled={!areaName.trim()}>
+                          <Plus aria-hidden="true" />
+                          Add area
+                        </Button>
+                      </>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">You can list up to {MAX_DELIVERY_AREAS} areas.</p>
+                    )}
+                  </section>
+                </>
+              ) : null}
+            </div>
+          )}
+
+          {step === 6 && (
             <>
+              <section aria-labelledby="wa-heading" className="space-y-3">
+                <h3 id="wa-heading" className="text-sm font-semibold">
+                  WhatsApp
+                </h3>
+                <div className="space-y-2">
+                  <Label htmlFor="wa">WhatsApp number (optional)</Label>
+                  <Input
+                    id="wa"
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    placeholder="98765 43210"
+                    value={whatsapp}
+                    onChange={(e) => {
+                      setWhatsapp(e.target.value);
+                      clearError("wa");
+                    }}
+                    {...fieldAria("wa", errors, "wa-hint")}
+                  />
+                  <FieldError id="wa" message={errors.wa} />
+                  <p id="wa-hint" className="text-sm text-muted-foreground">
+                    The number customers message about an order. It can differ from your login phone. Nobody sees it
+                    unless you turn a switch on below.
+                  </p>
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <label htmlFor="wa-orders" className="text-sm font-medium">
+                      Let customers send orders on WhatsApp
+                    </label>
+                    <p id="wa-orders-hint" className="text-sm text-muted-foreground">
+                      Customers who place an order can message it to you.{" "}
+                      <span className="font-medium text-warning">They will see this number.</span>
+                    </p>
+                  </div>
+                  <Switch
+                    id="wa-orders"
+                    aria-describedby="wa-orders-hint"
+                    checked={acceptWhatsappOrders}
+                    onCheckedChange={(on) => {
+                      setAcceptWhatsappOrders(on);
+                      clearError("wa");
+                    }}
+                  />
+                </div>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <label htmlFor="wa-store" className="text-sm font-medium">
+                      Show a WhatsApp button on your store page
+                    </label>
+                    <p id="wa-store-hint" className="text-sm text-muted-foreground">
+                      Anyone can message you before ordering.{" "}
+                      <span className="font-medium text-warning">Everyone who opens your store will see this number.</span>
+                    </p>
+                  </div>
+                  <Switch
+                    id="wa-store"
+                    aria-describedby="wa-store-hint"
+                    checked={showWhatsappOnStore}
+                    onCheckedChange={(on) => {
+                      setShowWhatsappOnStore(on);
+                      clearError("wa");
+                    }}
+                  />
+                </div>
+              </section>
+
               <div className="space-y-2">
-                <p className="text-sm font-medium">Alerts on this phone</p>
+                <Label htmlFor="instagram">Instagram username (optional)</Label>
+                <Input
+                  id="instagram"
+                  autoComplete="off"
+                  autoCapitalize="none"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  maxLength={200}
+                  placeholder="@yourstore"
+                  value={instagram}
+                  onChange={(e) => {
+                    setInstagram(e.target.value);
+                    clearError("instagram");
+                  }}
+                  {...fieldAria("instagram", errors, "instagram-hint")}
+                />
+                <FieldError id="instagram" message={errors.instagram} />
+                <p id="instagram-hint" className="text-sm text-muted-foreground">
+                  Your username or profile link. Customers tap it on your store page to open your Instagram.
+                </p>
+              </div>
+
+              {vocab.kind === "food" ? (
+                <div className="space-y-2">
+                  <Label htmlFor="fssai">FSSAI number (optional)</Label>
+                  <Input
+                    id="fssai"
+                    inputMode="numeric"
+                    autoComplete="off"
+                    maxLength={14}
+                    className="font-mono"
+                    value={fssai}
+                    onChange={(e) => {
+                      setFssai(e.target.value.replace(/\D/g, ""));
+                      clearError("fssai");
+                    }}
+                    {...fieldAria("fssai", errors, "fssai-hint")}
+                  />
+                  <FieldError id="fssai" message={errors.fssai} />
+                  <p id="fssai-hint" className="text-sm text-muted-foreground">
+                    14 digits. Shown on your store page so customers know your kitchen is registered.
+                  </p>
+                </div>
+              ) : null}
+
+              <section aria-labelledby="alerts-heading" className="space-y-2">
+                <h3 id="alerts-heading" className="text-sm font-semibold">
+                  Alerts on this phone
+                </h3>
                 <p className="text-sm text-muted-foreground">
                   A notification for every new order, even when the screen is locked. You can turn it on later in
                   Settings → Notifications.
@@ -961,27 +1405,7 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
                 <div className="flex flex-col gap-2">
                   <PushAlertsButton variant="settings" />
                 </div>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="wa">WhatsApp number (optional)</Label>
-                <Input
-                  id="wa"
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  placeholder="+91 98765 43210"
-                  value={whatsapp}
-                  onChange={(e) => {
-                    setWhatsapp(e.target.value);
-                    clearError("wa");
-                  }}
-                  {...fieldAria("wa", errors, "wa-hint")}
-                />
-                <FieldError id="wa" message={errors.wa} />
-                <p id="wa-hint" className="text-sm text-muted-foreground">
-                  So customers can message you about an order. They only see it after you turn that on in Settings.
-                </p>
-              </div>
+              </section>
             </>
           )}
 
