@@ -11,6 +11,7 @@ import { createMenuItem, createVendorSession } from "./helpers/vendor";
 
 const MIN_TAP = 44;
 const MIN_MIC = 80;
+const DESKTOP_MIC = 48;
 
 async function expectTapTarget(locator: Locator, min: number, label: string): Promise<void> {
   const box = await locator.boundingBox();
@@ -20,7 +21,7 @@ async function expectTapTarget(locator: Locator, min: number, label: string): Pr
 }
 
 test.describe("POS accessibility", () => {
-  test("the mic is 80x80 and announces its state to a screen reader", async ({ page, request }) => {
+  test("the mic is 80x80 on phones, a compact 48 px from md, and announces its state", async ({ page, request }) => {
     await createVendorSession(page, request, "a11y-mic");
     await createMenuItem(page, { name: "Filter Coffee", priceInRupees: 20 });
     await page.goto("/pos");
@@ -28,7 +29,13 @@ test.describe("POS accessibility", () => {
     // VoiceOrderButton's aria-label is state-driven; "Start voice order" is idle.
     const mic = page.getByRole("button", { name: /start voice order/i });
     await expect(mic).toBeVisible();
-    await expectTapTarget(mic, MIN_MIC, "mic button");
+    // Phones keep the 80 px thumb target; from md (mouse) it is a 48 px inline control.
+    const desktop = (page.viewportSize()?.width ?? 0) >= 768;
+    await expectTapTarget(mic, desktop ? DESKTOP_MIC : MIN_MIC, "mic button");
+    if (desktop) {
+      const box = (await mic.boundingBox())!;
+      expect(Math.round(box.height), "compact desktop mic").toBeLessThanOrEqual(DESKTOP_MIC);
+    }
 
     // Voice state must be distinguishable beyond colour — aria-pressed carries
     // listening vs idle for anyone who cannot see the red pulse.

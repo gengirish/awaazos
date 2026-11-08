@@ -113,11 +113,11 @@ function VoiceOrderButtonCore({ voiceLang, onCycleLang, onScheduleReset }: Voice
   const retry = state === "error" && !offlineIdle;
 
   return (
-    // Phones: mic on the left, status + language on the right, so the menu grid
-    // starts higher. From md: the centred column (language, mic, status) —
-    // `md:contents` lifts the right-hand stack into the column and `order` sorts it.
+    // Mic on the left, status + language on the right, so the menu grid starts
+    // higher. Phones keep the 80 px thumb target; from md the mic is a compact
+    // 48 px inline control (a mouse needs no thumb arc).
     <section
-      className="flex items-center gap-4 md:flex-col md:gap-2"
+      className="flex items-center gap-4 md:gap-3"
       aria-labelledby="voice-order-heading"
     >
       <h2 id="voice-order-heading" className="sr-only">
@@ -133,7 +133,7 @@ function VoiceOrderButtonCore({ voiceLang, onCycleLang, onScheduleReset }: Voice
         aria-label={offlineIdle ? "Voice needs internet — tap items below" : label}
         aria-pressed={state === "listening"}
         className={cn(
-          "relative flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-full shadow-md ring-4 ring-offset-2 ring-offset-background transition-transform focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-safe:transition-colors md:order-2",
+          "relative flex h-20 w-20 shrink-0 flex-col items-center justify-center rounded-full shadow-md ring-4 ring-offset-2 ring-offset-background transition-transform focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-safe:transition-colors md:h-12 md:w-12 md:shadow-sm md:ring-2",
           state === "idle" && !offlineIdle && "bg-primary text-primary-foreground ring-transparent",
           offlineIdle && "cursor-not-allowed bg-muted text-muted-foreground ring-border",
           // Listening is the mic working, not an error: primary colour with a
@@ -147,17 +147,17 @@ function VoiceOrderButtonCore({ voiceLang, onCycleLang, onScheduleReset }: Voice
           retry && "bg-background text-destructive ring-destructive",
         )}
       >
-        {state === "idle" ? <Mic className="h-9 w-9" aria-hidden /> : null}
-        {state === "listening" ? <Square className="h-8 w-8 fill-current" aria-hidden /> : null}
+        {state === "idle" ? <Mic className="h-9 w-9 md:h-5 md:w-5" aria-hidden /> : null}
+        {state === "listening" ? <Square className="h-8 w-8 fill-current md:h-4 md:w-4" aria-hidden /> : null}
         {state === "transcribing" || state === "parsing" ? (
-          <Loader2 className="h-9 w-9 motion-safe:animate-spin" aria-hidden />
+          <Loader2 className="h-9 w-9 motion-safe:animate-spin md:h-5 md:w-5" aria-hidden />
         ) : null}
-        {state === "success" ? <Check className="h-9 w-9" aria-hidden /> : null}
-        {retry ? <RotateCcw className="h-9 w-9" aria-hidden /> : null}
-        {state === "error" && !retry ? <AlertCircle className="h-9 w-9" aria-hidden /> : null}
+        {state === "success" ? <Check className="h-9 w-9 md:h-5 md:w-5" aria-hidden /> : null}
+        {retry ? <RotateCcw className="h-9 w-9 md:h-5 md:w-5" aria-hidden /> : null}
+        {state === "error" && !retry ? <AlertCircle className="h-9 w-9 md:h-5 md:w-5" aria-hidden /> : null}
       </button>
-      <div className="flex min-w-0 flex-1 flex-col items-start gap-1 md:contents">
-        <div className="w-full text-left md:order-3 md:min-h-12 md:max-w-sm md:text-center">
+      <div className="flex min-w-0 flex-1 flex-col items-start gap-1 md:flex-row md:items-center md:gap-3">
+        <div className="w-full text-left md:w-auto md:min-w-0 md:flex-1">
           {offlineIdle ? (
             <p aria-live="polite" className="text-sm font-medium text-muted-foreground">
               Voice needs internet — tap items below
@@ -188,7 +188,7 @@ function VoiceOrderButtonCore({ voiceLang, onCycleLang, onScheduleReset }: Voice
           onClick={onCycleLang}
           disabled={busy}
           aria-label={`Voice language: ${langLabel} — tap to change`}
-          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-muted px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 md:order-1"
+          className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border bg-muted px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 md:shrink-0"
         >
           <Languages className="h-3.5 w-3.5" aria-hidden />
           <span>{langLabel}</span>

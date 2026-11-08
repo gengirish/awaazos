@@ -22,6 +22,44 @@ export function buildUpiDeepLink({ upiId, name, amountRupees, billRef }: BuildUp
   return `upi://pay?${params.toString()}`;
 }
 
+/** `am=` text: always two decimals ("80.00"), integer maths on paise. */
+function upiAmountFixed2(paise: number): string {
+  const frac = paise % 100;
+  return `${(paise - frac) / 100}.${String(frac).padStart(2, "0")}`;
+}
+
+/**
+ * The counter's UPI intent for one bill, built from integer paise. Every value
+ * is percent-encoded (`encodeURIComponent`), so a space is `%20`, not the `+`
+ * of form encoding that some UPI apps show literally in the payee name.
+ * No VPA → `null`: the caller shows the "add your UPI ID" state, never a QR.
+ */
+export function buildUpiUri({
+  vpa,
+  payeeName,
+  amountPaise,
+  note,
+}: {
+  vpa: string | null | undefined;
+  payeeName: string;
+  amountPaise: number;
+  note: string;
+}): string | null {
+  const pa = vpa?.trim();
+  if (!pa) return null;
+  if (!Number.isSafeInteger(amountPaise) || amountPaise <= 0) {
+    throw new RangeError("amountPaise must be a positive integer");
+  }
+  const params: [string, string][] = [
+    ["pa", pa],
+    ["pn", payeeName],
+    ["am", upiAmountFixed2(amountPaise)],
+    ["cu", "INR"],
+    ["tn", note],
+  ];
+  return `upi://pay?${params.map(([k, v]) => `${k}=${encodeURIComponent(v)}`).join("&")}`;
+}
+
 /**
  * Standing "pay this stall" link — same UPI intent, no amount.
  *

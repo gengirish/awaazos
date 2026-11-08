@@ -19,6 +19,9 @@ export const transactionPostBodySchema = z.object({
   totalPaise: z.number().int(),
   paymentMethod: z.nativeEnum(PaymentMethod),
   upiRef: z.string().max(120).optional().nullable(),
+  // Cash handed over at the counter (lib/cash-tender.ts). CASH only, never
+  // below the total; the server derives the change.
+  cashReceivedPaise: z.number().int().positive().max(100_000_000).optional().nullable(),
   customerPhone: z.string().optional().nullable(),
   customerName: z.string().optional().nullable(),
   voiceTranscript: z.string().optional().nullable(),
