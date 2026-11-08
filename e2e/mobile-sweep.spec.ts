@@ -20,6 +20,9 @@ import { CONTEXT_OPTIONS, createMenuItem, createVendorSession, type MenuItemRow 
 /**
  * Mobile baseline sweep.
  *
+ * Runs on the `mobile` project only: 44 px comes from `@media (pointer: coarse)`,
+ * so a desktop browser at phone width would measure a density no phone gets.
+ *
  * Every vendor and public screen, at three widths, measured for the two things
  * that make a page unusable on a phone: horizontal overflow and tap targets
  * under 44x44 CSS px. A full-page screenshot of each lands in
@@ -29,8 +32,8 @@ import { CONTEXT_OPTIONS, createMenuItem, createVendorSession, type MenuItemRow 
  * listed in `e2e/mobile-sweep.baseline.json` is tolerated, anything new fails,
  * and anything that has been fixed is logged so the baseline can be tightened.
  *
- *   npx playwright test e2e/mobile-sweep.spec.ts                       # check
- *   MOBILE_SWEEP_UPDATE=1 npx playwright test e2e/mobile-sweep.spec.ts --workers=1   # re-record
+ *   npx playwright test e2e/mobile-sweep.spec.ts --project=mobile                       # check
+ *   MOBILE_SWEEP_UPDATE=1 npx playwright test e2e/mobile-sweep.spec.ts --project=mobile --workers=1   # re-record
  *
  * Writes real rows — run against a throwaway Postgres only (see CLAUDE.md).
  */
@@ -285,12 +288,12 @@ const VENDOR_ROUTES: Route[] = [
   { key: "/orders", path: () => "/orders" },
   { key: "/drops", path: () => "/drops" },
   { key: "/drops/new", path: () => "/drops/new" },
-  { key: "/drops/[id]", path: (s) => `/drops/${s.dropId}` },
+  { key: "/orders?drop=[id]", path: (s) => `/orders?drop=${s.dropId}` },
   { key: "/menu", path: () => "/menu" },
   { key: "/transactions", path: () => "/transactions" },
   { key: "/analytics", path: () => "/analytics" },
   { key: "/settings", path: () => "/settings" },
-  ...["store", "orders", "payments", "receipts", "notifications", "voice", "billing"].map((sub) => ({
+  ...["store", "orders", "offers", "payments", "receipts", "notifications", "voice", "billing"].map((sub) => ({
     key: `/settings/${sub}`,
     path: () => `/settings/${sub}`,
   })),
@@ -322,7 +325,8 @@ async function sweepRoute(
     await p.setViewportSize(viewport);
     const res = await p.goto(target, { timeout: 120_000 });
     expect(res?.status(), `${target} should load`).toBeLessThan(400);
-    expect(new URL(p.url()).pathname, `${target} should not redirect`).toBe(target);
+    const landed = new URL(p.url());
+    expect(landed.pathname + landed.search, `${target} should not redirect`).toBe(target);
     await settle(p);
     await judge(p, testInfo, s, route.key, viewport.width, { fullPage: true });
     if (i > 0) await p.close();
@@ -396,10 +400,10 @@ test.describe("mobile baseline sweep", () => {
     test("home — first visit, cookie banner showing", async ({ page }, testInfo) => {
       const s = await prepare(page, { signedIn: false, cookieBanner: true });
       await page.goto("/", { timeout: 120_000 });
-      await expect(page.getByRole("dialog", { name: "Cookie consent" })).toBeVisible();
+      await expect(page.getByRole("region", { name: "Cookie consent" })).toBeVisible();
       await settle(page);
       await judge(page, testInfo, s, "/ (cookie banner)", OVERLAY_VIEWPORT.width, {
-        rootSelector: '[role="dialog"]',
+        rootSelector: "[data-cookie-banner]",
         fullPage: false,
       });
     });

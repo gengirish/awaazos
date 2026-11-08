@@ -35,7 +35,7 @@ async function signInWithNoCallback(browser: Browser, creds: VendorCreds, path =
   });
   await page.goto(path);
   await page.getByLabel(/email/i).fill(creds.email);
-  await page.getByLabel(/password/i).fill(creds.password);
+  await page.getByLabel("Password", { exact: true }).fill(creds.password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL((u) => u.pathname !== "/sign-in" && u.pathname !== "/home", { timeout: 60_000 });
   return page;
@@ -57,20 +57,33 @@ test.describe("landing screen", () => {
   });
 
   test("a store that has not finished setup lands on onboarding", async ({ page, request, browser }) => {
+    // Two sign-ins and five page loads.
+    test.slow();
     const creds = await registerVendor(request, "home-setup");
 
     const fresh = await signInWithNoCallback(browser, creds);
     try {
       await expect(fresh).toHaveURL(/\/onboarding$/);
-      await expect(fresh.getByRole("heading", { name: "Set up your stall" })).toBeVisible();
+      await expect(fresh.getByRole("heading", { name: "Set up your store" })).toBeVisible();
     } finally {
       await fresh.context().close();
     }
 
     // The same answer straight from the resolver (the Home Screen icon).
-    await signIn(page, creds, "/menu");
+    await signIn(page, creds, "/menu", { finishSetup: false });
     await page.goto("/home");
     await expect(page).toHaveURL(/\/onboarding$/);
+
+    // A deep link (a push, a bookmark) can't skip setup either: every vendor page sends it back.
+    for (const path of ["/orders", "/settings/payments", "/menu"]) {
+      await page.goto(path);
+      await expect(page, `${path} while setup is unfinished`).toHaveURL(/\/onboarding$/);
+    }
+
+    // Once it's finished, the onboarding page itself sends the seller home.
+    await patchVendor(page, { onboardingDone: true });
+    await page.goto("/onboarding");
+    await expect(page).not.toHaveURL(/\/onboarding/);
   });
 
   test("a counter-only store lands on the POS", async ({ page, request, browser }) => {
@@ -100,12 +113,12 @@ test.describe("landing screen", () => {
 
     await page.goto("/home");
     await expect(page).toHaveURL(/\/orders$/);
-    await expect(page.getByRole("heading", { level: 1, name: "Online orders" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Orders", exact: true })).toBeVisible();
 
     const fresh = await signInWithNoCallback(browser, creds);
     try {
       await expect(fresh).toHaveURL(/\/orders$/);
-      await expect(fresh.getByRole("heading", { level: 1, name: "Online orders" })).toBeVisible();
+      await expect(fresh.getByRole("heading", { level: 1, name: "Orders", exact: true })).toBeVisible();
     } finally {
       await fresh.context().close();
     }

@@ -51,13 +51,13 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
       await sheet.getByLabel("Your name").fill("Claim Buyer");
       await sheet.getByLabel("Mobile number").fill("98480 54321");
       await sheet.getByRole("radio", { name: /pay now by upi/i }).check();
-      await sheet.getByRole("button", { name: /place order · ₹120\.00/i }).click();
+      await sheet.getByRole("button", { name: /place order(?: & pay)? · ₹120\.00/i }).click();
       await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
       const orderPath = new URL(buyer.url()).pathname;
       const token = orderPath.split("/").pop() as string;
       const claimUrl = `/api/s/${slug}/orders/${token}/utr`;
 
-      const paidButton = buyer.getByRole("button", { name: "I've paid" });
+      const paidButton = buyer.getByRole("button", { name: "Payment done" });
       await expect(paidButton).toBeVisible();
       expect((await paidButton.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
       await paidButton.click();
@@ -76,7 +76,7 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
       expect((await notReceived.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
 
       // Another vendor cannot answer this order's claim (404, no existence leak).
-      type Board = { data: { id: string; paymentStatus: string }[] };
+      type Board = { data: { id: string; paymentStatus: string; fulfilmentStatus: string }[] };
       const board = (await (await page.request.get("/api/storefront-orders")).json()) as Board;
       const orderId = board.data[0].id;
       const other = await otherCtx.newPage();
@@ -99,21 +99,23 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
       const bare = await buyer.request.post(claimUrl, { data: {}, headers: JSON_HEADERS });
       expect(bare.status()).toBe(400);
       expect(((await bare.json()) as { error: string }).error).toBe("reference_required");
-      await buyer.getByRole("button", { name: "I've paid" }).click();
+      await buyer.getByRole("button", { name: "Send to the store" }).click();
       await expect(buyer.getByText(/Enter the 12-digit UPI reference/)).toBeVisible();
 
       await buyer.getByLabel(/UPI reference/i).fill("412345678901");
-      await buyer.getByRole("button", { name: "I've paid" }).click();
+      await buyer.getByRole("button", { name: "Send to the store" }).click();
       await expect(buyer.getByRole("heading", { name: /payment submitted/i })).toBeVisible();
 
       // ── Seller: sees the UTR, answers "Payment received" ────────────
       await page.reload();
       const card2 = page.getByRole("article", { name: /Claim Buyer/ });
       await expect(card2.getByText("412345678901")).toBeVisible();
-      await card2.getByRole("button", { name: "Payment received" }).click();
-      await expect(card2.getByRole("button", { name: "Payment received" })).toHaveCount(0);
+      // One answer: no separate Confirm beside it, and paying confirms the order.
+      await expect(card2.getByRole("button", { name: "Confirm", exact: true })).toHaveCount(0);
+      await card2.getByRole("button", { name: "Payment received · Confirm" }).click();
+      await expect(card2.getByRole("button", { name: /Payment received/ })).toHaveCount(0);
       const after = (await (await page.request.get("/api/storefront-orders")).json()) as Board;
-      expect(after.data.find((o) => o.id === orderId)?.paymentStatus).toBe("PAID");
+      expect(after.data.find((o) => o.id === orderId)).toMatchObject({ paymentStatus: "PAID", fulfilmentStatus: "CONFIRMED" });
 
       // A late "Not received" on a paid order is refused.
       const late = await page.request.patch(`/api/storefront-orders/${orderId}`, {
@@ -124,9 +126,9 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
 
       // ── Buyer: paid ─────────────────────────────────────────────────
       await buyer.reload();
-      await expect(buyer.getByRole("heading", { name: /^paid$/i })).toBeVisible();
+      await expect(buyer.getByRole("heading", { name: /^confirmed$/i })).toBeVisible();
       await expect(buyer.getByText(/couldn't find your payment/i)).toHaveCount(0);
-      await expect(buyer.getByRole("button", { name: "I've paid" })).toHaveCount(0);
+      await expect(buyer.getByRole("button", { name: "Payment done" })).toHaveCount(0);
     } finally {
       await buyerCtx.close();
       await otherCtx.close();

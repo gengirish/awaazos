@@ -22,10 +22,10 @@ import { getShellContext } from "./_shell-context";
  * download sonner.
  */
 export default async function VendorLayout({ children }: { children: ReactNode }) {
-  const { vendor, role, storePath } = await getShellContext();
+  const { vendor, role, storePath, storeKind } = await getShellContext();
   return (
     <>
-      <AppShell role={role} vendorId={vendor.id} vendorName={vendor.name} storePath={storePath}>
+      <AppShell role={role} vendorId={vendor.id} vendorName={vendor.name} storePath={storePath} storeKind={storeKind}>
         {children}
       </AppShell>
       <Toaster richColors position="top-center" />

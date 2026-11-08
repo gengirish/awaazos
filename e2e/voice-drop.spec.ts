@@ -113,7 +113,8 @@ test.describe("voice drop builder", () => {
     expect(box?.height).toBeGreaterThanOrEqual(80);
 
     // Tap fallback untouched before voice: default delivery, nothing selected.
-    await expect(page.getByRole("radio", { name: "Delivery" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "Delivery" })).toBeChecked();
+    await page.getByText("More options").click();
     const titleBefore = await page.getByLabel("Title").inputValue();
 
     await mic.click();
@@ -129,7 +130,7 @@ test.describe("voice drop builder", () => {
     // ── Fields filled from the draft ──
     await expect(page.getByLabel("Title")).toHaveValue(draft.title);
     await expect(page.getByLabel("Cooking day")).toHaveValue(draft.date);
-    await expect(page.getByRole("radio", { name: "Pickup" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "Pickup" })).toBeChecked();
     await expect(page.getByLabel("From", { exact: true })).toHaveValue("18:00");
     await expect(page.getByLabel("Until", { exact: true })).toHaveValue("20:00");
     await expect(page.getByLabel("Order cut-off date")).toHaveValue(draft.date);
@@ -149,8 +150,8 @@ test.describe("voice drop builder", () => {
     await expect(panel.getByRole("listitem").filter({ hasText: "add pickup instructions" })).toBeVisible();
     const unmatched = panel.getByRole("list", { name: "Dishes not on your menu" });
     await expect(unmatched.getByText("masala chaas")).toBeVisible();
-    const addLink = unmatched.getByRole("link", { name: /Add masala chaas to menu/ });
-    await expect(addLink).toHaveAttribute("href", "/menu?add=masala%20chaas");
+    // Adds inline (a dialog on this page), not by sending the cook to /menu in a new tab.
+    await expect(unmatched.getByRole("button", { name: "Add masala chaas to menu" })).toBeVisible();
     await unmatched.getByRole("button", { name: "Remove masala chaas" }).click();
     await expect(panel.getByText("masala chaas")).toHaveCount(0);
 
@@ -162,7 +163,7 @@ test.describe("voice drop builder", () => {
     await panel.getByRole("button", { name: "Undo voice changes" }).click();
     await expect(panel.getByText("Voice changes undone.")).toBeVisible();
     await expect(page.getByLabel("Title")).toHaveValue(titleBefore);
-    await expect(page.getByRole("radio", { name: "Delivery" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "Delivery" })).toBeChecked();
     await expect(page.getByRole("checkbox", { name: new RegExp(menu.laddu.name) })).not.toBeChecked();
     await expect(page.getByText("From voice", { exact: true })).toHaveCount(0);
     await expect(panel.getByRole("button", { name: "Undo voice changes" })).toHaveCount(0);
@@ -172,7 +173,7 @@ test.describe("voice drop builder", () => {
     await expect(panel.getByText("Filled 7 fields and 2 dishes — check and save")).toBeVisible();
     expect(page.url()).toMatch(/\/drops\/new$/);
 
-    await page.getByRole("button", { name: "Create drop" }).click();
+    await page.getByRole("button", { name: "Save draft" }).click();
     await page.waitForURL(/\/drops\/[^/]+\/edit$/, { timeout: 120_000 });
     const dropId = new URL(page.url()).pathname.split("/")[2];
 
@@ -226,6 +227,7 @@ test.describe("voice drop builder", () => {
     await expect(panel.getByRole("button", { name: "Undo voice changes" })).toHaveCount(0);
 
     // Tap fallback: the form is untouched and usable.
+    await page.getByText("More options").click();
     await page.getByLabel("Title").fill("Typed by hand");
     await page.getByRole("checkbox", { name: new RegExp(menu.laddu.name) }).check();
     await expect(page.getByRole("checkbox", { name: new RegExp(menu.laddu.name) })).toBeChecked();

@@ -5,10 +5,13 @@ import { useState, useTransition } from "react";
 import { Check, Copy, ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 
+import { Notice } from "@/components/ui/notice";
+import { Switch } from "@/components/ui/switch";
+
 /**
  * Owner-facing control for the public storefront at /s/<slug>.
  *
- * Publishing is a one-way door in the vendor's eyes — menu names and prices
+ * Publishing is a one-way door in the vendor's eyes — item names and prices
  * become world-readable — so the switch states its consequence in plain words
  * rather than a bare "Enabled" label.
  */
@@ -17,6 +20,8 @@ export type StorefrontClientProps = {
   initialPublished: boolean;
   hasUpiId: boolean;
   availableItemCount: number;
+  /** "Menu" / "Products": the screen the empty-store notice links to (lib/store-vocabulary.ts). */
+  catalogueTitle: string;
 };
 
 export function StorefrontClient({
@@ -24,6 +29,7 @@ export function StorefrontClient({
   initialPublished,
   hasUpiId,
   availableItemCount,
+  catalogueTitle,
 }: StorefrontClientProps) {
   const [published, setPublished] = useState(initialPublished);
   const [copied, setCopied] = useState(false);
@@ -43,11 +49,11 @@ export function StorefrontClient({
         });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as { error?: string };
-          toast.error(body.error ?? "Could not update your storefront.");
+          toast.error(body.error ?? "Could not update your store.");
           return;
         }
         setPublished(next);
-        toast.success(next ? "Storefront is live." : "Storefront is now private.");
+        toast.success(next ? "Your store is live." : "Your store is now private.");
       } catch {
         toast.error("Network error — please try again.");
       }
@@ -70,40 +76,15 @@ export function StorefrontClient({
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <label htmlFor="storefront-toggle" className="text-sm font-medium">
-            Publish my menu
+            Publish my store
           </label>
           <p className="text-xs text-muted-foreground">
             {published
               ? "Anyone with the link can see your item names and prices."
-              : "Your menu is private. Nobody outside your staff can see it."}
+              : "Your store page is private. Nobody outside your staff can see it."}
           </p>
         </div>
-        <button
-          id="storefront-toggle"
-          type="button"
-          role="switch"
-          aria-checked={published}
-          onClick={() => toggle(!published)}
-          disabled={pending}
-          className="inline-flex min-h-11 min-w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <span className="sr-only">
-            {published ? "Unpublish storefront" : "Publish storefront"}
-          </span>
-          {/* 44px tap target around the 28px visual track. */}
-          <span
-            aria-hidden="true"
-            className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors ${
-              published ? "bg-primary" : "bg-input"
-            }`}
-          >
-            <span
-              className={`inline-block h-5 w-5 transform rounded-full bg-background shadow transition-transform motion-reduce:transition-none ${
-                published ? "translate-x-6" : "translate-x-1"
-              }`}
-            />
-          </span>
-        </button>
+        <Switch id="storefront-toggle" checked={published} onCheckedChange={toggle} disabled={pending} />
       </div>
 
       {published ? (
@@ -136,20 +117,24 @@ export function StorefrontClient({
       ) : null}
 
       {published && availableItemCount === 0 ? (
-        <p className="text-xs text-amber-600">
-          Your storefront is live but has no available items — add menu items so customers see
-          something.
-        </p>
+        <Notice tone="warning" icon>
+          Your store is live but has nothing on sale. Add items so customers see something.{" "}
+          <Link href="/menu" className="inline-flex min-h-11 items-center font-medium underline underline-offset-4">
+            Go to {catalogueTitle}
+          </Link>
+        </Notice>
       ) : null}
 
       {published && !hasUpiId ? (
-        <p className="text-xs text-amber-600">
-          No UPI ID saved, so the page shows the menu without a payment QR.{" "}
-          <Link href="/settings/payments" className="font-medium underline underline-offset-4">
+        <Notice tone="warning" icon>
+          No UPI ID saved, so your store page shows your items without a payment QR.{" "}
+          <Link
+            href="/settings/payments"
+            className="inline-flex min-h-11 items-center font-medium underline underline-offset-4"
+          >
             Add your UPI ID in Payments
           </Link>
-          .
-        </p>
+        </Notice>
       ) : null}
     </div>
   );

@@ -12,8 +12,10 @@ import {
   withVendorCookie,
 } from "@/lib/drops-api";
 import { canTransition, effectiveDropStatus, soldQtyByDropItem } from "@/lib/drops";
+import { hasPaymentMethod } from "@/lib/payment-guard";
 import { prisma } from "@/lib/prisma";
 import { requireVendorRole } from "@/lib/rbac";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { dropStatusChangeSchema } from "@/lib/zod-drops";
 
 export const dynamic = "force-dynamic";
@@ -50,9 +52,14 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
       if (drop._count.items === 0) throw conflict("no_items");
       const settings = await prisma.vendorSettings.findUnique({
         where: { vendorId },
-        select: { acceptPayOnDelivery: true, publishStorefront: true },
+        select: { acceptPayOnDelivery: true, publishStorefront: true, ...RAZORPAY_CRED_SELECT },
       });
-      if (!ctx.vendor.upiId && !settings?.acceptPayOnDelivery) throw conflict("no_payment_method");
+      const payable = hasPaymentMethod({
+        upiId: ctx.vendor.upiId,
+        acceptPayOnDelivery: settings?.acceptPayOnDelivery ?? false,
+        onlinePayment: isOnlinePaymentEnabled(ctx.vendor, settings, now),
+      });
+      if (!payable) throw conflict("no_payment_method");
       if (!settings?.publishStorefront) {
         // Publishing makes the menu world-readable, so opening a drop never
         // implies it: the client must ask for it, and only an OWNER may (the
@@ -66,8 +73,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     }
 
     const data: Prisma.DropUpdateManyMutationInput = { status: to };
-    if (to === "FROZEN") data.frozenAt = now;
-    else if (drop.status === "FROZEN") data.frozenAt = null;
+    if (drop.status === "FROZEN") data.frozenAt = null;
 
     // One transaction: the store is published only if the drop really opens.
     await prisma.$transaction(async (tx) => {

@@ -51,7 +51,7 @@ test.describe("install prompt", () => {
     await expect(page.getByTestId(BANNER)).toHaveCount(0);
 
     await page.goto("/orders");
-    await expect(page.getByRole("heading", { level: 1, name: "Online orders" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Orders", exact: true })).toBeVisible();
     // Same here: "Last checked" only appears once a tap on Refresh has been handled.
     await expect(async () => {
       await page.getByRole("button", { name: "Refresh", exact: true }).click();
@@ -119,9 +119,91 @@ test.describe("install prompt", () => {
 
     // And on the other home screen too.
     await page.goto("/orders");
-    await expect(page.getByRole("heading", { level: 1, name: "Online orders" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Orders", exact: true })).toBeVisible();
     nav = await secondaryNav(page);
     await offerInstall(page, () => expect(entry()).toBeVisible({ timeout: 2_000 }));
     await expect(banner).toHaveCount(0);
+  });
+
+  test.describe("iPhone", () => {
+    test.use({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Mobile/15E148 Safari/604.1",
+    });
+
+    test.beforeEach(async ({ page }) => {
+      // Chromium's touch emulation reports too few; a real iPhone reports 5.
+      await page.addInitScript(() => Object.defineProperty(navigator, "maxTouchPoints", { get: () => 5 }));
+    });
+
+    test("the banner opens the step-by-step dialog, loaded only on the tap", async ({ page, request }) => {
+      const creds = await createVendorSession(page, request, "install-ios", "/pos");
+      await page.reload();
+      await expect(page.getByRole("heading", { name: creds.stallName })).toBeVisible();
+
+      const banner = page.getByTestId(BANNER);
+      await expect(banner).toBeVisible();
+      await expect(page.locator("pwa-install")).toHaveCount(0);
+
+      const showMe = banner.getByRole("button", { name: "Show me how" });
+      await showMe.click();
+      const dialog = page.locator("pwa-install .install-dialog.apple");
+      await expect(dialog).toHaveClass(/available/);
+      await expect(dialog).toContainText("AwaazOS");
+      await expect(dialog).toContainText("Add to Home Screen");
+
+      const close = page.locator("pwa-install button.close");
+      await expect(close).toBeFocused();
+      await expect(async () => {
+        const box = await close.boundingBox();
+        expect(box!.height).toBeGreaterThanOrEqual(44);
+        expect(box!.width).toBeGreaterThanOrEqual(44);
+        // Settled after its slide-up, and all of it on screen.
+        const whole = await dialog.boundingBox();
+        expect(whole!.y).toBeGreaterThanOrEqual(0);
+        expect(whole!.y + whole!.height).toBeLessThanOrEqual(844);
+      }).toPass();
+      await page.screenshot({ path: test.info().outputPath("ios-dialog.png") });
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
+        "the dialog must not make the page scroll sideways",
+      ).toBe(true);
+
+      await close.click();
+      await expect(dialog).not.toHaveClass(/available/);
+      await expect(showMe).toBeFocused();
+
+      // And it opens again.
+      await showMe.click();
+      await expect(dialog).toHaveClass(/available/);
+    });
+  });
+
+  test.describe("iPhone, inside Instagram's browser", () => {
+    test.use({
+      viewport: { width: 390, height: 844 },
+      hasTouch: true,
+      isMobile: true,
+      userAgent:
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148 Instagram 337.0.2.24.92 (iPhone15,2; iOS 17_5; en_IN; en; scale=3.00; 1179x2556; 612345678)",
+    });
+
+    test("no banner; the sheet row opens the way out to Safari", async ({ page, request }) => {
+      await page.addInitScript(() => Object.defineProperty(navigator, "maxTouchPoints", { get: () => 5 }));
+      const creds = await createVendorSession(page, request, "install-insta", "/pos");
+      await page.reload();
+      await expect(page.getByRole("heading", { name: creds.stallName })).toBeVisible();
+      await expect(page.getByTestId(BANNER)).toHaveCount(0);
+
+      const nav = await secondaryNav(page);
+      await nav.getByRole("button", { name: /Install app/ }).click();
+
+      const dialog = page.locator("pwa-install .install-dialog.apple");
+      await expect(dialog).toHaveClass(/available/);
+      await expect(dialog).toContainText("Copy App Link");
+    });
   });
 });

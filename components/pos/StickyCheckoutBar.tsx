@@ -7,14 +7,14 @@ import { UNDO_TOAST_ID } from "@/components/pos/OrderCart";
 import { Button } from "@/components/ui/button";
 import { useCartStore } from "@/lib/cartStore";
 import { formatINR } from "@/lib/currency";
-import { computeCartTotals, type PosTaxSettings } from "@/lib/pos-totals";
+import { computeCartTotals, toPayTotals, type PayTotals, type PosTaxSettings } from "@/lib/pos-totals";
 
 /** Element id of the cart wrapper in `PosShell`; "View cart" scrolls to it. */
 export const POS_CART_ANCHOR_ID = "pos-cart";
 
 export type StickyCheckoutBarProps = {
   settings: PosTaxSettings;
-  onCollectPayment: (totals: { subtotalPaise: number; taxPaise: number; totalPaise: number }) => void;
+  onCollectPayment: (totals: PayTotals) => void;
 };
 
 /**
@@ -31,7 +31,8 @@ export type StickyCheckoutBarProps = {
  */
 export function StickyCheckoutBar({ settings, onCollectPayment }: StickyCheckoutBarProps) {
   const items = useCartStore((s) => s.items);
-  const { subtotalPaise, taxPaise, totalPaise, itemCount } = computeCartTotals(items, settings);
+  const totals = computeCartTotals(items, settings);
+  const { totalPaise, itemCount } = totals;
   const empty = items.length === 0;
 
   const viewCart = () => {
@@ -64,7 +65,7 @@ export function StickyCheckoutBar({ settings, onCollectPayment }: StickyCheckout
           onClick={() => {
             // An Undo left over from the cart must not put a line back into an order being paid.
             toast.dismiss(UNDO_TOAST_ID);
-            onCollectPayment({ subtotalPaise, taxPaise, totalPaise });
+            onCollectPayment(toPayTotals(totals));
           }}
         >
           <span className="min-w-0 truncate">Collect payment</span>

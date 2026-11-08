@@ -1,5 +1,6 @@
 import { formatINR } from "@/lib/currency";
 import { formatIstDateTime } from "@/lib/datetime";
+import { discountLabel } from "@/lib/offers";
 import { DEFAULT_RECEIPT_FOOTER, receiptState, receiptStatusLine, type ReceiptView } from "@/lib/receipt";
 import { cn } from "@/lib/utils";
 
@@ -16,6 +17,7 @@ export function ReceiptDocument({
   className,
   compact = false,
   headingLevel = 1,
+  poweredByPrintOnly = false,
 }: {
   view: ReceiptView;
   className?: string;
@@ -23,6 +25,12 @@ export function ReceiptDocument({
   compact?: boolean;
   /** The vendor name's heading level: 1 on a page of its own, deeper when embedded. */
   headingLevel?: 1 | 2 | 3;
+  /**
+   * Show the "Powered by AwaazOS" line on paper only. The customer page
+   * (/r/[token]) sets it because it shows the referral footer link on screen
+   * instead, so the screen never carries both.
+   */
+  poweredByPrintOnly?: boolean;
 }) {
   const Heading = (["h1", "h2", "h3"] as const)[headingLevel - 1];
   const state = receiptState(view);
@@ -93,7 +101,9 @@ export function ReceiptDocument({
 
       <dl className="space-y-0.5 tabular-nums">
         {showSubtotal ? <Row label="Subtotal" value={formatINR(view.subtotalPaise)} /> : null}
-        {view.discountPaise > 0 ? <Row label="Discount" value={`−${formatINR(view.discountPaise)}`} /> : null}
+        {view.discountPaise > 0 ? (
+          <Row label={discountLabel(view.offerName)} value={`−${formatINR(view.discountPaise)}`} />
+        ) : null}
         {view.deliveryFeePaise > 0 ? <Row label="Delivery" value={formatINR(view.deliveryFeePaise)} /> : null}
         {view.taxPaise > 0 ? <Row label="Tax" value={formatINR(view.taxPaise)} /> : null}
         <Row
@@ -108,7 +118,7 @@ export function ReceiptDocument({
 
       <footer className="space-y-0.5 text-center">
         <p className="whitespace-pre-line break-words">{view.receiptFooter?.trim() || DEFAULT_RECEIPT_FOOTER}</p>
-        <p className="text-[10px]">Powered by AwaazOS</p>
+        <p className={cn("text-[10px]", poweredByPrintOnly && "hidden print:block")}>Powered by AwaazOS</p>
       </footer>
     </article>
   );
@@ -117,8 +127,8 @@ export function ReceiptDocument({
 function Row({ label, value, className }: { label: string; value: string; className?: string }) {
   return (
     <div className={cn("flex justify-between gap-3", className)}>
-      <dt>{label}</dt>
-      <dd className="text-right">{value}</dd>
+      <dt className="min-w-0 break-words">{label}</dt>
+      <dd className="shrink-0 text-right">{value}</dd>
     </div>
   );
 }

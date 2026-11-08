@@ -1,13 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { boardHeaderAction, closeBoardActions } from "./helpers/board";
-import { isPhoneLayout } from "./helpers/nav";
+import { boardMenuItem, closeBoardMenu } from "./helpers/board";
 import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
  * "Order from menu": a stall switches on menu ordering, a guest buyer orders
  * straight from the everyday menu (no drop), and the vendor collects it from
- * the Online orders board.
+ * the orders board.
  *
  * Writes real rows — run against a throwaway Postgres only (see CLAUDE.md).
  */
@@ -76,23 +75,40 @@ test.describe("menu orders: order straight from the everyday menu", () => {
       await buyer.getByRole("button", { name: "Checkout" }).click();
       const sheet = buyer.getByRole("dialog", { name: "Checkout" });
       await expect(sheet).toBeVisible();
+
+      // The cart can be corrected inside the sheet: 2 × bhel + panna = ₹200.
+      const cart = sheet.getByRole("list", { name: "Items in your cart" });
+      await cart.getByRole("button", { name: `Add one more ${bhel}` }).click();
+      await expect(sheet.getByRole("button", { name: /place order(?: & pay)? · ₹275\.00/i })).toBeVisible();
+      await cart.getByRole("button", { name: `Remove one ${bhel}` }).click();
+      await expect(sheet.getByRole("button", { name: /place order(?: & pay)? · ₹200\.00/i })).toBeVisible();
+      // Removing the last of a line drops it; "Add more items" goes back to the store page.
+      await cart.getByRole("button", { name: `Remove one ${panna}` }).click();
+      await expect(cart.getByText(panna)).toHaveCount(0);
+      await expect(sheet.getByRole("button", { name: /place order(?: & pay)? · ₹150\.00/i })).toBeVisible();
+      await sheet.getByRole("button", { name: "Add more items" }).click();
+      await expect(sheet).toBeHidden();
+      await buyer.getByRole("button", { name: `Add ${panna}` }).click();
+      await buyer.getByRole("button", { name: "Checkout" }).click();
+      await expect(sheet).toBeVisible();
+
       await sheet.getByLabel("Your name").fill("Ravi Buyer");
       await sheet.getByLabel("Mobile number").fill("98480 54321");
       // Default menu fulfilment is pickup-only, so there is no delivery choice to make.
-      await sheet.getByRole("radio", { name: /pay on delivery/i }).check();
-      await sheet.getByRole("button", { name: /place order · ₹200\.00/i }).click();
+      await sheet.getByRole("button", { name: /place order(?: & pay)? · ₹200\.00/i }).click();
 
       await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
       await expect(buyer.getByRole("heading", { name: "Your order" })).toBeVisible();
-      await expect(buyer.getByText("Pay on delivery").first()).toBeVisible();
+      await expect(buyer.getByText("Pay when you collect").first()).toBeVisible();
       await expect(buyer.getByText(bhel).first()).toBeVisible();
     } finally {
       await buyerCtx.close();
     }
 
-    // ── Vendor: Online orders board ────────────────────────────────────
+    // ── Vendor: the orders board (menu orders only, so no source picker) ─
     await page.goto("/orders");
-    await expect(page.getByRole("heading", { name: "Online orders" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "Orders", exact: true })).toBeVisible();
+    await expect(page.getByRole("combobox", { name: "Show orders from" })).toHaveCount(0);
     await expect(page.getByText("Ravi Buyer").first()).toBeVisible();
     await expect(page.getByRole("heading", { name: "To make" })).toBeVisible();
 
@@ -101,14 +117,11 @@ test.describe("menu orders: order straight from the everyday menu", () => {
       await expect(page.getByRole("tab", { name })).toBeInViewport();
     }
 
-    // Header actions: beside the title from md, in the "More actions" sheet on a phone.
+    // The live sync bar. Sound is on unless turned off, and waits for the first tap.
     await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible();
-    await expect(await boardHeaderAction(page, "link", "Settings")).toHaveAttribute("href", "/settings/orders");
-    // Sound is on unless turned off, and waits for the first tap: on a phone,
-    // opening the "More actions" sheet is that tap.
-    const soundLabel = isPhoneLayout(page) ? "Sound on" : "Sound on — tap to enable";
-    await expect(await boardHeaderAction(page, "button", soundLabel)).toBeVisible();
-    await closeBoardActions(page);
+    await expect(page.getByRole("button", { name: "Order sounds on — tap once to allow", exact: true })).toBeVisible();
+    await expect(await boardMenuItem(page, "More actions", "Order settings")).toHaveAttribute("href", "/settings/orders");
+    await closeBoardMenu(page);
 
     const card = page.getByRole("article", { name: /Ravi Buyer/ });
     await expect(card.getByText(`2 × ${bhel}`)).toBeVisible();
@@ -121,7 +134,7 @@ test.describe("menu orders: order straight from the everyday menu", () => {
 
     await page.getByRole("tab", { name: /^Delivered/ }).click();
     const delivered = page.getByRole("article", { name: /Ravi Buyer/ });
-    await expect(delivered.getByText("Delivered", { exact: true })).toBeVisible();
+    await expect(delivered.getByText("Picked up", { exact: true })).toBeVisible();
     // Cash collected at handover marks it paid.
     await expect(page.getByRole("listitem").filter({ hasText: /^Paid/ })).toContainText("₹200.00");
   });

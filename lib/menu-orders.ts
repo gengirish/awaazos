@@ -26,20 +26,27 @@ import {
   generateOrderToken,
   nextBillNumber,
 } from "@/lib/drops";
-import { bumpDropOrderSignal } from "@/lib/drops-signal";
+import { deliveryFields } from "@/lib/delivery-address";
+import { deliveryFeeFor, parseDeliveryAreas } from "@/lib/delivery-areas";
+import { bumpOrderSignal } from "@/lib/drops-signal";
+import { findMenuSlot, parseMenuSlots, type MenuSlot } from "@/lib/menu-slots";
+import { applyOffers, giftLineName } from "@/lib/offers";
+import { loadResolvedOffers } from "@/lib/offers-server";
 import { effectivePlan, isBillingLocked } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
+import { alertsAtPlacement } from "@/lib/storefront-online-paid";
 import { generateReceiptToken } from "@/lib/receipt-data";
-
-/** Signal-key stand-in for the vendor's menu-orders board (no drop id). */
-export const MENU_ORDERS_SIGNAL_ID = "menu";
 
 export type MenuOrderSettings = {
   acceptMenuOrders: boolean;
   acceptPayOnDelivery: boolean;
   menuFulfilmentMode: FulfilmentMode;
   menuDeliveryFeePaise: number;
+  /** VendorSettings.menuSlots, raw JSON (lib/menu-slots.ts). Omitted = no slots. */
+  menuSlots?: unknown;
+  /** VendorSettings.deliveryAreas, raw JSON (lib/delivery-areas.ts). Omitted = anywhere. */
+  deliveryAreas?: unknown;
 };
 
 export type PlaceMenuOrderInput = {
@@ -56,9 +63,19 @@ export type PlaceMenuOrderInput = {
   customerPhone: string; // E.164, already validated
   fulfilmentType: FulfilmentType;
   deliveryAddress?: string | null;
+  /** Address parts beside the line (lib/delivery-address.ts); older checkouts send none. */
+  deliveryLocality?: string | null;
+  deliveryLandmark?: string | null;
+  deliveryPincode?: string | null;
+  /** Start of the picked slot (lib/menu-slots.ts); required when the store has slots. */
+  slotStart?: string | null;
   notes?: string | null;
   paymentMethod: "UPI" | "CASH";
   customerId?: string | null;
+  /** lib/order-channel.ts; decided by the route from the request. */
+  orderChannel?: "instagram" | null;
+  /** The store takes Razorpay: a UPI order alerts the seller once paid (lib/storefront-online-paid.ts). */
+  takesOnlinePayment?: boolean;
   now?: Date;
 };
 
@@ -68,6 +85,9 @@ export type PlaceMenuOrderError =
   | { code: "item_not_found"; menuItemId: string }
   | { code: "fulfilment_unavailable" }
   | { code: "address_required" }
+  | { code: "outside_delivery_area" }
+  | { code: "slot_required" }
+  | { code: "slot_unavailable" }
   | { code: "pay_on_delivery_disabled" }
   | { code: "monthly_txn_cap_reached" }
   | { code: "orders_paused" };
@@ -77,6 +97,7 @@ export type PlacedMenuOrder = {
   billNumber: string;
   orderToken: string;
   subtotalPaise: number;
+  discountPaise: number;
   deliveryFeePaise: number;
   totalPaise: number;
   paymentMethod: PaymentMethod;
@@ -135,9 +156,26 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
   if (!allowedFulfilmentTypes(settings.menuFulfilmentMode).includes(input.fulfilmentType)) {
     return { ok: false, error: { code: "fulfilment_unavailable" } };
   }
-  const address = input.deliveryAddress?.trim() || null;
-  if (input.fulfilmentType === "DELIVERY" && !address) {
+  const delivery = deliveryFields(input);
+  if (input.fulfilmentType === "DELIVERY" && !delivery.deliveryAddress) {
     return { ok: false, error: { code: "address_required" } };
+  }
+  // The store's delivery areas set the fee, and a locality outside them is refused.
+  const areaFee = deliveryFeeFor(
+    parseDeliveryAreas(settings.deliveryAreas),
+    input.deliveryLocality,
+    settings.menuDeliveryFeePaise,
+  );
+  if (input.fulfilmentType === "DELIVERY" && !areaFee.ok) {
+    return { ok: false, error: { code: "outside_delivery_area" } };
+  }
+  // "When": with slots configured the buyer must pick one that is still offered.
+  const slotRules = parseMenuSlots(settings.menuSlots);
+  let slot: MenuSlot | null = null;
+  if (slotRules.length > 0) {
+    if (!input.slotStart) return { ok: false, error: { code: "slot_required" } };
+    slot = findMenuSlot(slotRules, input.slotStart, now);
+    if (!slot) return { ok: false, error: { code: "slot_unavailable" } };
   }
 
   const lines = mergeMenuLines(input.items);
@@ -176,10 +214,26 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
         throw new MenuOrderRejected({ code: "monthly_txn_cap_reached" });
       }
 
-      const deliveryFeePaise = input.fulfilmentType === "DELIVERY" ? settings.menuDeliveryFeePaise : 0;
+      // Same rule as drops: offers are priced server-side from this vendor's rows.
+      const offers = await loadResolvedOffers(tx, vendorId, { channel: "MENU", now });
+      const offered = applyOffers(
+        priced.map((p) => ({
+          key: p.item.id,
+          menuItemId: p.item.id,
+          priceInPaise: p.item.priceInPaise,
+          qty: p.qty,
+        })),
+        offers,
+      );
+      const discountByLine = new Map(offered.lines.map((l) => [l.key, l.discountPaise]));
+      const appliedOffer = offered.applied;
+      const discountPaise = offered.discountTotalPaise;
+
+      const deliveryFeePaise = input.fulfilmentType === "DELIVERY" && areaFee.ok ? areaFee.feePaise : 0;
       const { subtotalPaise, totalPaise } = computeOrderTotals(
         priced.map((p) => ({ priceInPaise: p.item.priceInPaise, qty: p.qty })),
         deliveryFeePaise,
+        discountPaise,
       );
 
       const billNumber = await nextBillNumber(tx, vendorId, now);
@@ -190,6 +244,9 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
           vendorId,
           billNumber,
           subtotalPaise,
+          discountPaise,
+          offerId: appliedOffer?.offerId ?? null,
+          offerName: appliedOffer?.name ?? null,
           totalPaise,
           deliveryFeePaise,
           paymentMethod: input.paymentMethod,
@@ -201,17 +258,39 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
           dropId: null,
           fulfilmentStatus: "PLACED",
           fulfilmentType: input.fulfilmentType,
-          deliveryAddress: input.fulfilmentType === "DELIVERY" ? address : null,
+          ...(input.fulfilmentType === "DELIVERY" ? delivery : {}),
+          fulfilAt: slot?.start ?? null,
+          fulfilUntil: slot?.end ?? null,
           orderToken,
+          // The rider's "Delivered" link (app/d/[token]); deliveries only.
+          riderToken: input.fulfilmentType === "DELIVERY" ? generateOrderToken() : null,
           customerId: input.customerId ?? null,
+          orderChannel: input.orderChannel ?? null,
           orderItems: {
-            create: priced.map((p) => ({
-              menuItemId: p.item.id,
-              name: p.item.name, // snapshot
-              priceInPaise: p.item.priceInPaise,
-              qty: p.qty,
-              totalPaise: p.item.priceInPaise * p.qty,
-            })),
+            create: [
+              ...priced.map((p) => ({
+                menuItemId: p.item.id,
+                name: p.item.name, // snapshot
+                priceInPaise: p.item.priceInPaise,
+                qty: p.qty,
+                totalPaise: p.item.priceInPaise * p.qty,
+                discountPaise: discountByLine.get(p.item.id) ?? 0,
+              })),
+              // A free-item offer's gift: ₹0, outside every total (lib/offers.ts rule 6).
+              ...(offered.gift
+                ? [
+                    {
+                      menuItemId: offered.gift.menuItemId,
+                      name: giftLineName(offered.gift.name),
+                      priceInPaise: 0,
+                      qty: offered.gift.qty,
+                      totalPaise: 0,
+                      discountPaise: 0,
+                      isGift: true,
+                    },
+                  ]
+                : []),
+            ],
           },
         },
       });
@@ -231,22 +310,25 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
         billNumber,
         orderToken,
         subtotalPaise,
+        discountPaise,
         deliveryFeePaise,
         totalPaise,
         paymentMethod: created.paymentMethod,
       } satisfies PlacedMenuOrder;
     });
 
-    void bumpDropOrderSignal(vendorId, MENU_ORDERS_SIGNAL_ID);
-    notifyVendorInBackground(
-      vendorId,
-      newOrderPayload({
-        billNumber: order.billNumber,
-        totalPaise: order.totalPaise,
-        itemCount: lines.reduce((n, l) => n + l.qty, 0),
-        dropId: null,
-      }),
-    );
+    void bumpOrderSignal(vendorId);
+    if (alertsAtPlacement(input.paymentMethod, input.takesOnlinePayment ?? false)) {
+      notifyVendorInBackground(
+        vendorId,
+        newOrderPayload({
+          billNumber: order.billNumber,
+          totalPaise: order.totalPaise,
+          itemCount: lines.reduce((n, l) => n + l.qty, 0),
+          dropId: null,
+        }),
+      );
+    }
     return { ok: true, order };
   } catch (err) {
     if (err instanceof MenuOrderRejected) return { ok: false, error: err.error };

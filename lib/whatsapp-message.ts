@@ -2,6 +2,7 @@ import type { PaymentMethod, PaymentStatus } from "@prisma/client";
 
 import { formatINR } from "@/lib/currency";
 import { formatIstDateTime } from "@/lib/datetime";
+import { discountLabel } from "@/lib/offers";
 import { DEFAULT_RECEIPT_FOOTER, receiptStatusLine } from "@/lib/receipt";
 
 /**
@@ -19,6 +20,8 @@ export type ReceiptMessageInput = {
   items: { name: string; qty: number; priceInPaise: number; hsnCode?: string | null }[];
   subtotalPaise?: number;
   discountPaise?: number;
+  /** The offer behind the discount, named on its line. */
+  offerName?: string | null;
   deliveryFeePaise?: number;
   taxPaise: number;
   totalPaise: number;
@@ -82,7 +85,7 @@ export function formatWhatsAppReceiptMessage(input: ReceiptMessageInput): string
   if (input.subtotalPaise !== undefined && (discount > 0 || delivery > 0 || input.taxPaise > 0)) {
     lines.push(`Subtotal: ${formatINR(input.subtotalPaise)}`);
   }
-  if (discount > 0) lines.push(`Discount: −${formatINR(discount)}`);
+  if (discount > 0) lines.push(`${discountLabel(input.offerName)}: −${formatINR(discount)}`);
   if (delivery > 0) lines.push(`Delivery: ${formatINR(delivery)}`);
   if (input.taxPaise > 0) {
     lines.push(`Tax: ${formatINR(input.taxPaise)}`);

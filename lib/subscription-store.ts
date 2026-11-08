@@ -14,6 +14,7 @@
 import { Prisma } from "@prisma/client";
 
 import { prisma } from "@/lib/prisma";
+import { claimReferralCreditInTx, earnReferralRewardInTx } from "@/lib/referral-server";
 import {
   applySubscriptionEvent,
   type SubscriptionEventName,
@@ -97,6 +98,42 @@ export async function recordSubscriptionEvent(
           create: { vendorId, ...patch.settings },
           update: patch.settings,
         });
+      }
+
+      // Store-to-store referral (lib/referral.ts). Same transaction, so a
+      // replayed event (P2002 on the ledger above) never reaches here.
+      //  1. This store's own banked months pay back part or all of this charge
+      //     (a ReferralCredit; the refund is sent after commit).
+      //  2. The referred store's first charge that we keep money from earns its
+      //     referrer free time; the reward is unique on the referred store.
+      const chargePaise = input.amountPaise ?? 0;
+      if (event === "subscription.charged" && chargePaise > 0 && sub.mapped) {
+        const credit = await claimReferralCreditInTx(tx, {
+          vendorId,
+          sourceEventId: eventId,
+          paymentId: input.paymentId,
+          chargePaise,
+          interval: sub.mapped.interval,
+        });
+        if (credit?.created) {
+          console.info("[subscription-store] referral credit vendor=%s refund=%d", vendorId, credit.refundPaise);
+        }
+        if (chargePaise - (credit?.refundPaise ?? 0) > 0) {
+          const reward = await earnReferralRewardInTx(tx, {
+            referredVendorId: vendorId,
+            sourceEventId: eventId,
+            interval: sub.mapped.interval,
+          });
+          if (reward.kind === "earned") {
+            console.info(
+              "[subscription-store] referral reward earned referrer=%s referred=%s months=%d redeemed=%s",
+              reward.referrerVendorId,
+              vendorId,
+              reward.months,
+              reward.redeemed,
+            );
+          }
+        }
       }
       return { kind: "applied" as const, vendorId };
     });

@@ -24,7 +24,8 @@ Every voice-only path MUST have a tap fallback (`QuickAddGrid`).
   `SelectTrigger`, `SelectItem` and the Dialog / Sheet close buttons are 44 px on
   coarse pointers (see `design-system.mdc`, "Touch defaults"). Hand-rolled
   `<button>` / `<a>` elements still need `min-h-11` (+ `min-w-11` when icon-only).
-- Mic button: **80×80 px** (per spec) — must be reachable in single-handed thumb arc.
+- Mic button: **80×80 px** on phones (per spec) — must be reachable in single-handed thumb arc.
+  From `md` (counter computer, mouse) it is a compact 48×48 inline control.
 - Cart qty +/- buttons: 44×44 px minimum, with 8 px spacing.
 - Disable tap-highlight only after replacing with a custom focus ring.
 
@@ -54,7 +55,7 @@ Every voice-only path MUST have a tap fallback (`QuickAddGrid`).
 | listening | red, pulsing | mic-on | "Listening" + transcript live | short tap |
 | transcribing | purple | loader | "Transcribing audio" | — |
 | parsing | purple, spinning | sparkles | "Understanding order" | — |
-| error | gray | alert | error text | double tap |
+| error | destructive outline | rotate-ccw (alert-circle when offline) | "Try voice order again" (message in the `role="alert"` row) | double tap |
 
 ## Live regions
 
@@ -71,9 +72,12 @@ Every voice-only path MUST have a tap fallback (`QuickAddGrid`).
 
 ## Testing
 
-- No automated axe audit exists: `@axe-core/playwright` is not installed and
-  Vitest runs in a `node` environment (no DOM). Don't write axe calls until
-  someone adds the package and wires it into `npm run e2e`.
+- Colour contrast is checked by axe in `e2e/contrast.spec.ts`
+  (`@axe-core/playwright`, `color-contrast` rule only) on the landing page, a
+  store page and its checkout, on both Playwright projects. axe reads computed
+  colours, so the HSL tokens resolve as on a phone. `aria-hidden` mockups are
+  left out. Add a page there when you build one buyers or new sellers meet.
+  Vitest runs in a `node` environment (no DOM), so axe lives in Playwright only.
 - `e2e/accessibility.spec.ts` (Playwright) asserts the measurable rules: 44×44 /
   80×80 tap targets, the mic's state-driven `aria-label`, the cart live region,
   the QuickAddGrid tap fallback, skip links and labelled sign-in fields.

@@ -4,10 +4,15 @@ import { redirect } from "next/navigation";
 import { BillingLockedCard } from "@/components/billing/BillingLockedCard";
 import { TrialNotice } from "@/components/billing/TrialNotice";
 import { PosShell } from "@/components/pos/PosShell";
+import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
 import { getIstTodayStart } from "@/lib/billing-period";
+import { PLAN_LIMITS } from "@/lib/constants";
+import { loadResolvedOffers } from "@/lib/offers-server";
 import { prisma } from "@/lib/prisma";
 import type { BillingAccess } from "@/lib/plan";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
+import { loadSetupChecklist } from "@/lib/setup-checklist-server";
 
 export const dynamic = "force-dynamic";
 
@@ -15,11 +20,19 @@ export default async function PosPage() {
   let vendorId: string;
   let staffRole: StaffRole;
   let access: BillingAccess;
+  let voiceBilling: boolean;
+  let trialEndsAt: Date | null;
+  let customPricePaise: number | null;
+  let vocab: StoreVocabulary;
   try {
     const ctx = await requireVendorRole("CASHIER");
     vendorId = ctx.vendor.id;
+    trialEndsAt = ctx.vendor.trialEndsAt;
+    customPricePaise = ctx.vendor.customPricePaise;
+    vocab = storeVocabulary(ctx.vendor.stallType);
     staffRole = ctx.staff.role;
     access = ctx.access;
+    voiceBilling = PLAN_LIMITS[ctx.vendor.plan].voiceBilling;
   } catch (e) {
     if (e instanceof AuthError) {
       redirect("/sign-in");
@@ -33,14 +46,22 @@ export default async function PosPage() {
   if (access.kind === "locked") {
     return (
       <div data-pos-page="locked">
-        <BillingLockedCard since={access.since} staffRole={staffRole} />
+        <BillingLockedCard
+          since={access.since}
+          staffRole={staffRole}
+          trialEndsAt={trialEndsAt}
+          customPricePaise={customPricePaise}
+        />
       </div>
     );
   }
 
   const today = getIstTodayStart();
 
-  const [daily, menuItems, vendorRecord] = await Promise.all([
+  const [offers, daily, menuItems, vendorRecord] = await Promise.all([
+    // Offers live at the counter right now. The page (and its offline copy)
+    // previews with these; POST /api/transactions re-prices every live sale.
+    loadResolvedOffers(prisma, vendorId, { channel: "POS" }),
     prisma.dailySummary.findUnique({
       where: { vendorId_date: { vendorId, date: today } },
     }),
@@ -55,6 +76,7 @@ export default async function PosPage() {
         priceInPaise: true,
         isPopular: true,
         category: true,
+        aliases: true,
       },
     }),
     prisma.vendor.findUnique({
@@ -68,11 +90,21 @@ export default async function PosPage() {
   }
 
   const s = vendorRecord.settings;
+
+  // What still stops online orders, for the people who can fix it (nothing for
+  // a cashier, nothing once done). Reuses the rows read above; adds one count.
+  const setup = await loadSetupChecklist({
+    vendor: vendorRecord,
+    role: staffRole,
+    known: { settings: s, availableItemCount: menuItems.length },
+  });
   const settings = {
     voiceLang: s?.voiceLang ?? "en-IN",
     taxEnabled: s?.taxEnabled ?? false,
     taxPercent: s?.taxPercent != null ? String(s.taxPercent) : "0",
     autoPrintReceipt: s?.autoPrintReceipt ?? false,
+    voiceBilling,
+    offers,
   };
 
   const todaysRevenuePaise = daily?.totalRevenuePaise ?? 0;
@@ -85,6 +117,7 @@ export default async function PosPage() {
     priceInPaise: it.priceInPaise,
     isPopular: it.isPopular,
     category: it.category,
+    aliases: it.aliases,
   }));
 
   return (
@@ -95,6 +128,12 @@ export default async function PosPage() {
           now={new Date()}
           isOwner={staffRole === "OWNER"}
         />
+      ) : null}
+      {/* One closed row above the till, in PosShell's column. */}
+      {setup.items.length > 0 ? (
+        <div className="mx-auto max-w-lg px-4 pt-3 md:max-w-6xl">
+          <SetupChecklistCard {...setup} variant="compact" />
+        </div>
       ) : null}
       <PosShell
         vendor={{
@@ -107,6 +146,7 @@ export default async function PosPage() {
         settings={settings}
         todaysRevenuePaise={todaysRevenuePaise}
         renderedAt={new Date().toISOString()}
+        vocab={vocab}
       />
     </>
   );

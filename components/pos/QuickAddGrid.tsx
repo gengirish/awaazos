@@ -6,9 +6,12 @@ import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
+import { STAFF_SEARCH_MIN_ITEMS, itemSearchText, matchesSearch, searchTerms } from "@/lib/store-search";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
 export type MenuTile = {
@@ -20,18 +23,20 @@ export type MenuTile = {
   category: string;
   /** Optional photo. Absent (or null) falls back to `emoji`. */
   imageUrl?: string | null;
+  /** Voice spellings ("bhel" for "Bhel Puri"); the search matches them too. */
+  aliases?: string[];
 };
 
 export type QuickAddGridProps = {
   items: MenuTile[];
+  /** The store's words (lib/store-vocabulary.ts): "Menu" or "Products". */
+  vocab: StoreVocabulary;
 };
 
 type ItemGroup = { category: string | null; items: MenuTile[] };
 
 /** Group tiles by category above this many items (unchanged from before). */
 const GROUP_THRESHOLD = 8;
-/** Category chips and search only earn their space on a long menu. */
-const SEARCH_THRESHOLD = 15;
 /** Hold this long on a tile to take one off instead of adding one. */
 const LONG_PRESS_MS = 500;
 /** A finger drifting further than this is a scroll, not a press. */
@@ -54,7 +59,7 @@ function groupByCategory(items: MenuTile[]): ItemGroup[] {
   return Array.from(byCat.entries()).map(([category, groupItems]) => ({ category, items: groupItems }));
 }
 
-export function QuickAddGrid({ items }: QuickAddGridProps) {
+export function QuickAddGrid({ items, vocab }: QuickAddGridProps) {
   const cartItems = useCartStore((s) => s.items);
   const [query, setQuery] = useState("");
   const [pendingScroll, setPendingScroll] = useState<string | null>(null);
@@ -65,7 +70,8 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
     return m;
   }, [cartItems]);
 
-  const searchable = items.length > SEARCH_THRESHOLD;
+  // Category chips and search only earn their space on a long menu.
+  const searchable = items.length > STAFF_SEARCH_MIN_ITEMS;
   const grouped = items.length > GROUP_THRESHOLD;
 
   // Stable DOM ids per category, from the full menu so they don't shift while filtering.
@@ -78,14 +84,13 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
     return ids;
   }, [items]);
 
-  const needle = searchable ? query.trim().toLowerCase() : "";
+  // Same matcher as the store page and /menu (lib/store-search.ts): every word, any order.
+  const terms = useMemo(() => (searchable ? searchTerms(query) : []), [searchable, query]);
 
   const visibleItems = useMemo(() => {
-    if (!needle) return items;
-    return items.filter(
-      (it) => it.name.toLowerCase().includes(needle) || categoryOf(it).toLowerCase().includes(needle),
-    );
-  }, [items, needle]);
+    if (terms.length === 0) return items;
+    return items.filter((it) => matchesSearch(itemSearchText(it, categoryOf(it)), terms));
+  }, [items, terms]);
 
   const groups = useMemo((): ItemGroup[] => {
     if (!grouped) return [{ category: null, items: visibleItems }];
@@ -106,26 +111,26 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
 
   if (items.length === 0) {
     return (
-      <section
+      <EmptyState
+        as="section"
         aria-labelledby="quick-add-heading"
-        className="flex flex-col items-center gap-3 rounded-lg border border-dashed p-6 text-center"
+        title="No items yet"
+        titleAs="h2"
+        titleId="quick-add-heading"
+        description={`Add ${vocab.kind === "food" ? "menu items" : vocab.items} so cashiers can tap or speak them into the cart.`}
+        action={
+          <Link
+            href="/menu"
+            className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            Open {vocab.catalogueTitle} &rarr;
+          </Link>
+        }
       >
-        <h2 id="quick-add-heading" className="font-display text-lg font-semibold text-foreground">
-          No items yet
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          Add menu items so cashiers can tap or speak them into the cart.
-        </p>
-        <Link
-          href="/menu"
-          className="inline-flex min-h-11 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground shadow-xs ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-        >
-          Open menu &rarr;
-        </Link>
         <p className="text-xs text-muted-foreground">
-          Tip: items marked unavailable on /menu will not appear here.
+          Tip: items marked sold out in {vocab.catalogueTitle} will not appear here.
         </p>
-      </section>
+      </EmptyState>
     );
   }
 
@@ -142,7 +147,7 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
         <div className="mb-4 space-y-2">
           <div>
             <label htmlFor="quick-add-search" className="mb-1 block text-xs font-medium text-muted-foreground">
-              Search menu
+              Search {vocab.catalogue}
             </label>
             <div className="relative">
               <Search
@@ -163,7 +168,7 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
           {categories.length > 1 ? (
             <div
               role="group"
-              aria-label="Menu categories"
+              aria-label={`${vocab.catalogueTitle} categories`}
               className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1 scrollbar-thin"
             >
               {categories.map((c) => (
@@ -188,9 +193,7 @@ export function QuickAddGrid({ items }: QuickAddGridProps) {
       ) : null}
 
       {visibleItems.length === 0 ? (
-        <p role="status" className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">
-          No items match &ldquo;{query.trim()}&rdquo;.
-        </p>
+        <EmptyState role="status" description={<>No items match &ldquo;{query.trim()}&rdquo;.</>} />
       ) : (
         <div className="space-y-6">
           {groups.map((group) => (

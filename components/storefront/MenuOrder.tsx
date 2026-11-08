@@ -1,11 +1,12 @@
 "use client";
 
-import { MapPin, ShoppingBag, Sparkles, Truck } from "lucide-react";
-import Image from "next/image";
+import { CalendarClock, MapPin, ShoppingBag, Sparkles, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState } from "react";
 
 import { useCartHubEntry } from "@/components/storefront/CartHub";
+import { ItemPhoto } from "@/components/storefront/ItemPhoto";
+import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
 import {
   CartBar,
   CheckoutSheet,
@@ -15,7 +16,13 @@ import {
   type BuyerPrefill,
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
-import { formatINRCompact, sumPaise } from "@/lib/currency";
+import { ItemPrice } from "@/components/storefront/ItemPrice";
+import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
+import { formatINRCompact } from "@/lib/currency";
+import { deliveryAreaSummary, type DeliveryArea } from "@/lib/delivery-areas";
+import type { MenuSlotRule } from "@/lib/menu-slots";
+import { applyOffers, salePriceFor, type ResolvedOffer } from "@/lib/offers";
+import { itemSearchText } from "@/lib/store-search";
 import {
   cartStorageKey,
   fulfilmentOptionsLabel,
@@ -45,7 +52,11 @@ export type MenuOrderItem = {
   emoji: string;
   imageUrl: string | null;
   priceInPaise: number;
+  /** Selling unit ("kg", "piece"), shown after the price; null = none. */
+  unit?: string | null;
   isPopular: boolean;
+  /** One line under the name; null = none. */
+  description?: string | null;
 };
 
 export type MenuOrderCategory = {
@@ -61,12 +72,27 @@ export type MenuOrderProps = {
   categories: MenuOrderCategory[];
   fulfilmentTypes: FulfilmentType[];
   deliveryFeePaise: number;
+  /** The store's delivery areas (lib/delivery-areas.ts); see CheckoutSheet. */
+  deliveryAreas?: DeliveryArea[];
   pickupNote: string | null;
-  payment: { upi: boolean; cod: boolean };
-  /** The kitchen has a usable WhatsApp number (see CheckoutSheet). */
+  /** The store's weekly pickup / delivery slots (lib/menu-slots.ts); empty = checkout asks no "when". */
+  slotRules?: MenuSlotRule[];
+  /** "Tomorrow · 12–2 pm": the first slot open now, worked out on the server render. */
+  nextSlotLabel?: string | null;
+  payment: { upi: boolean; cod: boolean; online: boolean };
+  /** The store has a usable WhatsApp number (see CheckoutSheet). */
   whatsapp?: boolean;
   prefill?: BuyerPrefill | null;
+  /** See CheckoutSheet. */
+  theme?: string;
+  notesExample?: string;
+  /** Offers live on menu orders (lib/offers.ts). Preview only; the server re-prices. */
+  offers?: readonly ResolvedOffer[];
+  /** Rows for a kitchen's menu; a photo gallery (two columns, tap to enlarge) for goods. */
+  layout?: "list" | "gallery";
 };
+
+const NO_OFFERS: readonly ResolvedOffer[] = [];
 
 export function MenuOrder(props: MenuOrderProps) {
   const {
@@ -75,10 +101,17 @@ export function MenuOrder(props: MenuOrderProps) {
     categories,
     fulfilmentTypes,
     deliveryFeePaise,
+    deliveryAreas = [],
     pickupNote,
+    slotRules,
+    nextSlotLabel,
     payment,
     whatsapp,
     prefill,
+    theme,
+    notesExample,
+    offers = NO_OFFERS,
+    layout = "list",
   } = props;
   const router = useRouter();
 
@@ -91,6 +124,17 @@ export function MenuOrder(props: MenuOrderProps) {
     for (const c of categories) for (const i of c.items) m.set(i.id, i);
     return m;
   }, [categories]);
+
+  // The store page's search hides rows (and emptied categories); the cart keeps
+  // whatever was added, so hidden rows still check out.
+  const matchesSearch = useStoreSearchMatch();
+  const visibleCategories = useMemo(
+    () =>
+      categories
+        .map((c) => ({ ...c, items: c.items.filter((i) => matchesSearch(itemSearchText({ name: i.name, description: i.description }, c.category))) }))
+        .filter((c) => c.items.length > 0),
+    [categories, matchesSearch],
+  );
 
   // Saved per store; items no longer on the (available + online) menu are dropped on restore.
   const max = maxOrderableQty(null, null);
@@ -114,16 +158,23 @@ export function MenuOrder(props: MenuOrderProps) {
     .map((l) => ({ item: byId.get(l.menuItemId), qty: l.qty }))
     .filter((l): l is { item: MenuOrderItem; qty: number } => !!l.item);
   const itemCount = lines.reduce((s, l) => s + l.qty, 0);
-  const subtotalPaise = sumPaise(lines.map((l) => l.item.priceInPaise * l.qty));
+  const offered = applyOffers(
+    lines.map((l) => ({ key: l.item.id, menuItemId: l.item.id, priceInPaise: l.item.priceInPaise, qty: l.qty })),
+    offers,
+  );
+  const appliedOffer = offered.applied;
+  // What the cart bars show: items less the offer discount (delivery is added at checkout).
+  const payablePaise = offered.totalPaise;
   const canPay = payment.upi || payment.cod;
 
   // The page-level cart bar (CartHub) shows this cart next to any drop's.
   const inHub = useCartHubEntry({
     key: "menu",
-    label: "Everyday menu",
+    label: "Everyday items",
     itemCount,
-    subtotalPaise,
+    subtotalPaise: payablePaise,
     canPay,
+    note: offerCartNoteText(appliedOffer?.name ?? null, offered.nudge, offered.gift),
     onCheckout: () => setOpen(true),
     enabled: true,
   });
@@ -160,6 +211,19 @@ export function MenuOrder(props: MenuOrderProps) {
     }
   }
 
+  // Price (sale-aware, lib/offers.ts), unit and the Popular badge: the same line in both layouts.
+  const priceLine = (item: MenuOrderItem) => (
+    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
+      <ItemPrice priceInPaise={item.priceInPaise} sale={salePriceFor(offers, item.id, item.priceInPaise)} unit={item.unit} />
+      {item.isPopular ? (
+        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
+          <Sparkles className="h-3 w-3" aria-hidden="true" />
+          Popular
+        </span>
+      ) : null}
+    </span>
+  );
+
   return (
     <div id="menu-order" className="scroll-mt-16">
       <div className="mb-6 rounded-2xl border border-primary/25 bg-linear-to-b from-primary/8 to-background px-4 py-3 text-sm">
@@ -172,7 +236,8 @@ export function MenuOrder(props: MenuOrderProps) {
             <li className="flex items-start gap-2">
               <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
               <span>
-                {deliveryFeePaise > 0 ? `Delivery fee ${formatINRCompact(deliveryFeePaise)}` : "Free delivery"}
+                {deliveryAreaSummary(deliveryAreas, deliveryFeePaise) ??
+                  (deliveryFeePaise > 0 ? `Delivery fee ${formatINRCompact(deliveryFeePaise)}` : "Free delivery")}
               </span>
             </li>
           ) : null}
@@ -182,12 +247,20 @@ export function MenuOrder(props: MenuOrderProps) {
               <span>Pickup: {pickupNote}</span>
             </li>
           ) : null}
+          {nextSlotLabel ? (
+            <li className="flex items-start gap-2">
+              <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span>Next slot: {nextSlotLabel}</span>
+            </li>
+          ) : null}
           <li>Tap + to add items, then check out.</li>
         </ul>
       </div>
 
+      <OfferChips offers={offers} />
+
       <div className="space-y-8">
-        {categories.map(({ category, anchor, items }) => (
+        {visibleCategories.map(({ category, anchor, items }) => (
           <section key={anchor} aria-labelledby={anchor}>
             <div className="mb-3 flex items-baseline gap-3">
               <h3 id={anchor} className="scroll-mt-20 font-display text-base font-bold text-awaaz-charcoal">
@@ -196,53 +269,64 @@ export function MenuOrder(props: MenuOrderProps) {
               <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
               <span className="text-xs font-semibold text-muted-foreground">{items.length}</span>
             </div>
-            <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs">
-              {items.map((item) => (
-                <li
-                  key={item.id}
-                  id={menuItemAnchor(item.id)}
-                  className="flex scroll-mt-20 items-center gap-3 px-3 py-3 target:bg-primary/8 sm:gap-4 sm:px-4"
-                >
-                  {item.imageUrl ? (
-                    <Image
-                      src={item.imageUrl}
-                      alt=""
-                      width={48}
-                      height={48}
-                      className="h-12 w-12 shrink-0 rounded-xl object-cover ring-1 ring-border/60"
-                    />
-                  ) : (
-                    <span
-                      aria-hidden="true"
-                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-2xl"
-                    >
-                      {item.emoji}
-                    </span>
-                  )}
-
-                  <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                    <span className="truncate text-[15px] font-semibold text-foreground">{item.name}</span>
-                    <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                      <span className="font-mono font-bold tabular-nums text-foreground">
-                        {formatINRCompact(item.priceInPaise)}
+            <ul
+              className={
+                layout === "gallery"
+                  ? "grid grid-cols-2 gap-3 sm:grid-cols-3"
+                  : "divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs"
+              }
+            >
+              {items.map((item) =>
+                layout === "gallery" ? (
+                  <li
+                    key={item.id}
+                    id={menuItemAnchor(item.id)}
+                    className="flex scroll-mt-20 flex-col gap-2 rounded-2xl border border-border/60 bg-background p-2.5 shadow-xs target:bg-primary/8"
+                  >
+                    <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="tile" enlarge />
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">
+                        {item.name}
                       </span>
-                      {item.isPopular ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
-                          <Sparkles className="h-3 w-3" aria-hidden="true" />
-                          Popular
-                        </span>
+                      {item.description ? (
+                        <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
                       ) : null}
+                      {priceLine(item)}
                     </span>
-                  </span>
+                    <QtyStepper
+                      itemName={item.name}
+                      qty={cart[item.id] ?? 0}
+                      max={max}
+                      onChange={(q) => setQty(item.id, q)}
+                    />
+                  </li>
+                ) : (
+                  <li
+                    key={item.id}
+                    id={menuItemAnchor(item.id)}
+                    className="flex scroll-mt-20 items-center gap-3 px-3 py-3 target:bg-primary/8 sm:gap-4 sm:px-4"
+                  >
+                    <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="row" />
 
-                  <QtyStepper
-                    itemName={item.name}
-                    qty={cart[item.id] ?? 0}
-                    max={max}
-                    onChange={(q) => setQty(item.id, q)}
-                  />
-                </li>
-              ))}
+                    <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                      <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">
+                        {item.name}
+                      </span>
+                      {item.description ? (
+                        <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
+                      ) : null}
+                      {priceLine(item)}
+                    </span>
+
+                    <QtyStepper
+                      itemName={item.name}
+                      qty={cart[item.id] ?? 0}
+                      max={max}
+                      onChange={(q) => setQty(item.id, q)}
+                    />
+                  </li>
+                ),
+              )}
             </ul>
           </section>
         ))}
@@ -250,10 +334,17 @@ export function MenuOrder(props: MenuOrderProps) {
 
       {!canPay ? <NoPaymentNotice /> : null}
 
+      <OfferCartNote
+        appliedName={appliedOffer?.name ?? null}
+        nudge={offered.nudge}
+        gift={offered.gift}
+        inCartBar={inHub}
+      />
+
       {inHub ? null : (
         <CartBar
           itemCount={itemCount}
-          subtotalPaise={subtotalPaise}
+          subtotalPaise={payablePaise}
           canPay={canPay}
           onCheckout={() => setOpen(true)}
           buttonRef={checkoutRef}
@@ -261,21 +352,30 @@ export function MenuOrder(props: MenuOrderProps) {
       )}
 
       <CheckoutSheet
+        theme={theme}
+        notesExample={notesExample}
         open={open}
         onOpenChange={onSheetOpenChange}
         slug={slug}
         endpoint={`/api/s/${encodeURIComponent(slug)}/menu-orders`}
         idPrefix="menu"
         description={vendorName}
+        storeName={vendorName}
         lines={lines.map((l) => ({
           id: l.item.id,
           name: l.item.name,
           priceInPaise: l.item.priceInPaise,
           qty: l.qty,
+          max,
         }))}
+        onChangeQty={setQty}
+        discount={appliedOffer}
+        gift={offered.gift}
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
+        deliveryAreas={deliveryAreas}
         pickupNote={pickupNote}
+        slotRules={slotRules}
         payment={payment}
         whatsapp={whatsapp}
         prefill={prefill}

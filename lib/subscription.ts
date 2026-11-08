@@ -14,6 +14,9 @@
  *   `planExpiresAt`. The one exception: a subscription cancelled before its
  *   first charge (`paid_count` 0) takes back the access its `authenticated`
  *   event granted, since nothing was ever paid.
+ * - A subscription that resumes after a paid period (`resumesPaidPeriod`) grants
+ *   nothing on `authenticated` and takes nothing back: the time left is already
+ *   paid for, on the old plan. Its plan applies from its first charge.
  * - Events for a subscription other than the one on file only touch the
  *   vendor's plan when they carry a payment (`activated` / `charged`); they
  *   never overwrite the status or clear the id of the current one.
@@ -25,8 +28,8 @@ import { GST_BPS, PLAN_PRICES_PAISE, PLAN_PRICES_YEARLY_PAISE } from "@/lib/cons
 export const BILLING_INTERVALS = ["monthly", "yearly"] as const;
 export type BillingInterval = (typeof BILLING_INTERVALS)[number];
 
-/** Paid plans a vendor can buy through Razorpay. PRO is not sold (TODO.md §2). */
-export const SUBSCRIBABLE_PLANS = ["STARTER"] as const satisfies readonly Plan[];
+/** Paid plans a vendor can buy through Razorpay, cheapest first. */
+export const SUBSCRIBABLE_PLANS = ["LITE", "STARTER", "PRO"] as const satisfies readonly Plan[];
 export type SubscribablePlan = (typeof SUBSCRIBABLE_PLANS)[number];
 
 /** Billing cycles before a Razorpay subscription completes: ten years either way. */
@@ -50,6 +53,38 @@ export function subscriptionBasePaise(plan: SubscribablePlan, interval: BillingI
 /** What Razorpay charges per cycle: base + 18% GST. This is the Razorpay plan `amount`. */
 export function subscriptionChargePaise(plan: SubscribablePlan, interval: BillingInterval): number {
   const base = subscriptionBasePaise(plan, interval);
+  return base + gstPaise(base);
+}
+
+/**
+ * A store's own price (`Vendor.customPricePaise`), set by a platform SUPER_ADMIN
+ * on /admin/vendors. Null means the list price. It is the monthly base before
+ * GST; a year is ten months, the same "2 months free" as the list price.
+ *
+ * Whole rupees only: GST on a whole-rupee base is exact, so `chargeBasePaise`
+ * (lib/sales-earnings.ts) gets the base back from a charge.
+ *
+ * It applies when the owner next subscribes (lib/custom-subscription-plan.ts).
+ * A live subscription keeps the price it was made at. It is a price for STARTER:
+ * a store with one is offered only that (create-subscription refuses the others).
+ */
+export const CUSTOM_PRICE_MIN_RUPEES = 49;
+export const CUSTOM_PRICE_MAX_RUPEES = 4999;
+const YEARLY_MONTHS = 10;
+
+export function isValidCustomPriceRupees(rupees: number): boolean {
+  return Number.isInteger(rupees) && rupees >= CUSTOM_PRICE_MIN_RUPEES && rupees <= CUSTOM_PRICE_MAX_RUPEES;
+}
+
+/** One cycle's base price for this store, before GST. */
+export function storeBasePaise(interval: BillingInterval, customPricePaise: number | null): number {
+  if (customPricePaise === null) return subscriptionBasePaise("STARTER", interval);
+  return interval === "monthly" ? customPricePaise : customPricePaise * YEARLY_MONTHS;
+}
+
+/** What Razorpay charges this store per cycle: its base + 18% GST. */
+export function storeChargePaise(interval: BillingInterval, customPricePaise: number | null): number {
+  const base = storeBasePaise(interval, customPricePaise);
   return base + gstPaise(base);
 }
 
@@ -94,6 +129,8 @@ export type SubscriptionSnapshot = {
   currentEnd: Date | null;
   startAt: Date | null;
   paidCount: number | null;
+  /** Made to start when the vendor's paid period ends (`notes.resumesPaidPeriod`). */
+  resumesPaidPeriod?: boolean;
 };
 
 /** The vendor's stored billing state before the event. */
@@ -160,7 +197,7 @@ export function applySubscriptionEvent(
           billingInterval: sub.mapped.interval,
         },
       };
-      if (sub.startAt && sub.startAt.getTime() > now.getTime()) {
+      if (!sub.resumesPaidPeriod && sub.startAt && sub.startAt.getTime() > now.getTime()) {
         patch.vendor = {
           plan: sub.mapped.plan,
           planExpiresAt: laterOf(current.planExpiresAt, sub.startAt),
@@ -183,6 +220,7 @@ export function applySubscriptionEvent(
       // nothing later than its start_at was paid for.
       if (
         event === "subscription.cancelled" &&
+        !sub.resumesPaidPeriod &&
         sub.paidCount === 0 &&
         sub.startAt &&
         current.planExpiresAt &&

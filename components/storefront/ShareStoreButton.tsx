@@ -10,7 +10,21 @@ import { useEffect, useState } from "react";
  * current location, which may carry a hash or query. Best-effort throughout: a
  * dismissed sheet (AbortError) or a blocked clipboard is not an error.
  */
-export function ShareStoreButton({ vendorName, slug }: { vendorName: string; slug: string }) {
+export function ShareStoreButton({
+  vendorName,
+  slug,
+  path = `/s/${encodeURIComponent(slug)}`,
+  text = `Order from ${vendorName} online`,
+  compact = false,
+}: {
+  vendorName: string;
+  slug: string;
+  /** Icon only, for the sticky category bar (the label goes to `aria-label`). */
+  compact?: boolean;
+  /** The page to share; a community page passes `/c/<slug>`. */
+  path?: string;
+  text?: string;
+}) {
   const [status, setStatus] = useState<"" | "copied" | "failed">("");
 
   useEffect(() => {
@@ -20,10 +34,10 @@ export function ShareStoreButton({ vendorName, slug }: { vendorName: string; slu
   }, [status]);
 
   async function share() {
-    const url = `${window.location.origin}/s/${encodeURIComponent(slug)}`;
+    const url = `${window.location.origin}${path}`;
     if (typeof navigator.share === "function") {
       try {
-        await navigator.share({ title: vendorName, text: `Order from ${vendorName} online`, url });
+        await navigator.share({ title: vendorName, text, url });
         return;
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return;
@@ -43,17 +57,24 @@ export function ShareStoreButton({ vendorName, slug }: { vendorName: string; slu
       <button
         type="button"
         onClick={share}
-        className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        aria-label={
+          compact ? (status === "copied" ? "Link copied" : status === "failed" ? "Couldn't copy" : "Share this store") : undefined
+        }
+        className={
+          compact
+            ? "inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-full border border-border/70 text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            : "inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        }
       >
         {status === "copied" ? (
           <Check className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
         ) : (
           <Share2 className="h-4 w-4 shrink-0" aria-hidden="true" />
         )}
-        {status === "copied" ? "Link copied" : status === "failed" ? "Couldn't copy" : "Share"}
+        {compact ? null : status === "copied" ? "Link copied" : status === "failed" ? "Couldn't copy" : "Share"}
       </button>
       <span role="status" aria-live="polite" className="sr-only">
-        {status === "copied" ? "Store link copied" : status === "failed" ? "Couldn't copy the link" : ""}
+        {status === "copied" ? "Link copied" : status === "failed" ? "Couldn't copy the link" : ""}
       </span>
     </>
   );

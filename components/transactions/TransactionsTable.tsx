@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ReceiptText, SlidersHorizontal } from "lucide-react";
 
+import { PaymentMethodBadge, PaymentStatusBadge } from "@/components/transactions/payment-badges";
 import { TransactionCardList } from "@/components/transactions/TransactionCardList";
 import { TransactionDetailDrawer, type TransactionDetailModel } from "@/components/transactions/TransactionDetailDrawer";
 import {
@@ -12,8 +13,8 @@ import {
   TransactionFilterFields,
   type TransactionFilterValues,
 } from "@/components/transactions/TransactionFilterFields";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { EmptyState } from "@/components/ui/empty-state";
 import {
   ResponsiveDialog,
   ResponsiveDialogBody,
@@ -44,6 +45,7 @@ function toDetailModel(row: TransactionListRow): TransactionDetailModel {
     createdAt: created,
     subtotalPaise: row.subtotalPaise,
     discountPaise: row.discountPaise,
+    offerName: row.offerName,
     taxPaise: row.taxPaise,
     totalPaise: row.totalPaise,
     paymentMethod: row.paymentMethod,
@@ -241,20 +243,21 @@ export function TransactionsTable({
       {/* One list, two layouts, switched in CSS: display:none keeps the unused
           one out of the accessibility tree and nothing flashes on hydration. */}
       {initialItems.length === 0 ? (
-        <div
+        <EmptyState
           data-testid="transactions-empty"
-          className="flex flex-col items-center gap-3 rounded-lg border border-dashed px-4 py-10 text-center md:hidden"
-        >
-          <ReceiptText className="size-8 text-muted-foreground" aria-hidden="true" />
-          <p className="text-sm text-muted-foreground">
-            {neverSold ? "No transactions yet. Bills you ring up show here." : "No transactions match your filters."}
-          </p>
-          {activeFilterCount > 0 ? (
-            <Button type="button" variant="outline" className="min-h-11" onClick={clearFilters}>
-              Clear filters
-            </Button>
-          ) : null}
-        </div>
+          className="px-4 py-10 md:hidden"
+          icon={ReceiptText}
+          description={
+            neverSold ? "No transactions yet. Bills you ring up show here." : "No transactions match your filters."
+          }
+          action={
+            activeFilterCount > 0 ? (
+              <Button type="button" variant="outline" className="min-h-11" onClick={clearFilters}>
+                Clear filters
+              </Button>
+            ) : null
+          }
+        />
       ) : (
         <TransactionCardList
           items={initialItems}
@@ -301,21 +304,12 @@ export function TransactionsTable({
                   <TableCell className="whitespace-nowrap text-sm">{formatIstDateTime(row.createdAt)}</TableCell>
                   <TableCell className="text-right tabular-nums">{itemQtySum(row)}</TableCell>
                   <TableCell className="text-right font-medium tabular-nums">{formatINR(row.totalPaise)}</TableCell>
+                  {/* Same badges as the phone list: words, not the stored enum. */}
                   <TableCell>
-                    <Badge variant="outline">{row.paymentMethod}</Badge>
+                    <PaymentMethodBadge method={row.paymentMethod} />
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={
-                        row.paymentStatus === "PAID"
-                          ? "default"
-                          : row.paymentStatus === "PENDING"
-                            ? "secondary"
-                            : "destructive"
-                      }
-                    >
-                      {row.paymentStatus}
-                    </Badge>
+                    <PaymentStatusBadge status={row.paymentStatus} />
                   </TableCell>
                 </TableRow>
               ))

@@ -184,8 +184,18 @@ test.describe("app shell navigation", () => {
     expect(publish.status()).toBe(200);
     await openPos(page, PHONE);
 
-    await page.getByRole("navigation", { name: "Main" }).getByRole("button", { name: "More" }).click();
-    const live = page.getByRole("dialog", { name: "More" }).getByRole("link", { name: /Live store/ });
+    // A published store trades the Sell tab for Settings; Sell moves behind More.
+    const tabs = page.getByRole("navigation", { name: "Main" });
+    for (const name of ["Orders", "Drops", "Menu", "Settings"]) {
+      await expect(tabs.getByRole("link", { name, exact: true })).toBeVisible();
+    }
+    await expect(tabs.getByRole("link", { name: "Sell", exact: true })).toHaveCount(0);
+
+    await tabs.getByRole("button", { name: "More" }).click();
+    const sheet = page.getByRole("dialog", { name: "More" });
+    await expect(sheet.getByRole("link", { name: "Sell", exact: true })).toHaveAttribute("aria-current", "page");
+    await expect(sheet.getByRole("button", { name: "Share store link", exact: true })).toBeVisible();
+    const live = sheet.getByRole("link", { name: /Live store/ });
     await expect(live).toBeVisible();
     await expect(live).toHaveAttribute("href", /^\/s\//);
     await expect(live).toHaveAttribute("target", "_blank");
@@ -222,11 +232,11 @@ test.describe("app shell navigation", () => {
     await expect(item("Settings")).toHaveAttribute("aria-current", "page");
     await expect(item("Sell")).not.toHaveAttribute("aria-current", "page");
 
-    // A section page inside Settings keeps Settings marked, next to the section sidebar.
+    // A section page inside Settings keeps Settings marked, with a back link to the hub.
     await page.goto("/settings/payments");
     await expect(page.getByRole("heading", { level: 1, name: "Payments" })).toBeVisible();
     await expect(item("Settings")).toHaveAttribute("aria-current", "page");
-    await expect(page.getByRole("navigation", { name: "Settings", exact: true })).toBeVisible();
+    await expect(page.getByRole("main").getByRole("link", { name: "Settings", exact: true })).toBeVisible();
   });
 
   test("a cashier sees only Orders, Sell, Settings, Help and Sign out", async ({ page, request }) => {
@@ -299,7 +309,7 @@ test.describe("POS sale clears the cart", () => {
     await page.getByRole("button", { name: /Collect payment/ }).click();
 
     const dialog = page.getByRole("dialog");
-    await dialog.getByRole("button", { name: "Cash" }).click();
+    await dialog.getByRole("radio", { name: "Cash" }).check();
     await dialog.getByRole("button", { name: /Mark as paid/ }).click();
     await expect(page.getByText(/AWZ-\d{8}-\d{4}/)).toBeVisible({ timeout: 20_000 });
 

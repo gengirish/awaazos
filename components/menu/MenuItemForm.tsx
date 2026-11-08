@@ -3,7 +3,8 @@
 import type { MenuItem } from "@prisma/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Image from "next/image";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { ChevronDown } from "lucide-react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -18,7 +19,7 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { ShowOnlineSwitch } from "@/components/menu/ShowOnlineSwitch";
+import { Switch } from "@/components/ui/switch";
 import { Input } from "@/components/ui/input";
 import {
   ResponsiveDialog,
@@ -29,16 +30,13 @@ import {
   ResponsiveDialogHeader,
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { paiseToRupees } from "@/lib/currency";
 import { suggestEmoji } from "@/lib/menu-suggestions";
-import { menuItemCreateInputSchema, menuItemUpdateSchema } from "@/lib/zod-menu";
+import { isValidMenuUnit, MENU_UNIT_MAX, MENU_UNIT_MESSAGE, normaliseMenuUnit } from "@/lib/menu-unit";
+import { categoryOptions, paiseToRupeeInput, parseRupeeInput } from "@/lib/menu-voice";
+import { vocabularyForKind, type StoreVocabulary } from "@/lib/store-vocabulary";
+import { cn } from "@/lib/utils";
+import { MENU_DESCRIPTION_MAX, menuItemCreateInputSchema, menuItemUpdateSchema } from "@/lib/zod-menu";
 
 /** Starter emoji grid, shared with the voice menu builder's review rows. */
 export const FOOD_EMOJIS = [
@@ -64,25 +62,83 @@ export const FOOD_EMOJIS = [
   "🥞",
 ] as const;
 
-const DEFAULT_EMOJI = "🍽️";
+/** The starter grid for a store that doesn't sell food (lib/store-vocabulary.ts). */
+export const GOODS_EMOJIS = [
+  "🛍️",
+  "📦",
+  "🎁",
+  "🌿",
+  "🍃",
+  "🌸",
+  "🫙",
+  "🍯",
+  "🫖",
+  "🧴",
+  "🧼",
+  "💊",
+  "🕯️",
+  "🪔",
+  "🧘",
+  "💆",
+  "👕",
+  "👜",
+  "💍",
+  "✨",
+] as const;
 
-const MENU_CATEGORIES = ["General", "Snacks", "Beverages", "Meals", "Desserts"] as const;
+const DEFAULT_EMOJI = "🍽️";
+const DEFAULT_GOODS_EMOJI = "🛍️";
+
+/** The emoji grid this store is offered. */
+export function emojiChoices(vocab: StoreVocabulary): readonly string[] {
+  return vocab.foodArt ? FOOD_EMOJIS : GOODS_EMOJIS;
+}
+
+/** The emoji a new row gets when nothing suggests one. */
+export function defaultEmoji(vocab: StoreVocabulary): string {
+  return vocab.foodArt ? DEFAULT_EMOJI : DEFAULT_GOODS_EMOJI;
+}
 
 /** Mirrors the server-side allowlist in app/api/menu/[id]/image/route.ts. */
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_IMAGE_BYTES = 4 * 1024 * 1024;
 
-export type MenuItemFormValues = z.input<typeof menuItemCreateInputSchema>;
+/**
+ * The form's own schema: the shared create fields, except that the price stays
+ * the text the seller typed ("19.", "19.50") until submit. It becomes paise
+ * through `parseRupeeInput` (→ `rupeesToPaise`) there; the API contract is unchanged.
+ */
+const menuItemFormSchema = menuItemCreateInputSchema.extend({
+  priceInRupees: z.string().superRefine((value, ctx) => {
+    const parsed = parseRupeeInput(value);
+    if ("error" in parsed) ctx.addIssue({ code: z.ZodIssueCode.custom, message: parsed.error });
+  }),
+  // The typed text; normalised (blank → null) on submit, same rule as the API.
+  unit: z
+    .string()
+    .optional()
+    .refine((value) => {
+      const unit = normaliseMenuUnit(value);
+      return unit === null || isValidMenuUnit(unit);
+    }, MENU_UNIT_MESSAGE),
+});
 
-const defaultCreateValues: Partial<MenuItemFormValues> = {
+export type MenuItemFormValues = z.infer<typeof menuItemFormSchema>;
+
+const defaultCreateValues: MenuItemFormValues = {
   name: "",
+  priceInRupees: "",
   aliasesCsv: "",
+  tagsCsv: "",
   emoji: DEFAULT_EMOJI,
-  category: "General",
+  // Empty saves as "General" (the server default); the datalist offers the rest.
+  category: "",
   hsnCode: "",
   isPopular: false,
   isAvailable: true,
   showOnline: true,
+  unit: "",
+  description: "",
 };
 
 type MenuItemFormProps = {
@@ -92,17 +148,35 @@ type MenuItemFormProps = {
   onSaved: () => void;
   /** Create only: pre-fill the name (e.g. a dish heard by the voice drop builder). */
   defaultName?: string;
+  /** Categories already on this vendor's menu, offered as suggestions. */
+  categories?: readonly string[];
+  /** The store's words (lib/store-vocabulary.ts); a kitchen when not given. */
+  vocab?: StoreVocabulary;
 };
 
-export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = "" }: MenuItemFormProps) {
+const FOOD_VOCAB = vocabularyForKind("food");
+
+const NO_CATEGORIES: readonly string[] = [];
+
+export function MenuItemForm({
+  open,
+  onOpenChange,
+  item,
+  onSaved,
+  defaultName = "",
+  categories = NO_CATEGORIES,
+  vocab = FOOD_VOCAB,
+}: MenuItemFormProps) {
+  const baseEmoji = defaultEmoji(vocab);
+  const starterEmojis = emojiChoices(vocab);
+  const itemNoun = vocab.kind === "food" ? "Menu item" : vocab.Item;
   const isEdit = Boolean(item);
-  const categoryOptions = useMemo(() => {
-    const base: string[] = [...MENU_CATEGORIES];
-    if (item?.category && !base.includes(item.category)) {
-      base.push(item.category);
-    }
-    return base;
-  }, [item]);
+  const uid = useId();
+  const categoryListId = `${uid}-categories`;
+  const moreId = `${uid}-more`;
+  const categorySuggestions = useMemo(() => categoryOptions(categories), [categories]);
+  // Aliases, tags, HSN/SAC and the emoji: rarely needed, so they start folded away.
+  const [moreOpen, setMoreOpen] = useState(false);
 
   // The photo is not part of the RHF schema: it round-trips through
   // /api/menu/[id]/image, which needs an item id. On edit we upload
@@ -118,9 +192,13 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
   const [emojiSuggested, setEmojiSuggested] = useState(false);
 
   const form = useForm<MenuItemFormValues>({
-    resolver: zodResolver(menuItemCreateInputSchema),
-    defaultValues: defaultCreateValues as MenuItemFormValues,
+    resolver: zodResolver(menuItemFormSchema),
+    defaultValues: defaultCreateValues,
   });
+  const { errors, isSubmitting } = form.formState;
+  // A problem in a folded field must be visible, whatever the seller last tapped.
+  const moreShown =
+    moreOpen || Boolean(errors.aliasesCsv || errors.tagsCsv || errors.hsnCode || errors.emoji);
 
   useEffect(() => {
     if (!open) return;
@@ -129,28 +207,33 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
     setImageBusy(false);
     setEmojiPicked(false);
     setEmojiSuggested(false);
+    // On edit, open "More options" when one of its text fields is in use.
+    setMoreOpen(Boolean(item && (item.aliases.length > 0 || item.tags.length > 0 || item.hsnCode)));
     if (item) {
       form.reset({
         name: item.name,
-        priceInRupees: paiseToRupees(item.priceInPaise),
+        priceInRupees: paiseToRupeeInput(item.priceInPaise),
         aliasesCsv: item.aliases.length ? item.aliases.join(", ") : "",
+        tagsCsv: item.tags.length ? item.tags.join(", ") : "",
         emoji: item.emoji,
         category: item.category,
         hsnCode: item.hsnCode ?? "",
         isPopular: item.isPopular,
         isAvailable: item.isAvailable,
         showOnline: item.showOnline,
+        unit: item.unit ?? "",
+        description: item.description ?? "",
       });
     } else {
       const suggestion = defaultName ? suggestEmoji(defaultName) : null;
       form.reset({
         ...defaultCreateValues,
         name: defaultName,
-        emoji: suggestion ?? DEFAULT_EMOJI,
-      } as MenuItemFormValues);
+        emoji: suggestion ?? baseEmoji,
+      });
       setEmojiSuggested(suggestion !== null);
     }
-  }, [open, item, form, defaultName]);
+  }, [open, item, form, defaultName, baseEmoji]);
 
   function validateImage(file: File): string | null {
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return "Use a JPEG, PNG or WebP photo";
@@ -223,20 +306,29 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
     }
   }
 
-  async function onSubmit(values: MenuItemFormValues) {
+  /** `addAnother` (create only): keep the sheet open, cleared, for the next item. */
+  async function save(values: MenuItemFormValues, addAnother: boolean) {
+    const price = parseRupeeInput(values.priceInRupees);
+    if ("error" in price) {
+      form.setError("priceInRupees", { message: price.error }, { shouldFocus: true });
+      return;
+    }
+    const fields = {
+      name: values.name,
+      priceInRupees: paiseToRupees(price.paise),
+      aliasesCsv: values.aliasesCsv ?? "",
+      tagsCsv: values.tagsCsv ?? "",
+      emoji: values.emoji,
+      category: values.category?.trim() || "General",
+      isPopular: values.isPopular,
+      isAvailable: values.isAvailable,
+      showOnline: values.showOnline,
+      unit: normaliseMenuUnit(values.unit),
+      description: values.description ?? "",
+    };
     try {
       if (isEdit && item) {
-        const body = menuItemUpdateSchema.parse({
-          name: values.name,
-          priceInRupees: values.priceInRupees,
-          aliasesCsv: values.aliasesCsv,
-          emoji: values.emoji,
-          category: values.category,
-          hsnCode: values.hsnCode?.trim() || null,
-          isPopular: values.isPopular,
-          isAvailable: values.isAvailable,
-          showOnline: values.showOnline,
-        });
+        const body = menuItemUpdateSchema.parse({ ...fields, hsnCode: values.hsnCode?.trim() || null });
         const res = await fetch(`/api/menu/${item.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -247,23 +339,34 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
           toast.error(typeof json.error === "string" ? json.error : "Could not update item");
           return;
         }
-        toast.success("Menu item updated");
+        toast.success(`${itemNoun} updated`);
       } else {
         const res = await fetch("/api/menu", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(values),
+          body: JSON.stringify({ ...fields, hsnCode: values.hsnCode ?? "" }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
           toast.error(typeof json.error === "string" ? json.error : "Could not create item");
           return;
         }
-        toast.success("Menu item created");
+        toast.success(addAnother ? `${values.name} added. Add the next one.` : `${itemNoun} created`);
         // The item exists now, so the held photo finally has an id to attach to.
         // A failed upload has already toasted; the item itself is still saved.
         if (pendingFile && typeof json?.data?.id === "string") {
           await uploadImage(json.data.id, pendingFile);
+        }
+        if (addAnother) {
+          // Same category again: sellers add a whole section in one go.
+          form.reset({ ...defaultCreateValues, emoji: baseEmoji, category: values.category?.trim() ?? "" });
+          setPendingFile(null);
+          setEmojiPicked(false);
+          setEmojiSuggested(false);
+          setMoreOpen(false);
+          onSaved();
+          form.setFocus("name");
+          return;
         }
       }
       onOpenChange(false);
@@ -281,14 +384,14 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
         aria-describedby="menu-item-form-desc"
       >
         <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle id="menu-item-form-title">{isEdit ? "Edit item" : "Add menu item"}</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle id="menu-item-form-title">{isEdit ? "Edit item" : `Add ${itemNoun.toLowerCase()}`}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription id="menu-item-form-desc">
             Enter the price in rupees.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         <Form {...form}>
           {/* The fields scroll; Cancel / Save stay pinned under them. */}
-          <form onSubmit={form.handleSubmit(onSubmit)} className="flex min-h-0 flex-1 flex-col">
+          <form onSubmit={form.handleSubmit((values) => save(values, false))} className="flex min-h-0 flex-1 flex-col">
             <ResponsiveDialogBody className="space-y-4">
               <FormField
                 control={form.control}
@@ -299,13 +402,13 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
                     <FormControl>
                       <Input
                         autoComplete="off"
-                        placeholder="e.g. Bhel puri"
+                        placeholder={vocab.kind === "food" ? "e.g. Bhel puri" : "e.g. Ashwagandha powder"}
                         {...field}
                         onChange={(e) => {
                           field.onChange(e);
                           if (isEdit || emojiPicked) return;
                           const suggestion = suggestEmoji(e.target.value);
-                          form.setValue("emoji", suggestion ?? DEFAULT_EMOJI);
+                          form.setValue("emoji", suggestion ?? baseEmoji);
                           setEmojiSuggested(suggestion !== null);
                         }}
                       />
@@ -316,69 +419,66 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
               />
               <FormField
                 control={form.control}
-                name="aliasesCsv"
+                name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Voice aliases</FormLabel>
+                    <FormLabel>Description (optional)</FormLabel>
                     <FormControl>
-                      <Input
-                        autoComplete="off"
-                        placeholder="bhel, spicy bhel"
+                      <textarea
+                        rows={2}
+                        maxLength={MENU_DESCRIPTION_MAX}
+                        placeholder={
+                          vocab.kind === "food"
+                            ? "e.g. Soft idlis with coconut chutney, 4 per plate"
+                            : "e.g. 8 mm Karungali beads, 108 count"
+                        }
+                        className="flex min-h-20 w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 md:text-sm"
                         {...field}
                         value={field.value ?? ""}
                       />
                     </FormControl>
-                    <FormDescription>Comma-separated phrases customers might say.</FormDescription>
+                    <FormDescription>
+                      One line under the name on your store page. {(field.value ?? "").length}/{MENU_DESCRIPTION_MAX}
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
               <FormField
                 control={form.control}
-                name="emoji"
-                render={({ field }) => {
-                  // A suggested (or previously saved) emoji outside the starter
-                  // grid still needs a visible, selected button.
-                  const options: string[] =
-                    field.value && !(FOOD_EMOJIS as readonly string[]).includes(field.value)
-                      ? [field.value, ...FOOD_EMOJIS]
-                      : [...FOOD_EMOJIS];
-                  return (
-                    <FormItem>
-                      <FormLabel>Emoji</FormLabel>
-                      <FormControl>
-                        <div
-                          className="grid grid-cols-5 gap-2 sm:grid-cols-10"
-                          role="group"
-                          aria-label="Pick a food emoji"
-                        >
-                          {options.map((emo) => (
-                            <button
-                              key={emo}
-                              type="button"
-                              className={`flex min-h-11 min-w-11 items-center justify-center rounded-md border text-lg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
-                                field.value === emo ? "border-primary bg-primary/10" : "border-input bg-background hover:bg-accent"
-                              }`}
-                              aria-pressed={field.value === emo}
-                              aria-label={`Select emoji ${emo}`}
-                              onClick={() => {
-                                setEmojiPicked(true);
-                                setEmojiSuggested(false);
-                                field.onChange(emo);
-                              }}
-                            >
-                              {emo}
-                            </button>
-                          ))}
-                        </div>
-                      </FormControl>
-                      {!isEdit && emojiSuggested ? (
-                        <FormDescription>Picked from the name. Tap another to change it.</FormDescription>
-                      ) : null}
-                      <FormMessage />
-                    </FormItem>
-                  );
-                }}
+                name="priceInRupees"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Price (₹)</FormLabel>
+                    <FormControl>
+                      {/* The typed text is kept as it is ("19." must survive); it becomes paise on submit. */}
+                      <Input inputMode="decimal" autoComplete="off" placeholder="e.g. 40 or 19.50" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="unit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>{vocab.kind === "food" ? "Unit (optional)" : "Pack size (optional)"}</FormLabel>
+                    <FormControl>
+                      <Input
+                        autoComplete="off"
+                        maxLength={MENU_UNIT_MAX}
+                        placeholder={vocab.kind === "food" ? "e.g. kg, piece, box" : "e.g. 100 g, 60 capsules, 500 ml"}
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormDescription>
+                      Shown after the price on your store page, like {vocab.kind === "food" ? "₹1,200 / kg" : "₹399 / 100 g"}.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
               <div className="space-y-2" role="group" aria-labelledby="menu-item-photo-label">
                 <p className="text-sm font-medium leading-none" id="menu-item-photo-label">
@@ -454,92 +554,180 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
                 <p className="text-xs text-muted-foreground" aria-live="polite">
                   {imageBusy
                     ? "Uploading photo…"
-                    : "JPEG, PNG or WebP, up to 4MB. Shown instead of the emoji on the POS grid."}
+                    : "JPEG, PNG or WebP, up to 4MB. Shown on your store page and at the counter."}
                 </p>
               </div>
-              <FormField
-                control={form.control}
-                name="priceInRupees"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Price (₹)</FormLabel>
-                    <FormControl>
-                      <Input
-                        inputMode="decimal"
-                        autoComplete="off"
-                        placeholder="e.g. 40 or 19.50"
-                        name={field.name}
-                        ref={field.ref}
-                        onBlur={field.onBlur}
-                        value={field.value === undefined || field.value === null ? "" : String(field.value)}
-                        onChange={(e) => {
-                          const v = e.target.value;
-                          if (v === "") field.onChange(undefined);
-                          else field.onChange(Number(v));
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
               <FormField
                 control={form.control}
                 name="category"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Category</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value ?? "General"}>
-                      <FormControl>
-                        <SelectTrigger aria-label="Category">
-                          <SelectValue placeholder="Category" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {categoryOptions.map((c) => (
-                          <SelectItem key={c} value={c}>
-                            {c}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="hsnCode"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>HSN/SAC code (optional)</FormLabel>
                     <FormControl>
-                      <Input autoComplete="off" placeholder="e.g. 2106 or 9963" {...field} value={field.value ?? ""} />
+                      <Input
+                        autoComplete="off"
+                        list={categoryListId}
+                        maxLength={80}
+                        placeholder="General"
+                        {...field}
+                        value={field.value ?? ""}
+                        // Suggestions filter on the text in the box: select it so one tap shows them all.
+                        onFocus={(e) => e.target.select()}
+                      />
                     </FormControl>
-                    <FormDescription>Used for GST-ready receipts and tax exports.</FormDescription>
+                    <datalist id={categoryListId}>
+                      {categorySuggestions.map((c) => (
+                        <option key={c} value={c} />
+                      ))}
+                    </datalist>
+                    <FormDescription>
+                      Pick one or type your own, like {vocab.kind === "food" ? "Cakes or Thalis" : "Herbal teas or Oils"}.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              <div className="rounded-md border border-border">
+                <button
+                  type="button"
+                  aria-expanded={moreShown}
+                  aria-controls={moreId}
+                  onClick={() => setMoreOpen(!moreShown)}
+                  className="flex min-h-11 w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-left text-sm font-medium ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  <span>
+                    More options
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      Voice aliases, tags, HSN/SAC code, emoji
+                    </span>
+                  </span>
+                  <ChevronDown
+                    className={cn(
+                      "h-4 w-4 shrink-0 transition-transform motion-reduce:transition-none",
+                      moreShown && "rotate-180",
+                    )}
+                    aria-hidden="true"
+                  />
+                </button>
+                {/* Folded with `hidden`, not unmounted: the fields keep their values and their place in the form. */}
+                <div id={moreId} hidden={!moreShown} className="space-y-4 border-t border-border p-3">
+                  <FormField
+                    control={form.control}
+                    name="aliasesCsv"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Voice aliases</FormLabel>
+                        <FormControl>
+                          <Input
+                            autoComplete="off"
+                            placeholder={vocab.kind === "food" ? "bhel, spicy bhel" : "ashwagandha, ashwa powder"}
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormDescription>Comma-separated phrases customers might say.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="tagsCsv"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Tags</FormLabel>
+                        <FormControl>
+                          <Input
+                            autoComplete="off"
+                            autoCapitalize="none"
+                            className="h-11"
+                            placeholder={vocab.kind === "food" ? "quiche, paneer" : "herbal, gift"}
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormDescription>
+                          Comma-separated labels of your own. Offers use them to pick items, for example
+                          10% off 4 or more items tagged {vocab.kind === "food" ? "quiche" : "herbal"}.
+                        </FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="hsnCode"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>HSN/SAC code (optional)</FormLabel>
+                        <FormControl>
+                          <Input autoComplete="off" placeholder="e.g. 2106 or 9963" {...field} value={field.value ?? ""} />
+                        </FormControl>
+                        <FormDescription>Used for GST-ready receipts and tax exports.</FormDescription>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="emoji"
+                    render={({ field }) => {
+                      // A suggested (or previously saved) emoji outside the starter
+                      // grid still needs a visible, selected button.
+                      const options: string[] =
+                        field.value && !starterEmojis.includes(field.value)
+                          ? [field.value, ...starterEmojis]
+                          : [...starterEmojis];
+                      return (
+                        <FormItem>
+                          <FormLabel>Emoji</FormLabel>
+                          <FormControl>
+                            <div
+                              className="grid grid-cols-5 gap-2 sm:grid-cols-10"
+                              role="group"
+                              aria-label={vocab.foodArt ? "Pick a food emoji" : "Pick an emoji"}
+                            >
+                              {options.map((emo) => (
+                                <button
+                                  key={emo}
+                                  type="button"
+                                  className={`flex min-h-11 min-w-11 items-center justify-center rounded-md border text-lg transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 ${
+                                    field.value === emo ? "border-primary bg-primary/10" : "border-input bg-background hover:bg-accent"
+                                  }`}
+                                  aria-pressed={field.value === emo}
+                                  aria-label={`Select emoji ${emo}`}
+                                  onClick={() => {
+                                    setEmojiPicked(true);
+                                    setEmojiSuggested(false);
+                                    field.onChange(emo);
+                                  }}
+                                >
+                                  {emo}
+                                </button>
+                              ))}
+                            </div>
+                          </FormControl>
+                          {!isEdit && emojiSuggested ? (
+                            <FormDescription>Picked from the name. Tap another to change it.</FormDescription>
+                          ) : null}
+                          <FormMessage />
+                        </FormItem>
+                      );
+                    }}
+                  />
+                </div>
+              </div>
               <FormField
                 control={form.control}
                 name="isPopular"
                 render={({ field }) => (
                   <FormItem className="space-y-0">
-                    {/* The label is the 44px tap area; the box itself draws at 20px. */}
-                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
-                      <FormControl>
-                        <input
-                          type="checkbox"
-                          id="isPopular"
-                          className="h-5 w-5 shrink-0 cursor-pointer accent-primary"
-                          checked={field.value ?? false}
-                          onChange={field.onChange}
-                          aria-label="Mark as popular"
-                        />
-                      </FormControl>
-                      <span>Popular item</span>
-                    </label>
+                    <div className="flex items-center gap-3">
+                      <Switch id="isPopular" checked={field.value ?? false} onCheckedChange={field.onChange} />
+                      <label htmlFor="isPopular" className="cursor-pointer text-sm">
+                        Popular item
+                      </label>
+                    </div>
                   </FormItem>
                 )}
               />
@@ -547,20 +735,21 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
                 control={form.control}
                 name="isAvailable"
                 render={({ field }) => (
-                  <FormItem className="space-y-0">
-                    <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
-                      <FormControl>
-                        <input
-                          type="checkbox"
-                          id="isAvailable"
-                          className="h-5 w-5 shrink-0 cursor-pointer accent-primary"
-                          checked={field.value ?? true}
-                          onChange={field.onChange}
-                          aria-label="Available for sale"
-                        />
-                      </FormControl>
-                      <span>Available</span>
-                    </label>
+                  <FormItem className="space-y-1">
+                    <div className="flex items-center gap-3">
+                      <Switch
+                        id="isAvailable"
+                        checked={field.value ?? true}
+                        onCheckedChange={field.onChange}
+                        aria-describedby="isAvailable-help"
+                      />
+                      <label htmlFor="isAvailable" className="cursor-pointer text-sm">
+                        Selling now
+                      </label>
+                    </div>
+                    <p id="isAvailable-help" className="text-xs text-muted-foreground">
+                      Off: shown as sold out.
+                    </p>
                   </FormItem>
                 )}
               />
@@ -570,25 +759,36 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
                 render={({ field }) => (
                   <FormItem className="space-y-1">
                     <div className="flex flex-row items-center gap-3">
-                      <ShowOnlineSwitch
+                      <Switch
                         id="showOnline"
                         checked={field.value ?? true}
                         onCheckedChange={field.onChange}
-                        label="Show online"
-                        describedBy="showOnline-help"
+                        aria-describedby="showOnline-help"
                       />
-                      <span className="text-sm" aria-hidden="true">
+                      <label htmlFor="showOnline" className="cursor-pointer text-sm">
                         Show online
-                      </span>
+                      </label>
                     </div>
                     <p id="showOnline-help" className="text-xs text-muted-foreground">
-                      Off: stays on your counter POS, hidden from your online store.
+                      Off: sold at your counter only, hidden from your store page.
                     </p>
                   </FormItem>
                 )}
               />
             </ResponsiveDialogBody>
-            <ResponsiveDialogFooter className="flex-row md:border-t md:py-4">
+            <ResponsiveDialogFooter className="flex-row flex-wrap md:border-t md:py-4">
+              {!isEdit ? (
+                // Own row on phones, so the label never wraps beside Cancel / Create.
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="min-h-11 basis-full md:basis-auto"
+                  disabled={isSubmitting}
+                  onClick={form.handleSubmit((values) => save(values, true))}
+                >
+                  Save and add another
+                </Button>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
@@ -597,7 +797,7 @@ export function MenuItemForm({ open, onOpenChange, item, onSaved, defaultName = 
               >
                 Cancel
               </Button>
-              <Button type="submit" className="min-h-11 flex-1 md:flex-none">
+              <Button type="submit" className="min-h-11 flex-1 md:flex-none" disabled={isSubmitting}>
                 {isEdit ? "Save" : "Create"}
               </Button>
             </ResponsiveDialogFooter>

@@ -21,6 +21,7 @@ import { waitUntil } from "@vercel/functions";
 import webpush from "web-push";
 
 import { formatINR } from "@/lib/currency";
+import { dropOrdersHref } from "@/lib/drops-board";
 import { prisma } from "@/lib/prisma";
 
 export type PushPayload = {
@@ -78,7 +79,26 @@ export function newOrderPayload(o: {
   return {
     title: "🛒 New order",
     body: `${o.billNumber} · ${formatINR(o.totalPaise)} · ${plural(o.itemCount, "item", "items")}`,
-    url: o.dropId ? `/drops/${o.dropId}` : "/orders",
+    url: o.dropId ? dropOrdersHref(o.dropId) : "/orders",
+    tag: `order-${o.billNumber}`,
+  };
+}
+
+/**
+ * "New paid order": Razorpay took the money, so the order is already confirmed.
+ * Same tag as "New order", so the spoken alert treats them alike (lib/order-voice.ts).
+ * No buyer name/phone/address by design.
+ */
+export function newPaidOrderPayload(o: {
+  billNumber: string;
+  totalPaise: number;
+  itemCount: number;
+  dropId: string | null;
+}): PushPayload {
+  return {
+    title: "💰 New paid order",
+    body: `${o.billNumber} · ${formatINR(o.totalPaise)} · ${plural(o.itemCount, "item", "items")}`,
+    url: o.dropId ? dropOrdersHref(o.dropId) : "/orders",
     tag: `order-${o.billNumber}`,
   };
 }
@@ -92,8 +112,61 @@ export function paymentSubmittedPayload(o: {
   return {
     title: "💸 Customer says paid",
     body: `${o.billNumber} · ${formatINR(o.totalPaise)} — check your UPI app, then tap Payment received`,
-    url: o.dropId ? `/drops/${o.dropId}` : "/orders",
+    url: o.dropId ? dropOrdersHref(o.dropId) : "/orders",
     tag: `pay-${o.billNumber}`,
+  };
+}
+
+/** The rider tapped Delivered on their /d/ link. */
+export function riderDeliveredPayload(o: { billNumber: string; dropId: string | null }): PushPayload {
+  return {
+    title: "✅ Delivered",
+    body: `${o.billNumber} — your rider marked it delivered`,
+    url: o.dropId ? dropOrdersHref(o.dropId) : "/orders",
+    tag: `delivered-${o.billNumber}`,
+  };
+}
+
+/** The buyer tapped "I've received my order". Unpaid: the seller still confirms the cash. */
+export function buyerReceivedPayload(o: {
+  billNumber: string;
+  dropId: string | null;
+  delivered: boolean;
+}): PushPayload {
+  return {
+    title: "📦 Customer got their order",
+    body: o.delivered ? `${o.billNumber} — marked delivered` : `${o.billNumber} — collect the payment, then tap Delivered`,
+    url: o.dropId ? dropOrdersHref(o.dropId) : "/orders",
+    tag: `received-${o.billNumber}`,
+  };
+}
+
+/** A buyer rated an order. Never the comment: lock screens are public. Older orders have left the board. */
+export function orderRatedPayload(o: { billNumber: string; rating: number }): PushPayload {
+  return {
+    title: "⭐ New rating",
+    body: `${o.billNumber} — ${o.rating} out of 5`,
+    url: "/settings/feedback",
+    tag: `rated-${o.billNumber}`,
+  };
+}
+
+/** A buyer's order was refused because the store is locked. Nothing about the buyer. */
+export function storeLockedPayload(): PushPayload {
+  return {
+    title: "🔒 A customer just tried to order",
+    body: "Subscribe to reopen your store",
+    url: "/settings/billing",
+    tag: "locked-store",
+  };
+}
+
+export function orderCapPayload(): PushPayload {
+  return {
+    title: "🔒 A customer just tried to order",
+    body: "You've reached this month's order limit. Move up to keep taking orders",
+    url: "/settings/billing",
+    tag: "order-cap",
   };
 }
 

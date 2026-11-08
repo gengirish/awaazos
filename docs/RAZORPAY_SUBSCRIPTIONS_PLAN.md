@@ -27,6 +27,21 @@ Platform SaaS billing: a vendor pays AwaazOS for STARTER through the **platform*
 (`RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`). This is separate from storefront payments, which use
 each vendor's own keys (`lib/storefront-razorpay.ts`) and must stay that way.
 
+## Plans today
+
+This plan was written for one paid plan. Three are sold now (`SUBSCRIBABLE_PLANS`), and the design
+below applies to each of them:
+
+| Plan | Monthly, before GST | Razorpay amount | Yearly, before GST | Razorpay amount |
+| --- | ---: | ---: | ---: | ---: |
+| LITE | ₹599 | ₹706.82 | ₹5,990 | ₹7,068.20 |
+| STARTER | ₹649 | ₹765.82 | ₹6,490 | ₹7,658.20 |
+| PRO | ₹1,149 | ₹1,355.82 | ₹11,490 | ₹13,558.20 |
+
+Limits are in `PLAN_LIMITS` (`lib/constants.ts`). Lite has 50 orders a month and no Razorpay, counter
+billing by voice or CSV export. Stores that signed up at an earlier price keep it through
+`customPricePaise` and are offered Starter only.
+
 ## Decisions
 
 | Question | Decision |
@@ -36,7 +51,7 @@ each vendor's own keys (`lib/storefront-razorpay.ts`) and must stay that way.
 | Existing FREE vendors | **Grandfathered**: stay on FREE (50 txn/month), no trial, never locked. |
 | STARTER cap | **Unlimited** (`monthlyTxnCap: null`). Trial = paid plan, so converting changes nothing for the vendor. |
 | GST | Prices are **exclusive** of 18% GST. Charged amount = base + GST. |
-| Annual | Add now: **₹2,990/yr + GST** (10× monthly, 2 months free). |
+| Annual | Add now: **₹6,490/yr + GST** (10× monthly, 2 months free). |
 
 ### What these cost in paise
 
@@ -44,8 +59,8 @@ GST is computed in basis points like the rest of the codebase: `gst = Math.floor
 
 | Plan | Base | GST 18% | Razorpay plan `amount` |
 | --- | --- | --- | --- |
-| STARTER monthly | 29900 | 5382 | **35282** (₹352.82) |
-| STARTER yearly | 299000 | 53820 | **352820** (₹3,528.20) |
+| STARTER monthly | 64900 | 11682 | **76582** (₹765.82) |
+| STARTER yearly | 649000 | 116820 | **765820** (₹7,658.20) |
 
 Both divide exactly, so no rounding question.
 
@@ -66,7 +81,7 @@ change means new plans and a migration (Phase 0 note).
 | Lazy expiry + 3-day grace | `lib/plan.ts` (`effectivePlan`), applied once in `requireVendorRole` (`lib/rbac.ts:160`) | Good, extend |
 | Sign-up | `app/api/auth/register/route.ts` | Never sets a plan, so every vendor starts FREE |
 | Monthly txn cap | `app/api/transactions/route.ts:195`, `lib/drops.ts:377`, `lib/menu-orders.ts:160` | FREE 50, STARTER 500 |
-| Billing page | `app/(vendor)/settings/billing/page.tsx`, `components/billing/BillingManageClient.tsx` | Upgrade + cancel only |
+| Billing page | `app/(vendor)/settings/billing/page.tsx`, `components/billing/BillingManageClient.tsx` | Plan picker + cancel (`lib/billing-actions.ts`) |
 | Tests | `e2e/razorpay-subscription.spec.ts`, `lib/__tests__/razorpay-signature.test.ts` | Auth + mocked UI only |
 
 ## Bugs in the current subscription code
@@ -162,8 +177,8 @@ first charge that needs retries. Subscribing after the lock starts immediately (
 
 | Env | Razorpay plan |
 | --- | --- |
-| `RAZORPAY_PLAN_STARTER_MONTHLY` | 35282 paise, `period: monthly, interval: 1` |
-| `RAZORPAY_PLAN_STARTER_YEARLY` | 352820 paise, `period: yearly, interval: 1` |
+| `RAZORPAY_PLAN_STARTER_MONTHLY` | 76582 paise, `period: monthly, interval: 1` |
+| `RAZORPAY_PLAN_STARTER_YEARLY` | 765820 paise, `period: yearly, interval: 1` |
 
 `RAZORPAY_PLAN_STARTER` stays readable as an alias for monthly so nothing in flight breaks.
 `RAZORPAY_PLAN_PRO` is dropped from the create path. `planFromRazorpayPlanId` returns
@@ -228,7 +243,7 @@ locked 30 days after Phase 3 ships, so Phase 4 (in-app checkout) has that long t
 
 - creates the two plans in the table above, amounts computed from `PLAN_PRICES_PAISE` /
   a new `PLAN_PRICES_YEARLY_PAISE` and `GST_BPS = 1800` (read from `lib/constants.ts`, not retyped);
-- `item.name` "AwaazOS Starter (monthly)" / "(yearly)", `item.description` "₹299 + 18% GST" etc.;
+- `item.name` "AwaazOS Starter (monthly)" / "(yearly)", `item.description` "₹649 + 18% GST" etc.;
 - refuses to create a duplicate if a plan with the same name and amount exists (`plans.all`);
 - prints the ids for `RAZORPAY_PLAN_STARTER_MONTHLY` / `_YEARLY`.
 
@@ -256,8 +271,8 @@ enable all eight `subscription.*` events above.
 
 ### Phase 2 — Pricing copy
 
-`lib/plan-copy.ts` + pricing page + landing teaser: "30 days free, then ₹299/month + GST or
-₹2,990/year + GST (2 months free)". FREE leaves the marketing surface (`MARKETED_PLANS`) but stays
+`lib/plan-copy.ts` + pricing page + landing teaser: "30 days free, then ₹649/month + GST or
+₹6,490/year + GST (2 months free)". FREE leaves the marketing surface (`MARKETED_PLANS`) but stays
 in `PLAN_LIMITS` for grandfathered vendors. Billing page shows FREE only to them. Update
 `app/legal/terms` and `app/legal/refund` (auto-renewal, GST, what happens at trial end and on cancel).
 

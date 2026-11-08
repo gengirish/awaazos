@@ -15,12 +15,22 @@ import {
   restoreCartLines,
   sameCartLines,
   serializeCart,
+  savedContactUsable,
   validateCheckout,
   validateCheckoutField,
   type CheckoutInput,
 } from "@/lib/storefront-order";
 
 const NOW = Date.UTC(2026, 9, 5, 6, 30);
+
+describe("savedContactUsable", () => {
+  it("folds only a name with a real Indian mobile", () => {
+    expect(savedContactUsable("Priya", "98480 12345")).toBe(true);
+    expect(savedContactUsable("  ", "98480 12345")).toBe(false);
+    expect(savedContactUsable("Priya", "123")).toBe(false);
+    expect(savedContactUsable("", "")).toBe(false);
+  });
+});
 
 describe("cartStorageKey", () => {
   it("scopes menu and per-drop carts by store", () => {
@@ -131,6 +141,9 @@ describe("parseSavedBuyer", () => {
       name: "Priya",
       phone: "98480 12345",
       address: "",
+      locality: "",
+      landmark: "",
+      pincode: "",
       fulfilment: "PICKUP",
       savedAt: 5,
     });
@@ -141,6 +154,9 @@ describe("parseSavedBuyer", () => {
       name: "Ravi",
       phone: "",
       address: "Flat 2",
+      locality: "",
+      landmark: "",
+      pincode: "",
       fulfilment: null,
       savedAt: 0,
     });
@@ -158,8 +174,12 @@ describe("checkout validation", () => {
     name: "Priya",
     phone: "98480 12345",
     address: "",
+    locality: "",
+    pincode: "",
     fulfilment: "PICKUP",
     method: "CASH",
+    slotRequired: false,
+    slot: null,
   };
 
   it("accepts a complete pickup order", () => {
@@ -167,11 +187,23 @@ describe("checkout validation", () => {
   });
 
   it("reports every invalid field at once, in visual order", () => {
-    const errors = validateCheckout({ name: "  ", phone: "123", address: " ", fulfilment: "DELIVERY", method: null });
+    const errors = validateCheckout({
+      ...valid,
+      name: "  ",
+      phone: "123",
+      address: " ",
+      pincode: "1234",
+      fulfilment: "DELIVERY",
+      method: null,
+      slotRequired: true,
+    });
     expect(errors).toEqual({
       name: "Please enter your name.",
       phone: "Enter a valid 10-digit +91 mobile number.",
-      address: "Please enter a delivery address.",
+      slot: CHECKOUT_FIELD_MESSAGES.slot,
+      address: CHECKOUT_FIELD_MESSAGES.address,
+      locality: CHECKOUT_FIELD_MESSAGES.locality,
+      pincode: CHECKOUT_FIELD_MESSAGES.pincode,
       payment: CHECKOUT_FIELD_MESSAGES.payment,
     });
     expect(firstInvalidField(errors)).toBe("name");
@@ -185,6 +217,21 @@ describe("checkout validation", () => {
       CHECKOUT_FIELD_MESSAGES.address,
     );
     expect(validateCheckoutField("address", { ...valid, fulfilment: "DELIVERY", address: "Flat 2" })).toBeNull();
+    expect(validateCheckoutField("locality", { ...valid, fulfilment: "PICKUP" })).toBeNull();
+    expect(validateCheckoutField("locality", { ...valid, fulfilment: "DELIVERY", locality: "Kondapur" })).toBeNull();
+  });
+
+  it("pincode is optional, 6 digits when given", () => {
+    const delivery = { ...valid, fulfilment: "DELIVERY" as const };
+    expect(validateCheckoutField("pincode", { ...delivery, pincode: "" })).toBeNull();
+    expect(validateCheckoutField("pincode", { ...delivery, pincode: "500084" })).toBeNull();
+    expect(validateCheckoutField("pincode", { ...delivery, pincode: "50008" })).toBe(CHECKOUT_FIELD_MESSAGES.pincode);
+  });
+
+  it("requires a slot only when the store has slots", () => {
+    expect(validateCheckoutField("slot", valid)).toBeNull();
+    expect(validateCheckoutField("slot", { ...valid, slotRequired: true })).toBe(CHECKOUT_FIELD_MESSAGES.slot);
+    expect(validateCheckoutField("slot", { ...valid, slotRequired: true, slot: "2026-11-06T06:30:00.000Z" })).toBeNull();
   });
 
   it("recognises Indian mobiles in the usual shapes", () => {

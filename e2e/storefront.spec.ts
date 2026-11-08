@@ -105,6 +105,241 @@ test.describe("public storefront", () => {
     }
   });
 
+  test("the store's own staff get Dashboard, not the buyer Sign in", async ({ page, request, browser }) => {
+    await createVendorSession(page, request, "storefront-staff", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, { name: "Owner Chai", priceInRupees: 15 });
+    await setPublished(page, true);
+
+    // Signed in as the owner: one tap back to the app, no buyer sign-in.
+    await page.goto(`/s/${slug}`);
+    const dashboard = page.getByRole("link", { name: "Dashboard", exact: true });
+    await expect(dashboard).toHaveAttribute("href", "/home");
+    await expect(page.getByRole("link", { name: "Sign in", exact: true })).toHaveCount(0);
+    await expect(page.getByRole("link", { name: /back to the top of/i })).toHaveAttribute("href", "#store-top");
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const anonPage = await anon.newPage();
+    try {
+      await anonPage.goto(`/s/${slug}`);
+      await expect(anonPage.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
+      await expect(anonPage.getByRole("link", { name: "Dashboard", exact: true })).toHaveCount(0);
+    } finally {
+      await anon.close();
+    }
+  });
+
+  test("search filters the menu as the buyer types, read-only and orderable", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    await createVendorSession(page, request, "storefront-search", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, { name: "Chocolate Truffle Cake", priceInRupees: 650, category: "Cakes" });
+    await createMenuItem(page, {
+      name: "Ragi Laddu",
+      priceInRupees: 25,
+      category: "Sweets",
+      description: "No sugar, made with jaggery",
+      aliasesCsv: "millet ball",
+    });
+    await setPublished(page, true);
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const buyer = await anon.newPage();
+    const search = async (query: string) => {
+      await buyer.getByRole("button", { name: "Search items" }).click();
+      await buyer.getByRole("searchbox", { name: "Search items" }).fill(query);
+    };
+    try {
+      // Read-only menu.
+      await buyer.goto(`/s/${slug}`);
+      await search("choc cake");
+      await expect(buyer.getByText("Chocolate Truffle Cake")).toBeVisible();
+      await expect(buyer.getByText("Ragi Laddu")).toHaveCount(0);
+      // The description matches; voice aliases stay off the public page.
+      await buyer.getByRole("searchbox", { name: "Search items" }).fill("jaggery");
+      await expect(buyer.getByText("Ragi Laddu").first()).toBeVisible();
+      await expect(buyer.getByText("Chocolate Truffle Cake")).toHaveCount(0);
+      await buyer.getByRole("searchbox", { name: "Search items" }).fill("millet");
+      await expect(buyer.getByText(/No items match/)).toBeVisible();
+      expect(await buyer.content()).not.toContain("millet ball");
+      await buyer.getByRole("searchbox", { name: "Search items" }).fill("biryani");
+      await expect(buyer.getByText(/No items match/)).toBeVisible();
+      await buyer.getByRole("button", { name: "Clear search" }).click();
+      await expect(buyer.getByText("Ragi Laddu").first()).toBeVisible();
+
+      // Orderable menu: rows hide, the cart keeps what was added.
+      const on = await page.request.patch("/api/vendor", {
+        data: { acceptMenuOrders: true, acceptPayOnDelivery: true },
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(on.ok(), "turning on menu orders").toBe(true);
+      await buyer.goto(`/s/${slug}`);
+      await buyer.getByRole("button", { name: "Add Ragi Laddu", exact: true }).click();
+      await search("sweets");
+      await expect(buyer.getByText("Ragi Laddu").first()).toBeVisible();
+      await expect(buyer.getByText("Chocolate Truffle Cake")).toHaveCount(0);
+      await buyer.getByRole("button", { name: "Close search" }).click();
+      await expect(buyer.getByText("Chocolate Truffle Cake")).toBeVisible();
+      await expect(buyer.getByRole("button", { name: "Checkout", exact: true })).toBeVisible();
+    } finally {
+      await anon.close();
+    }
+  });
+
+  test("Settings sets an 'Other' store type and a corrected place on the store page", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    await createVendorSession(page, request, "storefront-details", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, { name: "Mango Pickle", priceInRupees: 180 });
+    await setPublished(page, true);
+
+    // OTHER without the seller's words is refused.
+    const bare = await page.request.patch("/api/vendor", {
+      data: { stallType: "OTHER" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(bare.status()).toBe(400);
+
+    await page.goto("/settings/store");
+    await page.getByLabel("What do you sell?").selectOption("OTHER");
+    await page.getByLabel("Describe your business").fill("Pickles & podis");
+    await page.getByLabel("Area and city").fill("Sahakar Nagar, Bengaluru");
+    await page.getByLabel("State", { exact: true }).fill("");
+    // Wait for the write itself: other forms on this page already read "Saved".
+    const saved = page.waitForResponse((r) => r.url().endsWith("/api/vendor") && r.request().method() === "PATCH");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    expect((await saved).ok()).toBe(true);
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const buyer = await anon.newPage();
+    try {
+      await buyer.goto(`/s/${slug}`);
+      await expect(buyer.getByText("Pickles & podis", { exact: true })).toBeVisible();
+      await expect(buyer.getByText("Sahakar Nagar, Bengaluru", { exact: true })).toBeVisible();
+      await expect(buyer.getByText(/Telangana/)).toHaveCount(0);
+    } finally {
+      await anon.close();
+    }
+  });
+
+  test("items without a photo show a drawing of the dish, served without a session", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    await createVendorSession(page, request, "storefront-food-img", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, { name: "Chocolate Truffle Cake", priceInRupees: 650, category: "Cakes" });
+    await createMenuItem(page, { name: "Grandma's Special", priceInRupees: 90, category: "Specials" });
+    await setPublished(page, true);
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const buyer = await anon.newPage();
+    try {
+      await buyer.goto(`/s/${slug}`);
+      const cakeRow = buyer.getByRole("listitem").filter({ hasText: "Chocolate Truffle Cake" });
+      await expect(cakeRow.locator('img[src*="food%2Fcake.webp"], img[src*="/food/cake.webp"]')).toHaveCount(1);
+      // No drawing matches: the emoji stays.
+      const specialRow = buyer.getByRole("listitem").filter({ hasText: "Grandma's Special" });
+      await expect(specialRow.locator("img")).toHaveCount(0);
+
+      // Public file: no redirect to sign-in for a buyer with no session.
+      const file = await anon.request.get("/food/cake.webp", { maxRedirects: 0 });
+      expect(file.status()).toBe(200);
+      expect(file.headers()["content-type"]).toContain("image/webp");
+    } finally {
+      await anon.close();
+    }
+  });
+
+  test("a goods store gets a tagline, product descriptions and a photo gallery; a kitchen keeps rows", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    test.setTimeout(120_000);
+    await createVendorSession(page, request, "storefront-goods", "/menu");
+    const slug = await vendorSlug(page);
+    await createMenuItem(page, {
+      name: "Karungali Mala",
+      priceInRupees: 799,
+      category: "Malas",
+      description: "  8 mm Karungali beads,\n108 count  ",
+    });
+    await setPublished(page, true);
+
+    // A kitchen (the sign-up default type) lists rows: no gallery grid, description under the name.
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const buyer = await anon.newPage();
+    try {
+      await buyer.goto(`/s/${slug}`);
+      await expect(buyer.getByText("8 mm Karungali beads, 108 count", { exact: true })).toBeVisible();
+      await expect(buyer.locator("ul.grid")).toHaveCount(0);
+    } finally {
+      await anon.close();
+    }
+
+    // The owner describes the store as goods and adds a tagline in Settings → Online store.
+    const typed = await page.request.patch("/api/vendor", {
+      data: { stallType: "OTHER", stallTypeOther: "Holistic wellness products" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(typed.status()).toBe(200);
+    await page.goto("/settings/store");
+    const card = page.getByRole("region", { name: "Tagline" });
+    const input = card.getByRole("textbox", { name: /tagline/i });
+    await input.fill("  Energised crystals and malas,  made in Hyderabad ");
+    await card.getByRole("button", { name: "Save" }).click();
+    await expect(card.getByRole("button", { name: "Saved" })).toBeVisible();
+
+    // One character is refused by the API with a field message; too long too.
+    const short = await page.request.patch("/api/vendor", {
+      data: { tagline: "x" },
+      headers: { "Content-Type": "application/json" },
+      failOnStatusCode: false,
+    });
+    expect(short.status()).toBe(400);
+    const long = await page.request.patch("/api/vendor", {
+      data: { tagline: "x".repeat(121) },
+      headers: { "Content-Type": "application/json" },
+      failOnStatusCode: false,
+    });
+    expect(long.status()).toBe(400);
+
+    const anon2 = await browser.newContext(CONTEXT_OPTIONS);
+    const buyer2 = await anon2.newPage();
+    try {
+      await buyer2.goto(`/s/${slug}`);
+      await expect(buyer2.getByText("Energised crystals and malas, made in Hyderabad", { exact: true })).toBeVisible();
+      await expect(buyer2.getByText("8 mm Karungali beads, 108 count", { exact: true })).toBeVisible();
+      // Goods: the category is a two-column gallery grid; without a photo there is nothing to enlarge.
+      await expect(buyer2.locator("ul.grid")).toHaveCount(1);
+      await expect(buyer2.getByRole("button", { name: /see the photo of/i })).toHaveCount(0);
+      // The link preview carries the tagline.
+      await expect(buyer2.locator('meta[name="description"]')).toHaveAttribute(
+        "content",
+        /^Energised crystals and malas, made in Hyderabad · /,
+      );
+    } finally {
+      await anon2.close();
+    }
+
+    // Clearing the tagline removes the line.
+    const cleared = await page.request.patch("/api/vendor", {
+      data: { tagline: "" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(cleared.status()).toBe(200);
+    const me = (await (await page.request.get("/api/vendor")).json()) as { vendor: { settings: { tagline: string | null } } };
+    expect(me.vendor.settings.tagline).toBeNull();
+  });
+
   test("an unknown slug 404s", async ({ page }) => {
     const res = await page.goto("/s/no-such-stall-abcxyz");
     expect(res?.status()).toBe(404);
@@ -169,6 +404,63 @@ test.describe("public storefront", () => {
       await anonPage.goto(`/s/${slug}`);
       await expect(anonPage.getByRole("heading", { name: /scan to pay/i })).toBeVisible();
       await expect(anonPage.getByRole("img", { name: /UPI QR code/i })).toBeVisible();
+    } finally {
+      await anon.close();
+    }
+  });
+
+  test("a store with nothing available says orders will open soon, with no open-amount QR", async ({
+    page,
+    request,
+    browser,
+  }) => {
+    await createVendorSession(page, request, "storefront-empty", "/menu");
+    const slug = await vendorSlug(page);
+    const item = await createMenuItem(page, { name: "Resting Ragi Laddu", priceInRupees: 30 });
+    const off = await page.request.patch(`/api/menu/${item.id}`, {
+      data: { isAvailable: false },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(off.ok(), "marking the only item unavailable").toBe(true);
+    const upi = await page.request.patch("/api/vendor", {
+      data: { upiId: "e2e-empty@okaxis", upiName: "E2E Empty" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(upi.ok(), "saving a UPI ID").toBe(true);
+    await setPublished(page, true);
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    const anonPage = await anon.newPage();
+    const heading = anonPage.getByRole("heading", { name: "Orders will open soon" });
+    const whatsappButton = anonPage.locator("main").getByRole("link", { name: "WhatsApp" });
+    try {
+      await anonPage.goto(`/s/${slug}`);
+      await expect(heading).toBeVisible();
+      await expect(anonPage.getByText(/Please check back soon/)).toBeVisible();
+      await expect(whatsappButton).toHaveCount(0);
+      await expect(anonPage.getByRole("heading", { name: /scan to pay/i })).toHaveCount(0);
+      await expect(anonPage.getByRole("link", { name: /scan & pay/i })).toHaveCount(0);
+      await expect(anonPage.getByRole("img", { name: /UPI QR code/i })).toHaveCount(0);
+
+      // WhatsApp on the store: the message points the buyer at it.
+      const contact = await page.request.patch("/api/vendor", {
+        data: { whatsappNumber: "9848012345", showWhatsappOnStore: true },
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(contact.ok(), "showing WhatsApp on the store").toBe(true);
+      await anonPage.goto(`/s/${slug}`);
+      await expect(anonPage.getByText(/Message them on WhatsApp to hear when orders open/)).toBeVisible();
+      await expect(whatsappButton).toHaveAttribute("href", /^https:\/\/wa\.me\/919848012345/);
+
+      // An item back on sale: the read-only menu keeps its QR.
+      const on = await page.request.patch(`/api/menu/${item.id}`, {
+        data: { isAvailable: true },
+        headers: { "Content-Type": "application/json" },
+      });
+      expect(on.ok(), "marking the item available again").toBe(true);
+      await anonPage.goto(`/s/${slug}`);
+      await expect(heading).toHaveCount(0);
+      await expect(anonPage.getByRole("heading", { name: /scan to pay/i })).toBeVisible();
     } finally {
       await anon.close();
     }

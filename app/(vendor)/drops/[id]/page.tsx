@@ -1,49 +1,16 @@
-import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { redirect } from "next/navigation";
 
-import { OrdersBoard } from "@/components/drops/orders/OrdersBoard";
-import { loadDropBoard } from "@/lib/drops-board-server";
-import { getDropOrderSignal } from "@/lib/drops-signal";
-import { AuthError, requireVendorRole } from "@/lib/rbac";
-
-export const dynamic = "force-dynamic";
+import { dropOrdersHref } from "@/lib/drops-board";
 
 type Props = { params: Promise<{ id: string }> };
 
-export const metadata = { title: "Drop orders · AwaazOS" };
-
-export default async function DropOrdersPage(props: Props) {
-  const params = await props.params;
-  let ctx: Awaited<ReturnType<typeof requireVendorRole>>;
-  try {
-    ctx = await requireVendorRole("CASHIER");
-  } catch (e) {
-    if (e instanceof AuthError) redirect("/sign-in");
-    throw e;
-  }
-
-  // Signal first, so an order landing between the reads triggers a refetch.
-  const signal = await getDropOrderSignal(ctx.vendor.id, params.id);
-  const board = await loadDropBoard(ctx.vendor.id, params.id);
-  if (!board) notFound();
-
-  return (
-    <main id="main" className="bg-background p-4 pb-16 md:p-6">
-      <a href="#orders-list" className="sr-only focus:not-sr-only">
-        Skip to orders
-      </a>
-      <nav aria-label="Breadcrumb" className="mx-auto mb-1 max-w-3xl text-sm md:mb-3">
-        <Link href="/drops" className="inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline">
-          ← All drops
-        </Link>
-      </nav>
-      <OrdersBoard
-        vendorName={ctx.vendor.name}
-        vendorSlug={ctx.vendor.slug}
-        source={{ kind: "drop", initialDrop: board.drop }}
-        initialOrders={board.orders}
-        initialSignal={signal}
-      />
-    </main>
-  );
+/**
+ * A drop's orders live on the one orders board (`/orders`), narrowed to the
+ * drop. This path stays so old links, bookmarks and push alerts already on a
+ * phone still land in the right place; `/orders` does the auth and tenant
+ * checks, and an id that is not this vendor's just shows the whole board.
+ */
+export default async function DropOrdersRedirect(props: Props) {
+  const { id } = await props.params;
+  redirect(dropOrdersHref(id));
 }

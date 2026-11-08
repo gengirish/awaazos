@@ -56,3 +56,19 @@ export function buildDropShareText(input: DropShareInput): string {
 export function buildWhatsAppShareUrl(text: string): string {
   return `https://wa.me/?text=${encodeURIComponent(text)}`;
 }
+
+/**
+ * The device's share sheet, else a wa.me link. A dismissed sheet (AbortError) is
+ * not an error; a refused one falls through to WhatsApp. Call it from a tap.
+ */
+export async function shareOrOpenWhatsApp({ title, text, url }: { title: string; text: string; url: string }): Promise<void> {
+  if (typeof navigator.share === "function") {
+    try {
+      await navigator.share({ title, text, url });
+      return;
+    } catch (err) {
+      if (err instanceof Error && err.name === "AbortError") return;
+    }
+  }
+  window.open(buildWhatsAppShareUrl(text), "_blank", "noopener,noreferrer");
+}

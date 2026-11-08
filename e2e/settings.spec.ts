@@ -13,6 +13,7 @@ import { createMenuItem, createVendorSession } from "./helpers/vendor";
 const ROWS = [
   { title: "Online store", path: "/settings/store", heading: "Online store" },
   { title: "Online orders", path: "/settings/orders", heading: "Online orders" },
+  { title: "Offers", path: "/settings/offers", heading: "Offers" },
   { title: "Payments", path: "/settings/payments", heading: "Payments" },
   { title: "Receipts", path: "/settings/receipts", heading: "Receipts" },
   { title: "Counter & voice", path: "/settings/voice", heading: "Counter & voice" },
@@ -53,6 +54,14 @@ test.describe("settings hub", () => {
     await expect(hubRow(page, "Counter & voice")).toContainText("English");
     await expect(hubRow(page, "Plan & billing")).toContainText("Free trial · 30 days left");
 
+    const hub = page.getByRole("navigation", { name: "Settings sections" });
+    await expect(hub.getByRole("heading", { level: 2 })).toHaveText([
+      "Your store",
+      "Money",
+      "Phone & counter",
+      "Help us improve",
+    ]);
+
     const checklist = page.getByRole("region", { name: /setup checklist/i });
     await expect(checklist).toBeVisible();
     await expect(checklist.getByRole("link", { name: /publish your online store/i })).toBeVisible();
@@ -65,13 +74,9 @@ test.describe("settings hub", () => {
       await hubRow(page, row.title).click();
       await expect(page).toHaveURL(new RegExp(`${row.path}$`));
       await expect(page.getByRole("heading", { level: 1, name: row.heading })).toBeVisible();
-      // Desktop (md+): the sidebar marks the current page. Phones have no sidebar —
-      // they get the "← Settings" back link instead (covered in the phone test).
-      if ((page.viewportSize()?.width ?? 0) >= 768) {
-        await expect(
-          page.getByRole("navigation", { name: "Settings", exact: true }).getByRole("link", { name: row.title }),
-        ).toHaveAttribute("aria-current", "page");
-      }
+      // Same on every screen: no side menu, a back link to the hub.
+      await expect(page.getByRole("navigation", { name: "Settings", exact: true })).toHaveCount(0);
+      await expect(page.getByRole("main").getByRole("link", { name: "Settings", exact: true })).toBeVisible();
     }
 
     // Fix both checklist items through the checklist's own links.
@@ -87,7 +92,33 @@ test.describe("settings hub", () => {
 
     await page.goto("/settings");
     await expect(hubRow(page, "Online store")).toContainText("Live · /s/");
+    // Both are ticked off. What is left is something to order from: no drop yet,
+    // and "order from menu" is off. The live store link now sits in the card.
+    await expect(checklist.getByRole("link", { name: /publish your online store/i })).toHaveCount(0);
+    await expect(checklist.getByRole("link", { name: /UPI ID or allow pay on delivery/i })).toHaveCount(0);
+    await expect(checklist.getByRole("link", { name: /create your first drop/i })).toBeVisible();
+    await expect(checklist.getByRole("button", { name: "Copy link" })).toBeVisible();
+  });
+
+  test("desktop: the FSSAI reminder strip is on the hub, and the back link is 44 px tall", async ({ page, request }) => {
+    await createVendorSession(page, request, "settings-desktop", "/settings");
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await createMenuItem(page, { name: "Masala Dosa", priceInRupees: 70 });
+    const patched = await page.request.patch("/api/vendor", {
+      data: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true },
+    });
+    expect(patched.status()).toBe(200);
+
+    await page.goto("/settings");
+    await expect(page.getByRole("link", { name: /add your FSSAI number/i })).toBeVisible();
     await expect(page.getByRole("region", { name: /setup checklist/i })).toHaveCount(0);
+
+    await hubRow(page, "Payments").click();
+    await expect(page.getByRole("heading", { level: 1, name: "Payments" })).toBeVisible();
+    const back = page.getByRole("main").getByRole("link", { name: "Settings", exact: true });
+    expect((await back.boundingBox())!.height).toBeGreaterThanOrEqual(44);
+    await back.click();
+    await expect(page).toHaveURL(/\/settings$/);
   });
 
   test("old /settings#anchor links land on the matching section", async ({ page, request }) => {
@@ -203,6 +234,55 @@ test.describe("settings hub", () => {
       failOnStatusCode: false,
     });
     expect(blank.status()).toBe(400);
+  });
+
+  test("store colour: one tap saves it, the store page carries it, the API rejects an unknown one", async ({
+    page,
+    request,
+  }) => {
+    test.setTimeout(120_000);
+    await createVendorSession(page, request, "store-colour", "/settings/store");
+
+    const me = (await (await page.request.get("/api/vendor")).json()) as { vendor: { slug: string } };
+
+    const card = page.getByRole("region", { name: "Store colour" });
+    const group = card.getByRole("group", { name: "Store colour" });
+    await expect(group.getByRole("radio", { name: "Saffron" })).toBeChecked();
+
+    // Every swatch is a 44 px tap target (the label wraps the hidden radio).
+    const purpleSwatch = group.locator("label").filter({ hasText: "Purple" });
+    const box = await purpleSwatch.boundingBox();
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+
+    await purpleSwatch.click();
+    await expect(page.getByText("Store colour: Purple.")).toBeVisible();
+    await page.reload();
+    await expect(page.getByRole("radio", { name: "Purple" })).toBeChecked();
+
+    const publish = await page.request.patch("/api/vendor", {
+      data: { publishStorefront: true },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(publish.status()).toBe(200);
+    await page.goto(`/s/${me.vendor.slug}`);
+    await expect(page.locator("#store-top")).toHaveAttribute("data-theme", "purple");
+
+    // Back to the default: the attribute goes away, the brand primary applies.
+    const reset = await page.request.patch("/api/vendor", {
+      data: { theme: "orange" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(reset.status()).toBe(200);
+    await page.reload();
+    await expect(page.locator("#store-top")).not.toHaveAttribute("data-theme", /./);
+
+    const bad = await page.request.patch("/api/vendor", {
+      data: { theme: "pink" },
+      headers: { "Content-Type": "application/json" },
+      failOnStatusCode: false,
+    });
+    expect(bad.status()).toBe(400);
   });
 
   test("online store has a banner & logo card; the upload routes validate before storing", async ({ page, request }) => {

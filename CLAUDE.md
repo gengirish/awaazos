@@ -2,8 +2,10 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-AwaazOS is multi-tenant pre-ordering and billing for Instagram-based cloud kitchens (ICP in
-`docs/ICP.md`): storefront link in bio → Drops with a cut-off → UPI → orders board and prep sheet.
+AwaazOS is multi-tenant pre-ordering and billing for Instagram and WhatsApp home sellers: cloud
+kitchens first (ICP in `docs/ICP.md`), other home businesses too (the first, from 2026-10-31, sells
+holistic wellness products): storefront link in bio → Drops with a cut-off → UPI → orders board
+and prep sheet.
 It began as a voice-first counter POS (vendor speaks "do samosa aur ek chai" → Claude parses it
 against the menu → UPI QR → WhatsApp receipt); that path still ships.
 
@@ -19,7 +21,9 @@ npm run build          # next build
 npm run e2e            # playwright (auto-starts dev server unless BASE_URL is set)
 npm run perf:budget    # after a build: first-load JS per route vs perf-budget.json (CI gate)
 
-npx prisma db push     # apply schema to Neon (no migration files and no seed script in this repo)
+npx prisma migrate dev --name <change>   # schema change → new prisma/migrations/<ts>_<change>/migration.sql (local DB)
+npx prisma migrate deploy                # apply pending migrations to Neon (DIRECT_URL), BEFORE merging
+npx prisma db push     # throwaway/e2e databases only (no seed script in this repo)
 npm run db:studio
 
 # Single test / single case
@@ -48,8 +52,10 @@ docker rm -f awaazos-e2e     # when done
 ```
 
 Exported vars win: Next does not overwrite an env var that is already set.
-`BASE_URL=https://…` runs the read-only specs against a deployment, but the
-vendor-creating specs will write to whatever database that deployment uses.
+`e2e/global-setup.ts` enforces this: a run stops before any spec if `DATABASE_URL` (exported, or in a
+`.env` file when not exported) isn't local, if `BASE_URL` is production, or if `BASE_URL` is any other
+deployment without `E2E_ALLOW_REMOTE=1`, because the vendor-creating specs write to that deployment's
+database. `e2e/mobile-sweep.spec.ts` runs on the `mobile` project only (44 px is a coarse-pointer rule).
 
 ### Golden tests (LLM/ASR regression harness)
 
@@ -81,7 +87,7 @@ round-trips against a live STT provider, for checking credentials/connectivity.
 | --- | --- |
 | **Vercel** | Next.js App Router, all `/api/*` (Node runtime), edge middleware |
 | **Fly.io (BOM)** | BullMQ workers — `workers/` — plus `services/whisper-stt` (optional Python ASR) |
-| **Neon** | Postgres. `DATABASE_URL` = pooled, `DIRECT_URL` = direct (`prisma db push`) |
+| **Neon** | Postgres. `DATABASE_URL` = pooled, `DIRECT_URL` = direct (`prisma migrate deploy`) |
 
 Vercel deploys through the Git integration: `vercel.json`'s `ignoreCommand` skips every non-production
 build, so preview deployments are off and a push to `main` is a production deploy. The Fly worker app
@@ -101,7 +107,32 @@ BullMQ queues in production.
 
 `.vercelignore` excludes `workers/` from the Vercel build.
 
+### Schema changes ship as migrations
+
+Every `schema.prisma` change comes with its SQL in `prisma/migrations/` (Prisma Migrate). `0_init`
+is a baseline of the schema as of 2026-10-21 and was never run on Neon — it is marked applied there
+(`prisma migrate resolve --applied 0_init`). Merging is a production deploy and nothing runs
+migrations on deploy, so `prisma migrate deploy` against Neon must finish **before** the PR merges;
+otherwise every query that selects a missing column or table 500s. Don't edit a migration that has
+been applied; add a new one. Check a branch: `prisma migrate diff --from-migrations prisma/migrations
+--to-schema-datamodel prisma/schema.prisma --shadow-database-url <throwaway> --exit-code` (0 = in sync).
+
 ## Architecture
+
+### Store wording: kitchens and everyone else (`lib/store-vocabulary.ts`)
+
+The app's words for the catalogue follow `Vendor.stallType`. `storeKind()` sorts every type into
+`food` (kitchens, bakeries, cafés, sweets, catering, street food, carnival, school canteen, and
+`GENERAL`, the sign-up default most existing kitchens carry) or `goods` (Other, Kirana, Clothing,
+Services, Event pop-up), and `storeVocabulary()` returns that kind's words: "Menu" / "Products",
+"dish" / "product", "Prep sheet" / "Packing list", "Order from menu" / "Order any time". **Wording
+only**: routes (`/menu`), models (`MenuItem`), API fields and settings (`acceptMenuOrders`) keep
+their names. The shell gets `storeKind` from `getShellContext()`, Settings pages from
+`requireSettingsContext()`; client components take a `storeKind` prop. Fixed copy (the Help guide,
+the setup checklist, Settings section blurbs) holds `{token}`s filled by `fillVocabulary()`; read
+the guide only through `helpTopicsForRole(role, published, kind)` / `helpGroupsFor` /
+`orderJourneyFor` / `helpScreenSummary`. A kitchen must read exactly as before; new copy that names
+the catalogue goes through the vocabulary, not a literal "menu" or "dish".
 
 ### Voice pipeline: STT and NLU are deliberately separate (see ARCHITECTURE.md §3 ADR)
 
@@ -202,39 +233,75 @@ storefront surface** — unauthenticated, and no longer read-only (buyers place 
 | `/s/[slug]/o/[token]` | Buyer's order page (status, UPI pay, "I've paid" claim) |
 | `/s/[slug]/account` | Signed-in buyer's own orders/profile |
 | `/r/[token]` | Customer receipt page (see "Receipt module"; not gated on `publishStorefront`) |
-| `/api/s/**` | Order placement, UTR submit, vendor-Razorpay start/verify, buyer magic-link auth |
+| `/d/[token]` + `POST /api/d/[token]` | Rider's "Delivered" link (see "Delivery handoff"; not gated on `publishStorefront`) |
+| `/survey` + `POST /api/survey` | Public seller survey: collects answers, shows nothing back (see "Owner survey"; no store involved) |
+| `/c/[slug]` | Community page: links to the listed stores of one housing society (see "Community pages") |
+| `/api/s/**` | Order placement, UTR submit, "I've received my order", order rating, vendor-Razorpay start/verify, buyer magic-link auth |
 | `/api/webhooks/razorpay-orders/[vendorId]` | Per-vendor Razorpay webhook (vendor's own secret) |
+| `/api/webhooks/razorpay-partner` | Partner-app webhook for "Connect Razorpay" stores (platform secret) |
 
 Rules every one of them follows:
 
+- The store link is `Vendor.slug`, chosen by the owner: the sign-up form's "Store link" field
+  (pre-filled from the store name, live availability from `GET /api/auth/store-handle`, public and
+  IP-limited) and Settings → Online store → Store link (`PATCH /api/vendor { slug }`, OWNER, 409
+  `store_handle_taken`). Rules in `lib/store-handle.ts` (3–40 chars, `[a-z0-9-]`, reserved words);
+  a register call without `storeHandle` still gets the random-suffix slug from `lib/store-slug.ts`
+  (demo stores, e2e helper). Changing the link retires the old one at once — nothing redirects — and
+  the `awz_vendor` cookie (it holds the slug) is re-set by the PATCH response.
 - Gated on `VendorSettings.publishStorefront` (default `false`); not opted in → **404, not 403**.
 - Prisma `select` is a hand-written allowlist. `Vendor.phone` / `Vendor.email` never appear.
 - Store banner and logo (`Vendor.bannerUrl` / `logoUrl`): OWNER-only `POST`/`DELETE /api/vendor/banner`
   and `/api/vendor/logo` (`lib/store-image.ts`), edited in Settings → Online store. Upload rules (4 MB,
   JPEG/PNG/WebP, validate before Blob) are shared with menu photos in `lib/blob-image.ts`; the browser
   shrinks photos first (`lib/image-downscale.ts`). No Blob token → 503. The banner is decorative
-  (`alt=""`); without one the header keeps its theme gradient.
+  (`alt=""`); without one the header keeps its theme gradient. A background tile
+  (`Vendor.backgroundUrl`, `/api/vendor/background`, same rules, seller's own routes only, not demo stores)
+  repeats across `/s/[slug]` under a wash of the page colour (`storeBackgroundStyle`, `lib/store-background.ts`).
+- Store colour (`VendorSettings.theme`, `lib/store-theme.ts`) and tagline (`VendorSettings.tagline`,
+  `lib/store-tagline.ts`) are OWNER settings in Settings → Online store via `PATCH /api/vendor`. The
+  tagline is one line under the store name, the link-preview description and a line on the share
+  image. `MenuItem.description` (≤ 200 chars, item form) is one line under the item's name. Neither
+  reaches the voice prompt (`stableMenuJson()` selects its fields). A goods store (`storeKind() ===
+  "goods"`) lists items as a photo gallery (two columns, tap to enlarge,
+  `components/storefront/ItemPhoto.tsx`); a kitchen keeps the rows.
 - The vendor's WhatsApp number reaches a public page only through `buyerWhatsappNumber()`
   (`lib/storefront-order.ts`): `VendorSettings.whatsappNumber`, and only once the vendor opts in
   with `acceptWhatsappOrders` (default `false`; Settings → Online orders). A saved number is not
   consent — onboarding pre-fills it from the sign-up phone.
+- The `/s/[slug]` header has two contact links. WhatsApp goes through `storeWhatsappNumber()`
+  (same file) and its own opt-in, `showWhatsappOnStore` (default `false`) — every visitor sees it,
+  not only buyers, so `acceptWhatsappOrders` does not imply it. Instagram is
+  `VendorSettings.instagramHandle` (Settings → Online store), stored bare and linked only through
+  `instagramProfileUrl()` (`lib/instagram.ts`); saving a handle publishes it.
 - Order pages are keyed on `Transaction.orderToken` alone (192-bit random, `generateOrderToken()`),
   always looked up together with the slug's `vendorId`. Never expose or accept a transaction `id`.
 - Every write is IP rate-limited (`makeLimiter` in `lib/ratelimit.ts`; buyer login also per-email).
+- Each store installs as **its own app** for buyers (`lib/store-app.ts`): `app/s/[slug]/layout.tsx` swaps the root
+  (seller) manifest for `/s/<slug>/manifest.webmanifest` (`id`/`scope`/`start_url` = `/s/<slug>`, store name and
+  colour) and icons from `/s/<slug>/app-icon/<180|192|512>`, both behind the publish gate. `StoreInstall` (store page
+  and order page, not demo stores) is a view over `useInstallPrompt`, with its own per-store close; inside Instagram on
+  Android it offers "Open in Chrome". Never link the root manifest from `/s/**`: buyers would install the seller app.
+- No `loading.tsx` under `app/s` or `app/r`: it streams the page, so `notFound()` would answer 200
+  instead of 404. `not-found.tsx` / `error.tsx` there read no data and say the same thing for every miss.
+- The buyer's device remembers recent orders in localStorage (`components/storefront/recent-orders.ts`:
+  token, bill number, date — never PII). The order page refreshes on tab-visible / `pageshow` and a
+  "Check for update" button, never on a timer.
 - No buyer PII (phone, name, address, UTR, email) in logs, Sentry or error bodies.
 - The order webhook can't verify HMAC before *any* DB read — the secret is per vendor — so it
   reads exactly one column (the encrypted webhook secret) first, and nothing else until verified.
   Unknown vendor and bad signature are indistinguishable (both 400).
 
-Two role axes: platform `UserRole` (`USER < ADMIN < SUPER_ADMIN`) and per-tenant `StaffRole`
+Two role axes: platform `UserRole` (`USER < SALES < ADMIN < SUPER_ADMIN`) and per-tenant `StaffRole`
 (`CASHIER < MANAGER < OWNER`). Plan gates are separate again: `requirePlan(vendor, Plan.STARTER)`
 throws `PlanGateError` (402) carrying `{ required, current }` so the UI can render an upgrade CTA.
 Limits live in `PLAN_LIMITS` in `lib/constants.ts`.
 
 ### Billing: trial, lock and platform subscriptions
 
-Full design in `docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md`. One offer is sold: a `TRIAL_DAYS` (30) day
-free trial with STARTER limits, then STARTER monthly or yearly. Prices exclude 18% GST
+Full design in `docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md`. A `TRIAL_DAYS` (30) day free trial with STARTER
+limits, then LITE, STARTER or PRO, monthly or yearly (`SUBSCRIBABLE_PLANS`). Starter is the plan we want
+chosen: Lite is a decoy just under its price with far less, Pro a high anchor (`lib/plan-copy.ts`). Prices exclude 18% GST
 (`GST_BPS`); the Razorpay plan amount is base + GST (`subscriptionChargePaise`).
 
 `billingAccess(vendor)` in `lib/plan.ts` derives one of four states from `Vendor.plan`,
@@ -266,11 +333,45 @@ passes, so Neon can sleep.
   /api/razorpay/verify-subscription`. Verify never trusts the browser: it checks
   `HMAC(payment_id|subscription_id)` with the platform key secret, requires the subscription to be
   the one on file for the signed-in vendor (else 404), then reads its state from Razorpay.
+- **What can be bought now** is one rule, `subscribeDecision` / `plansOnOffer` in `lib/billing-actions.ts`, used by the billing page and
+  `create-subscription`, so neither can offer what the other refuses. Not renewing (cancelled, also at cycle end, halted, expired, none) and paying:
+  the same or a lower plan starts at `planExpiresAt` with nothing charged today (`notes.resumesPaidPeriod`: its `authenticated` grants nothing and an
+  uncharged cancel takes nothing back); a higher plan starts today. A halted or paused subscription is cancelled first, since Razorpay can charge it again.
+  `/pricing` links carry the pick: `/settings/billing?plan=starter&interval=yearly` (`billingSelectionPath`), through sign-in for a signed-out seller. Sign-up carries no pick: a new store goes through onboarding first.
+  `/pricing` is in its own `(pricing)` route group because its header reads the session; the `(marketing)` layout must stay static.
 - **One write path:** the webhook and verify both go through `recordSubscriptionEvent`
   (`lib/subscription-store.ts`), so whichever lands second changes nothing. Don't write
   `plan` / `planExpiresAt` anywhere else.
 - Marketing copy (`lib/plan-copy.ts`) and the legal pages read the trial length and prices from
   the constants. FREE is not marketed.
+- **Three plans:** LITE ranks below STARTER, so `requirePlan(STARTER)` gates and `razorpayLinks` shut it out. Counter billing by voice is off on Lite (`PLAN_LIMITS.voiceBilling`, `POST /api/ai/parse-order`: Web Speech skips the transcribe gate); grandfathered FREE keeps it, and the voice menu and drop builders stay on every plan. The per-plan AI image cap is `PLAN_LIMITS.aiImagesPerMonth`. It never
+  cuts a running trial short (`billingAccess`). A store with `customPricePaise` is offered Starter only. Moving up
+  goes through `create-subscription`: Razorpay can't move a UPI AutoPay subscription between plans, so it cancels the
+  live one first (a failed cancel stops there, so nobody is charged twice), then starts the new one. Moving down is
+  cancel, then pick the lower plan: it starts when the paid period ends. Plan ids: `npm run razorpay:create-plans`.
+- **Changing a list price:** Razorpay plan amounts are fixed, so set the new constants, create new plans and put their ids
+  on Vercel in the same deploy. Old ids go in `RAZORPAY_RETIRED_PLANS` so existing subscribers stay credited, and
+  `resolveSubscriptionPlanId` refuses a list plan whose Razorpay amount differs from `subscriptionChargePaise`.
+  `npm run billing:keep-signup-price -- --price=<rupees> --before=<time>` keeps stores that signed up earlier on the price they were told (`customPricePaise`).
+- **Free access by hand:** a platform SUPER_ADMIN picks a "free until" day for a store on
+  `/admin/vendors` (`PATCH /api/admin/vendors/[id]/free-access`, `lib/admin-free-access.ts`). It only
+  moves `trialEndsAt` (23:59 IST that day, today … +24 months), so the store is on the trial for
+  longer; `plan` / `planExpiresAt` are untouched. Anyone else gets 404. The log line
+  "admin granted free access" is the only audit trail.
+- **Seller alerts** (`lib/trial-alerts.ts`, `lib/trial-alerts-server.ts`): reminder emails 5 and 1 IST days
+  before `trialEndsAt`, from the project's one cron, `GET /api/cron/trial-reminders` (`vercel.json`, daily 09:00
+  IST, `Authorization: Bearer $CRON_SECRET`; secret unset → 401 and no reminders). It only reads Postgres and
+  never changes billing state. When a buyer hits `orders_paused` or `monthly_txn_cap_reached`, the route pushes and
+  emails the store's owners, at most once a day, with nothing about the buyer. Each send is claimed in Upstash (`SET NX`); no KV → no alert.
+- **A store's own price:** a platform SUPER_ADMIN sets `Vendor.customPricePaise` on `/admin/vendors`
+  (`PATCH /api/admin/vendors/[id]/price`; whole rupees, ₹49 to ₹4,999 a month before GST; a year is ten
+  months). Rules in `lib/subscription.ts`. Show a seller their price through `storeBasePaise` /
+  `storeChargePaise`, never the list constants; marketing pages keep the list price. Razorpay plans are
+  immutable, so `resolveSubscriptionPlanId` (`lib/custom-subscription-plan.ts`) makes one per price and
+  interval when an owner subscribes, shared through `CustomRazorpayPlan`. A custom plan id is in no env var:
+  `toSubscriptionSnapshot` maps it from the subscription's `notes` (`plan`, `interval`), which
+  `createSubscription` writes. A live subscription keeps its price; a new one applies when they next subscribe.
+  The log line "admin set store price" is the only audit trail.
 - E2E: new vendors are on the trial. Specs that need another state set it in the database with
   `e2e/helpers/billing-db.ts` (local databases only).
 
@@ -300,6 +401,15 @@ them) and 404s for an unknown token or an inactive vendor. `VendorSettings.autoP
 the print page in a hidden iframe after a POS sale, on desktop only. Settings → Receipts edits the
 footer, GSTIN, paper width and auto-print.
 
+**Undo a counter sale** (`lib/pos-undo.ts`): "Mark as paid" commits at once, then the toast and the receipt sheet
+offer Undo for 5 s (`POS_UNDO_TOAST_MS`, a UI timer only). Undo is a real revert, not a deferred commit:
+`undoSale()` (`lib/pos-outbox.ts`) drops the outbox copy, then `POST /api/transactions/undo { clientRef }` (CASHIER,
+`{ vendorId, clientRef }`, never STOREFRONT, within 2 min of the receipt row's `createdAt`, else 409) deletes the row
+(items and receipt cascade) and decrements its DailySummary in one `$transaction`. The bill number is not handed
+back (it may be printed already), so a day's numbering can have a gap. A cash sale stores what was handed over
+(`cashReceivedPaise`, CASH only, ≥ total, else 400) and the server-derived `changeGivenPaise`; a short tender can't be
+marked paid. The payment sheet's U / C / Enter shortcuts are `lib/pay-sheet-keys.ts`.
+
 `OrderItem.name` and `priceInPaise` are snapshots, not joins. Renaming or deleting a menu item must
 not mutate historical bills.
 
@@ -307,7 +417,8 @@ not mutate historical bills.
 
 A `Drop` is one batch a home kitchen sells ahead of time ("Saturday bakes, order by Fri 9 pm").
 Core rules live in `lib/drops.ts` (read its header before touching it); buyers order on
-`/s/[slug]`, the vendor works from `/drops`, `/drops/[id]` (orders board), `/drops/[id]/prep`.
+`/s/[slug]`, the vendor builds drops on `/drops`, works their orders on `/orders` (the one orders
+board, see "One orders board" below) and prints from `/drops/[id]/prep`.
 
 Three invariants, enforced in `lib/drops.ts` and nowhere else:
 
@@ -323,9 +434,17 @@ Three invariants, enforced in `lib/drops.ts` and nowhere else:
 
 A drop is created as `DRAFT` with no storefront check; opening it (`PATCH /api/drops/[id]/status`,
 MANAGER) needs items, a future cut-off, a payment method and a published storefront, else 409.
-Opening never publishes the store by itself: an OWNER confirms "Publish your store too?" on the
-edit page, which sends `publishStorefront: true` and flips the setting in the same transaction as
-the status (a MANAGER sending it gets 403 `owner_required`).
+Opening never publishes the store by itself: an OWNER confirms "Publish your store too?", which
+sends `publishStorefront: true` and flips the setting in the same transaction as the status (a
+MANAGER sending it gets 403 `owner_required`).
+
+**A seller sees three steps: draft, taking orders, orders closed.** A new drop or a draft opens with
+the form's "Open orders" button, which saves what is on screen first; a closed one has "Reopen orders"
+in the Status panel. The cut-off closes a drop by itself and no tap follows it. `FROZEN` and `FULFILLED`
+are older rows only: nothing moves a drop into them now, they stay read-only, and they keep the
+`drop_frozen` / `drop_locked` rules. The form's "More options" holds what has a default (name, note,
+later start, everyday menu), and a new drop takes its handover details from the store's last one
+(`lastDropDefaults`).
 
 Money and plan rules:
 
@@ -342,23 +461,81 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   AES-256-GCM-encrypted with `PAYMENT_KEYS_ENCRYPTION_KEY` (`lib/secret-box.ts`). Never the platform
   `RAZORPAY_*` account — collecting on a vendor's behalf makes us an RBI payment aggregator.
   The other paths are UPI intent + the buyer's "I've paid" claim (vendor verifies) and pay on delivery.
-- **"I've paid" never marks an order paid.** `POST /api/s/[slug]/orders/[token]/utr` records
+  A store with Razorpay shows only "Pay online" on the order page: UPI and "Payment done?" stay hidden (`OnlinePayFlow`,
+  `lib/storefront-direct-pay.ts`) until Razorpay fails, its window is closed or the seller answered "Not received", and
+  never on `payment_processing`, so nobody is invited to pay twice. Closing Razorpay's window only leaves a quiet "Pay by UPI instead" link. Razorpay counts as a way to pay, so such a store needs no UPI ID (`payment.online`, `hasPaymentMethod`). Checkout sends a Razorpay order to the order page with `?pay=1`, which opens the window once and strips the param (`orderPagePath`).
+- **A Razorpay store's seller hears about paid orders** (`lib/storefront-online-paid.ts`). Placing a UPI order there
+  only moves the board signal; verify or the webhook, whichever wins `markOrderPaid`, sends the one "New paid order" push.
+  On the board a new order the buyer hasn't paid (`isAwaitingOnlinePay`) is bucket `awaiting_online`: listed under All
+  only, not in the summary, no chime, Cancel its only action (`checkOrderAction` agrees, so a stale board can't make it
+  hold stock for good). Stock and prep sheets still count it. A claim or an expired hold puts it back on the normal
+  path, so a direct UPI payment can still be marked paid. `BoardOrder.paidOnline` and the buyer's page say "Paid online"
+  from `razorpayPaymentId`, and the buyer's progress drops Confirmed.
+- **Connect Razorpay** (`lib/razorpay-oauth.ts`, plan in `docs/RAZORPAY_PARTNER_PLAN.md`): the same
+  vendor-owned account reached by our Razorpay Technology Partner OAuth app instead of pasted keys
+  (`RAZORPAY_OAUTH_CLIENT_ID` / `_SECRET` / `_MODE`). One method per store: connecting clears the keys,
+  saving keys revokes OAuth. Tokens are encrypted beside the keys; `getVendorRazorpayCreds` returns
+  either kind and renews the access token **on demand** under a `FOR UPDATE` row lock (refresh tokens
+  rotate) — no timer. Verify trusts Razorpay's order record, not the Checkout signature, for OAuth
+  stores. `/api/webhooks/razorpay-partner` (one app-level secret, HMAC before any DB read) matches
+  orders within the body's `account_id`; both webhooks share `lib/storefront-razorpay-webhook.ts`.
+  When Razorpay refuses to create a buyer's order (401 → access/keys, 400/403 → usually KYC not
+  finished), the buyer gets `online_payment_unavailable` (pay by UPI) and `lib/razorpay-issue.ts`
+  keeps the reason in Upstash (30-day TTL, fail-open) for Settings → Payments; the next accepted order,
+  a reconnect, new keys or a disconnect clears it. Sellers without a Razorpay account sign up inside the
+  Connect flow (Razorpay's co-branded onboarding), so there is no separate referral link. Connect starts
+  from Settings → Payments or from setup's payment step and comes back to the one it started from: a fixed
+  name (`?return=onboarding`, then a cookie scoped to the callback), never a URL (`lib/razorpay-connect.ts`).
+- **"I've paid" never marks an order paid.** The buyer sees "Payment done?" with a screenshot picker
+  (`PaidClaimForm`), or one "Payment done" button with no private Blob store. A direct UPI payment is
+  invisible to us, so this signal stays: it is what keeps a drop's stock held. `POST /api/s/[slug]/orders/[token]/utr` records
   `Transaction.paymentClaimedAt` (UTR optional) → display state `PAYMENT_SUBMITTED`. The vendor answers
   on the board: "Payment received" (`mark_paid` → `markOrderPaid`) or "Not received"
   (`reject_payment`: clears the claim and UTR, stamps `paymentRejectedAt`, per-order only). After a
   rejection the next claim needs a UTR (400 `reference_required`), so a hold can't be renewed by tapping.
+- **Payment screenshot** (`lib/payment-proof.ts`): with the claim, the buyer may attach a screenshot
+  (`POST /api/s/[slug]/orders/[token]/payment-proof`, multipart, only on an order that already has a
+  claim, so it never creates or renews a hold). It is PII (name, UPI ID, UTR): a **separate private**
+  Blob store (`PAYMENT_PROOF_BLOB_READ_WRITE_TOKEN`; unset → no field), never the public one. Staff
+  view it through `GET /api/storefront-orders/[orderId]/payment-proof` (CASHIER, compound scope,
+  `private, no-store`); boards and pages get `hasPaymentProof` only, never the URL. mark_paid,
+  reject_payment and cancel clear `Transaction.paymentProofUrl` and delete the blob. Evidence, not proof:
+  it never marks an order paid.
+- **Paid means confirmed.** `markOrderPaid` also moves a `PLACED` order to `CONFIRMED` (same txn), on
+  every path — seller tap, bulk, Razorpay webhook / verify, cash at the door. So a claimed order's
+  card offers "Payment received · Confirm" / "Not received" and no separate Confirm
+  (`availableOrderActions`); an unclaimed one keeps Confirm for accepting before the money arrives.
 
 Buyer accounts are **not** NextAuth: `Customer` + passwordless email magic link
 (`lib/customer-auth.ts`), tokens and sessions stored as SHA-256 hashes only, session in the
 httpOnly `awz_cust` cookie. A buyer session never touches staff RBAC or widens a vendor `select`.
 
-Orders board freshness: order placement and board actions bump a vendor-scoped Upstash counter
-(`lib/drops-signal.ts`, fire-and-forget). Instant alerts come from Web Push; board polling is only
-a fallback, so both boards (`/drops/[id]` and `/orders`) poll every **6 min** (`BOARD_POLL_MS`), only
-while visible (and, for drops, while it accepts orders), refetching from Postgres only when the
-counter moves. Keep it above Neon's idle timeout — each tick's session check reads Postgres.
+**One orders board.** `/orders` lists every storefront order — menu orders and all drops' orders —
+in one list (`loadOrdersBoard` in `lib/drops-board-server.ts`: the last 3 IST days, older orders
+still open, and every order of a drop whose handover window ended within those 3 days).
+`BoardOrder.dropId` says which kind an order is. The "Show orders from" picker narrows the board
+to menu orders or one drop (then its Share and "⋯" menus offer that drop's sharing, Edit and Prep sheet);
+with a single source there is no picker. `/orders?drop=<id>` opens it on a drop and keeps a past drop on
+the board; `/drops/[id]` only redirects there. **Don't add a second orders page.** Actions still
+go to the order's own route family (`orderActionBase` in `lib/drops-board.ts`), so each keeps its
+compound scope; the frozen rule is per order (`isDropFrozen` on its drop).
 
-**Web Push alerts** (`lib/push.ts`): new storefront orders and submitted UPI references push to the
+**Board layout** (`components/drops/orders/`): at most one banner above the board (`OrdersBannerSlot`, rules in
+`lib/orders-banner.ts`): FSSAI reminder, then the one-time store polish nudge (published stores: test-named items, else no tagline;
+`storePolishNudge`, "Got it" hides that reason for good), then install, then the owner survey, then "Earn free months"
+(`shouldAskToRefer`); "Not now" lasts 7 days per device (the survey: 14 days, and once per browser session).
+Billing notices and a checklist with open steps sit outside the slot. The header has one Share menu and one "⋯"
+menu (`BoardMenus.tsx`). In menu scope the status pill sets `acceptMenuOrders` for an OWNER through `PATCH
+/api/vendor`; it does not touch drops. Refresh, Sound and phone alerts are in the live sync bar at the bottom.
+
+Orders board freshness: order placement and board actions bump one per-vendor Upstash counter
+(`bumpOrderSignal` in `lib/drops-signal.ts`, fire-and-forget). Instant alerts come from Web Push;
+board polling is only a fallback, so the board polls every **6 min** (`BOARD_POLL_MS`), only while
+visible and only while a buyer could order (`boardPollKind`: "order from menu" on, or a drop open
+or about to open), refetching from Postgres only when the counter moves. Keep it above Neon's
+idle timeout — each tick's session check reads Postgres.
+
+**Web Push alerts** (`lib/push.ts`): new storefront orders (on a Razorpay store, once paid) and submitted UPI references push to the
 vendor's opted-in staff devices (`PushSubscription`, one row per device). Event-driven only — never
 add a timer. `notifyVendorInBackground` wraps the send in `waitUntil` so it never blocks a buyer.
 Payloads carry bill number, amount and item count only — **no buyer name, phone or address** (lock
@@ -369,7 +546,7 @@ screens are public). 404/410 from the push service deletes the row. Feature-gate
 **Spoken new-order alert** (`lib/order-voice.ts`): on each push `public/sw.js` also posts
 `{ type: "awz-push", tag }` to open pages. `OrderVoiceAlerts` (vendor layout) says "New order received
 from <first name>" via `speechSynthesis` when Sound is on for the device (one localStorage choice,
-**on by default**, shared by the board's Sound button and Settings → Notifications), then fires
+**on by default**, shared by the sync bar's Sound button and Settings → Notifications), then fires
 `PUSH_ARRIVED_EVENT` so an open board refetches at once. **The name never goes in the push payload**:
 the page reads it from `GET /api/storefront-orders/announce?bill=` (CASHIER, `{ vendorId, billNumber }`,
 returns the first name only) and gives it only to an on-device voice (`localService`); otherwise it
@@ -391,25 +568,87 @@ first membership otherwise). UPI QRs are rendered locally by `lib/qr.ts` — no 
 the manifest `start_url` all point at `/home` (`app/home/page.tsx`, Node, redirect only), which is the
 one place the rule lives: setup unfinished → `/onboarding`, `publishStorefront` → `/orders`, otherwise
 `/pos`. An explicit `callbackUrl` never goes through it. Never decide this in middleware (it needs
-Postgres). `public/sw.js` repeats the `/home` literal: with no network it answers that navigation
+Postgres). Setup is also a gate: every `(vendor)` page sends a store without `onboardingDone` to
+`/onboarding` (`getShellContext`, no exceptions), where non-owners get a waiting screen; resume uses
+`Vendor.onboardingStep`. Every step needs an answer (≥ 1 way to get paid, ≥ 1 item; voice loads inside the
+step). Plan for the step-by-step setup: `docs/ONBOARDING_PLAN.md`. E2E `signIn()` finishes
+setup through the API unless `finishSetup: false`. `public/sw.js` repeats the `/home` literal: with no network it answers that navigation
 with a redirect to `/pos` when a cached `/pos` exists, so the Home Screen icon still opens the offline
 till. Manifest `id` stays `"/"`. Install affordances (`components/pwa/InstallPrompt.tsx`) and every
 copy of the phone-alerts opt-in (`components/push/PushAlertsButton.tsx`) are views over module-level
 stores (`hooks/useInstallPrompt.ts`, `hooks/usePushAlerts.ts`) — add a copy, never a second detector.
+iPhone/iPad also get a step-by-step dialog from `@khmyznikov/pwa-install` (`lib/install-guide.ts`, loaded on
+the tap, version pinned). Never on Chromium: it would replace the one-tap prompt, and its Android sheet has no close button.
 Both are event-driven: no timers, no polling.
+
+**Setup checklist and billing notices** follow the seller to where they land: `/orders`, `/drops` and
+(collapsed) `/pos` render `SetupChecklistCard` (`components/setup/`, rules in `setupChecklist()` /
+`checklistForRole()` in `lib/settings-overview.ts`, loaded by `lib/setup-checklist-server.ts` on page
+render only) and `BillingAccessNotice` (`components/billing/TrialNotice.tsx`). Steps are role-trimmed;
+a CASHIER sees none. The phone tab bar depends on the store too: `appTabBarForRole(role, published)`
+in `lib/app-nav.ts` moves Sell behind More and puts Settings on the bar once the store is published,
+and `/help` must use the same function (`helpTopicsForRole(role, published)`).
 
 **Order from menu** (`lib/menu-orders.ts`, opt-in `VendorSettings.acceptMenuOrders`): buyers order
 everyday `MenuItem`s with no drop — same STOREFRONT transaction with `dropId = null`, same payment
 paths and plan-cap rule, but no cut-off, no stock caps and no row lock (only `isAvailable` items).
 Fulfilment/fee/pickup note come from `menuFulfilmentMode` / `menuDeliveryFeePaise` /
-`menuPickupNote`. Buyer route `POST /api/s/[slug]/menu-orders`; vendor board `/orders` over
-`/api/storefront-orders/**`, sharing order actions with drops via `lib/storefront-order-actions.ts`.
-The menu board has no cut-off to stop it, so it polls every 6 min — keep it above Neon's idle
-timeout.
+`menuPickupNote`. Buyer route `POST /api/s/[slug]/menu-orders`; the vendor sees them on `/orders`
+beside drop orders (`GET /api/storefront-orders` returns both; `PATCH` / `bulk` under it act on
+menu orders only), sharing order actions with drops via `lib/storefront-order-actions.ts`.
+Menu ordering has no cut-off to stop the board polling, so it polls every 6 min — keep it above
+Neon's idle timeout.
 
-**Bulk order actions** (`lib/order-bulk.ts` client-safe, `lib/storefront-order-bulk.ts` server): both
-boards select orders and apply confirm / mark_paid / deliver via `POST /api/drops/[id]/orders/bulk`
-and `POST /api/storefront-orders/bulk` (`{ orderIds: 1..50 unique, action }`, CASHIER). One
+**When and where** (`lib/menu-slots.ts`, `lib/delivery-address.ts`): a store can set weekly slots for menu
+orders (`VendorSettings.menuSlots`, Settings → Online orders → Pickup and delivery times). With slots set,
+checkout requires one and `placeMenuOrder` re-derives it from the rules (`slot_required` / `slot_unavailable`),
+storing `fulfilAt` + `fulfilUntil`; the next 7 days, nothing starting within 60 min. Drop orders use the drop's
+one window. A delivery address is a line + locality (required at checkout, optional on the wire so an old page
+still orders), landmark and pincode: `deliveryAddress` keeps the whole address as one text
+(`composeDeliveryAddress`), the parts sit beside it on `Transaction` and `Customer`. A store can also list where it delivers
+(`VendorSettings.deliveryAreas`, `lib/delivery-areas.ts`, Settings → Online orders → Delivery areas: localities, each with an
+optional fee replacing the drop's or menu's): with areas set, checkout offers the list instead of a free-text locality, both
+order paths refuse any other (`outside_delivery_area`) and charge that area's fee, and the store page says "Free delivery in …".
+No radius: orders carry no coordinates. Every window a page shows
+goes through `formatWindowWithDay` ("Today · 5–9 pm"); text read later (share, story, WhatsApp) keeps the date.
+Every drop state reads with its reason through `dropStateLabel` (`lib/drop-state.ts`), never a bare "Orders closed".
+
+**Delivery handoff** (`lib/delivery-handoff.ts`, `lib/delivery-riders.ts`): a delivery order's card has
+"Copy for rider" and, for each rider saved in Settings → Online orders (`VendorSettings.deliveryRiders`,
+≤ 5 `{ name, phone }`, OWNER via `PATCH /api/vendor`), "Send to <name>" — a `wa.me` link to the rider
+with the handoff text (buyer name, phone, address, items, cash to collect). The seller's tap sends it;
+nothing goes through the server. Opening it also runs the `dispatch` action, as does the "Out for
+delivery" button: `outForDeliveryAt` (+ `riderName` snapshot) is a **stamp, not a `FulfilmentStatus`**
+— the order stays `CONFIRMED`, so stock, payment, buckets and bulk actions are untouched. The buyer's
+page reads "On the way" and never shows the rider's name.
+The handoff text ends with the rider's own link, `/d/<Transaction.riderToken>` (`lib/rider-delivery.ts`):
+192-bit, minted for every DELIVERY order at placement (or on confirm / dispatch for older ones), and
+**separate from `orderToken`**, so the buyer's link can't mark an order delivered. The page shows the
+door details (name, phone, address, items, cash to collect) only while the order is live, and one
+"Delivered" button that runs the board's own `deliver` action (cash → paid, DailySummary once); once
+delivered or cancelled it shows no buyer details. The buyer's "I've received my order"
+(`POST /api/s/[slug]/orders/[token]/received`) stamps `buyerReceivedAt`; a paid order is also marked
+delivered, an unpaid one waits for the seller — a buyer's tap never books cash. Both push to the
+seller (bill number only) and bump the board signal.
+
+**Order again** (`lib/order-again.ts`, `lib/order-again-server.ts`): once an order is over (handed over,
+cancelled, lapsed), the buyer's order page and account page offer it. It fills the normal saved cart on
+the device (everyday menu or the open drop that can take the most of the order, matched by
+`OrderItem.menuItemId`) and opens the store; checkout re-checks everything. Read on page render only.
+
+**Messages to the buyer** (`buyerUpdateMessage` in `lib/drops-board.ts`): the order card's WhatsApp button
+pre-fills text for the order's status with the buyer's order link, plus "Ready for pickup" on a confirmed
+pickup. A `wa.me` link the seller sends from their own WhatsApp; it stamps nothing and sends nothing from us.
+
+**Instagram orders** (`lib/order-channel.ts`): `Transaction.orderChannel` is `"instagram"` when the order was
+placed in Instagram's in-app browser (user agent) or from a store page opened through a `?src=ig` link (posted as
+`src`). Only links the seller is told to put on Instagram carry the tag: the setup card's bio link and the story
+button's Link sticker. The general Copy link stays clean. `/admin/metrics` counts them; the user agent is never stored.
+
+**Bulk order actions** (`lib/order-bulk.ts` client-safe, `lib/storefront-order-bulk.ts` server): the
+board selects orders and applies confirm / mark_paid / deliver via `POST /api/drops/[id]/orders/bulk`
+and `POST /api/storefront-orders/bulk` (`{ orderIds: 1..50 unique, action }`, CASHIER); a selection
+that mixes sources is split per route on the client (`groupIdsByDrop`). One
 transaction per order, run in sequence, each through `applyStorefrontOrderAction` with the
 single-order compound scope, so one stale order never rolls back the rest. Response
 `{ data: { succeeded, failed: [{ id, error }], orders } }`; unknown and cross-tenant ids are both
@@ -417,6 +656,183 @@ single-order compound scope, so one stale order never rolls back the rest. Respo
 `availableOrderActions()` (`lib/drops-board.ts`) — keep them on that one function.
 
 DB-backed drops tests are opt-in: `npm run test:drops:db` (needs a throwaway `DATABASE_URL`).
+
+### AI images (fal)
+
+`lib/ai-image.ts` (server-only) turns a seller's description into a picture with `fal-ai/flux/schnell`,
+for two uses that store nothing themselves. A banner is previewed (`POST /api/vendor/banner/generate`,
+OWNER) and "Use this banner" sends it through the normal upload. A story background is composited on
+`POST` to either story-image route (MANAGER; the tenant check runs first, so a miss never reaches fal).
+`FAL_KEY` never reaches the browser; unset → 503. The controls are hidden until
+`NEXT_PUBLIC_AI_IMAGES_ENABLED=true`. Only the seller's own words go to fal, and the prompt is never logged.
+Every call is billed and nothing retries. `reserveFalImage` (`lib/ai-usage-guard.ts`) caps images per plan
+and fails **closed** in production, unlike the POS guards. `requireActiveBilling` applies.
+
+### Offers (sales and quantity plans)
+
+An `Offer` is a vendor's sale ("Diwali sale: 10% off everything") or plan ("4+ quiches incl. 1 paneer →
+10% off"); `isSaleOffer` tells them apart (`minQty` 1, no "at least N of tag X"). The rules live in
+`lib/offers.ts` (pure, client-safe; read its header before touching it) and nowhere else. Sellers edit
+them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireActiveBilling`).
+
+- **Eligibility:** all items, chosen item ids, or a `MenuItem.tags` tag (seller free text, edited in
+  the menu item form; compared trimmed and case-insensitively). The optional "at least N of tag X" is
+  counted among the eligible lines only.
+- **Sales price each item.** Every item takes its deepest live sale, so one order can use several
+  sales, and the storefront card shows the struck-out price and `salePriceFor()` before the item is in
+  the cart (`components/storefront/ItemPrice.tsx`). A sale rounds down per unit, so card price × qty is
+  exactly the bill.
+- **Plans never stack**, with each other or with sales: the cart gets its sale prices or the one plan
+  with the largest discount, whichever saves more (a tie keeps the sale prices). Between plans, ties go
+  to the higher `minQty`, then the older offer. Only eligible lines are discounted; delivery fees never are.
+- **Free items** (`discountType` FREE_ITEM, `Offer.freeItemId` / `freeItemQty`): a plan whose reward is one
+  catalogue item the seller picked ("4+ items → free Evil Eye Bracelet"), never a sale. It competes with the other
+  plans and sales at the gift's catalogue value, but takes nothing off: the order gets an extra `OrderItem` at ₹0
+  with `isGift` and the name `giftLineName()` ("… (free gift)"), so subtotal, discount and total are unchanged and
+  every bill, board and receipt shows it as is. The gift doesn't count toward the minimum. Online only (never
+  resolved on POS). On a drop it must be one of the drop's items and comes out of its stock (`withGiftsThatFit`,
+  server and cart alike). Order again skips gift lines. Settings → Offers warns when two switched-on offers, one a
+  plan, can meet in one order (`overlappingOffers`).
+- **One name per bill:** `OffersResult.applied` is what `Transaction.offerId` / `offerName` record (the
+  plan, the sale, or several sales as "A + B" / "A + 2 more", ≤ 60 chars). Never read `discounts[0]`.
+- **Rounding:** a plan takes `floor(eligibleSubtotal × bps / 10 000)`, split across eligible lines by
+  largest remainder into `OrderItem.discountPaise` (item analytics are net of it).
+  `subtotal − discount + delivery + tax = total`; counter tax is charged on `subtotal − discount`.
+- **No timers.** `startsAt` / `endsAt` are compared on every read (`offerIsLive`).
+- **The server prices; browsers preview.** `placeStorefrontOrder` and `placeMenuOrder` call
+  `applyOffers` inside their transaction (buyers send ids and quantities only), so `totalPaise`, and
+  with it the Razorpay amount, UPI QR and `DailySummary`, is the server's. The POS prices its own cart
+  (it works offline), so `POST /api/transactions` re-prices it (`lib/pos-offers.ts`): a live sale
+  whose discount is neither the server's figure nor 0 gets 400 `discount_mismatch`; a `deferred` sale
+  is kept as rung up.
+- **Public pages get resolved offers only** (`resolveOffers` → `offersForItems`): name, description,
+  numbers and the item ids already on that page. Raw tags stay on the server.
+- `Transaction.offerName` is a snapshot (`offerId` is set null on delete), so old bills keep their
+  line. Receipts, WhatsApp text, boards and the CSV label it with `discountLabel()`.
+- Not built: coupon codes, per-customer limits, fixed amount / bundle price (enum values reserved),
+  cheapest-one-free, a buyer choosing the gift, free items at the counter, a plan on top of sales, recurring subscriptions. POS item tiles don't show sale prices
+  (the cart's discount row does).
+- Test store data: `npm run seed:quiche-plans -- <slug>` (dry run; `--create` writes).
+
+### Customer feedback
+
+Rules in the header of `lib/order-feedback.ts` (pure), database side in `lib/order-feedback-server.ts`.
+A buyer rates a handed-over order once, on its order page (`POST /api/s/[slug]/orders/[token]/feedback`,
+IP-limited; 1 to 5 stars, optional comment ≤ 500 chars; `OrderFeedback`, unique per transaction). Not
+sample orders. The seller sees it on the order card and in Settings → Customer feedback (the board drops
+old orders, so the push links there). Push and logs never carry the comment. The public store gets only
+the average and count, from `PUBLIC_RATING_MIN` (5) ratings, not on demo stores, computed on each render:
+no timers, nothing cached on `Vendor`. There are no per-item ratings.
+
+### Owner survey
+
+Rules in the header of `lib/owner-survey.ts` (pure), database side in `lib/owner-survey-server.ts`. An OWNER
+of a real store answers once, changeably, in Settings → Tell us what's hard (`PUT /api/vendor/survey`,
+`OwnerSurveyResponse`, one row per store): which problems, which hurts most, orders a week, the most they can handle, what they would
+pay, an optional comment. `/orders` shows a prompt until answered, once per browser session ("Not now" snoozes it for 14 days on that device); Help lists it too.
+`/admin/survey` (SUPER_ADMIN) ranks the problems to decide what to build; `/admin/vendors` shows one store's
+answers beside its price. Answers never set a price by themselves, and `SURVEY_USE_NOTICE` tells the owner they
+may inform it: keep it on the form. Pain keys are stored, so retire one rather than renaming it. The comment is
+free text: never in a log. Read on page render only: no timers.
+
+The same questions are public at `/survey` (no sign-in, `noindex`, `POST /api/survey`, 5 per IP per hour), for
+sellers with no account. `PublicSurveyResponse` holds the answers and nothing else: no store, name, number or IP.
+`/admin/survey` counts them apart from the stores', because anyone can answer twice, and they never inform a price.
+
+### Referrals ("Refer a seller")
+
+Stores refer other stores; buyers are not part of it. Rules in the header of `lib/referral.ts`
+(pure), database side in `lib/referral-server.ts`; design in `docs/REFERRALS.md`.
+
+- The code is the referrer's slug: `/sign-up?ref=<slug>`, shared from Settings → Refer a seller
+  (OWNER: link, wa.me text, story image) and carried by the "Powered by AwaazOS" footer on
+  `/s/[slug]`, the buyer's order page and `/r/[token]` (not on demo stores). The sign-up page keeps
+  the code in localStorage for 30 days and posts it as `ref`.
+- `POST /api/auth/register` sets `Vendor.referredByVendorId` once (`resolveReferrerForSignUp`:
+  unknown, inactive, demo or self-referring stores are ignored, sign-up never fails over a code)
+  and gives a `REFERRED_TRIAL_DAYS` (60) trial instead of 30.
+- **Paid in free time, never cash.** The referred store's first `subscription.charged` with a
+  positive amount earns one `ReferralReward` (1 month, 2 for yearly; unique per referred store;
+  ≤ 12 months per referrer per rolling year), inside `recordSubscriptionEvent`'s transaction.
+- **No timers.** A referrer on the trial or locked with no live subscription gets `trialEndsAt`
+  moved forward at once. Otherwise the reward is banked (`EARNED`) and `create-subscription`
+  redeems it into `trialEndsAt` just before computing `start_at`.
+- **A paying referrer's months are refunds.** Razorpay can't skip or discount a UPI AutoPay charge,
+  so the referrer's own next `subscription.charged` uses banked months (`creditForCharge`: monthly
+  refunded in full, yearly 1/12 per month) and records a `ReferralCredit` in the same transaction;
+  the webhook then refunds it on the platform account (`settleReferralCredit`, row-locked, matched
+  by `notes.referralCreditId` so it never refunds twice). A refusal stays PENDING with a retry on
+  `/admin/referrals`; the webhook never 500s over it. A charge refunded in full earns its own
+  referrer nothing, and `/admin/earnings` nets the refund out.
+- Admin: `/admin/referrals` (SUPER_ADMIN) and two figures on `/admin/metrics`.
+- DB tests: `npm run test:referrals:db` (throwaway `DATABASE_URL`).
+
+### Internal demo stores (founder outreach)
+
+`/api/internal/demo-stores` (POST create, GET / DELETE `/{external_ref}`, POST `/{external_ref}/handover`)
+builds a prospect's demo store in one call; full contract, OpenAPI and a sample curl in
+`docs/INTERNAL_DEMO_STORES.md`. Auth is `x-internal-api-key` = `INTERNAL_API_KEY` (≥ 32 chars, server
+only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts` (+ `lib/demo-store-schema.ts`):
+
+- A demo store is a normal `Vendor` with `isDemo`, `demoExternalRef` (idempotency key) and one OWNER, the
+  internal `DEMO_OWNER_EMAIL` user. Created in one transaction; nothing is sent (no WhatsApp, email, push).
+- UPI is always `demo@upi`; payment-credential keys or VPA-looking values anywhere → 400. Sample phones must
+  match `9199999xxxxx`. Sample orders carry `Transaction.isSample`: never in `DailySummary`, not billable
+  (`billableTxnWhere`), not in `/admin/metrics`. Demo vendors can't subscribe and have no trial.
+- Display only: "(DEMO)" via `displayStoreName()` (storefront, app shell), `noindex` on `/s/[slug]`.
+- Handover stores a SHA-256 claim token (7 days); `/claim/[token]` → `POST /api/demo-claim` creates the
+  prospect's User (or, if the email already has an account, adds the store to it after checking that
+  account's password), moves OWNER, flips `isDemo`, clears `upiId`, starts the trial, and archives
+  (`archivedAt`, hidden from board / transactions / CSV) or deletes the samples.
+- Every create, delete, handover and claim writes `DemoAuditLog`; its "create" rows are the 20/day limit.
+- **Admin GUI:** the same create / claim link / delete on `/admin/demo-stores` (+ `/new`), for any
+  platform ADMIN through `/api/admin/demo-stores/**` (`lib/admin-api.ts`; audit actor `admin:<User.id>`,
+  so the limit is per admin). SUPER_ADMIN invites admins on `/admin/admins` with one-time links
+  (`lib/admin-invites.ts`, `/admin-invite/[token]`); an ADMIN sees only the demo-store and metrics pages.
+  Each demo store and claim link has a "Message on WhatsApp" wa.me button with an editable pre-filled
+  message (`lib/outreach-message.ts`) to the seller's saved business number; nothing is sent server-side.
+  Making a claim link here also emails it to the seller (`sendDemoClaimEmail`), and the response says whether it
+  went (`emailed`). The internal API's handover still sends nothing.
+- **Outreach pipeline** (`docs/admin-pipeline.md`, `lib/demo-pipeline.ts` pure, `lib/demo-pipeline-server.ts`):
+  `/admin/demo-stores` opens on a Today queue, one store at a time. Status, follow-ups, stale archiving and queue
+  order are derived from `DemoPipeline`'s dates on every read: **no cron**, and a claim stops follow-ups because `isDemo`
+  flips. Every action writes a `DemoAuditLog` row whose payload holds what it replaced (never contact details), which
+  is what Undo restores. The page's delete is soft (`deletedAt` + `Vendor.isActive = false`); only the internal API
+  deletes for real. A claim link needs the seller's saved email, so the first invite carries the store link only.
+- **Sales interns:** platform role `SALES` (`USER < SALES < ADMIN < SUPER_ADMIN`), invited on `/admin/admins`.
+  They see only the demo stores they built (`lib/sales-scope.ts`, ownership = the audit "create" row), can't
+  delete, and everything at ADMIN or above stays 404. `/admin/earnings` reports their share
+  (`lib/sales-earnings.ts`: `SALES_SHARE_BPS` of what the store pays excluding GST, `SALES_SHARE_MONTHS` from
+  its first charge, read from `SubscriptionEvent`); it moves no money, records no payouts and doesn't see refunds.
+
+**Fixture demo stores** (`lib/demo-fixture.ts`, `lib/demo-fixture-server.ts`): `npm run seed:demo-store --
+--category=bakery|meals|wellness|crafts --city=<city> [--name=…] [--create] [--allow-remote]` builds a clean
+outreach store through `createDemoStore`, then `applyDemoFixture` adds the tagline, pictures (`public/food`,
+`public/demo`), one open drop (cut-off ~2 days out, one item at 3), a "2+ → free item" plan and slots. Idempotent,
+dry run by default, demo stores only. Decisions and the review it came from: `docs/UX_REVIEW_2026-11.md`.
+
+Also added with it, for real orders too: `MenuItem.unit` ("₹1,200 / kg" on the storefront),
+`Transaction.advancePaidPaise` (order stays PENDING; the board shows "Advance paid · Balance due") and
+`Transaction.fulfilAt` (shown on the board card). Nothing but the demo API writes them yet.
+
+### Community pages (`/c/[slug]`)
+
+One public page per housing society ("SDG Home Kitchens") linking to the stores of the home kitchens
+living there. Rules in `lib/community.ts` (read its header), queries in `lib/community-server.ts`.
+A directory, not a marketplace: no cross-store cart, search, ranking or reviews; every card links to
+`/s/<slug>`. A platform ADMIN creates the page and invites stores on `/admin/communities`
+(`/api/admin/communities/**`); an invite lists nothing until the store's OWNER taps Join in
+Settings → Online store (`POST` / `DELETE /api/vendor/communities/[id]`, own row only, else 404).
+The page shows a store only while it is accepted, active, `publishStorefront` and not `isDemo`, with
+the storefront header allowlist (name, type, city, logo, slug). Pre-order state comes from the drops'
+times on each render — no timers. `noindex`: it names a residential society.
+
+### Landing page (`/`)
+
+`components/marketing/`. Prices and the "from ₹X" anchor come from `lib/plan-copy.ts` (`TRIAL_THEN_NOTE`), never a
+literal. Customer stories come from `lib/proof-stories.ts` and render only with `permission: true` (the owner agreed in
+writing). The WhatsApp button needs `NEXT_PUBLIC_SUPPORT_WHATSAPP` (build time). `e2e/contrast.spec.ts` runs axe's
+contrast rule here, on a store page and on checkout. The `(marketing)` layout must stay static.
 
 ### In-app Help (`/help`)
 
@@ -479,20 +895,21 @@ phones validated as +91 10-digit and stored E.164 via `libphonenumber-js`. Use t
 rather than local copies: `lib/datetime.ts` (`formatIstDate`, `formatIstDateTime`), `lib/phone.ts`
 (`normaliseIndianMobile`, `formatIndianMobile`, `lastFourDigits`).
 
-Accessibility is POS-critical, not decorative: 44×44 px minimum tap targets (mic button 80×80),
+Accessibility is POS-critical, not decorative: 44×44 px minimum tap targets (mic button 80×80 on phones, 48×48 from md),
 voice states distinguishable beyond color, `aria-live` on cart and voice status, and **every
 voice-only path needs a tap fallback** (`QuickAddGrid`).
 
 ## Before pushing
 
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → unit → build → bundle-size budget
-(`npm run perf:budget`, see `docs/PERFORMANCE.md`), plus gitleaks (full history) and `npm audit --audit-level=high`. The Playwright job is switched off
-on CI (`if: false`, 2026-10-13) — run the suite locally, see below. A husky
+(`npm run perf:budget`, see `docs/PERFORMANCE.md`), plus gitleaks (full history) and `npm audit --audit-level=high`. Two Playwright jobs, `E2E (chromium)` and
+`E2E (mobile)`, run after that on a throwaway Postgres: they apply the migrations from empty and check them against the schema. `main` has no
+branch protection, so a red run does not stop a merge, which is a production deploy: look before merging. A husky
 pre-commit hook runs `lint-staged` (eslint `--max-warnings=0`) and gitleaks if installed locally.
 
 Repo workflow for a meaningful change: `npm test && npm run typecheck && npm run lint && npm run build`
-→ Playwright against a throwaway Postgres (see "E2E writes real rows" above) → conventional commit
-→ push. Merging to `main` is the production deploy (see "Deploy topology"); never run the e2e
+→ conventional commit → push → green CI, E2E included (locally, Playwright against a throwaway Postgres:
+see "E2E writes real rows" above). Merging to `main` is the production deploy (see "Deploy topology"); never run the e2e
 suite against the production deployment, because its vendor-creating specs write to the live
 database.
 

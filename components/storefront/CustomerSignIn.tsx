@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
  * way whether or not the email is known, so the success state never says
  * "account found" — only "check your email".
  */
-export function CustomerSignIn({ returnTo, kitchenName }: { returnTo: string; kitchenName: string }) {
+export function CustomerSignIn({ returnTo, storeName }: { returnTo: string; storeName: string }) {
   const [email, setEmail] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
@@ -54,7 +54,7 @@ export function CustomerSignIn({ returnTo, kitchenName }: { returnTo: string; ki
         <h2 className="mt-2 font-display text-lg font-bold text-awaaz-charcoal">Check your email</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           If <span className="font-semibold text-foreground">{email.trim()}</span> can receive mail, a sign-in
-          link for {kitchenName} is on its way. It works once and expires in 15 minutes.
+          link for {storeName} is on its way. It works once and expires in 15 minutes.
         </p>
         <button
           type="button"

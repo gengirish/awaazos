@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 
-import { loadMenuOrdersBoard } from "@/lib/drops-board-server";
-import { getDropOrderSignal } from "@/lib/drops-signal";
-import { MENU_ORDERS_SIGNAL_ID } from "@/lib/menu-orders";
+import { loadOrdersBoard } from "@/lib/drops-board-server";
+import { getOrderSignal } from "@/lib/drops-signal";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 export const dynamic = "force-dynamic";
@@ -21,9 +20,13 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
 }
 
 /**
- * GET /api/storefront-orders — the vendor's "order from menu" orders
- * (storefront, no drop): placed in the last 3 IST days plus any older one still
- * open, newest first. `{ data: BoardOrder[], summary, signal }`.
+ * GET /api/storefront-orders — everything on the vendor's orders board: menu
+ * orders and drop orders together, newest first (window in `ordersBoardWhere`),
+ * plus the drops the board can be narrowed to.
+ * `{ data: BoardOrder[], drops: BoardDrop[], summary, signal }`.
+ *
+ * `?drop=<id>` keeps that drop and all its orders on the board even when it is
+ * long past; an id that is not this vendor's matches nothing.
  *
  * Contains customer name / phone / address: vendor-only, never logged.
  */
@@ -32,9 +35,9 @@ export async function GET(req: NextRequest) {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
     // Signal first: an order landing between the two reads bumps the counter
     // past what we return, so the next poll refetches instead of missing it.
-    const signal = await getDropOrderSignal(ctx.vendor.id, MENU_ORDERS_SIGNAL_ID);
-    const board = await loadMenuOrdersBoard(ctx.vendor.id);
-    const res = NextResponse.json({ data: board.orders, summary: board.summary, signal });
+    const signal = await getOrderSignal(ctx.vendor.id);
+    const board = await loadOrdersBoard(ctx.vendor.id, { pinDropId: req.nextUrl.searchParams.get("drop") });
+    const res = NextResponse.json({ data: board.orders, drops: board.drops, summary: board.summary, signal });
     res.headers.set("Cache-Control", "no-store");
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {

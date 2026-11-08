@@ -1,5 +1,7 @@
 import { expect, type APIRequestContext, type Page } from "@playwright/test";
 
+import { signIn } from "./vendor";
+
 const E2E_PASSWORD = "E2e_billing_Rzp9!";
 
 /**
@@ -7,10 +9,6 @@ const E2E_PASSWORD = "E2e_billing_Rzp9!";
  * Uses a unique email so tests can run repeatedly and in parallel projects.
  */
 export async function registerOwnerAndSignIn(page: Page, request: APIRequestContext): Promise<void> {
-  await page.addInitScript(() => {
-    window.localStorage.setItem("awz_cookie_pref_v1", "accepted");
-  });
-
   const suffix = `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
   const email = `e2e-rzp-${suffix}@example.com`;
 
@@ -27,10 +25,7 @@ export async function registerOwnerAndSignIn(page: Page, request: APIRequestCont
   });
   expect(reg.status(), "register should succeed when DB is available").toBe(201);
 
-  await page.goto("/sign-in?callbackUrl=/settings/billing");
-  await page.getByLabel(/email/i).fill(email);
-  await page.getByLabel(/password/i).fill(E2E_PASSWORD);
-  await page.getByRole("button", { name: /sign in/i }).click();
-  await page.waitForURL((u) => !u.pathname.includes("/sign-in"), { timeout: 45_000 });
+  // The shared sign-in also finishes first-run setup, which every vendor page now requires.
+  await signIn(page, { email, password: E2E_PASSWORD, stallName: `E2E Stall ${suffix}` }, "/settings/billing");
   await expect(page).toHaveURL(/\/settings\/billing/);
 }

@@ -47,9 +47,9 @@ describe("prices", () => {
 
   it("Razorpay plan amounts are base + GST", () => {
     expect(subscriptionBasePaise("STARTER", "monthly")).toBe(PLAN_PRICES_PAISE.STARTER);
-    expect(subscriptionChargePaise("STARTER", "monthly")).toBe(35282);
-    expect(subscriptionBasePaise("STARTER", "yearly")).toBe(299000);
-    expect(subscriptionChargePaise("STARTER", "yearly")).toBe(352820);
+    expect(subscriptionChargePaise("STARTER", "monthly")).toBe(76582);
+    expect(subscriptionBasePaise("STARTER", "yearly")).toBe(649000);
+    expect(subscriptionChargePaise("STARTER", "yearly")).toBe(765820);
   });
 
   it("yearly is 10× monthly (two months free)", () => {
@@ -175,6 +175,49 @@ describe("applySubscriptionEvent", () => {
     expect(p).toEqual({});
   });
 
+  it("a resubscribe that is cancelled before its first charge leaves the paid period alone", () => {
+    const paid: BillingState = { plan: "STARTER", planExpiresAt: day(5), razorpaySubId: "sub_A" };
+    const p = applySubscriptionEvent(
+      paid,
+      "subscription.cancelled",
+      sub({ status: "cancelled", startAt: day(5), paidCount: 0, resumesPaidPeriod: true }),
+      NOW,
+    );
+    expect(p.vendor).toBeUndefined();
+    expect(p.settings?.razorpaySubId).toBeNull();
+  });
+
+  it("a resubscribe's mandate grants nothing: the old plan runs to its end, a lower one starts at its first charge", () => {
+    const paid: BillingState = { plan: "STARTER", planExpiresAt: day(5), razorpaySubId: "sub_OLD" };
+    const lower = { plan: "LITE" as const, interval: "monthly" as const };
+    const auth = applySubscriptionEvent(
+      paid,
+      "subscription.authenticated",
+      sub({ status: "authenticated", mapped: lower, startAt: day(5), resumesPaidPeriod: true }),
+      NOW,
+    );
+    expect(auth.vendor).toBeUndefined();
+    expect(auth.settings?.razorpaySubId).toBe("sub_A");
+
+    const charged = applySubscriptionEvent(
+      { ...paid, razorpaySubId: "sub_A" },
+      "subscription.charged",
+      sub({ mapped: lower, currentEnd: day(35), resumesPaidPeriod: true }),
+      NOW,
+    );
+    expect(charged.vendor).toEqual({ plan: "LITE", planExpiresAt: day(35) });
+  });
+
+  it("the old sub ending at its cycle end changes nothing once a resubscribe is on file", () => {
+    const p = applySubscriptionEvent(
+      { plan: "STARTER", planExpiresAt: day(5), razorpaySubId: "sub_NEW" },
+      "subscription.cancelled",
+      sub({ status: "cancelled", paidCount: 3 }),
+      NOW,
+    );
+    expect(p).toEqual({});
+  });
+
   it("cancelled for an old sub doesn't clear the current one", () => {
     const p = applySubscriptionEvent(
       { ...free, razorpaySubId: "sub_NEW" },
@@ -207,6 +250,35 @@ describe("applySubscriptionEvent", () => {
 
 describe("Razorpay plan ids", () => {
   afterEach(() => vi.unstubAllEnvs());
+
+  it("finds and maps Lite and Pro, monthly and yearly", () => {
+    for (const plan of ["LITE", "PRO"] as const) {
+      for (const interval of ["monthly", "yearly"] as const) {
+        const id = `plan_${plan}_${interval}`;
+        vi.stubEnv(`RAZORPAY_PLAN_${plan}_${interval.toUpperCase()}`, id);
+        expect(getRazorpayPlanId(plan, interval)).toBe(id);
+        expect(planFromRazorpayPlanId(id)).toEqual({ plan, interval });
+      }
+    }
+  });
+
+  it("charges each plan its base plus GST, a year being ten months", () => {
+    expect(subscriptionChargePaise("LITE", "monthly")).toBe(70682);
+    expect(subscriptionChargePaise("LITE", "yearly")).toBe(706820);
+    expect(subscriptionChargePaise("PRO", "monthly")).toBe(135582);
+    expect(subscriptionChargePaise("PRO", "yearly")).toBe(1355820);
+  });
+
+  it("keeps crediting retired plans, and ignores entries it can't trust", () => {
+    vi.stubEnv(
+      "RAZORPAY_RETIRED_PLANS",
+      "plan_old_m:STARTER:monthly, plan_old_y:STARTER:yearly,plan_bad:ENTERPRISE:monthly,plan_worse:STARTER:weekly",
+    );
+    expect(planFromRazorpayPlanId("plan_old_m")).toEqual({ plan: "STARTER", interval: "monthly" });
+    expect(planFromRazorpayPlanId("plan_old_y")).toEqual({ plan: "STARTER", interval: "yearly" });
+    expect(planFromRazorpayPlanId("plan_bad")).toBeNull();
+    expect(planFromRazorpayPlanId("plan_worse")).toBeNull();
+  });
 
   it("maps monthly, yearly, the legacy monthly name and PRO", () => {
     vi.stubEnv("RAZORPAY_PLAN_STARTER_MONTHLY", "plan_m");

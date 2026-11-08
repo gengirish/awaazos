@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  checklistForRole,
   LEGACY_SETTINGS_ANCHORS,
   notificationsStatus,
   ordersStatus,
@@ -48,6 +49,9 @@ describe("settings hub status lines", () => {
     expect(s.on).toBe(true);
 
     expect(paymentsStatus({ upiId: "  ", acceptPayOnDelivery: false, razorpayConfigured: true }).on).toBe(false);
+    expect(
+      paymentsStatus({ upiId: null, acceptPayOnDelivery: false, razorpayConfigured: true, onlinePayment: true }).on,
+    ).toBe(true);
   });
 
   it("voice: picker labels, legacy codes, and a safe default", () => {
@@ -82,25 +86,85 @@ describe("settings hub status lines", () => {
   });
 });
 
+describe("setupChecklist: FSSAI", () => {
+  const ready = {
+    availableItemCount: 3,
+    publishStorefront: true,
+    upiId: "a.b@ybl",
+    acceptPayOnDelivery: true,
+    acceptMenuOrders: true,
+    dropCount: 1,
+  };
+
+  it("prompts a food store without a number, and only the owner", () => {
+    const items = setupChecklist({ ...ready, fssaiNumber: null }, "food");
+    expect(items.map((i) => i.id)).toEqual(["fssai_number"]);
+    expect(items[0]?.reminder).toBe(true);
+    expect(checklistForRole(items, "MANAGER")).toEqual([]);
+    expect(checklistForRole(items, "OWNER")).toHaveLength(1);
+  });
+
+  it("is quiet once saved, and for a goods store", () => {
+    expect(setupChecklist({ ...ready, fssaiNumber: "12345678901234" }, "food")).toEqual([]);
+    expect(setupChecklist({ ...ready, fssaiNumber: null }, "goods")).toEqual([]);
+  });
+});
+
 describe("setupChecklist", () => {
-  const ready = { availableItemCount: 3, publishStorefront: true, upiId: null, acceptPayOnDelivery: true };
+  const ready = {
+    availableItemCount: 3,
+    publishStorefront: true,
+    upiId: null,
+    acceptPayOnDelivery: true,
+    acceptMenuOrders: false,
+    dropCount: 1,
+      fssaiNumber: "12345678901234",
+  };
+  const nothing = {
+    availableItemCount: 0,
+    publishStorefront: false,
+    upiId: "",
+    acceptPayOnDelivery: false,
+    acceptMenuOrders: false,
+    dropCount: 0,
+      fssaiNumber: "12345678901234",
+  };
 
   it("is empty when the stall can take online orders", () => {
     expect(setupChecklist(ready)).toEqual([]);
     expect(setupChecklist({ ...ready, upiId: "a.b@ybl", acceptPayOnDelivery: false })).toEqual([]);
+    expect(setupChecklist({ ...ready, upiId: null, acceptPayOnDelivery: false, onlinePayment: true })).toEqual([]);
   });
 
   it("lists every missing step with where to fix it", () => {
-    const items = setupChecklist({ availableItemCount: 0, publishStorefront: false, upiId: "", acceptPayOnDelivery: false });
+    const items = setupChecklist(nothing);
     expect(items.map((i) => [i.id, i.href])).toEqual([
       ["menu_items", "/menu"],
       ["publish_store", "/settings/store"],
       ["payment_method", "/settings/payments"],
+      ["first_drop", "/drops/new"],
     ]);
   });
 
   it("needs a payment method only when both UPI and pay on delivery are missing", () => {
     expect(setupChecklist({ ...ready, acceptPayOnDelivery: false }).map((i) => i.id)).toEqual(["payment_method"]);
+  });
+
+  it("needs something to order from: a drop, or menu orders switched on", () => {
+    expect(setupChecklist({ ...ready, dropCount: 0 }).map((i) => i.id)).toEqual(["first_drop"]);
+    expect(setupChecklist({ ...ready, dropCount: 0, acceptMenuOrders: true })).toEqual([]);
+  });
+
+  it("shows a staff member only the steps their role can act on", () => {
+    const items = setupChecklist(nothing);
+    expect(checklistForRole(items, "OWNER").map((i) => i.id)).toEqual([
+      "menu_items",
+      "publish_store",
+      "payment_method",
+      "first_drop",
+    ]);
+    expect(checklistForRole(items, "MANAGER").map((i) => i.id)).toEqual(["menu_items", "first_drop"]);
+    expect(checklistForRole(items, "CASHIER")).toEqual([]);
   });
 });
 
@@ -112,5 +176,32 @@ describe("legacy anchors", () => {
       "menu-orders": "/settings/orders",
       "online-payments": "/settings/payments",
     });
+  });
+});
+
+describe("wording for a store that isn't a kitchen", () => {
+  it("names the everyday-orders setting as that store's Settings does", () => {
+    expect(ordersStatus({ acceptMenuOrders: false, menuFulfilmentMode: "PICKUP" }, "goods").text).toBe(
+      "Order any time: Off",
+    );
+  });
+
+  it("never says menu in the checklist", () => {
+    const items = setupChecklist(
+      {
+        availableItemCount: 0,
+        publishStorefront: true,
+        upiId: "shop@upi",
+        acceptPayOnDelivery: false,
+        acceptMenuOrders: false,
+        dropCount: 0,
+      fssaiNumber: "12345678901234",
+      },
+      "goods",
+    );
+    expect(items.map((i) => i.id)).toEqual(["menu_items", "first_drop"]);
+    expect(items[0]).toMatchObject({ text: "Add at least one item to your product list", linkText: "Go to Products", href: "/menu" });
+    expect(items[1]!.text).toBe("Create your first drop or turn on everyday orders");
+    expect(JSON.stringify(items)).not.toMatch(/menu(?! ?_items)(?!")/i);
   });
 });

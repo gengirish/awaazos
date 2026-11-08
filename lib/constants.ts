@@ -25,6 +25,14 @@ export const PLAN_LIMITS: Record<
     csvExport: boolean;
     sarvamStt: boolean;
     analyticsDays: number;
+    /**
+     * Counter billing by voice: the POS mic and POST /api/ai/parse-order. Web Speech
+     * skips /api/ai/transcribe for en/hi, so that route's plan gate isn't enough.
+     * FREE keeps it: those stores signed up before the trial, when they had it.
+     */
+    voiceBilling: boolean;
+    /** Monthly cap, enforced by `reserveFalImage` (lib/ai-usage-guard.ts). */
+    aiImagesPerMonth: number;
   }
 > = {
   FREE: {
@@ -39,11 +47,31 @@ export const PLAN_LIMITS: Record<
     csvExport: false,
     sarvamStt: false,
     analyticsDays: 7,
+    voiceBilling: true,
+    aiImagesPerMonth: 0,
+  },
+  // Sold just under Starter and well short of it, so Starter is the easy choice
+  // (lib/plan-copy.ts). Ranks below STARTER, so every requirePlan(STARTER) gate
+  // already shuts it out; storefront Razorpay reads `razorpayLinks`.
+  LITE: {
+    label: "Lite",
+    pricePaise: 59900,
+    txnPerMonth: 50,
+    maxStaff: 1,
+    whatsappReceipts: false,
+    razorpayLinks: false,
+    monthlyTxnCap: 50,
+    whatsapp: false,
+    csvExport: false,
+    sarvamStt: false,
+    analyticsDays: 30,
+    voiceBilling: false,
+    aiImagesPerMonth: 0,
   },
   STARTER: {
     label: "Starter",
-    pricePaise: 29900,
-    // Unlimited: STARTER is the one paid tier and matches the 30-day trial
+    pricePaise: 64900,
+    // Unlimited: STARTER matches the 30-day trial
     // (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md), so converting changes nothing.
     txnPerMonth: null,
     maxStaff: 3,
@@ -55,10 +83,12 @@ export const PLAN_LIMITS: Record<
     csvExport: true,
     sarvamStt: true,
     analyticsDays: 90,
+    voiceBilling: true,
+    aiImagesPerMonth: 30,
   },
   PRO: {
     label: "Pro",
-    pricePaise: 79900,
+    pricePaise: 114900,
     txnPerMonth: null,
     maxStaff: null,
     whatsappReceipts: true,
@@ -68,6 +98,8 @@ export const PLAN_LIMITS: Record<
     csvExport: true,
     sarvamStt: true,
     analyticsDays: 365,
+    voiceBilling: true,
+    aiImagesPerMonth: 100,
   },
   ENTERPRISE: {
     label: "Enterprise",
@@ -81,11 +113,19 @@ export const PLAN_LIMITS: Record<
     csvExport: true,
     sarvamStt: true,
     analyticsDays: 365,
+    voiceBilling: true,
+    aiImagesPerMonth: 300,
   },
 };
 
 export const STALL_TYPES: { value: StallType; label: string }[] = [
   { value: "GENERAL", label: "General" },
+  { value: "HOME_BAKERY", label: "Home bakery" },
+  { value: "HOME_KITCHEN", label: "Home kitchen" },
+  { value: "CLOUD_KITCHEN", label: "Cloud kitchen" },
+  { value: "SWEETS", label: "Sweets & mithai" },
+  { value: "CAFE", label: "Café" },
+  { value: "CATERING", label: "Catering" },
   { value: "FOOD_BEVERAGE", label: "Food & beverage" },
   { value: "STREET_FOOD", label: "Street food" },
   { value: "CARNIVAL", label: "Carnival / mela" },
@@ -94,6 +134,8 @@ export const STALL_TYPES: { value: StallType; label: string }[] = [
   { value: "KIRANA", label: "Kirana / grocery" },
   { value: "CLOTHING", label: "Clothing" },
   { value: "SERVICES", label: "Services" },
+  // Last on purpose: the seller then describes it (lib/stall-type.ts).
+  { value: "OTHER", label: "Other (describe it)" },
 ];
 
 /**
@@ -145,8 +187,9 @@ export const BRAND = {
 /** Per-plan SaaS price in paise (monthly). Mirrors `PLAN_LIMITS.*.pricePaise` for gates and marketing. */
 export const PLAN_PRICES_PAISE: Record<Plan, number> = {
   FREE: 0,
-  STARTER: 29900,
-  PRO: 79900,
+  LITE: 59900,
+  STARTER: 64900,
+  PRO: 114900,
   ENTERPRISE: 0,
 };
 
@@ -155,7 +198,9 @@ export const PLAN_PRICES_PAISE: Record<Plan, number> = {
  * free). Only plans that can be bought yearly are listed.
  */
 export const PLAN_PRICES_YEARLY_PAISE: Partial<Record<Plan, number>> = {
-  STARTER: 299000,
+  LITE: 599000,
+  STARTER: 649000,
+  PRO: 1149000,
 };
 
 /**
@@ -175,7 +220,8 @@ export const GST_BPS = 1800;
 /** Plan ordering for subscription gates (higher = better). */
 export const PLAN_RANK: Record<Plan, number> = {
   FREE: 0,
-  STARTER: 1,
-  PRO: 2,
-  ENTERPRISE: 3,
+  LITE: 1,
+  STARTER: 2,
+  PRO: 3,
+  ENTERPRISE: 4,
 };

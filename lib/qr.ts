@@ -16,3 +16,17 @@ export async function qrSvgDataUrl(text: string, size: number): Promise<string> 
   });
   return `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 }
+
+/**
+ * Same QR as a PNG data URL, for saving to the phone's gallery: UPI apps'
+ * "scan from gallery" reads photos, not SVGs. A wider quiet zone than the
+ * on-screen SVG, because a saved image is often cropped or shown edge to edge.
+ */
+export async function qrPngDataUrl(text: string, size: number): Promise<string> {
+  return QRCode.toDataURL(text, {
+    type: "image/png",
+    width: size,
+    margin: 4,
+    errorCorrectionLevel: "M",
+  });
+}

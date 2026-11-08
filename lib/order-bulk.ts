@@ -2,6 +2,7 @@
  * Bulk actions on storefront orders — pure, client-safe helpers shared by the
  * board's selection bar (components/drops/orders/OrdersBoard.tsx) and the bulk
  * routes (`POST /api/drops/[id]/orders/bulk`, `POST /api/storefront-orders/bulk`).
+ * The board sends each selected order to its own route (`groupIdsByDrop`).
  *
  * Bulk-eligible actions are the forward, everyday ones: confirm, mark paid,
  * deliver. Cancel (moves money back, vendor must refund by hand) and undeliver
@@ -11,25 +12,13 @@
  */
 
 import type { FulfilmentStatus, PaymentMethod, PaymentStatus } from "@prisma/client";
-import { z } from "zod";
-
-import { availableOrderActions, type OrderAction } from "@/lib/drops-board";
+import { availableOrderActions, type BoardBucket, type OrderAction } from "@/lib/drops-board";
 
 export const BULK_ORDER_ACTIONS = ["confirm", "mark_paid", "deliver"] as const satisfies readonly OrderAction[];
 export type BulkOrderAction = (typeof BULK_ORDER_ACTIONS)[number];
 
 export const BULK_ORDER_MAX = 50;
-
-export const bulkOrderActionSchema = z.object({
-  orderIds: z
-    .array(z.string().trim().min(1).max(64))
-    .min(1)
-    .max(BULK_ORDER_MAX)
-    .refine((ids) => new Set(ids).size === ids.length, { message: "orderIds must be unique" }),
-  action: z.enum(BULK_ORDER_ACTIONS),
-});
-
-export type BulkOrderActionInput = z.infer<typeof bulkOrderActionSchema>;
+// The routes' body schema is lib/order-bulk-schema.ts (zod stays off the board's bundle).
 
 /** Per-order failure codes. Unknown and cross-tenant ids are both `not_found`. */
 export type BulkFailureCode = "not_found" | "drop_frozen" | "invalid_state" | "error";
@@ -44,7 +33,19 @@ type ActionableOrder = {
   fulfilmentStatus: FulfilmentStatus | null;
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
+  bucket?: BoardBucket;
 };
+
+/**
+ * The frozen-drop rule for the orders at hand: one answer for all of them (a
+ * single drop's list), or asked per order when the list mixes drops and menu
+ * orders.
+ */
+export type FrozenRule<T> = boolean | ((o: T) => boolean);
+
+function frozenFor<T>(rule: FrozenRule<T>, o: T): boolean {
+  return typeof rule === "function" ? rule(o) : rule;
+}
 
 type MoneyOrder = { paymentMethod: PaymentMethod; paymentStatus: PaymentStatus; totalPaise: number };
 
@@ -64,21 +65,21 @@ export function bulkTargets<T extends ActionableOrder>(
   orders: T[],
   selected: ReadonlySet<string>,
   action: BulkOrderAction,
-  frozen: boolean,
+  frozen: FrozenRule<T>,
 ): T[] {
-  return orders.filter((o) => selected.has(o.id) && bulkActionsFor(o, frozen).includes(action));
+  return orders.filter((o) => selected.has(o.id) && bulkActionsFor(o, frozenFor(frozen, o)).includes(action));
 }
 
 /** How many selected orders each bulk action would change — for the bar's button labels. */
-export function bulkActionCounts(
-  orders: ActionableOrder[],
+export function bulkActionCounts<T extends ActionableOrder>(
+  orders: T[],
   selected: ReadonlySet<string>,
-  frozen: boolean,
+  frozen: FrozenRule<T>,
 ): Record<BulkOrderAction, number> {
   const out: Record<BulkOrderAction, number> = { confirm: 0, mark_paid: 0, deliver: 0 };
   for (const o of orders) {
     if (!selected.has(o.id)) continue;
-    for (const a of bulkActionsFor(o, frozen)) out[a] += 1;
+    for (const a of bulkActionsFor(o, frozenFor(frozen, o))) out[a] += 1;
   }
   return out;
 }
@@ -88,13 +89,13 @@ export function bulkActionCounts(
  * refetch, a filter change or a bulk run). Returns the same Set when nothing
  * changed so React can skip the re-render.
  */
-export function pruneSelection(
+export function pruneSelection<T extends ActionableOrder>(
   selected: ReadonlySet<string>,
-  visible: ActionableOrder[],
-  frozen: boolean,
+  visible: T[],
+  frozen: FrozenRule<T>,
 ): ReadonlySet<string> {
   if (selected.size === 0) return selected;
-  const keep = new Set(visible.filter((o) => isBulkSelectable(o, frozen)).map((o) => o.id));
+  const keep = new Set(visible.filter((o) => isBulkSelectable(o, frozenFor(frozen, o))).map((o) => o.id));
   let changed = false;
   const next = new Set<string>();
   selected.forEach((id) => {
@@ -125,7 +126,7 @@ export function bulkNeedsConfirm(
 
 const DONE_VERB: Record<BulkOrderAction, string> = {
   confirm: "confirmed",
-  mark_paid: "marked paid",
+  mark_paid: "marked paid", // new ones are confirmed too (markOrderPaid)
   deliver: "marked delivered",
 };
 
@@ -143,7 +144,7 @@ export function bulkResultMessage(
   if (bad === 0) return { kind: "success", text: `${nOrders(ok)} ${DONE_VERB[action]}` };
   const frozen = result.failed.some((f) => f.error === "drop_frozen");
   const reason = frozen
-    ? "orders are frozen"
+    ? "orders are locked"
     : result.failed.every((f) => f.error === "error")
       ? "try again"
       : "they changed on another device";

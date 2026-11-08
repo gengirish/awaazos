@@ -21,6 +21,9 @@
     "smoke:whisper": "node scripts/whisper-stt-smoke.mjs",
     "sync:agent-rules": "node scripts/sync-agent-rules.mjs",
     "razorpay:create-plans": "tsx scripts/razorpay-create-plans.ts",
+    "billing:keep-signup-price": "tsx scripts/keep-signup-price.ts",
+    "seed:quiche-plans": "tsx scripts/seed-quiche-plans.ts",
+    "seed:demo-store": "tsx scripts/seed-demo-store.ts",
     "test:golden": "vitest run tests/golden/parse-order/live.test.ts",
     "test:golden:validate": "vitest run tests/golden/parse-order/validate.test.ts",
     "test:golden:drop": "vitest run tests/golden/parse-drop/live.test.ts",
@@ -29,7 +32,8 @@
     "test:golden:menu:validate": "vitest run tests/golden/parse-menu/validate.test.ts",
     "test:golden:stt": "vitest run tests/golden/stt/live.test.ts",
     "test:golden:stt:validate": "vitest run tests/golden/stt/validate.test.ts",
-    "test:drops:db": "node -e \"process.env.DROPS_DB_TEST='1';process.exit(require('child_process').spawnSync('npx vitest run --no-file-parallelism lib/__tests__/drops.db.test.ts lib/__tests__/drop-open-publish.db.test.ts lib/__tests__/menu-orders.db.test.ts lib/__tests__/menu-visibility.db.test.ts lib/__tests__/everyday-menu-control.db.test.ts lib/__tests__/storefront-orders.db.test.ts lib/__tests__/push.db.test.ts lib/__tests__/push-routes.db.test.ts lib/__tests__/payment-guard.db.test.ts lib/__tests__/menu-bulk.db.test.ts lib/__tests__/subscription-webhook.db.test.ts lib/__tests__/subscription-verify.db.test.ts',{stdio:'inherit',shell:true}).status ?? 1)\"",
+    "test:drops:db": "node -e \"process.env.DROPS_DB_TEST='1';process.exit(require('child_process').spawnSync('npx vitest run --no-file-parallelism lib/__tests__/drops.db.test.ts lib/__tests__/drop-open-publish.db.test.ts lib/__tests__/menu-orders.db.test.ts lib/__tests__/menu-visibility.db.test.ts lib/__tests__/everyday-menu-control.db.test.ts lib/__tests__/storefront-orders.db.test.ts lib/__tests__/push.db.test.ts lib/__tests__/push-routes.db.test.ts lib/__tests__/payment-guard.db.test.ts lib/__tests__/menu-bulk.db.test.ts lib/__tests__/subscription-webhook.db.test.ts lib/__tests__/subscription-verify.db.test.ts lib/__tests__/offers.db.test.ts lib/__tests__/admin-free-access.db.test.ts lib/__tests__/demo-stores.db.test.ts lib/__tests__/demo-store-image.db.test.ts lib/__tests__/admin-store-insights.db.test.ts lib/__tests__/admin-outreach.db.test.ts lib/__tests__/demo-pipeline.db.test.ts lib/__tests__/rider-delivery.db.test.ts lib/__tests__/referral.db.test.ts lib/__tests__/trial-alerts.db.test.ts lib/__tests__/order-channel.db.test.ts lib/__tests__/owner-survey.db.test.ts',{stdio:'inherit',shell:true}).status ?? 1)\"",
+    "test:referrals:db": "node -e \"process.env.DROPS_DB_TEST='1';process.exit(require('child_process').spawnSync('npx vitest run --no-file-parallelism lib/__tests__/referral.db.test.ts',{stdio:'inherit',shell:true}).status ?? 1)\"",
     "perf:budget": "node scripts/check-bundle-budget.mjs",
     "perf:lighthouse": "node scripts/perf-lighthouse.mjs",
     "precommit:checks": "lint-staged",
@@ -39,11 +43,15 @@
     "@anthropic-ai/sdk": "^0.132.1",
     "@auth/prisma-adapter": "^2.11.3",
     "@hookform/resolvers": "^3.9.1",
+    "@khmyznikov/pwa-install": "0.7.0",
     "@prisma/client": "^6.3.1",
     "@radix-ui/react-dialog": "^1.1.4",
+    "@radix-ui/react-dropdown-menu": "^2.2.1",
     "@radix-ui/react-label": "^2.1.1",
+    "@radix-ui/react-popover": "^1.3.1",
     "@radix-ui/react-select": "^2.2.2",
     "@radix-ui/react-slot": "^1.1.1",
+    "@radix-ui/react-switch": "^1.4.1",
     "@sentry/nextjs": "^10.50.0",
     "@sentry/node": "^10.50.0",
     "@upstash/redis": "^1.37.0",
@@ -70,10 +78,11 @@
     "tailwind-merge": "^2.6.0",
     "tw-animate-css": "^1.4.0",
     "web-push": "^3.6.7",
-    "zod": "^3.24.1",
+    "zod": "^4.6.7",
     "zustand": "^5.0.2"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.10.2",
     "@eslint/eslintrc": "^3.3.7",
     "@next/bundle-analyzer": "^15.5.27",
     "@playwright/test": "^1.59.1",
@@ -105,6 +114,9 @@
       "postcss": "$postcss"
     },
     "deepmerge-ts": "^8.0.2",
+    "@vercel/cli-config": {
+      "zod": "$zod"
+    },
     "@next/eslint-plugin-next": {
       "fast-glob": "npm:tinyglobby@^0.2.17"
     }

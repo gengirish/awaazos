@@ -71,6 +71,60 @@ test.describe("tenant isolation", () => {
     expect(bodyB.data.some((i) => i.name === "B Only Coffee")).toBe(true);
   });
 
+  test("vendor B cannot see, edit, switch off or delete vendor A's offer (404, not 403)", async () => {
+    const itemA = await createMenuItem(pageA, { name: "A Offer Quiche", priceInRupees: 55 });
+    const offer = {
+      name: "A Weekly Plan",
+      eligibility: "ALL",
+      minQty: 4,
+      percentBps: 1000,
+    };
+    const created = await pageA.request.post("/api/offers", { data: offer });
+    expect(created.status()).toBe(201);
+    const offerA = ((await created.json()) as { data: { id: string } }).data;
+
+    const listB = await pageB.request.get("/api/offers");
+    expect(listB.status()).toBe(200);
+    expect(((await listB.json()) as { data: { id: string }[] }).data.some((o) => o.id === offerA.id)).toBe(false);
+
+    const edit = await pageB.request.patch(`/api/offers/${offerA.id}`, { data: { ...offer, percentBps: 9000 } });
+    expect(edit.status(), "cross-tenant offer edit must 404").toBe(404);
+    const toggle = await pageB.request.patch(`/api/offers/${offerA.id}`, { data: { isActive: false } });
+    expect(toggle.status(), "cross-tenant offer toggle must 404").toBe(404);
+    const del = await pageB.request.delete(`/api/offers/${offerA.id}`);
+    expect(del.status(), "cross-tenant offer delete must 404").toBe(404);
+
+    // B cannot point an offer of its own at A's menu item either.
+    const foreign = await pageB.request.post("/api/offers", {
+      data: { ...offer, name: "B Borrowed", eligibility: "ITEMS", eligibleItemIds: [itemA.id] },
+    });
+    expect(foreign.status()).toBe(400);
+    expect(await foreign.json()).toEqual({ error: "unknown_items" });
+
+    // A's offer is untouched, and B's counter sale cannot claim it.
+    const stillA = (await (await pageA.request.get("/api/offers")).json()) as {
+      data: { id: string; percentBps: number; isActive: boolean }[];
+    };
+    expect(stillA.data.find((o) => o.id === offerA.id)).toMatchObject({ percentBps: 1000, isActive: true });
+
+    const itemB = await createMenuItem(pageB, { name: "B Offer Quiche", priceInRupees: 55 });
+    const saleB = await pageB.request.post("/api/transactions", {
+      data: {
+        items: [{ menuItemId: itemB.id, name: itemB.name, priceInPaise: itemB.priceInPaise, qty: 4 }],
+        subtotalPaise: 22000,
+        discountPaise: 2200,
+        offerId: offerA.id,
+        offerName: "A Weekly Plan",
+        taxPaise: 0,
+        totalPaise: 19800,
+        paymentMethod: "CASH",
+        source: "MANUAL",
+      },
+    });
+    expect(saleB.status(), "a discount the server cannot reproduce is refused").toBe(400);
+    expect(((await saleB.json()) as { code: string }).code).toBe("discount_mismatch");
+  });
+
   test("vendor B's transaction list never contains vendor A's sales", async () => {
     const itemA = await createMenuItem(pageA, { name: "A Vada", priceInRupees: 20 });
     const saleA = await pageA.request.post("/api/transactions", {
@@ -96,6 +150,42 @@ test.describe("tenant isolation", () => {
 
     expect(bodyB.items.some((t) => t.billNumber === saleABody.transaction.billNumber)).toBe(false);
     expect(bodyB.total).toBe(0);
+  });
+
+  test("vendor B cannot undo vendor A's sale (404, not 403)", async () => {
+    const itemA = await createMenuItem(pageA, { name: "A Undo Poha", priceInRupees: 25 });
+    const clientRef = crypto.randomUUID();
+    const saleA = await pageA.request.post("/api/transactions", {
+      data: {
+        items: [{ menuItemId: itemA.id, name: itemA.name, priceInPaise: itemA.priceInPaise, qty: 1 }],
+        subtotalPaise: 2500,
+        discountPaise: 0,
+        taxPaise: 0,
+        totalPaise: 2500,
+        paymentMethod: "CASH",
+        source: "MANUAL",
+        clientRef,
+      },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(saleA.status()).toBe(201);
+
+    const undoB = await pageB.request.post("/api/transactions/undo", {
+      data: { clientRef },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(undoB.status(), "cross-tenant undo must 404").toBe(404);
+
+    // A's sale is untouched, and A can still undo it.
+    const listA = (await (await pageA.request.get("/api/transactions")).json()) as { total: number };
+    expect(listA.total).toBe(1);
+    const undoA = await pageA.request.post("/api/transactions/undo", {
+      data: { clientRef },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(undoA.status()).toBe(200);
+    const after = (await (await pageA.request.get("/api/transactions")).json()) as { total: number };
+    expect(after.total).toBe(0);
   });
 
   test("vendor B cannot read vendor A's receipt (404, not 403)", async () => {
@@ -151,6 +241,13 @@ test.describe("tenant isolation", () => {
 
     const cross = await pageB.request.get(`/api/drops/${dropA.id}/story-image`);
     expect(cross.status(), "cross-tenant story image must 404").toBe(404);
+
+    // The AI version must miss before anything is spent.
+    const crossAi = await pageB.request.post(`/api/drops/${dropA.id}/story-image`, {
+      data: { prompt: "a wooden table" },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(crossAi.status(), "cross-tenant AI story image must 404").toBe(404);
   });
 
   test("vendor B cannot bulk-act on vendor A's storefront order (reported not_found)", async ({ request }) => {
@@ -189,6 +286,12 @@ test.describe("tenant isolation", () => {
     expect(await nameA.json()).toEqual({ data: { firstName: "Iso" } });
     const nameB = await pageB.request.get(`/api/storefront-orders/announce?bill=${bill}`);
     expect(nameB.status(), "cross-tenant name lookup must 404").toBe(404);
+
+    // The payment-screenshot viewer: B gets the same 404 as "no screenshot" does for A.
+    const proofB = await pageB.request.get(`/api/storefront-orders/${orderId}/payment-proof`);
+    expect(proofB.status(), "cross-tenant payment screenshot must 404").toBe(404);
+    const proofA = await pageA.request.get(`/api/storefront-orders/${orderId}/payment-proof`);
+    expect(proofA.status()).toBe(404);
 
     // B forges a bulk confirm with A's order id: no existence leak, nothing changes.
     const bulkB = await pageB.request.post("/api/storefront-orders/bulk", {

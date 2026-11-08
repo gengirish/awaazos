@@ -1,10 +1,14 @@
 import { NextResponse } from "next/server";
 
+import { backfillCustomerProfile } from "@/lib/customer-backfill";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { placeStorefrontOrder } from "@/lib/drops";
 import { beginIdempotency, getIdempotencyKey } from "@/lib/idempotency";
+import { orderChannelFor } from "@/lib/order-channel";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
+import { alertSellerOrderCapInBackground, alertSellerStoreLockedInBackground } from "@/lib/trial-alerts-server";
 import { storefrontOrderSchema } from "@/lib/zod-drops";
 
 export const dynamic = "force-dynamic";
@@ -18,7 +22,8 @@ export const runtime = "nodejs";
  *   - the vendor must exist, be active and have opted in (publishStorefront),
  *     otherwise 404 — never 403;
  *   - the vendor `select` reads only id + plan + the one setting the order path
- *     needs; no contact PII is loaded;
+ *     needs, plus whether Razorpay is set up (who to alert, and when); no contact
+ *     PII is loaded;
  *   - prices are never taken from the client — placeStorefrontOrder re-prices
  *     every line from DropItem rows under a row lock.
  *
@@ -37,46 +42,6 @@ const orderRateLimit = makeLimiter({
   windowMs: 60_000,
   max: 10,
 });
-
-/**
- * Fill only the customer's empty name / phone / savedAddress from a placed
- * order. Conditional `updateMany` per field (`field: null`), so a concurrent
- * profile edit is never clobbered. Best-effort: the order already committed.
- */
-async function backfillCustomerProfile(
-  customer: { id: string; name: string | null; phone: string | null; savedAddress: string | null },
-  from: { name: string; phone: string; address: string | null },
-): Promise<void> {
-  try {
-    const writes = [];
-    if (!customer.name && from.name) {
-      writes.push(
-        prisma.customer.updateMany({ where: { id: customer.id, name: null }, data: { name: from.name } }),
-      );
-    }
-    if (!customer.phone && from.phone) {
-      writes.push(
-        prisma.customer.updateMany({ where: { id: customer.id, phone: null }, data: { phone: from.phone } }),
-      );
-    }
-    if (!customer.savedAddress && from.address) {
-      writes.push(
-        prisma.customer.updateMany({
-          where: { id: customer.id, savedAddress: null },
-          data: { savedAddress: from.address },
-        }),
-      );
-    }
-    if (writes.length) await Promise.all(writes);
-  } catch (err) {
-    console.error(
-      JSON.stringify({
-        event: "storefront_customer_backfill_failed",
-        error: err instanceof Error ? err.name : "unknown",
-      }),
-    );
-  }
-}
 
 export async function POST(req: Request, props: { params: Promise<{ slug: string }> }) {
   const params = await props.params;
@@ -108,7 +73,8 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         plan: true,
         planExpiresAt: true,
         trialEndsAt: true,
-        settings: { select: { acceptPayOnDelivery: true } },
+        // The Razorpay columns are only checked for presence; none of this is returned.
+        settings: { select: { acceptPayOnDelivery: true, deliveryAreas: true, ...RAZORPAY_CRED_SELECT } },
       },
     });
     if (!vendor) return NextResponse.json({ error: "Not found" }, { status: 404 });
@@ -141,15 +107,21 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         trialEndsAt: vendor.trialEndsAt,
       },
       acceptPayOnDelivery: vendor.settings?.acceptPayOnDelivery ?? false,
+      deliveryAreas: vendor.settings?.deliveryAreas,
+      takesOnlinePayment: isOnlinePaymentEnabled(vendor, vendor.settings),
       dropId: input.dropId,
       items: input.items,
       customerName: input.customerName,
       customerPhone: input.customerPhone,
       fulfilmentType: input.fulfilmentType,
       deliveryAddress: input.deliveryAddress ?? null,
+      deliveryLocality: input.deliveryLocality ?? null,
+      deliveryLandmark: input.deliveryLandmark ?? null,
+      deliveryPincode: input.deliveryPincode ?? null,
       notes: input.notes ?? null,
       paymentMethod: input.paymentMethod,
       customerId: customer?.id ?? null,
+      orderChannel: orderChannelFor({ src: input.src, userAgent: req.headers.get("user-agent") }),
     });
 
     if (result.ok && customer) {
@@ -157,6 +129,9 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
         name: input.customerName,
         phone: input.customerPhone,
         address: input.fulfilmentType === "DELIVERY" ? (input.deliveryAddress ?? null) : null,
+        locality: input.deliveryLocality,
+        landmark: input.deliveryLandmark,
+        pincode: input.deliveryPincode,
       });
     }
 
@@ -175,6 +150,8 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
       // Business rejection. monthly_txn_cap_reached is deliberately a plain 409
       // with no plan details — the buyer must not learn the vendor's plan.
       const { code, ...details } = result.error;
+      if (code === "orders_paused") alertSellerStoreLockedInBackground(vendor.id);
+      if (code === "monthly_txn_cap_reached") alertSellerOrderCapInBackground(vendor.id);
       status = 409;
       responseBody = { error: code, ...details };
       console.info(

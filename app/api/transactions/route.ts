@@ -2,9 +2,11 @@ import { Prisma, type PaymentMethod, type PaymentStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
 import { getIstTodayStart, formatBillDateYYYYMMDD } from "@/lib/billing-period";
+import { changeGivenPaise } from "@/lib/cash-tender";
 import { PLAN_LIMITS } from "@/lib/constants";
 import { countBillableTxnThisMonth } from "@/lib/drops";
 import { beginIdempotency, getIdempotencyKey } from "@/lib/idempotency";
+import { checkPosDiscount, type PosDiscountResult } from "@/lib/pos-offers";
 import { prisma } from "@/lib/prisma";
 import { generateReceiptToken } from "@/lib/receipt-data";
 import { getReceiptQueue } from "@/lib/queues";
@@ -190,11 +192,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: totals.code, code: totals.code }, { status: 400 });
     }
 
+    // Cash handed over: only on a cash sale, and it has to cover the bill.
+    const cashReceivedPaise = body.cashReceivedPaise ?? null;
+    if (
+      cashReceivedPaise !== null &&
+      (body.paymentMethod !== "CASH" || changeGivenPaise(body.totalPaise, cashReceivedPaise) === null)
+    ) {
+      return NextResponse.json({ error: "cash_received_invalid", code: "cash_received_invalid" }, { status: 400 });
+    }
+
     const saleTime = resolveSaleTime(body);
     if (!saleTime.ok) {
       return NextResponse.json({ error: saleTime.code, code: saleTime.code }, { status: 422 });
     }
     const { saleAt, fromClient } = saleTime;
+
+    // The POS prices its own cart; the discount is re-priced here from this
+    // vendor's offers (lib/pos-offers.ts). A live sale that disagrees is refused.
+    const discount = await checkPosDiscount(prisma, vendor.id, body, {
+      deferred: body.deferred === true,
+      saleAt,
+    });
+    if (!discount.ok) {
+      return NextResponse.json({ error: discount.code, code: discount.code }, { status: 400 });
+    }
+    if (discount.unverified) {
+      console.warn(
+        JSON.stringify({
+          route: "POST /api/transactions",
+          event: "offline_sale_discount_unverified",
+          vendorId: vendor.id,
+        }),
+      );
+    }
 
     // Trial over and not subscribed: no new sales. A queued offline sale rung
     // up before the lock is still recorded — the money already changed hands.
@@ -239,6 +269,7 @@ export async function POST(req: NextRequest) {
       transaction = await createSale({
         vendorId: vendor.id,
         body,
+        discount,
         today,
         paymentStatus,
         paidAt,
@@ -310,13 +341,15 @@ export async function POST(req: NextRequest) {
 async function createSale(args: {
   vendorId: string;
   body: TransactionPostBody;
+  /** The server's verdict on `body.discountPaise` (lib/pos-offers.ts). */
+  discount: Extract<PosDiscountResult, { ok: true }>;
   today: Date;
   paymentStatus: PaymentStatus;
   paidAt: Date | null;
   /** Set for deferred (offline-queued) sales; live sales use the column default. */
   createdAt?: Date;
 }) {
-  const { vendorId, body, today, paymentStatus, paidAt, createdAt } = args;
+  const { vendorId, body, discount, today, paymentStatus, paidAt, createdAt } = args;
 
   return prisma.$transaction(async (tx) => {
     const seq = await tx.billSequence.upsert({
@@ -338,11 +371,15 @@ async function createSale(args: {
         billNumber,
         subtotalPaise: body.subtotalPaise,
         discountPaise: body.discountPaise,
+        offerId: discount.offerId,
+        offerName: discount.offerName,
         taxPaise: body.taxPaise,
         totalPaise: body.totalPaise,
         paymentMethod: body.paymentMethod,
         paymentStatus,
         upiRef: body.upiRef?.trim() || null,
+        cashReceivedPaise: body.cashReceivedPaise ?? null,
+        changeGivenPaise: changeGivenPaise(body.totalPaise, body.cashReceivedPaise),
         customerPhone: body.customerPhone?.trim() || null,
         customerName: body.customerName?.trim() || null,
         voiceTranscript: body.voiceTranscript ?? null,
@@ -352,12 +389,13 @@ async function createSale(args: {
         clientRef: body.clientRef ?? null,
         ...(createdAt ? { createdAt } : {}),
         orderItems: {
-          create: body.items.map((i) => ({
+          create: body.items.map((i, index) => ({
             menuItemId: i.menuItemId ?? null,
             name: i.name,
             priceInPaise: i.priceInPaise,
             qty: i.qty,
             totalPaise: i.priceInPaise * i.qty,
+            discountPaise: discount.lineDiscounts[index] ?? 0,
           })),
         },
       },

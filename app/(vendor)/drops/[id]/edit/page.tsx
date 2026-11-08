@@ -5,21 +5,42 @@ import { notFound, redirect } from "next/navigation";
 import { DropForm, DropStatusControls } from "@/components/drops/DropForm";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
 import { allowedTransitions, liveDropOrderWhere } from "@/lib/drops-api";
-import { dropToFormInput } from "@/lib/drops-builder";
-import { effectiveDropStatus, soldQtyByDropItem } from "@/lib/drops";
+import { dropOrdersHref } from "@/lib/drops-board";
+import { DROP_SHARE_ANCHOR, dropToFormInput } from "@/lib/drops-builder";
+import { dropStateLabel } from "@/lib/drop-state";
+import { effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
+import { hasPaymentMethod } from "@/lib/payment-guard";
+import type { PlanFields } from "@/lib/plan";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
 
 export const dynamic = "force-dynamic";
 
-export default async function EditDropPage(props: { params: Promise<{ id: string }> }) {
+export default async function EditDropPage(props: {
+  params: Promise<{ id: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+}) {
   const params = await props.params;
-  let vendor: { id: string; name: string; slug: string };
+  // Set by the form's "Open orders" button.
+  const justOpened = (await props.searchParams).opened === "1";
+  let vendor: PlanFields & { id: string; name: string; slug: string; upiId: string | null };
   let isOwner: boolean;
+  let vocab: StoreVocabulary;
   try {
     const ctx = await requireVendorRole("MANAGER");
-    vendor = { id: ctx.vendor.id, name: ctx.vendor.name, slug: ctx.vendor.slug };
+    vendor = {
+      id: ctx.vendor.id,
+      name: ctx.vendor.name,
+      slug: ctx.vendor.slug,
+      upiId: ctx.vendor.upiId,
+      plan: ctx.vendor.plan,
+      planExpiresAt: ctx.vendor.planExpiresAt,
+      trialEndsAt: ctx.vendor.trialEndsAt,
+    };
     isOwner = ctx.staff.role === "OWNER";
+    vocab = storeVocabulary(ctx.vendor.stallType);
   } catch (e) {
     if (e instanceof AuthError) redirect(e.status === 403 ? "/pos" : "/sign-in");
     throw e;
@@ -40,7 +61,7 @@ export default async function EditDropPage(props: { params: Promise<{ id: string
     }),
     soldQtyByDropItem(prisma, drop.id, now),
     prisma.transaction.count({ where: { vendorId: vendor.id, dropId: drop.id, ...liveDropOrderWhere } }),
-    prisma.vendorSettings.findUnique({ where: { vendorId: vendor.id }, select: { acceptMenuOrders: true, voiceLang: true, publishStorefront: true } }),
+    prisma.vendorSettings.findUnique({ where: { vendorId: vendor.id }, select: { acceptMenuOrders: true, voiceLang: true, publishStorefront: true, acceptPayOnDelivery: true, ...RAZORPAY_CRED_SELECT } }),
   ]);
 
   const soldByMenuItem: Record<string, number> = {};
@@ -50,6 +71,9 @@ export default async function EditDropPage(props: { params: Promise<{ id: string
   }
 
   const effectiveStatus = effectiveDropStatus(drop, now);
+  const soldOut =
+    drop.items.length > 0 && drop.items.every((i) => remainingQty(i.maxQty, sold.get(i.id) ?? 0) === 0);
+  const stateLabel = dropStateLabel(drop, now, { soldOut });
   const locked = drop.status === "FROZEN" || drop.status === "FULFILLED";
   const itemNames = [...drop.items].sort((a, b) => a.sortOrder - b.sortOrder).map((i) => i.menuItem.name);
 
@@ -68,7 +92,7 @@ export default async function EditDropPage(props: { params: Promise<{ id: string
             All drops
           </Link>
           <Link
-            href={`/drops/${drop.id}`}
+            href={dropOrdersHref(drop.id)}
             className="inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
             <ClipboardList className="h-4 w-4" aria-hidden="true" />
@@ -81,26 +105,52 @@ export default async function EditDropPage(props: { params: Promise<{ id: string
         <DropStatusControls
           dropId={drop.id}
           effectiveStatus={effectiveStatus}
+          stateLabel={stateLabel}
           allowedTransitions={allowedTransitions(drop, now)}
           orderCount={orderCount}
           hidesEverydayMenu={!drop.showEverydayMenu && Boolean(settings?.acceptMenuOrders)}
           storePublished={settings?.publishStorefront ?? false}
           canPublishStore={isOwner}
           storePath={`/s/${vendor.slug}`}
+          itemCount={drop.items.length}
+          cutoffInFuture={drop.closesAt.getTime() > now.getTime()}
+          hasPaymentMethod={hasPaymentMethod({
+            upiId: vendor.upiId,
+            acceptPayOnDelivery: settings?.acceptPayOnDelivery ?? false,
+            onlinePayment: isOnlinePaymentEnabled(vendor, settings, now),
+          })}
+          justOpened={justOpened}
+          vocab={vocab}
         />
 
         {effectiveStatus === "OPEN" || effectiveStatus === "SCHEDULED" ? (
-          <ShareDropButton
-            dropId={drop.id}
-            vendorName={vendor.name}
-            vendorSlug={vendor.slug}
-            dropTitle={drop.title}
-            closesAt={drop.closesAt.toISOString()}
-            fulfilmentStartsAt={drop.fulfilmentStartsAt.toISOString()}
-            fulfilmentEndsAt={drop.fulfilmentEndsAt.toISOString()}
-            fulfilmentMode={drop.fulfilmentMode}
-            itemNames={itemNames}
-          />
+          // Focused by DropStatusControls right after orders open.
+          <section
+            id={DROP_SHARE_ANCHOR}
+            tabIndex={-1}
+            aria-labelledby="drop-share-title"
+            className="scroll-mt-4 space-y-3 rounded-xl border border-border bg-card p-4 focus:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <div>
+              <h2 id="drop-share-title" className="font-display text-lg font-semibold">
+                Tell your customers
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Send the link with what&apos;s on offer and the last time to order.
+              </p>
+            </div>
+            <ShareDropButton
+              dropId={drop.id}
+              vendorName={vendor.name}
+              vendorSlug={vendor.slug}
+              dropTitle={drop.title}
+              closesAt={drop.closesAt.toISOString()}
+              fulfilmentStartsAt={drop.fulfilmentStartsAt.toISOString()}
+              fulfilmentEndsAt={drop.fulfilmentEndsAt.toISOString()}
+              fulfilmentMode={drop.fulfilmentMode}
+              itemNames={itemNames}
+            />
+          </section>
         ) : null}
 
         <DropForm
@@ -111,6 +161,13 @@ export default async function EditDropPage(props: { params: Promise<{ id: string
           locked={locked}
           soldByMenuItem={soldByMenuItem}
           voiceLang={settings?.voiceLang ?? "en-IN"}
+          isOwner={isOwner}
+          vocab={vocab}
+          openFlow={
+            drop.status === "DRAFT"
+              ? { storePublished: settings?.publishStorefront ?? false, storePath: `/s/${vendor.slug}` }
+              : undefined
+          }
         />
       </main>
     </div>

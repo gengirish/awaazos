@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Copy } from "lucide-react";
+import { Check, ChevronDown, Copy } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { copyText } from "@/lib/clipboard";
@@ -14,10 +14,11 @@ import { cn } from "@/lib/utils";
  *
  * - Android: the generic `upi://pay` button opens the system chooser. Kept first.
  * - iPhone/iPad: `upi://` has no chooser and often opens nothing or a random
- *   app, so one button per app (`upiAppLinks`, same params) leads and the
- *   generic link drops to "Other UPI app".
+ *   app, so one row per app (`upiAppLinks`, same params) leads and the
+ *   generic link is the last row, "Other UPI app".
  * - Everywhere: "Copy UPI ID" / "Copy amount" and a one-line manual route, the
- *   fallback that works with every UPI app.
+ *   fallback that works with every UPI app. `foldFallback` tucks these (and
+ *   `children`, more fallbacks) under one line, so the pay button stands alone.
  *
  * Platform detection runs in an effect, so the server render and the first
  * client render are identical (no hydration mismatch); iOS re-orders after
@@ -36,6 +37,10 @@ export type UpiPayOptionsProps = {
   emphasis?: "primary" | "secondary";
   /** Hide the app-opening links from `sm` up (desktop has no UPI app to open). */
   linksMobileOnly?: boolean;
+  /** Fold the fallbacks under "UPI app didn't open or showed a warning?". */
+  foldFallback?: boolean;
+  /** More fallbacks, shown after the manual route. */
+  children?: React.ReactNode;
   className?: string;
 };
 
@@ -50,6 +55,8 @@ export function UpiPayOptions({
   genericLabel,
   emphasis = "primary",
   linksMobileOnly = false,
+  foldFallback = false,
+  children,
   className,
 }: UpiPayOptionsProps) {
   const [ios, setIos] = useState(false);
@@ -83,34 +90,52 @@ export function UpiPayOptions({
       className={cn(
         "inline-flex min-h-12 w-full items-center justify-center rounded-xl px-6 text-base font-bold",
         FOCUS,
-        emphasis === "primary" && !ios ? filled : outlined,
+        emphasis === "primary" ? filled : outlined,
       )}
     >
-      {ios ? "Other UPI app" : genericLabel}
+      {genericLabel}
     </a>
   );
 
+  // One row per app, as a picker: the app's initial in a tile, its name, a chevron.
+  const appRowClass = cn(
+    "flex min-h-14 w-full items-center gap-3 rounded-xl border bg-card px-3 text-left text-base font-semibold text-foreground transition-colors hover:border-primary/50 hover:bg-primary/5 motion-reduce:transition-none",
+    emphasis === "primary" ? "border-primary/30" : "border-border",
+    FOCUS,
+  );
+  const appTile =
+    "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border bg-muted text-sm font-bold text-foreground";
+
   const appButtons = ios && apps.length > 0 ? (
-    <div className="space-y-2">
-      <p className="text-sm font-semibold text-foreground">
+    <div className="space-y-2 text-left">
+      <p className="text-sm font-semibold text-muted-foreground">
         {hasAmount ? `Pay ${amountLabel} with` : "Open"}
       </p>
-      <ul className="grid grid-cols-3 gap-2">
+      <ul className="space-y-2">
         {apps.map((app) => (
           <li key={app.id}>
             <a
               href={app.href}
               aria-label={hasAmount ? `Pay ${amountLabel} with ${app.label}` : `Open ${app.label} to pay`}
-              className={cn(
-                "inline-flex min-h-12 w-full items-center justify-center rounded-xl px-2 text-sm font-bold",
-                FOCUS,
-                emphasis === "primary" ? filled : outlined,
-              )}
+              className={appRowClass}
             >
-              {app.label}
+              <span className={appTile} aria-hidden="true">
+                {app.label.charAt(0)}
+              </span>
+              <span className="flex-1">{app.label}</span>
+              <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-muted-foreground" aria-hidden="true" />
             </a>
           </li>
         ))}
+        <li>
+          <a href={upiLink} className={appRowClass}>
+            <span className={appTile} aria-hidden="true">
+              <span className="text-muted-foreground">⋯</span>
+            </span>
+            <span className="flex-1">Other UPI app</span>
+            <ChevronDown className="h-4 w-4 shrink-0 -rotate-90 text-muted-foreground" aria-hidden="true" />
+          </a>
+        </li>
       </ul>
     </div>
   ) : null;
@@ -120,13 +145,8 @@ export function UpiPayOptions({
     FOCUS,
   );
 
-  return (
-    <div className={cn("space-y-3", className)}>
-      <div className={cn("space-y-3", linksMobileOnly && "sm:hidden")}>
-        {appButtons}
-        {genericButton}
-      </div>
-
+  const fallback = (
+    <>
       <div className={cn("grid gap-2", hasAmount ? "grid-cols-2" : "grid-cols-1")}>
         <button type="button" onClick={() => void copy("upi")} className={copyButtonClass}>
           {copied === "upi" ? (
@@ -155,9 +175,33 @@ export function UpiPayOptions({
       ) : null}
       <p className="select-all break-all font-mono text-sm text-foreground">{upiId}</p>
       <p className="text-sm text-muted-foreground">
-        App didn&apos;t open? Open any UPI app → Pay to UPI ID → paste the UPI ID
+        App didn&apos;t open, or warned the payment may fail? Open any UPI app → Pay to UPI ID → paste the UPI ID
         {hasAmount ? ", then the amount" : ""}.
       </p>
+      {children}
+    </>
+  );
+
+  return (
+    <div className={cn("space-y-3", className)}>
+      <div className={cn("space-y-3", linksMobileOnly && "sm:hidden")}>
+        {appButtons ?? genericButton}
+      </div>
+
+      {foldFallback ? (
+        <details className="group overflow-hidden rounded-xl border border-border/60 text-left">
+          <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm font-semibold text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
+            <span className="flex-1">UPI app didn&apos;t open or showed a warning?</span>
+            <ChevronDown
+              className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
+              aria-hidden="true"
+            />
+          </summary>
+          <div className="space-y-3 border-t border-border/50 px-3 py-3">{fallback}</div>
+        </details>
+      ) : (
+        fallback
+      )}
 
       {/* Always mounted so screen readers announce the change. */}
       <p role="status" aria-live="polite" className="sr-only">

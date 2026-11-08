@@ -68,6 +68,22 @@ describe("billingAccess (trial / locked / free)", () => {
   const NOW = new Date("2026-10-10T06:30:00.000Z");
   const days = (n: number) => new Date(NOW.getTime() + n * DAY_MS);
 
+  it("subscribing to Lite during the trial keeps the trial until it ends", () => {
+    const v = { plan: "LITE" as const, planExpiresAt: days(5), trialEndsAt: days(5) };
+    expect(billingAccess(v, NOW)).toEqual({ kind: "trial", endsAt: days(5) });
+    expect(effectivePlan(v, NOW)).toBe(TRIAL_PLAN);
+    // Trial over, first charge still in its grace: Lite, not a lock.
+    expect(billingAccess(v, days(6))).toEqual({ kind: "paid", plan: "LITE" });
+    expect(effectivePlan(v, days(6))).toBe("LITE");
+  });
+
+  it("a plan at or above the trial's still wins over the trial", () => {
+    for (const plan of ["STARTER", "PRO"] as const) {
+      const v = { plan, planExpiresAt: days(5), trialEndsAt: days(5) };
+      expect(billingAccess(v, NOW)).toEqual({ kind: "paid", plan });
+    }
+  });
+
   it("no trial and no paid plan is the grandfathered free tier, never locked", () => {
     const v = { plan: "FREE" as const, planExpiresAt: null, trialEndsAt: null };
     expect(billingAccess(v, NOW)).toEqual({ kind: "free" });

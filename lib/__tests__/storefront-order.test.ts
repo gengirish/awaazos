@@ -13,6 +13,7 @@ import {
   orderStatusLabel,
   stockLabel,
   storefrontDropVisibility,
+  storeWhatsappNumber,
   whatsappChatLink,
 } from "@/lib/storefront-order";
 
@@ -63,7 +64,13 @@ describe("formatTimeLeft", () => {
 
   it("returns null when past or far away", () => {
     expect(formatTimeLeft(new Date(NOW.getTime() - 1), NOW)).toBeNull();
-    expect(formatTimeLeft(new Date(NOW.getTime() + 49 * 3600_000), NOW)).toBeNull();
+    expect(formatTimeLeft(new Date(NOW.getTime() + 8 * 24 * 3600_000), NOW)).toBeNull();
+  });
+
+  it("counts days past 24 hours", () => {
+    expect(formatTimeLeft(new Date(NOW.getTime() + 28 * 3600_000 + 12 * 60_000), NOW)).toBe("1 day 4 h left");
+    expect(formatTimeLeft(new Date(NOW.getTime() + 48 * 3600_000), NOW)).toBe("2 days left");
+    expect(formatTimeLeft(new Date(NOW.getTime() + 49 * 3600_000), NOW)).toBe("2 days 1 h left");
   });
 });
 
@@ -116,7 +123,7 @@ describe("orderErrorMessage", () => {
     expect(orderErrorMessage({ error: "sold_out", remaining: 0 }, "Laddu")).toContain("sold out");
     expect(orderErrorMessage({ error: "per_order_limit", limit: 4 }, "Cake")).toContain("at most 4");
     expect(orderErrorMessage({ error: "monthly_txn_cap_reached" })).toBe(
-      "This kitchen can't take online orders right now — message them directly.",
+      "This store can't take online orders right now — message them directly.",
     );
     expect(orderErrorMessage({ error: "drop_not_open" })).toMatch(/closed/);
   });
@@ -131,7 +138,7 @@ describe("orderStatusLabel", () => {
   it("gives text labels for every state", () => {
     expect(orderStatusLabel("AWAITING_PAYMENT", "PLACED").label).toBe("Waiting for payment");
     expect(orderStatusLabel("PAYMENT_SUBMITTED", "PLACED").label).toBe(
-      "Payment submitted — the kitchen will confirm",
+      "Payment submitted — the store will confirm",
     );
     expect(orderStatusLabel("PAID", "PLACED").label).toBe("Paid");
     expect(orderStatusLabel("PAY_ON_DELIVERY", "PLACED").label).toBe("Pay on delivery");
@@ -140,7 +147,7 @@ describe("orderStatusLabel", () => {
     expect(orderStatusLabel("EXPIRED", "PLACED").label).toBe("Expired — items released, please order again");
   });
 
-  it("shows Confirmed once the kitchen accepts, keeping the payment as a hint", () => {
+  it("shows Confirmed once the store accepts, keeping the payment as a hint", () => {
     expect(orderStatusLabel("PAID", "CONFIRMED")).toMatchObject({ label: "Confirmed", hint: "Paid" });
     expect(orderStatusLabel("PAY_ON_DELIVERY", "CONFIRMED")).toMatchObject({
       label: "Confirmed",
@@ -178,6 +185,26 @@ describe("buyerWhatsappNumber", () => {
   it("is null when opted in but the number is missing or unusable", () => {
     expect(buyerWhatsappNumber({ acceptWhatsappOrders: true, whatsappNumber: null })).toBeNull();
     expect(buyerWhatsappNumber({ acceptWhatsappOrders: true, whatsappNumber: "12345" })).toBeNull();
+  });
+});
+
+describe("storeWhatsappNumber", () => {
+  it("is null until the vendor opts in to the store-page button", () => {
+    expect(storeWhatsappNumber({ whatsappNumber: "+919876543210" })).toBeNull();
+    expect(storeWhatsappNumber({ showWhatsappOnStore: false, whatsappNumber: "+919876543210" })).toBeNull();
+    expect(storeWhatsappNumber(null)).toBeNull();
+  });
+
+  it("does not follow the WhatsApp orders opt-in", () => {
+    const settings = { acceptWhatsappOrders: true, showWhatsappOnStore: false, whatsappNumber: "+919876543210" };
+    expect(buyerWhatsappNumber(settings)).toBe("+919876543210");
+    expect(storeWhatsappNumber(settings)).toBeNull();
+  });
+
+  it("returns the number once opted in, and only a usable one", () => {
+    expect(storeWhatsappNumber({ showWhatsappOnStore: true, whatsappNumber: "+919876543210" })).toBe("+919876543210");
+    expect(storeWhatsappNumber({ showWhatsappOnStore: true, whatsappNumber: "12345" })).toBeNull();
+    expect(storeWhatsappNumber({ showWhatsappOnStore: true, whatsappNumber: null })).toBeNull();
   });
 });
 

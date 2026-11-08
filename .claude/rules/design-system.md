@@ -10,17 +10,45 @@ paths: ["**/*.tsx","**/*.css"]
 ## Brand
 
 - **Tagline:** "Bol. Bill. Becho." (always Latin script in UI; आवाज़ in logo only)
-- **Primary:** saffron orange `#FF6B00` → CSS var `--primary`
+- **Brand colour:** saffron orange `#FF6B00` — the logo and brand artwork only
+  (`brand-saffron`). White text on it is 2.9:1, so it is never a UI fill.
+- **Primary (UI fills, links, focus ring):** `--primary: 25 100% 37%` (`#BD4F00`),
+  the same hue darkened until white text passes AA (4.93:1). `--ring` and
+  `--awaaz-orange` carry the same value.
 - **Accent:** deep charcoal `#1A1A1A` (text)
 - **Surface:** white `#FFFFFF` / Slate-50 `#F8FAFC`
-- **Success:** green `#16A34A` (paid status)
-- **Warning:** amber `#F59E0B` (pending payment)
-- **Danger:** red `#DC2626` (failed)
+- **Success:** `--success: 142 72% 29%` → `bg-success` / `text-success` (paid status)
+- **Warning:** `--warning: 35 92% 33%` → `bg-warning` / `text-warning` (pending payment)
+- **Danger:** `--destructive` → `bg-destructive` / `text-destructive` (failed)
+
+Status tokens come with `-foreground` partners (`text-success-foreground` on
+`bg-success`) and `.dark` values. Both pass 4.5:1 as text on white and as a fill
+under their foreground (success 5.07:1, warning 4.95:1). Use them for new work
+instead of raw palette classes (`text-green-700`, `bg-amber-600`); existing
+screens still carry raw classes and move over as they are touched.
 
 ## Vendor theme override
 
-`VendorSettings.theme` ∈ `orange | green | blue | purple` swaps `--primary`
-via CSS variables — never hardcode hex in components.
+`VendorSettings.theme` swaps `--primary` and `--ring` through a `[data-theme]`
+block in `app/globals.css` — never hardcode hex in components. The one list is
+`STORE_THEMES` in `lib/store-theme.ts`: `green | amber | red | blue | purple`
+have a block; `orange` (the column default) and anything unknown stay on the
+default primary (`storeThemeAttribute()` returns `undefined`, so no attribute is
+rendered). Only the storefront pages (`/s/[slug]` and below) apply it. The owner
+picks it in Settings → Online store → Store colour (`StoreThemeClient`, one tap =
+`PATCH /api/vendor { theme }`); the swatches are painted by the same
+`[data-theme]` blocks, so the picker never carries a hex of its own.
+
+Every theme primary must keep white text at 4.5:1 or better:
+
+| Theme | `--primary` | White text |
+|---|---|---|
+| orange (default) | `25 100% 37%` | 4.93:1 |
+| green | `142 72% 29%` | 5.07:1 |
+| amber | `32 95% 33%` | 5.21:1 |
+| red | `0 72% 51%` | 4.80:1 |
+| blue | `221 83% 53%` | 5.20:1 |
+| purple | `262 83% 58%` | 5.67:1 |
 
 ## Typography
 
@@ -53,7 +81,8 @@ via CSS variables — never hardcode hex in components.
   one-screen tweak belongs at the call site via `className`. Re-running
   `npx shadcn@latest add` over an edited primitive drops those edits — diff first.
 - Pull new components via `npx shadcn@latest add <name>` (don't hand-write).
-  The exceptions are `responsive-dialog.tsx` and `confirm-dialog.tsx`, which are ours.
+  The exceptions are `responsive-dialog.tsx`, `confirm-dialog.tsx`, `empty-state.tsx`,
+  `notice.tsx` and `radio-option.tsx`, which are ours.
 
 ## Touch defaults built into the primitives
 
@@ -70,6 +99,24 @@ via CSS variables — never hardcode hex in components.
   `min-w-11` if icon-only) or the `touch-target` class.
 - Dialog / Sheet close buttons are a 44×44 hit area around the 16 px icon.
 
+## Toggles and choices
+
+One rule for every on/off or pick-one control. Don't hand-roll them.
+
+- **A single on/off setting is a `Switch`** (`components/ui/switch.tsx`): a 48×28 px
+  track in a 56×44 px tap area. Name it with `<label htmlFor>` or `aria-label`. The
+  off track is `--switch-off` (4.72:1 on white); `--input` is too faint for it.
+- **Choosing one of 2 to 5 options is a `RadioOption`** (`components/ui/radio-option.tsx`):
+  a native radio inside its label, which gives arrow keys for free. Same `name` across
+  a group, inside a `<fieldset>` + `<legend>` or `role="radiogroup"`. `size="compact"`
+  is for tight rows (POS payment mode, board filters). Never `aria-pressed` buttons for
+  this. More than 5 options is a `Select`.
+- **Choosing several, or a one-off opt-in on a form, is a checkbox** (native,
+  `accent-primary`, inside its label): picking dishes, bulk select, "Remember my details".
+- Leave these as they are: tabs that swap a panel (`role="tab"`), links that navigate
+  (`aria-current`), a button that does an action that can fail (phone alerts asks for
+  browser permission), and a button with a third state (the board's Sound button).
+
 ## Modals
 
 - Use `ResponsiveDialog` (`components/ui/responsive-dialog.tsx`) for any modal a
@@ -81,6 +128,17 @@ via CSS variables — never hardcode hex in components.
   (e.g. desktop-only auto-print).
 - Heights in `dvh`, never `vh` (`max-h-[92dvh]`): `vh` ignores mobile browser
   toolbars and hides the bottom of the modal.
+
+## Empty states and inline notices
+
+- "Nothing here yet" is `EmptyState` (`components/ui/empty-state.tsx`): the
+  dashed box with an optional icon, title, description and one action. Never
+  fake rows or placeholder numbers. Pass `role="status"` only when it appears
+  in response to an action (a search with no matches).
+- A boxed message about a blocked or failed action is `Notice`
+  (`components/ui/notice.tsx`, `tone="warning" | "danger"`), next to the control
+  it is about, with `role="alert"` when it appears in response to an action.
+  A one-line field error stays plain `text-destructive` text under its input.
 
 ## Safe areas
 

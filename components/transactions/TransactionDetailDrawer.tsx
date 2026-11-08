@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/responsive-dialog";
 import { formatINR } from "@/lib/currency";
 import { formatIstDateTime } from "@/lib/datetime";
+import { discountLabel } from "@/lib/offers";
 import { receiptWhatsappUrl } from "@/lib/whatsapp-message";
 
 export type TransactionDetailModel = {
@@ -23,6 +24,7 @@ export type TransactionDetailModel = {
   createdAt: string;
   subtotalPaise: number;
   discountPaise: number;
+  offerName?: string | null;
   taxPaise: number;
   totalPaise: number;
   paymentMethod: PaymentMethod;
@@ -109,9 +111,12 @@ export function TransactionDetailDrawer({ open, onOpenChange, transaction, vendo
               <dt className="text-muted-foreground">Subtotal</dt>
               <dd className="tabular-nums">{formatINR(transaction.subtotalPaise)}</dd>
             </div>
-            <div className="flex justify-between">
-              <dt className="text-muted-foreground">Discount</dt>
-              <dd className="tabular-nums">{formatINR(transaction.discountPaise)}</dd>
+            <div className="flex justify-between gap-3">
+              <dt className="min-w-0 break-words text-muted-foreground">{discountLabel(transaction.offerName)}</dt>
+              <dd className="shrink-0 tabular-nums">
+                {transaction.discountPaise > 0 ? "−" : ""}
+                {formatINR(transaction.discountPaise)}
+              </dd>
             </div>
             <div className="flex justify-between">
               <dt className="text-muted-foreground">Tax</dt>

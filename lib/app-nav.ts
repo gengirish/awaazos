@@ -1,5 +1,7 @@
 import type { StaffRole } from "@prisma/client";
 
+import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
+
 /**
  * Destinations of the signed-in app shell (components/shell). Pure and
  * client-safe: the bottom tab bar, the "More" sheet and the md+ rail are all
@@ -10,6 +12,12 @@ import type { StaffRole } from "@prisma/client";
  * dead end. `/drops` (the list) and `/analytics` require MANAGER; Menu and
  * Transactions are hidden from cashiers by product choice (they're owner tools).
  * Help (`/help`, content in lib/help-guide.ts) describes only what this list shows a role.
+ *
+ * The phone tab bar depends on whether the store is published (`appTabBarForRole`):
+ * a seller who takes orders online gets Settings on the bar and Sell behind More.
+ *
+ * Labels follow what the store sells (lib/store-vocabulary.ts): `/menu` is
+ * "Menu" for a kitchen and "Products" for any other store.
  */
 
 export type AppNavId = "orders" | "drops" | "sell" | "menu" | "transactions" | "analytics" | "settings" | "help";
@@ -18,7 +26,11 @@ export type AppNavItem = {
   id: AppNavId;
   href: string;
   label: string;
-  /** `tab`: on the phone tab bar. `more`: behind the phone "More" tab. The rail lists both. */
+  /**
+   * `tab`: on the phone tab bar. `more`: behind the phone "More" tab. The rail lists both.
+   * In `APP_NAV_ITEMS` this is the bar of an unpublished store; `appTabBarForRole` returns
+   * the placement a given seller actually sees.
+   */
   placement: "tab" | "more";
   /** Hidden from a CASHIER. */
   managerOnly: boolean;
@@ -35,10 +47,50 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
   { id: "help", href: "/help", label: "Help", placement: "more", managerOnly: false },
 ];
 
-/** The destinations a staff member of this role is shown, in display order. */
-export function appNavItemsForRole(role: StaffRole): AppNavItem[] {
+/** The destinations a staff member of this role is shown, in display order, labelled for the store's kind. */
+export function appNavItemsForRole(role: StaffRole, kind: StoreKind = "food"): AppNavItem[] {
   const isCashier = role === "CASHIER";
-  return APP_NAV_ITEMS.filter((item) => !(isCashier && item.managerOnly));
+  const catalogueTitle = vocabularyForKind(kind).catalogueTitle;
+  return APP_NAV_ITEMS.filter((item) => !(isCashier && item.managerOnly)).map((item) =>
+    item.id === "menu" ? { ...item, label: catalogueTitle } : item,
+  );
+}
+
+/** The phone tab bar holds this many destinations; "More" is the fifth tab. */
+export const APP_TAB_BAR_SLOTS = 4;
+
+/**
+ * Tab-bar priority once the store is published: orders come in online, so
+ * Settings (payments, store, alerts) is worth a slot more than the counter till.
+ */
+const PUBLISHED_TAB_PRIORITY: readonly AppNavId[] = ["orders", "drops", "menu", "settings", "sell"];
+
+/**
+ * The phone tab bar and its "More" sheet for this role.
+ *
+ * Store not published: the placement in `APP_NAV_ITEMS` (Orders, Drops, Sell, Menu).
+ * Store published: the first `APP_TAB_BAR_SLOTS` of `PUBLISHED_TAB_PRIORITY` the
+ * role may see (an owner gets Orders, Drops, Menu, Settings, with Sell behind
+ * More; a cashier's three destinations all fit, so Sell stays on the bar).
+ * Either way each list keeps the order of `APP_NAV_ITEMS`, and `placement` on
+ * the returned items says where each one landed.
+ */
+export function appTabBarForRole(
+  role: StaffRole,
+  storePublished: boolean,
+  kind: StoreKind = "food",
+): { tabs: AppNavItem[]; more: AppNavItem[] } {
+  const items = appNavItemsForRole(role, kind);
+  const onBar = storePublished
+    ? new Set(
+        PUBLISHED_TAB_PRIORITY.filter((id) => items.some((item) => item.id === id)).slice(0, APP_TAB_BAR_SLOTS),
+      )
+    : new Set(items.filter((item) => item.placement === "tab").map((item) => item.id));
+  const placed = items.map((item): AppNavItem => ({ ...item, placement: onBar.has(item.id) ? "tab" : "more" }));
+  return {
+    tabs: placed.filter((item) => item.placement === "tab"),
+    more: placed.filter((item) => item.placement === "more"),
+  };
 }
 
 /** Path-prefix match on whole segments: `/drops/123` is under `/drops`, `/dropship` is not. */

@@ -37,6 +37,20 @@ export type TransactionCreated = {
 };
 
 /**
+ * Open a signed-in vendor's store for "order from menu" with pay on delivery.
+ * Through the API: the settings screens have their own specs, this is only setup.
+ */
+export async function openStoreForMenuOrders(page: Page): Promise<{ id: string; slug: string }> {
+  const res = await page.request.patch("/api/vendor", {
+    data: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true },
+    headers: { "Content-Type": "application/json" },
+  });
+  expect(res.ok(), "opening the store for menu orders").toBe(true);
+  const me = await page.request.get("/api/vendor");
+  return ((await me.json()) as { vendor: { id: string; slug: string } }).vendor;
+}
+
+/**
  * Register a fresh vendor (OWNER) via the public API. Does NOT sign in.
  *
  * Registration is one `prisma.$transaction` creating User + Vendor +
@@ -67,20 +81,41 @@ export async function registerVendor(
   return { email, password: E2E_PASSWORD, stallName };
 }
 
-/** Sign in through the UI so the browser context carries the Auth.js session cookie. */
+/**
+ * Sign in through the UI so the browser context carries the Auth.js session cookie.
+ *
+ * Every vendor page sends a store that hasn't finished first-run setup to
+ * /onboarding (app/(vendor)/_shell-context.ts). Specs are about a set-up store,
+ * so unless `finishSetup: false` (or the callback is /onboarding itself), setup
+ * is marked done through the API and the browser is sent on to `callbackUrl`.
+ */
 export async function signIn(
   page: Page,
   creds: VendorCreds,
   callbackUrl = "/menu",
+  { finishSetup = true }: { finishSetup?: boolean } = {},
 ): Promise<void> {
   await page.addInitScript(() => {
     window.localStorage.setItem("awz_cookie_pref_v1", "accepted");
   });
   await page.goto(`/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}`);
   await page.getByLabel(/email/i).fill(creds.email);
-  await page.getByLabel(/password/i).fill(creds.password);
+  await page.getByLabel("Password", { exact: true }).fill(creds.password);
   await page.getByRole("button", { name: /sign in/i }).click();
   await page.waitForURL((u) => !u.pathname.includes("/sign-in"), { timeout: 45_000 });
+
+  if (!finishSetup || callbackUrl.startsWith("/onboarding")) return;
+  // Platform admins have no store: 401, nothing to finish.
+  const me = await page.request.get("/api/vendor", { failOnStatusCode: false });
+  if (!me.ok()) return;
+  const { vendor } = (await me.json()) as { vendor: { onboardingDone: boolean } };
+  if (vendor.onboardingDone) return;
+  const done = await page.request.patch("/api/vendor", {
+    data: { onboardingDone: true },
+    headers: { "Content-Type": "application/json" },
+  });
+  expect(done.ok(), "finishing setup for the spec's store").toBe(true);
+  await page.goto(callbackUrl);
 }
 
 /**
@@ -105,7 +140,9 @@ export async function createMenuItem(
     name: string;
     priceInRupees: number;
     aliasesCsv?: string;
+    tagsCsv?: string;
     category?: string;
+    description?: string;
   },
 ): Promise<MenuItemRow> {
   const res = await page.request.post("/api/menu", {

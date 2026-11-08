@@ -1,15 +1,15 @@
 "use client";
 
 import { Download, Share, X } from "lucide-react";
-import { useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import {
   dismissInstallHint,
+  isInstallBannerEligible,
   promptInstall,
-  setInstallBannerPresence,
   useInstallPrompt,
 } from "@/hooks/useInstallPrompt";
+import { openInstallGuide } from "@/lib/install-guide";
 import { INSTALL_COPY } from "@/lib/install-prompt";
 import { cn } from "@/lib/utils";
 
@@ -18,28 +18,25 @@ import { cn } from "@/lib/utils";
  * (hooks/useInstallPrompt.ts) and draw nothing on the server or before mount.
  *
  *   InstallBanner      one dismissible in-flow banner on the home screens
- *                      (/orders, /pos), until dismissed or installed.
+ *                      (/pos; on /orders through its banner slot), until
+ *                      dismissed or installed.
  *   InstallSheetRow    a row in the shell's "More" sheet on phones. Stays after
  *                      the banner is dismissed: it is how to find install again.
  *   InstallRailButton  the rail foot from md, only where the browser can prompt.
  *
  * Android / desktop Chromium get a button that opens the browser's install
  * dialog. iPhone has no install API, so it gets the Share → Add to Home Screen
- * steps as text. In-app browsers (Instagram, Facebook…) can't install at all:
- * no banner, and the sheet row says to open the page in a real browser.
+ * steps as text, plus a button for the step-by-step dialog (lib/install-guide.ts).
+ * In-app browsers (Instagram, Facebook…) can't install at all: no banner, and the
+ * sheet row says to open the page in a real browser, with the same dialog on iPhone.
  */
 
 const ICON_BADGE = "flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground";
 
 export function InstallBanner({ className }: { className?: string }) {
-  const { mode, dismissed, installing } = useInstallPrompt();
-  const visible = (mode === "prompt" || mode === "ios") && !dismissed;
-
-  useEffect(() => {
-    if (!visible) return;
-    setInstallBannerPresence(true);
-    return () => setInstallBannerPresence(false);
-  }, [visible]);
+  const install = useInstallPrompt();
+  const { mode, guide, installing } = install;
+  const visible = isInstallBannerEligible(install);
 
   if (!visible) return null;
 
@@ -55,6 +52,11 @@ export function InstallBanner({ className }: { className?: string }) {
         <p className={cn("text-muted-foreground", mode === "prompt" && "hidden sm:block")}>
           {mode === "ios" ? INSTALL_COPY.ios : INSTALL_COPY.prompt}
         </p>
+        {guide ? (
+          <Button type="button" variant="outline" className="mt-2 min-h-11" onClick={() => void openInstallGuide()}>
+            {INSTALL_COPY.guide}
+          </Button>
+        ) : null}
       </div>
       {mode === "prompt" ? (
         <Button
@@ -81,7 +83,7 @@ export function InstallBanner({ className }: { className?: string }) {
 
 /** `<li>` for the shell's "More" sheet; renders nothing when there is nothing to offer. */
 export function InstallSheetRow({ rowClassName, onPrompt }: { rowClassName: string; onPrompt?: () => void }) {
-  const { mode, installing } = useInstallPrompt();
+  const { mode, guide, installing } = useInstallPrompt();
 
   if (mode === "prompt") {
     return (
@@ -105,9 +107,8 @@ export function InstallSheetRow({ rowClassName, onPrompt }: { rowClassName: stri
   }
 
   if (mode === "ios" || mode === "in-app") {
-    // Instructions, not a control: there is nothing here a tap could do.
-    return (
-      <li className="flex min-h-14 items-center gap-3 px-4 py-3">
+    const content = (
+      <>
         <span className={ICON_BADGE}>
           {mode === "ios" ? <Share className="h-5 w-5" aria-hidden /> : <Download className="h-5 w-5" aria-hidden />}
         </span>
@@ -117,8 +118,26 @@ export function InstallSheetRow({ rowClassName, onPrompt }: { rowClassName: stri
             {mode === "ios" ? INSTALL_COPY.iosShort : INSTALL_COPY.inApp}
           </span>
         </span>
-      </li>
+      </>
     );
+    if (guide) {
+      return (
+        <li>
+          <button
+            type="button"
+            className={rowClassName}
+            onClick={() => {
+              onPrompt?.();
+              void openInstallGuide();
+            }}
+          >
+            {content}
+          </button>
+        </li>
+      );
+    }
+    // Instructions, not a control: there is nothing here a tap could do.
+    return <li className="flex min-h-14 items-center gap-3 px-4 py-3">{content}</li>;
   }
 
   return null;

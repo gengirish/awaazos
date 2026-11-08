@@ -1,42 +1,70 @@
 "use client";
 
-import type { FulfilmentMode } from "@prisma/client";
-import { ChefHat, ExternalLink, Loader2, Pencil, RefreshCw, Settings, Volume2, VolumeX } from "lucide-react";
+import type { FulfilmentMode, StaffRole } from "@prisma/client";
+import {
+  BellRing,
+  ChefHat,
+  CircleAlert,
+  Loader2,
+  PackageCheck,
+  Pencil,
+  Plus,
+  RefreshCw,
+  Search,
+  Settings,
+  Share2,
+  Volume2,
+  VolumeX,
+  X,
+} from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 
-import type { StoryImage } from "@/components/drops/InstagramStoryButton";
-import { BoardMoreActions, MORE_ACTION_ROW } from "@/components/drops/orders/BoardMoreActions";
+import type { OverflowLink } from "@/components/drops/orders/BoardMenus";
 import { BulkActionBar } from "@/components/drops/orders/BulkActionBar";
-import { OrderCard } from "@/components/drops/orders/OrderCard";
+import { OrderCard, type OrderSource } from "@/components/drops/orders/OrderCard";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
-import { PushAlertsButton, PushAlertsPrompt } from "@/components/push/PushAlertsButton";
+import { PushAlertsBarButton } from "@/components/push/PushAlertsBarButton";
 import { Button } from "@/components/ui/button";
+import { RadioOption } from "@/components/ui/radio-option";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Input } from "@/components/ui/input";
+import { usePushAlerts } from "@/hooks/usePushAlerts";
+import type { DeliveryRider } from "@/lib/delivery-riders";
 import { formatINR } from "@/lib/currency";
+import { dropStateLabel } from "@/lib/drop-state";
 import type { EffectiveDropStatus } from "@/lib/drops";
 import {
   BOARD_FILTERS,
-  DROP_STATUS_LABEL,
+  boardPollKind,
   countByFilter,
+  dropOrdersHref,
+  filterByHandover,
   filterOrders,
   firstName,
+  groupByFulfilment,
+  groupIdsByDrop,
+  isDropFrozen,
   liveEffectiveStatus,
   newOrderIds,
+  newOrdersTab,
+  orderActionBase,
+  ordersInScope,
   prepFromOrders,
-  shouldPollForOrders,
+  searchOrders,
   summarizeOrders,
   type BoardFilter,
   type BoardOrder,
+  type BoardScope,
+  type HandoverFilter,
   type OrderAction,
 } from "@/lib/drops-board";
 import type { BoardDrop } from "@/lib/drops-board-server";
+import { shareOrOpenWhatsApp } from "@/lib/drops-share";
 import { formatIstDate, formatIstTime } from "@/lib/drops-time";
-import {
-  BOARD_POLL_MS,
-  menuBoardPollKind,
-  toMakeFromOrders,
-} from "@/lib/menu-orders-board";
+import { BOARD_POLL_MS, toMakeFromOrders } from "@/lib/menu-orders-board";
 import {
   BULK_ORDER_MAX,
   bulkActionCounts,
@@ -54,45 +82,69 @@ import {
   writeOrderSoundPref,
   type PushArrivedDetail,
 } from "@/lib/order-voice";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
+
+// The select primitives are heavy and only a vendor with two or more sources
+// gets a picker, so it loads after the board. The placeholder holds its place.
+const BoardScopePicker = dynamic(() => import("@/components/drops/orders/BoardScopePicker"), {
+  ssr: false,
+  loading: () => <div aria-hidden className="h-11 w-40 rounded-md border border-input" />,
+});
+// The header's menus load after the board; each placeholder holds its control's place.
+const BoardShareMenu = dynamic(() => import("@/components/drops/orders/BoardMenus").then((m) => m.BoardShareMenu), {
+  loading: () => <div aria-hidden className="h-11 w-28 rounded-md bg-primary/40" />,
+});
+const BoardOverflowMenu = dynamic(() => import("@/components/drops/orders/BoardMenus").then((m) => m.BoardOverflowMenu), {
+  loading: () => <div aria-hidden className="h-11 w-11 rounded-md border border-input" />,
+});
+const MenuStatusPill = dynamic(() => import("@/components/drops/orders/BoardMenus").then((m) => m.MenuStatusPill), {
+  loading: () => <div aria-hidden className="h-11 w-36 rounded-full border border-input" />,
+});
+const BoardInfoHint = dynamic(() => import("@/components/drops/orders/BoardMenus").then((m) => m.BoardInfoHint), {
+  loading: () => <div aria-hidden className="h-11 w-11" />,
+});
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 /** Coming back to the tab (e.g. tapping a push alert) refetches at most this often. */
 const VISIBLE_REFETCH_MIN_MS = 30_000;
 
-/**
- * Which orders the board shows: one Drop's pre-orders (cut-off, prep sheet,
- * frozen rule), or the "order from menu" orders (storefront, no drop), which
- * have no cut-off and poll only while the vendor has the setting switched on.
- */
-export type OrdersBoardSource =
-  | { kind: "drop"; initialDrop: BoardDrop }
-  | { kind: "menu"; acceptMenuOrders: boolean; fulfilmentMode: FulfilmentMode };
-
 type Props = {
   vendorName: string;
   vendorSlug: string;
-  source: OrdersBoardSource;
+  /** "Order from menu" is switched on (Settings → Online orders). */
+  acceptMenuOrders: boolean;
+  menuFulfilmentMode: FulfilmentMode;
   initialOrders: BoardOrder[];
+  initialDrops: BoardDrop[];
+  /** From `?drop=`: open the board narrowed to this drop (ignored if it is not on the board). */
+  initialDropId: string | null;
   initialSignal: number | null;
+  /** The viewer's role here. Drops are MANAGER+, so a cashier is never sent to build one. */
+  staffRole: StaffRole;
+  /** Saved delivery riders (Settings → Online orders): "Send to <name>" on delivery orders. */
+  riders?: DeliveryRider[];
+  /** The store's words for its catalogue (lib/store-vocabulary.ts). */
+  vocab: StoreVocabulary;
 };
 
-type OrdersResponse = { data: BoardOrder[]; drop?: BoardDrop; signal: number | null };
+type OrdersResponse = { data: BoardOrder[]; drops: BoardDrop[]; signal: number | null };
 type BulkResponse = { data?: BulkOrderResult & { orders: BoardOrder[] }; error?: string };
 
 const EMPTY_SELECTION: ReadonlySet<string> = new Set();
+const NO_IDS: readonly string[] = [];
 
-function boardUrls(source: OrdersBoardSource): { orders: string; signal: string; actionBase: string } {
-  if (source.kind === "menu") {
-    return {
-      orders: "/api/storefront-orders",
-      signal: "/api/storefront-orders/signal",
-      actionBase: "/api/storefront-orders",
-    };
-  }
-  const base = `/api/drops/${encodeURIComponent(source.initialDrop.id)}`;
-  return { orders: `${base}/orders`, signal: `${base}/signal`, actionBase: `${base}/orders` };
-}
+/** A handful of orders is read at a glance; the search box appears from here. */
+const SEARCH_MIN_ORDERS = 6;
+
+const HANDOVER_FILTERS: { id: HandoverFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "pickup", label: "Pickup" },
+  { id: "delivery", label: "Delivery" },
+];
+
+const ORDERS_URL = "/api/storefront-orders";
+const SIGNAL_URL = "/api/storefront-orders/signal";
 
 const MENU_MODE_LABEL: Record<FulfilmentMode, string> = {
   PICKUP: "Pickup only",
@@ -100,34 +152,32 @@ const MENU_MODE_LABEL: Record<FulfilmentMode, string> = {
   BOTH: "Delivery or pickup",
 };
 
-const MENU_BOARD_SCOPE = "Orders customers placed from your menu in the last 3 days, plus older ones still open.";
+function allBoardScope(vocab: StoreVocabulary): string {
+  return `Every online order, from your ${vocab.catalogue} and from your drops: the last 3 days, plus older ones still open.`;
+}
+
+function catalogueBoardScope(vocab: StoreVocabulary): string {
+  return `Orders customers placed from your ${vocab.catalogue} in the last 3 days, plus older ones still open.`;
+}
 
 const ACTION_DONE: Record<OrderAction, string> = {
   confirm: "Order confirmed",
   mark_paid: "Marked paid",
   reject_payment: "Marked not received",
   cancel: "Order cancelled",
+  dispatch: "Marked out for delivery",
   deliver: "Marked delivered",
   undeliver: "Moved back to confirmed",
 };
 
-const LINK_BTN =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
+/** Summary tile: one line, label and figure. Four in a row from sm, 2×2 on phones. */
+const KPI_TILE = "flex min-w-0 flex-wrap items-center justify-between gap-x-1.5 rounded-lg border bg-card px-2.5 py-1.5";
+const KPI_VALUE = "font-mono text-sm font-bold tabular-nums";
 
-/** Summary tile: one line (label · figure) on phones, label over figure from sm. */
-const KPI_TILE =
-  "flex min-w-0 flex-wrap items-baseline justify-between gap-x-1.5 rounded-lg border bg-card px-2 py-1.5 sm:block sm:p-3";
-const KPI_VALUE = "font-mono text-sm font-bold tabular-nums sm:text-lg";
+const SEGMENT_BTN =
+  "inline-flex min-h-11 items-center justify-center gap-1 rounded-md border px-2 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
 
 const STATUS_BADGE = "inline-flex shrink-0 items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold";
-
-/** Header controls built by the board (they need its state), laid out by each header. */
-type BoardTools = {
-  refreshButton: ReactNode;
-  lastChecked: ReactNode;
-  soundButton: (className?: string) => ReactNode;
-  pollNote: ReactNode;
-};
 
 function beep(ctx: AudioContext | null) {
   if (!ctx) return;
@@ -146,10 +196,27 @@ function beep(ctx: AudioContext | null) {
   }
 }
 
-export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, initialSignal }: Props) {
-  const isMenu = source.kind === "menu";
-  const [drop, setDrop] = useState<BoardDrop | null>(source.kind === "drop" ? source.initialDrop : null);
+export function OrdersBoard({
+  vendorName,
+  vendorSlug,
+  acceptMenuOrders: initialAcceptMenuOrders,
+  menuFulfilmentMode,
+  initialOrders,
+  initialDrops,
+  initialDropId,
+  initialSignal,
+  staffRole,
+  riders = [],
+  vocab,
+}: Props) {
   const [orders, setOrders] = useState(initialOrders);
+  const [acceptMenuOrders, setAcceptMenuOrders] = useState(initialAcceptMenuOrders);
+  const [menuStatusPending, setMenuStatusPending] = useState(false);
+  // Paused from this page: the menu stays a source even with no orders on it,
+  // so the status pill that can turn it back on doesn't vanish under her thumb.
+  const [pausedHere, setPausedHere] = useState(false);
+  const [drops, setDrops] = useState(initialDrops);
+  const [scope, setScope] = useState<BoardScope>(initialDropId ?? "all");
   const [filter, setFilter] = useState<BoardFilter>("needs_action");
   const [refreshing, setRefreshing] = useState(false);
   const [pending, setPending] = useState<{ orderId: string; action: OrderAction } | null>(null);
@@ -157,6 +224,12 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
   const [bulkPending, setBulkPending] = useState<BulkOrderAction | null>(null);
   const [newIds, setNewIds] = useState<Set<string>>(() => new Set());
   const [announcement, setAnnouncement] = useState("");
+  // Orders that arrived and have not been looked at yet: the "N new orders —
+  // show" button. Cleared when she taps it or acts on any order.
+  const [unseenIds, setUnseenIds] = useState<readonly string[]>(NO_IDS);
+  const [query, setQuery] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [handover, setHandover] = useState<HandoverFilter>("all");
   const [soundOn, setSoundOn] = useState(false);
   /** Saved choice was "on" but audio is still locked until the first tap. */
   const [soundPending, setSoundPending] = useState(false);
@@ -174,19 +247,47 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
   soundRef.current = soundOn;
   const inFlight = useRef(false);
   const lastVisibleRefetch = useRef(0);
+  // The drop the vendor last opened stays on the board across refetches, even
+  // once it is old enough to have dropped off by itself (see loadOrdersBoard).
+  const pinnedDropRef = useRef<string | null>(initialDropId);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<Partial<Record<BoardFilter, HTMLButtonElement | null>>>({});
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const searchToggleRef = useRef<HTMLButtonElement>(null);
+  // The shared phone-alerts store (hooks/usePushAlerts.ts): the bar's control
+  // already subscribes to it, so reading it here asks the browser nothing new.
+  const push = usePushAlerts();
 
-  // A page never switches source, so these strings are stable for its lifetime.
-  const { orders: ordersUrl, signal: signalUrl, actionBase } = boardUrls(source);
-
+  // What the board can be narrowed to. With a single source there is nothing to
+  // choose, so the board simply is that source (and shows its details).
+  const showMenu = acceptMenuOrders || pausedHere || orders.some((o) => o.dropId === null);
+  const sources = useMemo<BoardScope[]>(
+    () => [...(showMenu ? ["menu"] : []), ...drops.map((d) => d.id)],
+    [showMenu, drops],
+  );
+  const activeScope: BoardScope =
+    sources.length === 1 ? sources[0]! : scope !== "all" && sources.includes(scope) ? scope : "all";
+  const drop = drops.find((d) => d.id === activeScope) ?? null;
   const effective: EffectiveDropStatus | null = drop ? liveEffectiveStatus(drop, now) : null;
-  const frozen = drop ? drop.status === "FROZEN" || drop.status === "FULFILLED" : false;
+
+  const frozenDropIds = useMemo(
+    () => new Set(drops.filter((d) => isDropFrozen(d.status)).map((d) => d.id)),
+    [drops],
+  );
+  const isFrozen = useCallback(
+    (o: { dropId: string | null }) => o.dropId !== null && frozenDropIds.has(o.dropId),
+    [frozenDropIds],
+  );
 
   const refresh = useCallback(async (opts?: { manual?: boolean; quiet?: boolean }) => {
     if (inFlight.current) return;
     inFlight.current = true;
     if (opts?.manual) setRefreshing(true);
     try {
-      const res = await fetch(ordersUrl, { cache: "no-store" });
+      const pin = pinnedDropRef.current;
+      const res = await fetch(pin ? `${ORDERS_URL}?drop=${encodeURIComponent(pin)}` : ORDERS_URL, {
+        cache: "no-store",
+      });
       if (!res.ok) {
         if (opts?.manual) toast.error("Could not refresh orders");
         return;
@@ -201,6 +302,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
             : `${fresh.length} new orders, latest from ${firstName(newest?.customerName)}`,
         );
         setNewIds((prev) => new Set([...Array.from(prev), ...fresh]));
+        setUnseenIds((prev) => [...prev, ...fresh]);
         // Chime, then the spoken alert — unless the push already said it.
         if (soundRef.current && !opts?.quiet) {
           beep(audioRef.current);
@@ -210,7 +312,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
       signalRef.current = body.signal;
       setSignalMode(body.signal === null ? "fallback" : "kv");
       setOrders(body.data);
-      if (body.drop) setDrop(body.drop);
+      setDrops(body.drops);
       setNow(new Date());
       setLastChecked(new Date());
     } catch {
@@ -219,42 +321,42 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
       inFlight.current = false;
       if (opts?.manual) setRefreshing(false);
     }
-  }, [ordersUrl]);
+  }, []);
 
-  // Re-render exactly when the drop opens / closes, so polling starts / stops on
+  // Re-render exactly when a drop opens / closes, so polling starts / stops on
   // time without a network call. Pure client timer — touches nothing remote.
-  // (Menu board: no drop, no edges, no timer.)
-  const opensAt = drop?.opensAt ?? null;
-  const closesAtIso = drop?.closesAt ?? null;
-  useEffect(() => {
-    const t = Date.now();
-    const edges = [opensAt, closesAtIso]
+  const nextEdgeAt = useMemo(() => {
+    const t = now.getTime();
+    const edges = drops
+      .flatMap((d) => [d.opensAt, d.closesAt])
       .filter((x): x is string => Boolean(x))
-      .map((x) => new Date(x).getTime() - t)
-      .filter((ms) => ms > 0);
-    if (edges.length === 0) return;
-    const id = window.setTimeout(() => setNow(new Date()), Math.min(Math.min(...edges) + 500, MAX_TIMEOUT_MS));
+      .map((x) => new Date(x).getTime())
+      .filter((ms) => ms > t);
+    return edges.length > 0 ? Math.min(...edges) : null;
+  }, [drops, now]);
+  useEffect(() => {
+    if (nextEdgeAt === null) return;
+    const id = window.setTimeout(
+      () => setNow(new Date()),
+      Math.min(Math.max(nextEdgeAt - Date.now(), 0) + 500, MAX_TIMEOUT_MS),
+    );
     return () => window.clearTimeout(id);
-  }, [opensAt, closesAtIso, now]);
+  }, [nextEdgeAt]);
 
   // New-order detection without pinning Neon awake. Instant alerts come from Web
-  // Push (lib/push.ts); polling is only a fallback, so BOTH boards tick every 6 min —
-  // above Neon's 5-min idle timeout, since each tick's session check reads Postgres.
+  // Push (lib/push.ts); polling is only a fallback, so the board ticks every
+  // 6 min — above Neon's 5-min idle timeout, since each tick's session check
+  // reads Postgres.
   //  - KV available: read the Upstash counter, refetch only when it moves.
-  //  - No KV: refetch directly, only while OPEN.
+  //  - No KV: refetch directly, only while something is taking orders.
   //  - Only while the tab is visible; returning to the tab refetches once.
-  //  - Drop board: nothing at all once orders are closed. Menu board: only while
-  //    "order from menu" is switched on.
-  const pollKind: "signal" | "fallback" | null =
-    source.kind === "menu"
-      ? menuBoardPollKind(source.acceptMenuOrders, signalMode)
-      : !effective || !shouldPollForOrders(effective)
-        ? null
-        : signalMode === "kv"
-          ? "signal"
-          : effective === "OPEN"
-            ? "fallback"
-            : null;
+  //  - Nothing at all unless a buyer could order right now: "order from menu"
+  //    is on, or a drop is open (or about to open). See `boardPollKind`.
+  const pollKind = boardPollKind({
+    acceptMenuOrders,
+    dropStatuses: drops.map((d) => liveEffectiveStatus(d, now)),
+    signalMode,
+  });
 
   useEffect(() => {
     if (!pollKind) return;
@@ -267,7 +369,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
         return;
       }
       try {
-        const res = await fetch(signalUrl, { cache: "no-store" });
+        const res = await fetch(SIGNAL_URL, { cache: "no-store" });
         if (!res.ok || cancelled) return;
         const { signal } = (await res.json()) as { signal: number | null };
         if (signal === null) {
@@ -291,7 +393,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
       window.clearInterval(id);
       document.removeEventListener("visibilitychange", onVisible);
     };
-  }, [pollKind, signalUrl, refresh]);
+  }, [pollKind, refresh]);
 
   // The server-rendered orders were just fetched; start the clock on mount
   // (not during render) so server and client markup match.
@@ -356,8 +458,12 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
       // The Sound button handles its own tap.
       if (e.target instanceof Element && e.target.closest("[data-sound-toggle]")) return;
       unlockAudio(false);
-      setSoundOn(true);
-      setSoundPending(false);
+      // After the tap has been handled: a re-render in the middle of the click
+      // makes React drop the change of a checkbox that was the thing tapped.
+      setTimeout(() => {
+        setSoundOn(true);
+        setSoundPending(false);
+      }, 0);
     };
     document.addEventListener("click", onTap, true);
     return () => document.removeEventListener("click", onTap, true);
@@ -375,13 +481,20 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
     writeOrderSoundPref(turnOn);
   };
 
-  const runAction = async (orderId: string, action: OrderAction) => {
+  const seenNewOrders = () => {
+    setUnseenIds(NO_IDS);
+    setAnnouncement("");
+  };
+
+  const runAction = async (orderId: string, action: OrderAction, opts?: { riderName?: string }) => {
+    const order = ordersRef.current.find((o) => o.id === orderId);
+    if (!order) return;
     setPending({ orderId, action });
     try {
-      const res = await fetch(`${actionBase}/${encodeURIComponent(orderId)}`, {
+      const res = await fetch(`${orderActionBase(order.dropId)}/${encodeURIComponent(orderId)}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify(opts?.riderName ? { action, riderName: opts.riderName } : { action }),
       });
       const body = (await res.json().catch(() => ({}))) as { data?: BoardOrder; error?: string };
       if (res.ok && body.data) {
@@ -392,11 +505,24 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
           next.delete(updated.id);
           return next;
         });
-        toast.success(ACTION_DONE[action]);
+        seenNewOrders();
+        if (action === "deliver") {
+          // A slip of the thumb at the door: one tap puts it back (the card's own
+          // "Undo delivered" is a filter away by now).
+          toast.success(updated.fulfilmentType === "PICKUP" ? "Marked picked up" : ACTION_DONE.deliver, {
+            duration: 8000,
+            classNames: { actionButton: "min-h-11" },
+            action: { label: "Undo", onClick: () => void runAction(updated.id, "undeliver") },
+          });
+        } else if (action === "dispatch" && opts?.riderName) {
+          toast.success(`Out for delivery with ${opts.riderName}`);
+        } else {
+          toast.success(ACTION_DONE[action]);
+        }
         return;
       }
       if (body.error === "drop_frozen") {
-        toast.error("Orders are frozen. Only payment and delivery can change now.");
+        toast.error("Orders are locked. Only payment and delivery can change now.");
       } else if (body.error === "invalid_state") {
         toast.error("This order changed on another device. Refreshed.");
       } else if (res.status === 404) {
@@ -412,19 +538,61 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
     }
   };
 
-  const summary = useMemo(() => summarizeOrders(orders), [orders]);
+  const scoped = useMemo(() => ordersInScope(orders, activeScope), [orders, activeScope]);
+  const summary = useMemo(() => summarizeOrders(scoped), [scoped]);
   const dropItems = drop?.items;
-  const prep = useMemo(() => (dropItems ? prepFromOrders(dropItems, orders) : []), [dropItems, orders]);
-  const toMake = useMemo(() => (isMenu ? toMakeFromOrders(orders) : []), [isMenu, orders]);
-  const counts = useMemo(() => countByFilter(orders), [orders]);
-  const visible = useMemo(() => filterOrders(orders, filter), [orders, filter]);
+  const prep = useMemo(() => (dropItems ? prepFromOrders(dropItems, scoped) : []), [dropItems, scoped]);
+  // "To make" is about today's menu orders. A drop is cooked on its own day and
+  // has its own "To cook" line and prep sheet, so its dishes are never mixed in.
+  const showToMake = !drop && showMenu;
+  const toMake = useMemo(
+    () => (showToMake ? toMakeFromOrders(ordersInScope(scoped, "menu")) : []),
+    [showToMake, scoped],
+  );
+  const counts = useMemo(() => countByFilter(scoped), [scoped]);
+  const inFilter = useMemo(() => filterOrders(scoped, filter), [scoped, filter]);
+  // Handover day: the Confirmed list splits into what is collected and what goes out.
+  const showHandover = useMemo(() => {
+    if (filter !== "confirmed") return false;
+    const { pickup, delivery } = groupByFulfilment(inFilter);
+    return pickup.length > 0 && delivery.length > 0;
+  }, [filter, inFilter]);
+  const activeHandover: HandoverFilter = showHandover ? handover : "all";
+  const trimmedQuery = query.trim();
+  // Search is over the list already on the device: no request, no timer.
+  const visible = useMemo(
+    () => searchOrders(filterByHandover(inFilter, activeHandover), trimmedQuery),
+    [inFilter, activeHandover, trimmedQuery],
+  );
+  const matchesInScope = useMemo(
+    () => (trimmedQuery ? searchOrders(scoped, trimmedQuery).length : 0),
+    [scoped, trimmedQuery],
+  );
+  const showSearch = scoped.length >= SEARCH_MIN_ORDERS || query !== "";
+  const searchExpanded = searchOpen || query !== "";
+
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  const closeSearch = () => {
+    setQuery("");
+    setSearchOpen(false);
+    setSelected(EMPTY_SELECTION);
+    searchToggleRef.current?.focus();
+  };
+  const unseenCount = useMemo(() => {
+    if (unseenIds.length === 0) return 0;
+    const ids = new Set(unseenIds);
+    return orders.filter((o) => ids.has(o.id)).length;
+  }, [orders, unseenIds]);
   const toCook = prep.filter((p) => p.qtyOrdered > 0);
 
   // Selection is limited to what is on screen and still actionable: derived, so
   // a refetch that moves an order to another tab silently drops it.
-  const activeSelected = useMemo(() => pruneSelection(selected, visible, frozen), [selected, visible, frozen]);
-  const selectableVisible = useMemo(() => visible.filter((o) => isBulkSelectable(o, frozen)), [visible, frozen]);
-  const bulkCounts = useMemo(() => bulkActionCounts(visible, activeSelected, frozen), [visible, activeSelected, frozen]);
+  const activeSelected = useMemo(() => pruneSelection(selected, visible, isFrozen), [selected, visible, isFrozen]);
+  const selectableVisible = useMemo(() => visible.filter((o) => isBulkSelectable(o, isFrozen(o))), [visible, isFrozen]);
+  const bulkCounts = useMemo(() => bulkActionCounts(visible, activeSelected, isFrozen), [visible, activeSelected, isFrozen]);
   const allSelected = selectableVisible.length > 0 && selectableVisible.every((o) => activeSelected.has(o.id));
   const someSelected = activeSelected.size > 0 && !allSelected;
 
@@ -451,32 +619,127 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
     setSelected(EMPTY_SELECTION);
   };
 
-  const targetsFor = (action: BulkOrderAction) => bulkTargets(visible, activeSelected, action, frozen);
+  // Arrow keys move between the filter tabs (one tab stop for the whole row).
+  const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
+    const i = BOARD_FILTERS.findIndex((f) => f.id === filter);
+    const last = BOARD_FILTERS.length - 1;
+    const next =
+      e.key === "ArrowRight"
+        ? i === last
+          ? 0
+          : i + 1
+        : e.key === "ArrowLeft"
+          ? i === 0
+            ? last
+            : i - 1
+          : e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? last
+              : -1;
+    if (next < 0) return;
+    e.preventDefault();
+    const id = BOARD_FILTERS[next]!.id;
+    changeFilter(id);
+    tabRefs.current[id]?.focus();
+  };
+
+  const changeScope = (next: BoardScope) => {
+    const isDrop = next !== "all" && next !== "menu";
+    if (isDrop) pinnedDropRef.current = next;
+    setScope(next);
+    setSelected(EMPTY_SELECTION);
+    // Keep the address in step, so a reload or coming back from the prep sheet
+    // lands on the same drop.
+    window.history.replaceState(null, "", isDrop ? dropOrdersHref(next) : "/orders");
+  };
+
+  // "N new orders — show": whatever tab, search or drop she was looking at, land
+  // on the new orders at the top of their tab.
+  const showNewOrders = () => {
+    const inScope = new Set(scoped.map((o) => o.id));
+    if (unseenIds.some((id) => !inScope.has(id))) changeScope("all");
+    const unseen = new Set(unseenIds);
+    const tab = newOrdersTab(orders.filter((o) => unseen.has(o.id)));
+    changeFilter(tab);
+    setQuery("");
+    setSearchOpen(false);
+    seenNewOrders();
+    rootRef.current?.scrollIntoView({ block: "start" });
+    // The button she tapped is gone; keep focus on the list's own tab.
+    tabRefs.current[tab]?.focus({ preventScroll: true });
+  };
+
+  const shareStore = () => {
+    const url = `${window.location.origin}/s/${encodeURIComponent(vendorSlug)}`;
+    void shareOrOpenWhatsApp({ title: vendorName, text: `Order from ${vendorName}: ${url}`, url });
+  };
+
+  const changeAcceptMenuOrders = async (next: boolean) => {
+    if (next === acceptMenuOrders || menuStatusPending) return;
+    setMenuStatusPending(true);
+    try {
+      const res = await fetch("/api/vendor", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ acceptMenuOrders: next }),
+      });
+      if (res.ok) {
+        setAcceptMenuOrders(next);
+        if (!next) setPausedHere(true);
+        toast.success(
+          next
+            ? `Customers can now order from your ${vocab.catalogue}.`
+            : `Paused. Customers can't order from your ${vocab.catalogue} until you turn it back on.`,
+        );
+        return;
+      }
+      const { error } = (await res.json().catch(() => ({}))) as { error?: string };
+      toast.error(
+        error === "storefront_not_published"
+          ? "Publish your store first, so customers have a page to order from."
+          : error === "no_payment_method"
+            ? "Customers need a way to pay. Add your UPI ID, or allow pay on delivery."
+            : res.status === 403
+              ? "Only the owner can change this setting."
+              : "Could not save. Try again.",
+      );
+    } catch {
+      toast.error("No internet. Nothing was changed.");
+    } finally {
+      setMenuStatusPending(false);
+    }
+  };
+
+  const targetsFor = (action: BulkOrderAction) => bulkTargets(visible, activeSelected, action, isFrozen);
 
   const runBulk = async (action: BulkOrderAction) => {
-    const ids = targetsFor(action).map((o) => o.id);
-    if (ids.length === 0) return;
+    const targets = targetsFor(action);
+    if (targets.length === 0) return;
     setBulkPending(action);
     const result: BulkOrderResult = { succeeded: [], failed: [] };
     const changed: BoardOrder[] = [];
     let requestFailed = false;
     try {
-      // The route takes at most 50 ids; a big drop goes in a few calls, one after another.
-      for (let i = 0; i < ids.length; i += BULK_ORDER_MAX) {
-        const chunk = ids.slice(i, i + BULK_ORDER_MAX);
-        const res = await fetch(`${actionBase}/bulk`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ orderIds: chunk, action }),
-        });
-        const body = (await res.json().catch(() => ({}))) as BulkResponse;
-        if (!res.ok || !body.data) {
-          requestFailed = true;
-          break;
+      // A selection can span menu orders and several drops; each goes to its own
+      // route. A route takes at most 50 ids, so a big batch goes in a few calls,
+      // one after another.
+      send: for (const group of groupIdsByDrop(targets)) {
+        for (let i = 0; i < group.ids.length; i += BULK_ORDER_MAX) {
+          const res = await fetch(`${orderActionBase(group.dropId)}/bulk`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ orderIds: group.ids.slice(i, i + BULK_ORDER_MAX), action }),
+          });
+          const body = (await res.json().catch(() => ({}))) as BulkResponse;
+          if (!res.ok || !body.data) {
+            requestFailed = true;
+            break send;
+          }
+          result.succeeded.push(...body.data.succeeded);
+          result.failed.push(...body.data.failed);
+          changed.push(...body.data.orders);
         }
-        result.succeeded.push(...body.data.succeeded);
-        result.failed.push(...body.data.failed);
-        changed.push(...body.data.orders);
       }
     } catch {
       requestFailed = true;
@@ -490,6 +753,7 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
         changed.forEach((o) => next.delete(o.id));
         return next;
       });
+      seenNewOrders();
     }
     setSelected(EMPTY_SELECTION);
     setBulkPending(null);
@@ -509,98 +773,196 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
     if (result.failed.length > 0) await refresh();
   };
 
-  const tools: BoardTools = {
-    refreshButton: (
-      <Button
-        type="button"
-        variant="outline"
-        className="min-h-11"
-        onClick={() => void refresh({ manual: true })}
-        disabled={refreshing}
-        aria-busy={refreshing}
-      >
-        {refreshing ? (
-          <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
-        ) : (
-          <RefreshCw aria-hidden />
-        )}
-        Refresh
-      </Button>
-    ),
-    lastChecked: lastChecked ? (
-      <span className="min-w-0 text-xs leading-tight text-muted-foreground">Last checked {formatIstTime(lastChecked)}</span>
-    ) : null,
-    // Rendered twice (header from md, "More actions" sheet on phones). Both carry
-    // data-sound-toggle so the "first tap enables sound" listener leaves them alone.
-    soundButton: (className) => (
-      <Button
-        type="button"
-        variant="outline"
-        className={cn("min-h-11", className)}
-        onClick={toggleSound}
-        aria-pressed={soundOn}
-        data-sound-toggle
-      >
-        {soundOn || soundPending ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />}
-        {soundOn ? "Sound on" : soundPending ? "Sound on — tap to enable" : "Sound off"}
-      </Button>
-    ),
-    pollNote: (
-      <p className="mt-2 text-xs text-muted-foreground">
-        {pollKind
-          ? "New orders appear automatically while this screen is open."
-          : "Not checking for new orders automatically. Tap Refresh to update."}
-      </p>
-    ),
-  };
+  const pollNote = !pollKind
+    ? "Not checking for new orders automatically. Tap Refresh to update."
+    : push.view === "subscribed"
+      ? "New orders appear automatically while this screen is open."
+      : push.view === "default" || push.view === "denied" || push.view === "ios-needs-install"
+        ? "Checks every few minutes. Turn on phone alerts to see orders instantly."
+        : "Checks every few minutes. Tap Refresh to check now.";
 
-  const emptyText =
-    orders.length === 0
-      ? source.kind === "menu"
-        ? source.acceptMenuOrders
-          ? "No online orders yet. Share your store link on WhatsApp to get the first one."
-          : "No online orders. Turn on “Order from menu” in Settings → Online orders to start taking them."
-        : effective === "OPEN"
-          ? "No orders yet. Share your drop on WhatsApp to get the first one."
-          : "No orders on this drop."
-      : "Nothing here right now.";
+  // Pending: the seller left sound on, but the browser plays nothing until one tap on this page.
+  const soundLabel = soundOn
+    ? "Order sounds on"
+    : soundPending
+      ? "Order sounds on — tap once to allow"
+      : "Order sounds off — tap to turn on";
+
+  const dropTitles = useMemo(() => new Map(drops.map((d) => [d.id, d.title])), [drops]);
+  // Only worth saying where an order came from while the list mixes sources.
+  const sourceOf = (o: BoardOrder): OrderSource | undefined =>
+    activeScope !== "all"
+      ? undefined
+      : o.dropId === null
+        ? { kind: "menu", label: vocab.catalogueOrder }
+        : { kind: "drop", label: dropTitles.get(o.dropId) ?? "Drop" };
+
+  const storeIsLive = acceptMenuOrders || drops.some((d) => liveEffectiveStatus(d, now) === "OPEN");
+
+  const canEditDrops = staffRole !== "CASHIER";
+  const newDropAction = canEditDrops ? (
+    <Button asChild>
+      <Link href="/drops/new">
+        <Plus aria-hidden />
+        New drop
+      </Link>
+    </Button>
+  ) : undefined;
+  const showAllAction = (
+    <Button type="button" variant="outline" onClick={() => changeFilter("all")}>
+      Show all orders
+    </Button>
+  );
+
+  // Every empty list says what would fill it and offers the one next step.
+  let empty: { title?: string; description: string; action?: ReactNode; live?: boolean };
+  if (trimmedQuery && scoped.length > 0) {
+    const elsewhere = filter !== "all" || activeHandover !== "all" ? matchesInScope : 0;
+    empty = {
+      title: `No orders match “${trimmedQuery}”`,
+      description:
+        elsewhere > 0
+          ? `Not in this list, but ${elsewhere === 1 ? "1 order matches" : `${elsewhere} orders match`} in All.`
+          : "Try a name, a bill number or the last 4 digits of a phone number.",
+      action:
+        elsewhere > 0 ? (
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => {
+              setHandover("all");
+              changeFilter("all");
+            }}
+          >
+            Show in all orders
+          </Button>
+        ) : (
+          <Button type="button" variant="outline" onClick={() => setQuery("")}>
+            <X aria-hidden />
+            Clear search
+          </Button>
+        ),
+      live: true,
+    };
+  } else if (scoped.length > 0) {
+    empty =
+      filter === "needs_action"
+        ? {
+            title: "All caught up",
+            description: "No order needs you right now.",
+            action:
+              counts.confirmed > 0 ? (
+                <Button type="button" variant="outline" onClick={() => changeFilter("confirmed")}>
+                  Show confirmed ({counts.confirmed})
+                </Button>
+              ) : (
+                showAllAction
+              ),
+          }
+        : { description: "Nothing here right now.", action: showAllAction };
+  } else if (drop) {
+    empty =
+      effective === "OPEN"
+        ? {
+            title: "No orders yet",
+            description: "Share your drop on WhatsApp to get the first one.",
+            action: (
+              <div className="w-full max-w-sm">
+                <ShareDropButton
+                  compact
+                  dropId={drop.id}
+                  vendorName={vendorName}
+                  vendorSlug={vendorSlug}
+                  dropTitle={drop.title}
+                  closesAt={drop.closesAt}
+                  fulfilmentStartsAt={drop.fulfilmentStartsAt}
+                  fulfilmentEndsAt={drop.fulfilmentEndsAt}
+                  fulfilmentMode={drop.fulfilmentMode}
+                  itemNames={drop.items.map((i) => i.name)}
+                />
+              </div>
+            ),
+          }
+        : effective === "DRAFT" && canEditDrops
+          ? {
+              title: "No orders yet",
+              description: "This drop is still a draft. Open it to start taking orders.",
+              action: (
+                <Button asChild>
+                  <Link href={`/drops/${drop.id}/edit`}>
+                    <Pencil aria-hidden />
+                    Edit drop
+                  </Link>
+                </Button>
+              ),
+            }
+          : { description: "No orders on this drop.", action: newDropAction };
+  } else if (sources.length === 0) {
+    empty = {
+      title: "No orders yet",
+      description: `Turn on “${vocab.catalogueOrdersTitle}” in Settings → Online orders, or create a drop, to start taking them.`,
+      action: newDropAction,
+    };
+  } else if (activeScope === "menu" && !acceptMenuOrders) {
+    empty = {
+      title: `No ${vocab.catalogueOrders.toLowerCase()}`,
+      description: `Turn on “${vocab.catalogueOrdersTitle}” in Settings → Online orders to start taking them.`,
+      action: (
+        <Button asChild>
+          <Link href="/settings/orders">
+            <Settings aria-hidden />
+            Online order settings
+          </Link>
+        </Button>
+      ),
+    };
+  } else if (storeIsLive) {
+    empty = {
+      title: "No orders yet",
+      description: "Share your store link on WhatsApp to get the first one.",
+      action: (
+        <Button type="button" onClick={shareStore}>
+          <Share2 aria-hidden />
+          Share store link
+        </Button>
+      ),
+    };
+  } else {
+    empty = {
+      title: "No orders yet",
+      description: "None of your drops is taking orders right now.",
+      action: newDropAction,
+    };
+  }
 
   return (
-    <div className="mx-auto max-w-3xl">
-      {drop && effective ? (
-        <DropHeader
-          drop={drop}
-          effective={effective}
-          vendorName={vendorName}
-          vendorSlug={vendorSlug}
-          tools={tools}
-        />
-      ) : source.kind === "menu" ? (
-        <MenuHeader
-          acceptMenuOrders={source.acceptMenuOrders}
-          fulfilmentMode={source.fulfilmentMode}
-          vendorSlug={vendorSlug}
-          tools={tools}
-        />
-      ) : null}
-
-      {/* Phones, until this device has alerts on: the opt-in must not hide in the sheet. */}
-      <PushAlertsPrompt className="mb-3" />
+    <div ref={rootRef} className="mx-auto max-w-3xl scroll-mt-4">
+      <BoardHeader
+        scope={activeScope}
+        sources={sources}
+        drops={drops}
+        drop={drop}
+        effective={effective}
+        acceptMenuOrders={acceptMenuOrders}
+        menuFulfilmentMode={menuFulfilmentMode}
+        storeIsLive={storeIsLive}
+        vendorName={vendorName}
+        vendorSlug={vendorSlug}
+        canChangeMenuStatus={staffRole === "OWNER"}
+        menuStatusPending={menuStatusPending}
+        onMenuStatus={(next) => void changeAcceptMenuOrders(next)}
+        onScope={changeScope}
+        vocab={vocab}
+      />
 
       <div role="status" aria-live="polite" aria-atomic="true" className="sr-only">
         {announcement}
       </div>
-      {announcement && (
-        <p className="mb-3 rounded-md border border-primary bg-primary/10 px-3 py-2 text-sm font-semibold" aria-hidden>
-          {announcement}
-        </p>
-      )}
 
       <section aria-labelledby="summary-h" className="mb-3 sm:mb-4">
         <h2 id="summary-h" className="sr-only">
           Summary
         </h2>
-        {/* Phones: label and figure share a line, so the 2×2 block is about half as tall. */}
         <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
           <li className={KPI_TILE}>
             <p className="text-xs text-muted-foreground">Paid</p>
@@ -614,37 +976,60 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
             <p className="text-xs text-muted-foreground">Live orders</p>
             <p className={KPI_VALUE}>{summary.activeOrders}</p>
           </li>
-          <li className={KPI_TILE}>
-            <p className="text-xs text-muted-foreground">Payment to check</p>
-            <p className={KPI_VALUE}>{summary.counts.PAYMENT_SUBMITTED + summary.counts.AWAITING_PAYMENT}</p>
+          <li className={cn(KPI_TILE, summary.counts.PAYMENT_SUBMITTED > 0 && "border-warning bg-warning/10")}>
+            <p
+              className={cn(
+                "inline-flex items-center gap-1 text-xs",
+                summary.counts.PAYMENT_SUBMITTED > 0 ? "font-semibold text-foreground" : "text-muted-foreground",
+              )}
+            >
+              {summary.counts.PAYMENT_SUBMITTED > 0 && <CircleAlert className="h-3.5 w-3.5 text-warning" aria-hidden />}
+              Payment to check
+            </p>
+            {/* Only a buyer's "I've paid" claim is something to check; unpaid UPI orders just wait. */}
+            <p className={KPI_VALUE}>{summary.counts.PAYMENT_SUBMITTED}</p>
+            {summary.counts.AWAITING_PAYMENT > 0 && (
+              <p className="basis-full text-xs text-muted-foreground">
+                Awaiting payment: <span className="font-mono tabular-nums">{summary.counts.AWAITING_PAYMENT}</span>
+              </p>
+            )}
           </li>
         </ul>
         {toCook.length > 0 && (
           <p className="mt-2 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">To cook: </span>
+            <span className="font-medium text-foreground">{vocab.toPrepare}: </span>
             {toCook
-              .map((p) => `${p.name} ${p.qtyOrdered}${p.maxQty !== null ? `/${p.maxQty}` : ""}`)
+              .map(
+                (p) =>
+                  `${p.name} ${p.qtyOrdered}${p.maxQty !== null ? `/${p.maxQty}` : ""}${p.qtyFree > 0 ? ` (${p.qtyFree} free)` : ""}`,
+              )
               .join(" · ")}
           </p>
         )}
-        {isMenu && (
-          // Phones: heading and chips share a row, no card. From sm: the card as before.
-          <div
-            className="mt-2 flex items-start gap-2 sm:mt-3 sm:block sm:rounded-lg sm:border sm:bg-card sm:p-3"
-            aria-live="polite"
-          >
-            <h3 className="shrink-0 text-sm font-semibold leading-7 sm:leading-normal">To make</h3>
+        {showToMake && (
+          <div className="mt-2 flex items-start gap-2" aria-live="polite">
+            <h3 className="shrink-0 text-sm font-semibold leading-7">
+              {vocab.kind === "food"
+                ? activeScope === "all"
+                  ? "To make (menu)"
+                  : "To make"
+                : activeScope === "all"
+                  ? "To pack (everyday)"
+                  : "To pack"}
+            </h3>
             {toMake.length === 0 ? (
-              <p className="text-sm leading-7 text-muted-foreground sm:mt-1 sm:leading-normal">Nothing to make right now.</p>
+              <p className="text-sm leading-7 text-muted-foreground">{vocab.kind === "food" ? "Nothing to make right now." : "Nothing to pack right now."}
+              </p>
             ) : (
-              <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5 sm:mt-2 sm:gap-2" aria-label="Items to make">
+              <ul className="flex min-w-0 flex-1 flex-wrap gap-1.5" aria-label={vocab.kind === "food" ? "Items to make" : "Items to pack"}>
                 {toMake.map((r) => (
                   <li
                     key={r.name}
-                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border bg-background px-2.5 text-sm sm:min-h-9 sm:px-3"
+                    className="inline-flex min-h-7 items-center gap-1.5 rounded-full border bg-background px-2.5 text-sm"
                   >
                     <span className="font-mono font-bold tabular-nums">{r.qty} ×</span>
                     <span>{r.name}</span>
+                    {r.free > 0 && <span className="text-muted-foreground">({r.free} free)</span>}
                   </li>
                 ))}
               </ul>
@@ -657,47 +1042,141 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
         Sticks to the top of the screen while the list scrolls. Phones: five
         segments that all fit at 360px (label over count), so no tab is cut off.
         From md: the pill row as before. aria-label keeps each tab's name
-        "Label (count)" in both layouts.
+        "Label (count)" in both layouts. One tab stop; arrow keys, Home and End
+        move between tabs. The "new orders" button rides along, so an order that
+        lands while she is deep in another list is one tap away; so does search,
+        an icon at the end of the row until it is opened.
       */}
       <nav
         aria-label="Filter orders"
-        className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-3 border-b bg-background px-4 py-2 md:mb-4 md:overflow-x-auto md:border-b-0"
+        className="sticky top-[env(safe-area-inset-top)] z-10 -mx-4 mb-3 border-b bg-background px-4 py-2 md:border-b-0"
       >
-        <div
-          role="tablist"
-          className="grid grid-cols-[repeat(3,minmax(0,1fr))_minmax(0,1.2fr)_minmax(2.75rem,0.7fr)] gap-1 md:flex md:gap-2"
-        >
-          {BOARD_FILTERS.map((f) => {
-            const active = filter === f.id;
-            return (
-              <button
-                key={f.id}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                aria-controls="orders-list"
-                aria-label={`${f.label} (${counts[f.id]})`}
-                onClick={() => changeFilter(f.id)}
-                className={cn(
-                  "flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border px-0.5 py-1 text-center text-[11px] font-medium leading-tight focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring min-[390px]:text-xs",
-                  "md:min-h-11 md:shrink-0 md:flex-row md:gap-1 md:whitespace-nowrap md:rounded-full md:px-4 md:py-0 md:text-sm",
-                  active
-                    ? "border-primary bg-primary text-primary-foreground max-md:font-bold max-md:underline max-md:underline-offset-2"
-                    : "border-input bg-background hover:bg-accent",
-                )}
-              >
-                <span className="max-w-full break-words">{f.label}</span>
-                <span className="font-mono text-sm font-bold tabular-nums md:hidden">{counts[f.id]}</span>
-                <span className="hidden md:inline">({counts[f.id]})</span>
-              </button>
-            );
-          })}
+        {unseenCount > 0 && (
+          <button
+            type="button"
+            onClick={showNewOrders}
+            className="mb-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-primary bg-primary/10 px-3 text-sm font-semibold hover:bg-primary/20 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <BellRing className="h-4 w-4 shrink-0" aria-hidden />
+            {unseenCount === 1 ? "1 new order" : `${unseenCount} new orders`} — show
+          </button>
+        )}
+        <div className="flex items-start gap-1 md:gap-2">
+          <div
+            role="tablist"
+            aria-label="Order status"
+            onKeyDown={onTabKeyDown}
+            className="grid min-w-0 flex-1 grid-cols-[repeat(4,minmax(0,1fr))_2.75rem] gap-0.5 md:flex md:gap-2 md:overflow-x-auto md:p-0.5"
+          >
+            {BOARD_FILTERS.map((f) => {
+              const active = filter === f.id;
+              return (
+                <button
+                  key={f.id}
+                  ref={(el) => {
+                    tabRefs.current[f.id] = el;
+                  }}
+                  id={`orders-tab-${f.id}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  aria-controls="orders-list"
+                  aria-label={`${f.label} (${counts[f.id]})`}
+                  tabIndex={active ? 0 : -1}
+                  onClick={() => changeFilter(f.id)}
+                  className={cn(
+                    "flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-md border py-1 text-center text-xs font-medium leading-tight focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring",
+                    "md:min-h-11 md:shrink-0 md:flex-row md:gap-1 md:whitespace-nowrap md:rounded-full md:px-4 md:py-0 md:text-sm",
+                    active
+                      ? "border-primary bg-primary text-primary-foreground max-md:font-semibold max-md:underline max-md:underline-offset-2"
+                      : "border-input bg-background hover:bg-accent",
+                  )}
+                >
+                  <span className="max-w-full break-words">{f.label}</span>
+                  <span className="font-mono text-sm font-bold tabular-nums md:hidden">{counts[f.id]}</span>
+                  <span className="hidden md:inline">({counts[f.id]})</span>
+                </button>
+              );
+            })}
+          </div>
+          {showSearch && (
+            <Button
+              ref={searchToggleRef}
+              type="button"
+              variant="outline"
+              size="icon"
+              className="shrink-0 rounded-full max-md:min-h-12 max-md:rounded-md md:h-11 md:w-11"
+              aria-label={searchExpanded ? "Close search" : "Search orders"}
+              aria-expanded={searchExpanded}
+              aria-controls="orders-search"
+              onClick={() => (searchExpanded ? closeSearch() : setSearchOpen(true))}
+            >
+              {searchExpanded ? <X aria-hidden /> : <Search aria-hidden />}
+            </Button>
+          )}
         </div>
+        {showSearch && searchExpanded && (
+          <div className="relative mt-2">
+            <label htmlFor="orders-search" className="sr-only">
+              Search orders
+            </label>
+            <Search
+              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"
+              aria-hidden
+            />
+            <Input
+              ref={searchInputRef}
+              id="orders-search"
+              type="text"
+              role="searchbox"
+              inputMode="search"
+              enterKeyHint="search"
+              autoComplete="off"
+              value={query}
+              onChange={(e) => {
+                setQuery(e.target.value);
+                setSelected(EMPTY_SELECTION);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Escape") closeSearch();
+              }}
+              placeholder="Name, bill number or last 4 of phone"
+              className="pl-9"
+            />
+          </div>
+        )}
       </nav>
 
-      <section id="orders-list" role="tabpanel" aria-label="Orders" aria-busy={refreshing}>
+      <section id="orders-list" role="tabpanel" aria-labelledby={`orders-tab-${filter}`} aria-busy={refreshing}>
+        {showHandover && (
+          <div role="radiogroup" aria-label="Pickup or delivery" className="mb-3 grid grid-cols-3 gap-1">
+            {HANDOVER_FILTERS.map((h) => (
+              <RadioOption
+                key={h.id}
+                size="compact"
+                name="orders-handover"
+                value={h.id}
+                checked={handover === h.id}
+                onChange={() => {
+                  setHandover(h.id);
+                  setSelected(EMPTY_SELECTION);
+                }}
+                label={
+                  <span className="flex flex-wrap items-baseline justify-center gap-x-1 leading-tight">
+                    {h.label} <span className="font-mono tabular-nums">({filterByHandover(inFilter, h.id).length})</span>
+                  </span>
+                }
+              />
+            ))}
+          </div>
+        )}
         {visible.length === 0 ? (
-          <p className="rounded-lg border border-dashed p-6 text-center text-sm text-muted-foreground">{emptyText}</p>
+          <EmptyState
+            title={empty.title}
+            description={empty.description}
+            action={empty.action}
+            role={empty.live ? "status" : undefined}
+          />
         ) : (
           <>
             {selectableVisible.length > 1 && (
@@ -723,11 +1202,13 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
                   <OrderCard
                     order={o}
                     vendorName={vendorName}
-                    frozen={frozen}
+                    riders={riders}
+                    frozen={isFrozen(o)}
+                    source={sourceOf(o)}
                     isNew={newIds.has(o.id)}
                     pendingAction={pending?.orderId === o.id ? pending.action : null}
                     onAction={runAction}
-                    selectable={isBulkSelectable(o, frozen)}
+                    selectable={isBulkSelectable(o, isFrozen(o))}
                     selected={activeSelected.has(o.id)}
                     onToggleSelect={toggleSelect}
                     locked={bulkPending !== null}
@@ -748,78 +1229,201 @@ export function OrdersBoard({ vendorName, vendorSlug, source, initialOrders, ini
           />
         )}
       </section>
+
+      {/* The bulk bar takes this spot while orders are selected. */}
+      {activeSelected.size === 0 && (
+        <div
+          role="group"
+          aria-label="Live updates"
+          className="sticky bottom-[var(--app-bottom-inset,0px)] z-10 -mx-4 mt-4 flex items-center gap-1 border-t bg-background px-4 py-1 md:gap-2"
+        >
+          {lastChecked ? (
+            <span className="min-w-0 text-xs leading-tight text-muted-foreground">
+              Last checked {formatIstTime(lastChecked)}
+            </span>
+          ) : null}
+          <BoardInfoHint label="How new orders are checked">
+            <p>{pollNote}</p>
+          </BoardInfoHint>
+          <div className="ml-auto flex shrink-0 items-center gap-1 md:gap-2">
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-w-11 px-2 md:px-3"
+              onClick={() => void refresh({ manual: true })}
+              disabled={refreshing}
+              aria-busy={refreshing}
+              aria-label="Refresh"
+            >
+              {refreshing ? (
+                <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
+              ) : (
+                <RefreshCw aria-hidden />
+              )}
+              <span className="hidden md:inline">Refresh</span>
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              className="min-w-11 px-2 md:px-3"
+              onClick={toggleSound}
+              aria-pressed={soundOn}
+              aria-label={soundLabel}
+              data-sound-toggle
+            >
+              {soundOn || soundPending ? <Volume2 aria-hidden /> : <VolumeX aria-hidden />}
+              <span className="hidden md:inline">{soundLabel}</span>
+            </Button>
+            <PushAlertsBarButton />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function DropHeader({
+/**
+ * The board's one header: the title, the status and "Show" picker, Share and
+ * the "⋯" menu, then the details of a drop when one is showing. Share and "⋯"
+ * follow the scope: a drop offers Edit, its prep sheet and its own sharing.
+ */
+function BoardHeader({
+  scope,
+  sources,
+  drops,
   drop,
   effective,
+  acceptMenuOrders,
+  menuFulfilmentMode,
+  storeIsLive,
   vendorName,
   vendorSlug,
-  tools,
+  canChangeMenuStatus,
+  menuStatusPending,
+  onMenuStatus,
+  onScope,
+  vocab,
+}: {
+  scope: BoardScope;
+  sources: BoardScope[];
+  drops: BoardDrop[];
+  drop: BoardDrop | null;
+  effective: EffectiveDropStatus | null;
+  acceptMenuOrders: boolean;
+  menuFulfilmentMode: FulfilmentMode;
+  storeIsLive: boolean;
+  vendorName: string;
+  vendorSlug: string;
+  canChangeMenuStatus: boolean;
+  menuStatusPending: boolean;
+  onMenuStatus: (accepting: boolean) => void;
+  onScope: (scope: BoardScope) => void;
+  vocab: StoreVocabulary;
+}) {
+  const hasPicker = sources.length > 1;
+  const isMenu = !drop && scope === "menu";
+  const scopeNote = drop ? null : isMenu ? catalogueBoardScope(vocab) : allBoardScope(vocab);
+  const overflowLinks: OverflowLink[] = [
+    ...(drop
+      ? [
+          { label: "Edit", href: `/drops/${drop.id}/edit`, icon: Pencil },
+          {
+            label: vocab.prepSheet,
+            href: `/drops/${drop.id}/prep`,
+            icon: vocab.kind === "food" ? ChefHat : PackageCheck,
+          },
+        ]
+      : []),
+    { label: "Order settings", href: "/settings/orders", icon: Settings },
+  ];
+  // A drop is shared while it takes orders; otherwise the store, while its menu does.
+  const shareDrop =
+    drop && effective === "OPEN"
+      ? {
+          id: drop.id,
+          title: drop.title,
+          closesAt: drop.closesAt,
+          fulfilmentStartsAt: drop.fulfilmentStartsAt,
+          fulfilmentEndsAt: drop.fulfilmentEndsAt,
+          fulfilmentMode: drop.fulfilmentMode,
+          itemNames: drop.items.map((i) => i.name),
+        }
+      : null;
+
+  return (
+    <header className="mb-3">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+        <div className="flex min-w-0 items-center gap-1">
+          <h1 className="font-display text-xl font-bold text-foreground md:text-2xl">Orders</h1>
+          {scopeNote ? (
+            <BoardInfoHint label="About this list">
+              <p>{scopeNote}</p>
+            </BoardInfoHint>
+          ) : null}
+        </div>
+        <div className="ml-auto flex shrink-0 items-center gap-2 md:order-last md:ml-0">
+          <BoardShareMenu
+            key={shareDrop?.id ?? "store"}
+            vendorName={vendorName}
+            vendorSlug={vendorSlug}
+            drop={shareDrop}
+            shareStore={!drop && acceptMenuOrders}
+            storeIsLive={storeIsLive}
+          />
+          <BoardOverflowMenu links={overflowLinks} />
+        </div>
+        {isMenu || hasPicker ? (
+          <div className="flex min-w-0 basis-full items-center gap-2 md:ml-auto md:basis-auto">
+            {isMenu ? (
+              <MenuStatusPill
+                accepting={acceptMenuOrders}
+                modeLabel={MENU_MODE_LABEL[menuFulfilmentMode]}
+                canChange={canChangeMenuStatus}
+                pending={menuStatusPending}
+                onChange={onMenuStatus}
+              />
+            ) : null}
+            {hasPicker ? (
+              <BoardScopePicker
+                scope={scope}
+                showMenu={sources.includes("menu")}
+                drops={drops}
+                onScope={onScope}
+                catalogueOrders={vocab.catalogueOrders}
+              />
+            ) : null}
+          </div>
+        ) : null}
+      </div>
+      {drop && effective ? <DropDetails drop={drop} effective={effective} named={hasPicker} /> : null}
+    </header>
+  );
+}
+
+function DropDetails({
+  drop,
+  effective,
+  named,
 }: {
   drop: BoardDrop;
   effective: EffectiveDropStatus;
-  vendorName: string;
-  vendorSlug: string;
-  tools: BoardTools;
+  /** The picker already names the drop; without one, say it here. */
+  named: boolean;
 }) {
-  // Held here, not in the share button: on phones the button lives in the "More
-  // actions" sheet, which unmounts on close. The Instagram flow is two taps
-  // (fetch, then share), and the fetched image must outlive a closed sheet.
-  const [story, setStory] = useState<StoryImage | null>(null);
-
   const closesAt = new Date(drop.closesAt);
   const fStart = new Date(drop.fulfilmentStartsAt);
   const fEnd = new Date(drop.fulfilmentEndsAt);
-
-  const editHref = `/drops/${drop.id}/edit`;
-  const prepHref = `/drops/${drop.id}/prep`;
-
-  // Rendered in two places (header from md, sheet on phones); only one shows.
-  const share =
-    effective === "OPEN" ? (
-      <ShareDropButton
-        dropId={drop.id}
-        vendorName={vendorName}
-        vendorSlug={vendorSlug}
-        dropTitle={drop.title}
-        closesAt={drop.closesAt}
-        fulfilmentStartsAt={drop.fulfilmentStartsAt}
-        fulfilmentEndsAt={drop.fulfilmentEndsAt}
-        fulfilmentMode={drop.fulfilmentMode}
-        itemNames={drop.items.map((i) => i.name)}
-        story={story}
-        onStory={setStory}
-      />
-    ) : null;
-
   return (
-    <header className="mb-3 md:mb-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <h1 className="min-w-0 break-words font-display text-xl font-bold text-foreground md:text-2xl">
-            {drop.title}
-          </h1>
-          <span
-            className={cn(STATUS_BADGE, effective === "OPEN" ? "border-primary bg-primary/10" : "border-border bg-muted")}
-          >
-            {DROP_STATUS_LABEL[effective]}
-          </span>
-        </div>
-        <div className="hidden flex-wrap gap-2 md:flex">
-          <Link href={editHref} className={LINK_BTN}>
-            <Pencil className="h-4 w-4" aria-hidden />
-            Edit
-          </Link>
-          <Link href={prepHref} className={LINK_BTN}>
-            <ChefHat className="h-4 w-4" aria-hidden />
-            Prep sheet
-          </Link>
-        </div>
+    <div className="mt-2">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        {!named && <h2 className="min-w-0 break-words text-base font-semibold text-foreground">{drop.title}</h2>}
+        <span
+          className={cn(STATUS_BADGE, effective === "OPEN" ? "border-primary bg-primary/10" : "border-border bg-muted")}
+        >
+          {dropStateLabel(drop, new Date())}
+        </span>
       </div>
-      <dl className="mt-2 grid grid-cols-1 gap-1 text-sm text-muted-foreground sm:grid-cols-2 md:mt-3">
+      <dl className="mt-2 grid grid-cols-1 gap-1 text-sm text-muted-foreground sm:grid-cols-2">
         <div>
           <dt className="inline font-medium text-foreground">Orders close: </dt>
           <dd className="inline">
@@ -835,148 +1439,6 @@ function DropHeader({
           </dd>
         </div>
       </dl>
-      <ActionRow
-        tools={tools}
-        lead={share}
-        sheetDescription="Edit, share and alert settings for this drop."
-        sheetRows={() => (
-          <>
-            <Link href={editHref} className={MORE_ACTION_ROW}>
-              <Pencil className="h-4 w-4 shrink-0" aria-hidden />
-              Edit
-            </Link>
-            <Link href={prepHref} className={MORE_ACTION_ROW}>
-              <ChefHat className="h-4 w-4 shrink-0" aria-hidden />
-              Prep sheet
-            </Link>
-            {share ? (
-              <div className="rounded-md border border-input p-3">
-                <h3 className="mb-2 text-sm font-semibold">Share this drop</h3>
-                {share}
-              </div>
-            ) : null}
-          </>
-        )}
-      />
-      {tools.pollNote}
-    </header>
-  );
-}
-
-/**
- * Refresh and "last checked" at every width. From md the other controls sit
- * beside them, as before. On phones they move into the "More actions" sheet,
- * so one row of controls is all that stands between the title and the orders.
- */
-function ActionRow({
-  tools,
-  lead,
-  sheetDescription,
-  sheetRows,
-}: {
-  tools: BoardTools;
-  /** Shown before Refresh, from md only. Phones get it through `sheetRows`. */
-  lead?: ReactNode;
-  sheetDescription: string;
-  /** Rows only the sheet shows (the header shows them elsewhere from md). */
-  sheetRows: (close: () => void) => ReactNode;
-}) {
-  return (
-    <div className="mt-2 flex items-center gap-2 md:mt-3 md:flex-wrap">
-      {lead ? <div className="hidden md:block">{lead}</div> : null}
-      {tools.refreshButton}
-      {tools.lastChecked}
-      {tools.soundButton("hidden md:inline-flex")}
-      <div className="hidden md:contents">
-        <PushAlertsButton variant="board" />
-      </div>
-      <BoardMoreActions description={sheetDescription}>
-        {(close) => (
-          <>
-            {sheetRows(close)}
-            {tools.soundButton("min-h-12 w-full justify-start gap-3")}
-            <div className="flex flex-wrap items-center gap-2">
-              <PushAlertsButton variant="board" />
-            </div>
-          </>
-        )}
-      </BoardMoreActions>
     </div>
-  );
-}
-
-function MenuHeader({
-  acceptMenuOrders,
-  fulfilmentMode,
-  vendorSlug,
-  tools,
-}: {
-  acceptMenuOrders: boolean;
-  fulfilmentMode: FulfilmentMode;
-  vendorSlug: string;
-  tools: BoardTools;
-}) {
-  const storeHref = `/s/${vendorSlug}`;
-
-  return (
-    <header className="mb-3 md:mb-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-            <h1 className="font-display text-xl font-bold text-foreground md:text-2xl">Online orders</h1>
-            <span
-              className={cn(
-                STATUS_BADGE,
-                acceptMenuOrders ? "border-primary bg-primary/10" : "border-border bg-muted",
-              )}
-            >
-              {acceptMenuOrders ? "Taking orders" : "Not taking orders"}
-            </span>
-            {acceptMenuOrders && (
-              <span className="text-sm text-muted-foreground">{MENU_MODE_LABEL[fulfilmentMode]}</span>
-            )}
-          </div>
-          {/* Phones read this in the "More actions" sheet instead. */}
-          <p className="mt-1 hidden text-xs text-muted-foreground md:block">{MENU_BOARD_SCOPE}</p>
-        </div>
-        <div className="hidden flex-wrap gap-2 md:flex">
-          {acceptMenuOrders && (
-            <a href={storeHref} target="_blank" rel="noopener noreferrer" className={LINK_BTN}>
-              <ExternalLink className="h-4 w-4" aria-hidden />
-              My store
-            </a>
-          )}
-          <Link href="/settings/orders" className={LINK_BTN}>
-            <Settings className="h-4 w-4" aria-hidden />
-            Settings
-          </Link>
-        </div>
-      </div>
-      <ActionRow
-        tools={tools}
-        sheetDescription={MENU_BOARD_SCOPE}
-        sheetRows={(close) => (
-          <>
-            {acceptMenuOrders && (
-              <a
-                href={storeHref}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={MORE_ACTION_ROW}
-                onClick={close}
-              >
-                <ExternalLink className="h-4 w-4 shrink-0" aria-hidden />
-                My store
-              </a>
-            )}
-            <Link href="/settings/orders" className={MORE_ACTION_ROW}>
-              <Settings className="h-4 w-4 shrink-0" aria-hidden />
-              Settings
-            </Link>
-          </>
-        )}
-      />
-      {tools.pollNote}
-    </header>
   );
 }

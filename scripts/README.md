@@ -12,6 +12,7 @@ Operational utilities. Not deployed; run locally only.
 | `sync-agent-rules.mjs` | `npm run sync:agent-rules` | Regenerates `.claude/rules` + `.claude/skills` from `.cursor/` |
 | `check-bundle-budget.mjs` | `npm run perf:budget` | First-load JS per route from the last `npm run build`, against `perf-budget.json`. Runs in CI. See `docs/PERFORMANCE.md` |
 | `perf-lighthouse.mjs` | `npm run perf:lighthouse` | Mobile Lighthouse (median of 3) against a locally running production build. Manual only. See `docs/PERFORMANCE.md` |
+| `seed-quiche-plans.ts` | `npm run seed:quiche-plans -- <slug>` | Dry-runs (or with `--create`, writes) five tagged quiche flavours, a Bhel Puri and the Weekly / Family Weekly offers for one test store. Local databases only unless `--allow-remote` |
 | `razorpay-create-plans.ts` | `npm run razorpay:create-plans` | Dry-runs (or with `-- --create`, creates) the Starter monthly/yearly subscription plans in Razorpay; prints the env ids |
 
 The smoke scripts are one-shot round trips against a live provider, for checking credentials and

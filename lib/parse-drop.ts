@@ -41,6 +41,7 @@ import type {
   DropDraftItem,
   DropDraftUnmatched,
 } from "@/lib/parse-drop-types";
+import type { StoreKind } from "@/lib/store-vocabulary";
 import { dropUpsertSchema } from "@/lib/zod-drops";
 
 export type { DropDraft, DropDraftField, DropDraftItem, DropDraftUnmatched } from "@/lib/parse-drop-types";
@@ -70,18 +71,18 @@ const DAY_KINDS = [
   "day_before_fulfilment",
 ] as const;
 
-const DROP_BUILD_SYSTEM = `You turn an Indian home cook's spoken plan for a "drop" (a one-day pre-order batch) into a draft for a form they will review.
-Use the build_drop tool exactly once. Only fill a field when the cook actually said it; leave everything else out. Never invent prices, quantities or times.
+const DROP_BUILD_SYSTEM = `You turn an Indian home seller's spoken plan for a "drop" (a one-day pre-order batch) into a draft for a form they will review. Most sellers are home kitchens; some sell products instead (wellness, beauty, gifting, handmade).
+Use the build_drop tool exactly once. Only fill a field when the seller actually said it; leave everything else out. Never invent prices, quantities or times.
 
 Speech is Hinglish, English or Hindi (sometimes Telugu/Kannada/Tamil transliterated) and comes from speech-to-text, so words may be misheard. Match items phonetically to menu names/aliases/slugs.
 
 Items:
 - menuItemId MUST be an "id" from the menu JSON, or null when nothing on the menu plausibly matches. Never invent ids, never use "slug".
-- spokenName = the words the cook used for the item.
-- quantity = how many they will make (capacity). A bare number next to an item is the quantity ("banana bread 10" → quantity 10).
+- spokenName = the words the seller used for the item.
+- quantity = how many they will make or have to sell (capacity). A bare number next to an item is the quantity ("banana bread 10" → quantity 10).
 - priceRupees only when a price is said with a money word (rupaye, rupees, rs, ₹, "ka", "each", "per piece"). Otherwise leave it out — the menu price is used.
 - perOrderLimit only for phrases like "ek order mein max 2", "2 per customer".
-- Serving/pack words (plate, piece, packet, dabba, box, jar) are not items: "15 dabba thepla" → thepla quantity 15.
+- Serving/pack words (plate, piece, packet, pack, dabba, box, jar, bottle, pouch) are not items: "15 dabba thepla" → thepla quantity 15, "20 herbal tea packs" → herbal tea quantity 20. The word is the item only when the menu item itself is named that way ("10 gift box" → the menu's Gift Box, quantity 10).
 
 Numbers:
 - hi: ek 1, do 2, teen 3, char 4, paanch 5, chhe 6, saat 7, aath 8, nau 9, das 10, gyarah 11, barah 12, pandrah 15, bees 20, pachees 25, tees 30, chalees 40, pachaas 50, saath 60, sattar 70, assi 80, nabbe 90, sau 100, hazaar 1000
@@ -91,16 +92,16 @@ Numbers:
 Days (all IST; today's date is given with the transcript):
 - day.kind: "today" (aaj), "tomorrow" (kal — in a plan for the future kal means tomorrow), "day_after_tomorrow" (parson), "weekday" (+ weekday: somvaar monday, mangalvaar tuesday, budhvaar wednesday, guruvaar/veervaar thursday, shukravaar friday, shanivaar saturday, ravivaar/itvaar sunday), or "date" (+ date YYYY-MM-DD) for an explicit calendar date.
 - te: ivala today, repu tomorrow · kn: ivattu today, naale tomorrow · ta: indru today, naalai tomorrow.
-- cutoffDay / opensDay may also be "fulfilment_day" (same day as cooking) or "day_before_fulfilment". Leave cutoffDay out if only a time was said.
+- cutoffDay / opensDay may also be "fulfilment_day" (same day as the pickup/delivery) or "day_before_fulfilment". Leave cutoffDay out if only a time was said.
 
 Times → 24h "HH:MM":
 - subah = morning (subah 8 → 08:00), dopahar = afternoon (dopahar 2 → 14:00, dopahar 12 → 12:00), shaam = evening (shaam 6 → 18:00), raat = night (raat 9 → 21:00). "baje" = o'clock. saade 6 → 6:30, sava 7 → 7:15, paune 8 → 7:45.
-- With no part-of-day word, pick the reading that fits a home-kitchen day: pickup/delivery is usually afternoon or evening ("6 se 8" → 18:00–20:00), and the order cut-off comes before pickup starts.
+- With no part-of-day word, pick the reading that fits a home seller's day: pickup/delivery is usually afternoon or evening ("6 se 8" → 18:00–20:00), and the order cut-off comes before pickup starts.
 - "se ... tak" = from ... until. "order X baje tak" / "orders close X" = cut-off. "orders khulenge X" / "orders open X" = opensAt.
 
 Fulfilment: pickup/le jao/aake le lo → PICKUP; delivery/ghar pe bhejenge → DELIVERY; both → BOTH. deliveryFeeRupees only if a delivery charge is said. pickupNote = where/how to collect if said (e.g. "gate number 2 pe").
-showEverydayMenu only if the cook explicitly says to also show the regular/everyday menu (true) or not (false).
-title only if the cook names the drop; note = any other customer-facing remark said for the drop.
+showEverydayMenu only if the seller explicitly says to also show the regular/everyday menu (true) or not (false).
+title only if the seller names the drop; note = any other customer-facing remark said for the drop.
 Put any fragment you could not place into unparsed.
 
 The authoritative menu JSON is provided in a separate user message block (cached).`;
@@ -119,13 +120,13 @@ const HM_DESC = "24h HH:MM, IST";
 
 export const BUILD_DROP_TOOL: Anthropic.Tool = {
   name: "build_drop",
-  description: "Fill a draft pre-order drop from the cook's spoken plan. Omit anything not said.",
+  description: "Fill a draft pre-order drop from the seller's spoken plan. Omit anything not said.",
   input_schema: {
     type: "object",
     properties: {
       title: { type: "string" },
       note: { type: "string" },
-      day: { ...dayRefSchemaJson, description: "Cooking / pickup / delivery day" },
+      day: { ...dayRefSchemaJson, description: "Cooking / packing / pickup / delivery day" },
       fulfilmentMode: { type: "string", enum: ["DELIVERY", "PICKUP", "BOTH"] },
       windowStart: { type: "string", description: HM_DESC },
       windowEnd: { type: "string", description: HM_DESC },
@@ -221,7 +222,7 @@ function capitalise(s: string): string {
 /** The uncached per-request block: today in IST + the transcript. */
 export function dropUserTurnText(transcript: string, lang: string, now: Date): string {
   const { ymd, hm } = utcToIstParts(now);
-  return `Today (IST): ${capitalise(istWeekday(ymd))} ${ymd}, time now ${hm}.\nCook's plan (${lang}):\n${transcript}`;
+  return `Today (IST): ${capitalise(istWeekday(ymd))} ${ymd}, time now ${hm}.\nSeller's plan (${lang}):\n${transcript}`;
 }
 
 function extractBuildDropInput(message: Anthropic.Messages.Message): unknown {
@@ -300,6 +301,8 @@ export async function parseDropFromTranscript(opts: {
   lang: string;
   now?: Date;
   clients?: { haiku: Anthropic; sonnet: Anthropic };
+  /** Words in the warnings (lib/store-vocabulary.ts); the prompt is the same for every store. */
+  kind?: StoreKind;
 }): Promise<ParseDropOutcome> {
   const now = opts.now ?? new Date();
   const haiku = opts.clients?.haiku ?? anthropicHaiku;
@@ -325,7 +328,7 @@ export async function parseDropFromTranscript(opts: {
   }
 
   return {
-    draft: postProcessDropDraft(raw, opts.menuItems, now, tier),
+    draft: postProcessDropDraft(raw, opts.menuItems, now, tier, opts.kind),
     modelUsed: tier === "sonnet" ? ANTHROPIC_FALLBACK_MODEL : ANTHROPIC_PRIMARY_MODEL,
     escalated: tier === "sonnet",
   };
@@ -434,7 +437,9 @@ export function postProcessDropDraft(
   menuItems: MenuItemForParse[],
   now: Date,
   model: "haiku" | "sonnet",
+  kind: StoreKind = "food",
 ): DropDraft {
+  const food = kind === "food";
   const warnings: string[] = [];
   const filled: DropDraftField[] = [];
   /** Fields that already carry a specific warning — schema issues for them are not repeated. */
@@ -475,7 +480,7 @@ export function postProcessDropDraft(
   draft.date = date;
   if (spokenDate) filled.push("date");
   else if (raw.day) warn("Couldn't understand the day — set to tomorrow, please check", "date");
-  if (date < todayYmd) warn("The cooking day is in the past — please pick a date", "date");
+  if (date < todayYmd) warn(`The ${food ? "cooking day" : "day"} is in the past — please pick a date`, "date");
 
   // ── Delivery fee + mode
   let feePaise: number | undefined;
@@ -623,7 +628,7 @@ export function postProcessDropDraft(
     if (line.priceRupees !== undefined) {
       const p = spokenRupeesToPaise(line.priceRupees);
       if (p !== null && p > 0) priceInPaise = p;
-      else warn(`Couldn't understand the price for ${menu.name} — used the menu price`);
+      else warn(`Couldn't understand the price for ${menu.name} — used the ${food ? "menu" : "usual"} price`);
     }
 
     if (line.quantity !== undefined && line.quantity > DRAFT_MAX_QTY) {
@@ -653,7 +658,7 @@ export function postProcessDropDraft(
   draft.items = items;
   draft.unmatched = unmatched;
   if (items.length > 0) filled.push("items");
-  else warn("No menu items recognised — please pick items below", "items");
+  else warn(`No ${food ? "menu items" : "products"} recognised — please pick items below`, "items");
 
   // ── Final pass through the real save schema: anything it would reject and we
   // haven't already explained becomes a warning, never a failure.

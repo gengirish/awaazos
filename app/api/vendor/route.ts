@@ -3,6 +3,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { SUPPORTED_VOICE_LANGS } from "@/lib/constants";
+import { deliveryRidersSchema } from "@/lib/delivery-riders";
+import { deliveryAreasSchema } from "@/lib/delivery-areas-schema";
+import { menuSlotsSchema } from "@/lib/menu-slots-schema";
+import { INSTAGRAM_HANDLE_MESSAGE, normaliseInstagramHandle } from "@/lib/instagram";
 import { menuOrdersEnableBlocker, type MenuOrdersBlocker } from "@/lib/menu-orders-board";
 import {
   dropWillTakeOrdersWhere,
@@ -13,10 +17,15 @@ import {
 } from "@/lib/payment-guard";
 import { normaliseIndianMobile } from "@/lib/phone";
 import { prisma } from "@/lib/prisma";
+import { resolveStallTypeOther } from "@/lib/stall-type";
 import { requireVendorRole } from "@/lib/rbac";
 import { GSTIN_FORMAT_MESSAGE, GSTIN_PATTERN, RECEIPT_FOOTER_MAX } from "@/lib/receipt";
+import { storeHandleSchema } from "@/lib/store-handle";
+import { isValidStoreTagline, normaliseStoreTagline, STORE_TAGLINE_MAX, STORE_TAGLINE_MESSAGE } from "@/lib/store-tagline";
+import { STORE_THEMES } from "@/lib/store-theme";
 import { storeNameSchema } from "@/lib/store-name";
 import { buyerWhatsappNumber } from "@/lib/storefront-order";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { UPI_ID_FORMAT_MESSAGE, UPI_ID_PATTERN } from "@/lib/upi";
 
 // Served to cashiers: the encrypted Razorpay secrets must never leave the server
@@ -24,13 +33,20 @@ import { UPI_ID_FORMAT_MESSAGE, UPI_ID_PATTERN } from "@/lib/upi";
 const SETTINGS_SECRET_OMIT = { razorpayKeySecretEnc: true, razorpayWebhookSecretEnc: true } as const;
 
 const patchSchema = z.object({
-  // Store display name (Settings → Online store). Only Vendor.name changes —
-  // Vendor.slug is never rewritten, because shared /s/[slug] links, printed QR
-  // codes and receipt links depend on it.
+  // Store display name (Settings → Online store). Renaming never touches the
+  // link; that is `slug` below, its own field with its own confirmation.
   name: storeNameSchema.optional(),
-  city: z.string().trim().min(1).max(80).optional(),
-  state: z.string().trim().min(1).max(80).optional(),
+  // The store link, /s/<slug> (Settings → Online store, OWNER). Changing it
+  // retires the old link at once: anything printed or posted with it stops
+  // working, which the UI says before it sends this. 409 store_handle_taken.
+  slug: storeHandleSchema.optional(),
+  // "" or null clears them: a store's place is optional (Settings → Online store).
+  city: z.string().trim().max(80).nullable().optional(),
+  state: z.string().trim().max(80).nullable().optional(),
   stallType: z.nativeEnum(StallType).optional(),
+  // The seller's words for stallType OTHER (lib/stall-type.ts). Read only
+  // together with stallType: required for OTHER, cleared for any other type.
+  stallTypeOther: z.string().max(200).nullable().optional(),
   // "" or null clears it; otherwise it must look like name@bank (lib/upi.ts).
   upiId: z
     .string()
@@ -41,9 +57,26 @@ const patchSchema = z.object({
     .nullable(),
   upiName: z.string().trim().max(120).optional().nullable(),
   onboardingDone: z.boolean().optional(),
+  // Highest first-run step saved (resumeStep in app/(onboarding)/onboarding/onboarding-steps.ts).
+  onboardingStep: z.number().int().min(1).max(20).optional(),
   whatsappNumber: z.string().trim().max(20).optional().nullable(),
   // Show whatsappNumber to storefront buyers (wa.me links). Off by default.
   acceptWhatsappOrders: z.boolean().optional(),
+  // Show a WhatsApp chat link to every storefront visitor. Off by default.
+  showWhatsappOnStore: z.boolean().optional(),
+  // The store colour (lib/store-theme.ts); the storefront pages read it as data-theme.
+  theme: z.enum(STORE_THEMES).optional(),
+  // One line under the store name (lib/store-tagline.ts); "" or null clears it.
+  tagline: z.string().max(STORE_TAGLINE_MAX * 2).nullable().optional(),
+  // "@handle" or a profile URL; stored bare. "" or null clears it.
+  instagramHandle: z
+    .string()
+    .trim()
+    .max(200)
+    .refine((v) => normaliseInstagramHandle(v) !== null, INSTAGRAM_HANDLE_MESSAGE)
+    .transform((v) => normaliseInstagramHandle(v))
+    .optional()
+    .nullable(),
   voiceLang: z.enum(SUPPORTED_VOICE_LANGS).optional(),
   publishStorefront: z.boolean().optional(),
   // FSSAI registration/licence numbers are exactly 14 digits. "" clears it.
@@ -69,6 +102,13 @@ const patchSchema = z.object({
   menuDeliveryFeePaise: z.number().int().min(0).max(100_000).optional(),
   // "" or null clears it.
   menuPickupNote: z.string().trim().max(200).optional().nullable(),
+  // The seller's own delivery people (Settings → Online orders). The whole
+  // list is replaced; [] removes every rider.
+  deliveryRiders: deliveryRidersSchema.optional(),
+  // Weekly pickup / delivery slots for menu orders (lib/menu-slots.ts); [] = checkout asks no "when".
+  menuSlots: menuSlotsSchema.optional(),
+  // Where the store delivers (lib/delivery-areas.ts); [] = anywhere.
+  deliveryAreas: deliveryAreasSchema.optional(),
   menuItems: z
     .array(
       z.object({
@@ -88,10 +128,16 @@ class SettingsConflict extends Error {
   }
 }
 
-/** Turning on WhatsApp orders needs a number that makes a working wa.me link. */
+/** Showing the number to buyers (after an order, or on the store page) needs a number that makes a working wa.me link. */
 class WhatsappNumberRequired extends Error {
   constructor() {
     super("whatsapp_number_required");
+  }
+}
+
+class StoreHandleTaken extends Error {
+  constructor() {
+    super("store_handle_taken");
   }
 }
 
@@ -156,13 +202,36 @@ export async function PATCH(req: NextRequest) {
 
     const { menuItems, ...vendorFields } = parsed.data;
 
+    let stallTypeOther: string | null | undefined;
+    if (vendorFields.stallType !== undefined) {
+      const other = resolveStallTypeOther(vendorFields.stallType, vendorFields.stallTypeOther);
+      if (!other.ok) {
+        return NextResponse.json(
+          { error: "Validation failed.", details: { stallTypeOther: [other.error] } },
+          { status: 400 },
+        );
+      }
+      stallTypeOther = other.value;
+    }
+
+    let tagline: string | null | undefined;
+    if (vendorFields.tagline !== undefined) {
+      tagline = normaliseStoreTagline(vendorFields.tagline);
+      if (!isValidStoreTagline(tagline)) {
+        return NextResponse.json(
+          { error: "Validation failed.", details: { tagline: [STORE_TAGLINE_MESSAGE] } },
+          { status: 400 },
+        );
+      }
+    }
+
     // One stored format (E.164 for Indian mobiles) so wa.me links don't depend on how it was typed.
     if (vendorFields.whatsappNumber) {
       vendorFields.whatsappNumber = normaliseIndianMobile(vendorFields.whatsappNumber);
     }
 
     await prisma.$transaction(async (tx) => {
-      if (vendorFields.acceptWhatsappOrders === true) {
+      if (vendorFields.acceptWhatsappOrders === true || vendorFields.showWhatsappOnStore === true) {
         const number =
           vendorFields.whatsappNumber !== undefined
             ? vendorFields.whatsappNumber
@@ -183,7 +252,9 @@ export async function PATCH(req: NextRequest) {
           where: { id: ctx.vendor.id },
           select: {
             upiId: true,
-            settings: { select: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true } },
+            settings: {
+              select: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true, ...RAZORPAY_CRED_SELECT },
+            },
           },
         });
         // The values this same request leaves behind.
@@ -192,10 +263,11 @@ export async function PATCH(req: NextRequest) {
           upiId: vendorFields.upiId !== undefined ? vendorFields.upiId : current?.upiId,
           acceptPayOnDelivery: vendorFields.acceptPayOnDelivery ?? current?.settings?.acceptPayOnDelivery ?? false,
           acceptMenuOrders: vendorFields.acceptMenuOrders ?? current?.settings?.acceptMenuOrders ?? false,
+          onlinePayment: isOnlinePaymentEnabled(ctx.vendor, current?.settings),
         };
 
         // Turning "order from menu" on needs somewhere to order (a published
-        // storefront) and a way to pay (UPI ID or pay on delivery).
+        // storefront) and a way to pay (Razorpay, UPI ID or pay on delivery).
         if (vendorFields.acceptMenuOrders === true) {
           const blocker = menuOrdersEnableBlocker(after);
           if (blocker) throw new SettingsConflict(blocker);
@@ -218,12 +290,23 @@ export async function PATCH(req: NextRequest) {
 
       const data: Prisma.VendorUpdateInput = {};
       if (vendorFields.name !== undefined) data.name = vendorFields.name;
-      if (vendorFields.city !== undefined) data.city = vendorFields.city;
-      if (vendorFields.state !== undefined) data.state = vendorFields.state;
-      if (vendorFields.stallType !== undefined) data.stallType = vendorFields.stallType;
+      if (vendorFields.slug !== undefined && vendorFields.slug !== ctx.vendor.slug) {
+        const taken = await tx.vendor.findUnique({ where: { slug: vendorFields.slug }, select: { id: true } });
+        if (taken) throw new StoreHandleTaken();
+        data.slug = vendorFields.slug;
+      }
+      if (vendorFields.city !== undefined) data.city = vendorFields.city || null;
+      if (vendorFields.state !== undefined) data.state = vendorFields.state || null;
+      if (vendorFields.stallType !== undefined) {
+        data.stallType = vendorFields.stallType;
+        data.stallTypeOther = stallTypeOther ?? null;
+      }
       if (vendorFields.upiId !== undefined) data.upiId = vendorFields.upiId || null;
       if (vendorFields.upiName !== undefined) data.upiName = vendorFields.upiName || null;
+      if (vendorFields.onboardingStep !== undefined) data.onboardingStep = vendorFields.onboardingStep;
       if (vendorFields.onboardingDone !== undefined) data.onboardingDone = vendorFields.onboardingDone;
+      // Finished: nothing left to resume.
+      if (vendorFields.onboardingDone === true) data.onboardingStep = null;
       if (vendorFields.gstin !== undefined) data.gstin = vendorFields.gstin || null;
 
       if (Object.keys(data).length) {
@@ -239,6 +322,18 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.acceptWhatsappOrders !== undefined) {
         settingsUpdate.acceptWhatsappOrders = vendorFields.acceptWhatsappOrders;
+      }
+      if (vendorFields.showWhatsappOnStore !== undefined) {
+        settingsUpdate.showWhatsappOnStore = vendorFields.showWhatsappOnStore;
+      }
+      if (vendorFields.instagramHandle !== undefined) {
+        settingsUpdate.instagramHandle = vendorFields.instagramHandle || null;
+      }
+      if (vendorFields.theme !== undefined) {
+        settingsUpdate.theme = vendorFields.theme;
+      }
+      if (tagline !== undefined) {
+        settingsUpdate.tagline = tagline;
       }
       if (vendorFields.voiceLang !== undefined) {
         settingsUpdate.voiceLang = vendorFields.voiceLang;
@@ -272,6 +367,15 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.menuPickupNote !== undefined) {
         settingsUpdate.menuPickupNote = vendorFields.menuPickupNote || null;
+      }
+      if (vendorFields.deliveryRiders !== undefined) {
+        settingsUpdate.deliveryRiders = vendorFields.deliveryRiders;
+      }
+      if (vendorFields.menuSlots !== undefined) {
+        settingsUpdate.menuSlots = vendorFields.menuSlots;
+      }
+      if (vendorFields.deliveryAreas !== undefined) {
+        settingsUpdate.deliveryAreas = vendorFields.deliveryAreas;
       }
       if (vendorFields.onboardingDone === true && vendorFields.whatsappNumber) {
         settingsUpdate.sendWhatsappReceipt = true;
@@ -308,8 +412,19 @@ export async function PATCH(req: NextRequest) {
     });
 
     const res = NextResponse.json({ vendor });
-    return withVendorCookie(res, ctx.setVendorCookie);
+    // The active-vendor cookie holds the slug (lib/rbac.ts); after a link
+    // change it must follow, or the next request falls back to the oldest
+    // membership.
+    const slugChanged = vendor && vendor.slug !== ctx.vendor.slug ? vendor.slug : null;
+    return withVendorCookie(res, slugChanged ?? ctx.setVendorCookie);
   } catch (e) {
+    if (e instanceof StoreHandleTaken) {
+      return NextResponse.json({ error: e.message }, { status: 409 });
+    }
+    if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
+      // Two owners racing for the same link: the unique index decides.
+      return NextResponse.json({ error: "store_handle_taken" }, { status: 409 });
+    }
     if (e instanceof SettingsConflict) {
       return NextResponse.json({ error: e.code }, { status: 409 });
     }

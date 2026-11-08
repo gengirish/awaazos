@@ -24,6 +24,13 @@ test.describe("help guide", () => {
     const main = page.getByRole("main");
     await expect(main.getByRole("link", { name: /The counter./ })).toHaveAttribute("href", "/pos");
 
+    // The order's whole life, in order: customer places it … the rider taps Delivered … finish.
+    const journey = main.getByRole("region", { name: "An online order, start to finish" });
+    await expect(journey.getByRole("listitem")).toHaveCount(7);
+    await expect(journey.getByRole("listitem").first()).toContainText("Customer places the order");
+    await expect(journey).toContainText("Rider delivers and taps Delivered");
+    await expect(journey.getByRole("listitem").last()).toContainText("Finish the order");
+
     await page.getByLabel("Search help").fill("upi");
     const payments = main.getByRole("link", { name: /Set your UPI ID/ });
     await expect(payments).toBeVisible();

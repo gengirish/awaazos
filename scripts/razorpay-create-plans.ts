@@ -9,8 +9,9 @@
  * live keys create live plans. Run against test first.
  *
  * Amounts come from lib/subscription.ts (base price + 18% GST), never retyped.
- * Razorpay plans can't be edited: a price change means new plans, new env ids,
- * and moving existing subscribers over with `subscriptions.update`.
+ * Razorpay plans can't be edited: a price change means new plans and new env
+ * ids. Subscribers stay on their old plan and price, so this also prints the old
+ * ids as RAZORPAY_RETIRED_PLANS, which keeps their renewals credited.
  * Idempotent — a plan with the same name, period and amount is reused.
  */
 import fs from "node:fs";
@@ -19,10 +20,13 @@ import path from "node:path";
 import Razorpay from "razorpay";
 
 import {
+  BILLING_INTERVALS,
   gstPaise,
+  SUBSCRIBABLE_PLANS,
   subscriptionBasePaise,
   subscriptionChargePaise,
   type BillingInterval,
+  type SubscribablePlan,
 } from "../lib/subscription";
 
 function loadEnvLocal(): void {
@@ -39,10 +43,16 @@ function rupees(paise: number): string {
   return `₹${Math.floor(paise / 100)}.${String(paise % 100).padStart(2, "0")}`;
 }
 
-const PLANS: { interval: BillingInterval; env: string; period: "monthly" | "yearly"; name: string }[] = [
-  { interval: "monthly", env: "RAZORPAY_PLAN_STARTER_MONTHLY", period: "monthly", name: "AwaazOS Starter (monthly)" },
-  { interval: "yearly", env: "RAZORPAY_PLAN_STARTER_YEARLY", period: "yearly", name: "AwaazOS Starter (yearly)" },
-];
+const PLANS: { plan: SubscribablePlan; interval: BillingInterval; env: string; period: "monthly" | "yearly"; name: string }[] =
+  SUBSCRIBABLE_PLANS.flatMap((plan) =>
+    BILLING_INTERVALS.map((interval) => ({
+      plan,
+      interval,
+      env: `RAZORPAY_PLAN_${plan}_${interval.toUpperCase()}`,
+      period: interval,
+      name: `AwaazOS ${plan.charAt(0)}${plan.slice(1).toLowerCase()} (${interval})`,
+    })),
+  );
 
 async function main(): Promise<void> {
   loadEnvLocal();
@@ -60,10 +70,17 @@ async function main(): Promise<void> {
   const existing = (await rz.plans.all({ count: 100 })).items;
 
   const lines: string[] = [];
+  const retired: string[] = [];
   for (const p of PLANS) {
-    const base = subscriptionBasePaise("STARTER", p.interval);
-    const amount = subscriptionChargePaise("STARTER", p.interval);
+    const base = subscriptionBasePaise(p.plan, p.interval);
+    const amount = subscriptionChargePaise(p.plan, p.interval);
     const description = `${rupees(base)} + 18% GST (${rupees(gstPaise(base))})`;
+
+    for (const old of existing) {
+      if (old.item.name === p.name && old.period === p.period && Number(old.item.amount) !== amount) {
+        retired.push(`${old.id}:${p.plan}:${p.interval}`);
+      }
+    }
 
     const match = existing.find(
       (e) =>
@@ -86,7 +103,7 @@ async function main(): Promise<void> {
       period: p.period,
       interval: 1,
       item: { name: p.name, amount, currency: "INR", description },
-      notes: { plan: "STARTER", interval: p.interval },
+      notes: { plan: p.plan, interval: p.interval },
     });
     console.log(`created  ${p.name}: ${rupees(amount)} → ${plan.id}`);
     lines.push(`${p.env}=${plan.id}`);
@@ -95,6 +112,7 @@ async function main(): Promise<void> {
   if (lines.length > 0) {
     console.log(`\nSet these in Vercel (${mode === "LIVE" ? "Production" : "Preview/Development"}) and .env.local:\n`);
     for (const l of lines) console.log(l);
+    if (retired.length > 0) console.log(`RAZORPAY_RETIRED_PLANS=${retired.join(",")}`);
   }
 }
 

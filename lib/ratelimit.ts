@@ -99,8 +99,30 @@ export const authRateLimit = makeLimiter({
   max: 5,
 });
 
+/**
+ * 5 public survey answers per IP per hour (POST /api/survey). A person answers
+ * once; the allowance is for a family or a shop sharing one connection.
+ */
+export const publicSurveyRateLimit = makeLimiter({
+  name: "public-survey",
+  windowMs: 60 * 60_000,
+  max: 5,
+});
+
+/**
+ * 30 store-link availability checks per IP per minute (GET /api/auth/store-handle).
+ * The forms debounce typing, so a person makes a handful; a scraper of taken
+ * handles gets the public /s/<handle> page's answer no faster than this.
+ */
+export const storeHandleRateLimit = makeLimiter({
+  name: "store-handle",
+  windowMs: 60_000,
+  max: 30,
+});
+
 const PLAN_AI_LIMITS: Record<Plan, { perMinute: number; burstPerSecond: number }> = {
   FREE: { perMinute: 10, burstPerSecond: 2 },
+  LITE: { perMinute: 10, burstPerSecond: 2 },
   STARTER: { perMinute: 30, burstPerSecond: 4 },
   PRO: { perMinute: 120, burstPerSecond: 12 },
   ENTERPRISE: { perMinute: 300, burstPerSecond: 30 },
@@ -149,6 +171,16 @@ export const billingRateLimit = makeLimiter({
   name: "billing",
   windowMs: 60_000,
   max: 5,
+});
+
+/**
+ * 6 AI images per vendor per minute. Each one is a billed fal job, so this is
+ * far below the text AI limits.
+ */
+export const aiImageRateLimit = makeLimiter({
+  name: "ai-image",
+  windowMs: 60_000,
+  max: 6,
 });
 
 /**

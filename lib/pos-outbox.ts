@@ -32,10 +32,16 @@ import { getIstTodayStart } from "@/lib/billing-period";
 export type OutboxSaleBody = {
   items: { menuItemId?: string; name: string; priceInPaise: number; qty: number }[];
   subtotalPaise: number;
+  /** Offer discount (lib/offers.ts). Absent on a bill without one. */
+  discountPaise?: number;
+  offerId?: string | null;
+  offerName?: string | null;
   taxPaise: number;
   totalPaise: number;
   paymentMethod: "CASH" | "UPI";
   upiRef: string | null;
+  /** Cash handed over (lib/cash-tender.ts). Absent when not entered. */
+  cashReceivedPaise?: number | null;
 };
 
 export type OutboxSale = {
@@ -106,6 +112,7 @@ const SALE_REJECTED_MESSAGES = new Map<string, string>([
   ["billing_locked", "Your free trial has ended. Subscribe in Settings → Plan & billing to keep selling."],
   ["subtotal_mismatch", "This bill's total didn't add up. Close this, check the cart and try again."],
   ["total_mismatch", "This bill's total didn't add up. Close this, check the cart and try again."],
+  ["discount_mismatch", "Your offers have changed. Reload this page, then ring up the order again."],
 ]);
 
 /**
@@ -226,8 +233,8 @@ async function postSale(sale: OutboxSale, opts: { deferred: boolean; timeoutMs?:
 }
 
 export type CheckoutResult =
-  | { kind: "synced"; bill: SyncedBill }
-  | { kind: "queued"; localNo: number; needsSignIn: boolean }
+  | { kind: "synced"; clientRef: string; bill: SyncedBill }
+  | { kind: "queued"; clientRef: string; localNo: number; needsSignIn: boolean }
   | { kind: "rejected"; code: string; status: number }
   /**
    * The device could not store the sale and the server did not confirm it, so
@@ -272,7 +279,7 @@ export async function checkoutSale(
     if (stored) await removeSale(vendorId, sale.clientRef);
     // The network is evidently up: push anything older that was waiting.
     void syncOutbox(vendorId);
-    return { kind: "synced", bill: outcome.bill };
+    return { kind: "synced", clientRef: sale.clientRef, bill: outcome.bill };
   }
   if (outcome.kind === "rejected") {
     // Live rejection (plan cap, tampered totals): same as before the outbox,
@@ -283,7 +290,7 @@ export async function checkoutSale(
   if (!stored) {
     return { kind: "unsaved", clientRef: sale.clientRef, reason: outcome.kind === "auth" ? "auth" : "network" };
   }
-  return { kind: "queued", localNo: sale.localNo, needsSignIn: outcome.kind === "auth" };
+  return { kind: "queued", clientRef: sale.clientRef, localNo: sale.localNo, needsSignIn: outcome.kind === "auth" };
 }
 
 export type SyncSummary = { synced: number; remaining: number; needsSignIn: boolean };
@@ -332,5 +339,42 @@ async function drain(vendorId: string): Promise<SyncSummary> {
   } catch {
     // IndexedDB unavailable (private mode quirks): nothing to drain.
     return { synced, remaining: 0, needsSignIn };
+  }
+}
+
+export type UndoResult = { kind: "undone" } | { kind: "failed"; reason: "network" | "too_late" | "error" };
+
+/**
+ * Reverts a sale just rung up (lib/pos-undo.ts). The device copy goes first,
+ * after any drain already in flight, so the outbox can't post it again; then
+ * the server deletes the bill if it has one. A queued sale taken offline never
+ * reached the server, so removing it here is the whole undo.
+ */
+export async function undoSale(
+  vendorId: string,
+  clientRef: string,
+  opts: { synced: boolean },
+): Promise<UndoResult> {
+  const draining = inFlight.get(vendorId);
+  if (draining) await draining.catch(() => undefined);
+  await removeSale(vendorId, clientRef);
+
+  const offline = typeof navigator !== "undefined" && navigator.onLine === false;
+  if (offline) return opts.synced ? { kind: "failed", reason: "network" } : { kind: "undone" };
+
+  try {
+    const res = await fetch(`/api/transactions/undo?vendor=${encodeURIComponent(vendorId)}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ clientRef, vendorId }),
+    });
+    if (res.ok) return { kind: "undone" };
+    // Not on the server: a queued sale that never synced is undone already.
+    if (res.status === 404 && !opts.synced) return { kind: "undone" };
+    if (res.status === 409) return { kind: "failed", reason: "too_late" };
+    return { kind: "failed", reason: "error" };
+  } catch {
+    return opts.synced ? { kind: "failed", reason: "network" } : { kind: "undone" };
   }
 }

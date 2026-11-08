@@ -1,11 +1,13 @@
 "use client";
 
-import { AlertTriangle, Check } from "lucide-react";
+import { Check } from "lucide-react";
 import { useId, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import { LastPaymentMethodNotice, lastPaymentMethodBlockersFrom } from "@/components/settings/LastPaymentMethodNotice";
+import { Notice } from "@/components/ui/notice";
 import type { PaymentGuardBlocker } from "@/lib/payment-guard";
+import type { StoreKind } from "@/lib/store-vocabulary";
 import { isValidUpiId, normalizeUpiId, UPI_ID_FORMAT_MESSAGE } from "@/lib/upi";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +21,10 @@ export type UpiDetailsClientProps = {
   /** Current pay-on-delivery setting: decides whether removing the UPI ID needs a warning. */
   acceptPayOnDelivery: boolean;
   isOwner: boolean;
+  /** Names the everyday-orders setting in the "last way to pay" notice. */
+  storeKind: StoreKind;
+  /** Razorpay can take payments, so removing the UPI ID leaves a way to pay. */
+  onlinePayment?: boolean;
   /** Told after a successful save with the stored UPI ID (null when removed). */
   onSaved?: (upiId: string | null) => void;
 };
@@ -32,7 +38,9 @@ export function UpiDetailsClient({
   initialUpiId,
   initialUpiName,
   acceptPayOnDelivery,
+  onlinePayment,
   isOwner,
+  storeKind,
   onSaved,
 }: UpiDetailsClientProps) {
   const ids = useId();
@@ -53,7 +61,7 @@ export function UpiDetailsClient({
   const nextUpiName = upiName.trim();
   const dirty = nextUpiId !== saved.upiId || nextUpiName !== saved.upiName;
   const removing = nextUpiId === "" && saved.upiId !== "";
-  const removeNeedsWarning = removing && !acceptPayOnDelivery;
+  const removeNeedsWarning = removing && !acceptPayOnDelivery && !onlinePayment;
 
   function save() {
     if (!dirty || pending || !isOwner) return;
@@ -180,24 +188,20 @@ export function UpiDetailsClient({
           className={INPUT}
         />
         <p id={upiNameHint} className={cn("text-xs", errors.upiName ? "text-destructive" : "text-muted-foreground")}>
-          {errors.upiName ?? "Customers see this name before they pay. Leave empty to use your stall name."}
+          {errors.upiName ?? "Customers see this name before they pay. Leave empty to use your store name."}
         </p>
       </div>
 
       {confirmRemove && removeNeedsWarning ? (
-        <div
-          role="alert"
-          className="flex gap-2 rounded-md border border-amber-500/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-        >
-          <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
+        <Notice role="alert" icon>
           <p>
             Pay on delivery is off, so without a UPI ID customers will have no way to pay you online. Tap
             &ldquo;Remove UPI ID&rdquo; again to confirm, or turn on pay on delivery below first.
           </p>
-        </div>
+        </Notice>
       ) : null}
 
-      {serverBlock ? <LastPaymentMethodNotice blockers={serverBlock} /> : null}
+      {serverBlock ? <LastPaymentMethodNotice blockers={serverBlock} storeKind={storeKind} /> : null}
 
       {isOwner && (
         <div className="flex flex-wrap items-center gap-3">

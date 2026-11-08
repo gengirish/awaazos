@@ -1,7 +1,9 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { PaymentMethod } from "@prisma/client";
+import { toast } from "sonner";
 
 import { PosHeader } from "@/components/pos/PosHeader";
 import { PosSyncStatus } from "@/components/pos/PosSyncStatus";
@@ -12,10 +14,17 @@ import { POS_CART_ANCHOR_ID, StickyCheckoutBar } from "@/components/pos/StickyCh
 import { UpiQRModal, type PaidResult } from "@/components/pos/UpiQRModal";
 import { VoiceOrderButton } from "@/components/pos/VoiceOrderButton";
 import { InstallBanner } from "@/components/pwa/InstallPrompt";
+import { Button } from "@/components/ui/button";
 import { useIsDesktop } from "@/hooks/useMediaQuery";
 import { useOnline } from "@/hooks/useOnline";
 import { usePosOutbox } from "@/hooks/usePosOutbox";
-import { useCartStore } from "@/lib/cartStore";
+import { paymentMethodLabel } from "@/lib/cash-tender";
+import { useCartStore, type CartLine } from "@/lib/cartStore";
+import { formatINR } from "@/lib/currency";
+import { undoSale, type UndoResult } from "@/lib/pos-outbox";
+import type { PayTotals } from "@/lib/pos-totals";
+import { POS_UNDO_TOAST_MS } from "@/lib/pos-undo";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { registerAppServiceWorker } from "@/lib/sw-client";
 
 export type PosShellProps = {
@@ -26,11 +35,24 @@ export type PosShellProps = {
     upiName: string | null;
   };
   initialItems: MenuTile[];
-  settings: PosSettings & { voiceLang: string; autoPrintReceipt: boolean };
+  settings: PosSettings & { voiceLang: string; autoPrintReceipt: boolean; voiceBilling: boolean };
   todaysRevenuePaise: number;
   /** ISO time the server rendered this page; shown as "menu as of" when offline. */
   renderedAt: string;
+  /** The store's words (lib/store-vocabulary.ts). */
+  vocab: StoreVocabulary;
 };
+
+const UNDO_TOAST_ID = "pos-undo";
+
+/** The sale "Undo" would revert, with what it takes to put the cart back. */
+type UndoableSale = { clientRef: string; synced: boolean; items: CartLine[]; totals: PayTotals };
+
+function undoFailedMessage(reason: Extract<UndoResult, { kind: "failed" }>["reason"]): string {
+  if (reason === "network") return "No connection, so the sale is still recorded.";
+  if (reason === "too_late") return "Too late to undo. The sale is still recorded.";
+  return "Couldn't undo. The sale is still recorded.";
+}
 
 export function PosShell({
   vendor,
@@ -38,7 +60,9 @@ export function PosShell({
   settings,
   todaysRevenuePaise,
   renderedAt,
+  vocab,
 }: PosShellProps) {
+  const router = useRouter();
   const items = useCartStore((s) => s.items);
   const online = useOnline();
   const outbox = usePosOutbox(vendor.id);
@@ -46,8 +70,11 @@ export function PosShell({
   const isDesktop = useIsDesktop();
   const [payOpen, setPayOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
-  const [payTotals, setPayTotals] = useState({
+  const [payTotals, setPayTotals] = useState<PayTotals>({
     subtotalPaise: 0,
+    discountPaise: 0,
+    offerId: null,
+    offerName: null,
     taxPaise: 0,
     totalPaise: 0,
   });
@@ -58,20 +85,63 @@ export function PosShell({
     queued: null as { localNo: number; needsSignIn: boolean } | null,
   });
 
+  // Undo after "Mark as paid": the toast and the receipt sheet both offer it
+  // for POS_UNDO_TOAST_MS. The sale is already committed; undo reverts it.
+  const undoableRef = useRef<UndoableSale | null>(null);
+  // clientRef of the sale on offer; keys the timer, so each sale gets its full window.
+  const [undoKey, setUndoKey] = useState<string | null>(null);
+  const [undoing, setUndoing] = useState(false);
+
+  useEffect(() => {
+    if (!undoKey) return;
+    // Only hides the button; nothing is polled or written when it fires.
+    const t = window.setTimeout(() => {
+      if (undoableRef.current?.clientRef === undoKey) undoableRef.current = null;
+      setUndoKey((k) => (k === undoKey ? null : k));
+    }, POS_UNDO_TOAST_MS);
+    return () => window.clearTimeout(t);
+  }, [undoKey]);
+
+  const undoLastSale = useCallback(async () => {
+    const sale = undoableRef.current;
+    if (!sale) return;
+    undoableRef.current = null;
+    toast.dismiss(UNDO_TOAST_ID);
+    setUndoing(true);
+    const result = await undoSale(vendor.id, sale.clientRef, { synced: sale.synced });
+    setUndoing(false);
+    setUndoKey(null);
+    if (result.kind === "failed") {
+      toast.error(undoFailedMessage(result.reason));
+      return;
+    }
+    // Back to where the vendor was: the same cart, the payment sheet open.
+    setReceiptOpen(false);
+    useCartStore.getState().restoreItems(sale.items);
+    setPayTotals(sale.totals);
+    setPayOpen(true);
+    toast("Payment undone");
+    // Today's revenue in the header; offline that request can only fail.
+    if (navigator.onLine) router.refresh();
+  }, [vendor.id, router]);
+
   // Lets /pos open from the Home Screen with no network (public/sw.js).
   useEffect(() => {
     registerAppServiceWorker();
   }, []);
 
-  const onCollectPayment = useCallback(
-    (totals: { subtotalPaise: number; taxPaise: number; totalPaise: number }) => {
-      setPayTotals(totals);
-      setPayOpen(true);
-    },
-    [],
-  );
+  const onCollectPayment = useCallback((totals: PayTotals) => {
+    setPayTotals(totals);
+    setPayOpen(true);
+  }, []);
 
   const onPaid = useCallback((result: PaidResult) => {
+    undoableRef.current = {
+      clientRef: result.clientRef,
+      synced: result.kind === "synced",
+      items: useCartStore.getState().items.map((l) => ({ ...l })),
+      totals: payTotals,
+    };
     // The sale is saved (synced or queued in the outbox) — empty the cart now,
     // so dismissing the receipt by swipe/Esc can never leave paid items behind.
     // UpiQRModal has already captured the lines it posted.
@@ -92,11 +162,24 @@ export function PosShell({
           },
     );
     setReceiptOpen(true);
-  }, []);
+    setUndoKey(result.clientRef);
+    toast.success(`Payment recorded · ${formatINR(result.totalPaise)} ${paymentMethodLabel(result.paymentMethod)}`, {
+      id: UNDO_TOAST_ID,
+      duration: POS_UNDO_TOAST_MS,
+      // Our Button, not sonner's 24 px action, so Undo is a 44 px target on phones.
+      action: (
+        <Button type="button" size="sm" variant="outline" className="ml-auto" onClick={() => void undoLastSale()}>
+          Undo
+        </Button>
+      ),
+    });
+  }, [payTotals, undoLastSale]);
 
   const cartSettings: PosSettings = {
     taxEnabled: settings.taxEnabled,
     taxPercent: settings.taxPercent,
+    offers: settings.offers,
+    voiceBilling: settings.voiceBilling,
   };
 
   return (
@@ -115,6 +198,7 @@ export function PosShell({
       <PosSyncStatus
         online={online}
         renderedAt={renderedAt}
+        vocab={vocab}
         pending={outbox.pending}
         failed={outbox.failed}
         needsSignIn={outbox.needsSignIn}
@@ -125,18 +209,18 @@ export function PosShell({
       <InstallBanner className="mt-4" />
       <main
         id="main-pos"
-        className="mt-6 flex flex-col gap-8 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] md:items-start md:gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]"
+        className="mt-4 flex flex-col gap-8 md:mt-6 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] md:items-start md:gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]"
       >
-        <div className="flex min-w-0 flex-col gap-8">
-          <VoiceOrderButton voiceLang={settings.voiceLang} />
-          <QuickAddGrid items={initialItems} />
+        <div className="flex min-w-0 flex-col gap-5 md:gap-8">
+          {settings.voiceBilling ? <VoiceOrderButton voiceLang={settings.voiceLang} /> : null}
+          <QuickAddGrid items={initialItems} vocab={vocab} />
         </div>
         <div
           id={POS_CART_ANCHOR_ID}
           tabIndex={-1}
           className="min-w-0 scroll-mt-4 focus:outline-hidden md:sticky md:top-6 md:max-h-[calc(100dvh-3rem)] md:overflow-y-auto"
         >
-          <OrderCart settings={cartSettings} onCollectPayment={onCollectPayment} />
+          <OrderCart settings={cartSettings} vocab={vocab} onCollectPayment={onCollectPayment} />
         </div>
       </main>
 
@@ -149,9 +233,7 @@ export function PosShell({
         stallName={vendor.name}
         upiId={vendor.upiId}
         upiName={vendor.upiName}
-        totalPaise={payTotals.totalPaise}
-        subtotalPaise={payTotals.subtotalPaise}
-        taxPaise={payTotals.taxPaise}
+        totals={payTotals}
         items={items}
         onPaid={onPaid}
       />
@@ -165,6 +247,7 @@ export function PosShell({
         paymentMethod={receiptMeta.paymentMethod}
         queued={receiptMeta.queued}
         autoPrint={settings.autoPrintReceipt}
+        undo={undoKey || undoing ? { busy: undoing, onUndo: () => void undoLastSale() } : null}
         onCloseAll={() => {
           setPayOpen(false);
           setReceiptOpen(false);

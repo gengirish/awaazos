@@ -6,8 +6,12 @@ import {
   HELP_GROUPS,
   HELP_SCREEN_SUMMARY,
   HELP_TOPICS,
+  helpGroupsFor,
+  helpScreenSummary,
   helpTopicsForRole,
   matchesHelpQuery,
+  ORDER_JOURNEY,
+  orderJourneyFor,
 } from "@/lib/help-guide";
 
 describe("help content", () => {
@@ -102,5 +106,52 @@ describe("matchesHelpQuery", () => {
   it("needs every word to match", () => {
     expect(ids("receipt whatsapp")).toEqual(expect.arrayContaining(["send-receipt", "resend-receipt"]));
     expect(ids("receipt zebra")).toEqual([]);
+  });
+});
+
+describe("ORDER_JOURNEY", () => {
+  it("runs from placing the order to finishing it, one step per id", () => {
+    const ids = ORDER_JOURNEY.map((s) => s.id);
+    expect(new Set(ids).size).toBe(ids.length);
+    expect(ids[0]).toBe("place");
+    expect(ids[ids.length - 1]).toBe("finish");
+    for (const step of ORDER_JOURNEY) expect(step.text.length).toBeGreaterThan(20);
+  });
+
+  it("names the Settings section riders are saved in as Settings does", () => {
+    const send = ORDER_JOURNEY.find((s) => s.id === "send")!;
+    const section = SETTINGS_SECTIONS.find((s) => s.href === "/settings/orders")!;
+    expect(send.text).toContain(`Settings, ${section.title}`);
+  });
+});
+
+describe("store wording", () => {
+  const allText = (kind: "food" | "goods") =>
+    [
+      ...helpTopicsForRole("OWNER", true, kind).flatMap((t) => [t.title, t.steps, ...t.path]),
+      ...orderJourneyFor(kind).flatMap((s) => [s.title, s.text]),
+      ...helpGroupsFor(kind).map((g) => g.title),
+      ...APP_NAV_ITEMS.map((i) => helpScreenSummary(i.id, kind)),
+    ].join("\n");
+
+  it("leaves no token unfilled for either kind", () => {
+    for (const kind of ["food", "goods"] as const) expect(allText(kind)).not.toMatch(/[{}]/);
+  });
+
+  it("reads as today for a kitchen", () => {
+    const byId = new Map(helpTopicsForRole("OWNER").map((t) => [t.id, t]));
+    expect(byId.get("prep-sheet")).toMatchObject({ title: "Find out how much to cook", path: ["Orders", "choose the drop", "Prep sheet"] });
+    expect(byId.get("edit-menu")!.title).toBe("Add a dish or change a price");
+    expect(byId.get("see-orders")!.steps).toContain("narrows the list to menu orders or to one drop");
+    expect(helpGroupsFor("food").find((g) => g.id === "menu")!.title).toBe("Menu");
+  });
+
+  it("never talks about dishes, cooking or the Menu screen to a product store", () => {
+    const text = allText("goods");
+    expect(text).not.toMatch(/\bdish(es)?\b|\bcook|Menu screen|Prep sheet|home kitchens/i);
+    const byId = new Map(helpTopicsForRole("OWNER", false, "goods").map((t) => [t.id, t]));
+    expect(byId.get("prep-sheet")).toMatchObject({ title: "Find out how much to pack", path: ["Orders", "choose the drop", "Packing list"] });
+    expect(byId.get("voice-menu")!.steps).toContain("Add products by voice at the top of the Products screen");
+    expect(byId.get("edit-menu")!.path).toEqual(["Products"]);
   });
 });

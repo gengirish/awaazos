@@ -1,7 +1,9 @@
 import { notFound } from "next/navigation";
 
+import { AdminNav } from "@/components/admin/AdminNav";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { getAdminMetrics } from "@/lib/admin-metrics";
+import { REFERRAL_METRICS_DAYS, getReferralMetrics } from "@/lib/admin-referrals";
 import { formatINR } from "@/lib/currency";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
 
@@ -38,17 +40,19 @@ function deltaClass(tone: "pos" | "neg" | "zero"): string {
 }
 
 export default async function AdminMetricsPage() {
+  let canManageStores = false;
   // Re-read the User row rather than trusting `session.user.role` off the JWT, so a
   // role revoked in the database takes effect immediately instead of at token expiry.
   try {
-    await requirePlatformRole("ADMIN");
+    canManageStores = (await requirePlatformRole("ADMIN")).user.role === "SUPER_ADMIN";
   } catch (err) {
     // 404, not 403 — never disclose that this admin surface exists.
     if (err instanceof AuthError) notFound();
     throw err;
   }
 
-  const metrics = await getAdminMetrics();
+  const now = new Date();
+  const [metrics, referrals] = await Promise.all([getAdminMetrics(now), getReferralMetrics(now)]);
 
   const voicePctLabel = `${ONE_DECIMAL.format(metrics.voiceSuccessRate7d * 100)}%`;
   const activeWow = formatDelta(metrics.wowGrowth.activeVendorsWoW);
@@ -67,6 +71,7 @@ export default async function AdminMetricsPage() {
         <p className="mt-2 text-sm text-muted-foreground">
           Rolling 7-day windows, IST midnights · Generated {generatedAt}
         </p>
+        <AdminNav current="/admin/metrics" superAdmin={canManageStores} />
       </header>
 
       <main className="mx-auto grid max-w-5xl grid-cols-1 gap-4 md:grid-cols-6">
@@ -128,6 +133,21 @@ export default async function AdminMetricsPage() {
             </p>
             <p className="mt-2 text-xs text-muted-foreground">
               Sum of <code>totalPaise</code> across paid bills in the last 7 days
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card className="md:col-span-3">
+          <CardHeader>
+            <CardTitle className="text-sm font-medium text-muted-foreground">
+              Orders from Instagram
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-4xl font-bold tabular-nums text-foreground">{metrics.instagram7d.orders}</p>
+            <p className="mt-2 text-xs text-muted-foreground">
+              Of {metrics.instagram7d.allStorefrontOrders} storefront orders in the last 7 days;{" "}
+              {metrics.instagram7d.paid} paid. Placed in Instagram&apos;s browser or from a <code>?src=ig</code> link.
             </p>
           </CardContent>
         </Card>

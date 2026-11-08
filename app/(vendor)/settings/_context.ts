@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { cache } from "react";
 
-import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { AuthError, requireVendorRole, staffRoleAtLeast } from "@/lib/rbac";
+import { storeKind, storeVocabulary } from "@/lib/store-vocabulary";
 
 /**
  * Every Settings page is readable by any staff member (CASHIER+); owner-only
@@ -16,7 +17,12 @@ export const requireSettingsContext = cache(async () => {
     return {
       vendor: ctx.vendor,
       access: ctx.access,
+      /** Kitchen or any other store: the words for the catalogue (lib/store-vocabulary.ts). */
+      storeKind: storeKind(ctx.vendor.stallType),
+      vocab: storeVocabulary(ctx.vendor.stallType),
       isOwner: ctx.staff.role === "OWNER",
+      /** MANAGER or OWNER: may edit offers (same floor as drops). */
+      canManage: staffRoleAtLeast(ctx.staff.role, "MANAGER"),
       user: { name: ctx.user.name, email: ctx.user.email },
     };
   } catch (e) {

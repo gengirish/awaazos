@@ -8,6 +8,9 @@
 import type { FulfilmentStatus } from "@prisma/client";
 
 import { formatINR } from "@/lib/currency";
+import { isValidPincode } from "@/lib/delivery-address";
+import { findDeliveryArea, type DeliveryArea } from "@/lib/delivery-areas";
+import { discountLabel } from "@/lib/offers";
 
 const IST = "Asia/Kolkata";
 
@@ -127,11 +130,20 @@ export function formatIstDeadline(d: Date, now: Date = new Date()): string {
   return `${p.weekday} ${p.dayMonth}, ${p.time}`;
 }
 
-/** "2 h 15 min left" / "45 min left" / null when past or more than 2 days away. */
+/**
+ * "1 day 4 h left" / "2 h 15 min left" / "45 min left"; null when past or more
+ * than a week away. Days drop the minutes: "1 day 4 h", never "1 day 4 h 12 min".
+ */
 export function formatTimeLeft(until: Date, now: Date = new Date()): string | null {
   const ms = until.getTime() - now.getTime();
-  if (ms <= 0 || ms > 48 * 60 * 60 * 1000) return null;
+  if (ms <= 0 || ms > 7 * 24 * 60 * 60 * 1000) return null;
   const totalMin = Math.max(1, Math.ceil(ms / 60_000));
+  if (totalMin >= 24 * 60) {
+    const days = Math.floor(totalMin / (24 * 60));
+    const hours = Math.floor((totalMin % (24 * 60)) / 60);
+    const dayPart = `${days} ${days === 1 ? "day" : "days"}`;
+    return hours === 0 ? `${dayPart} left` : `${dayPart} ${hours} h left`;
+  }
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
   if (h === 0) return `${m} min left`;
@@ -162,7 +174,7 @@ export function menuItemAnchor(menuItemId: string): string {
 /**
  * True while at least one item in a drop can still be ordered (`null` =
  * unlimited). An open drop whose every item is sold out must not drive the
- * "Pre-order now" CTA or a countdown: there is nothing left to pre-order.
+ * header "Pre-order · closes …" CTA or a countdown: there is nothing left to pre-order.
  */
 export function dropHasStock(items: readonly { remaining: number | null }[]): boolean {
   return items.some((i) => i.remaining === null || i.remaining > 0);
@@ -310,7 +322,11 @@ export function sameCartLines(a: Record<string, number>, b: Record<string, numbe
 export type SavedBuyer = {
   name: string;
   phone: string;
+  /** The address line (older entries: the whole address). */
   address: string;
+  locality: string;
+  landmark: string;
+  pincode: string;
   fulfilment: "DELIVERY" | "PICKUP" | null;
   /** ms epoch of the last save; 0 for entries written before it existed. */
   savedAt: number;
@@ -332,6 +348,9 @@ export function parseSavedBuyer(raw: string | null): SavedBuyer | null {
     name: str(o.name),
     phone: str(o.phone),
     address: str(o.address),
+    locality: str(o.locality),
+    landmark: str(o.landmark),
+    pincode: str(o.pincode),
     fulfilment: o.fulfilment === "DELIVERY" || o.fulfilment === "PICKUP" ? o.fulfilment : null,
     savedAt: typeof o.savedAt === "number" && Number.isFinite(o.savedAt) ? o.savedAt : 0,
   };
@@ -339,16 +358,27 @@ export function parseSavedBuyer(raw: string | null): SavedBuyer | null {
 
 // ─── Checkout validation ────────────────────────────────────────────
 
-export type CheckoutField = "name" | "phone" | "address" | "payment";
+export type CheckoutField = "name" | "phone" | "slot" | "address" | "locality" | "pincode" | "payment";
 export type CheckoutFieldErrors = Partial<Record<CheckoutField, string>>;
 
 /** Visual order of the fields in the checkout sheet — first invalid one gets focus. */
-export const CHECKOUT_FIELD_ORDER: readonly CheckoutField[] = ["name", "phone", "address", "payment"];
+export const CHECKOUT_FIELD_ORDER: readonly CheckoutField[] = [
+  "name",
+  "phone",
+  "slot",
+  "address",
+  "locality",
+  "pincode",
+  "payment",
+];
 
 export const CHECKOUT_FIELD_MESSAGES: Record<CheckoutField, string> = {
   name: "Please enter your name.",
   phone: "Enter a valid 10-digit +91 mobile number.",
-  address: "Please enter a delivery address.",
+  slot: "Please choose when you want it.",
+  address: "Please enter your house or flat and street.",
+  locality: "Please enter your area or locality.",
+  pincode: "A pincode has 6 digits.",
   payment: "Please choose how you'll pay.",
 };
 
@@ -362,10 +392,21 @@ export function looksLikeIndianMobile(raw: string): boolean {
 export type CheckoutInput = {
   name: string;
   phone: string;
+  /** The address line. */
   address: string;
+  locality: string;
+  pincode: string;
   fulfilment: "DELIVERY" | "PICKUP";
   method: "UPI" | "CASH" | null;
+  /** The store has menu slots (lib/menu-slots.ts), so one must be picked. */
+  slotRequired: boolean;
+  slot: string | null;
+  /** The store's delivery areas (lib/delivery-areas.ts): non-empty → the locality must be one of them. */
+  areas?: readonly DeliveryArea[];
 };
+
+/** The locality error when the store delivers only to its listed areas. */
+export const CHOOSE_AREA_MESSAGE = "Please choose your area.";
 
 /** One field's client-side error, or null when it is valid (address only counts for delivery). */
 export function validateCheckoutField(field: CheckoutField, input: CheckoutInput): string | null {
@@ -374,11 +415,28 @@ export function validateCheckoutField(field: CheckoutField, input: CheckoutInput
       return input.name.trim() ? null : CHECKOUT_FIELD_MESSAGES.name;
     case "phone":
       return looksLikeIndianMobile(input.phone) ? null : CHECKOUT_FIELD_MESSAGES.phone;
+    case "slot":
+      return !input.slotRequired || input.slot ? null : CHECKOUT_FIELD_MESSAGES.slot;
     case "address":
       return input.fulfilment !== "DELIVERY" || input.address.trim() ? null : CHECKOUT_FIELD_MESSAGES.address;
+    case "locality":
+      if (input.fulfilment !== "DELIVERY") return null;
+      if (input.areas && input.areas.length > 0) {
+        return findDeliveryArea(input.areas, input.locality) ? null : CHOOSE_AREA_MESSAGE;
+      }
+      return input.locality.trim() ? null : CHECKOUT_FIELD_MESSAGES.locality;
+    case "pincode":
+      return input.fulfilment !== "DELIVERY" || !input.pincode.trim() || isValidPincode(input.pincode)
+        ? null
+        : CHECKOUT_FIELD_MESSAGES.pincode;
     case "payment":
       return input.method ? null : CHECKOUT_FIELD_MESSAGES.payment;
   }
+}
+
+/** Saved name and phone are good enough to show as one card instead of two fields. */
+export function savedContactUsable(name: string, phone: string): boolean {
+  return name.trim() !== "" && looksLikeIndianMobile(phone);
 }
 
 /** Every client-side error at once (empty object = valid). */
@@ -401,6 +459,11 @@ export function checkoutFieldForErrorCode(code: string): CheckoutField | null {
   switch (code) {
     case "address_required":
       return "address";
+    case "outside_delivery_area":
+      return "locality";
+    case "slot_required":
+    case "slot_unavailable":
+      return "slot";
     case "pay_on_delivery_disabled":
       return "payment";
     default:
@@ -412,6 +475,9 @@ const ISSUE_PATH_FIELD: Record<string, CheckoutField> = {
   customerName: "name",
   customerPhone: "phone",
   deliveryAddress: "address",
+  deliveryLocality: "locality",
+  deliveryPincode: "pincode",
+  slotStart: "slot",
   paymentMethod: "payment",
 };
 
@@ -458,24 +524,30 @@ export function orderErrorMessage(err: OrderApiError, itemName?: string): string
       return `${name}: you can order at most ${err.limit ?? 1} per order.`;
     case "drop_not_open":
     case "drop_not_found":
-      return "Orders for this menu have closed. Refresh to see what's available.";
+      return "This pre-order has closed. Refresh to see what's available.";
     case "item_not_found":
       return err.menuItemId
         ? `${name} isn't available right now. We've removed it from your cart — please check and try again.`
-        : `${name} is no longer on this menu. Please refresh and try again.`;
+        : `${name} is no longer available. Please refresh and try again.`;
     case "menu_orders_disabled":
-      return "This store has stopped taking online orders for now. Please order at the counter.";
+      return "This store has stopped taking online orders for now. Please check back later.";
     case "menu_paused_for_drop":
-      return "The everyday menu is paused while today's special menu is open. Order from the drop above.";
+      return "Everyday items are paused while a pre-order is open. Order from the pre-order above.";
     case "address_required":
       return "Please enter a delivery address.";
+    case "outside_delivery_area":
+      return "The store doesn't deliver to that area. Pick one of its areas, or choose pickup.";
+    case "slot_required":
+      return "Please choose when you want your order.";
+    case "slot_unavailable":
+      return "That time is no longer available. Please pick another.";
     case "fulfilment_unavailable":
-      return "That delivery option isn't available for this menu. Please pick another.";
+      return "That delivery option isn't available for this order. Please pick another.";
     case "pay_on_delivery_disabled":
       return "Pay on delivery isn't available. Please pay by UPI.";
     case "monthly_txn_cap_reached":
     case "orders_paused":
-      return "This kitchen can't take online orders right now — message them directly.";
+      return "This store can't take online orders right now — message them directly.";
     case "rate_limited":
       return "Too many attempts. Please wait a minute and try again.";
     case "in_progress":
@@ -503,18 +575,35 @@ export type StatusTone = "success" | "warning" | "danger" | "neutral";
 /**
  * Text label (never colour alone) for the buyer's order page. `menuOrder`
  * (no drop) drops the stock wording — everyday-menu orders hold no stock.
+ * `fulfilmentType: "PICKUP"` swaps the delivery wording for pickup wording
+ * ("Collected", "Pay when you collect"); the states themselves are the same.
+ * `outForDelivery`: the seller handed it to a rider, so a confirmed order
+ * reads "On the way" (the payment line moves to the hint).
  */
 export function orderStatusLabel(
   state: OrderDisplayStateName,
   fulfilmentStatus: FulfilmentStatus | null,
-  opts: { menuOrder?: boolean } = {},
+  opts: { menuOrder?: boolean; fulfilmentType?: "DELIVERY" | "PICKUP" | null; outForDelivery?: boolean } = {},
 ): { label: string; hint: string | null; tone: StatusTone } {
   const confirmed = fulfilmentStatus === "CONFIRMED";
+  const payLater = payOnDeliveryLabel(opts.fulfilmentType);
+  if (confirmed && opts.outForDelivery) {
+    switch (state) {
+      case "PAID":
+        return { label: "On the way", hint: "Paid", tone: "success" };
+      case "PAY_ON_DELIVERY":
+        return { label: "On the way", hint: payLater, tone: "success" };
+      case "PAYMENT_SUBMITTED":
+        return { label: "On the way", hint: "Payment submitted — the store will confirm", tone: "success" };
+      default:
+        break;
+    }
+  }
   switch (state) {
     case "CANCELLED":
       return { label: "Cancelled", hint: null, tone: "danger" };
     case "DELIVERED":
-      return { label: "Delivered", hint: null, tone: "success" };
+      return { label: handedOverLabel(opts.fulfilmentType), hint: null, tone: "success" };
     case "EXPIRED":
       return {
         label: opts.menuOrder ? "Expired — please order again" : "Expired — items released, please order again",
@@ -527,11 +616,11 @@ export function orderStatusLabel(
       return confirmed
         ? {
             label: "Confirmed",
-            hint: "Payment submitted — the kitchen will confirm",
+            hint: "Payment submitted — the store will confirm",
             tone: "success",
           }
         : {
-            label: "Payment submitted — the kitchen will confirm",
+            label: "Payment submitted — the store will confirm",
             hint: null,
             tone: "warning",
           };
@@ -541,16 +630,26 @@ export function orderStatusLabel(
         : { label: "Paid", hint: null, tone: "success" };
     case "PAY_ON_DELIVERY":
       return confirmed
-        ? { label: "Confirmed", hint: "Pay on delivery", tone: "success" }
-        : { label: "Pay on delivery", hint: null, tone: "neutral" };
+        ? { label: "Confirmed", hint: payLater, tone: "success" }
+        : { label: payLater, hint: null, tone: "neutral" };
   }
+}
+
+/** "Collected" for a pickup, "Delivered" otherwise — the word for a handed-over order. */
+export function handedOverLabel(fulfilmentType: "DELIVERY" | "PICKUP" | null | undefined): string {
+  return fulfilmentType === "PICKUP" ? "Collected" : "Delivered";
+}
+
+/** "Pay when you collect" for a pickup, "Pay on delivery" otherwise. */
+export function payOnDeliveryLabel(fulfilmentType: "DELIVERY" | "PICKUP" | null | undefined): string {
+  return fulfilmentType === "PICKUP" ? "Pay when you collect" : "Pay on delivery";
 }
 
 // ─── WhatsApp ───────────────────────────────────────────────────────
 
 /**
  * wa.me click-to-chat link. A customer-initiated message is what opens the
- * kitchen's 24h WhatsApp service window. Returns null for unusable numbers.
+ * store's 24h WhatsApp service window. Returns null for unusable numbers.
  */
 export function whatsappChatLink(number: string, text: string): string | null {
   let digits = number.replace(/\D/g, "");
@@ -572,10 +671,25 @@ export function buyerWhatsappNumber(
   return whatsappChatLink(settings.whatsappNumber, "") ? settings.whatsappNumber : null;
 }
 
+/**
+ * The vendor's WhatsApp number as every storefront visitor may see it, or null.
+ * A wider audience than `buyerWhatsappNumber` (which is buyers who placed an
+ * order), so it has its own opt-in: `showWhatsappOnStore`, default off.
+ */
+export function storeWhatsappNumber(
+  settings: { showWhatsappOnStore?: boolean | null; whatsappNumber?: string | null } | null | undefined,
+): string | null {
+  if (!settings?.showWhatsappOnStore || !settings.whatsappNumber) return null;
+  return whatsappChatLink(settings.whatsappNumber, "") ? settings.whatsappNumber : null;
+}
+
 export type WhatsAppOrderMessageInput = {
   vendorName: string;
   billNumber: string;
   items: { name: string; qty: number; totalPaise: number }[];
+  /** Offer discount on this order (lib/offers.ts); omitted or 0 when none. */
+  discountPaise?: number;
+  offerName?: string | null;
   deliveryFeePaise: number;
   totalPaise: number;
   paymentMethod: "UPI" | "CASH";
@@ -592,9 +706,9 @@ export type WhatsAppOrderMessageInput = {
 };
 
 /**
- * The order as a message the buyer sends to the kitchen from their own
+ * The order as a message the buyer sends to the store from their own
  * WhatsApp (tap-to-compose, TODO 3.2). Every amount comes from the saved
- * order, so the text matches what the kitchen sees on its board; the bill
+ * order, so the text matches what the store sees on its board; the bill
  * number ties the chat to that order. The buyer is the sender, so their own
  * name, address and note are theirs to share — the phone is not repeated
  * (WhatsApp already shows it). Asterisks are WhatsApp bold; no emoji (some
@@ -604,6 +718,9 @@ export function formatWhatsAppOrderMessage(o: WhatsAppOrderMessageInput): string
   const lines: string[] = [`Hi ${o.vendorName}, I'd like to order:`, ""];
   if (o.dropTitle) lines.push(`*${o.dropTitle}*`);
   for (const i of o.items) lines.push(`${i.qty} x ${i.name} - ${formatINR(i.totalPaise)}`);
+  if (o.discountPaise && o.discountPaise > 0) {
+    lines.push(`${discountLabel(o.offerName)} - −${formatINR(o.discountPaise)}`);
+  }
   if (o.deliveryFeePaise > 0) lines.push(`Delivery fee - ${formatINR(o.deliveryFeePaise)}`);
   lines.push(`*Total: ${formatINR(o.totalPaise)}*`, "");
 

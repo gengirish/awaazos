@@ -162,7 +162,14 @@ test.describe("POS grid and cart", () => {
     await createVendorSession(page, request, "poscart-search");
     const snacks = ["Samosa", "Kachori", "Vada Pav", "Pav Bhaji", "Bhel Puri", "Pani Puri", "Sev Puri", "Dabeli"];
     const drinks = ["Masala Chai", "Filter Coffee", "Lassi", "Nimbu Pani", "Jaljeera", "Badam Milk", "Rose Milk", "Buttermilk"];
-    for (const name of snacks) await createMenuItem(page, { name, priceInRupees: 20, category: "Snacks" });
+    for (const name of snacks) {
+      await createMenuItem(page, {
+        name,
+        priceInRupees: 20,
+        category: "Snacks",
+        aliasesCsv: name === "Bhel Puri" ? "lays bhel" : undefined,
+      });
+    }
     for (const name of drinks) await createMenuItem(page, { name, priceInRupees: 15, category: "Drinks" });
 
     await page.goto("/pos");
@@ -182,6 +189,14 @@ test.describe("POS grid and cart", () => {
     // Category match.
     await search.fill("drinks");
     await expect(page.getByRole("button", { name: /^Lassi/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Samosa/ })).toHaveCount(0);
+
+    // Every word, any order (lib/store-search.ts), and voice aliases.
+    await search.fill("bhaji pav");
+    await expect(page.getByRole("button", { name: /^Pav Bhaji/ })).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Vada Pav/ })).toHaveCount(0);
+    await search.fill("lays");
+    await expect(page.getByRole("button", { name: /^Bhel Puri/ })).toBeVisible();
     await expect(page.getByRole("button", { name: /^Samosa/ })).toHaveCount(0);
 
     await search.fill("zzz");

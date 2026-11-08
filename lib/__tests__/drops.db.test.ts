@@ -381,6 +381,24 @@ describe.skipIf(!ENABLED)("drops — DB integration", () => {
     expect(await prisma.transaction.count({ where: { dropId: theirs.drop.id } })).toBe(0);
   });
 
+  it("delivery areas set a drop order's fee and refuse other localities", async () => {
+    const s = await seed({ maxQty: null });
+    const deliveryAreas = [
+      { name: "Kondapur", feePaise: 1000 },
+      { name: "Madhapur", feePaise: null },
+    ];
+    const deliver = { fulfilmentType: "DELIVERY" as const, deliveryAddress: "Flat 2", deliveryAreas };
+
+    expect(await order(s, { ...deliver, deliveryLocality: "Miyapur" })).toEqual({
+      ok: false,
+      error: { code: "outside_delivery_area" },
+    });
+    const own = await order(s, { ...deliver, deliveryLocality: "Kondapur" });
+    expect(own.ok && own.order.deliveryFeePaise).toBe(1000);
+    const usual = await order(s, { ...deliver, deliveryLocality: "madhapur" });
+    expect(usual.ok && usual.order.deliveryFeePaise).toBe(3000);
+  });
+
   it("rejects items from another drop, per-order limits and missing delivery address", async () => {
     const s = await seed();
     const other = await seed();

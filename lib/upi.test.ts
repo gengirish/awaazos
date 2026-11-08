@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildUpiCollectLink,
   buildUpiDeepLink,
+  buildUpiUri,
   isAppleMobile,
   isValidUpiId,
   normalizeUpiId,
@@ -157,5 +158,48 @@ describe("upiAmountText", () => {
   it("rejects non-integer or negative paise", () => {
     expect(() => upiAmountText(10.5)).toThrow(RangeError);
     expect(() => upiAmountText(-1)).toThrow(RangeError);
+  });
+});
+
+describe("buildUpiUri", () => {
+  const base = { vpa: "sam@okaxis", payeeName: "Sam Store", amountPaise: 8_000, note: "Sam Store" };
+
+  it("builds a full UPI intent with a two-decimal amount", () => {
+    expect(buildUpiUri(base)).toBe(
+      "upi://pay?pa=sam%40okaxis&pn=Sam%20Store&am=80.00&cu=INR&tn=Sam%20Store",
+    );
+  });
+
+  it("percent-encodes spaces and & in the payee name and note", () => {
+    const uri = buildUpiUri({ ...base, payeeName: "Ram & Shyam Tiffins", note: "Bill #12 & co" })!;
+    expect(uri).toContain("pn=Ram%20%26%20Shyam%20Tiffins");
+    expect(uri).toContain("tn=Bill%20%2312%20%26%20co");
+    expect(uri).not.toContain("+");
+    // Decodes back to the exact name (no stray parameter from the &).
+    const params = new URLSearchParams(uri.slice("upi://pay?".length).replace(/\+/g, "%2B"));
+    expect(params.get("pn")).toBe("Ram & Shyam Tiffins");
+    expect([...params.keys()]).toEqual(["pa", "pn", "am", "cu", "tn"]);
+  });
+
+  it("formats paise without floats", () => {
+    expect(buildUpiUri({ ...base, amountPaise: 8_000 })).toContain("am=80.00");
+    expect(buildUpiUri({ ...base, amountPaise: 8_005 })).toContain("am=80.05");
+    expect(buildUpiUri({ ...base, amountPaise: 1 })).toContain("am=0.01");
+    expect(buildUpiUri({ ...base, amountPaise: 12_345_67 })).toContain("am=12345.67");
+  });
+
+  it("returns null without a VPA", () => {
+    expect(buildUpiUri({ ...base, vpa: null })).toBeNull();
+    expect(buildUpiUri({ ...base, vpa: undefined })).toBeNull();
+    expect(buildUpiUri({ ...base, vpa: "   " })).toBeNull();
+  });
+
+  it("trims the VPA", () => {
+    expect(buildUpiUri({ ...base, vpa: " sam@okaxis " })).toContain("pa=sam%40okaxis&");
+  });
+
+  it("rejects a non-integer or non-positive amount", () => {
+    expect(() => buildUpiUri({ ...base, amountPaise: 80.5 })).toThrow(RangeError);
+    expect(() => buildUpiUri({ ...base, amountPaise: 0 })).toThrow(RangeError);
   });
 });

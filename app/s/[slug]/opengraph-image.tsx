@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 
 import { effectiveDropStatus } from "@/lib/drops";
 import { formatFulfilmentWindow, formatIstDayLabel, formatIstTime } from "@/lib/drops-time";
-import { fulfilmentModeLabel, OG_COLORS as C, Price, truncate } from "@/lib/og-parts";
+import { fulfilmentModeLabel, OG_COLORS as C, Price, storeLogoDataUrl, truncate } from "@/lib/og-parts";
 import { prisma } from "@/lib/prisma";
 import { everydayMenuHiddenByDrops, STOREFRONT_MENU_ITEM_WHERE } from "@/lib/storefront-order";
 
@@ -15,6 +15,10 @@ import { everydayMenuHiddenByDrops, STOREFRONT_MENU_ITEM_WHERE } from "@/lib/sto
  * via `publishStorefront`. Anything else gets a generic AwaazOS card (an image
  * URL shouldn't 404, but it must not confirm the stall exists either — the
  * generic card carries nothing derived from the slug).
+ *
+ * The store logo (`Vendor.logoUrl`) sits top-right when it loads in time, and the
+ * tagline (`VendorSettings.tagline`) goes under the headline of the menu and
+ * browse variants.
  *
  * Variants, in priority order: an open (or scheduled) drop with its items and
  * cut-off; else, with "Order from menu" on, up to four menu items offered
@@ -33,7 +37,7 @@ import { everydayMenuHiddenByDrops, STOREFRONT_MENU_ITEM_WHERE } from "@/lib/sto
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const alt = "Today's menu on AwaazOS";
+export const alt = "Order on AwaazOS";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -46,8 +50,9 @@ async function loadCard(slug: string, now: Date) {
       id: true,
       name: true,
       city: true,
+      logoUrl: true,
       // "Order from menu" variant: only what the card draws.
-      settings: { select: { acceptMenuOrders: true, menuFulfilmentMode: true } },
+      settings: { select: { acceptMenuOrders: true, menuFulfilmentMode: true, tagline: true } },
       menuItems: {
         where: STOREFRONT_MENU_ITEM_WHERE,
         orderBy: [{ isPopular: "desc" }, { category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
@@ -87,7 +92,14 @@ async function loadCard(slug: string, now: Date) {
     !drop && !menuHidden && (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0
       ? { mode: vendor.settings?.menuFulfilmentMode ?? "PICKUP", items: vendor.menuItems }
       : null;
-  return { name: vendor.name, city: vendor.city, drop, menuOrdering };
+  return {
+    name: vendor.name,
+    city: vendor.city,
+    tagline: vendor.settings?.tagline ?? null,
+    logo: await storeLogoDataUrl(vendor.logoUrl),
+    drop,
+    menuOrdering,
+  };
 }
 
 function Brand() {
@@ -163,7 +175,7 @@ function GenericCard() {
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", fontSize: 72, fontWeight: 700 }}>Order on AwaazOS</div>
         <div style={{ display: "flex", fontSize: 36, color: C.muted, marginTop: 16 }}>
-          Fresh menus from local kitchens and stalls
+          Order online from local stores
         </div>
       </div>
       <Brand />
@@ -188,20 +200,37 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
   return new ImageResponse(
     (
       <Frame>
-        <div style={{ display: "flex", flexDirection: "column" }}>
-          <div style={{ display: "flex", fontSize: 30, color: C.primary, fontWeight: 700 }}>
-            {truncate(card.name, 48)}
-            {card.city ? ` · ${truncate(card.city, 24)}` : ""}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
+            <div style={{ display: "flex", fontSize: 30, color: C.primary, fontWeight: 700 }}>
+              {truncate(card.name, 48)}
+              {card.city ? ` · ${truncate(card.city, 24)}` : ""}
+            </div>
+            {drop ? (
+              <div style={{ display: "flex", fontSize: 64, fontWeight: 700, marginTop: 8 }}>
+                {truncate(drop.title, 36)}
+              </div>
+            ) : (
+              <div style={{ display: "flex", fontSize: 64, fontWeight: 700, marginTop: 8 }}>
+                {menuOrdering ? "Order now" : "Browse the store"}
+              </div>
+            )}
+            {card.tagline && !drop ? (
+              <div style={{ display: "flex", fontSize: 30, color: C.muted, marginTop: 8 }}>
+                {truncate(card.tagline, 64)}
+              </div>
+            ) : null}
           </div>
-          {drop ? (
-            <div style={{ display: "flex", fontSize: 64, fontWeight: 700, marginTop: 8 }}>
-              {truncate(drop.title, 36)}
-            </div>
-          ) : (
-            <div style={{ display: "flex", fontSize: 64, fontWeight: 700, marginTop: 8 }}>
-              {menuOrdering ? "Order from the menu" : "See the menu"}
-            </div>
-          )}
+          {card.logo ? (
+            // eslint-disable-next-line @next/next/no-img-element -- Satori draws a plain <img>
+            <img
+              src={card.logo}
+              alt=""
+              width={128}
+              height={128}
+              style={{ width: 128, height: 128, borderRadius: 24, objectFit: "cover", marginLeft: 32 }}
+            />
+          ) : null}
         </div>
 
         {drop ? (

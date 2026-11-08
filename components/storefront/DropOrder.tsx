@@ -15,7 +15,12 @@ import {
   type BuyerPrefill,
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
-import { formatINRCompact, sumPaise } from "@/lib/currency";
+import { ItemPrice } from "@/components/storefront/ItemPrice";
+import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
+import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
+import type { DeliveryArea } from "@/lib/delivery-areas";
+import { applyOffers, salePriceFor, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
+import { itemSearchText } from "@/lib/store-search";
 import {
   cartStorageKey,
   maxOrderableQty,
@@ -40,9 +45,13 @@ export type { BuyerPrefill } from "@/components/storefront/StorefrontCheckout";
 
 export type DropOrderItem = {
   id: string;
+  /** The catalogue item behind this row; offers are matched on it. */
+  menuItemId: string;
   name: string;
   emoji: string;
   imageUrl: string | null;
+  /** One line under the name; null = none. */
+  description?: string | null;
   priceInPaise: number;
   /** null = unlimited */
   remaining: number | null;
@@ -58,38 +67,54 @@ export type DropOrderProps = {
   slug: string;
   dropId: string;
   dropTitle: string;
+  /** The store's name, for the checkout's "you pay the store directly" line. */
+  storeName?: string;
   items: DropOrderItem[];
   /** false → read-only preview (scheduled or closed drop) */
   orderable: boolean;
   fulfilmentTypes: FulfilmentType[];
   deliveryFeePaise: number;
+  /** The store's delivery areas (lib/delivery-areas.ts); see CheckoutSheet. */
+  deliveryAreas?: DeliveryArea[];
   pickupNote: string | null;
   /** Fulfilment window label ("Sat, 5 Oct · 5:00 pm – 8:00 pm"), shown with Pickup at checkout. */
   pickupWindow?: string | null;
-  payment: { upi: boolean; cod: boolean };
-  /** The kitchen has a usable WhatsApp number (see CheckoutSheet). */
+  payment: { upi: boolean; cod: boolean; online: boolean };
+  /** The store has a usable WhatsApp number (see CheckoutSheet). */
   whatsapp?: boolean;
+  /** See CheckoutSheet. */
+  theme?: string;
+  notesExample?: string;
   /**
    * Signed-in buyer's own saved details (lib/customer-auth.ts). Non-empty
    * fields win over the device's "remember me" values; absent for guests.
    */
   prefill?: BuyerPrefill | null;
+  /** Offers live on this drop (lib/offers.ts). Preview only; the server re-prices. */
+  offers?: readonly ResolvedOffer[];
 };
+
+const NO_OFFERS: readonly ResolvedOffer[] = [];
 
 export function DropOrder(props: DropOrderProps) {
   const {
     slug,
     dropId,
     dropTitle,
+    storeName,
     items,
     orderable,
     fulfilmentTypes,
     deliveryFeePaise,
+    deliveryAreas,
     pickupNote,
     pickupWindow,
     payment,
     whatsapp,
+    theme,
+    notesExample,
     prefill,
+    offers = NO_OFFERS,
   } = props;
   const router = useRouter();
 
@@ -100,6 +125,12 @@ export function DropOrder(props: DropOrderProps) {
   const checkoutRef = useRef<HTMLButtonElement>(null);
 
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  // The store page's search hides rows; the cart keeps what was added.
+  const matchesSearch = useStoreSearchMatch();
+  const visibleItems = useMemo(
+    () => items.filter((i) => matchesSearch(itemSearchText({ name: i.name, description: i.description }, dropTitle))),
+    [items, dropTitle, matchesSearch],
+  );
 
   // Saved per drop; discarded once the drop stops taking orders, clamped to
   // current stock and per-order limits on restore.
@@ -131,7 +162,25 @@ export function DropOrder(props: DropOrderProps) {
     .map(([id, qty]) => ({ item: byId.get(id), qty }))
     .filter((l): l is { item: DropOrderItem; qty: number } => !!l.item && l.qty > 0);
   const itemCount = lines.reduce((s, l) => s + l.qty, 0);
-  const subtotalPaise = sumPaise(lines.map((l) => l.item.priceInPaise * l.qty));
+  // Same rule as the server (lib/drops.ts): the gift must still fit in the stock this cart leaves.
+  const giftFits = (menuItemId: string, qty: number) =>
+    items.some((i) => {
+      if (i.menuItemId !== menuItemId) return false;
+      const remaining = remainingFor(i);
+      return remaining === null || remaining - (cart[i.id] ?? 0) >= qty;
+    });
+  const offered = applyOffers(
+    lines.map((l) => ({
+      key: l.item.id,
+      menuItemId: l.item.menuItemId,
+      priceInPaise: l.item.priceInPaise,
+      qty: l.qty,
+    })),
+    withGiftsThatFit(offers, giftFits),
+  );
+  const appliedOffer = offered.applied;
+  // What the cart bars show: items less the offer discount (delivery is added at checkout).
+  const payablePaise = offered.totalPaise;
   const canPay = payment.upi || payment.cod;
 
   // The page-level cart bar (CartHub) shows this cart next to any others.
@@ -139,8 +188,9 @@ export function DropOrder(props: DropOrderProps) {
     key: `drop:${dropId}`,
     label: `Pre-order · ${dropTitle}`,
     itemCount,
-    subtotalPaise,
+    subtotalPaise: payablePaise,
     canPay,
+    note: offerCartNoteText(appliedOffer?.name ?? null, offered.nudge, offered.gift),
     onCheckout: () => setOpen(true),
     enabled: orderable,
   });
@@ -177,23 +227,27 @@ export function DropOrder(props: DropOrderProps) {
 
   return (
     <div>
-      <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs">
-        {items.map((item) => {
+      {orderable ? <OfferChips offers={offers} /> : null}
+      {/* No box or side padding of its own: the drop's card (DropSection) already
+          pads the rows, and at 360 px a second inset leaves the name no room
+          beside the 72 px photo and the stepper. */}
+      <ul className="divide-y divide-border/50 border-y border-border/50">
+        {visibleItems.map((item) => {
           const remaining = remainingFor(item);
           const max = maxOrderableQty(remaining, item.perOrderLimit);
           const qty = cart[item.id] ?? 0;
           const soldOut = remaining !== null && remaining <= 0;
           const badge = stockLabel(remaining);
           return (
-            <li key={item.id} className="flex items-center gap-3 px-3 py-3 sm:gap-4 sm:px-4">
+            <li key={item.id} className="flex items-center gap-3 py-3 sm:gap-4">
               {item.imageUrl ? (
                 <Image
                   src={item.imageUrl}
                   alt=""
-                  width={48}
-                  height={48}
+                  width={80}
+                  height={80}
                   className={cn(
-                    "h-12 w-12 shrink-0 rounded-xl object-cover ring-1 ring-border/60",
+                    "h-20 w-20 shrink-0 rounded-xl object-cover ring-1 ring-border/60",
                     soldOut && "opacity-50",
                   )}
                 />
@@ -201,7 +255,7 @@ export function DropOrder(props: DropOrderProps) {
                 <span
                   aria-hidden="true"
                   className={cn(
-                    "flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-2xl",
+                    "flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-3xl",
                     soldOut && "opacity-50",
                   )}
                 >
@@ -210,11 +264,15 @@ export function DropOrder(props: DropOrderProps) {
               )}
 
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="truncate text-[15px] font-semibold text-foreground">{item.name}</span>
+                <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">{item.name}</span>
+                {item.description ? (
+                  <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
+                ) : null}
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                  <span className="font-mono font-bold tabular-nums text-foreground">
-                    {formatINRCompact(item.priceInPaise)}
-                  </span>
+                  <ItemPrice
+                    priceInPaise={item.priceInPaise}
+                    sale={orderable ? salePriceFor(offers, item.menuItemId, item.priceInPaise) : null}
+                  />
                   {badge ? (
                     <span
                       className={cn(
@@ -239,9 +297,9 @@ export function DropOrder(props: DropOrderProps) {
                 <a
                   href={`#${item.menuAnchor}`}
                   className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-2 text-xs font-bold text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  aria-label={`${item.name} is on the everyday menu`}
+                  aria-label={`${item.name} is in everyday items`}
                 >
-                  On menu
+                  Order below
                   <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
                 </a>
               ) : null}
@@ -252,10 +310,19 @@ export function DropOrder(props: DropOrderProps) {
 
       {orderable && !canPay ? <NoPaymentNotice /> : null}
 
+      {orderable ? (
+        <OfferCartNote
+          appliedName={appliedOffer?.name ?? null}
+          nudge={offered.nudge}
+          gift={offered.gift}
+          inCartBar={inHub}
+        />
+      ) : null}
+
       {orderable && !inHub ? (
         <CartBar
           itemCount={itemCount}
-          subtotalPaise={subtotalPaise}
+          subtotalPaise={payablePaise}
           canPay={canPay}
           onCheckout={() => setOpen(true)}
           buttonRef={checkoutRef}
@@ -263,20 +330,28 @@ export function DropOrder(props: DropOrderProps) {
       ) : null}
 
       <CheckoutSheet
+        theme={theme}
+        notesExample={notesExample}
         open={open}
         onOpenChange={setOpen}
         slug={slug}
         endpoint={`/api/s/${encodeURIComponent(slug)}/orders`}
         idPrefix={dropId}
         description={dropTitle}
+        storeName={storeName}
         lines={lines.map((l) => ({
           id: l.item.id,
           name: l.item.name,
           priceInPaise: l.item.priceInPaise,
           qty: l.qty,
+          max: maxOrderableQty(remainingFor(l.item), l.item.perOrderLimit),
         }))}
+        onChangeQty={setQty}
+        discount={appliedOffer}
+        gift={offered.gift}
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
+        deliveryAreas={deliveryAreas}
         pickupNote={pickupNote}
         pickupWindow={pickupWindow}
         payment={payment}

@@ -87,7 +87,10 @@ and approved marketing templates first. The customer-initiated design in 3.2 avo
 `docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md`: new sign-ups get a 30-day free trial with STARTER limits,
 STARTER is unlimited, and one plan is sold (₹299/month or ₹2,990/year, + GST). FREE (50/month)
 remains only for vendors who signed up before the trial. The bullets below are kept as the record
-of why; the staff-invite and "Pro is not sold" items are still open.
+of why; the staff-invite item is still open.
+
+**Since then:** three plans are sold, Lite, Starter and Pro at ₹599, ₹649 and ₹1,149 a month + GST
+(`lib/constants.ts`). The prices in this section are the ones from that time.
 
 **ICP changed 2026-10-09** to Instagram cloud kitchens (`docs/ICP.md`): roughly 10–80 orders per
 batch or day, so STARTER's 500/month now fits and the "10× below the ICP" point below applies only
@@ -113,11 +116,9 @@ Limits live in `PLAN_LIMITS` (`lib/constants.ts`).
   from the copy (`lib/plan-copy.ts`; `lib/__tests__/plan-copy.test.ts` fails if "staff" reappears).
   To ship: StaffMember invite/accept, enforce `PLAN_LIMITS.maxStaff`, add a tenant-isolation e2e
   case — then re-add "staff logins" to the Starter copy and relax that test.
-- **Pro is not sold** — hidden from pricing (`MARKETED_PLANS` in `lib/plan-copy.ts`) and billing,
-  and `POST /api/razorpay/create-subscription` rejects it (`SUBSCRIBABLE_PLANS` is STARTER only).
-  Any vendor on PRO was set manually. Since 2026-10-13 the vendor's own Razorpay keys are a STARTER
-  feature (trial included); what PRO still adds is 365 days of analytics instead of 90 and higher
-  AI rate limits and usage caps (`lib/ratelimit.ts`, `lib/ai-usage-guard.ts`).
+- **Pro was not sold** (resolved 2026-11-04, #132): it is now on the pricing page and in billing.
+  What PRO adds is 365 days of analytics instead of 90 and higher AI rate limits and usage caps
+  (`lib/ratelimit.ts`, `lib/ai-usage-guard.ts`).
 
 **Proposed fix:** time-box the trial instead of transaction-boxing it — 30 days, unlimited, every
 language, WhatsApp on — then one paid tier whose cap is above real usage. Cost is some Sarvam
@@ -142,7 +143,7 @@ Unit-tested; never seen in a real WhatsApp message because no receipt has been s
 
 ### 3.2 Tap-to-compose WhatsApp order on the storefront
 **Status:** implemented on `feat/whatsapp-order`. When `VendorSettings.whatsappNumber` is set,
-checkout (drops and menu) also offers "Place order & send on WhatsApp": the order is saved exactly
+checkout (drops and menu) also offers the checkbox "Also send my order to the store on WhatsApp": the order is saved exactly
 as today (`source` stays `STOREFRONT`, so the board, payment, stock and plan-cap rules are
 unchanged), then `/s/[slug]/o/[token]?wa=1` leads with a wa.me link pre-filled with the whole order
 (`formatWhatsAppOrderMessage` in `lib/storefront-order.ts`). Not done: tagging these orders
@@ -157,7 +158,7 @@ consent apparatus are needed.
 ### 3.3 `fssaiNumber` on storefront and receipts
 **Status:** implemented on `feat/home-kitchen-drops`. Receipt delivery still blocked by 1.1.
 
-`VendorSettings.fssaiNumber` (Settings → Pre-orders) is shown on the storefront and printed as
+`VendorSettings.fssaiNumber` (Settings → Online store) is shown on the storefront and printed as
 "FSSAI Lic. No: …" on the WhatsApp receipt when set. Still open: confirm the current FSSAI rule for
 home-scale operators (registration vs licence wording) before putting it in a pitch.
 
@@ -175,7 +176,7 @@ STARTER, so trial vendors have it too.
 ### 3.5 Drops: open items found while building it
 
 - ~~**Orders board keeps Neon awake during order windows.**~~ **Resolved:** with Web Push carrying
-  instant alerts, both boards now poll every 6 min (`BOARD_POLL_MS`), above Neon's idle timeout.
+  instant alerts, the orders board polls every 6 min (`BOARD_POLL_MS`), above Neon's idle timeout.
   A JWT-only session check on the signal route would allow faster polling again if ever needed.
 - **Marking an EXPIRED order paid can oversell.** After the 15-minute hold lapses its stock is
   released and may be resold; the board still lets the vendor tap Mark paid (e.g. a late UTR), which
@@ -214,19 +215,24 @@ STARTER, so trial vendors have it too.
 
 **Web Push implemented on `feat/web-push`** (option 1 below, plus the small wins): `lib/push.ts`,
 `public/sw.js`, `app/manifest.ts`, `/api/push/**`, Settings → Notifications, "Get alerts on this
-phone" on both boards. Still unverified: **real delivery on devices** — Android Chrome with the screen
+phone" on the orders board. Still unverified: **real delivery on devices** — Android Chrome with the screen
 locked, and an iPhone (iOS 16.4+) with AwaazOS added to the Home Screen. Headless CI can't reach a
 push service. Known gap: the button trusts this browser's subscription, so a row removed from another
 device leaves it saying "on" until toggled. The original analysis follows.
 
-Today the only alert is the orders board's **Sound** toggle (`components/drops/orders/OrdersBoard.tsx`,
-`beep()`): a Web Audio beep when the board's own poll finds new orders. Its limits:
+**Spoken alert since then (`lib/order-voice.ts`):** each push also reaches open pages, which say
+"New order received from <first name>" with an on-device voice and make an open board refetch at
+once. Sound is one per-device localStorage choice, **on by default**, shared by the board's Sound
+button and Settings → Notifications. It still needs an open page: a locked phone gets the
+notification without speech.
 
-- **Delay.** It beeps only when the board checks: every 6 min on both boards (Web Push is the
-  instant path). Refresh checks immediately.
-- **Screen on only.** Polling stops when the tab is hidden or the phone is locked, so nothing beeps
-  in a pocket — the vendor has to keep the board open and visible.
-- **Not remembered.** Sound starts off on every page load (browsers need a tap before playing audio).
+Before Web Push, the only alert was a Web Audio beep when the board's own poll found new orders.
+Its limits, kept for the record:
+
+- **Delay.** It beeped only when the board checked: every 6 min.
+- **Screen on only.** Polling stops when the tab is hidden or the phone is locked, so nothing beeped
+  in a pocket — the vendor had to keep the board open and visible.
+- **Not remembered.** Sound started off on every page load. (Now remembered and on by default.)
 
 Options, cheapest first:
 
@@ -238,21 +244,17 @@ Options, cheapest first:
 2. **WhatsApp to the vendor** on each new order — most reliable for this audience, but needs an
    approved utility template and a running worker, so it is blocked by 1.1 (gates 3 and 4).
 3. **Small wins regardless:** remember the Sound choice per device (localStorage, try/catch), and
-   show "Last checked HH:MM · next check in N min" on the menu board so the delay is visible.
+   show "Last checked HH:MM · next check in N min" on the orders board so the delay is visible.
 
 ---
 
 ## 4. Correctness and quality
 
-### 4.1 Tap targets are 40px against a documented 44px rule
-`accessibility.mdc` requires 44×44 for any tap target and globs `**/*.tsx`, but the shared Button
-default is `h-10` (`components/ui/button.tsx`). ~11 buttons across auth and marketing are 4px
-short. The POS is unaffected — its controls set `min-h-11` explicitly.
-
-Parked as a `test.fixme` in `e2e/accessibility.spec.ts` with the reasoning inline. Un-skip it once
-the call is made. It is a design-system decision, not a test one: `design-system.mdc` forbids
-editing `components/ui/` primitives, so it is either a global `h-10 → h-11` (moves every button in
-the app) or `min-h-11` on each call site.
+### 4.1 Tap targets are 40px for mouse users
+**Mostly resolved (`d2b4996`, 2026-10-11):** `Button`, `Input`, `SelectTrigger`, `SelectItem` and the
+Dialog / Sheet close buttons now carry `touch-target`, which sets a 44px floor under
+`@media (pointer: coarse)` (`app/globals.css`). Phones and tablets get 44px; a desktop with a mouse
+keeps the 40px `h-10` density on purpose.
 
 ### 4.2 E2E gaps that need infrastructure first
 - **StaffRole enforcement** (a CASHIER refused an OWNER-only write) — untestable because there is
@@ -260,10 +262,10 @@ the app) or `min-h-11` on each call site.
 - **CSV export contents** — the PII rule says last-4 phone only and DD/MM/YYYY IST, both untested,
   because the route is STARTER-gated and nothing can upgrade a plan from a test.
 
-### 4.3 Confirm CI actually runs e2e on `main`
-`e2e/public.spec.ts` asserted a pricing tier that had been deliberately cut, so it had been failing.
-Fixed in `433164c`. If CI was green through that period, the Playwright job is not gating `main` —
-worth checking `.github/workflows/ci.yml` actually runs and blocks on it.
+### 4.3 E2E on CI does not gate merges
+`E2E (chromium)` and `E2E (mobile)` run on every PR and push to `main`, but `main` has no branch
+protection, so a red run does not stop a merge. Turning it on is the owner's call: settings in
+`docs/BRANCH_PROTECTION.md`.
 
 ### 4.4 Customer phone numbers are stored as typed
 `POST /api/transactions` (`transactionPostBodySchema` in `lib/transaction-post-body.ts`) and

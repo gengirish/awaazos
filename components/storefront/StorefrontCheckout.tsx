@@ -1,24 +1,44 @@
 "use client";
 
-import { AlertCircle, Clock, Loader2, MapPin, MessageCircle, Minus, Plus, ShoppingBag } from "lucide-react";
+import { AlertCircle, Clock, Gift, Loader2, MapPin, Minus, Plus, ShieldCheck, ShoppingBag, Smartphone } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
+import { rememberRecentOrder } from "@/components/storefront/recent-orders";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { formatINR, sumPaise } from "@/lib/currency";
+import { RadioOption } from "@/components/ui/radio-option";
+import {
+  ResponsiveDialog,
+  ResponsiveDialogBody,
+  ResponsiveDialogContent,
+  ResponsiveDialogDescription,
+  ResponsiveDialogFooter,
+  ResponsiveDialogHeader,
+  ResponsiveDialogTitle,
+} from "@/components/ui/responsive-dialog";
+import { formatINR, formatINRCompact, sumPaise } from "@/lib/currency";
+import { ADDRESS_LINE_MAX, composeDeliveryAddress, LANDMARK_MAX, LOCALITY_MAX } from "@/lib/delivery-address";
+import { areaFeePaise, findDeliveryArea, type DeliveryArea } from "@/lib/delivery-areas";
+import { formatIstTimeRange, formatRelativeIstDay } from "@/lib/drops-time";
+import { upcomingMenuSlots, type MenuSlotRule } from "@/lib/menu-slots";
+import { discountLabel, giftLineName } from "@/lib/offers";
+import { orderSrcFromSearch } from "@/lib/order-channel";
+import { loadCheckout } from "@/lib/razorpay-checkout";
+import { orderPagePath } from "@/lib/storefront-direct-pay";
 import { formatIndianMobile, normaliseIndianMobile } from "@/lib/phone";
 import {
   CHECKOUT_FIELD_MESSAGES,
   checkoutErrorsFromIssues,
   checkoutFieldForErrorCode,
   firstInvalidField,
+  maxOrderableQty,
   orderErrorMessage,
   parseSavedBuyer,
   parseStoredCart,
   restoreCartLines,
   sameCartLines,
+  savedContactUsable,
   serializeCart,
   validateCheckout,
   validateCheckoutField,
@@ -33,14 +53,17 @@ import { cn } from "@/lib/utils";
  * Shared buyer-side checkout pieces for the public storefront, used by both
  * DropOrder (pre-order batches) and MenuOrder (everyday menu): quantity
  * stepper, sticky cart bar, device-local cart persistence, and the checkout
- * sheet with remember-me, phone normalisation, idempotent submit and
- * per-field error copy.
+ * sheet with an editable cart summary (the same stepper, so quantities can be
+ * changed and lines removed without leaving the sheet), remember-me, phone
+ * normalisation, idempotent submit and per-field error copy. A returning buyer
+ * sees their saved details as one card with "Change", so the order is a tap.
  *
  * The server is authoritative for price, stock and every limit. Nothing here
  * sends a price — callers build the request body from ids + quantities only.
- * Buyer details live only in this component's state and (opt-in) the device's
- * localStorage; they are never logged. The saved cart holds ids + quantities
- * only, never buyer details.
+ * Buyer details live only in this component's state and the device's
+ * localStorage (on by default, untick "Remember" to clear); they are never logged. The saved cart holds ids + quantities
+ * only, never buyer details. A placed order is remembered on the device as its
+ * token, bill number and time (recent-orders.ts) so a guest can find it again.
  */
 
 export type FulfilmentType = "DELIVERY" | "PICKUP";
@@ -50,19 +73,40 @@ export type BuyerPrefill = {
   name: string | null;
   /** E.164 as stored (+91XXXXXXXXXX). */
   phone: string | null;
+  /** The saved address line, and its parts (lib/delivery-address.ts). */
   address: string | null;
+  locality?: string | null;
+  landmark?: string | null;
+  pincode?: string | null;
 };
 
-export type CheckoutLine = { id: string; name: string; priceInPaise: number; qty: number };
+export type CheckoutLine = {
+  id: string;
+  name: string;
+  priceInPaise: number;
+  qty: number;
+  /**
+   * The most of this line the buyer may order (stock and per-order limit, see
+   * `maxOrderableQty`). Caps the "+" in the sheet's cart summary; absent =
+   * the generic line cap.
+   */
+  max?: number;
+};
 
 export type CheckoutDetails = {
   customerName: string;
   /** Normalised to E.164 when it looks like an Indian mobile; else as typed. */
   customerPhone: string;
   fulfilmentType: FulfilmentType;
+  /** The address line; the server joins it with the parts (lib/delivery-address.ts). */
   deliveryAddress: string | null;
+  deliveryLocality: string | null;
+  deliveryLandmark: string | null;
+  deliveryPincode: string | null;
   notes: string | null;
   paymentMethod: PaymentMethod;
+  /** Menu orders with slots: the picked slot's start (lib/menu-slots.ts). */
+  slotStart?: string | null;
 };
 
 const STORAGE_KEY = "awz:storefront:buyer:v1";
@@ -172,7 +216,14 @@ export function usePersistedCart(opts: {
 
 // ─── Quantity stepper ───────────────────────────────────────────────
 
-/** "Add" button at 0, else 44×44 −/qty/+ group. */
+/**
+ * "Add" button at 0, else 44×44 −/qty/+ group.
+ *
+ * The two states are different elements, so the button that was tapped
+ * unmounts on 0 → 1 and 1 → 0. Focus is moved by hand: to "+" after the first
+ * add, back to "Add" after the last one is removed — a keyboard or switch user
+ * is never dropped at the top of the page.
+ */
 export function QtyStepper({
   itemName,
   qty,
@@ -184,13 +235,31 @@ export function QtyStepper({
   max: number;
   onChange: (qty: number) => void;
 }) {
+  const addRef = useRef<HTMLButtonElement>(null);
+  const minusRef = useRef<HTMLButtonElement>(null);
+  const plusRef = useRef<HTMLButtonElement>(null);
+  /** Set by the tap that swaps the two states; consumed once the new one is mounted. */
+  const moveFocusRef = useRef(false);
+
+  useEffect(() => {
+    if (!moveFocusRef.current) return;
+    moveFocusRef.current = false;
+    if (qty === 0) addRef.current?.focus();
+    // "+" is disabled when one is already the most allowed.
+    else (plusRef.current?.disabled ? minusRef.current : plusRef.current)?.focus();
+  }, [qty]);
+
   if (qty === 0) {
     return (
       <button
+        ref={addRef}
         type="button"
-        onClick={() => onChange(1)}
+        onClick={() => {
+          moveFocusRef.current = true;
+          onChange(1);
+        }}
         disabled={max < 1}
-        className="inline-flex min-h-11 min-w-[72px] items-center justify-center gap-1 rounded-xl border border-primary/40 bg-primary/5 px-4 text-sm font-bold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50"
+        className="inline-flex min-h-11 min-w-[72px] shrink-0 items-center justify-center gap-1 rounded-xl border border-primary/40 bg-primary/5 px-4 text-sm font-bold text-primary transition-colors hover:bg-primary/10 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-50"
         aria-label={`Add ${itemName}`}
       >
         <Plus className="h-4 w-4" aria-hidden="true" />
@@ -201,17 +270,23 @@ export function QtyStepper({
   return (
     <div className="flex shrink-0 items-center gap-2" role="group" aria-label={`${itemName} quantity`}>
       <button
+        ref={minusRef}
         type="button"
-        onClick={() => onChange(qty - 1)}
+        onClick={() => {
+          moveFocusRef.current = qty === 1;
+          onChange(qty - 1);
+        }}
         className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-border bg-background text-foreground hover:bg-muted focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         aria-label={`Remove one ${itemName}`}
       >
         <Minus className="h-4 w-4" aria-hidden="true" />
       </button>
-      <span className="w-6 text-center font-mono text-base font-bold tabular-nums" aria-hidden="true">
-        {qty}
+      <span className="w-6 text-center font-mono text-base font-bold tabular-nums">
+        <span aria-hidden="true">{qty}</span>
+        <span className="sr-only">{qty} in cart</span>
       </span>
       <button
+        ref={plusRef}
         type="button"
         onClick={() => onChange(Math.min(max, qty + 1))}
         disabled={qty >= max}
@@ -279,7 +354,7 @@ export function CartBar({
 export function NoPaymentNotice() {
   return (
     <p className="mt-3 rounded-xl border border-dashed border-border bg-background px-4 py-3 text-sm text-muted-foreground">
-      This kitchen hasn&apos;t set up online payment yet — message them to order.
+      This store hasn&apos;t set up online payment yet — message them to order.
     </p>
   );
 }
@@ -295,21 +370,59 @@ export type CheckoutSheetProps = {
   /** Unique per page — prefixes form control ids. */
   idPrefix: string;
   description: string;
+  /** Named in the "you pay the store directly" line under the form. */
+  storeName?: string;
   lines: CheckoutLine[];
+  /**
+   * Lets the buyer change quantities (and remove lines, at 0) from the cart
+   * summary inside the sheet. The caller owns the cart: it applies the change
+   * and passes the new `lines` (and `discount`) back down. Absent → read-only
+   * summary.
+   */
+  onChangeQty?: (id: string, qty: number) => void;
+  /**
+   * The offer this cart earns, as previewed in the browser (lib/offers.ts).
+   * The server prices the order again when it is placed.
+   */
+  discount?: { name: string; discountPaise: number } | null;
+  /** A free item the cart earns (lib/offers.ts). Shown as a ₹0 line; the server adds it. */
+  gift?: { name: string; qty: number } | null;
   fulfilmentTypes: FulfilmentType[];
   deliveryFeePaise: number;
   /** Where to collect, as the vendor wrote it. Never invented when absent. */
   pickupNote: string | null;
-  /** When to collect (drops: the fulfilment window label), if known. */
-  pickupWindow?: string | null;
-  payment: { upi: boolean; cod: boolean };
   /**
-   * The kitchen has a WhatsApp number: also offer "Place order & send on
-   * WhatsApp". Same order, same endpoint — the order page then leads with a
-   * wa.me link carrying the whole order (`?wa=1`).
+   * Drops: the one handover window ("Tomorrow · 5–9 pm"), shown read-only for
+   * pickup and delivery alike. A drop has a single slot, so there is nothing to pick.
+   */
+  pickupWindow?: string | null;
+  /**
+   * Menu orders: the store's weekly slots (lib/menu-slots.ts). Non-empty → the
+   * buyer must pick one; the server checks it is still offered.
+   */
+  slotRules?: MenuSlotRule[];
+  /**
+   * The store's delivery areas (lib/delivery-areas.ts). Non-empty → the buyer
+   * picks one instead of typing a locality, and its fee replaces `deliveryFeePaise`.
+   */
+  deliveryAreas?: DeliveryArea[];
+  payment: { upi: boolean; cod: boolean; online: boolean };
+  /**
+   * The store has a WhatsApp number: also offer the "Also send my order to
+   * the store on WhatsApp" checkbox (ticked by default unless the store takes
+   * online payment). Same order, same
+   * endpoint — the order page then leads with a wa.me link carrying the whole
+   * order (`?wa=1`).
    */
   whatsapp?: boolean;
   prefill?: BuyerPrefill | null;
+  /**
+   * The store's colour (`storeThemeAttribute`). The sheet is portalled to
+   * <body>, outside the page's `data-theme`, so it carries its own.
+   */
+  theme?: string;
+  /** Example text in the note field (`StoreVocabulary.orderNoteExample`). */
+  notesExample?: string;
   /** Focus goes back here when the sheet closes (the Checkout button). */
   returnFocusRef?: React.RefObject<HTMLElement | null>;
   /** Request body from the buyer's details — ids and quantities only, never prices. */
@@ -334,14 +447,22 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     endpoint,
     idPrefix,
     description,
+    storeName,
     lines,
+    onChangeQty,
+    discount,
+    gift,
     fulfilmentTypes,
     deliveryFeePaise,
     pickupNote,
     pickupWindow,
+    slotRules,
+    deliveryAreas,
     payment,
     whatsapp = false,
     prefill,
+    theme,
+    notesExample,
     returnFocusRef,
     buildBody,
     onRejected,
@@ -352,13 +473,24 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [address, setAddress] = useState("");
+  const [locality, setLocality] = useState("");
+  const [landmark, setLandmark] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [slot, setSlot] = useState<string | null>(null);
   const [notes, setNotes] = useState("");
-  const [remember, setRemember] = useState(false);
+  const [remember, setRemember] = useState(true);
+  /** Name and phone are already known: show them as one card with "Change". */
+  const [contactFolded, setContactFolded] = useState(false);
+  /** Same for the address. Set when details load, never while typing, so the field can't vanish mid-word. */
+  const [addressFolded, setAddressFolded] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [fulfilment, setFulfilment] = useState<FulfilmentType>(fulfilmentTypes[0] ?? "PICKUP");
   const [method, setMethod] = useState<PaymentMethod | null>(
     payment.upi ? "UPI" : payment.cod ? "CASH" : null,
   );
-  const [submitting, setSubmitting] = useState<false | "order" | "whatsapp">(false);
+  const [submitting, setSubmitting] = useState(false);
+  // Ticked by default, except where the buyer pays online: WhatsApp first would hold back the Razorpay window.
+  const [sendOnWhatsapp, setSendOnWhatsapp] = useState(!payment.online);
   const [fieldErrors, setFieldErrors] = useState<CheckoutFieldErrors>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [focusRequest, setFocusRequest] = useState<{ field: CheckoutField; n: number } | null>(null);
@@ -369,16 +501,65 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     phone: `${idPrefix}-phone`,
     phoneHint: `${idPrefix}-phone-hint`,
     address: `${idPrefix}-address`,
+    locality: `${idPrefix}-locality`,
+    areaHint: `${idPrefix}-area-hint`,
+    landmark: `${idPrefix}-landmark`,
+    pincode: `${idPrefix}-pincode`,
+    slot: `${idPrefix}-slot`,
     payment: `${idPrefix}-payment`,
     error: (f: CheckoutField) => `${idPrefix}-${f}-error`,
   };
 
-  const input: CheckoutInput = { name, phone, address, fulfilment, method };
+  // The slots offered right now, worked out when the sheet opens (never on a timer);
+  // the server re-checks the pick, so a sheet left open can't book a past slot.
+  const slotRulesKey = JSON.stringify(slotRules ?? []);
+  const slots = useMemo(
+    () => (open && slotRules && slotRules.length > 0 ? upcomingMenuSlots(slotRules, new Date()) : []),
+    // slotRulesKey stands in for the array, which callers may rebuild each render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [open, slotRulesKey],
+  );
+  const slotRequired = (slotRules?.length ?? 0) > 0;
+  const slotGroups = useMemo(() => {
+    const now = new Date();
+    const groups: { day: string; slots: { key: string; time: string }[] }[] = [];
+    for (const sl of slots) {
+      const day = formatRelativeIstDay(sl.start, now);
+      const time = formatIstTimeRange(sl.start, sl.end);
+      const last = groups[groups.length - 1];
+      if (last && last.day === day) last.slots.push({ key: sl.key, time });
+      else groups.push({ day, slots: [{ key: sl.key, time }] });
+    }
+    return groups;
+  }, [slots]);
+  // A pick that is no longer offered (the sheet reopened later) is cleared.
+  useEffect(() => {
+    if (slot && open && !slots.some((sl) => sl.key === slot)) setSlot(null);
+  }, [slot, slots, open]);
+
+  const areas = deliveryAreas ?? [];
+  const area = findDeliveryArea(areas, locality);
+  // One fee for every area reads as the delivery fee; different fees go beside each area.
+  const areaFees = new Set(areas.map((a) => areaFeePaise(a, deliveryFeePaise)));
+  const deliveryLabelFee = areas.length === 0 ? deliveryFeePaise : areaFees.size === 1 ? [...areaFees][0]! : 0;
+
+  const input: CheckoutInput = {
+    name,
+    phone,
+    address,
+    locality,
+    pincode,
+    fulfilment,
+    method,
+    slotRequired,
+    slot,
+    areas,
+  };
 
   // ── Remember my details ─────────────────────────────────────────────
   // Latest values for timers / event handlers that outlive a render.
-  const latestRef = useRef({ name, phone, address, fulfilment, remember });
-  latestRef.current = { name, phone, address, fulfilment, remember };
+  const latestRef = useRef({ name, phone, address, locality, landmark, pincode, fulfilment, remember });
+  latestRef.current = { name, phone, address, locality, landmark, pincode, fulfilment, remember };
   const fulfilmentTypesRef = useRef(fulfilmentTypes);
   fulfilmentTypesRef.current = fulfilmentTypes;
   const loadedRef = useRef(false);
@@ -393,6 +574,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
       name: v.name,
       phone: v.phone,
       address: v.address,
+      locality: v.locality,
+      landmark: v.landmark,
+      pincode: v.pincode,
       fulfilment: v.fulfilment,
       savedAt: Date.now(),
     });
@@ -400,10 +584,25 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
   }, []);
 
   const applySaved = useCallback(
-    (saved: { name: string; phone: string; address: string; fulfilment: FulfilmentType | null }) => {
+    (saved: {
+      name: string;
+      phone: string;
+      address: string;
+      locality: string;
+      landmark: string;
+      pincode: string;
+      fulfilment: FulfilmentType | null;
+    }) => {
       setName(saved.name);
       setPhone(saved.phone);
       setAddress(saved.address);
+      setLocality(saved.locality);
+      setLandmark(saved.landmark);
+      setPincode(saved.pincode);
+      const usable = savedContactUsable(saved.name, saved.phone);
+      setContactFolded(usable);
+      // An address saved before it had parts has no locality: open it so the buyer adds one.
+      setAddressFolded(usable && saved.address.trim() !== "" && saved.locality.trim() !== "");
       if (saved.fulfilment && fulfilmentTypesRef.current.includes(saved.fulfilment)) {
         setFulfilment(saved.fulfilment);
       }
@@ -419,11 +618,15 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     mountedAtRef.current = Date.now();
     const saved = parseSavedBuyer(readSavedBuyerRaw());
     const p = prefillRef.current;
-    if (saved) setRemember(true);
+    // The address line and its parts come from one source, so they never mix.
+    const fromAccount = !!p?.address;
     applySaved({
       name: p?.name || saved?.name || "",
       phone: formatIndianMobile(p?.phone ?? null) || saved?.phone || "",
-      address: p?.address || saved?.address || "",
+      address: (fromAccount ? p?.address : saved?.address) || "",
+      locality: (fromAccount ? p?.locality : saved?.locality) || "",
+      landmark: (fromAccount ? p?.landmark : saved?.landmark) || "",
+      pincode: (fromAccount ? p?.pincode : saved?.pincode) || "",
       fulfilment: saved?.fulfilment ?? null,
     });
     loadedRef.current = true;
@@ -434,7 +637,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     if (!loadedRef.current || !remember) return;
     const t = window.setTimeout(persistDetails, SAVE_DEBOUNCE_MS);
     return () => window.clearTimeout(t);
-  }, [remember, name, phone, address, fulfilment, persistDetails]);
+  }, [remember, name, phone, address, locality, landmark, pincode, fulfilment, persistDetails]);
 
   // Flush the pending debounce when the tab is hidden or unloaded.
   useEffect(() => {
@@ -492,6 +695,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
 
   function showFieldErrors(errors: CheckoutFieldErrors) {
     setFieldErrors(errors);
+    if (errors.name || errors.phone) setContactFolded(false);
+    if (errors.address || errors.locality || errors.pincode) setAddressFolded(false);
     const first = firstInvalidField(errors);
     if (first) setFocusRequest((r) => ({ field: first, n: (r?.n ?? 0) + 1 }));
   }
@@ -520,17 +725,37 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     return all.length > 0 ? all.join(" ") : undefined;
   }
 
+  // A head start on the Razorpay window, which opens right after this sheet. A failed load is retried there.
+  useEffect(() => {
+    if (open && payment.online) loadCheckout().catch(() => {});
+  }, [open, payment.online]);
+
   const subtotalPaise = sumPaise(lines.map((l) => l.priceInPaise * l.qty));
-  const feePaise = fulfilment === "DELIVERY" ? deliveryFeePaise : 0;
-  const totalPaise = subtotalPaise + feePaise;
+  const feePaise = fulfilment === "DELIVERY" ? (area ? areaFeePaise(area, deliveryFeePaise) : deliveryFeePaise) : 0;
+  const discountPaise = discount?.discountPaise ?? 0;
+  const totalPaise = subtotalPaise - discountPaise + feePaise;
+  // One way to pay needs no choice. Two radios only when there are two.
+  const onlyPayment = payment.upi && payment.cod ? null : payment.upi ? "UPI" : payment.cod ? "CASH" : null;
+  const showBreakdown = discountPaise > 0 || fulfilment === "DELIVERY";
+  /** What sits between the cart lines and the total, for the line under the footer total. */
+  const totalNote = [
+    discountPaise > 0 ? `${formatINR(discountPaise)} off` : null,
+    fulfilment === "DELIVERY" ? (feePaise > 0 ? `incl. ${formatINR(feePaise)} delivery` : "free delivery") : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  function changeDetails() {
+    setContactFolded(false);
+    setAddressFolded(false);
+    setFocusRequest((r) => ({ field: "name", n: (r?.n ?? 0) + 1 }));
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (submitting) return;
     setFormError(null);
-    // Enter in a field submits via the first (plain) button.
-    const submitter = (e.nativeEvent as SubmitEvent).submitter as HTMLElement | null | undefined;
-    const viaWhatsapp = whatsapp && submitter?.dataset.via === "whatsapp";
+    const viaWhatsapp = whatsapp && sendOnWhatsapp;
 
     const errors = validateCheckout(input);
     showFieldErrors(errors);
@@ -541,7 +766,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     // a response (network drop), so a retry can't create a second order.
     if (!idemKeyRef.current) idemKeyRef.current = newIdempotencyKey();
 
-    setSubmitting(viaWhatsapp ? "whatsapp" : "order");
+    setSubmitting(true);
     let res: Response;
     try {
       res = await fetch(endpoint, {
@@ -550,20 +775,25 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
           "Content-Type": "application/json",
           "Idempotency-Key": idemKeyRef.current,
         },
-        body: JSON.stringify(
-          buildBody({
+        body: JSON.stringify({
+          ...buildBody({
             customerName: name.trim(),
             customerPhone: normaliseIndianMobile(phone),
             fulfilmentType: fulfilment,
             deliveryAddress: fulfilment === "DELIVERY" ? address.trim() : null,
+            deliveryLocality: fulfilment === "DELIVERY" ? locality.trim() || null : null,
+            deliveryLandmark: fulfilment === "DELIVERY" ? landmark.trim() || null : null,
+            deliveryPincode: fulfilment === "DELIVERY" ? pincode.trim() || null : null,
             notes: notes.trim() || null,
             paymentMethod: method ?? "UPI",
+            ...(slotRequired ? { slotStart: slot } : {}),
           }),
-        ),
+          src: orderSrcFromSearch(window.location.search),
+        }),
       });
     } catch {
       setSubmitting(false);
-      setFormError("Couldn't reach the kitchen — check your connection and try again.");
+      setFormError("Couldn't reach the store — check your connection and try again.");
       return;
     }
     idemKeyRef.current = null;
@@ -576,14 +806,15 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     }
 
     if (res.status === 201) {
-      const token = (json as { data?: { orderToken?: string } } | null)?.data?.orderToken;
+      const data = (json as { data?: { orderToken?: string; billNumber?: string } } | null)?.data;
+      const token = data?.orderToken;
       if (remember) persistDetails();
       else writeSavedBuyerRaw(null);
       onOrdered?.();
       if (token) {
-        router.push(
-          `/s/${encodeURIComponent(slug)}/o/${encodeURIComponent(token)}${viaWhatsapp ? "?wa=1" : ""}`,
-        );
+        // So the store page can point back at it; the order page records it too.
+        if (data?.billNumber) rememberRecentOrder(slug, { token, billNumber: data.billNumber, createdAt: Date.now() });
+        router.push(orderPagePath(slug, token, { viaWhatsapp, payNow: method === "UPI" && payment.online }));
         return; // keep the spinner while navigating
       }
     }
@@ -602,16 +833,18 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     const message = onRejected(err);
     const field = checkoutFieldForErrorCode(err.error);
     if (field && (field !== "address" || fulfilment === "DELIVERY")) {
+      if (field === "slot") setSlot(null);
       return showFieldErrors({ ...fieldErrors, [field]: message });
     }
     setFormError(message);
   }
 
   return (
-    <Sheet open={open} onOpenChange={(v) => !submitting && onOpenChange(v)}>
-      <SheetContent
-        side="bottom"
-        className="mx-auto max-h-[92dvh] max-w-2xl overflow-y-auto rounded-t-2xl px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6"
+    <ResponsiveDialog open={open} onOpenChange={(v) => !submitting && onOpenChange(v)}>
+      {/* Header (title + close) and footer (total + Place order) stay put; only the cards scroll. */}
+      <ResponsiveDialogContent
+        data-theme={theme}
+        className="bg-muted"
         onCloseAutoFocus={(e) => {
           const target = returnFocusRef?.current;
           if (target && target.isConnected) {
@@ -620,248 +853,463 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
           }
         }}
       >
-        <SheetHeader className="text-left">
-          <SheetTitle className="font-display text-xl">Checkout</SheetTitle>
-          <SheetDescription>{description}</SheetDescription>
-        </SheetHeader>
+        <ResponsiveDialogHeader>
+          <ResponsiveDialogTitle className="font-display text-xl">Checkout</ResponsiveDialogTitle>
+          <ResponsiveDialogDescription>{description}</ResponsiveDialogDescription>
+        </ResponsiveDialogHeader>
 
-        <form onSubmit={submit} className="mt-4 space-y-5" noValidate>
-          <ul className="space-y-1 rounded-xl bg-muted/50 px-3 py-2 text-sm">
-            {lines.map((l) => (
-              <li key={l.id} className="flex justify-between gap-3">
-                <span className="min-w-0 truncate">
-                  {l.qty} × {l.name}
-                </span>
-                <span className="font-mono tabular-nums">{formatINR(l.priceInPaise * l.qty)}</span>
-              </li>
-            ))}
-          </ul>
-
-          <div className="space-y-2">
-            <Label htmlFor={ids.name}>Your name</Label>
-            <Input
-              id={ids.name}
-              autoComplete="name"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                revalidate("name", { name: e.target.value });
-              }}
-              maxLength={80}
-              required
-              aria-invalid={fieldErrors.name ? true : undefined}
-              aria-describedby={describedBy("name")}
-              className="h-11 scroll-my-24 aria-invalid:border-destructive"
-            />
-            <FieldError id={ids.error("name")} message={fieldErrors.name} />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor={ids.phone}>Mobile number</Label>
-            <div className="flex items-center gap-2">
-              <span
-                className="inline-flex h-11 items-center rounded-md border border-input bg-muted px-3 font-mono text-sm text-muted-foreground"
-                aria-hidden="true"
-              >
-                +91
-              </span>
-              <Input
-                id={ids.phone}
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel-national"
-                placeholder="98765 43210"
-                value={phone}
-                onChange={(e) => {
-                  setPhone(e.target.value);
-                  revalidate("phone", { phone: e.target.value });
-                }}
-                maxLength={16}
-                required
-                aria-invalid={fieldErrors.phone ? true : undefined}
-                aria-describedby={describedBy("phone", ids.phoneHint)}
-                className="h-11 scroll-my-24 aria-invalid:border-destructive"
+        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col" noValidate>
+          <ResponsiveDialogBody className="space-y-4">
+            <CheckoutCard title="Your order">
+              <CartLines
+                lines={lines}
+                gift={lines.length > 0 ? (gift ?? null) : null}
+                onChangeQty={onChangeQty}
+                onAddMore={onChangeQty && !submitting ? () => onOpenChange(false) : undefined}
               />
-            </div>
-            <FieldError id={ids.error("phone")} message={fieldErrors.phone} />
-            <p id={ids.phoneHint} className="text-xs text-muted-foreground">
-              The kitchen uses this to reach you about this order.
-            </p>
-          </div>
+              {/* The lines show list prices: what comes off and what delivery costs sit right under them. */}
+              {showBreakdown && lines.length > 0 ? (
+                <dl className="mt-1 space-y-1 border-t border-border/60 pt-3 text-sm">
+                  <div className="flex justify-between">
+                    <dt className="text-muted-foreground">Items</dt>
+                    <dd className="font-mono tabular-nums">{formatINR(subtotalPaise)}</dd>
+                  </div>
+                  {discount && discountPaise > 0 ? (
+                    <div className="flex justify-between gap-3 font-semibold text-primary">
+                      <dt className="min-w-0 break-words">{discountLabel(discount.name)}</dt>
+                      <dd className="shrink-0 font-mono tabular-nums">−{formatINR(discountPaise)}</dd>
+                    </div>
+                  ) : null}
+                  {fulfilment === "DELIVERY" ? (
+                    <div className="flex justify-between">
+                      <dt className="text-muted-foreground">Delivery fee</dt>
+                      <dd className="font-mono tabular-nums">{feePaise > 0 ? formatINR(feePaise) : "Free"}</dd>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-between pt-1 text-base font-bold">
+                    <dt>Total</dt>
+                    <dd className="font-mono tabular-nums">{formatINR(totalPaise)}</dd>
+                  </div>
+                </dl>
+              ) : null}
+            </CheckoutCard>
 
-          {fulfilmentTypes.length > 1 ? (
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium">Delivery or pickup</legend>
-              <div className="grid grid-cols-2 gap-2">
-                {fulfilmentTypes.map((t) => (
-                  <label
-                    key={t}
-                    className={cn(
-                      "flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 py-2 text-sm font-semibold has-focus-visible:ring-2 has-focus-visible:ring-primary",
-                      fulfilment === t ? "border-primary bg-primary/10 text-primary" : "border-border",
-                    )}
+            <CheckoutCard title="Your details">
+              {contactFolded ? (
+                <div className="flex items-start gap-3 text-sm">
+                  <Smartphone className="mt-1 h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                  <span className="min-w-0 flex-1 py-1">
+                    <span className="block truncate font-semibold">{name}</span>
+                    <span className="block font-mono text-xs tabular-nums text-muted-foreground">
+                      {formatIndianMobile(normaliseIndianMobile(phone))}
+                    </span>
+                    {fulfilment === "DELIVERY" && addressFolded ? (
+                      <span className="mt-1 block whitespace-pre-line break-words text-muted-foreground">
+                        {composeDeliveryAddress({ line: address, locality, landmark, pincode })}
+                      </span>
+                    ) : null}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={changeDetails}
+                    className="inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center rounded-lg px-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
                   >
-                    <input
-                      type="radio"
-                      name={`${idPrefix}-fulfilment`}
-                      value={t}
-                      checked={fulfilment === t}
-                      onChange={() => {
-                        setFulfilment(t);
-                        revalidate("address", { fulfilment: t });
+                    Change
+                    <span className="sr-only"> your details</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor={ids.name}>Your name</Label>
+                    <Input
+                      id={ids.name}
+                      autoComplete="name"
+                      value={name}
+                      onChange={(e) => {
+                        setName(e.target.value);
+                        revalidate("name", { name: e.target.value });
                       }}
-                      className="h-4 w-4 accent-[hsl(var(--primary))]"
+                      maxLength={80}
+                      required
+                      aria-invalid={fieldErrors.name ? true : undefined}
+                      aria-describedby={describedBy("name")}
+                      className="h-12 scroll-my-24 rounded-xl aria-invalid:border-destructive"
                     />
-                    {t === "DELIVERY"
-                      ? deliveryFeePaise > 0
-                        ? `Delivery (+${formatINR(deliveryFeePaise)})`
-                        : "Delivery"
-                      : "Pickup"}
+                    <FieldError id={ids.error("name")} message={fieldErrors.name} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor={ids.phone}>Mobile number</Label>
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="inline-flex h-12 items-center rounded-xl border border-input bg-muted px-3 font-mono text-sm text-muted-foreground"
+                        aria-hidden="true"
+                      >
+                        +91
+                      </span>
+                      <Input
+                        id={ids.phone}
+                        type="tel"
+                        inputMode="tel"
+                        autoComplete="tel-national"
+                        placeholder="98765 43210"
+                        value={phone}
+                        onChange={(e) => {
+                          setPhone(e.target.value);
+                          revalidate("phone", { phone: e.target.value });
+                        }}
+                        maxLength={16}
+                        required
+                        aria-invalid={fieldErrors.phone ? true : undefined}
+                        aria-describedby={describedBy("phone", ids.phoneHint)}
+                        className="h-12 scroll-my-24 rounded-xl aria-invalid:border-destructive"
+                      />
+                    </div>
+                    <FieldError id={ids.error("phone")} message={fieldErrors.phone} />
+                    <p id={ids.phoneHint} className="text-xs text-muted-foreground">
+                      The store uses this to reach you about this order.
+                    </p>
+                  </div>
+
+                  <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={remember}
+                      onChange={(e) => onRememberChange(e.target.checked)}
+                      className="h-5 w-5 accent-[hsl(var(--primary))]"
+                    />
+                    Remember my details on this device
                   </label>
-                ))}
-              </div>
-            </fieldset>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              {fulfilment === "DELIVERY" ? "Delivery only" : "Pickup only"}
-            </p>
-          )}
+                </div>
+              )}
+            </CheckoutCard>
 
-          {fulfilment === "DELIVERY" ? (
-            <div className="space-y-2">
-              <Label htmlFor={ids.address}>Delivery address</Label>
-              <textarea
-                id={ids.address}
-                autoComplete="street-address"
-                value={address}
-                onChange={(e) => {
-                  setAddress(e.target.value);
-                  revalidate("address", { address: e.target.value });
-                }}
-                maxLength={500}
-                rows={3}
-                required
-                placeholder="Flat, building, street, landmark"
-                aria-invalid={fieldErrors.address ? true : undefined}
-                aria-describedby={describedBy("address")}
-                className="flex w-full scroll-my-24 rounded-md border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
-              />
-              <FieldError id={ids.error("address")} message={fieldErrors.address} />
-            </div>
-          ) : (
-            <div className="space-y-1.5 rounded-xl bg-muted/50 px-3 py-2 text-sm">
-              <p className="flex items-start gap-2">
-                <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                {pickupNote ? (
-                  <span>
-                    <span className="font-semibold">Pickup: </span>
-                    {pickupNote}
-                  </span>
+            <CheckoutCard
+              title={fulfilmentTypes.length > 1 ? "Pickup or delivery" : fulfilment === "DELIVERY" ? "Delivery" : "Pickup"}
+            >
+              <div className="space-y-3">
+                {fulfilmentTypes.length > 1 ? (
+                  <fieldset>
+                    <legend className="sr-only">Delivery or pickup</legend>
+                    {/* A segmented control made of native radios: arrow keys and the checked state come free. */}
+                    <div className="grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
+                      {fulfilmentTypes.map((t) => (
+                        <RadioOption
+                          key={t}
+                          name={`${idPrefix}-fulfilment`}
+                          value={t}
+                          checked={fulfilment === t}
+                          onChange={() => {
+                            setFulfilment(t);
+                            revalidate("address", { fulfilment: t });
+                            revalidate("locality", { fulfilment: t });
+                            revalidate("pincode", { fulfilment: t });
+                          }}
+                          size="compact"
+                          className={cn(
+                            "relative rounded-lg border-transparent",
+                            fulfilment === t ? "bg-background shadow-sm" : "bg-transparent text-muted-foreground",
+                          )}
+                          // Invisible but covering the whole option, so a tap or click lands on the radio itself.
+                          inputClassName="absolute inset-0 m-0 h-full w-full cursor-pointer appearance-none opacity-0"
+                          label={
+                            t === "DELIVERY"
+                              ? deliveryLabelFee > 0
+                                ? `Delivery (+${formatINR(deliveryLabelFee)})`
+                                : "Delivery"
+                              : "Pickup"
+                          }
+                        />
+                      ))}
+                    </div>
+                  </fieldset>
+                ) : null}
+
+                {/* When: a drop's one window, read-only; or a menu slot the buyer picks. */}
+                {slotRequired ? (
+                  <div className="space-y-2">
+                    <Label htmlFor={ids.slot}>{fulfilment === "DELIVERY" ? "Deliver when?" : "Pick up when?"}</Label>
+                    {slots.length > 0 ? (
+                      // Native, grouped by day: the phone's own picker, and no extra bundle on the store page.
+                      <select
+                        id={ids.slot}
+                        value={slot ?? ""}
+                        onChange={(e) => {
+                          const v = e.target.value || null;
+                          setSlot(v);
+                          revalidate("slot", { slot: v });
+                        }}
+                        aria-invalid={fieldErrors.slot ? true : undefined}
+                        aria-describedby={describedBy("slot")}
+                        className="flex h-12 w-full scroll-my-24 rounded-xl border border-input bg-background px-3 text-base focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
+                      >
+                        <option value="" disabled>
+                          Choose a day and time
+                        </option>
+                        {slotGroups.map((g) => (
+                          <optgroup key={g.day} label={g.day}>
+                            {g.slots.map((sl) => (
+                              <option key={sl.key} value={sl.key}>
+                                {g.day} · {sl.time}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    ) : (
+                      <p className="text-sm text-muted-foreground">
+                        No times are open this week. Message the store to arrange a time.
+                      </p>
+                    )}
+                    <FieldError id={ids.error("slot")} message={fieldErrors.slot} />
+                  </div>
+                ) : pickupWindow ? (
+                  <p className="flex items-start gap-2 text-sm">
+                    <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    <span>
+                      <span className="font-semibold">{fulfilment === "DELIVERY" ? "Delivery: " : "Pickup: "}</span>
+                      {pickupWindow}
+                    </span>
+                  </p>
+                ) : null}
+
+                {fulfilment === "DELIVERY" && addressFolded ? null : fulfilment === "DELIVERY" ? (
+                  <fieldset className="space-y-3">
+                    <legend className="mb-2 text-sm font-medium">Delivery address</legend>
+                    <div className="space-y-2">
+                      <Label htmlFor={ids.address}>House or flat, building, street</Label>
+                      <textarea
+                        id={ids.address}
+                        autoComplete="street-address"
+                        value={address}
+                        onChange={(e) => {
+                          setAddress(e.target.value);
+                          revalidate("address", { address: e.target.value });
+                        }}
+                        maxLength={ADDRESS_LINE_MAX}
+                        rows={2}
+                        required
+                        placeholder="Flat 302, Lake View Apartments, 4th Cross"
+                        aria-invalid={fieldErrors.address ? true : undefined}
+                        aria-describedby={describedBy("address")}
+                        className="flex w-full scroll-my-24 rounded-xl border border-input bg-background px-3 py-2 text-base placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
+                      />
+                      <FieldError id={ids.error("address")} message={fieldErrors.address} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor={ids.locality}>{areas.length > 0 ? "Area" : "Area or locality"}</Label>
+                      {areas.length > 0 ? (
+                        <>
+                          {/* The store delivers only here (lib/delivery-areas.ts): a list, so there is no typo to refuse. */}
+                          <select
+                            id={ids.locality}
+                            value={area?.name ?? ""}
+                            onChange={(e) => {
+                              setLocality(e.target.value);
+                              revalidate("locality", { locality: e.target.value });
+                            }}
+                            required
+                            aria-invalid={fieldErrors.locality ? true : undefined}
+                            aria-describedby={describedBy("locality", ids.areaHint)}
+                            className="flex h-12 w-full scroll-my-24 rounded-xl border border-input bg-background px-3 text-base focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 aria-invalid:border-destructive md:text-sm"
+                          >
+                            <option value="" disabled>
+                              Choose your area
+                            </option>
+                            {areas.map((a) => {
+                              const fee = areaFeePaise(a, deliveryFeePaise);
+                              return (
+                                <option key={a.name} value={a.name}>
+                                  {areaFees.size > 1 ? `${a.name} (${fee > 0 ? `+${formatINRCompact(fee)}` : "free"})` : a.name}
+                                </option>
+                              );
+                            })}
+                          </select>
+                          <p id={ids.areaHint} className="text-sm text-muted-foreground">
+                            The store delivers only to these areas. Somewhere else? Choose pickup, or message the store.
+                          </p>
+                        </>
+                      ) : (
+                        <Input
+                          id={ids.locality}
+                          autoComplete="address-level3"
+                          value={locality}
+                          onChange={(e) => {
+                            setLocality(e.target.value);
+                            revalidate("locality", { locality: e.target.value });
+                          }}
+                          maxLength={LOCALITY_MAX}
+                          required
+                          placeholder="Kondapur"
+                          aria-invalid={fieldErrors.locality ? true : undefined}
+                          aria-describedby={describedBy("locality")}
+                          className="h-12 scroll-my-24 rounded-xl aria-invalid:border-destructive"
+                        />
+                      )}
+                      <FieldError id={ids.error("locality")} message={fieldErrors.locality} />
+                    </div>
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-[1fr_9rem]">
+                      <div className="space-y-2">
+                        <Label htmlFor={ids.landmark}>Landmark (optional)</Label>
+                        <Input
+                          id={ids.landmark}
+                          value={landmark}
+                          onChange={(e) => setLandmark(e.target.value)}
+                          maxLength={LANDMARK_MAX}
+                          placeholder="Near Ganesh temple"
+                          className="h-12 rounded-xl"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor={ids.pincode}>Pincode (optional)</Label>
+                        <Input
+                          id={ids.pincode}
+                          inputMode="numeric"
+                          autoComplete="postal-code"
+                          value={pincode}
+                          onChange={(e) => {
+                            setPincode(e.target.value);
+                            revalidate("pincode", { pincode: e.target.value });
+                          }}
+                          maxLength={7}
+                          placeholder="500084"
+                          aria-invalid={fieldErrors.pincode ? true : undefined}
+                          aria-describedby={describedBy("pincode")}
+                          className="h-12 scroll-my-24 rounded-xl font-mono aria-invalid:border-destructive"
+                        />
+                        <FieldError id={ids.error("pincode")} message={fieldErrors.pincode} />
+                      </div>
+                    </div>
+                  </fieldset>
                 ) : (
-                  <span>{PICKUP_FALLBACK}</span>
+                  <p className="flex items-start gap-2 text-sm">
+                    <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                    {pickupNote ? (
+                      <span>
+                        <span className="font-semibold">Pickup: </span>
+                        {pickupNote}
+                      </span>
+                    ) : (
+                      <span className="text-muted-foreground">{PICKUP_FALLBACK}</span>
+                    )}
+                  </p>
                 )}
-              </p>
-              {pickupWindow ? (
-                <p className="flex items-start gap-2">
-                  <Clock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-                  <span>
-                    <span className="font-semibold">When: </span>
-                    {pickupWindow}
-                  </span>
-                </p>
-              ) : null}
-            </div>
-          )}
 
-          <div className="space-y-2">
-            <Label htmlFor={`${idPrefix}-notes`}>Notes for the kitchen (optional)</Label>
-            <Input
-              id={`${idPrefix}-notes`}
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              maxLength={280}
-              placeholder="eggless, less spicy…"
-              className="h-11"
-            />
-          </div>
-
-          <fieldset
-            id={ids.payment}
-            aria-invalid={fieldErrors.payment ? true : undefined}
-            aria-describedby={describedBy("payment")}
-            className="space-y-2"
-          >
-            <legend className="text-sm font-medium">Payment</legend>
-            <div className="grid gap-2 sm:grid-cols-2">
-              {payment.upi ? (
-                <PaymentOption
-                  name={`${idPrefix}-payment`}
-                  checked={method === "UPI"}
-                  onSelect={() => {
-                    setMethod("UPI");
-                    revalidate("payment", { method: "UPI" });
-                  }}
-                  label="Pay now by UPI"
-                  hint="Any UPI app — you'll see a QR next"
-                  invalid={!!fieldErrors.payment}
-                  describedBy={describedBy("payment")}
-                />
-              ) : null}
-              {payment.cod ? (
-                <PaymentOption
-                  name={`${idPrefix}-payment`}
-                  checked={method === "CASH"}
-                  onSelect={() => {
-                    setMethod("CASH");
-                    // A pay_on_delivery_disabled rejection stays until they pick UPI.
-                    setFieldErrors((prev) => {
-                      if (prev.payment !== CHECKOUT_FIELD_MESSAGES.payment) return prev;
-                      const next = { ...prev };
-                      delete next.payment;
-                      return next;
-                    });
-                  }}
-                  label="Pay on delivery"
-                  hint={fulfilment === "PICKUP" ? "Pay when you collect" : "Cash or UPI at the door"}
-                  invalid={!!fieldErrors.payment}
-                  describedBy={describedBy("payment")}
-                />
-              ) : null}
-            </div>
-            <FieldError id={ids.error("payment")} message={fieldErrors.payment} />
-          </fieldset>
-
-          <label className="flex min-h-11 cursor-pointer items-center gap-3 text-sm">
-            <input
-              type="checkbox"
-              checked={remember}
-              onChange={(e) => onRememberChange(e.target.checked)}
-              className="h-5 w-5 accent-[hsl(var(--primary))]"
-            />
-            Remember my details on this device
-          </label>
-
-          <dl className="space-y-1 border-t border-border pt-3 text-sm">
-            <div className="flex justify-between">
-              <dt>Items</dt>
-              <dd className="font-mono tabular-nums">{formatINR(subtotalPaise)}</dd>
-            </div>
-            {feePaise > 0 ? (
-              <div className="flex justify-between">
-                <dt>Delivery fee</dt>
-                <dd className="font-mono tabular-nums">{formatINR(feePaise)}</dd>
+                {notesOpen ? (
+                  <div className="space-y-2">
+                    <Label htmlFor={`${idPrefix}-notes`}>Note for the store (optional)</Label>
+                    <Input
+                      id={`${idPrefix}-notes`}
+                      value={notes}
+                      onChange={(e) => setNotes(e.target.value)}
+                      maxLength={280}
+                      placeholder={notesExample}
+                      autoFocus
+                      className="h-12 rounded-xl"
+                    />
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setNotesOpen(true)}
+                    className="-mx-1 inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  >
+                    <Plus className="h-4 w-4" aria-hidden="true" />
+                    Add a note for the store
+                  </button>
+                )}
               </div>
-            ) : null}
-            <div className="flex justify-between text-base font-bold">
-              <dt>Total</dt>
-              <dd className="font-mono tabular-nums" aria-live="polite">
-                {formatINR(totalPaise)}
-              </dd>
-            </div>
-          </dl>
+            </CheckoutCard>
 
-          {/* Order-level problems only (stock, cut-off, network); field problems sit under their field. */}
-          <div role="alert" aria-atomic="true">
+            <section className="space-y-3 rounded-2xl border border-border bg-card p-4 text-card-foreground">
+              <fieldset
+                id={ids.payment}
+                aria-invalid={fieldErrors.payment ? true : undefined}
+                aria-describedby={describedBy("payment")}
+                className="space-y-2"
+              >
+                <legend className="mb-2 text-base font-semibold">Payment</legend>
+                {onlyPayment ? (
+                  <p className="text-sm text-muted-foreground">
+                    {onlyPayment === "UPI"
+                      ? payment.online
+                        ? "Pay online by UPI, card or netbanking, secured by Razorpay."
+                        : "Pay by UPI on the next screen, with any UPI app."
+                      : fulfilment === "PICKUP"
+                        ? "Pay when you collect."
+                        : "Pay on delivery, by cash or UPI at the door."}
+                  </p>
+                ) : null}
+                <div className={cn("grid gap-2 sm:grid-cols-2", onlyPayment && "hidden")}>
+                  {payment.upi ? (
+                    <PaymentOption
+                      name={`${idPrefix}-payment`}
+                      checked={method === "UPI"}
+                      onSelect={() => {
+                        setMethod("UPI");
+                        revalidate("payment", { method: "UPI" });
+                      }}
+                      label={payment.online ? "Pay online" : "Pay now by UPI"}
+                      hint={payment.online ? "UPI, cards or netbanking · secured by Razorpay" : "Any UPI app, on the next screen"}
+                      invalid={!!fieldErrors.payment}
+                      describedBy={describedBy("payment")}
+                    />
+                  ) : null}
+                  {payment.cod ? (
+                    <PaymentOption
+                      name={`${idPrefix}-payment`}
+                      checked={method === "CASH"}
+                      onSelect={() => {
+                        setMethod("CASH");
+                        // A pay_on_delivery_disabled rejection stays until they pick UPI.
+                        setFieldErrors((prev) => {
+                          if (prev.payment !== CHECKOUT_FIELD_MESSAGES.payment) return prev;
+                          const next = { ...prev };
+                          delete next.payment;
+                          return next;
+                        });
+                      }}
+                      label="Pay on delivery"
+                      hint={fulfilment === "PICKUP" ? "Pay when you collect" : "Cash or UPI at the door"}
+                      invalid={!!fieldErrors.payment}
+                      describedBy={describedBy("payment")}
+                    />
+                  ) : null}
+                </div>
+                <FieldError id={ids.error("payment")} message={fieldErrors.payment} />
+              </fieldset>
+
+              {whatsapp ? (
+                <label className="flex min-h-11 cursor-pointer items-start gap-3 py-1 text-sm">
+                  <input
+                    type="checkbox"
+                    checked={sendOnWhatsapp}
+                    onChange={(e) => setSendOnWhatsapp(e.target.checked)}
+                    disabled={submitting}
+                    aria-describedby={`${idPrefix}-wa-hint`}
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-[hsl(var(--primary))]"
+                  />
+                  <span>
+                    Also send my order to the store on WhatsApp
+                    <span id={`${idPrefix}-wa-hint`} className="block text-muted-foreground">
+                      So the store sees it instantly.
+                    </span>
+                  </span>
+                </label>
+              ) : null}
+            </section>
+
+            {/* True on every path: UPI goes to the store's own UPI ID, "Pay online" to its own Razorpay account. */}
+            <p className="flex items-start gap-2.5 px-1 text-sm leading-snug text-muted-foreground">
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span>You pay {storeName || "the store"} directly. AwaazOS never holds your money.</span>
+            </p>
+          </ResponsiveDialogBody>
+
+          {/* Order-level problems only (stock, cut-off, network); field problems sit under their field.
+              Outside the scrolling body, so it is in view whatever the scroll position. */}
+          <div role="alert" aria-atomic="true" className={cn("shrink-0 px-4 md:px-6", formError && "pb-3 pt-1")}>
             {formError ? (
               <p className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm font-medium text-destructive">
                 <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden="true" />
@@ -870,36 +1318,169 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
             ) : null}
           </div>
 
-          <button
-            type="submit"
-            disabled={!!submitting || lines.length === 0}
-            aria-busy={submitting === "order"}
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
-          >
-            {submitting === "order" ? (
-              <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-            ) : null}
-            {submitting === "order" ? "Placing order…" : `Place order · ${formatINR(totalPaise)}`}
-          </button>
-          {whatsapp ? (
+          <ResponsiveDialogFooter className="flex-col gap-2 md:flex-col md:border-t md:pb-4 md:pt-3">
+            <div className="flex items-baseline justify-between gap-3">
+              <span className="text-sm text-muted-foreground">Total</span>
+              <span className="flex flex-col items-end">
+                <span className="font-mono text-xl font-bold tabular-nums" aria-live="polite">
+                  {formatINR(totalPaise)}
+                </span>
+                {/* The footer stays put while the breakdown scrolls away: say what changed the total. */}
+                {totalNote && lines.length > 0 ? <span className="text-xs text-muted-foreground">{totalNote}</span> : null}
+              </span>
+            </div>
             <button
               type="submit"
-              data-via="whatsapp"
-              disabled={!!submitting || lines.length === 0}
-              aria-busy={submitting === "whatsapp"}
-              className="-mt-2 inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-green-600/40 bg-background px-6 text-base font-bold text-green-800 hover:bg-green-600/5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-green-700 focus-visible:ring-offset-2 disabled:opacity-60"
+              disabled={submitting || lines.length === 0}
+              aria-busy={submitting}
+              className="inline-flex min-h-13 w-full items-center justify-center gap-2 rounded-2xl bg-primary px-6 text-base font-bold text-primary-foreground shadow-md focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:opacity-60"
             >
-              {submitting === "whatsapp" ? (
+              {submitting ? (
                 <Loader2 className="h-5 w-5 animate-spin motion-reduce:animate-none" aria-hidden="true" />
-              ) : (
-                <MessageCircle className="h-5 w-5" aria-hidden="true" />
-              )}
-              {submitting === "whatsapp" ? "Placing order…" : "Place order & send on WhatsApp"}
+              ) : null}
+              {submitting
+                ? "Placing order…"
+                : method === "UPI" && payment.online
+                  ? `Pay ${formatINR(totalPaise)}`
+                  : `${method === "UPI" ? "Place order & pay" : "Place order"} · ${formatINR(totalPaise)}`}
             </button>
-          ) : null}
+          </ResponsiveDialogFooter>
         </form>
-      </SheetContent>
-    </Sheet>
+      </ResponsiveDialogContent>
+    </ResponsiveDialog>
+  );
+}
+
+/** One white card of the checkout sheet, under its own heading. */
+function CheckoutCard({ title, children }: { title: string; children: React.ReactNode }) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-4 text-card-foreground">
+      <h3 className="mb-3 text-base font-semibold">{title}</h3>
+      {children}
+    </section>
+  );
+}
+
+const EMPTY_CART_COPY = "Your cart is empty. Close this to add items.";
+
+/**
+ * The cart summary at the top of the sheet. With `onChangeQty`, each line
+ * carries the same −/qty/+ stepper as the store page, so the buyer corrects an
+ * order where they are about to pay for it. A line leaves the list at 0; focus
+ * then moves to the neighbouring line's stepper (or the empty-cart message),
+ * never out of the sheet. Prices shown are the item's list price; the offer
+ * row below the form shows what comes off.
+ */
+function CartLines({
+  lines,
+  gift,
+  onChangeQty,
+  onAddMore,
+}: {
+  lines: CheckoutLine[];
+  gift: { name: string; qty: number } | null;
+  onChangeQty?: (id: string, qty: number) => void;
+  /** Closes the sheet so the buyer can pick more from the store page. */
+  onAddMore?: () => void;
+}) {
+  const listRef = useRef<HTMLUListElement>(null);
+  const emptyRef = useRef<HTMLParagraphElement>(null);
+  /** Index of the line just removed by its stepper; the next render focuses its neighbour. */
+  const removedAtRef = useRef<number | null>(null);
+
+  useLayoutEffect(() => {
+    const removedAt = removedAtRef.current;
+    if (removedAt === null) return;
+    removedAtRef.current = null;
+    if (lines.length === 0) {
+      emptyRef.current?.focus();
+      return;
+    }
+    const li = listRef.current?.children[Math.min(removedAt, lines.length - 1)];
+    li?.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+  }, [lines]);
+
+  if (lines.length === 0) {
+    return (
+      <p
+        ref={emptyRef}
+        tabIndex={-1}
+        role="status"
+        className="rounded-xl border border-dashed border-border bg-muted/50 px-3 py-3 text-sm text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary"
+      >
+        {EMPTY_CART_COPY}
+      </p>
+    );
+  }
+
+  if (!onChangeQty) {
+    return (
+      <ul className="space-y-1 text-sm">
+        {lines.map((l) => (
+          <li key={l.id} className="flex justify-between gap-3">
+            <span className="min-w-0 truncate">
+              {l.qty} × {l.name}
+            </span>
+            <span className="font-mono tabular-nums">{formatINR(l.priceInPaise * l.qty)}</span>
+          </li>
+        ))}
+        {gift ? (
+          <li className="flex justify-between gap-3">
+            <span className="min-w-0 truncate">
+              {gift.qty} × {giftLineName(gift.name)}
+            </span>
+            <span className="font-semibold">Free</span>
+          </li>
+        ) : null}
+      </ul>
+    );
+  }
+
+  return (
+    <div className="-mt-2">
+      <ul ref={listRef} aria-label="Items in your cart" className="divide-y divide-border/60">
+        {lines.map((l, index) => (
+          <li key={l.id} className="flex items-center gap-3 py-2">
+            <span className="flex min-w-0 flex-1 flex-col gap-0.5 text-sm">
+              <span className="truncate font-semibold">{l.name}</span>
+              <span className="font-mono text-xs tabular-nums text-muted-foreground">
+                <span className="font-bold text-foreground">{formatINR(l.priceInPaise * l.qty)}</span>
+                {l.qty > 1 ? ` · ${formatINR(l.priceInPaise)} each` : null}
+              </span>
+            </span>
+            <QtyStepper
+              itemName={l.name}
+              qty={l.qty}
+              max={l.max ?? maxOrderableQty(null, null)}
+              onChange={(q) => {
+                if (q <= 0) removedAtRef.current = index;
+                onChangeQty(l.id, q);
+              }}
+            />
+          </li>
+        ))}
+      </ul>
+      {gift ? (
+        <p className="flex items-center gap-3 border-t border-border/60 py-2 text-sm">
+          <Gift className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span className="min-w-0 flex-1 truncate font-semibold">
+            {gift.qty > 1 ? `${gift.qty} × ` : ""}
+            {giftLineName(gift.name)}
+          </span>
+          <span className="font-semibold">Free</span>
+        </p>
+      ) : null}
+      {onAddMore ? (
+        <button
+          type="button"
+          onClick={onAddMore}
+          className="-mx-1 inline-flex min-h-11 items-center gap-1.5 px-1 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Add more items
+        </button>
+      ) : null}
+    </div>
   );
 }
 
@@ -924,24 +1505,15 @@ function PaymentOption(props: {
   describedBy: string | undefined;
 }) {
   return (
-    <label
-      className={cn(
-        "flex min-h-11 cursor-pointer items-start gap-3 rounded-xl border px-3 py-2.5 has-focus-visible:ring-2 has-focus-visible:ring-primary",
-        props.checked ? "border-primary bg-primary/10" : props.invalid ? "border-destructive" : "border-border",
-      )}
-    >
-      <input
-        type="radio"
-        name={props.name}
-        checked={props.checked}
-        onChange={props.onSelect}
-        aria-describedby={props.describedBy}
-        className="mt-0.5 h-4 w-4 scroll-my-24 accent-[hsl(var(--primary))]"
-      />
-      <span className="flex flex-col">
-        <span className="text-sm font-semibold">{props.label}</span>
-        <span className="text-xs text-muted-foreground">{props.hint}</span>
-      </span>
-    </label>
+    <RadioOption
+      name={props.name}
+      checked={props.checked}
+      onChange={props.onSelect}
+      aria-describedby={props.describedBy}
+      inputClassName="scroll-my-24"
+      invalid={props.invalid}
+      label={props.label}
+      hint={props.hint}
+    />
   );
 }

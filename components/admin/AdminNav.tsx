@@ -1,0 +1,43 @@
+import Link from "next/link";
+
+const LINKS = [
+  { href: "/admin/metrics", label: "Weekly metrics", superAdminOnly: false, sales: false },
+  { href: "/admin/vendors", label: "Stores, free access and prices", superAdminOnly: true, sales: false },
+  { href: "/admin/survey", label: "Owner survey", superAdminOnly: true, sales: false },
+  { href: "/admin/referrals", label: "Referrals", superAdminOnly: true, sales: false },
+  { href: "/admin/demo-stores", label: "Demo-store pipeline", superAdminOnly: false, sales: true },
+  { href: "/admin/earnings", label: "Sales earnings", superAdminOnly: true, sales: true },
+  { href: "/admin/communities", label: "Community pages", superAdminOnly: false, sales: false },
+  { href: "/admin/pricing", label: "Pricing calculator", superAdminOnly: false, sales: false },
+  { href: "/admin/admins", label: "Admins", superAdminOnly: true, sales: false },
+] as const;
+
+/**
+ * The admin pages link to each other here. Store and admin pages are SUPER_ADMIN
+ * only; a SALES user gets just the pipeline and earnings.
+ */
+export function AdminNav({
+  current,
+  superAdmin,
+  sales = false,
+}: {
+  current: (typeof LINKS)[number]["href"];
+  superAdmin: boolean;
+  sales?: boolean;
+}) {
+  const links = LINKS.filter((l) => l.href !== current && (sales ? l.sales : superAdmin || !l.superAdminOnly));
+  if (links.length === 0) return null;
+  return (
+    <nav aria-label="Admin" className="mt-2 flex flex-wrap gap-x-5">
+      {links.map((l) => (
+        <Link
+          key={l.href}
+          href={l.href}
+          className="inline-flex min-h-11 items-center text-sm font-medium underline underline-offset-4"
+        >
+          {l.label}
+        </Link>
+      ))}
+    </nav>
+  );
+}

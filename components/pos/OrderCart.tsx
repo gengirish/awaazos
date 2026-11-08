@@ -8,18 +8,18 @@ import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
-import { computeCartTotals, type PosTaxSettings } from "@/lib/pos-totals";
+import { discountLabel, offerNudgeText } from "@/lib/offers";
+import { computeCartTotals, toPayTotals, type PayTotals, type PosTaxSettings } from "@/lib/pos-totals";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
-export type PosSettings = PosTaxSettings;
+export type PosSettings = PosTaxSettings & { voiceBilling?: boolean };
 
 export type OrderCartProps = {
   settings: PosSettings;
-  onCollectPayment: (totals: {
-    subtotalPaise: number;
-    taxPaise: number;
-    totalPaise: number;
-  }) => void;
+  /** The store's words; names the catalogue in the voice "not on menu" line. */
+  vocab: StoreVocabulary;
+  onCollectPayment: (totals: PayTotals) => void;
 };
 
 /** Ask before clearing more lines than this (a slip on a long order is costly). */
@@ -28,7 +28,7 @@ const CONFIRM_CLEAR_ABOVE_LINES = 2;
 /** One shared id: each remove replaces the previous Undo toast (the store keeps one `lastRemoved`). */
 export const UNDO_TOAST_ID = "cart-undo";
 
-export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
+export function OrderCart({ settings, vocab, onCollectPayment }: OrderCartProps) {
   const items = useCartStore((s) => s.items);
   const incQty = useCartStore((s) => s.incQty);
   const decQty = useCartStore((s) => s.decQty);
@@ -39,12 +39,13 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
   const voiceReview = useCartStore((s) => s.voiceReview);
   const setVoiceReview = useCartStore((s) => s.setVoiceReview);
 
-  const { subtotalPaise, taxPaise, totalPaise, itemCount } = computeCartTotals(items, settings);
+  const totals = computeCartTotals(items, settings);
+  const { subtotalPaise, discountPaise, taxPaise, totalPaise, itemCount } = totals;
 
   const showReview = voiceReview !== null && (voiceReview.lowConfidence || voiceReview.unmatched.length > 0);
 
-  // `lines` outlives `open` so the sheet's text holds still while it closes.
-  const [confirmClear, setConfirmClear] = useState({ open: false, lines: 0 });
+  // `count` outlives `open` so the sheet's text holds still while it closes.
+  const [confirmClear, setConfirmClear] = useState({ open: false, count: 0 });
 
   const clearNow = () => {
     toast.dismiss(UNDO_TOAST_ID);
@@ -53,7 +54,7 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
 
   const onClear = () => {
     if (items.length > CONFIRM_CLEAR_ABOVE_LINES) {
-      setConfirmClear({ open: true, lines: items.length });
+      setConfirmClear({ open: true, count: itemCount });
       return;
     }
     clearNow();
@@ -114,7 +115,7 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
             ) : null}
             {voiceReview.unmatched.length > 0 ? (
               <p className={cn(!voiceReview.lowConfidence && "font-medium")}>
-                Not on menu: {voiceReview.unmatched.join(", ")}
+                Not on {vocab.catalogue}: {voiceReview.unmatched.join(", ")}
               </p>
             ) : null}
           </div>
@@ -130,7 +131,7 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
       ) : null}
 
       {items.length === 0 ? (
-        <p className="px-4 py-8 text-center text-sm text-muted-foreground">Tap items or use voice to build an order.</p>
+        <p className="px-4 py-8 text-center text-sm text-muted-foreground">{settings.voiceBilling === false ? "Tap items to build an order." : "Tap items or use voice to build an order."}</p>
       ) : (
         <ul className="divide-y">
           {items.map((line) => {
@@ -219,6 +220,17 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
           <span className="text-muted-foreground">Subtotal</span>
           <span className="font-mono tabular-nums text-foreground">{formatINR(subtotalPaise)}</span>
         </div>
+        {discountPaise > 0 ? (
+          <div className="flex justify-between gap-3 text-sm">
+            <span className="min-w-0 break-words text-muted-foreground">{discountLabel(totals.offer?.name)}</span>
+            <span className="shrink-0 font-mono tabular-nums text-foreground">−{formatINR(discountPaise)}</span>
+          </div>
+        ) : null}
+        {totals.nudge ? (
+          <p className="rounded-md bg-primary/10 px-3 py-2 text-sm font-medium text-foreground">
+            {offerNudgeText(totals.nudge)}
+          </p>
+        ) : null}
         {settings.taxEnabled ? (
           <div className="flex justify-between text-sm">
             <span className="text-muted-foreground">Tax ({settings.taxPercent}%)</span>
@@ -237,7 +249,7 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
           onClick={() => {
             // A stale Undo must not put a line back into an order being paid for.
             toast.dismiss(UNDO_TOAST_ID);
-            onCollectPayment({ subtotalPaise, taxPaise, totalPaise });
+            onCollectPayment(toPayTotals(totals));
           }}
         >
           Collect payment
@@ -248,7 +260,7 @@ export function OrderCart({ settings, onCollectPayment }: OrderCartProps) {
         open={confirmClear.open}
         onOpenChange={(open) => setConfirmClear((c) => ({ ...c, open }))}
         title="Clear the cart?"
-        description={`All ${confirmClear.lines} items will be removed from this order.`}
+        description={`All ${confirmClear.count} items will be removed from this order.`}
         confirmLabel="Clear cart"
         onConfirm={clearNow}
       />

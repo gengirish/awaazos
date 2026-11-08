@@ -16,8 +16,8 @@ export const runtime = "nodejs";
  * Customer (no account enumeration). Rate limited per IP and per email (the
  * email bucket key is a hash, so the limiter's own logs never carry it).
  *
- * The kitchen is derived from `returnTo` (/s/<slug>/…) and held to the same
- * publish gate as the storefront page. Unknown / unpublished kitchen → the
+ * The store is derived from `returnTo` (/s/<slug>/…) and held to the same
+ * publish gate as the storefront page. Unknown / unpublished store → the
  * same 200, nothing created, nothing sent.
  *
  * PII: the email is never logged. The link and token are never logged.
@@ -84,7 +84,7 @@ export async function POST(req: Request) {
       console.info("[customer-login] email not configured (AGENTMAIL_*); sign-in link was not sent");
     }
 
-    await sendCustomerLoginEmail({ to: parsed.data.email, url, kitchenName: vendor.name, expiresAt });
+    await sendCustomerLoginEmail({ to: parsed.data.email, url, storeName: vendor.name, expiresAt });
     return NextResponse.json(OK);
   } catch (err) {
     console.error(

@@ -37,7 +37,7 @@ async function placeUpiOrder(buyer: Page, slug: string, itemName: string): Promi
   await sheet.getByLabel("Your name").fill("Upi Buyer");
   await sheet.getByLabel("Mobile number").fill("98480 54321");
   await sheet.getByRole("radio", { name: /pay now by upi/i }).check();
-  await sheet.getByRole("button", { name: /place order · ₹120\.00/i }).click();
+  await sheet.getByRole("button", { name: /place order(?: & pay)? · ₹120\.00/i }).click();
   await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
   await expect(buyer.getByRole("heading", { name: /pay ₹120\.00/i })).toBeVisible();
 }
@@ -106,6 +106,9 @@ test.describe("storefront order page: UPI pay options per platform", () => {
         expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
       }
 
+      // The fallbacks wait behind one line, so the pay buttons stand alone.
+      await expect(buyer.getByRole("button", { name: "Copy UPI ID" })).toBeHidden();
+      await buyer.getByText("UPI app didn't open or showed a warning?").click();
       await buyer.getByRole("button", { name: "Copy UPI ID" }).click();
       await expect(buyer.getByRole("status").filter({ hasText: "UPI ID copied" })).toBeAttached();
       expect(await buyer.evaluate(() => navigator.clipboard.readText())).toBe(UPI_ID);
@@ -115,7 +118,11 @@ test.describe("storefront order page: UPI pay options per platform", () => {
       expect(await buyer.evaluate(() => navigator.clipboard.readText())).toBe("120");
 
       await expect(buyer.getByText(/Open any UPI app → Pay to UPI ID → paste/)).toBeVisible();
-      await expect(buyer.getByText(/Paying from another phone\? Scan this QR/)).toBeVisible();
+      // The QR is for a second phone, so it waits behind a disclosure.
+      const qr = buyer.getByRole("img", { name: /UPI QR code to pay ₹120\.00/ });
+      await expect(qr).toBeHidden();
+      await buyer.getByText("Paying from another phone? Show QR").click();
+      await expect(qr).toBeVisible();
     } finally {
       await ios.close();
     }
@@ -135,7 +142,19 @@ test.describe("storefront order page: UPI pay options per platform", () => {
         /^upi:\/\/pay\?/,
       );
       await expect(buyer.getByRole("link", { name: /with Google Pay/ })).toHaveCount(0);
+      await buyer.getByText("UPI app didn't open or showed a warning?").click();
       await expect(buyer.getByRole("button", { name: "Copy UPI ID" })).toBeVisible();
+
+      // ── Same device, second order: the details are one card, not two fields ──
+      await buyer.goto(`/s/${slug}`);
+      await buyer.getByRole("button", { name: `Add ${item}` }).first().click();
+      await buyer.getByRole("button", { name: "Checkout", exact: true }).click();
+      const again = buyer.getByRole("dialog", { name: "Checkout" });
+      await expect(again.getByText("Upi Buyer")).toBeVisible();
+      await expect(again.getByLabel("Your name")).toHaveCount(0);
+      await again.getByRole("button", { name: /Change/ }).click();
+      await expect(again.getByLabel("Your name")).toHaveValue("Upi Buyer");
+      await expect(again.getByLabel("Your name")).toBeFocused();
     } finally {
       await android.close();
     }

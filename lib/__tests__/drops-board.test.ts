@@ -2,18 +2,32 @@ import type { DropStatus, FulfilmentStatus, PaymentMethod, PaymentStatus } from 
 import { describe, expect, it } from "vitest";
 
 import {
+  BOARD_FILTERS,
+  availableOrderActions,
   boardBucket,
+  boardPollKind,
   checkOrderAction,
   countByFilter,
+  filterByHandover,
   filterOrders,
   firstName,
   groupByFulfilment,
+  groupIdsByDrop,
   handoverDue,
+  isDropFrozen,
   liveEffectiveStatus,
+  markPaidNeedsConfirm,
   newOrderIds,
+  newOrdersTab,
+  orderActionBase,
+  ordersInScope,
   ordersToPack,
   prepFromOrders,
+  primaryOrderAction,
+  searchOrders,
   shouldPollForOrders,
+  orderStateLabel,
+  type BoardBucket,
   summarizeOrders,
   whatsappHref,
 } from "@/lib/drops-board";
@@ -51,8 +65,86 @@ describe("boardBucket", () => {
   });
 });
 
+describe("a Razorpay store's unpaid new order (awaiting_online)", () => {
+  const order = {
+    fulfilmentStatus: "PLACED" as const,
+    paymentStatus: "PENDING" as const,
+    paymentMethod: "UPI" as const,
+    fulfilmentType: "DELIVERY" as const,
+    displayState: "AWAITING_PAYMENT" as const,
+    bucket: "awaiting_online" as const,
+  };
+
+  it("only a new, unpaid order on an online store", () => {
+    const bucket = (displayState: OrderDisplayState, fulfilmentStatus: FulfilmentStatus, onlineStore = true) =>
+      boardBucket({ displayState, fulfilmentStatus, onlineStore });
+    expect(bucket("AWAITING_PAYMENT", "PLACED")).toBe("awaiting_online");
+    expect(bucket("AWAITING_PAYMENT", "PLACED", false)).toBe("needs_action");
+    // The seller confirmed it: it holds stock until they answer, so it must stay reachable.
+    expect(bucket("AWAITING_PAYMENT", "CONFIRMED")).toBe("needs_action");
+    // A claim or a lapsed hold: money may have come by direct UPI, so the seller can still mark it paid.
+    expect(bucket("PAYMENT_SUBMITTED", "PLACED")).toBe("needs_action");
+    expect(bucket("EXPIRED", "PLACED")).toBe("closed");
+    expect(bucket("PAY_ON_DELIVERY", "PLACED")).toBe("needs_action");
+    expect(bucket("PAID", "CONFIRMED")).toBe("confirmed");
+  });
+
+  it("is only listed under All", () => {
+    const orders = [{ id: "a", bucket: "awaiting_online" as const }, { id: "b", bucket: "needs_action" as const }];
+    expect(BOARD_FILTERS.map((f) => f.id)).not.toContain("awaiting_online");
+    expect(filterOrders(orders, "needs_action").map((o) => o.id)).toEqual(["b"]);
+    expect(filterOrders(orders, "all").map((o) => o.id)).toEqual(["a", "b"]);
+    expect(countByFilter(orders)).toEqual({ needs_action: 1, confirmed: 0, delivered: 0, closed: 0, all: 2 });
+  });
+
+  it("isn't in the summary", () => {
+    const s = summarizeOrders([
+      { displayState: "AWAITING_PAYMENT", paymentStatus: "PENDING", totalPaise: 12_000, bucket: "awaiting_online" },
+      { displayState: "AWAITING_PAYMENT", paymentStatus: "PENDING", totalPaise: 5_000, bucket: "needs_action" },
+    ]);
+    expect(s.pendingPaise).toBe(5_000);
+    expect(s.activeOrders).toBe(1);
+    expect(s.counts.AWAITING_PAYMENT).toBe(1);
+  });
+
+  it("offers only Cancel, with no next step, and nothing on a frozen drop", () => {
+    expect(Array.from(availableOrderActions(order, false))).toEqual(["cancel"]);
+    expect(Array.from(availableOrderActions(order, true))).toEqual([]);
+    expect(primaryOrderAction(order, false)).toBeNull();
+  });
+
+  it("the server refuses everything else, so a stale board can't hold its stock", () => {
+    const o = { fulfilmentStatus: "PLACED" as const, paymentStatus: "PENDING" as const, fulfilmentType: "DELIVERY" as const };
+    for (const action of ["confirm", "mark_paid", "reject_payment", "dispatch", "deliver", "undeliver"] as const) {
+      expect(checkOrderAction(action, "OPEN", { ...o, awaitingOnlinePay: true })).toEqual({ ok: false, error: "invalid_state" });
+    }
+    expect(checkOrderAction("cancel", "OPEN", { ...o, awaitingOnlinePay: true })).toEqual({ ok: true });
+    expect(checkOrderAction("confirm", "OPEN", o)).toEqual({ ok: true });
+  });
+
+  it("arrives when it moves on, not when it is placed or lapses", () => {
+    const row = (id: string, bucket: BoardBucket) => ({ id, bucket });
+    expect(newOrderIds([], [row("a", "awaiting_online")])).toEqual([]);
+    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "awaiting_online")])).toEqual([]);
+    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "confirmed")])).toEqual(["a"]);
+    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "needs_action")])).toEqual(["a"]);
+    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "closed")])).toEqual([]);
+    // Paid before the board ever saw it.
+    expect(newOrderIds([], [row("a", "confirmed")])).toEqual(["a"]);
+    // An order already on the board moving tabs is not new.
+    expect(newOrderIds([row("a", "needs_action")], [row("a", "confirmed")])).toEqual([]);
+  });
+
+  it("\"N new orders — show\" lands where the new orders are", () => {
+    expect(newOrdersTab([{ bucket: "confirmed" }])).toBe("confirmed");
+    expect(newOrdersTab([{ bucket: "confirmed" }, { bucket: "needs_action" }])).toBe("needs_action");
+    expect(newOrdersTab([{ bucket: "needs_action" }])).toBe("needs_action");
+    expect(newOrdersTab([])).toBe("needs_action");
+  });
+});
+
 describe("summarizeOrders", () => {
-  it("splits paid vs pending and ignores cancelled / expired", () => {
+  it("splits paid vs pending, ignores cancelled / expired, and counts only unfinished orders as live", () => {
     const s = summarizeOrders([
       { displayState: "PAID", paymentStatus: "PAID", totalPaise: 25_000 },
       { displayState: "DELIVERED", paymentStatus: "PAID", totalPaise: 10_000 },
@@ -63,11 +155,20 @@ describe("summarizeOrders", () => {
     ]);
     expect(s.paidPaise).toBe(35_000);
     expect(s.pendingPaise).toBe(20_000);
-    expect(s.activeOrders).toBe(4);
+    expect(s.activeOrders).toBe(3); // the delivered one is done
     expect(s.counts.CANCELLED).toBe(1);
     expect(s.counts.EXPIRED).toBe(1);
     expect(s.counts.AWAITING_PAYMENT).toBe(0);
     expect(Number.isInteger(s.paidPaise) && Number.isInteger(s.pendingPaise)).toBe(true);
+  });
+});
+
+describe("orderStateLabel", () => {
+  it("says Picked up for a handed-over pickup order, Delivered otherwise", () => {
+    expect(orderStateLabel({ displayState: "DELIVERED", fulfilmentType: "PICKUP" })).toBe("Picked up");
+    expect(orderStateLabel({ displayState: "DELIVERED", fulfilmentType: "DELIVERY" })).toBe("Delivered");
+    expect(orderStateLabel({ displayState: "DELIVERED", fulfilmentType: null })).toBe("Delivered");
+    expect(orderStateLabel({ displayState: "PAID", fulfilmentType: "PICKUP" })).toBe("Paid");
   });
 });
 
@@ -87,10 +188,25 @@ describe("prepFromOrders", () => {
       { holdsStock: true, displayState: "PAID", items: [{ dropItemId: null, qty: 7 }] },
     ]);
     expect(rows).toEqual([
-      { dropItemId: "laddu", name: "Besan laddu", emoji: null, qtyOrdered: 7, maxQty: 10, remaining: 3 },
-      { dropItemId: "cake", name: "Eggless cake", emoji: null, qtyOrdered: 1, maxQty: null, remaining: null },
-      { dropItemId: "chakli", name: "Chakli", emoji: null, qtyOrdered: 0, maxQty: 5, remaining: 5 },
+      { dropItemId: "laddu", name: "Besan laddu", emoji: null, qtyOrdered: 7, qtyFree: 0, maxQty: 10, remaining: 3 },
+      { dropItemId: "cake", name: "Eggless cake", emoji: null, qtyOrdered: 1, qtyFree: 0, maxQty: null, remaining: null },
+      { dropItemId: "chakli", name: "Chakli", emoji: null, qtyOrdered: 0, qtyFree: 0, maxQty: 5, remaining: 5 },
     ]);
+  });
+
+  it("counts a free gift in the item's total and in qtyFree", () => {
+    const [laddu] = prepFromOrders([items[0]!], [
+      {
+        holdsStock: true,
+        displayState: "PAID",
+        items: [
+          { dropItemId: "laddu", qty: 3 },
+          { dropItemId: "laddu", qty: 1, isGift: true },
+        ],
+      },
+      { holdsStock: false, displayState: "CANCELLED", items: [{ dropItemId: "laddu", qty: 1, isGift: true }] },
+    ]);
+    expect(laddu).toMatchObject({ qtyOrdered: 4, qtyFree: 1, remaining: 6 });
   });
 
   it("never reports negative remaining when capacity was lowered below sold", () => {
@@ -166,6 +282,49 @@ describe("checkOrderAction", () => {
     expect(checkOrderAction("mark_paid", status, o("CONFIRMED"))).toEqual({ ok: true });
     expect(checkOrderAction("deliver", status, o("CONFIRMED"))).toEqual({ ok: true });
     expect(checkOrderAction("undeliver", status, o("DELIVERED"))).toEqual({ ok: true });
+    expect(checkOrderAction("dispatch", status, { ...o("CONFIRMED"), fulfilmentType: "DELIVERY" })).toEqual({
+      ok: true,
+    });
+  });
+
+  it("dispatch is for live delivery orders only", () => {
+    const delivery = (fs: FulfilmentStatus) => ({ ...o(fs), fulfilmentType: "DELIVERY" as const });
+    const bad = { ok: false, error: "invalid_state" };
+    expect(checkOrderAction("dispatch", null, delivery("PLACED"))).toEqual({ ok: true });
+    expect(checkOrderAction("dispatch", null, delivery("CONFIRMED"))).toEqual({ ok: true });
+    expect(checkOrderAction("dispatch", null, delivery("DELIVERED"))).toEqual(bad);
+    expect(checkOrderAction("dispatch", null, delivery("CANCELLED"))).toEqual(bad);
+    expect(checkOrderAction("dispatch", null, { ...o("CONFIRMED"), fulfilmentType: "PICKUP" })).toEqual(bad);
+    expect(checkOrderAction("dispatch", null, o("CONFIRMED"))).toEqual(bad);
+  });
+});
+
+describe("availableOrderActions: out for delivery", () => {
+  const card = (over: Partial<Parameters<typeof availableOrderActions>[0]> = {}) => ({
+    fulfilmentStatus: "CONFIRMED" as FulfilmentStatus,
+    paymentStatus: "PENDING" as PaymentStatus,
+    paymentMethod: "CASH" as PaymentMethod,
+    fulfilmentType: "DELIVERY" as const,
+    outForDeliveryAt: null,
+    ...over,
+  });
+
+  it("offers it on a live delivery order that has not gone out", () => {
+    expect(availableOrderActions(card(), false).has("dispatch")).toBe(true);
+    expect(availableOrderActions(card({ fulfilmentStatus: "PLACED" }), true).has("dispatch")).toBe(true);
+  });
+
+  it("not once it has gone out, nor for pickups or finished orders", () => {
+    expect(availableOrderActions(card({ outForDeliveryAt: "2026-10-16T10:00:00.000Z" }), false).has("dispatch")).toBe(
+      false,
+    );
+    expect(availableOrderActions(card({ fulfilmentType: "PICKUP" }), false).has("dispatch")).toBe(false);
+    expect(availableOrderActions(card({ fulfilmentStatus: "DELIVERED" }), false).has("dispatch")).toBe(false);
+    expect(availableOrderActions(card({ fulfilmentStatus: "CANCELLED" }), false).has("dispatch")).toBe(false);
+  });
+
+  it("is never the card's primary step (Delivered stays primary)", () => {
+    expect(primaryOrderAction(card({ paymentMethod: "UPI", paymentStatus: "PAID" }), false)).toBe("deliver");
   });
 });
 
@@ -221,5 +380,179 @@ describe("display helpers", () => {
   it("newOrderIds", () => {
     expect(newOrderIds([{ id: "a" }, { id: "b" }], [{ id: "c" }, { id: "a" }, { id: "b" }])).toEqual(["c"]);
     expect(newOrderIds([{ id: "a" }], [{ id: "a" }])).toEqual([]);
+  });
+});
+
+describe("one board for menu and drop orders", () => {
+  const orders = [
+    { id: "m1", dropId: null },
+    { id: "a1", dropId: "dropA" },
+    { id: "m2", dropId: null },
+    { id: "b1", dropId: "dropB" },
+    { id: "a2", dropId: "dropA" },
+  ];
+
+  it("ordersInScope: everything, only menu orders, or one drop", () => {
+    expect(ordersInScope(orders, "all")).toBe(orders);
+    expect(ordersInScope(orders, "menu").map((o) => o.id)).toEqual(["m1", "m2"]);
+    expect(ordersInScope(orders, "dropA").map((o) => o.id)).toEqual(["a1", "a2"]);
+    expect(ordersInScope(orders, "no-such-drop")).toEqual([]);
+  });
+
+  it("orderActionBase: each order goes to its own route family", () => {
+    expect(orderActionBase(null)).toBe("/api/storefront-orders");
+    expect(orderActionBase("dropA")).toBe("/api/drops/dropA/orders");
+    expect(orderActionBase("a/b")).toBe("/api/drops/a%2Fb/orders");
+  });
+
+  it("groupIdsByDrop: one group per drop plus one for menu orders, board order kept", () => {
+    expect(groupIdsByDrop(orders)).toEqual([
+      { dropId: null, ids: ["m1", "m2"] },
+      { dropId: "dropA", ids: ["a1", "a2"] },
+      { dropId: "dropB", ids: ["b1"] },
+    ]);
+    expect(groupIdsByDrop([])).toEqual([]);
+  });
+
+  it("isDropFrozen: only the stored FROZEN / FULFILLED states lock a drop's orders", () => {
+    const frozen: DropStatus[] = ["FROZEN", "FULFILLED"];
+    for (const s of ["DRAFT", "OPEN", "CLOSED", "FROZEN", "FULFILLED"] as DropStatus[]) {
+      expect(isDropFrozen(s)).toBe(frozen.includes(s));
+    }
+  });
+});
+
+describe("boardPollKind", () => {
+  it("never polls when nothing can take an order", () => {
+    for (const signalMode of ["kv", "fallback"] as const) {
+      expect(boardPollKind({ acceptMenuOrders: false, dropStatuses: [], signalMode })).toBeNull();
+      expect(
+        boardPollKind({ acceptMenuOrders: false, dropStatuses: ["DRAFT", "CLOSED", "FROZEN", "FULFILLED"], signalMode }),
+      ).toBeNull();
+    }
+  });
+
+  it("order from menu on: polls the KV signal when available, else falls back", () => {
+    expect(boardPollKind({ acceptMenuOrders: true, dropStatuses: [], signalMode: "kv" })).toBe("signal");
+    expect(boardPollKind({ acceptMenuOrders: true, dropStatuses: ["CLOSED"], signalMode: "fallback" })).toBe("fallback");
+  });
+
+  it("one open drop among closed ones is enough", () => {
+    expect(boardPollKind({ acceptMenuOrders: false, dropStatuses: ["FULFILLED", "OPEN"], signalMode: "kv" })).toBe("signal");
+    expect(boardPollKind({ acceptMenuOrders: false, dropStatuses: ["FULFILLED", "OPEN"], signalMode: "fallback" })).toBe(
+      "fallback",
+    );
+  });
+
+  it("a drop that only opens later polls the cheap signal, never Postgres directly", () => {
+    expect(boardPollKind({ acceptMenuOrders: false, dropStatuses: ["SCHEDULED"], signalMode: "kv" })).toBe("signal");
+    expect(boardPollKind({ acceptMenuOrders: false, dropStatuses: ["SCHEDULED"], signalMode: "fallback" })).toBeNull();
+  });
+});
+
+describe("primaryOrderAction", () => {
+  type Row = [
+    string,
+    {
+      displayState: OrderDisplayState;
+      fulfilmentStatus: FulfilmentStatus;
+      paymentStatus: PaymentStatus;
+      paymentMethod: PaymentMethod;
+    },
+    boolean,
+    string | null,
+  ];
+  const o = (
+    displayState: OrderDisplayState,
+    fulfilmentStatus: FulfilmentStatus,
+    paymentStatus: PaymentStatus,
+    paymentMethod: PaymentMethod,
+  ) => ({ displayState, fulfilmentStatus, paymentStatus, paymentMethod });
+  const cases: Row[] = [
+    ["new, buyer says paid", o("PAYMENT_SUBMITTED", "PLACED", "PENDING", "UPI"), false, "mark_paid"],
+    ["confirmed, buyer says paid", o("PAYMENT_SUBMITTED", "CONFIRMED", "PENDING", "UPI"), false, "mark_paid"],
+    ["new, UPI unpaid", o("AWAITING_PAYMENT", "PLACED", "PENDING", "UPI"), false, "confirm"],
+    ["new, pay on delivery", o("PAY_ON_DELIVERY", "PLACED", "PENDING", "CASH"), false, "confirm"],
+    ["new, already paid", o("PAID", "PLACED", "PAID", "UPI"), false, "confirm"],
+    ["new on a locked drop", o("PAY_ON_DELIVERY", "PLACED", "PENDING", "CASH"), true, "deliver"],
+    ["confirmed, paid", o("PAID", "CONFIRMED", "PAID", "UPI"), false, "deliver"],
+    ["confirmed, pay on delivery", o("PAY_ON_DELIVERY", "CONFIRMED", "PENDING", "CASH"), false, "deliver"],
+    ["confirmed, UPI unpaid", o("AWAITING_PAYMENT", "CONFIRMED", "PENDING", "UPI"), false, "deliver"],
+    ["delivered, still unpaid", o("DELIVERED", "DELIVERED", "PENDING", "UPI"), false, "mark_paid"],
+    ["delivered and paid", o("DELIVERED", "DELIVERED", "PAID", "UPI"), false, null],
+    ["cancelled", o("CANCELLED", "CANCELLED", "PENDING", "UPI"), false, null],
+  ];
+  it.each(cases)("%s", (_name, order, frozen, expected) => {
+    const primary = primaryOrderAction(order, frozen);
+    expect(primary).toBe(expected);
+    // Never something the card would not offer.
+    if (primary) expect(availableOrderActions(order, frozen).has(primary)).toBe(true);
+  });
+
+  it("a buyer's claim gets one answer: no separate Confirm beside Payment received", () => {
+    const claimed = o("PAYMENT_SUBMITTED", "PLACED", "PENDING", "UPI");
+    const actions = availableOrderActions(claimed, false);
+    expect(actions.has("mark_paid")).toBe(true);
+    expect(actions.has("reject_payment")).toBe(true);
+    expect(actions.has("confirm")).toBe(false);
+    // Without a claim the seller may still accept an order before the money arrives.
+    expect(availableOrderActions(o("AWAITING_PAYMENT", "PLACED", "PENDING", "UPI"), false).has("confirm")).toBe(true);
+  });
+
+  it("markPaidNeedsConfirm: only a buyer's claim lets one tap mark an order paid", () => {
+    expect(markPaidNeedsConfirm({ displayState: "PAYMENT_SUBMITTED" })).toBe(false);
+    for (const s of ["AWAITING_PAYMENT", "PAY_ON_DELIVERY", "DELIVERED"] as const) {
+      expect(markPaidNeedsConfirm({ displayState: s })).toBe(true);
+    }
+  });
+});
+
+describe("searchOrders / filterByHandover", () => {
+  const orders = [
+    {
+      id: "a",
+      customerName: "Priya Nair",
+      customerPhone: "+919876543210",
+      billNumber: "AWZ-20261005-0001",
+      fulfilmentType: "PICKUP" as const,
+    },
+    {
+      id: "b",
+      customerName: "Ravi",
+      customerPhone: "+919812300077",
+      billNumber: "AWZ-20261005-0012",
+      fulfilmentType: "DELIVERY" as const,
+    },
+    { id: "c", customerName: null, customerPhone: null, billNumber: "AWZ-20261004-0003", fulfilmentType: null },
+  ];
+  const ids = (q: string) => searchOrders(orders, q).map((x) => x.id);
+
+  it("an empty query keeps every order", () => {
+    expect(ids("")).toEqual(["a", "b", "c"]);
+    expect(ids("   ")).toEqual(["a", "b", "c"]);
+  });
+
+  it("matches the buyer's name, any case", () => {
+    expect(ids("priya")).toEqual(["a"]);
+    expect(ids(" NAIR ")).toEqual(["a"]);
+    expect(ids("zzz")).toEqual([]);
+  });
+
+  it("matches the bill number", () => {
+    expect(ids("0012")).toEqual(["b"]);
+    expect(ids("awz-20261004")).toEqual(["c"]);
+  });
+
+  it("matches the end of the phone number, not its middle", () => {
+    expect(ids("3210")).toEqual(["a"]);
+    expect(ids("0077")).toEqual(["b"]);
+    expect(ids("98765 43210")).toEqual(["a"]);
+    expect(ids("8765")).toEqual([]);
+  });
+
+  it("filterByHandover: pickups on one side, everything else is a delivery", () => {
+    expect(filterByHandover(orders, "all")).toHaveLength(3);
+    expect(filterByHandover(orders, "pickup").map((x) => x.id)).toEqual(["a"]);
+    expect(filterByHandover(orders, "delivery").map((x) => x.id)).toEqual(["b", "c"]);
   });
 });

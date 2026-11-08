@@ -221,7 +221,13 @@ export function useVoiceOrder(options: { voiceLang: string }) {
       };
 
       recognition.onend = () => {
+        // A newer session owns the ref and the state: leave both alone.
+        if (recognitionRef.current && recognitionRef.current !== recognition) return;
         recognitionRef.current = null;
+        // Ended with neither a result nor an error (stopped before any speech):
+        // without this the mic stays on "Listening". onresult / onerror run
+        // first and have already moved the state on, so they are not undone.
+        setState((s) => (s === "listening" ? "idle" : s));
       };
 
       recognitionRef.current = recognition;

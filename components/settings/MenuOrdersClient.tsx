@@ -6,13 +6,18 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
 
+import { Notice } from "@/components/ui/notice";
+import { RadioOption } from "@/components/ui/radio-option";
+import { Switch } from "@/components/ui/switch";
 import { paiseToRupees, rupeesToPaise } from "@/lib/currency";
 import type { MenuOrdersBlocker } from "@/lib/menu-orders-board";
+import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
 /**
- * "Order from menu": lets storefront buyers order the everyday menu at any
- * time (no Drop, no cut-off, no stock caps). Orders land on /orders.
+ * "Order from menu" ("Order any time" outside kitchens): lets storefront
+ * buyers order the everyday menu at any time (no Drop, no cut-off, no stock
+ * caps). Orders land on /orders.
  */
 export type MenuOrdersClientProps = {
   slug: string;
@@ -21,6 +26,8 @@ export type MenuOrdersClientProps = {
   initialDeliveryFeePaise: number;
   initialPickupNote: string | null;
   isOwner: boolean;
+  /** Words for the catalogue (lib/store-vocabulary.ts). */
+  storeKind: StoreKind;
 };
 
 const MODES: { id: FulfilmentMode; label: string }[] = [
@@ -34,7 +41,7 @@ const MAX_FEE_PAISE = 100_000;
 
 const BLOCKER_COPY: Record<MenuOrdersBlocker, { text: string; href: string; link: string }> = {
   storefront_not_published: {
-    text: "Publish your storefront first, so customers have a page to order from.",
+    text: "Publish your store first, so customers have a page to order from.",
     href: "/settings/store",
     link: "Go to Online store",
   },
@@ -45,14 +52,17 @@ const BLOCKER_COPY: Record<MenuOrdersBlocker, { text: string; href: string; link
   },
 };
 
-function paiseToInput(paise: number): string {
-  return paise > 0 ? String(paiseToRupees(paise)) : "";
+/**
+ * Pickup-only with no fee: empty, so a seller turning delivery on has to say what
+ * it costs instead of advertising "Free delivery" by default. Delivery already on: the saved fee, 0 included.
+ */
+function feeToInput(paise: number, mode: FulfilmentMode): string {
+  return mode === "PICKUP" && paise <= 0 ? "" : String(paiseToRupees(paise));
 }
 
-/** "" → 0, "30" / "12.50" → paise, anything else → null (invalid). */
+/** "30" / "12.50" / "0" → paise, anything else (empty too) → null (invalid). */
 function feeInputToPaise(raw: string): number | null {
   const t = raw.trim();
-  if (t === "") return 0;
   if (!/^\d{1,4}(\.\d{1,2})?$/.test(t)) return null;
   try {
     const p = rupeesToPaise(Number(t));
@@ -69,15 +79,20 @@ export function MenuOrdersClient({
   initialDeliveryFeePaise,
   initialPickupNote,
   isOwner,
+  storeKind,
 }: MenuOrdersClientProps) {
+  const vocab = vocabularyForKind(storeKind);
+  // "Menu ordering" / "Everyday ordering".
+  const ordering = vocab.catalogueOrders.replace(/ orders$/, " ordering");
+  const catalogueItems = vocab.kind === "food" ? "menu items" : vocab.items;
   const [enabled, setEnabled] = useState(initialAcceptMenuOrders);
   const [blocker, setBlocker] = useState<MenuOrdersBlocker | null>(null);
   const [mode, setMode] = useState<FulfilmentMode>(initialFulfilmentMode);
-  const [fee, setFee] = useState(paiseToInput(initialDeliveryFeePaise));
+  const [fee, setFee] = useState(feeToInput(initialDeliveryFeePaise, initialFulfilmentMode));
   const [note, setNote] = useState(initialPickupNote ?? "");
   const [saved, setSaved] = useState({
     mode: initialFulfilmentMode,
-    fee: paiseToInput(initialDeliveryFeePaise),
+    fee: feeToInput(initialDeliveryFeePaise, initialFulfilmentMode),
     note: initialPickupNote ?? "",
   });
   const [feeError, setFeeError] = useState<string | null>(null);
@@ -118,7 +133,7 @@ export function MenuOrdersClient({
       if (await patch({ acceptMenuOrders: next })) {
         setEnabled(next);
         setBlocker(null);
-        toast.success(next ? "Customers can now order from your menu." : "Menu ordering is off.");
+        toast.success(next ? `Customers can now order from your ${vocab.catalogue}.` : `${ordering} is off.`);
       }
     });
   }
@@ -126,7 +141,7 @@ export function MenuOrdersClient({
   function saveDetails() {
     const feePaise = showFee ? feeInputToPaise(fee) : null;
     if (showFee && feePaise === null) {
-      setFeeError("Enter a fee between ₹0 and ₹1,000, like 30 or 25.50.");
+      setFeeError("Enter your delivery fee, up to ₹1,000, like 30 or 25.50. Enter 0 for free delivery.");
       return;
     }
     setFeeError(null);
@@ -134,9 +149,9 @@ export function MenuOrdersClient({
     if (showFee && feePaise !== null) body.menuDeliveryFeePaise = feePaise;
     startTransition(async () => {
       if (await patch(body)) {
-        setSaved({ mode, fee: showFee && feePaise !== null ? paiseToInput(feePaise) : saved.fee, note: note.trim() });
-        if (showFee && feePaise !== null) setFee(paiseToInput(feePaise));
-        toast.success("Menu ordering details saved.");
+        setSaved({ mode, fee: showFee && feePaise !== null ? feeToInput(feePaise, mode) : saved.fee, note: note.trim() });
+        if (showFee && feePaise !== null) setFee(feeToInput(feePaise, mode));
+        toast.success(`${ordering} details saved.`);
       }
     });
   }
@@ -148,53 +163,30 @@ export function MenuOrdersClient({
       <div className="flex items-start justify-between gap-4">
         <div className="space-y-1">
           <label htmlFor="menu-orders-toggle" className="text-sm font-medium">
-            Let customers order from your menu anytime
+            Let customers order from your {vocab.catalogue} anytime
           </label>
           <p className="text-xs text-muted-foreground">
             {enabled
-              ? "Customers can order available menu items from your storefront. New orders show under Orders."
-              : "Off. Customers can only see your menu (and order from open Drops)."}
+              ? `Customers can order available ${catalogueItems} from your store page. New orders show under Orders.`
+              : `Off. Customers can only see your ${vocab.catalogue} (and order from open Drops).`}
           </p>
           <p className="text-xs text-muted-foreground">
-            Hide single items from your store with &ldquo;Show online&rdquo; on the Menu page. Drops hide the
-            everyday menu unless you tick &ldquo;Also show my everyday menu&rdquo;.
+            Hide single items from your store with &ldquo;Show online&rdquo; on the {vocab.catalogueTitle} page. Drops
+            hide the everyday {vocab.catalogue} unless you turn on &ldquo;Also show my everyday {vocab.catalogue}&rdquo;.
           </p>
           {!isOwner && <p className="text-xs text-muted-foreground">Only the owner can change this.</p>}
         </div>
-        <button
+        <Switch
           id="menu-orders-toggle"
-          type="button"
-          role="switch"
-          aria-checked={enabled}
+          checked={enabled}
           aria-describedby={blockerCopy ? "menu-orders-blocker" : undefined}
-          onClick={() => toggle(!enabled)}
+          onCheckedChange={toggle}
           disabled={pending || !isOwner}
-          className="group inline-flex min-h-11 min-w-14 shrink-0 items-center justify-center rounded-full focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <span className="sr-only">{enabled ? "Turn off ordering from menu" : "Turn on ordering from menu"}</span>
-          <span
-            aria-hidden="true"
-            className={cn(
-              "relative inline-flex h-7 w-12 items-center rounded-full transition-colors",
-              enabled ? "bg-primary" : "bg-input",
-            )}
-          >
-            <span
-              className={cn(
-                "inline-block h-5 w-5 transform rounded-full bg-background shadow-sm transition-transform motion-reduce:transition-none",
-                enabled ? "translate-x-6" : "translate-x-1",
-              )}
-            />
-          </span>
-        </button>
+        />
       </div>
 
       {blockerCopy && (
-        <div
-          id="menu-orders-blocker"
-          role="alert"
-          className="rounded-md border border-amber-500/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
-        >
+        <Notice id="menu-orders-blocker" role="alert">
           <p>{blockerCopy.text}</p>
           <Link
             href={blockerCopy.href}
@@ -202,7 +194,7 @@ export function MenuOrdersClient({
           >
             {blockerCopy.link}
           </Link>
-        </div>
+        </Notice>
       )}
 
       {enabled && (
@@ -228,23 +220,17 @@ export function MenuOrdersClient({
 
       <fieldset className="space-y-2" disabled={!isOwner}>
         <legend className="text-sm font-medium">How customers get their order</legend>
-        <div role="radiogroup" aria-label="How customers get their order" className="flex flex-wrap gap-2">
+        <div className="grid grid-cols-3 gap-2">
           {MODES.map((m) => (
-            <button
+            <RadioOption
               key={m.id}
-              type="button"
-              role="radio"
-              aria-checked={mode === m.id}
-              onClick={() => setMode(m.id)}
-              className={cn(
-                "min-h-11 rounded-full border px-4 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
-                mode === m.id
-                  ? "border-primary bg-primary text-primary-foreground"
-                  : "border-input bg-background hover:bg-accent",
-              )}
-            >
-              {m.label}
-            </button>
+              size="compact"
+              name="menu-fulfilment-mode"
+              value={m.id}
+              checked={mode === m.id}
+              onChange={() => setMode(m.id)}
+              label={m.label}
+            />
           ))}
         </div>
       </fieldset>
@@ -264,7 +250,7 @@ export function MenuOrdersClient({
               setFee(e.target.value.replace(/[^\d.]/g, ""));
               setFeeError(null);
             }}
-            placeholder="0"
+            placeholder="30"
             aria-invalid={feeError ? true : undefined}
             aria-describedby="menu-delivery-fee-hint"
             className="flex min-h-11 w-full max-w-xs rounded-md border border-input bg-background px-3 font-mono text-base tabular-nums ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
@@ -273,7 +259,7 @@ export function MenuOrdersClient({
             id="menu-delivery-fee-hint"
             className={cn("text-xs", feeError ? "text-destructive" : "text-muted-foreground")}
           >
-            {feeError ?? "Added to delivery orders only. Leave empty for free delivery."}
+            {feeError ?? "Added to delivery orders only. Enter 0 for free delivery."}
           </p>
         </div>
       )}
@@ -300,7 +286,7 @@ export function MenuOrdersClient({
               className="rounded-md border border-amber-500/60 bg-amber-50 p-2 text-xs text-amber-900 dark:bg-amber-950/40 dark:text-amber-100"
             >
               <span className="font-semibold">Recommended:</span> Add where and when to collect, e.g.
-              &ldquo;Stall 12, Exhibition Grounds · 5–9 pm&rdquo; — customers see this at checkout.
+              &ldquo;Gate 2, Sunrise Apartments, Indiranagar · 5–8 pm&rdquo; — customers see this at checkout.
             </p>
           ) : (
             <p id="menu-pickup-note-hint" className="text-xs text-muted-foreground">

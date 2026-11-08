@@ -1,13 +1,13 @@
 import { expect, test } from "@playwright/test";
 
 test.describe("public surfaces", () => {
-  test("landing page renders hero + Bharat badge + pricing teaser", async ({ page }) => {
+  test("landing page renders hero + product badge + sign-up CTA", async ({ page }) => {
     await page.goto("/");
     await expect(page).toHaveTitle(/AwaazOS/i);
-    await expect(page.getByRole("heading", { level: 1 })).toContainText(/Bol\.\s*Bill\.\s*Becho/i);
-    await expect(page.getByText(/Bharat AI/i).first()).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1 })).toContainText(/orders from Instagram and WhatsApp/i);
+    await expect(page.getByText(/IntelliForge AI/i).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /sign in/i }).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /(get started|sign up)/i }).first()).toBeVisible();
+    await expect(page.getByRole("link", { name: /start 30 days free/i }).first()).toBeVisible();
   });
 
   test("landing page offers Install app, with written steps when the browser has no prompt", async ({ page }) => {
@@ -18,44 +18,51 @@ test.describe("public surfaces", () => {
     await expect(dialog.getByRole("listitem").first()).toBeVisible();
   });
 
-  test("pricing page sells one plan: free trial, then Starter monthly or yearly", async ({ page }) => {
+  test("pricing page sells three plans: free trial, then Lite, Starter or Pro", async ({ page }) => {
     await page.goto("/pricing");
+    await expect(page.getByRole("heading", { name: /^lite$/i })).toBeVisible();
     await expect(page.getByRole("heading", { name: /^starter$/i })).toBeVisible();
+    await expect(page.getByRole("heading", { name: /^pro$/i })).toBeVisible();
+    await expect(page.getByText("Best value", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { level: 1 })).toContainText("30 days free");
-    await expect(page.getByText("₹2,990/yr + GST")).toBeVisible();
+    await expect(page.getByText("₹6,490/yr + GST")).toBeVisible();
     await expect(page.getByText(/2 months free/i).first()).toBeVisible();
-    await expect(page.getByRole("link", { name: /start 30 days free/i })).toHaveAttribute("href", "/sign-up");
+    // Scoped to <main>: the header carries the same call to action.
+    await expect(page.getByRole("main").getByRole("link", { name: /start 30 days free/i }).first()).toHaveAttribute(
+      "href",
+      "/sign-up",
+    );
     // Copy comes from lib/plan-copy.ts: Starter sells CSV export, and nothing
     // promises staff logins (there is no invite flow — see TODO.md §2).
     await expect(page.getByText(/CSV export/i).first()).toBeVisible();
     await expect(page.getByText(/staff/i)).toHaveCount(0);
   });
 
-  test("FREE and PRO stay off the marketing surface", async ({ page }) => {
+  test("FREE stays off the marketing surface", async ({ page }) => {
     await page.goto("/pricing");
-    // MARKETED_PLANS in lib/plan-copy.ts is ["STARTER"]. FREE is kept only for
-    // vendors who signed up before the trial; PRO is a deliberate cut (PITCH.md
-    // "minimal product"). PLAN_PRICES_PAISE still carries both for the gates.
-    await expect(page.getByText(/₹\s*799/)).toHaveCount(0);
-    await expect(page.getByRole("heading", { name: /^pro$/i })).toHaveCount(0);
+    // FREE is kept only for vendors who signed up before the trial.
     await expect(page.getByRole("heading", { name: /^free$/i })).toHaveCount(0);
     await expect(page.getByText(/₹\s*0\b/)).toHaveCount(0);
-    await expect(page.getByText(/bills a month/i)).toHaveCount(0);
   });
 
   test("pricing shows whole-rupee prices, all exclusive of GST", async ({ page }) => {
     await page.goto("/pricing");
-    await expect(page.getByText("₹299/mo + GST", { exact: true })).toBeVisible();
+    await expect(page.getByText("₹649/mo + GST", { exact: true })).toBeVisible();
     await expect(page.getByText(/₹\s*299\.00/)).toHaveCount(0);
     await expect(page.getByText(/exclude 18% GST/i)).toBeVisible();
+    await expect(page.getByText(/Save ₹1,298, about ₹541 a month/)).toBeVisible();
+    const compare = page.getByRole("table");
+    await expect(compare.getByRole("row", { name: /^Orders a month/ })).toContainText("Unlimited");
+    await expect(compare.getByRole("row", { name: /^Counter billing by voice/ })).toContainText("No");
   });
 
   test("landing teaser offers the same trial and prices", async ({ page }) => {
     await page.goto("/");
-    const teaser = page.getByRole("region", { name: /one simple plan/i });
+    const teaser = page.getByRole("region", { name: /simple plans/i });
     await expect(teaser).toContainText("30 days free");
-    await expect(teaser).toContainText("₹299/mo + GST");
-    await expect(teaser).toContainText("₹2,990/yr + GST");
+    for (const amount of ["₹599", "₹649", "₹1,149"]) await expect(teaser).toContainText(amount);
+    await expect(teaser).toContainText("Best value");
+    await expect(teaser).toContainText("2 months free");
   });
 
   for (const path of ["/legal/privacy", "/legal/terms"]) {
@@ -69,14 +76,15 @@ test.describe("public surfaces", () => {
   test("sign-in form renders email + password + submit", async ({ page }) => {
     await page.goto("/sign-in");
     await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.getByLabel(/password/i)).toBeVisible();
+    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: /sign in/i })).toBeVisible();
   });
 
   test("sign-up form renders required fields", async ({ page }) => {
     await page.goto("/sign-up");
     await expect(page.getByLabel(/email/i)).toBeVisible();
-    await expect(page.getByLabel(/password/i)).toBeVisible();
+    // Exact: the show/hide toggle is labelled "Show password".
+    await expect(page.getByLabel("Password", { exact: true })).toBeVisible();
   });
 });
 

@@ -22,11 +22,12 @@ function buildPresetHref(range: Exclude<AnalyticsRange, "custom">): string {
 }
 
 /**
- * Below `sm` the five tabs share one row as equal grid columns (about 60 px
- * each at 360 px), so "Custom" never wraps onto a line of its own. The active
- * tab is filled and bold, not just a different colour.
+ * Below `sm` the five links share one row as equal grid columns (about 60 px
+ * each at 360 px), so "Custom" never wraps onto a line of its own. They are
+ * navigation links, not tabs: the current range carries `aria-current="page"`
+ * and is filled and bold, not just a different colour.
  */
-function tabClass(isActive: boolean): string {
+function rangeLinkClass(isActive: boolean): string {
   return cn(
     "inline-flex min-h-11 items-center justify-center rounded-full px-1 text-sm transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-4",
     isActive
@@ -72,18 +73,17 @@ export function RangeSwitcher({
   const customHref = `/analytics?range=custom&from=${encodeURIComponent(suggestedCustomFrom)}&to=${encodeURIComponent(suggestedCustomTo)}`;
 
   return (
-    <nav aria-label="Date range" className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
-      <div className="grid grid-cols-5 gap-1.5 sm:flex sm:flex-wrap sm:gap-2" role="tablist" aria-label="Preset ranges">
+    <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end">
+      <nav aria-label="Date range" className="grid grid-cols-5 gap-1.5 sm:flex sm:flex-wrap sm:gap-2">
         {PRESETS.map((p) => {
           const isActive = active === p.value;
           return (
             <Link
               key={p.value}
               href={buildPresetHref(p.value)}
-              role="tab"
-              aria-selected={isActive}
+              aria-current={isActive ? "page" : undefined}
               scroll={false}
-              className={tabClass(isActive)}
+              className={rangeLinkClass(isActive)}
             >
               {p.label}
             </Link>
@@ -91,16 +91,19 @@ export function RangeSwitcher({
         })}
         <Link
           href={customHref}
-          role="tab"
-          aria-selected={active === "custom"}
+          aria-current={active === "custom" ? "page" : undefined}
           scroll={false}
-          className={tabClass(active === "custom")}
+          className={rangeLinkClass(active === "custom")}
         >
           Custom
         </Link>
-      </div>
+      </nav>
       {/* Phones: From and To share a row at full width, Apply spans beneath them. */}
-      <div className="grid grid-cols-2 items-end gap-2 border-t border-border pt-3 sm:flex sm:flex-wrap sm:border-0 sm:pt-0">
+      <div
+        role="group"
+        aria-label="Custom date range"
+        className="grid grid-cols-2 items-end gap-2 border-t border-border pt-3 sm:flex sm:flex-wrap sm:border-0 sm:pt-0"
+      >
         <div className="min-w-0">
           <label htmlFor="analytics-from" className="mb-1 block text-xs font-medium text-muted-foreground">
             From
@@ -129,6 +132,6 @@ export function RangeSwitcher({
           Apply
         </Button>
       </div>
-    </nav>
+    </div>
   );
 }

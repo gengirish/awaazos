@@ -1,27 +1,37 @@
-import { CheckCircle2, ChevronRight, CircleDashed, ListChecks, MinusCircle } from "lucide-react";
+import { CheckCircle2, ChevronRight, CircleDashed, MinusCircle } from "lucide-react";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
 import { LegacyAnchorRedirect } from "@/components/settings/LegacyAnchorRedirect";
-import { SETTINGS_SECTIONS, type SettingsSectionId } from "@/components/settings/sections";
+import { settingsGroupsFor, settingsSectionsFor, type SettingsSectionId } from "@/components/settings/sections";
+import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
 import { trialDaysLeft } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { isPushConfigured } from "@/lib/push";
 import { countVendorPushDevices } from "@/lib/push-devices";
 import {
+  checklistForRole,
   notificationsStatus,
   ordersStatus,
   paymentsStatus,
   planStatus,
   receiptsStatus,
+  feedbackStatus,
+  referStatus,
   setupChecklist,
   storeStatus,
+  surveyStatus,
+  offersStatus,
   voiceStatus,
   type SectionStatus,
   type SettingsSnapshot,
 } from "@/lib/settings-overview";
-import { hasStoredRazorpayCreds } from "@/lib/storefront-razorpay";
+import { loadRatingSummary } from "@/lib/order-feedback-server";
+import { loadSurveyAnswers } from "@/lib/owner-survey-server";
+import { loadReferralSummary } from "@/lib/referral-server";
+import { fillVocabulary } from "@/lib/store-vocabulary";
+import { hasStoredRazorpayCreds, isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 
 import { requireSettingsContext } from "./_context";
 
@@ -65,10 +75,13 @@ function StatusLine({ status }: { status: SectionStatus }) {
 }
 
 export default async function SettingsHubPage() {
-  const { vendor, user, access } = await requireSettingsContext();
+  const { vendor, user, access, isOwner, canManage, storeKind, vocab } = await requireSettingsContext();
 
   const pushConfigured = isPushConfigured();
-  const [settings, availableItemCount, pushDeviceCount] = await Promise.all([
+  const sections = settingsSectionsFor({ isOwner, isDemo: vendor.isDemo });
+  const showRefer = sections.some((s) => s.id === "refer");
+  const showSurvey = sections.some((s) => s.id === "survey");
+  const [settings, availableItemCount, pushDeviceCount, activeOfferCount, dropCount, referral, ratings, surveyAnswers] = await Promise.all([
     prisma.vendorSettings.findUnique({
       where: { vendorId: vendor.id },
       select: {
@@ -77,16 +90,20 @@ export default async function SettingsHubPage() {
         acceptPayOnDelivery: true,
         acceptMenuOrders: true,
         menuFulfilmentMode: true,
+        fssaiNumber: true,
         receiptPaper: true,
         autoPrintReceipt: true,
         // Presence only — the encrypted secrets never leave this server component.
-        razorpayKeyId: true,
-        razorpayKeySecretEnc: true,
-        razorpayWebhookSecretEnc: true,
+        ...RAZORPAY_CRED_SELECT,
       },
     }),
     prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
     pushConfigured ? countVendorPushDevices(vendor.id) : Promise.resolve(0),
+    prisma.offer.count({ where: { vendorId: vendor.id, isActive: true } }),
+    prisma.drop.count({ where: { vendorId: vendor.id } }),
+    showRefer ? loadReferralSummary(vendor) : Promise.resolve(null),
+    loadRatingSummary(vendor.id),
+    showSurvey ? loadSurveyAnswers(vendor.id) : Promise.resolve(null),
   ]);
 
   const snapshot: SettingsSnapshot = {
@@ -96,7 +113,9 @@ export default async function SettingsHubPage() {
     menuFulfilmentMode: settings?.menuFulfilmentMode ?? "PICKUP",
     upiId: vendor.upiId,
     acceptPayOnDelivery: settings?.acceptPayOnDelivery ?? true,
+    fssaiNumber: settings?.fssaiNumber ?? null,
     razorpayConfigured: hasStoredRazorpayCreds(settings),
+    onlinePayment: isOnlinePaymentEnabled(vendor, settings),
     voiceLang: settings?.voiceLang ?? "en-IN",
     plan: vendor.plan,
     billing:
@@ -106,13 +125,16 @@ export default async function SettingsHubPage() {
           ? { kind: "locked" }
           : undefined,
     availableItemCount,
+    dropCount,
     pushConfigured,
     pushDeviceCount,
   };
 
   const statuses: Record<SettingsSectionId, SectionStatus> = {
     store: storeStatus(snapshot),
-    orders: ordersStatus(snapshot),
+    orders: ordersStatus(snapshot, storeKind),
+    feedback: feedbackStatus(ratings),
+    offers: offersStatus(activeOfferCount),
     payments: paymentsStatus(snapshot),
     receipts: receiptsStatus({
       receiptPaper: settings?.receiptPaper ?? "MM80",
@@ -122,72 +144,60 @@ export default async function SettingsHubPage() {
     notifications: notificationsStatus(snapshot),
     voice: voiceStatus(snapshot),
     billing: planStatus(snapshot),
+    refer: referral ? referStatus(referral) : { text: "", on: false },
+    survey: surveyStatus(surveyAnswers !== null),
   };
-  const checklist = setupChecklist(snapshot);
+  // Same rule and card as /orders and /pos: only steps this role can act on.
+  const checklist = checklistForRole(
+    setupChecklist(snapshot, storeKind),
+    isOwner ? "OWNER" : canManage ? "MANAGER" : "CASHIER",
+  );
 
   return (
     <>
       <LegacyAnchorRedirect />
       <header className="mb-4">
         <h1 className="font-display text-2xl font-bold text-foreground">Settings</h1>
-        <p className="text-sm text-muted-foreground">Manage your stall, online store and plan.</p>
+        <p className="text-sm text-muted-foreground">Manage your store, payments and plan.</p>
       </header>
 
-      {checklist.length > 0 ? (
-        <section
-          aria-labelledby="setup-checklist-heading"
-          className="mb-4 rounded-lg border border-amber-500/60 bg-amber-50 p-4 text-amber-950 dark:bg-amber-950/40 dark:text-amber-50"
-        >
-          <h2 id="setup-checklist-heading" className="flex items-center gap-2 font-display text-base font-semibold">
-            <ListChecks className="h-5 w-5" aria-hidden="true" />
-            Setup checklist: start taking online orders
-          </h2>
-          <ul className="mt-2 space-y-1">
-            {checklist.map((item) => (
-              <li key={item.id}>
-                <Link
-                  href={item.href}
-                  className="flex min-h-11 items-center justify-between gap-3 rounded-md px-2 text-sm font-medium underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <span className="flex items-center gap-2">
-                    <CircleDashed className="h-4 w-4 shrink-0" aria-hidden="true" />
-                    {item.text}
-                  </span>
-                  <span className="sr-only">{item.linkText}</span>
-                  <ChevronRight className="h-4 w-4 shrink-0" aria-hidden="true" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <SetupChecklistCard
+        items={checklist}
+        store={snapshot.publishStorefront ? { slug: vendor.slug, name: vendor.name } : null}
+        className="mb-4"
+      />
 
-      <nav aria-label="Settings sections">
-        <ul className="divide-y divide-border overflow-hidden rounded-lg border bg-card">
-          {SETTINGS_SECTIONS.map((section) => {
-            const Icon = section.icon;
-            return (
-              <li key={section.id}>
-                <Link
-                  href={section.href}
-                  className="flex min-h-14 items-center gap-3 px-4 py-3 ring-inset transition-colors hover:bg-muted/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-                >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                    <Icon className="h-5 w-5" aria-hidden="true" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block font-semibold text-foreground">{section.title}</span>
-                    <span className="hidden truncate text-xs text-muted-foreground sm:block">{section.description}</span>
-                    <span className="mt-0.5 block text-sm text-muted-foreground">
-                      <StatusLine status={statuses[section.id]} />
-                    </span>
-                  </span>
-                  <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                </Link>
-              </li>
-            );
-          })}
-        </ul>
+      <nav aria-label="Settings sections" className="space-y-6">
+        {settingsGroupsFor(sections).map((group) => (
+          <div key={group.title}>
+            <h2 className="mb-2 font-display text-base font-semibold text-foreground">{group.title}</h2>
+            <ul className="divide-y divide-border overflow-hidden rounded-lg border bg-card">
+              {group.sections.map((section) => {
+                const Icon = section.icon;
+                return (
+                  <li key={section.id}>
+                    <Link
+                      href={section.href}
+                      className="flex min-h-14 items-center gap-3 px-4 py-3 ring-inset transition-colors hover:bg-muted/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                    >
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                        <Icon className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block font-semibold text-foreground">{section.title}</span>
+                        <span className="hidden truncate text-xs text-muted-foreground sm:block">{fillVocabulary(section.description, vocab)}</span>
+                        <span className="mt-0.5 block text-sm text-muted-foreground">
+                          <StatusLine status={statuses[section.id]} />
+                        </span>
+                      </span>
+                      <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        ))}
       </nav>
 
       <section aria-labelledby="account-heading" className="mt-6">

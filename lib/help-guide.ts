@@ -1,6 +1,10 @@
 import type { StaffRole } from "@prisma/client";
 
-import { APP_NAV_ITEMS, appNavItemsForRole, type AppNavId, type AppNavItem } from "@/lib/app-nav";
+import { appNavItemsForRole, appTabBarForRole, type AppNavId } from "@/lib/app-nav";
+import { TRIAL_DAYS } from "@/lib/constants";
+import { PUBLIC_RATING_MIN } from "@/lib/order-feedback";
+import { REFERRAL_REWARD_CAP_PER_YEAR, REFERRED_TRIAL_DAYS, rewardMonthsFor } from "@/lib/referral";
+import { fillVocabulary, vocabularyForKind, type StoreKind, type StoreVocabulary } from "@/lib/store-vocabulary";
 
 /**
  * Content of the in-app Help page (`/help`): what each screen is for and where
@@ -10,19 +14,100 @@ import { APP_NAV_ITEMS, appNavItemsForRole, type AppNavId, type AppNavItem } fro
  *
  * Wording rule: name buttons exactly as the screen shows them ("Collect
  * payment", "Prep sheet"), so a vendor can match the words to what they see.
+ *
+ * Words that depend on what the store sells are `{token}`s (lib/store-vocabulary.ts:
+ * `{items}`, `{catalogueTitle}`, `{prepSheet}`, …), plus two of this file's own:
+ * `{lower:<word>}` (that word in lower case, "menu orders") and `{homeSellers}`.
+ * Read the guide through `helpScreenSummary`, `orderJourneyFor`, `helpGroupsFor`
+ * and `helpTopicsForRole`, which fill them in; the raw constants still hold tokens.
  */
 
-/** One line per destination, in the words of someone running a kitchen. */
+/** Fill the guide's tokens for one kind of store. */
+export function fillHelpText(text: string, vocab: StoreVocabulary): string {
+  const local = text
+    .replace(/\{lower:(\w+)\}/g, (whole, key: string) => {
+      const filled = fillVocabulary(`{${key}}`, vocab);
+      return filled.startsWith("{") ? whole : filled.toLowerCase();
+    })
+    .replace(/\{homeSellers\}/g, vocab.kind === "food" ? "home kitchens" : "home sellers");
+  return fillVocabulary(local, vocab);
+}
+
+/** One line per destination, in the seller's own words. Holds tokens: read it with `helpScreenSummary`. */
 export const HELP_SCREEN_SUMMARY: Record<AppNavId, string> = {
-  orders: "Online orders from your menu: confirm them, check payments and mark them delivered.",
-  drops: "Pre-order batches with a cut-off. Create a drop, then work from its orders and prep sheet.",
+  orders: "Every online order, from your {catalogue} and from your drops: confirm them, check payments and mark them delivered.",
+  drops: "Pre-order batches with a cut-off. Create and edit drops here; their orders come in on the Orders screen.",
   sell: "The counter. Ring up a sale by tapping or by voice, and take payment.",
-  menu: "Your dishes: names, prices, photos and what is available today.",
+  menu: "Your {items}: names, prices, photos and what is available today.",
   transactions: "Every bill you have made. Search, resend a receipt, or export.",
-  analytics: "Sales totals, best-selling dishes and busy hours.",
+  analytics: "Sales totals, best-selling {items} and busy hours.",
   settings: "Your online store, payments, receipts, alerts and plan.",
   help: "This guide.",
 };
+
+/**
+ * "An online order, start to finish": the whole life of one storefront order
+ * as the Help page tells it, in order. Every role sees it (the Orders screen
+ * is everyone's); button names are quoted exactly as the screens show them.
+ */
+export type OrderJourneyStep = {
+  id: string;
+  /** Who does this step. */
+  who: "Customer" | "You" | "Rider";
+  title: string;
+  text: string;
+  /** When the step only applies to some orders. */
+  when?: string;
+};
+
+export const ORDER_JOURNEY: readonly OrderJourneyStep[] = [
+  {
+    id: "place",
+    who: "Customer",
+    title: "Places the order",
+    text: "On your store page they pick {items}, choose delivery or pickup, and pay by UPI now or on delivery. Your phone gets an alert and the order appears on Orders under Needs action.",
+  },
+  {
+    id: "pay",
+    who: "Customer",
+    title: "Pays and tells you it's done",
+    when: "UPI orders",
+    text: "They pay from their UPI app, then send you a screenshot of the payment, or tell you it's done without one. Open the screenshot from the order card, but check your UPI app and tap Payment received, or Not received if it isn't there. Their tap never marks the order paid by itself.",
+  },
+  {
+    id: "confirm",
+    who: "You",
+    title: "Confirm",
+    text: "Tap Confirm so the customer knows you have it. Their order page says Confirmed. A paid order is confirmed for you: Payment received does both.",
+  },
+  {
+    id: "send",
+    who: "You",
+    title: "Hand it to your rider",
+    when: "Deliveries",
+    text: "Tap Send to and your rider's name (save riders in Settings, Online orders). WhatsApp opens to the rider with the name, phone, address, items and cash to collect, and the order is marked Out for delivery: the customer's page says On the way. Using Porter or Rapido? Tap Copy for rider and paste it there, then Out for delivery.",
+  },
+  {
+    id: "door",
+    who: "Rider",
+    title: "Delivers and taps Delivered",
+    when: "Deliveries",
+    text: "At the door the rider collects any cash due, then opens the link at the end of their message and taps Delivered. Your Orders screen updates by itself.",
+  },
+  {
+    id: "received",
+    who: "Customer",
+    title: "Can tap I've received my order",
+    when: "Deliveries",
+    text: "If it is already paid, the order is finished for you. If it is pay on delivery, the card says Customer got it so you can make sure the cash reached you.",
+  },
+  {
+    id: "finish",
+    who: "You",
+    title: "Finish the order",
+    text: "If nobody tapped Delivered, tap Delivered or Picked up yourself. For a pay-on-delivery order the button says Delivered · and the amount collected, and marks it paid. Tapped it by mistake? Use Undo.",
+  },
+];
 
 export type HelpGroupId = "counter" | "orders" | "drops" | "menu" | "records" | "setup";
 
@@ -30,7 +115,7 @@ export const HELP_GROUPS: readonly { id: HelpGroupId; title: string }[] = [
   { id: "counter", title: "Selling at the counter" },
   { id: "orders", title: "Online orders" },
   { id: "drops", title: "Drops (pre-orders)" },
-  { id: "menu", title: "Menu" },
+  { id: "menu", title: "{catalogueTitle}" },
   { id: "records", title: "Bills and reports" },
   { id: "setup", title: "Store setup" },
 ];
@@ -59,7 +144,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "ring-up-sale",
     group: "counter",
     title: "Ring up a sale",
-    steps: "Tap dishes under Quick add, or tap the mic and say the order. Check the cart, then tap Collect payment.",
+    steps: "Tap {items} under Quick add, or tap the mic and say the order. Check the cart, then tap Collect payment.",
     nav: "sell",
     keywords: "pos bill voice speak cart checkout upi qr cash",
   },
@@ -83,9 +168,9 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "see-orders",
     group: "orders",
     title: "See new online orders",
-    steps: "Orders placed from your everyday menu are listed here, newest first. Orders for a drop are inside that drop.",
+    steps: "Every online order is listed here, newest first, whether it came from your everyday {catalogue} or from a drop. If you take both, the picker at the top narrows the list to {lower:catalogueOrders} or to one drop. With Razorpay connected, an order paid online reaches you already confirmed, under Confirmed. One not paid yet waits under All, with nothing for you to do.",
     nav: "orders",
-    keywords: "storefront board incoming",
+    keywords: "storefront board incoming razorpay paid online",
   },
   {
     id: "check-payment",
@@ -99,15 +184,31 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "deliver-order",
     group: "orders",
     title: "Mark an order as delivered",
-    steps: "Tap Delivered on the order. To finish several at once, select them and use the bar that appears under the list.",
+    steps: "Tap Delivered on the order. To finish several at once, select them and use the bar that appears under the list. Your rider can also tap Delivered on the link in their message, and a customer can tap I've received my order: a paid order is then finished for you, and an unpaid one shows Customer got it so you can collect the payment.",
     nav: "orders",
-    keywords: "complete done pickup bulk cash on delivery collected",
+    keywords: "complete done pickup bulk cash on delivery collected rider link received customer got it",
+  },
+  {
+    id: "rider-handoff",
+    group: "orders",
+    title: "Send a delivery to Porter, Rapido or your rider",
+    steps: "Tap Copy for rider on a delivery order and paste it into the booking app. It has the name, phone, address, items and any cash to collect. The drop's {prepSheet} has the same button. If you saved your own riders in Settings, tap Send to and the rider's name: WhatsApp opens to them with the order filled in, and the order is marked Out for delivery. Your customer's order page then says On the way. No saved rider? Tap Out for delivery yourself once it leaves. The message ends with a link for the rider: they tap Delivered on it at the door and your board updates.",
+    nav: "orders",
+    keywords: "dunzo courier driver address booking cash collect handover whatsapp send out for delivery on the way dispatch",
+  },
+  {
+    id: "share-store",
+    group: "orders",
+    title: "Share your store on Instagram",
+    steps: "With {catalogueOrdersTitle} on, tap Share on the Orders screen: Share store link, Copy link, or Instagram story for a ready-made image of your {catalogue}. Open store shows your store as customers see it.",
+    nav: "orders",
+    keywords: "post link promote story bio",
   },
   {
     id: "new-drop",
     group: "drops",
     title: "Create a drop",
-    steps: "Tap New drop. Add the dishes, how many you can make, the pickup or delivery time and the order cut-off. You can also speak the plan.",
+    steps: "Tap New drop. Add the {items}, how many you can make, the pickup or delivery time and the order cut-off. You can also speak the plan.",
     nav: "drops",
     href: "/drops/new",
     trail: ["New drop"],
@@ -117,52 +218,60 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "drop-orders",
     group: "drops",
     title: "See the orders for a drop",
-    steps: "Open the drop. Its orders are listed with the same actions as the Orders screen.",
-    nav: "drops",
-    trail: ["open the drop"],
+    steps: "Drop orders are on the Orders screen with all your other orders. Choose the drop in the picker at the top to see only its orders. Tapping a drop on the Drops screen opens the same list.",
+    nav: "orders",
+    trail: ["choose the drop"],
     keywords: "board preorder",
   },
   {
     id: "prep-sheet",
     group: "drops",
-    title: "Find out how much to cook",
-    steps: "Open the drop, then Prep sheet. It adds up every dish across the drop's orders, ready to print.",
-    nav: "drops",
-    trail: ["open the drop", "Prep sheet"],
-    keywords: "quantities totals kitchen print cooking list",
+    title: "Find out how much {lower:toPrepare}",
+    steps: "Choose the drop on the Orders screen, tap More actions, then {prepSheet}. It adds up every {item} across the drop's orders, ready to print.",
+    nav: "orders",
+    trail: ["choose the drop", "{prepSheet}"],
+    keywords: "quantities totals kitchen print cooking packing list prep",
   },
   {
     id: "share-drop",
     group: "drops",
     title: "Share a drop on Instagram",
-    steps: "Open the drop and tap Instagram story for a ready-made story image, or Share to send its link.",
-    nav: "drops",
-    trail: ["open the drop", "Instagram story"],
+    steps: "Choose the drop on the Orders screen, tap Share, then Instagram story for a ready-made story image, or Share this drop to send its link.",
+    nav: "orders",
+    trail: ["choose the drop", "Share", "Instagram story"],
     keywords: "post link promote",
   },
   {
     id: "edit-menu",
     group: "menu",
-    title: "Add a dish or change a price",
-    steps: "Tap Add item for a new dish, or Edit on a dish to change its name, price, photo and category.",
+    title: "Add a {item} or change a price",
+    steps: "Tap Add item for a new {item}, or Edit on a {item} to change its name, price, photo, description and category.",
     nav: "menu",
-    keywords: "item rate cost picture image",
+    keywords: "item rate cost picture image dish product pack size unit description",
   },
   {
     id: "voice-menu",
     group: "menu",
-    title: "Add many dishes by speaking",
-    steps: "Open Add dishes by voice at the top of the Menu screen and say each dish with its price. Check the list it shows before you save.",
+    title: "Add many {items} by speaking",
+    steps: "Open Add {items} by voice at the top of the {catalogueTitle} screen and say each {item} with its price. Check the list it shows before you save.",
     nav: "menu",
     keywords: "voice mic bulk list",
   },
   {
     id: "sold-out",
     group: "menu",
-    title: "Mark a dish as sold out",
-    steps: "Switch the dish from Available to Unavailable. It stays off Sell and your online store until you switch it back.",
+    title: "Mark a {item} as sold out",
+    steps: "Tap Selling on the {item} so it reads Sold out. It stays off Sell and your online store until you switch it back.",
     nav: "menu",
     keywords: "unavailable hide out of stock availability",
+  },
+  {
+    id: "find-item",
+    group: "menu",
+    title: "Find a {item} on a long {catalogue}",
+    steps: "Once you have more than 15 {items}, the {catalogueTitle} screen has a search box: type any word of the name, description or category. Choose Sold out to see only what is switched off. Clear the search to move {items} up or down again.",
+    nav: "menu",
+    keywords: "search filter look up sold out",
   },
   {
     id: "find-bill",
@@ -192,7 +301,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "sales-report",
     group: "records",
     title: "See how sales are going",
-    steps: "Pick a period to see total sales, your best-selling dishes and your busiest hours.",
+    steps: "Pick a period to see total sales, your best-selling {items} and your busiest hours.",
     nav: "analytics",
     keywords: "revenue report today week month top items",
   },
@@ -208,21 +317,54 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     keywords: "storefront publish url share",
   },
   {
-    id: "store-look",
+    id: "store-link",
     group: "setup",
-    title: "Change your store name, banner or logo",
-    steps: "Edit the name and upload a banner and logo. Customers see them at the top of your store.",
+    title: "Choose or change your store link",
+    steps: "You picked the link (awaazos.in/s/your-name) at sign-up. To change it, edit Store link and save. The old link stops working, so update your Instagram bio and any QR code.",
     nav: "settings",
     href: "/settings/store",
     trail: ["Online store"],
     ownerOnly: true,
-    keywords: "photo picture brand rename",
+    keywords: "url handle slug address rename bio",
+  },
+  {
+    id: "store-look",
+    group: "setup",
+    title: "Change your store name, tagline, banner, logo or colour",
+    steps: "Edit the name and tagline, upload a banner and logo, and pick a store colour. Customers see them at the top of your store; the colour tints its buttons and links. A background pattern repeats a small picture, like a peacock feather, behind your items.",
+    nav: "settings",
+    href: "/settings/store",
+    trail: ["Online store"],
+    ownerOnly: true,
+    keywords: "photo picture brand rename colour color theme tagline",
+  },
+  {
+    id: "store-details",
+    group: "setup",
+    title: "Change what you sell or where you are",
+    steps: "Under Store type & location, pick what you sell (or Other, and describe it) and type your area, city and state. Leave one blank to hide it.",
+    nav: "settings",
+    href: "/settings/store",
+    trail: ["Online store"],
+    ownerOnly: true,
+    keywords: "type category business other city state location address place",
+  },
+  {
+    id: "community-page",
+    group: "setup",
+    title: "Join your society's community page",
+    steps: "When your housing society has a page that lists its {homeSellers}, the invite shows under Community pages. Tap Join to be listed, or Leave later. Customers still order on your own store.",
+    nav: "settings",
+    href: "/settings/store",
+    trail: ["Online store"],
+    ownerOnly: true,
+    keywords: "society apartment rwa community neighbours directory list",
   },
   {
     id: "menu-orders",
     group: "setup",
-    title: "Let customers order from your everyday menu",
-    steps: "Turn on ordering from the menu and choose pickup, delivery or both, with a delivery fee if you charge one.",
+    title: "Let customers order from your everyday {catalogue}",
+    steps: "Turn on ordering from the {catalogue} and choose pickup, delivery or both, with a delivery fee if you charge one.",
     nav: "settings",
     href: "/settings/orders",
     trail: ["Online orders"],
@@ -230,10 +372,45 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     keywords: "whatsapp pickup delivery fee",
   },
   {
+    id: "delivery-areas",
+    group: "setup",
+    title: "Choose where you deliver",
+    steps:
+      "Add the localities you deliver to, each with its own fee if you like: 0 for free delivery, or leave it empty for your usual fee. Customers then pick one of them at checkout, and your store page lists them. With no areas, you deliver anywhere at your usual fee.",
+    nav: "settings",
+    href: "/settings/orders",
+    trail: ["Online orders"],
+    ownerOnly: true,
+    keywords: "delivery area locality radius free delivery fee zone where",
+  },
+  {
+    id: "delivery-riders",
+    group: "setup",
+    title: "Save your delivery riders",
+    steps: "Add each person who delivers for you with their WhatsApp number, up to 5. Delivery orders then get a Send to button for each of them.",
+    nav: "settings",
+    href: "/settings/orders",
+    trail: ["Online orders"],
+    ownerOnly: true,
+    keywords: "rider delivery boy driver whatsapp phone staff",
+  },
+  {
+    id: "offers",
+    group: "setup",
+    title: "Give a discount on bigger orders",
+    steps:
+      "Create an offer with a minimum quantity and a percentage off. A minimum of 1 makes it a sale: your store shows each item's old price struck out next to the sale price. Tag items on the {catalogueTitle} page to choose which ones count. The discount is applied for you in your online store, in drops and at the counter. To give something away instead, pick A free item: once an order has enough items, the item you chose is added to it at no charge (online orders only).",
+    nav: "settings",
+    href: "/settings/offers",
+    trail: ["Offers"],
+    keywords: "discount plan combo bundle weekly percent off tag free gift item",
+  },
+  {
     id: "payment-setup",
     group: "setup",
     title: "Set your UPI ID and how customers pay",
-    steps: "Enter the UPI ID that money should go to. You can also allow pay on delivery or connect your own Razorpay account.",
+    steps:
+      "Enter the UPI ID that money should go to. You can also allow pay on delivery, or tap Connect Razorpay to take card and netbanking payments into your own Razorpay account.",
     nav: "settings",
     href: "/settings/payments",
     trail: ["Payments"],
@@ -283,6 +460,39 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     trail: ["Plan & billing"],
     keywords: "trial upgrade pay subscription locked price",
   },
+  {
+    id: "customer-feedback",
+    group: "setup",
+    title: "See what customers said",
+    steps: `Customers can rate an order on their order page once you mark it delivered or picked up. The rating and any comment show on the order card too, and stay listed here. Your store page shows only your average, once you have ${PUBLIC_RATING_MIN} ratings. Comments stay with you.`,
+    nav: "settings",
+    href: "/settings/feedback",
+    trail: ["Customer feedback"],
+    keywords: "rating ratings review stars feedback comment complaint customer",
+  },
+  {
+    id: "refer-seller",
+    group: "setup",
+    title: "Invite another seller and earn free months",
+    steps: `Copy your link, or tap Share on WhatsApp or Instagram story. A store that signs up with it gets ${REFERRED_TRIAL_DAYS} days free instead of ${TRIAL_DAYS}. When it pays for its first subscription you get ${rewardMonthsFor("monthly")} free month (${rewardMonthsFor("yearly")} if it pays yearly), up to ${REFERRAL_REWARD_CAP_PER_YEAR} a year. If you have a subscription, the free month is refunded from your next charge.`,
+    nav: "settings",
+    href: "/settings/refer",
+    trail: ["Refer a seller"],
+    ownerOnly: true,
+    keywords: "referral refer invite friend link reward free month trial share",
+  },
+  {
+    id: "owner-survey",
+    group: "setup",
+    title: "Tell us what slows your store down",
+    steps:
+      "Pick what is hard about running your store and which part hurts most. It takes about a minute, and you can change your answers later. We use them to decide what to build next, and we may use them to offer your store a price that fits.",
+    nav: "settings",
+    href: "/settings/survey",
+    trail: ["Tell us what's hard"],
+    ownerOnly: true,
+    keywords: "survey feedback problem request feature suggestion price",
+  },
 ];
 
 export type ResolvedHelpTopic = HelpTopic & {
@@ -295,22 +505,44 @@ export type ResolvedHelpTopic = HelpTopic & {
   ownerLocked: boolean;
 };
 
-function navItem(id: AppNavId): AppNavItem {
-  return APP_NAV_ITEMS.find((item) => item.id === id)!;
+/** What a destination is for, in this store's words. */
+export function helpScreenSummary(id: AppNavId, kind: StoreKind = "food"): string {
+  return fillHelpText(HELP_SCREEN_SUMMARY[id], vocabularyForKind(kind));
 }
 
-/** The topics a staff member of this role can act on or look at, in display order. */
-export function helpTopicsForRole(role: StaffRole): ResolvedHelpTopic[] {
-  const visible = new Set(appNavItemsForRole(role).map((item) => item.id));
-  return HELP_TOPICS.filter((topic) => visible.has(topic.nav)).map((topic) => {
-    const item = navItem(topic.nav);
-    return {
-      ...topic,
-      href: topic.href ?? item.href,
-      path: [item.label, ...(topic.trail ?? [])],
-      behindMore: item.placement === "more",
-      ownerLocked: Boolean(topic.ownerOnly) && role !== "OWNER",
-    };
+/** `ORDER_JOURNEY` in this store's words. */
+export function orderJourneyFor(kind: StoreKind = "food"): OrderJourneyStep[] {
+  const vocab = vocabularyForKind(kind);
+  return ORDER_JOURNEY.map((step) => ({ ...step, title: fillHelpText(step.title, vocab), text: fillHelpText(step.text, vocab) }));
+}
+
+/** `HELP_GROUPS` in this store's words ("Menu" / "Products"). */
+export function helpGroupsFor(kind: StoreKind = "food"): { id: HelpGroupId; title: string }[] {
+  const vocab = vocabularyForKind(kind);
+  return HELP_GROUPS.map((group) => ({ ...group, title: fillHelpText(group.title, vocab) }));
+}
+
+/** The topics a staff member of this role can act on or look at, in display order and in this store's words. */
+export function helpTopicsForRole(role: StaffRole, storePublished = false, kind: StoreKind = "food"): ResolvedHelpTopic[] {
+  const vocab = vocabularyForKind(kind);
+  const items = appNavItemsForRole(role, kind);
+  const moreIds = new Set(appTabBarForRole(role, storePublished, kind).more.map((item) => item.id));
+  return HELP_TOPICS.flatMap((topic) => {
+    const item = items.find((i) => i.id === topic.nav);
+    if (!item) return [];
+    const trail = (topic.trail ?? []).map((step) => fillHelpText(step, vocab));
+    return [
+      {
+        ...topic,
+        title: fillHelpText(topic.title, vocab),
+        steps: fillHelpText(topic.steps, vocab),
+        trail,
+        href: topic.href ?? item.href,
+        path: [item.label, ...trail],
+        behindMore: moreIds.has(topic.nav),
+        ownerLocked: Boolean(topic.ownerOnly) && role !== "OWNER",
+      },
+    ];
   });
 }
 

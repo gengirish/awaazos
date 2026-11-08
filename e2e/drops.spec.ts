@@ -1,6 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
 
-import { boardHeaderAction, closeBoardActions } from "./helpers/board";
+import { boardMenuItem, closeBoardMenu } from "./helpers/board";
 import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
@@ -34,13 +34,15 @@ async function checkoutPickupPayOnDelivery(page: Page) {
   await expect(sheet).toBeVisible();
   await sheet.getByLabel("Your name").fill("Priya Buyer");
   await sheet.getByLabel("Mobile number").fill("98480 12345");
-  await sheet.getByRole("radio", { name: "Pickup" }).check();
+  // The invisible radio covers its whole option, so a buyer's tap lands on it.
+  await sheet.getByRole("radio", { name: "Pickup" }).click();
+  await expect(sheet.getByRole("radio", { name: "Pickup" })).toBeChecked();
   await sheet.getByRole("radio", { name: /pay on delivery/i }).check();
   return sheet;
 }
 
 test.describe("drops: home-kitchen pre-order day", () => {
-  test("vendor sets up a drop, buyer orders limited stock, vendor fulfils and freezes", async ({
+  test("vendor sets up a drop, buyer orders limited stock, vendor fulfils and closes orders", async ({
     page,
     request,
     browser,
@@ -89,9 +91,15 @@ test.describe("drops: home-kitchen pre-order day", () => {
     // ── Vendor: build the drop ─────────────────────────────────────────
     await page.goto("/drops/new");
     await expect(page.getByRole("heading", { name: "New drop" })).toBeVisible();
+    await page.getByText("More options").click();
     await page.getByLabel("Title").fill(dropTitle);
     await page.getByRole("radio", { name: "Both" }).click();
-    await expect(page.getByRole("radio", { name: "Both" })).toHaveAttribute("aria-checked", "true");
+    await expect(page.getByRole("radio", { name: "Both" })).toBeChecked();
+    // A native radio group: arrow keys move the choice.
+    await page.keyboard.press("ArrowLeft");
+    await expect(page.getByRole("radio", { name: "Pickup" })).toBeChecked();
+    await page.keyboard.press("ArrowRight");
+    await expect(page.getByRole("radio", { name: "Both" })).toBeChecked();
 
     // The form defaults the cut-off to tonight 21:00 (or tomorrow 10:00 if it's
     // already late), cooking day tomorrow — always in the future.
@@ -100,7 +108,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
     const ladduRow = page.getByRole("listitem").filter({ hasText: laddu });
     await ladduRow.getByLabel("How many can you make?").fill("3");
 
-    await page.getByRole("button", { name: "Create drop" }).click();
+    await page.getByRole("button", { name: "Save draft" }).click();
     // Generous: next dev compiles the edit route on first hit.
     await page.waitForURL(/\/drops\/[^/]+\/edit$/, { timeout: 120_000 });
     const dropId = new URL(page.url()).pathname.split("/")[2];
@@ -138,30 +146,33 @@ test.describe("drops: home-kitchen pre-order day", () => {
 
       await buyer.waitForURL(new RegExp(`/s/${slug}/o/[^/]+$`), { timeout: 120_000 });
       await expect(buyer.getByRole("heading", { name: "Your order" })).toBeVisible();
-      await expect(buyer.getByText("Pay on delivery").first()).toBeVisible();
+      await expect(buyer.getByText("Pay when you collect").first()).toBeVisible();
 
       // ── Vendor: the board shows it; hand over and collect cash ─────────
+      // The drop's old address still works: it opens the one orders board on this drop.
       await page.goto(`/drops/${dropId}`);
+      await expect(page).toHaveURL(new RegExp(`/orders\\?drop=${dropId}$`));
+      await expect(page.getByRole("heading", { level: 2, name: dropTitle })).toBeVisible();
       const card = page.getByRole("article", { name: /Priya Buyer/ });
       await expect(card).toBeVisible();
       await expect(card.getByText(`2 × ${laddu}`)).toBeVisible();
       await expect(card.getByText("Pay on delivery")).toBeVisible();
 
-      // Header actions: beside the title from md, in the "More actions" sheet on a phone.
       await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible();
-      await expect(await boardHeaderAction(page, "link", "Prep sheet")).toHaveAttribute(
+      await expect(await boardMenuItem(page, "More actions", "Prep sheet")).toHaveAttribute(
         "href",
         `/drops/${dropId}/prep`,
       );
-      await expect(await boardHeaderAction(page, "link", "Edit")).toHaveAttribute("href", `/drops/${dropId}/edit`);
-      await expect(await boardHeaderAction(page, "button", "Instagram story")).toBeVisible();
-      await closeBoardActions(page);
+      await expect(await boardMenuItem(page, "More actions", "Edit")).toHaveAttribute("href", `/drops/${dropId}/edit`);
+      await closeBoardMenu(page);
+      await expect(await boardMenuItem(page, "Share", "Instagram story")).toBeVisible();
+      await closeBoardMenu(page);
 
       await card.getByRole("button", { name: /picked up · ₹240\.00 collected/i }).click();
 
       await page.getByRole("tab", { name: /^Delivered/ }).click();
       const delivered = page.getByRole("article", { name: /Priya Buyer/ });
-      await expect(delivered.getByText("Delivered", { exact: true })).toBeVisible();
+      await expect(delivered.getByText("Picked up", { exact: true })).toBeVisible();
       // Cash collected at handover marks it paid.
       await expect(page.getByRole("listitem").filter({ hasText: /^Paid/ })).toContainText("₹240.00");
 
@@ -178,14 +189,11 @@ test.describe("drops: home-kitchen pre-order day", () => {
       await staleCtx.close();
     }
 
-    // ── Vendor: freeze, then the prep sheet has the right totals ─────────
+    // ── Vendor: close orders, then the prep sheet has the right totals ─────────
     await page.goto(`/drops/${dropId}/edit`);
-    await page.getByRole("button", { name: "Freeze orders" }).click();
-    const confirm = page.getByRole("dialog", { name: "Freeze orders?" });
-    await confirm.getByRole("button", { name: "Freeze orders" }).click();
-    await expect(confirm).toBeHidden();
+    await page.getByRole("button", { name: "Close orders now" }).click();
     await expect(
-      page.getByRole("region", { name: "Status" }).getByText("Orders frozen", { exact: true }),
+      page.getByRole("region", { name: "Status" }).getByText("Closed by you", { exact: true }),
     ).toBeVisible();
 
     await page.goto(`/drops/${dropId}/prep`);
@@ -196,7 +204,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
     // Chakli was offered but not ordered, so it is not on the cook list.
     await expect(cook.getByRole("row", { name: new RegExp(chakli) })).toHaveCount(0);
     await expect(cook.getByRole("row", { name: /total items/i }).getByRole("cell")).toHaveText(["2", ""]);
-    // Frozen: no "orders can still change" warning.
+    // Closed: no "orders can still change" warning.
     await expect(page.getByText("Orders can still change")).toHaveCount(0);
   });
 
@@ -237,17 +245,17 @@ test.describe("drops: home-kitchen pre-order day", () => {
 
     await page.goto(`/drops/${drop.id}/edit`);
     const status = page.getByRole("region", { name: "Status" });
-    await status.getByRole("button", { name: "Open orders" }).click();
+    await page.getByRole("button", { name: "Open orders" }).click();
 
     // Nothing is published until the owner says so: backing out leaves it private.
     const confirm = page.getByRole("dialog", { name: "Publish your store too?" });
     await expect(confirm).toContainText(`/s/${slug}`);
-    await confirm.getByRole("button", { name: "Cancel" }).click();
+    await confirm.getByRole("button", { name: "Keep as a draft" }).click();
     await expect(confirm).toBeHidden();
-    await expect(status.getByText("Draft", { exact: true })).toBeVisible();
+    await expect(status.getByText("Draft · not open yet", { exact: true })).toBeVisible();
     expect((await page.request.get(`/s/${slug}`)).status()).toBe(404);
 
-    await status.getByRole("button", { name: "Open orders" }).click();
+    await page.getByRole("button", { name: "Open orders" }).click();
     await confirm.getByRole("button", { name: "Publish store and open orders" }).click();
     await expect(confirm).toBeHidden();
     await expect(status.getByText("Taking orders", { exact: true })).toBeVisible();

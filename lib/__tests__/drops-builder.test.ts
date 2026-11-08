@@ -6,11 +6,13 @@ import {
   daysBetweenYmd,
   dayOffset,
   defaultCutoffFor,
+  defaultDropTitle,
   dropToFormInput,
   duplicateDropFields,
   groupDropsByDay,
   istTodayYmd,
   istTomorrowYmd,
+  lastDropDefaults,
   planDropItemRemoval,
   shiftDropSchedule,
   shiftOrderWindowDates,
@@ -38,6 +40,19 @@ describe("IST day helpers", () => {
     expect(dayOffset(ymdToDbDate("2026-10-05"), "2026-10-06")).toBe(1);
     expect(dayOffset(ymdToDbDate("2026-10-05"), "2026-10-01")).toBe(-4);
     expect(() => dayOffset(ymdToDbDate("2026-10-05"), "06/10/2026")).toThrow();
+  });
+});
+
+describe("defaultDropTitle", () => {
+  it("names a new drop after its cooking day", () => {
+    expect(defaultDropTitle("2026-10-17")).toBe("Saturday menu");
+    expect(defaultDropTitle("2026-10-18")).toBe("Sunday menu");
+    expect(defaultDropTitle("2026-10-17", "goods")).toBe("Saturday batch");
+  });
+
+  it("is empty while the date input is cleared or invalid", () => {
+    expect(defaultDropTitle("")).toBe("");
+    expect(defaultDropTitle("2026-13-40")).toBe("");
   });
 });
 
@@ -163,6 +178,26 @@ describe("duplicateDropFields (copy for tomorrow)", () => {
   });
 });
 
+describe("lastDropDefaults", () => {
+  it("keeps how and when buyers got the last drop, in IST", () => {
+    expect(
+      lastDropDefaults({
+        fulfilmentMode: "BOTH",
+        fulfilmentStartsAt: istToUtc("2026-10-10", "18:30"),
+        fulfilmentEndsAt: istToUtc("2026-10-10", "21:00"),
+        pickupNote: "Gate 2",
+        deliveryFeePaise: 3000,
+      }),
+    ).toEqual({
+      fulfilmentMode: "BOTH",
+      fulfilmentStart: "18:30",
+      fulfilmentEnd: "21:00",
+      pickupNote: "Gate 2",
+      deliveryFeePaise: 3000,
+    });
+  });
+});
+
 describe("planDropItemRemoval", () => {
   const existing = [
     { id: "di1", menuItemId: "m1", orderItemCount: 0 },
@@ -188,6 +223,12 @@ describe("groupDropsByDay", () => {
     const drops = [{ date: "2026-10-01" }, { date: "2026-10-07" }, { date: "2026-10-05" }, { date: "2026-10-03" }];
     const { upcoming, past } = groupDropsByDay(drops, "2026-10-05");
     expect(upcoming.map((d) => d.date)).toEqual(["2026-10-05", "2026-10-07"]);
+    expect(past.map((d) => d.date)).toEqual(["2026-10-03", "2026-10-01"]);
+  });
+
+  it("keeps only the latest two past drops", () => {
+    const drops = [{ date: "2026-09-20" }, { date: "2026-10-03" }, { date: "2026-09-27" }, { date: "2026-10-01" }];
+    const { past } = groupDropsByDay(drops, "2026-10-05");
     expect(past.map((d) => d.date)).toEqual(["2026-10-03", "2026-10-01"]);
   });
 });

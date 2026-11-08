@@ -32,8 +32,8 @@ test.describe("free trial", () => {
 
     await expect(page.getByText(/starter — free trial/i)).toBeVisible();
     await expect(page.getByText(/30 of 30 days left/i)).toBeVisible();
-    await expect(page.getByRole("button", { name: /^starter monthly/i })).toBeVisible();
-    await expect(page.getByRole("button", { name: /^starter yearly/i })).toBeVisible();
+    await expect(page.getByRole("radio", { name: /^starter/i })).toBeChecked();
+    await expect(page.getByRole("button", { name: /^subscribe — starter monthly/i })).toBeVisible();
 
     // CSV export is a Starter feature: the plan gate lets a trial vendor through.
     const csv = await page.request.get("/api/transactions/export?from=2026-01-01&to=2026-12-31");
@@ -93,11 +93,12 @@ test.describe("free trial", () => {
       const csv = await page.request.get("/api/transactions/export?from=2026-01-01&to=2026-12-31");
       expect(csv.status()).toBe(200);
 
-      // Billing explains the state and offers both plans.
+      // Billing explains the state and offers the plans.
       await page.goto("/settings/billing");
       await expect(page.getByText(/no active plan/i)).toBeVisible();
-      await expect(page.getByRole("button", { name: /^starter monthly/i })).toBeVisible();
-      await expect(page.getByRole("button", { name: /^starter yearly/i })).toBeVisible();
+      await expect(page.getByRole("radio", { name: /^starter/i })).toBeChecked();
+      await page.getByRole("radio", { name: /^yearly/i }).check();
+      await expect(page.getByRole("button", { name: /^subscribe — starter yearly/i })).toBeVisible();
     });
 
     test("an offline sale rung up before the lock still syncs; one rung up after does not", async ({

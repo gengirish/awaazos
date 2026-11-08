@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 // Pure functions only — keep Prisma/env/KV out of the unit run.
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
-vi.mock("@/lib/drops-signal", () => ({ bumpDropOrderSignal: vi.fn() }));
+vi.mock("@/lib/drops-signal", () => ({ bumpOrderSignal: vi.fn() }));
 vi.mock("@/lib/push", () => ({ notifyVendorInBackground: vi.fn(), newOrderPayload: vi.fn() }));
 
 import type { DropStatus } from "@prisma/client";
@@ -92,7 +92,7 @@ describe("storefront menu item filter", () => {
 describe("menu_paused_for_drop copy", () => {
   it("points the buyer at the drop", () => {
     expect(orderErrorMessage({ error: "menu_paused_for_drop" })).toBe(
-      "The everyday menu is paused while today's special menu is open. Order from the drop above.",
+      "Everyday items are paused while a pre-order is open. Order from the pre-order above.",
     );
   });
 });

@@ -134,5 +134,43 @@
       "sweets"
     ],
     "priceInPaise": 40000
+  },
+  {
+    "id": "herbal-tea",
+    "slug": "herbal-tea",
+    "name": "Herbal Tea",
+    "aliases": [
+      "tulsi tea",
+      "herbal chai"
+    ],
+    "tags": [
+      "wellness"
+    ],
+    "priceInPaise": 24900
+  },
+  {
+    "id": "festive-gift-box",
+    "slug": "festive-gift-box",
+    "name": "Festive Gift Box",
+    "aliases": [
+      "gift box",
+      "gift hamper"
+    ],
+    "tags": [
+      "gifting"
+    ],
+    "priceInPaise": 89900
+  },
+  {
+    "id": "ashwagandha-powder",
+    "slug": "ashwagandha-powder",
+    "name": "Ashwagandha Powder",
+    "aliases": [
+      "ashwagandha"
+    ],
+    "tags": [
+      "wellness"
+    ],
+    "priceInPaise": 39900
   }
 ]

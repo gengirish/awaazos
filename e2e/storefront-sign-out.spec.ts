@@ -5,8 +5,9 @@ import { createLoginToken } from "../lib/customer-auth";
 import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
- * A signed-in storefront buyer can sign out from the store header and from the
- * top of the account page — not only from the bottom of the profile form.
+ * A signed-in storefront buyer can sign out from the top of the account page —
+ * not only from the bottom of the profile form. The store header keeps just
+ * "My orders" (its pill row has to fit a 360 px phone), one tap from Sign out.
  *
  * Signs in through the real magic-link route: the test mints a login token
  * directly (no email in CI) and opens /api/s/customer/verify like the email
@@ -47,25 +48,22 @@ test.describe("storefront buyer sign-out", () => {
         await buyer.waitForURL(new RegExp(`/s/${slug}$`));
       };
 
-      // 1) Store header: "My orders" + "Sign out" side by side.
+      // 1) Store header: "My orders" only — Sign out is on the account page it opens.
       await signIn();
-      await expect(buyer.getByRole("link", { name: /my orders/i })).toBeVisible();
-      await buyer.getByRole("button", { name: "Sign out" }).click();
-      await expect(buyer.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
       await expect(buyer.getByRole("button", { name: "Sign out" })).toHaveCount(0);
-      // The session is really gone server-side, not just hidden.
-      expect((await buyer.request.get("/api/s/customer/profile")).status()).toBe(401);
+      await buyer.getByRole("link", { name: /my orders/i }).click();
+      await buyer.waitForURL(new RegExp(`/s/${slug}/account$`));
 
       // 2) Account page: Sign out is in the header, no scrolling needed.
-      await signIn();
-      await buyer.goto(`/s/${slug}/account`);
       const header = buyer.getByRole("banner");
       await header.getByRole("button", { name: "Sign out" }).click();
       await expect(buyer.getByRole("heading", { level: 1, name: /sign in to/i })).toBeVisible();
+      // The session is really gone server-side, not just hidden.
       expect((await buyer.request.get("/api/s/customer/profile")).status()).toBe(401);
 
       // 3) Guests never see a Sign out button.
       await buyer.goto(`/s/${slug}`);
+      await expect(buyer.getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
       await expect(buyer.getByRole("button", { name: "Sign out" })).toHaveCount(0);
     } finally {
       await buyerCtx.close();

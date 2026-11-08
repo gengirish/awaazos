@@ -1,0 +1,33 @@
+{
+  "id": "en-004-capsules-no-price",
+  "lang": "en-IN",
+  "transcript": "Moringa capsules, 60 capsules, 499. Neem soap 120. Rose water 200 ml, price later.",
+  "expected": {
+    "items": [
+      {
+        "name": "Moringa Capsules",
+        "action": "create",
+        "priceInPaise": 49900,
+        "unit": "60 capsules"
+      },
+      {
+        "name": "Neem Soap",
+        "action": "create",
+        "priceInPaise": 12000,
+        "unit": null
+      },
+      {
+        "name": "Rose Water",
+        "action": "create",
+        "priceSpoken": false,
+        "unit": "200 ml"
+      }
+    ]
+  },
+  "tags": [
+    "products",
+    "pack-size",
+    "no-price"
+  ],
+  "notes": "A count is a pack size; a size with no price must not become the price."
+}

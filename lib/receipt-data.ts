@@ -27,6 +27,7 @@ const RECEIPT_TX_SELECT = {
   createdAt: true,
   subtotalPaise: true,
   discountPaise: true,
+  offerName: true,
   deliveryFeePaise: true,
   taxPaise: true,
   totalPaise: true,
@@ -44,6 +45,7 @@ const RECEIPT_TX_SELECT = {
     select: {
       id: true,
       slug: true,
+      isDemo: true,
       name: true,
       city: true,
       state: true,
@@ -82,6 +84,7 @@ function toView(row: ReceiptRow, publicToken: string | null, baseUrl: string): R
     })),
     subtotalPaise: row.subtotalPaise,
     discountPaise: row.discountPaise,
+    offerName: row.offerName,
     deliveryFeePaise: row.deliveryFeePaise,
     taxPaise: row.taxPaise,
     totalPaise: row.totalPaise,
@@ -95,6 +98,7 @@ function toView(row: ReceiptRow, publicToken: string | null, baseUrl: string): R
       baseUrl,
     }),
     receiptUrl: publicReceiptUrl(publicToken, baseUrl),
+    referralSlug: row.vendor.isDemo ? null : row.vendor.slug,
   };
 }
 

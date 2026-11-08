@@ -1,9 +1,10 @@
 import Link from "next/link";
+import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { MARKETED_PLANS, PLAN_MARKETING } from "@/lib/plan-copy";
 
-// Tier copy lives in lib/plan-copy.ts (one source with the pricing page). One plan is sold.
+// Tier copy lives in lib/plan-copy.ts (one source with the pricing page).
 const tiers = MARKETED_PLANS.map((plan) => ({ name: plan, ...PLAN_MARKETING[plan] }));
 
 export function PricingTeaser() {
@@ -11,13 +12,13 @@ export function PricingTeaser() {
     <section aria-labelledby="pricing-teaser-heading" className="px-4 py-16 sm:px-6 sm:py-20">
       <div className="mx-auto max-w-6xl">
         <h2 id="pricing-teaser-heading" className="font-display text-3xl font-bold text-balance text-awaaz-charcoal sm:text-4xl">
-          One simple plan for every vendor
+          Simple plans
         </h2>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          {PLAN_MARKETING.STARTER.trial}. Then {PLAN_MARKETING.STARTER.price}, or{" "}
-          {PLAN_MARKETING.STARTER.yearlyPrice} ({PLAN_MARKETING.STARTER.yearlyNote}). No upsells.
+          {PLAN_MARKETING.STARTER.trial} on {PLAN_MARKETING.STARTER.label}, no card needed. Then pick your plan, or pay
+          yearly for {PLAN_MARKETING.STARTER.yearlyNote}.
         </p>
-        <div className="mt-10 grid max-w-md gap-6">
+        <div className="mt-10 grid max-w-md gap-6 md:max-w-none md:grid-cols-3">
           {tiers.map((tier) => (
             <Card
               key={tier.name}
@@ -28,6 +29,9 @@ export function PricingTeaser() {
               }
             >
               <CardHeader>
+                {tier.badge ? (
+                  <p className="text-sm font-semibold uppercase tracking-wider text-primary">{tier.badge}</p>
+                ) : null}
                 <CardTitle className="font-display text-lg text-awaaz-charcoal">{tier.label}</CardTitle>
                 <p className="mt-2 font-display text-3xl font-bold text-awaaz-charcoal">
                   {tier.amount}
@@ -49,7 +53,7 @@ export function PricingTeaser() {
                       : "min-h-11 w-full focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
                   }
                 >
-                  <Link href="/sign-up">Start {tier.trial}</Link>
+                  <Link href="/sign-up">{tier.cta}</Link>
                 </Button>
               </CardFooter>
             </Card>
@@ -58,9 +62,10 @@ export function PricingTeaser() {
         <div className="mt-10 text-center">
           <Link
             href="/pricing"
-            className="inline-flex min-h-11 items-center justify-center rounded-md px-4 text-base font-semibold text-awaaz-orange underline-offset-4 outline-hidden hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+            className="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-md px-4 text-base font-semibold text-awaaz-orange underline-offset-4 outline-hidden hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
           >
-            See pricing →
+            See pricing
+            <ArrowRight className="h-4 w-4" aria-hidden="true" />
           </Link>
         </div>
       </div>

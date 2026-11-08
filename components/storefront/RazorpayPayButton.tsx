@@ -2,22 +2,43 @@
 
 import { CreditCard, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { loadCheckout, type RazorpayOrderSuccess } from "@/lib/razorpay-checkout";
+import {
+  checkoutCancelledMessage,
+  checkoutLoadFailedMessage,
+  directPayOfferLabel,
+  PAY_NOW_PARAM,
+  startErrorMessage,
+  startErrorOpensDirectPay,
+  type DirectPayFallback,
+} from "@/lib/storefront-direct-pay";
 
 /**
- * "Pay online" for a storefront order, through the kitchen's OWN Razorpay
+ * "Pay online" for a storefront order, through the store's OWN Razorpay
  * account (Razorpay Standard Checkout). Flow:
  *
  *   1. POST …/razorpay        → server creates/reuses a Razorpay Order for the
  *                                exact order total; returns the public key id.
  *   2. Load checkout.js on click (not on page load — most buyers never need it).
  *   3. Checkout success       → POST …/razorpay/verify (server checks the HMAC
- *                                with the vendor's secret) → router.refresh().
+ *                                with the vendor's secret, or asks Razorpay for a
+ *                                "Connect Razorpay" store) → router.refresh().
  *
- * The per-vendor webhook marks the order paid independently, so if step 3 fails
- * (flaky network) the buyer is told to refresh rather than pay again.
+ * The webhooks mark the order paid independently, so if step 3 fails
+ * (flaky network) the buyer is pointed at the order page's "Check for update"
+ * button (OrderRefresh) rather than told to pay again.
+ *
+ * `onOfferDirectPay` fires when Razorpay can't take this payment, so the page can
+ * show the way to pay without it (lib/storefront-direct-pay.ts). Closing the window
+ * isn't a failure: it only leaves a quiet link to the same place, so a change of mind
+ * doesn't end in a payment the seller has to check by hand. Never once Checkout
+ * reports success: the buyer has paid and must not be invited to pay again.
+ *
+ * `autoStart` runs the same `start()` once on arrival from checkout and takes
+ * `?pay=1` out of the address, so a reload or Back never reopens the window. The
+ * button stays usable in case the window doesn't appear (nothing reports that).
  *
  * `prefillName` / `prefillContact` are the buyer's own details on the buyer's
  * own order page; they go only to Razorpay Checkout, never to a log.
@@ -32,37 +53,40 @@ type StartPaymentData = {
   billNumber: string;
 };
 
-const START_ERRORS: Record<string, string> = {
-  order_expired: "This order's hold has expired, so the items were released. Please place the order again.",
-  not_awaiting_payment: "This order isn't waiting for payment any more. Refresh to see its status.",
-  online_payment_unavailable: "Online payment isn't available for this kitchen right now. Please pay by UPI below.",
-  payment_processing: "Your payment went through — we're confirming it. Refresh in a minute.",
-  razorpay_unavailable: "Couldn't reach the payment service. Please try again, or pay by UPI below.",
-  rate_limited: "Too many attempts. Please wait a minute and try again.",
-};
-
 export function RazorpayPayButton({
   slug,
   token,
   amountLabel,
   prefillName,
   prefillContact,
+  fallback,
+  onOfferDirectPay,
+  directPayOpen,
+  autoStart,
 }: {
   slug: string;
   token: string;
   amountLabel: string;
   prefillName?: string | null;
   prefillContact?: string | null;
+  fallback: DirectPayFallback;
+  onOfferDirectPay: () => void;
+  directPayOpen: boolean;
+  autoStart: boolean;
 }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; tone: "error" | "info" } | null>(null);
+  const [closedWindow, setClosedWindow] = useState(false);
+  const paid = useRef(false);
+  const autoStarted = useRef(false);
 
   const base = `/api/s/${encodeURIComponent(slug)}/orders/${encodeURIComponent(token)}/razorpay`;
 
   async function confirm(resp: RazorpayOrderSuccess) {
+    paid.current = true;
     setBusy(true);
-    setMessage({ text: "Payment received — confirming with the kitchen…", tone: "info" });
+    setMessage({ text: "Payment received — confirming with the store…", tone: "info" });
     try {
       const res = await fetch(`${base}/verify`, {
         method: "POST",
@@ -74,20 +98,22 @@ export function RazorpayPayButton({
         router.refresh();
         return;
       }
-      if (res.status === 409) {
+      const verifyError = ((await res.json().catch(() => ({}))) as { error?: string }).error;
+      // not_paid_yet: Razorpay hasn't captured it yet (OAuth stores) — the webhook will.
+      if (res.status === 409 && verifyError !== "not_paid_yet") {
         setMessage({
-          text: "Your payment went through, but this order was closed in the meantime. Please message the kitchen — they'll refund or confirm it.",
+          text: "Your payment went through, but this order was closed in the meantime. Please message the store — they'll refund or confirm it.",
           tone: "error",
         });
       } else {
         setMessage({
-          text: "Your payment went through. We're still confirming it — refresh this page in a minute. Please don't pay again.",
+          text: "Your payment went through. We're still confirming it — tap “Check for update” above in a minute. Please don't pay again.",
           tone: "info",
         });
       }
     } catch {
       setMessage({
-        text: "Your payment went through. We're still confirming it — refresh this page in a minute. Please don't pay again.",
+        text: "Your payment went through. We're still confirming it — tap “Check for update” above in a minute. Please don't pay again.",
         tone: "info",
       });
     } finally {
@@ -99,14 +125,16 @@ export function RazorpayPayButton({
     if (busy) return;
     setBusy(true);
     setMessage(null);
+    setClosedWindow(false);
     try {
       const res = await fetch(base, { method: "POST" });
       const json = (await res.json().catch(() => ({}))) as { data?: StartPaymentData; error?: string };
       if (!res.ok || !json.data) {
         setMessage({
-          text: START_ERRORS[json.error ?? ""] ?? "Couldn't start the payment. Please try again, or pay by UPI below.",
+          text: startErrorMessage(json.error, fallback),
           tone: json.error === "payment_processing" ? "info" : "error",
         });
+        if (startErrorOpensDirectPay(json.error)) onOfferDirectPay();
         setBusy(false);
         return;
       }
@@ -116,14 +144,17 @@ export function RazorpayPayButton({
         await loadCheckout();
       } catch {
         setMessage({
-          text: "Couldn't load the payment window. Check your connection, or pay by UPI below.",
+          text: checkoutLoadFailedMessage(fallback),
           tone: "error",
         });
+        onOfferDirectPay();
         setBusy(false);
         return;
       }
       const Razorpay = window.Razorpay;
       if (!Razorpay) {
+        setMessage({ text: checkoutLoadFailedMessage(fallback), tone: "error" });
+        onOfferDirectPay();
         setBusy(false);
         return;
       }
@@ -145,23 +176,40 @@ export function RazorpayPayButton({
         modal: {
           confirm_close: true,
           ondismiss: () => {
+            if (paid.current) return;
             setBusy(false);
-            setMessage((m) =>
-              m?.tone === "error" ? m : { text: "Payment cancelled. You can try again, or pay by UPI below.", tone: "info" },
-            );
+            setClosedWindow(true);
+            setMessage((m) => (m?.tone === "error" ? m : { text: checkoutCancelledMessage(), tone: "info" }));
           },
         },
       });
       rzp.on("payment.failed", () => {
         // Checkout lets the buyer retry inside the window; this just leaves a note.
         setMessage({ text: "That payment didn't go through. No money was taken — try again or use another method.", tone: "error" });
+        onOfferDirectPay();
       });
       rzp.open();
+      // The window covers the button. If it never appeared, the button must still work.
+      if (!paid.current) setBusy(false);
     } catch {
-      setMessage({ text: "Couldn't reach the kitchen — check your connection and try again.", tone: "error" });
+      setMessage({ text: "Couldn't reach the store — check your connection and try again.", tone: "error" });
+      onOfferDirectPay();
       setBusy(false);
     }
   }
+
+  useEffect(() => {
+    if (!autoStart || autoStarted.current) return;
+    autoStarted.current = true;
+    const url = new URL(window.location.href);
+    url.searchParams.delete(PAY_NOW_PARAM);
+    window.history.replaceState(null, "", url);
+    void start();
+    // Once, on arrival: `start` reads only values that are fixed for this mount.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const offerLabel = closedWindow && !directPayOpen && !busy ? directPayOfferLabel(fallback) : null;
 
   return (
     <div className="space-y-2">
@@ -190,6 +238,15 @@ export function RazorpayPayButton({
           </p>
         ) : null}
       </div>
+      {offerLabel ? (
+        <button
+          type="button"
+          onClick={onOfferDirectPay}
+          className="inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold text-primary underline underline-offset-4 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+        >
+          {offerLabel}
+        </button>
+      ) : null}
     </div>
   );
 }

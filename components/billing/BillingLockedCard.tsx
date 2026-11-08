@@ -2,16 +2,43 @@ import type { StaffRole } from "@prisma/client";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
-import { TRIAL_DAYS } from "@/lib/constants";
+import { formatINRCompact } from "@/lib/currency";
 import { formatIstDate } from "@/lib/datetime";
 import { PLAN_MARKETING } from "@/lib/plan-copy";
+import { storeBasePaise } from "@/lib/subscription";
+
+/** What ran out when a vendor became locked: the free trial, or a paid period. */
+export type LockReason = "trial" | "paid";
+
+/**
+ * `billingAccess` (lib/plan.ts) locks from whichever ended last, the trial or
+ * a paid period plus grace, and reports that instant as `since`. So the lock
+ * is the trial's exactly when `since` is `trialEndsAt`.
+ */
+export function lockReason(since: Date, trialEndsAt: Date | null | undefined): LockReason {
+  return trialEndsAt && trialEndsAt.getTime() === since.getTime() ? "trial" : "paid";
+}
 
 /**
  * Shown instead of a selling screen when the vendor is locked (trial over or
  * paid period ended, not subscribed — `billingAccess` in lib/plan.ts). Records
  * stay reachable, so it always links to bills and, for the owner, billing.
+ *
+ * Pass `ctx.vendor.trialEndsAt` so the copy names what ended.
  */
-export function BillingLockedCard({ since, staffRole }: { since: Date; staffRole: StaffRole }) {
+export function BillingLockedCard({
+  since,
+  staffRole,
+  trialEndsAt,
+  customPricePaise,
+}: {
+  since: Date;
+  staffRole: StaffRole;
+  trialEndsAt: Date | null | undefined;
+  /** This store's own price (lib/subscription.ts). Null = the list price. */
+  customPricePaise: number | null;
+}) {
+  const reason = lockReason(since, trialEndsAt);
   const starter = PLAN_MARKETING.STARTER;
   const isOwner = staffRole === "OWNER";
   return (
@@ -21,13 +48,22 @@ export function BillingLockedCard({ since, staffRole }: { since: Date; staffRole
           Subscribe to keep selling
         </h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Your {TRIAL_DAYS}-day free trial or paid period ended on {formatIstDate(since)}. New bills and online
-          orders are paused until you subscribe. Your bills, reports and settings are all still here.
+          {reason === "trial"
+            ? `Your free trial ended on ${formatIstDate(since)}.`
+            : `Your paid plan ended on ${formatIstDate(since)}.`}{" "}
+          New bills and online orders are paused until you subscribe. Your bills, reports and settings are all
+          still here.
         </p>
         <p className="mt-4 text-lg font-semibold">
-          {starter.price}
+          {customPricePaise === null
+            ? starter.price
+            : `${formatINRCompact(storeBasePaise("monthly", customPricePaise))}/mo + GST`}
           <span className="block text-sm font-normal text-muted-foreground">
-            or {starter.yearlyPrice} — {starter.yearlyNote}
+            or{" "}
+            {customPricePaise === null
+              ? starter.yearlyPrice
+              : `${formatINRCompact(storeBasePaise("yearly", customPricePaise))}/yr + GST`}{" "}
+            — {starter.yearlyNote}
           </span>
         </p>
         <div className="mt-6 flex flex-col gap-3">

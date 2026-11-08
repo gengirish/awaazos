@@ -1,0 +1,89 @@
+import type { StaffRole, StallType } from "@prisma/client";
+
+import type { PlanFields } from "@/lib/plan";
+import { prisma } from "@/lib/prisma";
+import { checklistForRole, setupChecklist, type ChecklistItem } from "@/lib/settings-overview";
+import { storeKind } from "@/lib/store-vocabulary";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
+
+// Server only (Prisma): import it from server components and route handlers.
+
+/** Props of `<SetupChecklistCard>` (components/setup/SetupChecklistCard.tsx). */
+export type SetupChecklistData = {
+  /** Steps still open that this viewer can act on. Empty → the card renders nothing. */
+  items: ChecklistItem[];
+  /** The published store, for the link with Copy / Share. Null while unpublished. */
+  store: { slug: string; name: string } | null;
+};
+
+type KnownSettings = {
+  publishStorefront: boolean;
+  acceptPayOnDelivery: boolean;
+  acceptMenuOrders: boolean;
+  fssaiNumber: string | null;
+};
+
+export type SetupChecklistInput = {
+  /** `ctx.vendor` from `requireVendorRole`. */
+  vendor: PlanFields & { id: string; slug: string; name: string; upiId: string | null; stallType: StallType };
+  /** `ctx.staff.role`. */
+  role: StaffRole;
+  /** Values the page has already read, so they are not read twice. */
+  known?: {
+    /** The vendor's settings row (null when it has none). */
+    settings?: KnownSettings | null;
+    /** `MenuItem` rows with `isAvailable: true`. */
+    availableItemCount?: number;
+  };
+};
+
+/**
+ * The "start taking online orders" checklist for one page render:
+ *
+ *   const setup = await loadSetupChecklist({ vendor: ctx.vendor, role: ctx.staff.role });
+ *   <SetupChecklistCard {...setup} />
+ *
+ * Read once per page load, in one batch, and only for staff who can act on a
+ * step (every step needs MANAGER or OWNER, so a cashier costs no query). No
+ * timer and nothing cached: the rule is the pure `setupChecklist()`.
+ */
+export async function loadSetupChecklist({ vendor, role, known }: SetupChecklistInput): Promise<SetupChecklistData> {
+  if (role === "CASHIER") return { items: [], store: null };
+
+  const [settings, availableItemCount, dropCount] = await Promise.all([
+    known?.settings !== undefined
+      ? known.settings
+      : prisma.vendorSettings.findUnique({
+          where: { vendorId: vendor.id },
+          select: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true, fssaiNumber: true },
+        }),
+    known?.availableItemCount ?? prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
+    prisma.drop.count({ where: { vendorId: vendor.id } }),
+  ]);
+
+  const publishStorefront = settings?.publishStorefront ?? false;
+  const acceptPayOnDelivery = settings?.acceptPayOnDelivery ?? true;
+  // Razorpay only decides the payment step when nothing else satisfies it, so most pages skip this read.
+  const onlinePayment =
+    !vendor.upiId?.trim() &&
+    !acceptPayOnDelivery &&
+    isOnlinePaymentEnabled(
+      vendor,
+      await prisma.vendorSettings.findUnique({ where: { vendorId: vendor.id }, select: RAZORPAY_CRED_SELECT }),
+    );
+  const items = checklistForRole(
+    setupChecklist({
+      availableItemCount,
+      publishStorefront,
+      upiId: vendor.upiId,
+      acceptPayOnDelivery,
+      onlinePayment,
+      acceptMenuOrders: settings?.acceptMenuOrders ?? false,
+      dropCount,
+      fssaiNumber: settings?.fssaiNumber ?? null,
+    }, storeKind(vendor.stallType)),
+    role,
+  );
+
+  return { items, store: publishStorefront ? { slug: vendor.slug, name: vendor.name } : null };
+}

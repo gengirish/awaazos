@@ -1,14 +1,16 @@
 "use client";
 
-import { AlertCircle, Loader2, Mic, Square, Undo2, X } from "lucide-react";
+import { AlertCircle, Loader2, Mic, Plus, Square, Undo2, X } from "lucide-react";
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { AddMenuItemDialog, type AddedMenuItem } from "@/components/drops/AddMenuItemDialog";
 import { Button } from "@/components/ui/button";
 import { useOnline } from "@/hooks/useOnline";
 import { useVoiceDictation, type DictationError } from "@/hooks/useVoiceDictation";
 import { voiceSummary } from "@/lib/drop-voice";
 import type { DropDraft } from "@/lib/parse-drop-types";
+import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import type { SttSource } from "@/lib/stt-source";
 import { cn } from "@/lib/utils";
 
@@ -24,6 +26,12 @@ export type VoiceDropPanelProps = {
   /** Restore the form as it was before the last voice take. */
   onUndo: () => void;
   canUndo: boolean;
+  /** A spoken dish was added to the menu from here: tick it in the form with the spoken quantity. */
+  onMenuItemAdded: (item: AddedMenuItem, quantity: number | null) => void;
+  /** Owners get a link to billing when voice is paused by the billing lock. */
+  canManageBilling?: boolean;
+  /** The store's words for its catalogue (lib/store-vocabulary.ts). */
+  vocab: StoreVocabulary;
 };
 
 const LANG_LABEL: Record<string, string> = {
@@ -35,6 +43,12 @@ const LANG_LABEL: Record<string, string> = {
 };
 
 /** One sentence in the way a home cook would say it in that language (romanised). */
+/** A product store's plan (lib/store-vocabulary.ts). The dormant languages fall back to English. */
+const GOODS_EXAMPLE: Record<string, string> = {
+  "en-IN": "This Saturday, 20 herbal tea packs at 299 rupees, 10 gift boxes at 899, delivery 4 to 7 in the evening, orders till Friday 9 pm.",
+  "hi-IN": "Is Saturday 20 herbal tea pack 299 rupaye, 10 gift box 899, delivery shaam 4 se 7 baje, order Friday raat 9 baje tak.",
+};
+
 const EXAMPLE: Record<string, string> = {
   "en-IN": "Tomorrow, 20 ragi laddu at 150 rupees, 15 thepla, pickup 6 to 8 in the evening, orders till 4.",
   "hi-IN": "Aaj ke liye 20 ragi laddu 150 rupaye, 15 thepla, pickup shaam 6 se 8 baje, order 4 baje tak.",
@@ -48,6 +62,7 @@ const FORM_HINT = "fill the form below";
 const ERROR_MESSAGES: Record<string, string> = {
   voice_unavailable: `Voice isn't available right now — ${FORM_HINT}.`,
   ai_limit: `Voice limit reached for your plan — ${FORM_HINT}.`,
+  billing_locked: "Voice is paused until you subscribe. You can still fill in the form.",
   rate_limited: `Too many voice tries — wait a minute, or ${FORM_HINT}.`,
   not_allowed: `Voice isn't available for your account here — ${FORM_HINT}.`,
   mic_denied: `Microphone blocked — allow mic access, or ${FORM_HINT}.`,
@@ -69,7 +84,8 @@ function errorMessage(code: DictationError | null): string {
 /** parse-drop HTTP status → panel error code (shapes mirror /api/ai/parse-order). */
 function errorForStatus(status: number, body: { error?: string }): DictationError {
   if (status === 503 || body.error === "voice_unavailable") return "voice_unavailable";
-  if (status === 402) return "ai_limit";
+  // 402 is two different things: the billing lock, or a plan / usage cap.
+  if (status === 402) return body.error === "billing_locked" ? "billing_locked" : "ai_limit";
   if (status === 429) return "rate_limited";
   if (status === 401 || status === 403 || status === 404) return "not_allowed";
   return "parse_failed";
@@ -78,8 +94,18 @@ function errorForStatus(status: number, body: { error?: string }): DictationErro
 type Unmatched = { key: string; spokenName: string; quantity?: number | null };
 type Result = { summary: string; warnings: string[]; unmatched: Unmatched[] };
 
-export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, canUndo }: VoiceDropPanelProps) {
+export function VoiceDropPanel({
+  voiceLang,
+  isEdit = false,
+  onDraft,
+  onUndo,
+  canUndo,
+  onMenuItemAdded,
+  canManageBilling = false,
+  vocab,
+}: VoiceDropPanelProps) {
   const [result, setResult] = useState<Result | null>(null);
+  const [adding, setAdding] = useState<Unmatched | null>(null);
   const [undone, setUndone] = useState(false);
   const summaryRef = useRef<HTMLParagraphElement>(null);
   const micRef = useRef<HTMLButtonElement>(null);
@@ -112,19 +138,19 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
       const unmatched = (draft.unmatched ?? []).map((u, i) => ({ ...u, key: `${i}-${u.spokenName}` }));
       const warnings = [...(draft.warnings ?? [])];
       for (const it of draft.items ?? []) {
-        if (it.matchedByName) warnings.push(`Picked “${it.name}” from your menu by name — check it's the right dish.`);
+        if (it.matchedByName) warnings.push(`Picked “${it.name}” from your ${vocab.catalogue} by name — check it's the right ${vocab.item}.`);
       }
       if (applied.unknownItemIds.length > 0) {
-        warnings.push("Some dishes weren't on your menu and were left out — check the item list.");
+        warnings.push(`Some ${vocab.items} weren't on your ${vocab.catalogue} and were left out — check the item list.`);
       }
       if (applied.fieldCount === 0 && applied.dishCount === 0 && unmatched.length === 0) {
         return "nothing_found";
       }
       focusSummary.current = true;
       setUndone(false);
-      setResult({ summary: voiceSummary(applied.fieldCount, applied.dishCount), warnings, unmatched });
+      setResult({ summary: voiceSummary(applied.fieldCount, applied.dishCount, vocab), warnings, unmatched });
     },
-    [voiceLang],
+    [voiceLang, vocab],
   );
 
   const { state, transcript, error, start, stop } = useVoiceDictation({ voiceLang, onTranscript: parse });
@@ -153,6 +179,16 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
     start();
   }
 
+  function menuItemAdded(item: AddedMenuItem) {
+    if (!adding) return;
+    onMenuItemAdded(item, adding.quantity ?? null);
+    const key = adding.key;
+    setAdding(null);
+    // The row (and the button that opened the dialog) goes away: review continues from the summary.
+    focusSummary.current = true;
+    setResult((r) => (r ? { ...r, unmatched: r.unmatched.filter((x) => x.key !== key) } : r));
+  }
+
   function undo() {
     onUndo();
     setResult(null);
@@ -172,10 +208,13 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
             ? "Voice changes undone."
             : result
               ? "Done — check the form below."
-              : "Tap the mic and say what you're cooking, how many, the price and the timings.";
+              : `Tap the mic and say what you're ${vocab.kind === "food" ? "cooking" : "selling"}, how many, the price and the timings.`;
 
   const langLabel = LANG_LABEL[voiceLang] ?? voiceLang;
-  const example = EXAMPLE[voiceLang] ?? EXAMPLE["en-IN"];
+  const example =
+    vocab.kind === "food"
+      ? (EXAMPLE[voiceLang] ?? EXAMPLE["en-IN"])
+      : (GOODS_EXAMPLE[voiceLang] ?? GOODS_EXAMPLE["en-IN"]);
 
   return (
     <section
@@ -248,7 +287,16 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden="true" />
               <span>{statusText}</span>
             </p>
-          ) : (
+          ) : null}
+          {state === "error" && error === "billing_locked" && canManageBilling && !offline ? (
+            <Link
+              href="/settings/billing"
+              className="inline-flex min-h-11 items-center text-sm font-semibold text-primary underline underline-offset-2"
+            >
+              Choose a plan
+            </Link>
+          ) : null}
+          {state === "error" || offline ? null : (
             <p
               id="voice-drop-status"
               aria-live="polite"
@@ -297,23 +345,24 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
 
           {result.unmatched.length > 0 ? (
             <div>
-              <h3 className="text-sm font-medium">Not on your menu</h3>
-              <ul className="mt-1 space-y-2" aria-label="Dishes not on your menu">
+              <h3 className="text-sm font-medium">Not on your {vocab.catalogue}</h3>
+              <ul className="mt-1 space-y-2" aria-label={`${vocab.Items} not on your ${vocab.catalogue}`}>
                 {result.unmatched.map((u) => (
                   <li key={u.key} className="flex flex-wrap items-center gap-2 rounded-md border border-border p-2">
                     <span className="min-w-0 flex-1 text-sm">
                       {u.spokenName}
                       {u.quantity ? <span className="text-muted-foreground"> · {u.quantity}</span> : null}
                     </span>
-                    <Link
-                      href={`/menu?add=${encodeURIComponent(u.spokenName)}`}
-                      target="_blank"
-                      rel="noopener"
-                      aria-label={`Add ${u.spokenName} to menu (opens in a new tab)`}
-                      className="inline-flex min-h-11 items-center rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="min-h-11"
+                      aria-label={`Add ${u.spokenName} to ${vocab.catalogue}`}
+                      onClick={() => setAdding(u)}
                     >
-                      Add to menu
-                    </Link>
+                      <Plus aria-hidden="true" />
+                      <span aria-hidden="true">Add to {vocab.catalogue}</span>
+                    </Button>
                     <Button
                       type="button"
                       variant="ghost"
@@ -330,11 +379,22 @@ export function VoiceDropPanel({ voiceLang, isEdit = false, onDraft, onUndo, can
                 ))}
               </ul>
               <p className="mt-1 text-xs text-muted-foreground">
-                New menu dishes show up here after a page reload — save this drop first so nothing is lost.
+                Add to {vocab.catalogue} saves the {vocab.item} and ticks it in the item list below, with the quantity you
+                said.
               </p>
             </div>
           ) : null}
         </div>
+      ) : null}
+
+      {adding ? (
+        <AddMenuItemDialog
+          key={adding.key}
+          spokenName={adding.spokenName}
+          onClose={() => setAdding(null)}
+          onAdded={menuItemAdded}
+          vocab={vocab}
+        />
       ) : null}
 
       {canUndo ? (

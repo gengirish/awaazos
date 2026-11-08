@@ -6,6 +6,7 @@
 
 import type { EffectiveDropStatus } from "@/lib/drops";
 import { dbDateToYmd, utcToIstParts } from "@/lib/drops-time";
+import type { StoreKind } from "@/lib/store-vocabulary";
 import type { DropUpsertInput } from "@/lib/zod-drops";
 
 const DAY_MS = 86_400_000;
@@ -53,6 +54,18 @@ export function isValidYmd(ymd: string): boolean {
   } catch {
     return false;
   }
+}
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/**
+ * The title a new drop starts with, from its cooking day: "2026-10-17" →
+ * "Saturday menu". "" when the day isn't a valid "YYYY-MM-DD".
+ */
+export function defaultDropTitle(cookingYmd: string, kind: StoreKind = "food"): string {
+  if (!isValidYmd(cookingYmd)) return "";
+  // "Saturday menu" for a kitchen, "Saturday batch" for any other store (lib/store-vocabulary.ts).
+  return `${WEEKDAYS[new Date(ymdToUtcMidnightMs(cookingYmd)).getUTCDay()]} ${kind === "food" ? "menu" : "batch"}`;
 }
 
 /** Usual cut-off: the evening before the cooking day. */
@@ -183,6 +196,27 @@ export function dropToFormInput(drop: StoredDropForForm): DropUpsertInput {
   };
 }
 
+/**
+ * What a new drop keeps from the store's last one: how buyers get it and when,
+ * which rarely change between batches. Day, cut-off and items stay fresh, and so
+ * does the everyday-menu choice, which sits out of sight under "More options".
+ */
+export function lastDropDefaults(last: {
+  fulfilmentMode: DropUpsertInput["fulfilmentMode"];
+  fulfilmentStartsAt: Date;
+  fulfilmentEndsAt: Date;
+  pickupNote: string | null;
+  deliveryFeePaise: number;
+}): Pick<DropUpsertInput, "fulfilmentMode" | "fulfilmentStart" | "fulfilmentEnd" | "pickupNote" | "deliveryFeePaise"> {
+  return {
+    fulfilmentMode: last.fulfilmentMode,
+    fulfilmentStart: utcToIstParts(last.fulfilmentStartsAt).hm,
+    fulfilmentEnd: utcToIstParts(last.fulfilmentEndsAt).hm,
+    pickupNote: last.pickupNote,
+    deliveryFeePaise: last.deliveryFeePaise,
+  };
+}
+
 type CopyableDrop = DropSchedule & {
   title: string;
   note: string | null;
@@ -226,15 +260,27 @@ export function planDropItemRemoval(
   };
 }
 
-/** Upcoming = cooking day today or later (nearest first); past = earlier (newest first). */
+/** How many past drops `/drops` lists: enough to copy last week's, no long history. */
+export const PAST_DROPS_SHOWN = 2;
+
+/**
+ * Upcoming = cooking day today or later (nearest first); past = earlier (newest first),
+ * only the latest `PAST_DROPS_SHOWN`.
+ */
 export function groupDropsByDay<T extends { date: string }>(
   drops: T[],
   todayYmd: string,
 ): { upcoming: T[]; past: T[] } {
   const upcoming = drops.filter((d) => d.date >= todayYmd).sort((a, b) => a.date.localeCompare(b.date));
-  const past = drops.filter((d) => d.date < todayYmd).sort((a, b) => b.date.localeCompare(a.date));
+  const past = drops
+    .filter((d) => d.date < todayYmd)
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, PAST_DROPS_SHOWN);
   return { upcoming, past };
 }
+
+/** DOM id of the share block on the drop edit page; the page focuses it once orders open. */
+export const DROP_SHARE_ANCHOR = "drop-share";
 
 /** Text label for every status — colour is a secondary cue only (a11y). */
 export const DROP_STATUS_LABEL: Record<EffectiveDropStatus, string> = {
@@ -242,8 +288,8 @@ export const DROP_STATUS_LABEL: Record<EffectiveDropStatus, string> = {
   SCHEDULED: "Opens later",
   OPEN: "Taking orders",
   CLOSED: "Orders closed",
-  FROZEN: "Orders frozen",
-  FULFILLED: "Fulfilled",
+  FROZEN: "Orders locked",
+  FULFILLED: "Done",
 };
 
 /** Shared by `dropUpsertSchema` and the form's client-side check. */
@@ -257,9 +303,9 @@ export const DROP_CONFLICT_MESSAGE: Record<string, string> = {
   no_payment_method:
     "Customers have no way to pay yet. Add your UPI ID, or allow pay on delivery, in Settings → Payments.",
   storefront_not_published:
-    "Your storefront is private, so customers can't see this drop. Switch on \"Publish my menu\" in Settings → Online store.",
+    "Your store is private, so customers can't see this drop. Switch on \"Publish my store\" in Settings → Online store.",
   owner_required: "Only the owner can publish the store.",
-  drop_locked: "Orders are frozen, so this drop can no longer be edited.",
+  drop_locked: "Orders are locked, so this drop can no longer be edited.",
   item_has_orders: "Customers have already ordered this item, so it can't be removed. Lower its quantity instead.",
   has_orders: "This drop has orders, so it can't be deleted. Close orders instead.",
   stale: "This drop was changed somewhere else. Refresh and try again.",

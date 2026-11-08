@@ -6,19 +6,25 @@ import { cache } from "react";
 
 import { CustomerProfile, CustomerSignOut } from "@/components/storefront/CustomerProfile";
 import { CustomerSignIn } from "@/components/storefront/CustomerSignIn";
+import { OrderAgainButton } from "@/components/storefront/OrderAgainButton";
+import { EmptyState } from "@/components/ui/empty-state";
+import { Notice } from "@/components/ui/notice";
 import { formatINR } from "@/lib/currency";
 import { getCurrentCustomer } from "@/lib/customer-auth";
 import { orderDisplayState } from "@/lib/drops";
 import { formatIstDate, formatIstTime } from "@/lib/drops-time";
+import { orderIsOver, orderItemsSummary, planOrderAgain } from "@/lib/order-again";
+import { loadOrderableNow } from "@/lib/order-again-server";
 import { prisma } from "@/lib/prisma";
 import { orderStatusLabel, type StatusTone } from "@/lib/storefront-order";
 import { cn } from "@/lib/utils";
+import { storeThemeAttribute } from "@/lib/store-theme";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 /**
- * Storefront buyer account — sign in, edit details, "My orders at <kitchen>".
+ * Storefront buyer account — sign in, edit details, "My orders at <store>".
  *
  * Same gate as app/s/[slug]/page.tsx: vendor active + publishStorefront, else
  * 404. The vendor `select` is a hand-written allowlist — `Vendor.phone` and
@@ -29,8 +35,6 @@ export const runtime = "nodejs";
  * phone on an order is unverified, so matching on it would show one person
  * another person's orders. UTR is read only to derive the status label.
  */
-
-const BRAND_THEMES = new Set(["green", "amber", "red", "blue", "purple"]);
 
 const loadVendor = cache(async (slug: string) =>
   prisma.vendor.findFirst({
@@ -68,8 +72,7 @@ export default async function StorefrontAccountPage(
   if (!vendor) notFound();
 
   const customer = await getCurrentCustomer();
-  const rawTheme = vendor.settings?.theme ?? "orange";
-  const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
+  const theme = storeThemeAttribute(vendor.settings?.theme);
   const accountPath = `/s/${vendor.slug}/account`;
 
   const orders = customer
@@ -93,12 +96,17 @@ export default async function StorefrontAccountPage(
           upiRef: true,
           paymentClaimedAt: true,
           fulfilmentStatus: true,
+          fulfilmentType: true,
+          outForDeliveryAt: true,
           drop: { select: { title: true } },
+          orderItems: { select: { menuItemId: true, name: true, qty: true, isGift: true }, orderBy: { id: "asc" } },
+          feedback: { select: { rating: true } },
         },
       })
     : [];
 
   const now = new Date();
+  const orderable = orders.length > 0 ? await loadOrderableNow(vendor.id, now) : null;
 
   return (
     <div data-theme={theme} className="min-h-screen bg-awaaz-cream/40">
@@ -133,15 +141,15 @@ export default async function StorefrontAccountPage(
               Sign in
             </h2>
             {searchParams.login === "expired" ? (
-              <p role="alert" className="mb-4 rounded-xl border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-900">
+              <Notice role="alert" className="mb-4 rounded-xl">
                 That sign-in link has expired or was already used. Enter your email for a new one.
-              </p>
+              </Notice>
             ) : null}
             <p className="mb-4 text-sm text-muted-foreground">
               Optional — you can always order as a guest. Signing in fills in your details at checkout and
               keeps your orders here.
             </p>
-            <CustomerSignIn returnTo={accountPath} kitchenName={vendor.name} />
+            <CustomerSignIn returnTo={accountPath} storeName={vendor.name} />
           </section>
         ) : (
           <>
@@ -150,9 +158,10 @@ export default async function StorefrontAccountPage(
                 My orders at {vendor.name}
               </h2>
               {orders.length === 0 ? (
-                <p className="rounded-2xl border border-dashed border-border bg-background px-4 py-8 text-center text-sm text-muted-foreground">
-                  No orders yet. Orders you place while signed in show up here.
-                </p>
+                <EmptyState
+                  className="rounded-2xl bg-background px-4 py-8"
+                  description="No orders yet. Orders you place while signed in show up here."
+                />
               ) : (
                 <ul className="divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs">
                   {orders.map((o) => {
@@ -167,7 +176,16 @@ export default async function StorefrontAccountPage(
                       },
                       now,
                     );
-                    const status = orderStatusLabel(state, o.fulfilmentStatus);
+                    const status = orderStatusLabel(state, o.fulfilmentStatus, {
+                      menuOrder: !o.drop,
+                      fulfilmentType: o.fulfilmentType,
+                      outForDelivery: o.fulfilmentType === "DELIVERY" && o.outForDeliveryAt !== null,
+                    });
+                    const summary = orderItemsSummary(o.orderItems);
+                    const againPlan =
+                      orderable && orderIsOver(state, o.fulfilmentStatus)
+                        ? planOrderAgain(o.orderItems, orderable)
+                        : null;
                     return (
                       <li key={o.id}>
                         <Link
@@ -176,9 +194,12 @@ export default async function StorefrontAccountPage(
                         >
                           <ShoppingBag className="h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-sm font-semibold text-foreground">
-                              {o.drop?.title ?? "Order"}
+                            <span className="line-clamp-2 block text-sm font-semibold text-foreground">
+                              {o.drop?.title ?? (summary || "Order")}
                             </span>
+                            {o.drop && summary ? (
+                              <span className="line-clamp-2 block text-xs text-muted-foreground">{summary}</span>
+                            ) : null}
                             <span className="block text-xs text-muted-foreground">
                               {formatIstDate(o.createdAt)} · {formatIstTime(o.createdAt)} ·{" "}
                               <span className="font-mono">{o.billNumber}</span>
@@ -191,12 +212,27 @@ export default async function StorefrontAccountPage(
                             >
                               {status.label}
                             </span>
+                            {o.feedback ? (
+                              <span className="ml-2 text-xs font-semibold text-muted-foreground">
+                                You rated {o.feedback.rating} of 5
+                              </span>
+                            ) : o.fulfilmentStatus === "DELIVERED" ? (
+                              <span className="ml-2 text-xs font-semibold text-primary">Rate this order</span>
+                            ) : null}
                           </span>
                           <span className="shrink-0 font-mono text-sm font-bold tabular-nums">
                             {formatINR(o.totalPaise)}
                           </span>
                           <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
                         </Link>
+                        {againPlan ? (
+                          <OrderAgainButton
+                            slug={vendor.slug}
+                            plan={againPlan}
+                            billNumber={o.billNumber}
+                            className="px-4 pb-3"
+                          />
+                        ) : null}
                       </li>
                     );
                   })}
@@ -213,6 +249,9 @@ export default async function StorefrontAccountPage(
                 name={customer.name}
                 phone={customer.phone}
                 savedAddress={customer.savedAddress}
+                savedLocality={customer.savedLocality}
+                savedLandmark={customer.savedLandmark}
+                savedPincode={customer.savedPincode}
               />
             </section>
 

@@ -30,6 +30,14 @@ const envSchema = z.object({
   // AES-256-GCM key for vendors' own Razorpay credentials (lib/secret-box.ts).
   // Length is validated lazily there, so a bad value can't block boot.
   PAYMENT_KEYS_ENCRYPTION_KEY: z.string().optional(),
+  // Razorpay Technology Partner OAuth app ("Connect Razorpay", lib/razorpay-oauth.ts).
+  // Use the app's Development credentials with mode "test", Production with "live".
+  RAZORPAY_OAUTH_CLIENT_ID: z.string().optional(),
+  RAZORPAY_OAUTH_CLIENT_SECRET: z.string().optional(),
+  // "test" | "live", checked lazily in lib/razorpay-oauth.ts so a typo can't block boot.
+  RAZORPAY_OAUTH_MODE: z.string().optional(),
+  // Secret of the app-level webhook (/api/webhooks/razorpay-partner).
+  RAZORPAY_PARTNER_WEBHOOK_SECRET: z.string().optional(),
   // Web Push (lib/push.ts). Generate once: `npx web-push generate-vapid-keys`.
   NEXT_PUBLIC_VAPID_PUBLIC_KEY: z.string().optional(),
   VAPID_PRIVATE_KEY: z.string().optional(),
@@ -40,7 +48,20 @@ const envSchema = z.object({
   GUPSHUP_APP_NAME: z.string().optional(),
   GUPSHUP_SOURCE_NUMBER: z.string().optional(),
   BLOB_READ_WRITE_TOKEN: z.string().optional(),
+  // AI images (lib/ai-image.ts). Server only. Absent → those routes answer 503.
+  FAL_KEY: z.string().optional(),
+  // Read-write token of a separate PRIVATE Blob store for buyers' payment
+  // screenshots (lib/payment-proof.ts). Absent → the upload field is hidden.
+  PAYMENT_PROOF_BLOB_READ_WRITE_TOKEN: z.string().optional(),
   REDIS_URL: z.string().optional(),
+  // Bearer secret Vercel Cron sends to /api/cron/* (lib/cron-auth.ts). Absent →
+  // every cron call is 401, so the trial reminder emails don't go out.
+  CRON_SECRET: z.string().optional(),
+  // Internal demo-store API (lib/internal-auth.ts). Absent or < 32 chars →
+  // every /api/internal/* call is 401. Server-side only; never NEXT_PUBLIC_.
+  INTERNAL_API_KEY: z.string().optional(),
+  // Login of the internal account that owns demo stores until handover.
+  DEMO_OWNER_EMAIL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -3,12 +3,15 @@ import { NextResponse } from "next/server";
 import { orderHoldsStock } from "@/lib/drops";
 import { prisma } from "@/lib/prisma";
 import { getClientIp, makeLimiter, tooManyRequests } from "@/lib/ratelimit";
+import { classifyRazorpayRefusal, clearRazorpayIssue, recordRazorpayIssue } from "@/lib/razorpay-issue";
 import {
+  checkoutKey,
   createRazorpayOrder,
   fetchRazorpayOrder,
   findStorefrontOrderForPayment,
   getVendorRazorpayCreds,
   isOnlinePaymentEnabled,
+  RazorpayApiError,
   type RazorpayCreds,
 } from "@/lib/storefront-razorpay";
 
@@ -103,16 +106,27 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
           notes: { transactionId: order.id, vendorId: order.vendorId },
         });
       } catch (e) {
+        const status = (e as { status?: unknown } | null)?.status;
+        const issue = e instanceof RazorpayApiError && typeof status === "number" ? classifyRazorpayRefusal(status) : null;
         console.warn(
           JSON.stringify({
             event: "storefront_rzp_order_create_failed",
             vendorId: order.vendorId,
+            method: creds.kind,
             error: e instanceof Error ? e.name : "unknown",
-            status: (e as { status?: unknown } | null)?.status ?? null,
+            status: status ?? null,
+            issue,
           }),
         );
+        if (issue) {
+          // The seller's account refused (not activated, access revoked): tell the
+          // seller in Settings, and send this buyer to UPI rather than "try again".
+          await recordRazorpayIssue(order.vendorId, issue);
+          return err("online_payment_unavailable", 409);
+        }
         return err("razorpay_unavailable", 502);
       }
+      await clearRazorpayIssue(order.vendorId);
 
       // Compare-and-set on the id we started from: two taps racing must not
       // leave the buyer paying an order id we no longer have on file.
@@ -141,7 +155,7 @@ export async function POST(req: Request, props: { params: Promise<{ slug: string
 
     return NextResponse.json({
       data: {
-        keyId: creds.keyId, // public by design — Checkout needs it in the browser
+        keyId: checkoutKey(creds), // public by design — Checkout needs it in the browser
         razorpayOrderId,
         amountPaise: order.totalPaise,
         currency: "INR",

@@ -10,8 +10,9 @@ import {
   CardDescription,
   CardHeader,
 } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { PasswordInput } from "@/components/ui/password-input";
+import { Notice } from "@/components/ui/notice";
 
 export function ResetPasswordForm({ token }: { token: string }) {
   const router = useRouter();
@@ -63,10 +64,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
         <form onSubmit={onSubmit} className="space-y-4" noValidate>
           <div className="space-y-2">
             <Label htmlFor="newPassword">New password</Label>
-            <Input
+            <PasswordInput
               id="newPassword"
               name="newPassword"
-              type="password"
               autoComplete="new-password"
               minLength={8}
               required
@@ -79,10 +79,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
 
           <div className="space-y-2">
             <Label htmlFor="confirmPassword">Confirm new password</Label>
-            <Input
+            <PasswordInput
               id="confirmPassword"
               name="confirmPassword"
-              type="password"
               autoComplete="new-password"
               enterKeyHint="go"
               minLength={8}
@@ -94,13 +93,9 @@ export function ResetPasswordForm({ token }: { token: string }) {
           </div>
 
           {error ? (
-            <p
-              role="alert"
-              aria-live="assertive"
-              className="rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
-            >
+            <Notice role="alert" aria-live="assertive" tone="danger">
               {error}
-            </p>
+            </Notice>
           ) : null}
 
           <Button

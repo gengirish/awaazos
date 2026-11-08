@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { rupeesToPaise } from "@/lib/currency";
+import { menuUnitSchema } from "@/lib/menu-unit";
 
 /** Split a comma-separated string into a deduplicated, trimmed array. */
 function parseCsvToArray(csv: string | undefined): string[] {
@@ -33,6 +34,16 @@ export function isMenuImageUrl(url: string): boolean {
   }
 }
 
+/** `MenuItem.description`: one line for buyers under the item's name on the store page. */
+export const MENU_DESCRIPTION_MAX = 200;
+
+/** Trimmed, whitespace (and newlines) collapsed; blank → null. */
+export function normaliseMenuDescription(raw: string | null | undefined): string | null {
+  if (raw == null) return null;
+  const text = raw.replace(/\s+/g, " ").trim();
+  return text === "" ? null : text;
+}
+
 function preprocessRupeesInput(val: unknown): unknown {
   if (val === "" || val === null || val === undefined) return undefined;
   if (typeof val === "number") return val;
@@ -45,7 +56,7 @@ const menuItemCreateFields = {
   priceInRupees: z.preprocess(
     preprocessRupeesInput,
     z
-      .number({ required_error: "Price is required", invalid_type_error: "Price is required" })
+      .number({ error: "Price is required" })
       .refine((n) => Number.isFinite(n) && n > 0, "Price must be greater than 0"),
   ),
   aliasesCsv: z.string().optional(),
@@ -60,6 +71,13 @@ const menuItemCreateFields = {
   isPopular: z.boolean().optional(),
   isAvailable: z.boolean().optional(),
   showOnline: z.boolean().optional(),
+  /** Pack / selling size printed after the price ("100 g"); blank = none (lib/menu-unit.ts). */
+  unit: menuUnitSchema.optional(),
+  /** One line under the name on the store page; blank = none. */
+  description: z
+    .string()
+    .max(MENU_DESCRIPTION_MAX, `Description must be at most ${MENU_DESCRIPTION_MAX} characters`)
+    .optional(),
 };
 
 /** Client / RHF input validation (no paise transform). */
@@ -76,6 +94,8 @@ export const menuItemCreateSchema = menuItemCreateInputSchema.transform((data) =
   isPopular: data.isPopular ?? false,
   isAvailable: data.isAvailable ?? true,
   showOnline: data.showOnline ?? true,
+  unit: data.unit ?? null,
+  description: normaliseMenuDescription(data.description),
 }));
 
 export const menuItemUpdateSchema = z
@@ -93,6 +113,10 @@ export const menuItemUpdateSchema = z
     isPopular: z.boolean().optional(),
     isAvailable: z.boolean().optional(),
     showOnline: z.boolean().optional(),
+    // `null` or "" clears it.
+    unit: menuUnitSchema.optional(),
+    // `null` or "" clears it.
+    description: z.string().max(MENU_DESCRIPTION_MAX).optional().nullable(),
     sortOrder: z.coerce.number().int().optional(),
     // `null` clears the photo; the upload route sets it, the form can unset it.
     imageUrl: z
@@ -116,6 +140,8 @@ export const menuItemUpdateSchema = z
       d.isPopular !== undefined ||
       d.isAvailable !== undefined ||
       d.showOnline !== undefined ||
+      d.unit !== undefined ||
+      d.description !== undefined ||
       d.sortOrder !== undefined ||
       d.imageUrl !== undefined,
     { message: "At least one field is required", path: ["_root"] },
@@ -151,6 +177,8 @@ const bulkItemSchema = z.object({
     .optional()
     .transform((e) => (e?.trim() ? e : "🍽️")),
   aliases: z.array(z.string().trim().min(1).max(MENU_NAME_MAX)).max(30).default([]),
+  /** Spoken pack size ("250 g") for a new row; null / absent = none. Ignored on a price update. */
+  unit: menuUnitSchema.optional(),
   existingMenuItemId: z.string().trim().min(1).max(64).nullish(),
 });
 

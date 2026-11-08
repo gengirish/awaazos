@@ -4,6 +4,7 @@ import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
+import { EmptyState } from "@/components/ui/empty-state";
 
 import { HourlyHeatmap, type HourlyRow } from "./HourlyHeatmap";
 import { KpiGrid } from "./KpiGrid";
@@ -84,19 +85,16 @@ export function AnalyticsDashboard({
       />
 
       {!hasSales ? (
-        <Card className="border-dashed">
-          <CardHeader>
-            <h2 className="font-display text-lg font-semibold leading-snug tracking-tight">
-              No sales yet — head to the POS and bol bill becho!
-            </h2>
-            <CardDescription>Charts and KPIs will fill in once you record bills.</CardDescription>
-          </CardHeader>
-          <CardFooter>
+        <EmptyState
+          title="No sales yet — head to the POS and bol bill becho!"
+          titleAs="h2"
+          description="Charts and KPIs will fill in once you record bills."
+          action={
             <Button asChild className="min-h-11">
               <Link href="/pos">Open POS</Link>
             </Button>
-          </CardFooter>
-        </Card>
+          }
+        />
       ) : null}
 
       <KpiGrid

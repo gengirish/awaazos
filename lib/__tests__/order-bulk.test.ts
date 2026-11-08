@@ -7,13 +7,13 @@ import {
   bulkActionCounts,
   bulkActionsFor,
   bulkNeedsConfirm,
-  bulkOrderActionSchema,
   bulkResultMessage,
   bulkTargets,
   cashToCollectPaise,
   isBulkSelectable,
   pruneSelection,
 } from "@/lib/order-bulk";
+import { bulkOrderActionSchema } from "@/lib/order-bulk-schema";
 
 type O = {
   id: string;
@@ -30,6 +30,19 @@ const o = (
   paymentStatus: PaymentStatus = "PENDING",
   totalPaise = 10_000,
 ): O => ({ id, fulfilmentStatus, paymentStatus, paymentMethod, totalPaise });
+
+describe("a Razorpay store's unpaid new order", () => {
+  it("can't be selected: Cancel is its only action and that is never bulk", () => {
+    const order = {
+      fulfilmentStatus: "PLACED" as const,
+      paymentStatus: "PENDING" as const,
+      paymentMethod: "UPI" as const,
+      bucket: "awaiting_online" as const,
+    };
+    expect(bulkActionsFor(order, false)).toEqual([]);
+    expect(isBulkSelectable(order, false)).toBe(false);
+  });
+});
 
 describe("BULK_ORDER_ACTIONS", () => {
   it("is the forward actions only — never cancel or undeliver", () => {
@@ -130,6 +143,14 @@ describe("bulkTargets / bulkActionCounts", () => {
     expect(bulkActionCounts(orders, sel, false)).toEqual({ confirm: 2, mark_paid: 1, deliver: 3 });
     expect(bulkActionCounts(orders, sel, true)).toEqual({ confirm: 0, mark_paid: 1, deliver: 3 });
   });
+
+  it("asks the frozen rule per order when the list mixes frozen and open sources", () => {
+    // p1 belongs to a frozen drop; p2 is a menu order.
+    const frozen = (order: { id: string }) => order.id === "p1";
+    expect(bulkTargets(orders, sel, "confirm", frozen).map((t) => t.id)).toEqual(["p2"]);
+    expect(bulkActionCounts(orders, sel, frozen)).toEqual({ confirm: 1, mark_paid: 1, deliver: 3 });
+    expect([...pruneSelection(sel, orders, frozen)]).toEqual(["p1", "p2", "c1"]);
+  });
 });
 
 describe("pruneSelection", () => {
@@ -193,6 +214,6 @@ describe("bulkResultMessage", () => {
 
   it("frozen and total failure", () => {
     const m = bulkResultMessage("confirm", { succeeded: [], failed: [{ id: "b", error: "drop_frozen" }] });
-    expect(m).toEqual({ kind: "error", text: "No orders changed (orders are frozen). Refreshed." });
+    expect(m).toEqual({ kind: "error", text: "No orders changed (orders are locked). Refreshed." });
   });
 });

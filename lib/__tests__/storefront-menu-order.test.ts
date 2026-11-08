@@ -56,9 +56,29 @@ describe("orderErrorMessage — menu orders", () => {
       "Masala chai isn't available right now. We've removed it from your cart — please check and try again.",
     );
     expect(orderErrorMessage({ error: "item_not_found", dropItemId: "d1" }, "Laddu")).toMatch(
-      /no longer on this menu/,
+      /no longer available/,
     );
     expect(orderErrorMessage({ error: "item_not_found", menuItemId: "m1" })).toMatch(/^One item isn't available/);
+  });
+});
+
+describe("orderStatusLabel — out for delivery", () => {
+  it("reads On the way once a confirmed order has gone out, keeping the payment line", () => {
+    const out = { fulfilmentType: "DELIVERY" as const, outForDelivery: true };
+    expect(orderStatusLabel("PAY_ON_DELIVERY", "CONFIRMED", out)).toEqual({
+      label: "On the way",
+      hint: "Pay on delivery",
+      tone: "success",
+    });
+    expect(orderStatusLabel("PAID", "CONFIRMED", out).label).toBe("On the way");
+    expect(orderStatusLabel("PAYMENT_SUBMITTED", "CONFIRMED", out).label).toBe("On the way");
+  });
+
+  it("delivered, cancelled and unpaid UPI orders keep their own words", () => {
+    const out = { fulfilmentType: "DELIVERY" as const, outForDelivery: true };
+    expect(orderStatusLabel("DELIVERED", "DELIVERED", out).label).toBe("Delivered");
+    expect(orderStatusLabel("CANCELLED", "CANCELLED", out).label).toBe("Cancelled");
+    expect(orderStatusLabel("AWAITING_PAYMENT", "CONFIRMED", out).label).toBe("Waiting for payment");
   });
 });
 

@@ -19,16 +19,30 @@ function isPublicPath(pathname: string): boolean {
   if (pathname === "/sign-up" || pathname.startsWith("/sign-up/")) return true;
   if (pathname === "/forgot-password" || pathname.startsWith("/forgot-password/")) return true;
   if (pathname === "/reset-password" || pathname.startsWith("/reset-password/")) return true;
+  // Demo-store claim links (/claim/<token>). The page shows nothing unless the
+  // token matches an unused, unexpired DemoHandover.
+  if (pathname.startsWith("/claim/")) return true;
+  // Platform-admin invite links (/admin-invite/<token>). Same rule: the page
+  // shows nothing unless the token matches an unused, unexpired AdminInvite.
+  if (pathname.startsWith("/admin-invite/")) return true;
   if (pathname === "/pricing" || pathname.startsWith("/pricing/")) return true;
+  // The public seller survey: it collects answers and shows nothing back.
+  if (pathname === "/survey") return true;
   // Privacy, terms, refund, DPDP rights — linked from the public footer.
   if (pathname === "/legal" || pathname.startsWith("/legal/")) return true;
   // Public vendor storefronts. Opt-in per vendor: the route itself 404s unless
   // VendorSettings.publishStorefront is true, so this allowlist exposes nothing
   // on its own.
   if (pathname.startsWith("/s/")) return true;
+  // Community pages (/c/<slug>): links to stores that accepted a listing.
+  // They list only published stores, so this exposes nothing on its own.
+  if (pathname.startsWith("/c/")) return true;
   // Customer receipt pages (/r/<token>). The route 404s unless the token
   // matches a Receipt.publicToken, so this allowlist exposes nothing on its own.
   if (pathname.startsWith("/r/")) return true;
+  // Rider "Delivered" links (/d/<token>). The route 404s unless the token
+  // matches a Transaction.riderToken, so this allowlist exposes nothing on its own.
+  if (pathname.startsWith("/d/")) return true;
   // Storefront write paths (place order, submit UTR). Same opt-in gate: every
   // handler under /api/s/ 404s unless the vendor has publishStorefront = true.
   if (pathname.startsWith("/api/s/")) return true;

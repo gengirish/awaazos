@@ -1,30 +1,60 @@
 import type { Metadata } from "next";
-import { CheckCircle2, Clock, MapPin, MessageCircle, ShoppingBag, XCircle } from "lucide-react";
-import Image from "next/image";
+import {
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Circle,
+  CircleDot,
+  Clock,
+  MapPin,
+  MessageCircle,
+  QrCode,
+  ShoppingBag,
+  XCircle,
+} from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { cache } from "react";
 
+import { BuyerReceivedButton } from "@/components/storefront/BuyerReceivedButton";
+import { OrderAgainButton } from "@/components/storefront/OrderAgainButton";
+import { OrderFeedbackForm } from "@/components/storefront/OrderFeedbackForm";
+import { OnlinePayFlow } from "@/components/storefront/OnlinePayFlow";
+import { OrderLinkActions } from "@/components/storefront/OrderLinkActions";
+import { StoreInstall } from "@/components/storefront/StoreInstall";
+import { OrderRefresh } from "@/components/storefront/OrderRefresh";
 import { OtherCartsNotice } from "@/components/storefront/OtherCartsNotice";
 import { PaidClaimForm } from "@/components/storefront/PaidClaimForm";
-import { RazorpayPayButton } from "@/components/storefront/RazorpayPayButton";
+import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
+import { SaveQrButton } from "@/components/storefront/SaveQrButton";
 import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
+import { UpiQrImage } from "@/components/storefront/UpiQrImage";
 import { formatINR, paiseToRupees } from "@/lib/currency";
 import { orderDisplayState, PENDING_HOLD_MINUTES } from "@/lib/drops";
-import { formatFulfilmentWindow, formatIstDate, formatIstTime } from "@/lib/drops-time";
+import { formatFulfilmentWindow, formatIstDate, formatIstTime, formatWindowWithDay } from "@/lib/drops-time";
+import { orderSlotLabel } from "@/lib/menu-slots";
 import {
   buyerWhatsappNumber,
   formatWhatsAppOrderMessage,
+  handedOverLabel,
   holdMinutesLeft,
   orderStatusLabel,
+  payOnDeliveryLabel,
   whatsappChatLink,
   type StatusTone,
 } from "@/lib/storefront-order";
+import { discountLabel } from "@/lib/offers";
+import { orderIsOver, planOrderAgain } from "@/lib/order-again";
+import { RATING_WORDS } from "@/lib/order-feedback";
+import { loadOrderableNow } from "@/lib/order-again-server";
+import { paymentProofEnabled } from "@/lib/payment-proof";
+import { PAY_NOW_PARAM } from "@/lib/storefront-direct-pay";
 import { prisma } from "@/lib/prisma";
-import { appBaseUrl, isOnlinePaymentEnabled } from "@/lib/storefront-razorpay";
-import { qrSvgDataUrl } from "@/lib/qr";
+import { appBaseUrl, isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
+import { qrPngDataUrl, qrSvgDataUrl } from "@/lib/qr";
 import { buildUpiDeepLink } from "@/lib/upi";
 import { cn } from "@/lib/utils";
+import { storeThemeAttribute } from "@/lib/store-theme";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -41,12 +71,24 @@ export const runtime = "nodejs";
  *
  * UPI pay: `UpiPayOptions` (client) leads with the generic `upi://` button on
  * Android and with per-app buttons (GPay / PhonePe / Paytm) on iPhone, where
- * `upi://` has no app chooser; plus copy-UPI-ID / copy-amount. The QR below is
- * for scanning from a second phone. Only the vendor VPA and total reach it.
+ * `upi://` has no app chooser; plus copy-UPI-ID / copy-amount. The QR, for
+ * scanning from a second phone, sits in a collapsed <details> under them; on a
+ * phone, "Save QR to gallery" (PNG) covers apps that refuse a link to a personal
+ * UPI ID and ask for a scanned QR instead; it sits with the other fallbacks under
+ * "UPI app didn't open…". Only the vendor VPA and total reach it. Below the pay
+ * button, "Payment done?" is `PaidClaimForm` — it never marks the order paid.
  *
- * When the kitchen has connected her own Razorpay account (PRO plan), "Pay
- * online" is offered above the UPI intent/QR. The buyer's own name and phone
- * are handed to that button only to prefill Razorpay Checkout. Razorpay
+ * Nothing here polls. `OrderRefresh` re-reads the order when the buyer comes
+ * back to the tab and from its "Check for update" button; the hold deadline is
+ * printed as a clock time, which stays true however long the page is open.
+ * `OrderLinkActions` remembers the order on the device (token, bill number and
+ * time only) and shares the order link.
+ *
+ * When the store has connected its own Razorpay account, "Pay online" is the
+ * only option shown; the UPI intent/QR and "Payment done?" wait in `OnlinePayFlow`
+ * until Razorpay fails or the buyer asks for them after closing its window. `?pay=1`,
+ * set by checkout, opens Razorpay on arrival. The buyer's own name and phone are handed to that button
+ * only to prefill Razorpay Checkout. Razorpay
  * credentials are selected for presence checks only — never rendered or passed
  * to a client component.
  *
@@ -54,14 +96,18 @@ export const runtime = "nodejs";
  * drop title or fulfilment window; a pickup shows the vendor's
  * `menuPickupNote` instead of the drop's.
  *
- * WhatsApp: the kitchen's opted-in number gets a wa.me link pre-filled with
+ * WhatsApp: the store's opted-in number gets a wa.me link pre-filled with
  * the whole order (`formatWhatsAppOrderMessage`). `?wa=1` — set when the buyer
- * chose "Place order & send on WhatsApp" at checkout — puts that link at the
- * top as the next step. The buyer sends it from their own WhatsApp; nothing is
- * sent from our side.
+ * ticked "Also send my order to the store on WhatsApp" at checkout — puts that
+ * link at the top as the next step. The buyer sends it from their own WhatsApp;
+ * nothing is sent from our side. Where the buyer is stuck waiting on the store
+ * (payment submitted, rejected, expired) the link moves into the status card;
+ * without an opted-in number the copy never says "message the store".
+ *
+ * Once the order is over, "Order again" (lib/order-again.ts) fills the buyer's
+ * saved cart with whatever from it the store sells today. Once it is handed
+ * over, the buyer can rate it, once (lib/order-feedback.ts).
  */
-
-const BRAND_THEMES = new Set(["green", "amber", "red", "blue", "purple"]);
 
 const loadOrder = cache(async (slug: string, token: string) => {
   return prisma.transaction.findFirst({
@@ -75,9 +121,12 @@ const loadOrder = cache(async (slug: string, token: string) => {
       },
     },
     select: {
+      vendorId: true,
       billNumber: true,
       createdAt: true,
       subtotalPaise: true,
+      discountPaise: true,
+      offerName: true,
       deliveryFeePaise: true,
       totalPaise: true,
       paymentMethod: true,
@@ -85,14 +134,22 @@ const loadOrder = cache(async (slug: string, token: string) => {
       upiRef: true,
       paymentClaimedAt: true,
       paymentRejectedAt: true,
+      paymentProofUrl: true,
+      razorpayPaymentId: true,
       fulfilmentStatus: true,
       fulfilmentType: true,
+      outForDeliveryAt: true,
+      buyerReceivedAt: true,
+      isSample: true,
+      feedback: { select: { rating: true } },
       deliveryAddress: true,
+      fulfilAt: true,
+      fulfilUntil: true,
       notes: true,
       customerName: true,
       customerPhone: true,
       orderItems: {
-        select: { id: true, name: true, qty: true, totalPaise: true },
+        select: { id: true, menuItemId: true, name: true, qty: true, totalPaise: true, isGift: true },
       },
       drop: {
         select: {
@@ -106,6 +163,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
         select: {
           name: true,
           slug: true,
+          isDemo: true,
           upiId: true,
           upiName: true,
           plan: true,
@@ -118,9 +176,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
               acceptWhatsappOrders: true,
               fssaiNumber: true,
               menuPickupNote: true,
-              razorpayKeyId: true,
-              razorpayKeySecretEnc: true,
-              razorpayWebhookSecretEnc: true,
+              ...RAZORPAY_CRED_SELECT,
             },
           },
         },
@@ -144,25 +200,101 @@ export async function generateMetadata(
 }
 
 const TONE_CLASS: Record<StatusTone, string> = {
-  success: "border-green-600/30 bg-green-600/10 text-green-800",
+  success: "border-primary/25 bg-background",
   warning: "border-amber-500/40 bg-amber-500/10 text-amber-900",
   danger: "border-destructive/30 bg-destructive/10 text-destructive",
-  neutral: "border-border bg-muted text-foreground",
+  neutral: "border-border/60 bg-background",
+};
+
+/** The round badge over the status heading. Each tone has its own icon, so colour is never the only signal. */
+const TONE_BADGE: Record<StatusTone, string> = {
+  success: "bg-primary text-primary-foreground",
+  warning: "bg-amber-500/20 text-amber-800",
+  danger: "bg-destructive/15 text-destructive",
+  neutral: "bg-muted text-muted-foreground",
 };
 
 function ToneIcon({ tone }: { tone: StatusTone }) {
-  const cls = "h-5 w-5 shrink-0";
-  if (tone === "success") return <CheckCircle2 className={cls} aria-hidden="true" />;
-  if (tone === "danger") return <XCircle className={cls} aria-hidden="true" />;
-  return <Clock className={cls} aria-hidden="true" />;
+  const cls = "h-8 w-8";
+  const Icon = tone === "success" ? Check : tone === "danger" ? XCircle : Clock;
+  return (
+    <span
+      className={cn("inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full", TONE_BADGE[tone])}
+      aria-hidden="true"
+    >
+      <Icon className={cls} strokeWidth={tone === "success" ? 2.5 : 2} />
+    </span>
+  );
 }
+
+type ProgressStep = { key: string; label: string; done: boolean };
+
+/**
+ * Placed → Paid → Confirmed → (On the way, deliveries only) → Collected /
+ * Delivered (pay on delivery: no Paid step, payment happens at the last one; paid
+ * online: no Confirmed step, being paid is what confirmed it). Static: each step is an icon plus
+ * words ("Done" / "Now"), and the step the order is waiting on carries
+ * `aria-current`. Colour only repeats what the words say.
+ */
+function OrderProgress({ steps }: { steps: ProgressStep[] }) {
+  const firstOpen = steps.findIndex((s) => !s.done);
+  const current = firstOpen === -1 ? steps.length - 1 : firstOpen;
+  return (
+    <ol
+      aria-label="Order progress"
+      className="flex gap-1 rounded-2xl border border-border/60 bg-background px-2 py-3 shadow-xs"
+    >
+      {steps.map((step, i) => {
+        const isCurrent = i === current;
+        const Icon = step.done ? Check : isCurrent ? CircleDot : Circle;
+        return (
+          <li
+            key={step.key}
+            aria-current={isCurrent ? "step" : undefined}
+            className="flex min-w-0 flex-1 flex-col items-center gap-1 text-center"
+          >
+            <Icon
+              className={cn("h-5 w-5 shrink-0", step.done || isCurrent ? "text-primary" : "text-muted-foreground")}
+              aria-hidden="true"
+            />
+            <span
+              className={cn(
+                "text-xs leading-tight",
+                isCurrent ? "font-bold text-foreground" : "font-semibold text-muted-foreground",
+              )}
+            >
+              {step.label}
+            </span>
+            <span className="text-[11px] font-bold uppercase tracking-wide text-foreground">
+              {step.done ? "Done" : isCurrent ? "Now" : <span className="sr-only">Not yet</span>}
+            </span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/** One label / value line of the order details card. */
+function DetailRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-4 py-3">
+      <dt className="shrink-0 text-muted-foreground">{label}</dt>
+      <dd className="min-w-0 break-words text-right font-semibold">{children}</dd>
+    </div>
+  );
+}
+
+const WA_BUTTON =
+  "inline-flex min-h-11 items-center justify-center gap-2 rounded-xl border border-green-600/40 bg-background px-4 text-sm font-bold text-green-800 shadow-xs hover:bg-green-600/5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 
 export default async function StorefrontOrderPage(props: {
   params: Promise<{ slug: string; token: string }>;
-  searchParams: Promise<{ wa?: string | string[] }>;
+  searchParams: Promise<{ wa?: string | string[]; pay?: string | string[] }>;
 }) {
   const params = await props.params;
-  const viaWhatsapp = (await props.searchParams).wa === "1";
+  const searchParams = await props.searchParams;
+  const viaWhatsapp = searchParams.wa === "1";
   const order = await loadOrder(params.slug, params.token);
   if (!order) notFound();
 
@@ -179,11 +311,16 @@ export default async function StorefrontOrderPage(props: {
     now,
   );
   const { vendor, drop } = order;
-  const status = orderStatusLabel(state, order.fulfilmentStatus, { menuOrder: !drop });
+  // Handed to a rider and not yet delivered. Who the rider is stays with the seller.
+  const onTheWay = order.fulfilmentType === "DELIVERY" && order.outForDeliveryAt !== null;
+  const status = orderStatusLabel(state, order.fulfilmentStatus, {
+    menuOrder: !drop,
+    fulfilmentType: order.fulfilmentType,
+    outForDelivery: onTheWay,
+  });
   const pickupNote = drop ? drop.pickupNote : (vendor.settings?.menuPickupNote ?? null);
   const slug = vendor.slug;
-  const rawTheme = vendor.settings?.theme ?? "orange";
-  const theme = BRAND_THEMES.has(rawTheme) ? rawTheme : undefined;
+  const theme = storeThemeAttribute(vendor.settings?.theme);
 
   const awaitingUpi = state === "AWAITING_PAYMENT" && order.paymentMethod === "UPI";
   // The seller answered "Not received" to an earlier "I've paid" and nothing has changed since.
@@ -191,8 +328,15 @@ export default async function StorefrontOrderPage(props: {
     order.paymentRejectedAt !== null &&
     order.paymentMethod === "UPI" &&
     (state === "AWAITING_PAYMENT" || state === "EXPIRED");
-  // Claimed with a bare tap: the buyer can still add the reference to help the seller.
-  const canAddReference = state === "PAYMENT_SUBMITTED" && order.paymentMethod === "UPI" && !order.upiRef;
+  // Payment screenshots need the private Blob store (lib/payment-proof.ts). Only
+  // whether one exists reaches the page — never its URL.
+  const proofUploads = paymentProofEnabled();
+  const hasProof = order.paymentProofUrl !== null;
+  // Claimed: the buyer can still add the reference or a screenshot to help the seller.
+  const claimedUpi = state === "PAYMENT_SUBMITTED" && order.paymentMethod === "UPI";
+  // One piece of evidence is enough: a screenshot already sent ends the asking.
+  const canAddReference = claimedUpi && !order.upiRef && !hasProof;
+  const canAddScreenshot = claimedUpi && proofUploads && !hasProof;
   const payeeName = vendor.upiName ?? vendor.name;
   const upiLink =
     awaitingUpi && vendor.upiId
@@ -204,9 +348,24 @@ export default async function StorefrontOrderPage(props: {
         })
       : null;
   const qrSrc = upiLink ? await qrSvgDataUrl(upiLink, 220) : "";
+  // For "Save QR to gallery" (scan-from-gallery when the app refuses the link).
+  // Not for demo stores: their QR is a sample and must not leave the page.
+  const qrPng = upiLink && !order.vendor.isDemo ? await qrPngDataUrl(upiLink, 512) : "";
   const minsLeft = awaitingUpi ? holdMinutesLeft(order.createdAt, PENDING_HOLD_MINUTES, now) : 0;
+  // A clock time, not a countdown: it stays right while the page sits open.
+  const payBy = formatIstTime(new Date(order.createdAt.getTime() + PENDING_HOLD_MINUTES * 60_000));
   const payOnline = awaitingUpi && minsLeft > 0 && isOnlinePaymentEnabled(vendor, vendor.settings, now);
 
+  // The WhatsApp text is read later, so it keeps the date; the page says "Today" / "Tomorrow".
+  // A menu order's window is the slot the buyer picked (lib/menu-slots.ts), if the store has slots.
+  const fulfilmentWindow = drop
+    ? formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt)
+    : order.fulfilAt
+      ? formatFulfilmentWindow(order.fulfilAt, order.fulfilUntil ?? order.fulfilAt)
+      : null;
+  const windowOnPage = drop
+    ? formatWindowWithDay(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt, now)
+    : orderSlotLabel(order.fulfilAt, order.fulfilUntil, now);
   const waNumber = buyerWhatsappNumber(vendor.settings);
   const waLink = waNumber
     ? whatsappChatLink(
@@ -215,13 +374,15 @@ export default async function StorefrontOrderPage(props: {
           vendorName: vendor.name,
           billNumber: order.billNumber,
           items: order.orderItems,
+          discountPaise: order.discountPaise,
+          offerName: order.offerName,
           deliveryFeePaise: order.deliveryFeePaise,
           totalPaise: order.totalPaise,
           paymentMethod: order.paymentMethod === "CASH" ? "CASH" : "UPI",
           fulfilmentType: order.fulfilmentType,
           deliveryAddress: order.deliveryAddress,
           dropTitle: drop?.title ?? null,
-          fulfilmentWindow: drop ? formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt) : null,
+          fulfilmentWindow,
           customerName: order.customerName,
           notes: order.notes,
           orderUrl: `${appBaseUrl()}/s/${encodeURIComponent(slug)}/o/${encodeURIComponent(params.token)}`,
@@ -230,6 +391,110 @@ export default async function StorefrontOrderPage(props: {
     : null;
   // Chosen at checkout and still worth sending: lead with it.
   const waFirst = viaWhatsapp && !!waLink && order.fulfilmentStatus !== "CANCELLED";
+  // Stuck waiting on the store: the way to reach it belongs next to the status.
+  const waInStatus =
+    !!waLink && !waFirst && (state === "PAYMENT_SUBMITTED" || state === "EXPIRED" || paymentRejected);
+
+  const payOnDelivery = order.paymentMethod === "CASH";
+  // Read as a boolean only; the payment id is never rendered.
+  const paidOnline = order.razorpayPaymentId !== null;
+  const isPickup = order.fulfilmentType === "PICKUP";
+  const confirmed = order.fulfilmentStatus === "CONFIRMED";
+  const handedOver = order.fulfilmentStatus === "DELIVERED";
+  const lastStep = handedOverLabel(order.fulfilmentType);
+  const againPlan = orderIsOver(state, order.fulfilmentStatus)
+    ? planOrderAgain(order.orderItems, await loadOrderableNow(order.vendorId, now))
+    : null;
+  const steps: ProgressStep[] | null =
+    state === "CANCELLED" || state === "EXPIRED"
+      ? null
+      : [
+          { key: "placed", label: "Placed", done: true },
+          ...(payOnDelivery ? [] : [{ key: "paid", label: "Paid", done: order.paymentStatus === "PAID" }]),
+          ...(paidOnline ? [] : [{ key: "confirmed", label: "Confirmed", done: confirmed || handedOver }]),
+          ...(order.fulfilmentType !== "DELIVERY" ? [] : [{ key: "on-the-way", label: "On the way", done: onTheWay || handedOver }]),
+          { key: "handed", label: payOnDelivery ? `${lastStep} · pay then` : lastStep, done: handedOver },
+        ];
+  const storeHref = `/s/${slug}`;
+
+  const payHeading = (
+    <div className="space-y-1">
+      <h2 id="pay-heading" className="font-display text-2xl font-bold text-awaaz-charcoal">
+        Pay {formatINR(order.totalPaise)}
+      </h2>
+      <p className="text-sm text-muted-foreground">
+        to {payeeName} · ref <span className="font-mono">{order.billNumber}</span>
+      </p>
+    </div>
+  );
+  // What a buyer can do without Razorpay. With Razorpay it stays hidden until Razorpay fails.
+  const directPay = upiLink ? (
+    <>
+      <UpiPayOptions
+        upiLink={upiLink}
+        upiId={vendor.upiId ?? ""}
+        amountPaise={order.totalPaise}
+        genericLabel={`Pay ${formatINR(order.totalPaise)} with a UPI app`}
+        emphasis={payOnline ? "secondary" : "primary"}
+        foldFallback
+      >
+        {qrPng ? (
+          <div className="space-y-1.5 sm:hidden">
+            <SaveQrButton pngDataUrl={qrPng} fileName={`upi-${order.billNumber}`} />
+            <p className="text-sm text-muted-foreground">
+              Then use &ldquo;Scan from gallery&rdquo; in your UPI app.
+            </p>
+          </div>
+        ) : null}
+      </UpiPayOptions>
+      <details className="group overflow-hidden rounded-xl border border-dashed border-border text-left">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 px-3 py-2 text-sm font-semibold text-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary [&::-webkit-details-marker]:hidden">
+          <QrCode className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span className="flex-1">Paying from another phone? Show QR</span>
+          <ChevronDown
+            className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-180 motion-reduce:transition-none"
+            aria-hidden="true"
+          />
+        </summary>
+        <div className="border-t border-border/50 px-3 py-4 text-center">
+          <div className="mx-auto w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
+            <UpiQrImage
+              src={qrSrc}
+              alt={`UPI QR code to pay ${formatINR(order.totalPaise)} to ${payeeName}`}
+              size={220}
+              sample={order.vendor.isDemo}
+            />
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">Scan it with the phone you pay from.</p>
+        </div>
+      </details>
+    </>
+  ) : waLink ? (
+    <p className="text-sm text-muted-foreground">
+      The store hasn&apos;t added a UPI ID yet — message them to pay.
+    </p>
+  ) : null;
+  // A claim needs a payment to be about: one the buyer could make here or by messaging
+  // the store, or an earlier one the seller answered "Not received".
+  const claimSection =
+    directPay || paymentRejected ? (
+      <section aria-labelledby="claim-heading" className="space-y-3 border-t border-border/50 p-4 sm:p-6">
+        <h2 id="claim-heading" className="font-display text-lg font-bold text-awaaz-charcoal">
+          Payment done?
+        </h2>
+        <PaidClaimForm
+          slug={slug}
+          token={params.token}
+          requireReference={paymentRejected}
+          askScreenshot={proofUploads}
+        />
+      </section>
+    ) : null;
+  // "I've received my order": a confirmed delivery that isn't waiting on an
+  // upfront payment. Pickups are handed over in person.
+  const liveDelivery = order.fulfilmentType === "DELIVERY" && confirmed;
+  const canSayReceived = liveDelivery && !order.buyerReceivedAt && state !== "AWAITING_PAYMENT";
+  const saidReceived = liveDelivery && order.buyerReceivedAt !== null;
 
   return (
     <div data-theme={theme} className="min-h-screen bg-awaaz-cream/40">
@@ -243,10 +508,11 @@ export default async function StorefrontOrderPage(props: {
       <header className="border-b border-border/50 bg-linear-to-b from-primary/15 to-background">
         <div className="mx-auto max-w-xl px-4 pb-6 pt-8 sm:px-6">
           <Link
-            href={`/s/${slug}`}
-            className="inline-flex min-h-11 items-center text-sm font-semibold text-primary hover:underline"
+            href={storeHref}
+            className="-ml-2 inline-flex min-h-11 items-center gap-2 rounded-xl px-2 text-sm font-semibold text-primary hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           >
-            ← {vendor.name}
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back to {vendor.name}
           </Link>
           <h1 className="mt-1 font-display text-2xl font-bold text-awaaz-charcoal">Your order</h1>
           <p className="mt-1 font-mono text-sm text-muted-foreground">
@@ -258,34 +524,98 @@ export default async function StorefrontOrderPage(props: {
       <main id="main" className="mx-auto max-w-xl space-y-5 px-4 py-6 sm:px-6">
         <section
           aria-labelledby="status-heading"
-          className={cn("flex items-start gap-3 rounded-2xl border px-4 py-3", TONE_CLASS[status.tone])}
+          className={cn(
+            "flex flex-col items-center gap-3 rounded-2xl border px-4 py-6 text-center shadow-xs",
+            TONE_CLASS[status.tone],
+          )}
         >
           <ToneIcon tone={status.tone} />
-          <div>
-            <h2 id="status-heading" className="text-base font-bold">
+          <div className="w-full min-w-0 space-y-1.5">
+            <h2 id="status-heading" className="font-display text-2xl font-bold leading-tight">
               {status.label}
             </h2>
             {status.hint ? <p className="text-sm">{status.hint}</p> : null}
-            {awaitingUpi && minsLeft > 0 ? (
+            {state === "PAYMENT_SUBMITTED" ? (
               <p className="text-sm">
-                {drop
-                  ? `Hold expires in ${minsLeft} min — pay before then to keep your items.`
-                  : `Pay within ${minsLeft} min to confirm your order.`}
+                The store checks its UPI app, then confirms here.
+                {hasProof ? " Your screenshot is with the store." : ""}
+              </p>
+            ) : null}
+            {awaitingUpi && minsLeft > 0 ? (
+              <p className="text-sm font-semibold">
+                {drop ? `Pay by ${payBy} to keep your items.` : `Pay by ${payBy} to confirm your order.`}
               </p>
             ) : null}
             {paymentRejected ? (
               <p className="text-sm font-semibold">
-                The kitchen couldn&apos;t find your payment. Check your UPI app
+                The store couldn&apos;t find your payment. Check your UPI app
                 {awaitingUpi
                   ? ". If the money left your account, enter the UPI reference below."
-                  : ". If the money left your account, message the kitchen with the UPI reference."}
+                  : waLink
+                    ? ". If the money left your account, message the store with the UPI reference."
+                    : ". If the money left your account, keep the UPI reference from your payment app — the seller will need it."}
               </p>
             ) : null}
             {state === "EXPIRED" && order.paymentMethod === "UPI" && !paymentRejected ? (
-              <p className="text-sm">If you already paid, message the kitchen with your UPI reference.</p>
+              <p className="text-sm">
+                {waLink
+                  ? "If you already paid, message the store with your UPI reference."
+                  : "If you already paid, keep the UPI reference from your payment app — the seller will need it."}
+              </p>
             ) : null}
+            {confirmed && (windowOnPage || (isPickup && pickupNote)) ? (
+              <p className="text-sm font-semibold">
+                {isPickup ? "Pickup" : "Delivery"}
+                {windowOnPage ? ` · ${windowOnPage}` : ""}
+                {isPickup && pickupNote ? ` · ${pickupNote}` : ""}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap items-center justify-center gap-2 pt-2 empty:hidden">
+              {state === "EXPIRED" || state === "CANCELLED" ? (
+                <Link
+                  href={storeHref}
+                  className="inline-flex min-h-11 items-center justify-center gap-2 rounded-xl bg-primary px-4 text-sm font-bold text-primary-foreground shadow-xs hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+                  Order again
+                </Link>
+              ) : null}
+              {waInStatus && waLink ? (
+                <a href={waLink} target="_blank" rel="noopener noreferrer" className={WA_BUTTON}>
+                  <MessageCircle className="h-5 w-5" aria-hidden="true" />
+                  Message the store on WhatsApp
+                </a>
+              ) : null}
+            </div>
+            <OrderRefresh
+              auto={!handedOver && state !== "CANCELLED"}
+              checkedAt={formatIstTime(now)}
+              className="justify-center pt-2"
+            />
           </div>
         </section>
+
+        {canSayReceived ? (
+          <BuyerReceivedButton slug={slug} token={params.token} />
+        ) : saidReceived ? (
+          <p role="status" className="text-center text-sm font-semibold">
+            Thanks — the store knows you got it.
+          </p>
+        ) : null}
+
+        {order.feedback ? (
+          <p role="status" className="text-center text-sm font-semibold">
+            Thanks for your feedback. You rated this {order.feedback.rating} of 5 ·{" "}
+            {RATING_WORDS[order.feedback.rating - 1]}.
+          </p>
+        ) : handedOver && !order.isSample ? (
+          <OrderFeedbackForm slug={slug} token={params.token} vendorName={vendor.name} />
+        ) : null}
+
+        {againPlan ? <OrderAgainButton slug={slug} plan={againPlan} billNumber={order.billNumber} /> : null}
+
+        {/* While payment is due the next step is the pay button, right below. */}
+        {steps && !awaitingUpi ? <OrderProgress steps={steps} /> : null}
 
         {waFirst && waLink ? (
           <section
@@ -312,73 +642,52 @@ export default async function StorefrontOrderPage(props: {
         ) : null}
 
         {awaitingUpi ? (
-          <section
-            aria-labelledby="pay-heading"
-            className="space-y-4 rounded-2xl border border-primary/25 bg-background p-4 text-center shadow-xs sm:p-6"
-          >
-            <h2 id="pay-heading" className="font-display text-xl font-bold text-awaaz-charcoal">
-              Pay {formatINR(order.totalPaise)}
-            </h2>
+          <div className="rounded-2xl border border-primary/25 bg-background text-center shadow-xs">
             {payOnline ? (
+              <OnlinePayFlow
+                slug={slug}
+                token={params.token}
+                amountLabel={formatINR(order.totalPaise)}
+                prefillName={order.customerName}
+                prefillContact={order.customerPhone}
+                fallback={upiLink ? "upi" : waLink ? "message" : null}
+                startOpen={paymentRejected}
+                autoStart={searchParams[PAY_NOW_PARAM] === "1" && !viaWhatsapp && !paymentRejected}
+                heading={payHeading}
+                directPay={directPay}
+                claim={claimSection}
+              />
+            ) : (
               <>
-                <RazorpayPayButton
-                  slug={slug}
-                  token={params.token}
-                  amountLabel={formatINR(order.totalPaise)}
-                  prefillName={order.customerName}
-                  prefillContact={order.customerPhone}
-                />
-                {upiLink ? (
-                  <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                    or pay directly with a UPI app
-                  </p>
-                ) : null}
+                <section aria-labelledby="pay-heading" className="space-y-4 p-4 sm:p-6">
+                  {payHeading}
+                  {directPay ?? (
+                    <p className="text-sm text-muted-foreground">
+                      The store hasn&apos;t added a UPI ID yet, so it can&apos;t take a UPI payment here.
+                    </p>
+                  )}
+                </section>
+                {claimSection}
               </>
-            ) : null}
-            {upiLink ? (
-              <>
-                <UpiPayOptions
-                  upiLink={upiLink}
-                  upiId={vendor.upiId ?? ""}
-                  amountPaise={order.totalPaise}
-                  genericLabel={`Pay ${formatINR(order.totalPaise)} with a UPI app`}
-                  emphasis={payOnline ? "secondary" : "primary"}
-                />
-                <div className="mx-auto w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
-                  <Image
-                    src={qrSrc}
-                    alt={`UPI QR code to pay ${formatINR(order.totalPaise)} to ${payeeName}`}
-                    width={220}
-                    height={220}
-                    unoptimized
-                    className="rounded-lg"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  Paying from another phone? Scan this QR with it.
-                </p>
-                <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                  Paying {payeeName} · ref {order.billNumber}
-                </p>
-              </>
-            ) : payOnline ? null : (
-              <p className="text-sm text-muted-foreground">
-                The kitchen hasn&apos;t added a UPI ID yet — message them to pay.
-              </p>
             )}
-            <PaidClaimForm slug={slug} token={params.token} requireReference={paymentRejected} />
-          </section>
+          </div>
         ) : null}
 
-        {canAddReference ? (
+        {canAddReference || canAddScreenshot ? (
           <section
             aria-labelledby="add-ref-heading"
             className="space-y-3 rounded-2xl border border-border/60 bg-background p-4 shadow-xs sm:p-6"
           >
             <h2 id="add-ref-heading" className="text-base font-bold text-awaaz-charcoal">
-              Help the kitchen find your payment
+              Help the store find your payment
             </h2>
-            <PaidClaimForm slug={slug} token={params.token} claimed />
+            <PaidClaimForm
+              slug={slug}
+              token={params.token}
+              claimed
+              askReference={canAddReference}
+              askScreenshot={canAddScreenshot}
+            />
           </section>
         ) : null}
 
@@ -399,85 +708,102 @@ export default async function StorefrontOrderPage(props: {
                 <span>
                   {i.qty} × {i.name}
                 </span>
-                <span className="font-mono tabular-nums">{formatINR(i.totalPaise)}</span>
+                <span className="font-mono tabular-nums">{i.isGift ? "Free" : formatINR(i.totalPaise)}</span>
               </li>
             ))}
           </ul>
           <dl className="space-y-1 border-t border-border/50 px-4 py-3 text-sm">
+            {order.deliveryFeePaise > 0 || order.discountPaise > 0 ? (
+              <div className="flex justify-between">
+                <dt>Items</dt>
+                <dd className="font-mono tabular-nums">{formatINR(order.subtotalPaise)}</dd>
+              </div>
+            ) : null}
+            {order.discountPaise > 0 ? (
+              <div className="flex justify-between gap-3 font-semibold text-primary">
+                <dt className="min-w-0 break-words">{discountLabel(order.offerName)}</dt>
+                <dd className="shrink-0 font-mono tabular-nums">−{formatINR(order.discountPaise)}</dd>
+              </div>
+            ) : null}
             {order.deliveryFeePaise > 0 ? (
-              <>
-                <div className="flex justify-between">
-                  <dt>Items</dt>
-                  <dd className="font-mono tabular-nums">{formatINR(order.subtotalPaise)}</dd>
-                </div>
-                <div className="flex justify-between">
-                  <dt>Delivery fee</dt>
-                  <dd className="font-mono tabular-nums">{formatINR(order.deliveryFeePaise)}</dd>
-                </div>
-              </>
+              <div className="flex justify-between">
+                <dt>Delivery fee</dt>
+                <dd className="font-mono tabular-nums">{formatINR(order.deliveryFeePaise)}</dd>
+              </div>
             ) : null}
             <div className="flex justify-between text-base font-bold">
               <dt>Total</dt>
               <dd className="font-mono tabular-nums">{formatINR(order.totalPaise)}</dd>
-            </div>
-            <div className="flex justify-between text-muted-foreground">
-              <dt>Payment</dt>
-              <dd>{order.paymentMethod === "CASH" ? "Pay on delivery" : "UPI"}</dd>
             </div>
           </dl>
         </section>
 
         <section
           aria-labelledby="fulfil-heading"
-          className="space-y-2 rounded-2xl border border-border/60 bg-background p-4 text-sm shadow-xs"
+          className="rounded-2xl border border-border/60 bg-background text-sm shadow-xs"
         >
-          <h2 id="fulfil-heading" className="flex items-center gap-2 font-display text-base font-bold">
+          <h2
+            id="fulfil-heading"
+            className="flex items-center gap-2 border-b border-border/50 px-4 py-3 font-display text-base font-bold"
+          >
             <MapPin className="h-4 w-4 text-primary" aria-hidden="true" />
             {order.fulfilmentType === "DELIVERY" ? "Delivery" : "Pickup"}
           </h2>
-          {drop ? (
-            <p className="font-semibold">
-              {formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt)}
-            </p>
-          ) : null}
-          {order.fulfilmentType === "DELIVERY" && order.deliveryAddress ? (
-            <p className="whitespace-pre-line text-muted-foreground">{order.deliveryAddress}</p>
-          ) : null}
-          {order.fulfilmentType === "PICKUP" && pickupNote ? (
-            <p className="text-muted-foreground">{pickupNote}</p>
-          ) : null}
-          {order.notes ? (
-            <p>
-              <span className="font-semibold">Your note: </span>
-              {order.notes}
-            </p>
-          ) : null}
+          <dl className="divide-y divide-border/50 px-4">
+            <DetailRow label="Order">
+              <span className="font-mono">{order.billNumber}</span>
+            </DetailRow>
+            {windowOnPage ? <DetailRow label="When">{windowOnPage}</DetailRow> : null}
+            {order.fulfilmentType === "DELIVERY" && order.deliveryAddress ? (
+              <DetailRow label="Where">
+                <span className="whitespace-pre-line font-normal">{order.deliveryAddress}</span>
+              </DetailRow>
+            ) : null}
+            {order.fulfilmentType === "PICKUP" && pickupNote ? (
+              <DetailRow label="Where">
+                <span className="font-normal">{pickupNote}</span>
+              </DetailRow>
+            ) : null}
+            <DetailRow label="Payment">
+              {payOnDelivery ? payOnDeliveryLabel(order.fulfilmentType) : paidOnline ? "Paid online" : "UPI"}
+            </DetailRow>
+            {order.notes ? (
+              <DetailRow label="Your note">
+                <span className="font-normal">{order.notes}</span>
+              </DetailRow>
+            ) : null}
+          </dl>
         </section>
 
         <OtherCartsNotice slug={slug} vendorName={vendor.name} />
 
-        {waLink && !waFirst ? (
+        {waLink && !waFirst && !waInStatus ? (
           <a
             href={waLink}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-green-600/40 bg-background px-6 text-sm font-bold text-green-800 shadow-xs hover:bg-green-600/5 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className={cn(WA_BUTTON, "min-h-14 w-full rounded-2xl px-6 text-base")}
           >
             <MessageCircle className="h-5 w-5" aria-hidden="true" />
-            Message the kitchen on WhatsApp
+            Message the store on WhatsApp
           </a>
         ) : null}
 
-        <p className="text-center text-xs text-muted-foreground">
-          Bookmark this page to check your order status.
-        </p>
+        <OrderLinkActions
+          slug={slug}
+          token={params.token}
+          billNumber={order.billNumber}
+          createdAt={order.createdAt.toISOString()}
+          vendorName={vendor.name}
+        />
+
+        {/* After an order is the moment a buyer wants the store one tap away (lib/store-app.ts). */}
+        {vendor.isDemo ? null : <StoreInstall slug={vendor.slug} storeName={vendor.name} />}
       </main>
 
       <footer className="space-y-2 px-4 pb-10 pt-2 text-center text-xs text-muted-foreground">
         {vendor.settings?.fssaiNumber ? <p>FSSAI Lic. No. {vendor.settings.fssaiNumber}</p> : null}
-        <Link href="/" className="inline-flex min-h-11 items-center font-semibold hover:text-primary">
-          Billing by AwaazOS — Bol. Bill. Becho.
-        </Link>
+        <PoweredByFooter slug={vendor.slug} isDemo={vendor.isDemo} />
       </footer>
     </div>
   );

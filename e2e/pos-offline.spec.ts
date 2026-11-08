@@ -49,7 +49,7 @@ async function cashSale(page: Page): Promise<void> {
   await page.getByRole("button", { name: new RegExp(`^${CHAI.name}`) }).click();
   await page.getByRole("button", { name: "Collect payment" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByRole("button", { name: "Cash" }).click();
+  await dialog.getByRole("radio", { name: "Cash" }).check();
   await dialog.getByRole("button", { name: /Mark as paid/ }).click();
 }
 

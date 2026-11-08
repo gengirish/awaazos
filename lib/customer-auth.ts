@@ -36,7 +36,11 @@ export type CurrentCustomer = {
   email: string;
   name: string | null;
   phone: string | null;
+  /** The address line; its parts beside it (lib/delivery-address.ts). */
   savedAddress: string | null;
+  savedLocality: string | null;
+  savedLandmark: string | null;
+  savedPincode: string | null;
 };
 
 // ─── Pure helpers ───────────────────────────────────────────────────
@@ -178,7 +182,7 @@ export type ConsumeResult =
 /**
  * Redeem a login token. Single use: the conditional update means exactly one
  * caller can flip `usedAt` from null. On failure still reports the stored
- * `returnTo` (when the row exists) so the buyer lands back on the kitchen.
+ * `returnTo` (when the row exists) so the buyer lands back on the store.
  */
 export async function consumeLoginToken(rawToken: string, now: Date = new Date()): Promise<ConsumeResult> {
   if (typeof rawToken !== "string" || rawToken.length < 20 || rawToken.length > 128) {
@@ -224,7 +228,18 @@ export async function customerFromSessionToken(
     where: { tokenHash: hashToken(rawToken) },
     select: {
       expiresAt: true,
-      customer: { select: { id: true, email: true, name: true, phone: true, savedAddress: true } },
+      customer: {
+        select: {
+          id: true,
+          email: true,
+          name: true,
+          phone: true,
+          savedAddress: true,
+          savedLocality: true,
+          savedLandmark: true,
+          savedPincode: true,
+        },
+      },
     },
   });
   if (!session || session.expiresAt.getTime() <= now.getTime()) return null;

@@ -12,10 +12,16 @@ export const transactionPostBodySchema = z.object({
   items: z.array(transactionPostItemSchema).min(1),
   subtotalPaise: z.number().int(),
   discountPaise: z.number().int().min(0).default(0),
+  // The offer the POS applied (lib/offers.ts). The server re-prices it.
+  offerId: z.string().min(1).max(64).optional().nullable(),
+  offerName: z.string().trim().max(60).optional().nullable(),
   taxPaise: z.number().int().min(0),
   totalPaise: z.number().int(),
   paymentMethod: z.nativeEnum(PaymentMethod),
   upiRef: z.string().max(120).optional().nullable(),
+  // Cash handed over at the counter (lib/cash-tender.ts). CASH only, never
+  // below the total; the server derives the change.
+  cashReceivedPaise: z.number().int().positive().max(100_000_000).optional().nullable(),
   customerPhone: z.string().optional().nullable(),
   customerName: z.string().optional().nullable(),
   voiceTranscript: z.string().optional().nullable(),
@@ -43,7 +49,7 @@ export function expectedSubtotalPaise(items: { priceInPaise: number; qty: number
 
 export type TotalsCheckResult =
   | { ok: true }
-  | { ok: false; code: "subtotal_mismatch" | "total_mismatch" };
+  | { ok: false; code: "subtotal_mismatch" | "total_mismatch" | "discount_mismatch" };
 
 export function checkTransactionTotals(body: {
   items: { priceInPaise: number; qty: number }[];
@@ -55,6 +61,9 @@ export function checkTransactionTotals(body: {
   const expected = expectedSubtotalPaise(body.items);
   if (expected !== body.subtotalPaise) {
     return { ok: false, code: "subtotal_mismatch" };
+  }
+  if (body.discountPaise > body.subtotalPaise) {
+    return { ok: false, code: "discount_mismatch" };
   }
   const recomputed = body.subtotalPaise - body.discountPaise + body.taxPaise;
   if (recomputed !== body.totalPaise) {

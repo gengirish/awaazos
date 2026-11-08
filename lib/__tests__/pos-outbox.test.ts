@@ -9,6 +9,7 @@ import {
   saleUnsavedMessage,
   syncOrder,
   syncOutbox,
+  undoSale,
   type OutboxSale,
 } from "@/lib/pos-outbox";
 
@@ -149,20 +150,25 @@ describe("checkoutSale", () => {
 
   it("storage works: saves, posts, then clears the entry", async () => {
     fetchMock.mockResolvedValue(json(201, { transaction: BILL }));
-    await expect(checkoutSale(VENDOR, BODY)).resolves.toEqual({ kind: "synced", bill: BILL });
+    expect(await checkoutSale(VENDOR, BODY)).toEqual({ kind: "synced", clientRef: postedRef(0), bill: BILL });
     expect(storedSales()).toEqual([]);
   });
 
   it("storage works, network down: queued on the device", async () => {
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
-    await expect(checkoutSale(VENDOR, BODY)).resolves.toEqual({ kind: "queued", localNo: 1, needsSignIn: false });
+    expect(await checkoutSale(VENDOR, BODY)).toEqual({
+      kind: "queued",
+      clientRef: postedRef(0),
+      localNo: 1,
+      needsSignIn: false,
+    });
     expect(storedSales()).toHaveLength(1);
   });
 
   it("storage fails, post ok: a normal synced sale", async () => {
     idb.broken = true;
     fetchMock.mockResolvedValue(json(201, { transaction: BILL }));
-    await expect(checkoutSale(VENDOR, BODY)).resolves.toEqual({ kind: "synced", bill: BILL });
+    expect(await checkoutSale(VENDOR, BODY)).toEqual({ kind: "synced", clientRef: postedRef(0), bill: BILL });
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as [string, RequestInit];
     expect(url).toBe("/api/transactions?vendor=v1");
@@ -207,8 +213,9 @@ describe("checkoutSale", () => {
 
     // The first post had landed: the server answers the replay with that bill.
     fetchMock.mockResolvedValueOnce(json(200, { transaction: BILL }));
-    await expect(checkoutSale(VENDOR, BODY, { clientRef: first.clientRef })).resolves.toEqual({
+    expect(await checkoutSale(VENDOR, BODY, { clientRef: first.clientRef })).toEqual({
       kind: "synced",
+      clientRef: first.clientRef,
       bill: BILL,
     });
     expect(postedRef(1)).toBe(postedRef(0));
@@ -228,7 +235,44 @@ describe("checkoutSale", () => {
       idb.broken = true;
       return json(201, { transaction: BILL });
     });
-    await expect(checkoutSale(VENDOR, BODY)).resolves.toEqual({ kind: "synced", bill: BILL });
+    expect(await checkoutSale(VENDOR, BODY)).toEqual({ kind: "synced", clientRef: postedRef(0), bill: BILL });
+  });
+
+  it("undoSale: a synced sale is removed on the server", async () => {
+    fetchMock.mockResolvedValueOnce(json(201, { transaction: BILL }));
+    const done = await checkoutSale(VENDOR, BODY);
+    if (done.kind !== "synced") throw new Error(`expected synced, got ${done.kind}`);
+    fetchMock.mockResolvedValueOnce(json(200, { success: true }));
+    await expect(undoSale(VENDOR, done.clientRef, { synced: true })).resolves.toEqual({ kind: "undone" });
+    const [url, init] = fetchMock.mock.calls.at(-1) as [string, RequestInit];
+    expect(url).toBe("/api/transactions/undo?vendor=v1");
+    expect(JSON.parse(init.body as string)).toEqual({ clientRef: done.clientRef, vendorId: VENDOR });
+  });
+
+  it("undoSale: a queued sale leaves the device and is never posted again", async () => {
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    const queued = await checkoutSale(VENDOR, BODY);
+    if (queued.kind !== "queued") throw new Error(`expected queued, got ${queued.kind}`);
+    expect(storedSales()).toHaveLength(1);
+    vi.stubGlobal("navigator", { onLine: false });
+    await expect(undoSale(VENDOR, queued.clientRef, { synced: false })).resolves.toEqual({ kind: "undone" });
+    expect(storedSales()).toEqual([]);
+    // Back online, the server never heard of it: still undone.
+    vi.stubGlobal("navigator", { onLine: true });
+    fetchMock.mockResolvedValueOnce(json(404, { error: "Not found" }));
+    await expect(undoSale(VENDOR, queued.clientRef, { synced: false })).resolves.toEqual({ kind: "undone" });
+  });
+
+  it("undoSale: a synced sale can't be undone offline, too late, or on a server error", async () => {
+    vi.stubGlobal("navigator", { onLine: false });
+    await expect(undoSale(VENDOR, "ref", { synced: true })).resolves.toEqual({ kind: "failed", reason: "network" });
+    vi.stubGlobal("navigator", { onLine: true });
+    fetchMock.mockResolvedValueOnce(json(409, { error: "undo_window_closed" }));
+    await expect(undoSale(VENDOR, "ref", { synced: true })).resolves.toEqual({ kind: "failed", reason: "too_late" });
+    fetchMock.mockResolvedValueOnce(json(404, { error: "Not found" }));
+    await expect(undoSale(VENDOR, "ref", { synced: true })).resolves.toEqual({ kind: "failed", reason: "error" });
+    fetchMock.mockRejectedValueOnce(new TypeError("Failed to fetch"));
+    await expect(undoSale(VENDOR, "ref", { synced: true })).resolves.toEqual({ kind: "failed", reason: "network" });
   });
 
   it("removeSale and syncOutbox never reject on broken storage", async () => {

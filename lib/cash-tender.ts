@@ -1,6 +1,7 @@
 /**
- * Counter-side cash helpers for the POS payment sheet. Informational only:
- * nothing here is sent to the server. All amounts are integer paise.
+ * Counter-side cash helpers for the POS payment sheet. All amounts are integer
+ * paise. What the vendor typed as received goes on the bill
+ * (`cashReceivedPaise`); the server works out the change itself.
  */
 import type { PaymentMethod } from "@prisma/client";
 
@@ -59,6 +60,33 @@ export type CashChange =
 export function cashChange(totalPaise: number, receivedPaise: number): CashChange {
   const diff = receivedPaise - totalPaise;
   return diff >= 0 ? { kind: "change", changePaise: diff } : { kind: "short", shortPaise: -diff };
+}
+
+export type CashTender =
+  /** Nothing (or nothing readable) typed: the sale can go through, nothing recorded. */
+  | { kind: "none"; canMarkPaid: true }
+  | { kind: "change"; canMarkPaid: true; receivedPaise: number; changePaise: number }
+  /** Less than the bill: "Mark as paid" waits until the rest is handed over. */
+  | { kind: "short"; canMarkPaid: false; receivedPaise: number; shortPaise: number };
+
+/** What the Cash tab shows and whether it may be marked paid. */
+export function cashTender(totalPaise: number, receivedPaise: number | null): CashTender {
+  if (receivedPaise === null) return { kind: "none", canMarkPaid: true };
+  const c = cashChange(totalPaise, receivedPaise);
+  return c.kind === "change"
+    ? { kind: "change", canMarkPaid: true, receivedPaise, changePaise: c.changePaise }
+    : { kind: "short", canMarkPaid: false, receivedPaise, shortPaise: c.shortPaise };
+}
+
+/**
+ * Change owed for a cash bill, for the server to store beside what was handed
+ * over. `null` when nothing was recorded or it doesn't cover the bill (the
+ * POS never sends a short tender; the route refuses one).
+ */
+export function changeGivenPaise(totalPaise: number, cashReceivedPaise: number | null | undefined): number | null {
+  if (cashReceivedPaise == null) return null;
+  const diff = cashReceivedPaise - totalPaise;
+  return diff >= 0 ? diff : null;
 }
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {

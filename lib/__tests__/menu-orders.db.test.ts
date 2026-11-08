@@ -11,6 +11,8 @@ import { randomBytes } from "node:crypto";
 import type { Plan } from "@prisma/client";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { upcomingMenuSlots } from "@/lib/menu-slots";
+
 const ENABLED = process.env.DROPS_DB_TEST === "1";
 
 type MenuOrdersModule = typeof import("@/lib/menu-orders");
@@ -247,5 +249,73 @@ describe.skipIf(!ENABLED)("menu orders — DB integration", () => {
       items: [{ menuItemId: bhel.id, qty: 1 }],
     });
     expect(res.ok).toBe(true);
+  });
+  it("with slots set, needs a slot that is still offered and stores it on the order", async () => {
+    const { vendor, bhel } = await seed();
+    const rules = [{ days: [0, 1, 2, 3, 4, 5, 6], start: "12:00", end: "14:00" }];
+    const withSlots = { ...base(vendor), settings: { ...settings, menuSlots: rules } };
+    const items = [{ menuItemId: bhel.id, qty: 1 }];
+
+    expect(await mo.placeMenuOrder({ ...withSlots, items })).toEqual({ ok: false, error: { code: "slot_required" } });
+    expect(await mo.placeMenuOrder({ ...withSlots, items, slotStart: "2020-01-01T06:30:00.000Z" })).toEqual({
+      ok: false,
+      error: { code: "slot_unavailable" },
+    });
+
+    const [slot] = upcomingMenuSlots(rules);
+    const res = await mo.placeMenuOrder({ ...withSlots, items, slotStart: slot.key });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const t = await prisma.transaction.findFirstOrThrow({ where: { id: res.order.id, vendorId: vendor.id } });
+    expect(t.fulfilAt).toEqual(slot.start);
+    expect(t.fulfilUntil).toEqual(slot.end);
+  });
+
+  it("stores a delivery address in parts beside the whole address", async () => {
+    const { vendor, bhel } = await seed();
+    const res = await mo.placeMenuOrder({
+      ...base(vendor),
+      fulfilmentType: "DELIVERY",
+      deliveryAddress: "Flat 302, Lake View",
+      deliveryLocality: "Kondapur",
+      deliveryLandmark: "Ganesh temple",
+      deliveryPincode: "500 084",
+      items: [{ menuItemId: bhel.id, qty: 1 }],
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const t = await prisma.transaction.findFirstOrThrow({ where: { id: res.order.id, vendorId: vendor.id } });
+    expect(t.deliveryAddress).toBe("Flat 302, Lake View, Near Ganesh temple, Kondapur 500084");
+    expect(t.deliveryLocality).toBe("Kondapur");
+    expect(t.deliveryLandmark).toBe("Ganesh temple");
+    expect(t.deliveryPincode).toBe("500084");
+    // No slots set: no "when" on the order.
+    expect(t.fulfilAt).toBeNull();
+  });
+  it("with delivery areas, charges the area's fee and refuses other localities; pickup is untouched", async () => {
+    const { vendor, bhel } = await seed();
+    const areas = [
+      { name: "Kondapur", feePaise: 0 },
+      { name: "Madhapur", feePaise: null },
+    ];
+    const withAreas = { ...base(vendor), settings: { ...settings, deliveryAreas: areas } };
+    const items = [{ menuItemId: bhel.id, qty: 1 }];
+    const deliver = { fulfilmentType: "DELIVERY" as const, deliveryAddress: "Flat 2" };
+
+    expect(await mo.placeMenuOrder({ ...withAreas, ...deliver, deliveryLocality: "Miyapur", items })).toEqual({
+      ok: false,
+      error: { code: "outside_delivery_area" },
+    });
+    expect(await mo.placeMenuOrder({ ...withAreas, ...deliver, items })).toEqual({
+      ok: false,
+      error: { code: "outside_delivery_area" },
+    });
+
+    const free = await mo.placeMenuOrder({ ...withAreas, ...deliver, deliveryLocality: " kondapur", items });
+    expect(free.ok && free.order.deliveryFeePaise).toBe(0);
+    const usual = await mo.placeMenuOrder({ ...withAreas, ...deliver, deliveryLocality: "Madhapur", items });
+    expect(usual.ok && usual.order.deliveryFeePaise).toBe(2000);
+    const pickup = await mo.placeMenuOrder({ ...withAreas, items });
+    expect(pickup.ok).toBe(true);
   });
 });

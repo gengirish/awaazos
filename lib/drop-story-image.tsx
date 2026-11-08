@@ -17,7 +17,7 @@ import { prisma } from "@/lib/prisma";
 
 export const STORY_SIZE = { width: 1080, height: 1920 };
 export const STORY_MAX_ITEMS = 6;
-const STORY_SAFE = { top: 260, bottom: 360, side: 80 };
+export const STORY_SAFE = { top: 260, bottom: 360, side: 80 };
 
 export async function loadDropStory(dropId: string, vendorId: string) {
   const drop = await prisma.drop.findFirst({
@@ -56,7 +56,30 @@ export function storyOrderUrl(host: string, slug: string): string {
   return `${host}/s/${encodeURIComponent(slug)}`;
 }
 
-export function DropStoryCard({ story, host }: { story: DropStory; host: string }) {
+/** Where a generated background sits: inside the card's top border. */
+const STORY_BACKGROUND_SIZE = { width: STORY_SIZE.width, height: STORY_SIZE.height - 24 };
+
+/** Full-bleed picture behind a story card (lib/ai-image.ts). */
+export function StoryBackground({ src }: { src?: string }) {
+  if (!src) return null;
+  return (
+    // eslint-disable-next-line @next/next/no-img-element -- Satori renders plain <img>
+    <img
+      src={src}
+      alt=""
+      {...STORY_BACKGROUND_SIZE}
+      style={{ position: "absolute", top: 0, left: 0, objectFit: "cover" }}
+    />
+  );
+}
+
+/** Keeps a block of text readable when a picture is behind it. */
+export function storyPanel(background?: string) {
+  return background ? { background: "rgba(255,255,255,0.92)", borderRadius: 24, padding: "24px 32px" } : {};
+}
+
+export function DropStoryCard({ story, host, background }: { story: DropStory; host: string; background?: string }) {
+  const panel = storyPanel(background);
   const shown = story.items.slice(0, STORY_MAX_ITEMS);
   const more = story.items.length - shown.length;
   return (
@@ -74,7 +97,8 @@ export function DropStoryCard({ story, host }: { story: DropStory; host: string 
         fontFamily: "sans-serif",
       }}
     >
-      <div style={{ display: "flex", flexDirection: "column" }}>
+      <StoryBackground src={background} />
+      <div style={{ display: "flex", flexDirection: "column", ...panel }}>
         <div style={{ display: "flex", fontSize: 44, color: C.primary, fontWeight: 700 }}>
           {truncate(story.vendorName, 32)}
           {story.city ? ` · ${truncate(story.city, 18)}` : ""}
@@ -84,7 +108,7 @@ export function DropStoryCard({ story, host }: { story: DropStory; host: string 
         </div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", flexDirection: "column", ...panel }}>
         {shown.map((it, i) => (
           <div
             key={i}
@@ -106,7 +130,7 @@ export function DropStoryCard({ story, host }: { story: DropStory; host: string 
         ) : null}
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex", flexDirection: "column", ...panel }}>
         <div
           style={{
             display: "flex",

@@ -26,6 +26,7 @@ export async function listVendorTransactions(
   const skip = (filters.page - 1) * filters.limit;
   const where: Prisma.TransactionWhereInput = {
     vendorId,
+    archivedAt: null, // a claimed demo store's hidden sample orders
     ...(filters.paymentStatus ? { paymentStatus: filters.paymentStatus } : {}),
     ...(filters.paymentMethod ? { paymentMethod: filters.paymentMethod } : {}),
     ...(filters.source ? { source: filters.source } : {}),

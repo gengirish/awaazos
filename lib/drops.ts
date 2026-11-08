@@ -40,10 +40,15 @@ import { Prisma } from "@prisma/client";
 import { formatBillDateYYYYMMDD, getIstMonthStart, getIstTodayStart } from "@/lib/billing-period";
 import { PLAN_LIMITS } from "@/lib/constants";
 import { sumPaise } from "@/lib/currency";
-import { bumpDropOrderSignal } from "@/lib/drops-signal";
+import { deliveryFields } from "@/lib/delivery-address";
+import { deliveryFeeFor, parseDeliveryAreas } from "@/lib/delivery-areas";
+import { bumpOrderSignal } from "@/lib/drops-signal";
+import { applyOffers, giftLineName, withGiftsThatFit } from "@/lib/offers";
+import { loadResolvedOffers } from "@/lib/offers-server";
 import { effectivePlan, isBillingLocked } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
+import { alertsAtPlacement } from "@/lib/storefront-online-paid";
 import { generateReceiptToken } from "@/lib/receipt-data";
 
 type Db = PrismaClient | Prisma.TransactionClient;
@@ -82,19 +87,26 @@ export function allowedFulfilmentTypes(mode: FulfilmentMode): FulfilmentType[] {
   return [mode];
 }
 
-/** Vendor-driven transitions. Time-driven ones (cut-off) are never stored. */
+/**
+ * Vendor-driven transitions. Time-driven ones (cut-off) are never stored, so a
+ * drop needs no further tap once orders close.
+ *
+ * Nothing moves a drop into FROZEN or FULFILLED any more: those are older rows
+ * from when sellers locked a drop and marked it done by hand. They stay read-only
+ * (a locked one can still be unlocked).
+ */
 const ALLOWED_TRANSITIONS: Record<DropStatus, DropStatus[]> = {
   DRAFT: ["OPEN"],
-  OPEN: ["CLOSED", "FROZEN", "DRAFT"],
-  CLOSED: ["OPEN", "FROZEN"],
-  FROZEN: ["FULFILLED", "CLOSED"],
+  OPEN: ["CLOSED"],
+  CLOSED: ["OPEN"],
+  FROZEN: ["CLOSED"],
   FULFILLED: [],
 };
 
 /**
  * Can the vendor move `from` → `to`? Uses the *effective* status as `from`, so
- * an OPEN drop past its cut-off behaves as CLOSED (it can be frozen, or reopened
- * — reopening requires moving closesAt forward, which the caller enforces).
+ * an OPEN drop past its cut-off behaves as CLOSED (it can be reopened, which
+ * requires moving closesAt forward; the caller enforces that).
  */
 export function canTransition(from: EffectiveDropStatus, to: DropStatus): boolean {
   const base: DropStatus = from === "SCHEDULED" ? "OPEN" : from;
@@ -194,12 +206,17 @@ export function remainingQty(maxQty: number | null, sold: number): number | null
 
 // ─── Totals ─────────────────────────────────────────────────────────
 
+/**
+ * `total = subtotal − discount + delivery fee`. The discount comes from
+ * `applyOffers` (lib/offers.ts) and never touches the delivery fee.
+ */
 export function computeOrderTotals(
   lines: { priceInPaise: number; qty: number }[],
   deliveryFeePaise: number,
+  discountPaise = 0,
 ): { subtotalPaise: number; totalPaise: number } {
   const subtotalPaise = sumPaise(lines.map((l) => l.priceInPaise * l.qty));
-  return { subtotalPaise, totalPaise: subtotalPaise + deliveryFeePaise };
+  return { subtotalPaise, totalPaise: subtotalPaise - discountPaise + deliveryFeePaise };
 }
 
 /** 32 url-safe chars, 192 bits. The buyer's order page is keyed on this alone. */
@@ -212,7 +229,8 @@ export function generateOrderToken(): string {
 /**
  * Transactions that are real sales: every counter sale (any status — it was
  * rung up), plus storefront orders only once they are paid. Unpaid, expired
- * and cancelled pre-orders (cancel of a paid order sets REFUNDED) are excluded.
+ * and cancelled pre-orders (cancel of a paid order sets REFUNDED) are excluded,
+ * and so are a demo store's sample orders (`isSample`, lib/demo-store.ts).
  *
  * This is the one definition of "a bill" for the plan cap, the billing usage
  * line and analytics counts. Spread it into a `where` alongside `vendorId`;
@@ -220,14 +238,14 @@ export function generateOrderToken(): string {
  * `billableTxnSql` is its raw-SQL twin — keep the two in lockstep (tested).
  */
 export function billableTxnWhere(): Prisma.TransactionWhereInput {
-  return { OR: [{ source: { not: "STOREFRONT" } }, { paymentStatus: "PAID" }] };
+  return { isSample: false, OR: [{ source: { not: "STOREFRONT" } }, { paymentStatus: "PAID" }] };
 }
 
 /**
  * Raw-SQL twin of `billableTxnWhere`, for `$queryRaw`. Expects the
  * `transactions` table aliased as `t`.
  */
-export const billableTxnSql = Prisma.sql`(t."source" <> 'STOREFRONT' OR t."paymentStatus" = 'PAID')`;
+export const billableTxnSql = Prisma.sql`(NOT t."isSample" AND (t."source" <> 'STOREFRONT' OR t."paymentStatus" = 'PAID'))`;
 
 const IST_OFFSET_MS = 330 * 60_000;
 
@@ -290,10 +308,20 @@ export type PlaceOrderInput = {
   customerPhone: string; // E.164, already validated
   fulfilmentType: FulfilmentType;
   deliveryAddress?: string | null;
+  /** Address parts beside the line (lib/delivery-address.ts); older checkouts send none. */
+  deliveryLocality?: string | null;
+  deliveryLandmark?: string | null;
+  deliveryPincode?: string | null;
+  /** VendorSettings.deliveryAreas, raw JSON (lib/delivery-areas.ts). Omitted = anywhere. */
+  deliveryAreas?: unknown;
   notes?: string | null;
   paymentMethod: "UPI" | "CASH";
   /** Signed-in storefront customer, if any (lib/customer-auth.ts). */
   customerId?: string | null;
+  /** lib/order-channel.ts; decided by the route from the request. */
+  orderChannel?: "instagram" | null;
+  /** The store takes Razorpay: a UPI order alerts the seller once paid (lib/storefront-online-paid.ts). */
+  takesOnlinePayment?: boolean;
   now?: Date;
 };
 
@@ -305,6 +333,7 @@ export type PlaceOrderError =
   | { code: "per_order_limit"; dropItemId: string; limit: number }
   | { code: "fulfilment_unavailable" }
   | { code: "address_required" }
+  | { code: "outside_delivery_area" }
   | { code: "pay_on_delivery_disabled" }
   | { code: "monthly_txn_cap_reached" }
   | { code: "orders_paused" };
@@ -314,6 +343,7 @@ export type PlacedOrder = {
   billNumber: string;
   orderToken: string;
   subtotalPaise: number;
+  discountPaise: number;
   deliveryFeePaise: number;
   totalPaise: number;
   paymentMethod: PaymentMethod;
@@ -360,9 +390,14 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
       if (!allowedFulfilmentTypes(drop.fulfilmentMode).includes(input.fulfilmentType)) {
         throw new OrderRejected({ code: "fulfilment_unavailable" });
       }
-      const address = input.deliveryAddress?.trim() || null;
-      if (input.fulfilmentType === "DELIVERY" && !address) {
+      const delivery = deliveryFields(input);
+      if (input.fulfilmentType === "DELIVERY" && !delivery.deliveryAddress) {
         throw new OrderRejected({ code: "address_required" });
+      }
+      // The store's delivery areas set the fee, and a locality outside them is refused.
+      const areaFee = deliveryFeeFor(parseDeliveryAreas(input.deliveryAreas), input.deliveryLocality, drop.deliveryFeePaise);
+      if (input.fulfilmentType === "DELIVERY" && !areaFee.ok) {
+        throw new OrderRejected({ code: "outside_delivery_area" });
       }
 
       const byId = new Map(drop.items.map((i) => [i.id, i]));
@@ -401,10 +436,40 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
         throw new OrderRejected({ code: "monthly_txn_cap_reached" });
       }
 
-      const deliveryFeePaise = input.fulfilmentType === "DELIVERY" ? drop.deliveryFeePaise : 0;
+      // Offers are priced here, from this vendor's rows, inside the same
+      // transaction: the buyer's browser never sends a price or a discount.
+      // A gift comes out of this drop's stock, so it has to be one of its items
+      // with enough left after the paid lines (lib/offers.ts rule 6).
+      const giftItemFor = (menuItemId: string) => drop.items.find((i) => i.menuItemId === menuItemId);
+      const offers = withGiftsThatFit(
+        await loadResolvedOffers(tx, vendorId, { channel: "DROP", dropId: drop.id, now }),
+        (menuItemId, qty) => {
+          const item = giftItemFor(menuItemId);
+          if (!item) return false;
+          const remaining = remainingQty(item.maxQty, sold.get(item.id) ?? 0);
+          const paid = priced.reduce((n, p) => n + (p.item.id === item.id ? p.qty : 0), 0);
+          return remaining === null || remaining - paid >= qty;
+        },
+      );
+      const offered = applyOffers(
+        priced.map((p) => ({
+          key: p.item.id,
+          menuItemId: p.item.menuItemId,
+          priceInPaise: p.item.priceInPaise,
+          qty: p.qty,
+        })),
+        offers,
+      );
+      const discountByLine = new Map(offered.lines.map((l) => [l.key, l.discountPaise]));
+      const appliedOffer = offered.applied;
+      const discountPaise = offered.discountTotalPaise;
+      const giftItem = offered.gift ? giftItemFor(offered.gift.menuItemId) : undefined;
+
+      const deliveryFeePaise = input.fulfilmentType === "DELIVERY" && areaFee.ok ? areaFee.feePaise : 0;
       const { subtotalPaise, totalPaise } = computeOrderTotals(
         priced.map((p) => ({ priceInPaise: p.item.priceInPaise, qty: p.qty })),
         deliveryFeePaise,
+        discountPaise,
       );
 
       const billNumber = await nextBillNumber(tx, vendorId, now);
@@ -415,6 +480,9 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
           vendorId,
           billNumber,
           subtotalPaise,
+          discountPaise,
+          offerId: appliedOffer?.offerId ?? null,
+          offerName: appliedOffer?.name ?? null,
           totalPaise,
           deliveryFeePaise,
           paymentMethod: input.paymentMethod,
@@ -426,18 +494,39 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
           dropId: drop.id,
           fulfilmentStatus: "PLACED",
           fulfilmentType: input.fulfilmentType,
-          deliveryAddress: input.fulfilmentType === "DELIVERY" ? address : null,
+          ...(input.fulfilmentType === "DELIVERY" ? delivery : {}),
           orderToken,
+          // The rider's "Delivered" link (app/d/[token]); deliveries only.
+          riderToken: input.fulfilmentType === "DELIVERY" ? generateOrderToken() : null,
           customerId: input.customerId ?? null,
+          orderChannel: input.orderChannel ?? null,
           orderItems: {
-            create: priced.map((p) => ({
-              menuItemId: p.item.menuItemId,
-              dropItemId: p.item.id,
-              name: p.item.menuItem.name, // snapshot
-              priceInPaise: p.item.priceInPaise,
-              qty: p.qty,
-              totalPaise: p.item.priceInPaise * p.qty,
-            })),
+            create: [
+              ...priced.map((p) => ({
+                menuItemId: p.item.menuItemId,
+                dropItemId: p.item.id,
+                name: p.item.menuItem.name, // snapshot
+                priceInPaise: p.item.priceInPaise,
+                qty: p.qty,
+                totalPaise: p.item.priceInPaise * p.qty,
+                discountPaise: discountByLine.get(p.item.id) ?? 0,
+              })),
+              // The gift: ₹0 and outside every total, but it holds stock like any line.
+              ...(offered.gift && giftItem
+                ? [
+                    {
+                      menuItemId: offered.gift.menuItemId,
+                      dropItemId: giftItem.id,
+                      name: giftLineName(offered.gift.name),
+                      priceInPaise: 0,
+                      qty: offered.gift.qty,
+                      totalPaise: 0,
+                      discountPaise: 0,
+                      isGift: true,
+                    },
+                  ]
+                : []),
+            ],
           },
         },
       });
@@ -457,6 +546,7 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
         billNumber,
         orderToken,
         subtotalPaise,
+        discountPaise,
         deliveryFeePaise,
         totalPaise,
         paymentMethod: created.paymentMethod,
@@ -465,16 +555,18 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
 
     // Fire-and-forget: lets the vendor's board notice without polling Postgres,
     // and pushes an alert to opted-in staff phones (lib/push.ts).
-    void bumpDropOrderSignal(vendorId, input.dropId);
-    notifyVendorInBackground(
-      vendorId,
-      newOrderPayload({
-        billNumber: order.billNumber,
-        totalPaise: order.totalPaise,
-        itemCount: lines.reduce((n, l) => n + l.qty, 0),
-        dropId: input.dropId,
-      }),
-    );
+    void bumpOrderSignal(vendorId);
+    if (alertsAtPlacement(input.paymentMethod, input.takesOnlinePayment ?? false)) {
+      notifyVendorInBackground(
+        vendorId,
+        newOrderPayload({
+          billNumber: order.billNumber,
+          totalPaise: order.totalPaise,
+          itemCount: lines.reduce((n, l) => n + l.qty, 0),
+          dropId: input.dropId,
+        }),
+      );
+    }
     return { ok: true, order };
   } catch (err) {
     if (err instanceof OrderRejected) return { ok: false, error: err.error };
@@ -489,6 +581,11 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
  * The conditional `updateMany` is the idempotency guard: a webhook retry and a
  * vendor tap racing each other credit revenue once. Returns false if the order
  * was already paid, cancelled, or not this vendor's.
+ *
+ * Paid means accepted: a PLACED order is CONFIRMED in the same step, so the
+ * seller never answers "Payment received" and then "Confirm" for one order.
+ * Every payment path (seller tap, bulk, Razorpay webhook / verify, cash at
+ * the door) comes through here. A DELIVERED order is left as it is.
  */
 export async function markOrderPaid(
   tx: Prisma.TransactionClient,
@@ -519,10 +616,17 @@ export async function markOrderPaid(
   });
   if (res.count === 0) return false;
 
+  await tx.transaction.updateMany({
+    where: { id: args.transactionId, vendorId: args.vendorId, fulfilmentStatus: "PLACED" },
+    data: { fulfilmentStatus: "CONFIRMED" },
+  });
+
   const t = await tx.transaction.findFirstOrThrow({
     where: { id: args.transactionId, vendorId: args.vendorId },
-    select: { totalPaise: true, paymentMethod: true, orderItems: { select: { qty: true } } },
+    select: { totalPaise: true, paymentMethod: true, isSample: true, orderItems: { select: { qty: true } } },
   });
+  // A demo store's sample order is not revenue (lib/demo-store.ts).
+  if (t.isSample) return true;
   await applyToDailySummary(tx, {
     vendorId: args.vendorId,
     date: getIstTodayStart(now),
@@ -555,6 +659,7 @@ export async function cancelOrder(
       paymentMethod: true,
       paidAt: true,
       totalPaise: true,
+      isSample: true,
       orderItems: { select: { qty: true } },
     },
   });
@@ -571,7 +676,7 @@ export async function cancelOrder(
   });
   if (res.count === 0) return false;
 
-  if (wasPaid && t.paidAt) {
+  if (wasPaid && t.paidAt && !t.isSample) {
     await applyToDailySummary(tx, {
       vendorId: args.vendorId,
       date: getIstTodayStart(t.paidAt),

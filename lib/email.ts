@@ -1,5 +1,6 @@
 /**
- * Transactional email — currently used only for password-reset links.
+ * Transactional email: password-reset links, buyer sign-in links, billing
+ * notices to sellers and demo store claim links.
  *
  * Sends through AgentMail's REST API over plain `fetch`, so this module adds
  * no dependency. Swapping provider (Resend, SES, Postmark) means rewriting
@@ -15,7 +16,12 @@
  *      out-of-band must mint a fresh token, not read one out of logs.
  */
 
+import { TRIAL_DAYS } from "@/lib/constants";
+import { storeBasePaise } from "@/lib/subscription";
+import { formatINR } from "@/lib/currency";
+import { formatIstDate } from "@/lib/datetime";
 import { logger } from "@/lib/logger";
+import { trialEndsPhrase } from "@/lib/trial-alerts";
 
 export type SendPasswordResetEmailInput = {
   to: string;
@@ -190,15 +196,15 @@ export async function sendPasswordResetEmail(
 export type SendCustomerLoginEmailInput = {
   to: string;
   url: string;
-  kitchenName: string;
+  storeName: string;
   expiresAt: Date;
 };
 
-function buildCustomerLoginText(kitchenName: string, url: string): string {
+function buildCustomerLoginText(storeName: string, url: string): string {
   return [
     "Namaste,",
     "",
-    `Here is your sign-in link for ${kitchenName}.`,
+    `Here is your sign-in link for ${storeName}.`,
     "It works once and expires in 15 minutes:",
     "",
     url,
@@ -209,18 +215,18 @@ function buildCustomerLoginText(kitchenName: string, url: string): string {
   ].join("\n");
 }
 
-function buildCustomerLoginHtml(kitchenName: string, url: string): string {
-  const kitchen = escapeHtml(kitchenName);
+function buildCustomerLoginHtml(storeName: string, url: string): string {
+  const store = escapeHtml(storeName);
   const href = escapeHtml(url);
   return `<!doctype html>
 <html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:32px;">
   <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e2e8f0;">
-    <div style="font-weight:700;font-size:18px;color:#FF6B00;">${kitchen}</div>
+    <div style="font-weight:700;font-size:18px;color:#FF6B00;">${store}</div>
     <h1 style="font-size:22px;margin:24px 0 8px 0;color:#1a1a1a;">Sign in to order</h1>
     <p style="color:#334155;line-height:1.5;">
       Namaste,<br><br>
-      Tap the button to sign in at ${kitchen}. This link works once and expires in 15 minutes.
+      Tap the button to sign in at ${store}. This link works once and expires in 15 minutes.
     </p>
     <p style="margin:28px 0;">
       <a href="${href}" style="background:#FF6B00;color:#ffffff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
@@ -242,7 +248,7 @@ function buildCustomerLoginHtml(kitchenName: string, url: string): string {
 }
 
 /**
- * Best-effort send. Always resolves `{ ok: true }`. Kitchen name is
+ * Best-effort send. Always resolves `{ ok: true }`. Store name is
  * vendor-authored, so it is HTML-escaped and stripped of newlines in the subject.
  */
 export async function sendCustomerLoginEmail(
@@ -250,7 +256,7 @@ export async function sendCustomerLoginEmail(
 ): Promise<{ ok: true }> {
   try {
     const { to, url, expiresAt } = input;
-    const kitchenName = input.kitchenName.replace(/[\r\n]+/g, " ").trim().slice(0, 80) || "AwaazOS";
+    const storeName = input.storeName.replace(/[\r\n]+/g, " ").trim().slice(0, 80) || "AwaazOS";
     const config = getConfig();
 
     if (!config) {
@@ -267,9 +273,9 @@ export async function sendCustomerLoginEmail(
 
     const messageId = await deliver(config, {
       to: [to],
-      subject: `Your sign-in link for ${kitchenName}`,
-      text: buildCustomerLoginText(kitchenName, url),
-      html: buildCustomerLoginHtml(kitchenName, url),
+      subject: `Your sign-in link for ${storeName}`,
+      text: buildCustomerLoginText(storeName, url),
+      html: buildCustomerLoginHtml(storeName, url),
       labels: ["customer-login", "transactional"],
     }, "email.customer_login");
 
@@ -282,4 +288,197 @@ export async function sendCustomerLoginEmail(
     logger.error({}, "email.customer_login.failed");
   }
   return { ok: true };
+}
+
+// ─── Billing notices to sellers ─────────────────────────────────────
+//
+// Same "never throws" rule. These tell the caller whether the provider took the
+// message, so a failed send can be retried. Store and owner names are
+// vendor-authored: escaped in HTML, stripped of newlines in the subject.
+
+function buildSellerNoticeText(greetingName: string, paragraphs: string[], url: string): string {
+  return [`Namaste ${greetingName},`, "", ...paragraphs.flatMap((p) => [p, ""]), url, "", "AwaazOS — Bol. Bill. Becho."].join(
+    "\n",
+  );
+}
+
+function buildSellerNoticeHtml(input: {
+  greetingName: string;
+  heading: string;
+  paragraphs: string[];
+  cta: string;
+  url: string;
+}): string {
+  const href = escapeHtml(input.url);
+  const body = input.paragraphs
+    .map((p) => `<p style="color:#334155;line-height:1.5;">${escapeHtml(p)}</p>`)
+    .join("\n    ");
+  return `<!doctype html>
+<html>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:32px;">
+  <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e2e8f0;">
+    <div style="font-weight:700;font-size:18px;color:#FF6B00;">AwaazOS</div>
+    <h1 style="font-size:22px;margin:24px 0 8px 0;color:#1a1a1a;">${escapeHtml(input.heading)}</h1>
+    <p style="color:#334155;line-height:1.5;">Namaste ${escapeHtml(input.greetingName)},</p>
+    ${body}
+    <p style="margin:28px 0;">
+      <a href="${href}" style="background:#FF6B00;color:#ffffff;padding:12px 22px;border-radius:8px;text-decoration:none;font-weight:600;display:inline-block;">
+        ${escapeHtml(input.cta)}
+      </a>
+    </p>
+    <p style="color:#64748b;font-size:12px;line-height:1.5;">
+      If the button doesn't work, paste this into your browser:<br>
+      <span style="word-break:break-all;">${href}</span>
+    </p>
+  </div>
+</body>
+</html>`;
+}
+
+async function sendSellerNotice(
+  input: {
+    to: string;
+    name: string | null;
+    subject: string;
+    heading: string;
+    paragraphs: string[];
+    cta: string;
+    url: string;
+    labels?: string[];
+  },
+  event: string,
+): Promise<{ delivered: boolean }> {
+  try {
+    const config = getConfig();
+    if (!config) {
+      logger.warn({ toMasked: maskEmail(input.to) }, `${event}.unconfigured`);
+      return { delivered: false };
+    }
+    const greetingName = input.name?.trim() || "there";
+    const messageId = await deliver(
+      config,
+      {
+        to: [input.to],
+        subject: input.subject.replace(/[\r\n]+/g, " ").trim(),
+        text: buildSellerNoticeText(greetingName, input.paragraphs, input.url),
+        html: buildSellerNoticeHtml({ ...input, greetingName }),
+        labels: input.labels ?? ["billing-notice", "transactional"],
+      },
+      event,
+    );
+    logger.info({ toMasked: maskEmail(input.to), messageId, delivered: messageId != null }, `${event}.sent`);
+    return { delivered: messageId != null };
+  } catch {
+    logger.error({}, `${event}.failed`);
+    return { delivered: false };
+  }
+}
+
+function subscriptionPriceLine(customPricePaise: number | null): string {
+  const monthly = formatINR(storeBasePaise("monthly", customPricePaise));
+  const yearly = formatINR(storeBasePaise("yearly", customPricePaise));
+  return `It costs ${monthly} a month or ${yearly} a year, plus GST.`;
+}
+
+export type SendTrialReminderEmailInput = {
+  to: string;
+  name: string | null;
+  storeName: string;
+  endsAt: Date;
+  /** IST calendar days to `endsAt` (lib/trial-alerts.ts). */
+  daysLeft: number;
+  billingUrl: string;
+  /** This store's own price (lib/subscription.ts). Null = the list price. */
+  customPricePaise: number | null;
+};
+
+export async function sendTrialReminderEmail(input: SendTrialReminderEmailInput): Promise<{ delivered: boolean }> {
+  const when = trialEndsPhrase(input.daysLeft);
+  return sendSellerNotice(
+    {
+      to: input.to,
+      name: input.name,
+      subject: `Your AwaazOS free trial ends ${when}`,
+      heading: `Your free trial ends ${when}`,
+      paragraphs: [
+        `The free trial for ${input.storeName} ends ${when} (${formatIstDate(input.endsAt)}). Subscribe to keep taking orders after that.`,
+        subscriptionPriceLine(input.customPricePaise),
+        "If you don't subscribe, customers can't place new orders. Your existing orders and records stay available.",
+      ],
+      cta: "Choose a plan",
+      url: input.billingUrl,
+    },
+    "email.trial_reminder",
+  );
+}
+
+export type SendStoreLockedEmailInput = {
+  to: string;
+  name: string | null;
+  storeName: string;
+  billingUrl: string;
+  /** This store's own price (lib/subscription.ts). Null = the list price. */
+  customPricePaise: number | null;
+};
+
+export type SendOrderCapEmailInput = { to: string; name: string | null; storeName: string; billingUrl: string };
+
+export async function sendOrderCapEmail(input: SendOrderCapEmailInput): Promise<{ delivered: boolean }> {
+  return sendSellerNotice(
+    {
+      to: input.to,
+      name: input.name,
+      subject: `A customer just tried to order from ${input.storeName}`,
+      heading: "A customer just tried to order",
+      paragraphs: [
+        `A customer just tried to order from ${input.storeName}, but you've reached your plan's order limit for this month, so the order didn't go through.`,
+        "Move up to a plan with unlimited orders to keep your store open. The limit also resets at the start of next month.",
+      ],
+      cta: "See plans",
+      url: input.billingUrl,
+    },
+    "email.order_cap",
+  );
+}
+
+export async function sendStoreLockedEmail(input: SendStoreLockedEmailInput): Promise<{ delivered: boolean }> {
+  return sendSellerNotice(
+    {
+      to: input.to,
+      name: input.name,
+      subject: `A customer just tried to order from ${input.storeName}`,
+      heading: "A customer just tried to order",
+      paragraphs: [
+        `A customer just tried to order from ${input.storeName}, but your free trial or plan has ended, so the order didn't go through.`,
+        "Subscribe to reopen your store. Your existing orders and records are safe.",
+        subscriptionPriceLine(input.customPricePaise),
+      ],
+      cta: "Reopen my store",
+      url: input.billingUrl,
+    },
+    "email.store_locked",
+  );
+}
+
+export type SendDemoClaimEmailInput = { to: string; storeName: string; claimUrl: string; expiresAt: Date };
+
+/** The one-time link that makes a demo store the seller's own. Never logs the link. */
+export async function sendDemoClaimEmail(input: SendDemoClaimEmailInput): Promise<{ delivered: boolean }> {
+  return sendSellerNotice(
+    {
+      to: input.to,
+      name: null,
+      subject: `${input.storeName} is ready for you to claim`,
+      heading: "Your store is ready",
+      paragraphs: [
+        `We set up ${input.storeName} on AwaazOS for you. Claim it and the store moves to your account, with a ${TRIAL_DAYS}-day free trial.`,
+        "You'll choose a password, or sign in if you already use AwaazOS. You can hide or delete the sample orders, and you add your own UPI ID before taking real orders.",
+        `The link works once, until ${formatIstDate(input.expiresAt)}.`,
+      ],
+      cta: "Claim my store",
+      url: input.claimUrl,
+      labels: ["demo-claim", "transactional"],
+    },
+    "email.demo_claim",
+  );
 }

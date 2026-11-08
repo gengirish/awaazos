@@ -1,6 +1,12 @@
 import { expect, test } from "@playwright/test";
 
-import { CAN_SET_BILLING, makeGrandfatheredFree } from "./helpers/billing-db";
+import {
+  CAN_SET_BILLING,
+  daysFromNow,
+  makeGrandfatheredFree,
+  setVendorBilling,
+  setVendorSubscription,
+} from "./helpers/billing-db";
 import { createVendorSession } from "./helpers/vendor";
 
 type PlanGateBody = {
@@ -21,6 +27,46 @@ type PlanGateBody = {
  */
 test.describe("plan gates return structured 402s", () => {
   test.skip(!CAN_SET_BILLING, "needs a local throwaway database to put the vendor on FREE");
+
+  test("a paying Lite store is held to Lite, and is offered only a step up", async ({ page, request }) => {
+    const creds = await createVendorSession(page, request, "gate-lite");
+    await setVendorBilling(creds.email, { plan: "LITE", planExpiresAt: daysFromNow(20), trialEndsAt: daysFromNow(-1) });
+    await setVendorSubscription(creds.email, { razorpaySubId: "sub_e2e_lite", razorpaySubStatus: "active" });
+
+    const csv = await page.request.get("/api/transactions/export?from=2026-01-01&to=2026-12-31");
+    expect(csv.status()).toBe(402);
+    expect(((await csv.json()) as PlanGateBody).currentPlan).toBe("LITE");
+
+    await page.goto("/settings/billing");
+    await expect(page.getByText("Lite", { exact: true })).toBeVisible();
+    await expect(page.getByText(/\/ 50 bills/)).toBeVisible();
+    await expect(page.getByRole("radio", { name: /^Starter/ })).toBeVisible();
+    await expect(page.getByRole("radio", { name: /^Pro/ })).toBeVisible();
+    await expect(page.getByRole("radio", { name: /^Lite/ })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^Upgrade — Starter monthly/ })).toBeVisible();
+    await expect(page.getByText(/ends your current subscription now/)).toBeVisible();
+
+    // Voice billing: Web Speech skips the transcribe gate, so parse-order holds it.
+    const voice = await page.request.post("/api/ai/parse-order", {
+      data: { transcript: "do samosa", lang: "en-IN", sttSource: "webspeech" },
+    });
+    expect(voice.status()).toBe(402);
+    expect((await voice.json()) as PlanGateBody).toMatchObject({ currentPlan: "LITE", feature: "voice_billing" });
+
+    await page.goto("/pos");
+    await expect(page.getByRole("button", { name: /start voice order/i })).toHaveCount(0);
+    await expect(page.getByText("Tap items to build an order.")).toBeVisible();
+  });
+
+  test("a store on the trial is offered all three plans", async ({ page, request }) => {
+    await createVendorSession(page, request, "gate-trial-plans");
+
+    await page.goto("/settings/billing");
+    for (const name of [/^Lite/, /^Starter/, /^Pro/, /^Monthly/, /^Yearly/]) {
+      await expect(page.getByRole("radio", { name })).toBeVisible();
+    }
+    await expect(page.getByText(/ends your current subscription now/)).toHaveCount(0);
+  });
 
   test("CSV export is STARTER-only and refuses a FREE vendor", async ({ page, request }) => {
     const creds = await createVendorSession(page, request, "gate-csv");

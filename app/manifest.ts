@@ -15,7 +15,7 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     name: "AwaazOS",
     short_name: "AwaazOS",
-    description: "Voice-first POS and UPI billing for Indian vendors.",
+    description: "Orders, UPI billing and receipts for home kitchens that sell on Instagram and WhatsApp.",
     // `id` is the app's identity: changing it would make every installed copy a
     // different app. `start_url` can move underneath it.
     id: "/",

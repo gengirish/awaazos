@@ -13,44 +13,77 @@ datasource db {
 // ─── VENDOR (Tenant) ────────────────────────────────────────────────
 
 model Vendor {
-  id             String    @id @default(cuid())
-  slug           String    @unique // URL-safe handle, e.g. "ravis-bhel"
-  name           String // Stall/shop name
-  ownerName      String
-  phone          String? // +91 format
-  email          String?
-  upiId          String? // e.g. vendor@okaxis
-  upiName        String? // Name shown on UPI screen
-  logoUrl        String? // Vercel Blob URL
-  bannerUrl      String? // Vercel Blob URL — wide cover photo on /s/[slug] (POST /api/vendor/banner)
-  plan           Plan      @default(FREE)
-  planExpiresAt  DateTime?
+  id                 String    @id @default(cuid())
+  slug               String    @unique // URL-safe handle, e.g. "ravis-bhel"
+  name               String // Stall/shop name
+  ownerName          String
+  phone              String? // +91 format
+  email              String?
+  upiId              String? // e.g. vendor@okaxis
+  upiName            String? // Name shown on UPI screen
+  logoUrl            String? // Vercel Blob URL
+  bannerUrl          String? // Vercel Blob URL — wide cover photo on /s/[slug] (POST /api/vendor/banner)
+  backgroundUrl      String? // Vercel Blob URL — tile repeated behind /s/[slug] (POST /api/vendor/background, lib/store-background.ts)
+  plan               Plan      @default(FREE)
+  planExpiresAt      DateTime?
   // End of the 30-day free trial (docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md). Set at
   // sign-up; null = grandfathered vendor on FREE, never locked. Evaluated
   // lazily by billingAccess() in lib/plan.ts — nothing runs at this instant.
-  trialEndsAt    DateTime?
-  stallType      StallType @default(GENERAL)
-  city           String?
-  state          String    @default("Telangana")
-  gstin          String? // 15-char GST identifier (optional)
-  isActive       Boolean   @default(true)
-  onboardingDone Boolean   @default(false)
-  createdAt      DateTime  @default(now())
-  updatedAt      DateTime  @updatedAt
+  trialEndsAt        DateTime?
+  stallType          StallType @default(GENERAL)
+  // The seller's own words when stallType is OTHER ("Pickles & podis"); null otherwise.
+  stallTypeOther     String?   @db.VarChar(40)
+  city               String?
+  // No default: a default ("Telangana" until 2026-10) put every store that had
+  // not chosen one in Telangana on its public page. Null = not given.
+  state              String?
+  gstin              String? // 15-char GST identifier (optional)
+  isActive           Boolean   @default(true)
+  onboardingDone     Boolean   @default(false)
+  // Highest first-run setup step saved (app/(onboarding)/onboarding), so a
+  // reload or another phone reopens the right one. Null before step 1 and
+  // again once onboardingDone is set.
+  onboardingStep     Int?
+  // Internal demo store built for a prospect by POST /api/internal/demo-stores
+  // (lib/demo-store.ts). Owned by the internal demo account until the prospect
+  // claims it; excluded from platform metrics and subscriptions; noindex.
+  isDemo             Boolean   @default(false)
+  demoExternalRef    String?   @unique // The outreach workflow's idempotency key; kept after claim
+  // The store whose referral link this store signed up through (lib/referral.ts).
+  // Set once at sign-up, never changed. Null = not referred.
+  referredByVendorId String?
+  // This store's STARTER price a month in paise, before GST, set by a platform
+  // SUPER_ADMIN on /admin/vendors (lib/subscription.ts). Null = the list price.
+  // Used when the owner next subscribes; a live subscription keeps its price.
+  customPricePaise   Int?
+  createdAt          DateTime  @default(now())
+  updatedAt          DateTime  @updatedAt
 
-  menuItems          MenuItem[]
-  transactions       Transaction[]
-  receipts           Receipt[]
-  staff              StaffMember[]
-  settings           VendorSettings?
-  dailySummaries     DailySummary[]
-  billSequences      BillSequence[]
-  voiceParseLogs     VoiceParseLog[]
-  drops              Drop[]
-  pushSubscriptions  PushSubscription[]
-  subscriptionEvents SubscriptionEvent[]
+  menuItems             MenuItem[]
+  transactions          Transaction[]
+  receipts              Receipt[]
+  staff                 StaffMember[]
+  settings              VendorSettings?
+  dailySummaries        DailySummary[]
+  billSequences         BillSequence[]
+  voiceParseLogs        VoiceParseLog[]
+  drops                 Drop[]
+  pushSubscriptions     PushSubscription[]
+  subscriptionEvents    SubscriptionEvent[]
+  offers                Offer[]
+  demoHandovers         DemoHandover[]
+  demoPipeline          DemoPipeline?
+  communities           CommunityMember[]
+  referredBy            Vendor?              @relation("VendorReferrals", fields: [referredByVendorId], references: [id], onDelete: SetNull)
+  referrals             Vendor[]             @relation("VendorReferrals")
+  referralRewardsEarned ReferralReward[]     @relation("ReferralRewardReferrer")
+  referralRewardFrom    ReferralReward?      @relation("ReferralRewardReferred")
+  referralCredits       ReferralCredit[]
+  orderFeedback         OrderFeedback[]
+  ownerSurveyResponse   OwnerSurveyResponse?
 
   @@index([slug])
+  @@index([referredByVendorId])
   @@map("vendors")
 }
 
@@ -66,10 +99,14 @@ model VendorSettings {
   whatsappNumber           String? // +91XXXXXXXXXX
   // Opt-in: buyers may see whatsappNumber (as a wa.me link) on public storefront/order pages.
   acceptWhatsappOrders     Boolean        @default(false)
+  // Opt-in: every visitor of /s/<slug> sees a WhatsApp chat link to whatsappNumber.
+  showWhatsappOnStore      Boolean        @default(false)
+  instagramHandle          String? // bare, lower-case (lib/instagram.ts); linked on the storefront
+  tagline                  String?        @db.VarChar(120) // One line under the store name on /s/[slug] (lib/store-tagline.ts)
   voiceLang                String         @default("en-IN") // hi-IN, te-IN, kn-IN, ta-IN
   receiptFooter            String? // "Thanks for visiting!"
   receiptPaper             ReceiptPaper   @default(MM80) // Width of the printed receipt (/receipts/[bill])
-  theme                    String         @default("orange") // orange | green | blue | purple
+  theme                    String         @default("orange") // Store colour, STORE_THEMES in lib/store-theme.ts (Settings → Online store)
   hsnDefault               String? // Default HSN/SAC code for menu items without one
   publishStorefront        Boolean        @default(false) // Opt-in: expose /s/<vendor slug> to the public
   fssaiNumber              String? // 14-digit FSSAI registration; shown on storefront + receipts
@@ -80,12 +117,33 @@ model VendorSettings {
   menuFulfilmentMode       FulfilmentMode @default(PICKUP)
   menuDeliveryFeePaise     Int            @default(0)
   menuPickupNote           String?
+  // Weekly pickup / delivery slots for menu orders: [{ days: [0..6], start: "HH:MM", end: "HH:MM" }]
+  // (IST, 0 = Sunday). Empty = no slots, checkout asks no "when". Read only through
+  // parseMenuSlots (lib/menu-slots.ts).
+  menuSlots                Json           @default("[]")
+  // Where the store delivers: [{ name, feePaise (null = the usual fee) }], at most
+  // MAX_DELIVERY_AREAS. Empty = anywhere. Read only through parseDeliveryAreas
+  // (lib/delivery-areas.ts); drops and menu orders both use it.
+  deliveryAreas            Json           @default("[]")
+  // The seller's own delivery people: [{ name, phone (E.164) }], at most
+  // MAX_DELIVERY_RIDERS. Read only through parseDeliveryRiders (lib/delivery-riders.ts).
+  deliveryRiders           Json           @default("[]")
   // Vendor-owned Razorpay account for storefront payments (money goes to the
   // vendor, never through the platform). Secrets are AES-256-GCM encrypted with
   // PAYMENT_KEYS_ENCRYPTION_KEY (lib/secret-box.ts) — never stored or logged raw.
   razorpayKeyId            String?
   razorpayKeySecretEnc     String?
   razorpayWebhookSecretEnc String?
+  // The same, connected by Razorpay OAuth ("Connect Razorpay", lib/razorpay-oauth.ts)
+  // instead of pasted keys. Set together or not at all; when set they win over the
+  // keys above. Tokens are encrypted like the key secret. Not unique: one Razorpay
+  // account may run several stores (orders are matched by razorpayOrderId first).
+  razorpayAccountId        String?
+  razorpayAccessTokenEnc   String?
+  razorpayRefreshTokenEnc  String?
+  razorpayPublicToken      String? // Checkout key, rzp_(live|test)_oauth_… — public
+  razorpayTokenExpiresAt   DateTime? // access token
+  razorpayRefreshExpiresAt DateTime? // refresh token; past it the seller must reconnect
   // Platform SaaS subscription (AwaazOS's own Razorpay account, not the
   // vendor's). Written by the subscription webhook / verify route only.
   razorpaySubId            String?
@@ -94,6 +152,7 @@ model VendorSettings {
   billingInterval          String? // monthly | yearly
   razorpayCustomerId       String?
 
+  @@index([razorpayAccountId])
   @@map("vendor_settings")
 }
 
@@ -135,6 +194,8 @@ model MenuItem {
   isPopular    Boolean  @default(false)
   sortOrder    Int      @default(0)
   imageUrl     String?
+  unit         String? // Selling unit shown after the price ("kg", "piece"); null = none
+  description  String?  @db.VarChar(200) // One line for buyers under the name on /s/[slug]; never in the voice prompt
   hsnCode      String? // HSN/SAC; falls back to VendorSettings.hsnDefault
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
@@ -145,6 +206,45 @@ model MenuItem {
   @@unique([vendorId, slug])
   @@index([vendorId, isAvailable])
   @@map("menu_items")
+}
+
+// ─── OFFERS (quantity-based plan discounts) ────────────────────────
+//
+// "Weekly Plan: 4+ quiches incl. 1 paneer → 10% off". Rules live in
+// lib/offers.ts (pure, shared by the server and the cart previews). Start/end
+// dates are evaluated lazily on every read — nothing runs when one passes.
+// At most one offer applies to an order (the best one for the buyer).
+
+model Offer {
+  id              String            @id @default(cuid())
+  vendorId        String
+  vendor          Vendor            @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name            String // "Weekly Plan"
+  description     String? // Shown to buyers
+  eligibility     OfferEligibility  @default(ALL)
+  eligibleItemIds String[]          @default([]) // MenuItem ids, when eligibility = ITEMS
+  eligibleTag     String? // MenuItem tag, when eligibility = TAG
+  minQty          Int // Units of eligible items in one order
+  requiredTag     String? // Optional: at least requiredTagQty of the eligible units carry this tag
+  requiredTagQty  Int               @default(0)
+  discountType    OfferDiscountType @default(PERCENT)
+  percentBps      Int // 1000 = 10%; 0 for FREE_ITEM
+  freeItemId      String? // MenuItem given free, when discountType = FREE_ITEM (no FK: a deleted item just stops the offer)
+  freeItemQty     Int               @default(1)
+  onMenuOrders    Boolean           @default(true) // Storefront "order from menu"
+  onDrops         Boolean           @default(true)
+  onPos           Boolean           @default(true)
+  dropIds         String[]          @default([]) // Empty = every drop
+  isActive        Boolean           @default(true)
+  startsAt        DateTime?
+  endsAt          DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  transactions Transaction[]
+
+  @@index([vendorId, isActive])
+  @@map("offers")
 }
 
 // ─── DROPS (daily pre-order menus) ───────────────────────────────
@@ -209,13 +309,16 @@ model DropItem {
 // Tokens and session ids are stored only as SHA-256 hashes.
 
 model Customer {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  name         String?
-  phone        String? // E.164; PII
-  savedAddress String? // PII
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id            String   @id @default(cuid())
+  email         String   @unique
+  name          String?
+  phone         String? // E.164; PII
+  savedAddress  String? // PII. The address line; locality / landmark / pincode beside it.
+  savedLocality String? // PII
+  savedLandmark String? // PII
+  savedPincode  String?  @db.VarChar(6) // PII
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
   sessions     CustomerSession[]
   loginTokens  CustomerLoginToken[]
@@ -284,8 +387,13 @@ model Transaction {
   billNumber        String // AWZ-20260502-0001 (auto-generated)
   subtotalPaise     Int
   discountPaise     Int           @default(0)
+  // The offer behind discountPaise (lib/offers.ts). offerName is a snapshot, so
+  // the bill still names it after the offer is renamed or deleted.
+  offerId           String?
+  offer             Offer?        @relation(fields: [offerId], references: [id], onDelete: SetNull)
+  offerName         String?
   taxPaise          Int           @default(0)
-  totalPaise        Int // subtotal - discount + tax
+  totalPaise        Int // subtotal - discount + delivery fee + tax
   paymentMethod     PaymentMethod @default(UPI)
   paymentStatus     PaymentStatus @default(PENDING)
   upiRef            String? // Customer's UTR reference
@@ -302,18 +410,56 @@ model Transaction {
   // confirms with "Payment received" (markOrderPaid) or "Not received".
   paymentClaimedAt  DateTime?
   paymentRejectedAt DateTime? // Seller tapped "Not received"; a new claim then needs a UTR
+  // Buyer's payment screenshot (lib/payment-proof.ts): a PRIVATE Vercel Blob URL,
+  // only ever streamed to the seller's staff. Cleared (and the blob deleted) when
+  // the seller answers the claim or cancels. Never sent to a public page.
+  paymentProofUrl   String?
+  // Paid up front against totalPaise, order still PENDING until the balance is
+  // in. 0 = no advance. Never above totalPaise; never credits DailySummary.
+  advancePaidPaise  Int           @default(0)
+  // When the buyer wants it (cake for a party): a menu order's own date. Drop
+  // orders use the drop's window instead. Null = as soon as ready.
+  fulfilAt          DateTime?
+  // End of the slot the buyer picked (lib/menu-slots.ts); fulfilAt is its start.
+  // Null with fulfilAt = a single time (demo orders), both null = no slot chosen.
+  fulfilUntil       DateTime?
+  // Demo-store sample order (lib/demo-store.ts). On handover they are archived
+  // (archivedAt set, hidden from every list) or deleted.
+  isSample          Boolean       @default(false)
+  // Where a storefront order came from (lib/order-channel.ts): "instagram" or null.
+  orderChannel      String?       @db.VarChar(20)
+  archivedAt        DateTime?
 
   // Storefront pre-orders (source = STOREFRONT). Null for counter sales.
   dropId           String?
   drop             Drop?             @relation(fields: [dropId], references: [id], onDelete: SetNull)
   fulfilmentStatus FulfilmentStatus?
   fulfilmentType   FulfilmentType?
-  deliveryAddress  String? // PII — never logged, never sent to an LLM
+  deliveryAddress  String? // PII — never logged, never sent to an LLM. The full address as one text (lib/delivery-address.ts).
+  // Its parts, from checkouts since 2026-11 (older orders have deliveryAddress only).
+  deliveryLocality String? // PII
+  deliveryLandmark String? // PII
+  deliveryPincode  String?           @db.VarChar(6) // PII
   deliveryFeePaise Int               @default(0)
   orderToken       String?           @unique // Unguessable handle for the buyer's order page
+  // A delivery order handed to a rider ("Out for delivery"). A stamp, not a
+  // FulfilmentStatus: the order stays CONFIRMED for stock, payment and lists.
+  outForDeliveryAt DateTime?
+  riderName        String? // Snapshot of the rider it went with, when one was named
+  // The rider's "Delivered" link (/d/<riderToken>): 192-bit, minted for every
+  // DELIVERY order (at placement, or on confirm / dispatch for older ones).
+  // Separate from orderToken so the buyer's link can't mark it delivered.
+  riderToken       String?           @unique
+  // The buyer tapped "I've received my order" on their order page.
+  buyerReceivedAt  DateTime?
   customerId       String?
   customer         Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   cancelledAt      DateTime?
+
+  // Counter cash sale: what the customer handed over and the change returned
+  // (lib/cash-tender.ts). Null when the vendor didn't enter it, and for UPI.
+  cashReceivedPaise Int?
+  changeGivenPaise  Int?
 
   // POS offline outbox (docs/PWA_OFFLINE_PLAN.md): device-generated uuid for a
   // counter sale. Dedupes replays for as long as the row exists, unlike the
@@ -325,6 +471,7 @@ model Transaction {
 
   orderItems OrderItem[]
   receipt    Receipt?
+  feedback   OrderFeedback?
 
   @@unique([vendorId, clientRef])
   @@index([vendorId, createdAt])
@@ -333,6 +480,70 @@ model Transaction {
   @@index([dropId])
   @@index([customerId])
   @@map("transactions")
+}
+
+// A buyer's rating of one handed-over order (lib/order-feedback.ts). The comment
+// is seen only by the store; the public page gets an average and a count.
+model OrderFeedback {
+  id            String      @id @default(cuid())
+  vendorId      String
+  vendor        Vendor      @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  transactionId String      @unique
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  rating        Int // 1 to 5
+  comment       String?     @db.VarChar(500)
+  createdAt     DateTime    @default(now())
+
+  @@index([vendorId, createdAt])
+  @@map("order_feedback")
+}
+
+// One owner's answers per store, changeable (lib/owner-survey.ts). Pain and
+// band values are the keys defined there.
+model OwnerSurveyResponse {
+  id              String   @id @default(cuid())
+  vendorId        String   @unique
+  vendor          Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  pains           String[]
+  topPain         String
+  weeklyOrders    String
+  /// Null on answers saved before the question existed.
+  maxWeeklyOrders String?
+  willingToPay    String
+  comment         String?  @db.VarChar(500)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([updatedAt])
+  @@map("owner_survey_responses")
+}
+
+/// Answers from the public /survey link. Tied to no store or person (lib/owner-survey.ts).
+model PublicSurveyResponse {
+  id              String   @id @default(cuid())
+  pains           String[]
+  topPain         String
+  weeklyOrders    String
+  /// Null on answers saved before the question existed.
+  maxWeeklyOrders String?
+  willingToPay    String
+  comment         String?  @db.VarChar(500)
+  createdAt       DateTime @default(now())
+
+  @@index([createdAt])
+  @@map("public_survey_responses")
+}
+
+// The Razorpay plan behind a custom store price (lib/custom-subscription-plan.ts).
+model CustomRazorpayPlan {
+  id             String   @id @default(cuid())
+  basePaise      Int // Before GST, for one cycle of `interval`
+  interval       String // "monthly" | "yearly"
+  razorpayPlanId String   @unique
+  createdAt      DateTime @default(now())
+
+  @@unique([basePaise, interval])
+  @@map("custom_razorpay_plans")
 }
 
 model OrderItem {
@@ -347,6 +558,8 @@ model OrderItem {
   priceInPaise  Int
   qty           Int         @default(1)
   totalPaise    Int // priceInPaise * qty
+  discountPaise Int         @default(0) // This line's share of Transaction.discountPaise
+  isGift        Boolean     @default(false) // A FREE_ITEM offer's gift: priced 0, never re-ordered
 
   @@index([transactionId])
   @@map("order_items")
@@ -531,18 +744,146 @@ model VoiceParseLog {
   @@map("voice_parse_logs")
 }
 
+// ─── DEMO STORES (internal founder outreach) ──────────────────────
+// A pending claim of a demo store by its prospect. Only the SHA-256 of the
+// one-time token is stored. Created by POST /api/internal/demo-stores/{ref}/handover,
+// burned by POST /api/demo-claim; a new invite voids earlier unused ones.
+
+model DemoHandover {
+  id        String    @id @default(cuid())
+  vendorId  String
+  vendor    Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  email     String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([vendorId])
+  @@map("demo_handovers")
+}
+
+// Who did what to a demo store, for the internal API. No PII: the external
+// ref and ids only. Not tied to Vendor by FK so a delete is still on record.
+// Also the create rate limit ("create" rows per actor in the last 24 h).
+model DemoAuditLog {
+  id          String   @id @default(cuid())
+  // create | delete | handover | claim, plus the pipeline's (lib/demo-pipeline-server.ts):
+  // invite_sent | nudge_sent | snoozed | archived | restored | contact_saved | undo
+  action      String
+  externalRef String
+  vendorId    String?
+  actor       String // "key:<16 hex of sha256(INTERNAL_API_KEY)>", "admin:<User.id>" or "claim"
+  // Pipeline rows: what the action replaced, so it can be undone. Dates and enums, never contact details.
+  payload     Json?
+  createdAt   DateTime @default(now())
+
+  @@index([action, createdAt])
+  @@index([externalRef])
+  @@index([vendorId, createdAt])
+  @@map("demo_audit_logs")
+}
+
+enum DemoArchiveReason {
+  manual
+  stale
+  duplicate
+  test
+}
+
+// The outreach facts for one demo store on /admin/demo-stores. No row = nothing
+// has happened yet. Status, next action and queue position are derived from these
+// dates on every read (lib/demo-pipeline.ts): nothing moves on a timer.
+model DemoPipeline {
+  vendorId       String             @id
+  vendor         Vendor             @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  // The prospect, for the message and the claim link. Never in a log or an audit payload.
+  contactName    String?            @db.VarChar(40)
+  contactEmail   String?
+  inviteSentAt   DateTime?
+  lastNudgeAt    DateTime?
+  nudgeCount     Int                @default(0)
+  snoozedUntil   DateTime?
+  archivedAt     DateTime?
+  archivedReason DemoArchiveReason?
+  // Restarts the stale clock after a restore.
+  restoredAt     DateTime?
+  // Soft delete. Also sets Vendor.isActive = false, which the public pages check.
+  deletedAt      DateTime?
+  updatedAt      DateTime           @updatedAt
+
+  @@index([deletedAt])
+  @@map("demo_pipeline")
+}
+
+// A one-time link that makes someone a platform ADMIN (outreach only), made by
+// a SUPER_ADMIN on /admin/admins (lib/admin-invites.ts). Only a SHA-256 of the
+// token is stored. Redeeming it creates the account (own password) or promotes
+// the signed-in account with the same email.
+model AdminInvite {
+  id          String    @id @default(cuid())
+  email       String
+  tokenHash   String    @unique
+  role        UserRole  @default(ADMIN) // SALES or ADMIN: what redeeming it grants
+  invitedById String
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@index([email])
+  @@map("admin_invites")
+}
+
+// ─── COMMUNITY PAGES ────────────────────────────────────────────────
+// One public page per housing society ("SDG Home Kitchens") at /c/<slug> that
+// links to the stores of the home kitchens living there (lib/community.ts).
+// Made by a platform ADMIN on /admin/communities. A store is listed only after
+// its OWNER accepts the invite in Settings → Online store.
+
+model Community {
+  id          String            @id @default(cuid())
+  slug        String            @unique // /c/<slug>; same rules as a store link
+  name        String            @db.VarChar(80)
+  area        String?           @db.VarChar(80) // "Yelahanka, Bengaluru"
+  description String?           @db.VarChar(280)
+  createdById String // platform admin User.id; no FK so the page outlives the admin
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  members     CommunityMember[]
+
+  @@map("communities")
+}
+
+model CommunityMember {
+  id          String    @id @default(cuid())
+  communityId String
+  community   Community @relation(fields: [communityId], references: [id], onDelete: Cascade)
+  vendorId    String
+  vendor      Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  // Null = invited by an admin, waiting for the store's OWNER. Only accepted
+  // rows are listed on the public page.
+  acceptedAt  DateTime?
+  createdAt   DateTime  @default(now())
+
+  @@unique([communityId, vendorId])
+  @@index([vendorId])
+  @@map("community_members")
+}
+
 // ─── ENUMS ──────────────────────────────────────────────────────────
 
 enum UserRole {
   USER // Default — vendors and their staff
+  SALES // Sales intern: only the demo stores they built, and their earnings
   ADMIN // IntelliForge support / ops
   SUPER_ADMIN // Platform owners
 }
 
 enum Plan {
   FREE // 50 transactions/month, 1 staff
-  STARTER // ₹299/month — 500 txn, 3 staff, WhatsApp receipts
-  PRO // ₹799/month — unlimited, Razorpay links, analytics export
+  LITE // ₹599/month — limits in PLAN_LIMITS (lib/constants.ts)
+  STARTER // ₹649/month — unlimited orders, online payments, CSV
+  PRO // ₹1,149/month — Starter + a year of analytics
   ENTERPRISE // Custom
 }
 
@@ -556,6 +897,28 @@ enum StallType {
   KIRANA
   CLOTHING
   SERVICES
+  // Kitchen kinds (docs/ICP.md); before these, all of them were FOOD_BEVERAGE.
+  HOME_BAKERY
+  HOME_KITCHEN
+  CLOUD_KITCHEN
+  CAFE
+  SWEETS
+  CATERING
+  // Not in the list: the seller describes it in Vendor.stallTypeOther.
+  OTHER
+}
+
+enum OfferEligibility {
+  ALL // Every menu item
+  ITEMS // eligibleItemIds
+  TAG // Items carrying eligibleTag
+}
+
+enum OfferDiscountType {
+  PERCENT
+  FIXED_AMOUNT // Reserved; not accepted yet
+  BUNDLE_PRICE // Reserved; not accepted yet
+  FREE_ITEM // freeItemId given free once the order qualifies (lib/offers.ts)
 }
 
 enum PaymentMethod {
@@ -616,4 +979,68 @@ enum StaffRole {
   OWNER
   MANAGER
   CASHIER
+}
+
+// One free STARTER month a referrer earned when the store they referred paid
+// its first subscription charge (lib/referral.ts). Unique on the referred
+// store, so one referral can never pay twice. No timers: EARNED rows are
+// redeemed on a webhook (trial extension) or at subscribe time.
+model ReferralReward {
+  id               String               @id @default(cuid())
+  referrerVendorId String
+  referredVendorId String               @unique
+  months           Int // 1, or 2 when the referred store paid yearly
+  // Of `months`, how many a refund of the referrer's own charge has used (ReferralCredit).
+  monthsUsed       Int                  @default(0)
+  status           ReferralRewardStatus @default(EARNED)
+  // How it was redeemed: "trial_extension" | "subscribe_start" | "charge_refund"; null while EARNED.
+  redeemedVia      String?
+  // The referred store's first-charge event (SubscriptionEvent.razorpayEventId).
+  sourceEventId    String
+  earnedAt         DateTime             @default(now())
+  redeemedAt       DateTime?
+
+  referrer Vendor @relation("ReferralRewardReferrer", fields: [referrerVendorId], references: [id], onDelete: Cascade)
+  referred Vendor @relation("ReferralRewardReferred", fields: [referredVendorId], references: [id], onDelete: Cascade)
+
+  @@index([referrerVendorId, status])
+  @@index([earnedAt])
+  @@map("referral_rewards")
+}
+
+enum ReferralRewardStatus {
+  EARNED // banked, not yet applied
+  REDEEMED // applied as free time
+}
+
+/// A paying referrer's free month: one of its own subscription charges, refunded
+/// (lib/referral.ts, "Free months for a paying store"). Written in the charge's
+/// transaction; the Razorpay refund runs after commit (settleReferralCredit).
+model ReferralCredit {
+  id               String               @id @default(cuid())
+  vendorId         String
+  // The charge being refunded. Unique, so one payment is credited once.
+  paymentId        String               @unique
+  // SubscriptionEvent.razorpayEventId of that charge.
+  sourceEventId    String               @unique
+  chargePaise      Int
+  refundPaise      Int
+  months           Int
+  status           ReferralCreditStatus @default(PENDING)
+  razorpayRefundId String?
+  // Razorpay's error description from the last failed attempt; never buyer data.
+  lastError        String?
+  createdAt        DateTime             @default(now())
+  refundedAt       DateTime?
+
+  vendor Vendor @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([vendorId, createdAt])
+  @@map("referral_credits")
+}
+
+enum ReferralCreditStatus {
+  PENDING // recorded, refund not yet confirmed by Razorpay
+  REFUNDED
 }

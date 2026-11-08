@@ -29,9 +29,9 @@ export function sumPaise(items: number[]): number         // integer sum
 ## Tax computation
 
 ```ts
-// taxPaise = floor(subtotalPaise * taxPercentBps / 10_000)
+// Tax is charged on the discounted value (an offer discount, lib/offers.ts, comes off first).
 // Use bps (basis points) to keep tax percent as integer too.
-const taxPaise = Math.floor((subtotalPaise * taxPercentBps) / 10_000);
+const taxPaise = Math.floor(((subtotalPaise - discountPaise) * taxPercentBps) / 10_000);
 const totalPaise = subtotalPaise - discountPaise + taxPaise;
 ```
 

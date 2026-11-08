@@ -2,7 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 // Keep Prisma/env/KV out of the unit run (same as drops.test.ts).
 vi.mock("@/lib/prisma", () => ({ prisma: {} }));
-vi.mock("@/lib/drops-signal", () => ({ bumpDropOrderSignal: vi.fn() }));
+vi.mock("@/lib/drops-signal", () => ({ bumpOrderSignal: vi.fn() }));
 
 import {
   billableTxnSql,
@@ -12,8 +12,9 @@ import {
 } from "@/lib/drops";
 
 describe("billableTxnWhere", () => {
-  it("is counter sales of any status, plus storefront orders only when paid", () => {
+  it("is counter sales of any status, plus storefront orders only when paid, never sample orders", () => {
     expect(billableTxnWhere()).toEqual({
+      isSample: false,
       OR: [{ source: { not: "STOREFRONT" } }, { paymentStatus: "PAID" }],
     });
   });
@@ -23,7 +24,9 @@ describe("billableTxnWhere", () => {
   });
 
   it("has a raw-SQL twin with the same predicate", () => {
-    expect(billableTxnSql.sql).toBe(`(t."source" <> 'STOREFRONT' OR t."paymentStatus" = 'PAID')`);
+    expect(billableTxnSql.sql).toBe(
+      `(NOT t."isSample" AND (t."source" <> 'STOREFRONT' OR t."paymentStatus" = 'PAID'))`,
+    );
     expect(billableTxnSql.values).toEqual([]);
   });
 });

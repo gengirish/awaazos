@@ -3,15 +3,25 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
 import { PrintButton } from "@/components/drops/orders/PrintButton";
+import { RiderHandoffButton } from "@/components/drops/orders/RiderHandoffButton";
 import { formatINR } from "@/lib/currency";
-import { groupByFulfilment, handoverDue, ordersToPack, type BoardOrder } from "@/lib/drops-board";
+import { dropOrdersHref, groupByFulfilment, handoverDue, ordersToPack, type BoardOrder } from "@/lib/drops-board";
 import { loadDropBoard } from "@/lib/drops-board-server";
 import { formatIstDate, formatIstTime } from "@/lib/drops-time";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { storeVocabulary } from "@/lib/store-vocabulary";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Prep sheet · AwaazOS" };
+/** "Prep sheet" for a kitchen, "Packing list" for any other store; the membership read is request-cached. */
+export async function generateMetadata() {
+  try {
+    const ctx = await requireVendorRole("CASHIER");
+    return { title: `${storeVocabulary(ctx.vendor.stallType).prepSheet} · AwaazOS` };
+  } catch {
+    return { title: "Prep sheet · AwaazOS" };
+  }
+}
 
 type Props = { params: Promise<{ id: string }> };
 
@@ -32,7 +42,18 @@ function DueCell({ order }: { order: BoardOrder }) {
   );
 }
 
-function HandoverTable({ title, orders, showAddress }: { title: string; orders: BoardOrder[]; showAddress: boolean }) {
+function HandoverTable({
+  title,
+  orders,
+  showAddress,
+  vendorName,
+}: {
+  title: string;
+  orders: BoardOrder[];
+  /** Delivery list: show the address and the "Copy for rider" hand-off. */
+  showAddress: boolean;
+  vendorName: string;
+}) {
   return (
     <div className="mt-4 break-inside-avoid">
       <h3 className="text-base font-semibold">
@@ -58,10 +79,14 @@ function HandoverTable({ title, orders, showAddress }: { title: string; orders: 
                 </p>
                 <DueCell order={o} />
               </div>
+              {showAddress && o.deliveryLocality && <p className="mt-1 font-semibold">{o.deliveryLocality}</p>}
               {showAddress && o.deliveryAddress && (
                 <p className="mt-1 whitespace-pre-wrap text-muted-foreground print:text-foreground">{o.deliveryAddress}</p>
               )}
               <p className="mt-1 font-mono text-xs text-muted-foreground print:text-foreground">{o.billNumber}</p>
+              {showAddress && o.fulfilmentStatus !== "DELIVERED" && (
+                <RiderHandoffButton order={o} vendorName={vendorName} className="mt-2 max-w-xs" />
+              )}
             </li>
           ))}
         </ol>
@@ -84,6 +109,8 @@ export default async function DropPrepPage(props: Props) {
   if (!board) notFound();
 
   const { drop, prep } = board;
+  const vocab = storeVocabulary(ctx.vendor.stallType);
+  const food = vocab.kind === "food";
   // Oldest first for packing — first come, first packed.
   const packing = ordersToPack(board.orders).slice().reverse();
   const { delivery, pickup } = groupByFulfilment(packing);
@@ -91,14 +118,15 @@ export default async function DropPrepPage(props: Props) {
   const totalItems = cook.reduce((s, p) => s + p.qtyOrdered, 0);
   const fStart = new Date(drop.fulfilmentStartsAt);
   const fEnd = new Date(drop.fulfilmentEndsAt);
-  const notFrozen = drop.status !== "FROZEN" && drop.status !== "FULFILLED";
+  // Past the cut-off the list is final by itself; there is nothing to lock.
+  const stillOpen = drop.effectiveStatus === "OPEN" || drop.effectiveStatus === "SCHEDULED";
 
   return (
     <main id="main" className="bg-background p-4 pb-16 text-foreground md:p-6 print:p-0">
       <div className="mx-auto max-w-3xl print:max-w-none">
         <nav aria-label="Breadcrumb" className="mb-3 flex flex-wrap items-center justify-between gap-2 print:hidden">
           <Link
-            href={`/drops/${drop.id}`}
+            href={dropOrdersHref(drop.id)}
             className="inline-flex min-h-11 items-center text-sm font-medium text-primary underline-offset-4 hover:underline"
           >
             ← Back to orders
@@ -107,23 +135,29 @@ export default async function DropPrepPage(props: Props) {
         </nav>
 
         <header className="mb-4">
-          <h1 className="font-display text-2xl font-bold">Prep sheet · {drop.title}</h1>
+          <h1 className="font-display text-2xl font-bold">
+            {vocab.prepSheet} · {drop.title}
+          </h1>
           <p className="text-sm text-muted-foreground print:text-foreground">
             {ctx.vendor.name} · {formatIstDate(fStart)}, {formatIstTime(fStart)} – {formatIstTime(fEnd)} ·{" "}
             {packing.length} orders · printed {formatIstDate(new Date())} {formatIstTime(new Date())}
           </p>
         </header>
 
-        {notFrozen && (
+        {stillOpen && (
           <div
             role="note"
             className="mb-4 flex gap-2 rounded-md border border-amber-500/60 bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950/40 dark:text-amber-100 print:border-foreground print:bg-transparent print:text-foreground"
           >
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
             <p>
-              <span className="font-semibold">Orders can still change</span> — freeze orders before you start cooking.{" "}
-              <Link href={`/drops/${drop.id}/edit`} className="font-semibold underline print:hidden">
-                Freeze on the edit page
+              <span className="font-semibold">Orders can still change</span> until {formatIstDate(new Date(drop.closesAt))},{" "}
+              {formatIstTime(new Date(drop.closesAt))}.{" "}
+              <Link
+                href={`/drops/${drop.id}/edit`}
+                className="inline-flex min-h-11 items-center font-semibold underline print:hidden"
+              >
+                Close orders now
               </Link>
             </p>
           </div>
@@ -131,10 +165,12 @@ export default async function DropPrepPage(props: Props) {
 
         <section aria-labelledby="cook-h" className="mb-6 break-inside-avoid">
           <h2 id="cook-h" className="border-b pb-1 text-lg font-bold">
-            1. Cook list
+            1. {food ? "Cook list" : "Item totals"}
           </h2>
           {cook.length === 0 ? (
-            <p className="mt-2 text-sm text-muted-foreground">No orders to cook yet.</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {food ? "No orders to cook yet." : "No orders yet."}
+            </p>
           ) : (
             <table className="mt-2 w-full text-sm">
               <thead>
@@ -157,7 +193,14 @@ export default async function DropPrepPage(props: Props) {
                       {p.emoji && <span aria-hidden>{p.emoji} </span>}
                       {p.name}
                     </td>
-                    <td className="py-2 text-right font-mono text-xl font-bold tabular-nums">{p.qtyOrdered}</td>
+                    <td className="py-2 text-right font-mono text-xl font-bold tabular-nums">
+                      {p.qtyOrdered}
+                      {p.qtyFree > 0 && (
+                        <span className="block text-sm font-medium text-muted-foreground print:text-foreground">
+                          {p.qtyFree} free
+                        </span>
+                      )}
+                    </td>
                     <td className="py-2 text-right font-mono tabular-nums text-muted-foreground print:text-foreground">
                       {p.maxQty === null ? "—" : `${p.qtyOrdered}/${p.maxQty}`}
                     </td>
@@ -179,7 +222,7 @@ export default async function DropPrepPage(props: Props) {
 
         <section aria-labelledby="pack-h" className="mb-6 print:break-before-page">
           <h2 id="pack-h" className="border-b pb-1 text-lg font-bold">
-            2. Packing list
+            2. {food ? "Packing list" : "Order by order"}
           </h2>
           {packing.length === 0 ? (
             <p className="mt-2 text-sm text-muted-foreground">No orders to pack.</p>
@@ -221,7 +264,9 @@ export default async function DropPrepPage(props: Props) {
           <h2 id="handover-h" className="border-b pb-1 text-lg font-bold">
             3. Delivery / pickup list
           </h2>
-          {(drop.fulfilmentMode !== "PICKUP" || delivery.length > 0) && <HandoverTable title="Delivery" orders={delivery} showAddress />}
+          {(drop.fulfilmentMode !== "PICKUP" || delivery.length > 0) && (
+            <HandoverTable title="Delivery" orders={delivery} showAddress vendorName={ctx.vendor.name} />
+          )}
           {(drop.fulfilmentMode !== "DELIVERY" || pickup.length > 0) && (
             <>
               {drop.pickupNote && (
@@ -230,7 +275,7 @@ export default async function DropPrepPage(props: Props) {
                   {drop.pickupNote}
                 </p>
               )}
-              <HandoverTable title="Pickup" orders={pickup} showAddress={false} />
+              <HandoverTable title="Pickup" orders={pickup} showAddress={false} vendorName={ctx.vendor.name} />
             </>
           )}
         </section>

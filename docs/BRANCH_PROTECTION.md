@@ -7,7 +7,8 @@ Apply these settings in GitHub repository settings for `main`.
 Require these checks before merge:
 
 - `Lint + Type + Unit + Build`
-- `E2E (Playwright)`
+- `E2E (chromium)`
+- `E2E (mobile)`
 - `Secret scan + npm audit`
 
 ## Pull request rules
