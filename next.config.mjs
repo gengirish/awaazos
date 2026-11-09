@@ -57,6 +57,10 @@ const nextConfig = {
       },
     ],
   },
+  // Nudge copy the admin edits as text (lib/seller-heartbeat-server.ts reads it with fs).
+  outputFileTracingIncludes: {
+    "/admin/metrics": ["./content/admin-nudges/*.txt"],
+  },
   async headers() {
     return [
       {
