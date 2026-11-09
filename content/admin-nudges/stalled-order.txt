@@ -1,0 +1,5 @@
+Hi {firstName}, this is {senderName} from AwaazOS.
+
+Order {billNumber} at {storeName} ({amount}, placed {placedAt}) still shows as unpaid. If the buyer has already paid you, you can mark it paid on your orders board: {boardUrl}
+
+If they haven't, a quick message to them from your WhatsApp usually helps. Tell me if something in the app got in the way.

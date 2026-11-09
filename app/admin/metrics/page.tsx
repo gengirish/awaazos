@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { AdminNav } from "@/components/admin/AdminNav";
+import { OrderLeakMap } from "@/components/admin/OrderLeakMap";
 import { SellerHeartbeat } from "@/components/admin/SellerHeartbeat";
 import { TrackingTripwireBanner } from "@/components/admin/TrackingTripwireBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -10,6 +11,8 @@ import { ADMIN_METRICS_CONFIG } from "@/lib/admin-metrics-config";
 import type { TripwireResult } from "@/lib/admin-tripwires";
 import { formatINR } from "@/lib/currency";
 import { formatIstDate } from "@/lib/datetime";
+import { parseStalledFilter } from "@/lib/order-funnel";
+import { loadOrderFunnel, loadRemindTemplate, remindMessageFor } from "@/lib/order-funnel-server";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
 import { countByBadge, parseBadgeFilter } from "@/lib/seller-heartbeat";
 import { loadNudgeTemplates, loadSellerHeartbeat, nudgeMessageFor } from "@/lib/seller-heartbeat-server";
@@ -56,7 +59,18 @@ function checkLabel(check: TripwireResult): string {
   return `Waiting: ${check.trackedDays} of ${check.requiredDays} tracked days`;
 }
 
-export default async function AdminMetricsPage(props: { searchParams: Promise<{ badge?: string | string[] }> }) {
+/** /admin/metrics with both section filters, landing on `hash`. */
+function metricsHref(query: { badge: string | null; leak: string | null }, hash: string): string {
+  const params = new URLSearchParams();
+  if (query.badge) params.set("badge", query.badge);
+  if (query.leak) params.set("leak", query.leak);
+  const qs = params.toString();
+  return `/admin/metrics${qs ? `?${qs}` : ""}#${hash}`;
+}
+
+export default async function AdminMetricsPage(props: {
+  searchParams: Promise<{ badge?: string | string[]; leak?: string | string[] }>;
+}) {
   let canManageStores = false;
   let adminName: string | null = null;
   // Re-read the User row rather than trusting `session.user.role` off the JWT, so a
@@ -72,17 +86,30 @@ export default async function AdminMetricsPage(props: { searchParams: Promise<{ 
   }
 
   const now = new Date();
-  const { badge } = await props.searchParams;
+  const { badge, leak } = await props.searchParams;
   const badgeFilter = parseBadgeFilter(badge);
-  // Owner contacts are SUPER_ADMIN-only (as on /admin/vendors): an ADMIN sees the grid without Nudge.
-  const [metrics, heartbeat, templates] = await Promise.all([
+  const leakFilter = parseStalledFilter(leak);
+  // Owner contacts are SUPER_ADMIN-only (as on /admin/vendors): an ADMIN sees the
+  // grid and the leak map without Nudge or Remind.
+  const [metrics, heartbeat, templates, funnel, remindTemplate] = await Promise.all([
     getAdminMetrics(now),
     loadSellerHeartbeat(now, { withContacts: canManageStores }),
     canManageStores ? loadNudgeTemplates() : Promise.resolve(null),
+    loadOrderFunnel(now, { withContacts: canManageStores }),
+    canManageStores ? loadRemindTemplate() : Promise.resolve(null),
   ]);
   const nudgeMessages = templates
     ? Object.fromEntries(heartbeat.map((row) => [row.id, nudgeMessageFor(row, templates, adminName)]))
     : null;
+  const remindMessages =
+    remindTemplate === null
+      ? null
+      : Object.fromEntries(
+          funnel.stalled.flatMap((o) => {
+            const store = funnel.stores[o.vendorId];
+            return store ? [[o.id, remindMessageFor(o, store, remindTemplate, adminName)]] : [];
+          }),
+        );
 
   const { smallBase } = ADMIN_METRICS_CONFIG;
   const sellersChange = describeChange(
@@ -234,11 +261,20 @@ export default async function AdminMetricsPage(props: { searchParams: Promise<{ 
           </section>
         </div>
 
+        <OrderLeakMap
+          funnel={funnel}
+          expectedOrders={metrics.instagram.storefrontOrders}
+          filter={leakFilter}
+          messages={remindMessages}
+          hrefFor={(f) => metricsHref({ badge: badgeFilter, leak: f }, "leak-heading")}
+        />
+
         <SellerHeartbeat
           rows={heartbeat}
           counts={countByBadge(heartbeat)}
           filter={badgeFilter}
           messages={nudgeMessages}
+          hrefFor={(b) => metricsHref({ badge: b, leak: leakFilter }, "heartbeat-heading")}
         />
       </main>
     </div>

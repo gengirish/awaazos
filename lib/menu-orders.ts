@@ -32,6 +32,7 @@ import { bumpOrderSignal } from "@/lib/drops-signal";
 import { findMenuSlot, parseMenuSlots, type MenuSlot } from "@/lib/menu-slots";
 import { applyOffers, giftLineName } from "@/lib/offers";
 import { loadResolvedOffers } from "@/lib/offers-server";
+import type { OrderChannel } from "@/lib/order-channel";
 import { effectivePlan, isBillingLocked } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
 import { notifyVendorInBackground, newOrderPayload } from "@/lib/push";
@@ -73,7 +74,7 @@ export type PlaceMenuOrderInput = {
   paymentMethod: "UPI" | "CASH";
   customerId?: string | null;
   /** lib/order-channel.ts; decided by the route from the request. */
-  orderChannel?: "instagram" | null;
+  orderChannel?: OrderChannel | null;
   /** The store takes Razorpay: a UPI order alerts the seller once paid (lib/storefront-online-paid.ts). */
   takesOnlinePayment?: boolean;
   now?: Date;

@@ -87,6 +87,15 @@ export type AdminMetrics = {
 /** Demo stores and their sample orders are not traction (lib/demo-store.ts). */
 export const REAL_SALES = { isSample: false, vendor: { isDemo: false } } satisfies Prisma.TransactionWhereInput;
 
+/**
+ * Storefront orders placed in `[gte, lt)`, real stores only. The one definition
+ * behind the Instagram card and the order leak map (lib/order-funnel-server.ts),
+ * so the two always count the same orders.
+ */
+export function storefrontOrdersWhere(range: { gte: Date; lt: Date }) {
+  return { ...REAL_SALES, source: "STOREFRONT", createdAt: range } satisfies Prisma.TransactionWhereInput;
+}
+
 function emptyDays(thisWeekStart: Date): DayCounts[] {
   return Array.from({ length: WINDOW_DAYS }, (_, i) => {
     const start = new Date(thisWeekStart.getTime() + i * MS_PER_DAY);
@@ -127,7 +136,7 @@ export async function getAdminMetrics(now: Date = new Date()): Promise<AdminMetr
       }),
       prisma.transaction.findMany({ where: { ...paid, paidAt: thisWeek }, select: { paidAt: true, source: true } }),
       prisma.transaction.findMany({
-        where: { ...REAL_SALES, source: "STOREFRONT", createdAt: thisWeek },
+        where: storefrontOrdersWhere(thisWeek),
         select: { createdAt: true, orderChannel: true, paymentStatus: true },
       }),
     ]);

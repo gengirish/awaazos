@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { buildDropShareText, buildWhatsAppShareUrl, formatShareItemList } from "@/lib/drops-share";
+import {
+  buildDropShareText,
+  buildTaggedWhatsAppShareUrl,
+  buildWhatsAppShareUrl,
+  formatShareItemList,
+} from "@/lib/drops-share";
 import { istToUtc } from "@/lib/drops-time";
 
 const base = {
@@ -77,5 +82,20 @@ describe("buildWhatsAppShareUrl", () => {
   });
   it("encodes & and ? so they don't break the query", () => {
     expect(buildWhatsAppShareUrl("a&b?c=d")).toBe("https://wa.me/?text=a%26b%3Fc%3Dd");
+  });
+});
+
+describe("buildTaggedWhatsAppShareUrl", () => {
+  const decode = (u: string) => decodeURIComponent(u.slice("https://wa.me/?text=".length));
+
+  it("tags the store link in the message with src=wa and changes nothing else", () => {
+    const text = buildDropShareText(base);
+    const tagged = decode(buildTaggedWhatsAppShareUrl(text, base.url));
+    expect(tagged).toBe(text.replace(base.url, `${base.url}?src=wa`));
+  });
+
+  it("leaves a message without the link alone", () => {
+    expect(decode(buildTaggedWhatsAppShareUrl("Order now", "https://x.test/s/sam"))).toBe("Order now");
+    expect(decode(buildTaggedWhatsAppShareUrl("Order now", ""))).toBe("Order now");
   });
 });

@@ -1,7 +1,7 @@
 # Seller nudge messages
 
-The "Nudge" button in the seller heartbeat on /admin/metrics opens WhatsApp with one of these
-messages filled in. The admin can still edit it before sending, and nothing is sent until they tap
+The "Nudge" button in the seller heartbeat on /admin/metrics, and the "Remind" button on a stalled
+order in the order leak map, open WhatsApp to the seller with one of these messages filled in. The admin can still edit it before sending, and nothing is sent until they tap
 send in WhatsApp.
 
 Edit the text freely. A change needs a commit and deploy like any other file, but no code.
@@ -13,6 +13,7 @@ Edit the text freely. A change needs a commit and deploy like any other file, bu
 | `watch.txt` | Watch: 3 to 6 days since the last paid bill |
 | `new.txt` | New: the store is under 14 days old |
 | `healthy.txt` | Healthy: paid bill in the last 2 days |
+| `stalled-order.txt` | Remind: one of the seller's storefront orders is still unpaid |
 
 Variables, written with braces:
 
@@ -21,6 +22,15 @@ Variables, written with braces:
 - `{senderName}`: the first name of the admin sending it.
 - `{storeName}`: the store's name.
 - `{storeUrl}`: the store's public link.
-- `{daysIdle}`: days since the last paid bill, as a number (0 = today).
+- `{daysIdle}`: days since the last paid bill, as a number (0 = today). Nudge only.
+
+Remind (`stalled-order.txt`) has `{firstName}`, `{senderName}` and `{storeName}` too, plus:
+
+- `{billNumber}`: the order's bill number, such as AWZ-20261108-0004.
+- `{amount}`: the order total, such as ₹1,250.00.
+- `{placedAt}`: when it was placed, such as 08/11/2026, 17:30 IST.
+- `{boardUrl}`: the link to the seller's orders board.
+
+Remind always goes to the seller, never to the buyer: the leak map reads no buyer contact details.
 
 A misspelt variable stays in the message as typed, so you will see it before sending.
