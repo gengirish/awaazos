@@ -25,7 +25,9 @@ export const transactionPostBodySchema = z.object({
   customerPhone: z.string().optional().nullable(),
   customerName: z.string().optional().nullable(),
   voiceTranscript: z.string().optional().nullable(),
-  source: z.nativeEnum(OrderSource).default(OrderSource.MANUAL),
+  // The till posts only these two (lib/pos-sale-source.ts); STOREFRONT and the
+  // rest are written by their own paths, never through this route.
+  source: z.enum([OrderSource.VOICE, OrderSource.MANUAL]).default(OrderSource.MANUAL),
   notes: z.string().optional().nullable(),
   // POS offline outbox (docs/PWA_OFFLINE_PLAN.md). `clientRef` dedupes durably;
   // `vendorId` pins the sale to the tenant it was rung up for; `deferred` marks a

@@ -52,4 +52,28 @@ describe("transaction-post-body", () => {
     });
     expect(parsed.success).toBe(false);
   });
+
+  describe("source", () => {
+    const sale = {
+      items: [baseItem],
+      subtotalPaise: 4000,
+      taxPaise: 0,
+      totalPaise: 4000,
+      paymentMethod: PaymentMethod.CASH,
+    };
+
+    it("defaults to MANUAL (sales queued before the till sent a source)", () => {
+      const parsed = transactionPostBodySchema.parse(sale);
+      expect(parsed.source).toBe("MANUAL");
+    });
+
+    it("accepts VOICE and MANUAL", () => {
+      expect(transactionPostBodySchema.parse({ ...sale, source: "VOICE" }).source).toBe("VOICE");
+      expect(transactionPostBodySchema.parse({ ...sale, source: "MANUAL" }).source).toBe("MANUAL");
+    });
+
+    it.each(["STOREFRONT", "WHATSAPP", "API", "voice"])("rejects %s", (source) => {
+      expect(transactionPostBodySchema.safeParse({ ...sale, source }).success).toBe(false);
+    });
+  });
 });

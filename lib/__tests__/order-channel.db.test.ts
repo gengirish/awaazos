@@ -150,7 +150,13 @@ describe.skipIf(!ENABLED)("order channel — DB integration", () => {
 
   it("counts them on the admin metrics, leaving out demo stores", async () => {
     const { getAdminMetrics } = await import("@/lib/admin-metrics");
-    const before = (await getAdminMetrics()).instagram7d;
+    // The windows are complete IST days, so today's orders appear in tomorrow's report.
+    const tomorrow = () => new Date(Date.now() + 86_400_000);
+    const instagramOf = async () => {
+      const { since: _since, ...counts } = (await getAdminMetrics(tomorrow())).instagram;
+      return counts;
+    };
+    const before = await instagramOf();
 
     const vendor = await seed();
     await menuOrder(vendor, IG);
@@ -165,10 +171,11 @@ describe.skipIf(!ENABLED)("order channel — DB integration", () => {
     await menuOrder(demo, IG);
     await prisma.vendor.update({ where: { id: demo.id }, data: { isDemo: true } });
 
-    expect((await getAdminMetrics()).instagram7d).toEqual({
+    expect(await instagramOf()).toEqual({
       orders: before.orders + 2,
       paid: before.paid + 1,
-      allStorefrontOrders: before.allStorefrontOrders + 3,
+      storefrontOrdersSince: before.storefrontOrdersSince + 3,
+      storefrontOrders: before.storefrontOrders + 3,
     });
   });
 });

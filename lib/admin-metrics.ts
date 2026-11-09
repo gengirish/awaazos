@@ -1,16 +1,22 @@
 /**
- * Internal-only admin metrics for the YC partner dashboard at /admin/metrics.
+ * Internal-only admin metrics for /admin/metrics. Definitions are in
+ * docs/admin-redesign/PHASE-1.md.
  *
- * All time math is anchored to IST (Asia/Kolkata) midnights — see
- * `istDayStart` below. Money is paise-integer end-to-end; render via
- * `formatINR` from `@/lib/currency` at the UI boundary.
+ * Windows are complete IST days (`istDayStart` below): "this week" is the 7 IST
+ * days before today, "last week" the 7 before that, and today so far is reported
+ * on its own, so both sides of a comparison are exactly 7 days long. Money is
+ * paise-integer end-to-end; render via `formatINR` from `@/lib/currency`.
  */
 import type { Prisma } from "@prisma/client";
 
+import { ADMIN_METRICS_CONFIG } from "@/lib/admin-metrics-config";
+import { type DayCounts, type TripwireResult, evaluateTripwires } from "@/lib/admin-tripwires";
+import { utcToIstParts } from "@/lib/drops-time";
 import { prisma } from "@/lib/prisma";
 
 const MS_PER_DAY = 86_400_000;
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
+const WINDOW_DAYS = 7;
 
 /**
  * Returns the UTC `Date` corresponding to the start of the IST calendar day
@@ -41,145 +47,135 @@ export function median(values: number[]): number {
   return sorted[mid];
 }
 
-/**
- * Week-over-week relative change: (this - last) / max(last, 1).
- * `max(last, 1)` is the agreed divide-by-zero guard so a fresh-week
- * baseline of 0 doesn't blow up to Infinity.
- */
-export function wowDelta(thisWeek: number, lastWeek: number): number {
-  return (thisWeek - lastWeek) / Math.max(lastWeek, 1);
-}
+/** This window and the one before it. */
+export type WindowPair = { current: number; prior: number };
 
 export type AdminMetrics = {
-  weeklyActiveVendors: number;
-  billsPerVendorPerDayMedian: number;
-  voiceSuccessRate7d: number;
-  weeklyGmvPaise: number;
-  /** Storefront orders placed in the last 7 days, paid or not (lib/order-channel.ts). */
-  instagram7d: { orders: number; paid: number; allStorefrontOrders: number };
-  wowGrowth: {
-    activeVendorsWoW: number;
-    gmvWoW: number;
+  /** Distinct sellers with ≥ 1 paid bill. */
+  activeSellers: WindowPair;
+  /** Median over active sellers of (paid bills ÷ 7), one decimal. */
+  billsPerSellerPerDayMedian: number;
+  /** Paid bills rung up by voice ÷ all paid bills; 0 with no paid bills. */
+  voiceShare: { share: number; voiceBills: number; paidBills: number; counterPaidBills: number };
+  /** Sum of `totalPaise` over paid bills. */
+  gmvPaise: WindowPair;
+  /** Since 00:00 IST today, outside the comparison windows. */
+  today: { paidBills: number; gmvPaise: number };
+  /**
+   * Storefront orders (any payment status) by `createdAt`, counted only from
+   * `since` = max(window start, the day `orderChannel` was first written).
+   */
+  instagram: {
+    since: Date;
+    orders: number;
+    paid: number;
+    storefrontOrdersSince: number;
+    /** Every storefront order in the window, tracked or not. */
+    storefrontOrders: number;
   };
+  /** One entry per IST day of this week, oldest first. */
+  days: DayCounts[];
+  tripwires: TripwireResult[];
   windows: {
     now: Date;
+    todayStart: Date;
     thisWeekStart: Date;
     lastWeekStart: Date;
   };
 };
 
 /** Demo stores and their sample orders are not traction (lib/demo-store.ts). */
-const REAL_SALES = { isSample: false, vendor: { isDemo: false } } satisfies Prisma.TransactionWhereInput;
+export const REAL_SALES = { isSample: false, vendor: { isDemo: false } } satisfies Prisma.TransactionWhereInput;
+
+function emptyDays(thisWeekStart: Date): DayCounts[] {
+  return Array.from({ length: WINDOW_DAYS }, (_, i) => {
+    const start = new Date(thisWeekStart.getTime() + i * MS_PER_DAY);
+    return {
+      day: utcToIstParts(start).ymd,
+      start,
+      counts: { instagramOrders: 0, storefrontOrders: 0, voiceBills: 0, counterPaidBills: 0 },
+    };
+  });
+}
+
+/** Index into `emptyDays` (IST has no DST, so every day is 24 h). */
+function dayIndex(at: Date, thisWeekStart: Date): number {
+  return Math.floor((at.getTime() - thisWeekStart.getTime()) / MS_PER_DAY);
+}
 
 export async function getAdminMetrics(now: Date = new Date()): Promise<AdminMetrics> {
-  const thisWeekStart = istDayStart(7, now);
-  const lastWeekStart = istDayStart(14, now);
+  const todayStart = istDayStart(0, now);
+  const thisWeekStart = istDayStart(WINDOW_DAYS, now);
+  const lastWeekStart = istDayStart(WINDOW_DAYS * 2, now);
+  const thisWeek = { gte: thisWeekStart, lt: todayStart };
+  const lastWeek = { gte: lastWeekStart, lt: thisWeekStart };
+  const channelSince = ADMIN_METRICS_CONFIG.tracking.orderChannelSince;
+  const instagramSince = channelSince > thisWeekStart ? channelSince : thisWeekStart;
 
-  const [
-    thisWeekVendorGroups,
-    thisWeekVoiceCount,
-    thisWeekPaidCount,
-    thisWeekSum,
-    lastWeekVendorGroups,
-    lastWeekSum,
-    instagramOrders,
-    instagramPaid,
-    storefrontOrders,
-  ] = await Promise.all([
-    prisma.transaction.groupBy({
-      by: ["vendorId"],
-      where: {
-        ...REAL_SALES,
-        paymentStatus: "PAID",
-        paidAt: { gte: thisWeekStart },
-      },
-      _count: { _all: true },
-    }),
-    prisma.transaction.count({
-      where: {
-        ...REAL_SALES,
-        paymentStatus: "PAID",
-        paidAt: { gte: thisWeekStart },
-        source: "VOICE",
-      },
-    }),
-    prisma.transaction.count({
-      where: {
-        ...REAL_SALES,
-        paymentStatus: "PAID",
-        paidAt: { gte: thisWeekStart },
-      },
-    }),
-    prisma.transaction.aggregate({
-      where: {
-        ...REAL_SALES,
-        paymentStatus: "PAID",
-        paidAt: { gte: thisWeekStart },
-      },
-      _sum: { totalPaise: true },
-    }),
-    prisma.transaction.groupBy({
-      by: ["vendorId"],
-      where: {
-        ...REAL_SALES,
-        paymentStatus: "PAID",
-        paidAt: { gte: lastWeekStart, lt: thisWeekStart },
-      },
-      _count: { _all: true },
-    }),
-    prisma.transaction.aggregate({
-      where: {
-        ...REAL_SALES,
-        paymentStatus: "PAID",
-        paidAt: { gte: lastWeekStart, lt: thisWeekStart },
-      },
-      _sum: { totalPaise: true },
-    }),
-    prisma.transaction.count({
-      where: { ...REAL_SALES, source: "STOREFRONT", orderChannel: "instagram", createdAt: { gte: thisWeekStart } },
-    }),
-    prisma.transaction.count({
-      where: {
-        ...REAL_SALES,
-        source: "STOREFRONT",
-        orderChannel: "instagram",
-        paymentStatus: "PAID",
-        createdAt: { gte: thisWeekStart },
-      },
-    }),
-    prisma.transaction.count({
-      where: { ...REAL_SALES, source: "STOREFRONT", createdAt: { gte: thisWeekStart } },
-    }),
-  ]);
+  const paid = { ...REAL_SALES, paymentStatus: "PAID" } satisfies Prisma.TransactionWhereInput;
 
-  const weeklyActiveVendors = thisWeekVendorGroups.length;
+  const [thisWeekSellers, lastWeekSellers, thisWeekSum, lastWeekSum, todaySum, paidRows, storefrontRows] =
+    await Promise.all([
+      prisma.transaction.groupBy({ by: ["vendorId"], where: { ...paid, paidAt: thisWeek }, _count: { _all: true } }),
+      prisma.transaction.groupBy({ by: ["vendorId"], where: { ...paid, paidAt: lastWeek }, _count: { _all: true } }),
+      prisma.transaction.aggregate({ where: { ...paid, paidAt: thisWeek }, _sum: { totalPaise: true } }),
+      prisma.transaction.aggregate({ where: { ...paid, paidAt: lastWeek }, _sum: { totalPaise: true } }),
+      prisma.transaction.aggregate({
+        where: { ...paid, paidAt: { gte: todayStart } },
+        _sum: { totalPaise: true },
+        _count: { _all: true },
+      }),
+      prisma.transaction.findMany({ where: { ...paid, paidAt: thisWeek }, select: { paidAt: true, source: true } }),
+      prisma.transaction.findMany({
+        where: { ...REAL_SALES, source: "STOREFRONT", createdAt: thisWeek },
+        select: { createdAt: true, orderChannel: true, paymentStatus: true },
+      }),
+    ]);
 
-  const ratesPerVendor = thisWeekVendorGroups.map((g) => g._count._all / 7);
-  const billsPerVendorPerDayMedian =
-    Math.round(median(ratesPerVendor) * 10) / 10;
+  const days = emptyDays(thisWeekStart);
 
-  const voiceSuccessRate7d =
-    thisWeekPaidCount === 0 ? 0 : thisWeekVoiceCount / thisWeekPaidCount;
+  let voiceBills = 0;
+  let counterPaidBills = 0;
+  for (const row of paidRows) {
+    const isVoice = row.source === "VOICE";
+    const isCounter = row.source !== "STOREFRONT";
+    if (isVoice) voiceBills += 1;
+    if (isCounter) counterPaidBills += 1;
+    const day = row.paidAt ? days[dayIndex(row.paidAt, thisWeekStart)] : undefined;
+    if (!day) continue;
+    if (isVoice) day.counts.voiceBills += 1;
+    if (isCounter) day.counts.counterPaidBills += 1;
+  }
 
-  const weeklyGmvPaise = thisWeekSum._sum.totalPaise ?? 0;
+  const instagram = { since: instagramSince, orders: 0, paid: 0, storefrontOrdersSince: 0, storefrontOrders: 0 };
+  for (const row of storefrontRows) {
+    instagram.storefrontOrders += 1;
+    const fromInstagram = row.orderChannel === "instagram";
+    if (row.createdAt >= instagramSince) {
+      instagram.storefrontOrdersSince += 1;
+      if (fromInstagram) {
+        instagram.orders += 1;
+        if (row.paymentStatus === "PAID") instagram.paid += 1;
+      }
+    }
+    const day = days[dayIndex(row.createdAt, thisWeekStart)];
+    if (!day) continue;
+    day.counts.storefrontOrders += 1;
+    if (fromInstagram) day.counts.instagramOrders += 1;
+  }
 
-  const lastWeekActiveVendors = lastWeekVendorGroups.length;
-  const lastWeekGmvPaise = lastWeekSum._sum.totalPaise ?? 0;
+  const paidBills = paidRows.length;
+  const ratesPerSeller = thisWeekSellers.map((g) => g._count._all / WINDOW_DAYS);
 
   return {
-    weeklyActiveVendors,
-    billsPerVendorPerDayMedian,
-    voiceSuccessRate7d,
-    weeklyGmvPaise,
-    instagram7d: { orders: instagramOrders, paid: instagramPaid, allStorefrontOrders: storefrontOrders },
-    wowGrowth: {
-      activeVendorsWoW: wowDelta(weeklyActiveVendors, lastWeekActiveVendors),
-      gmvWoW: wowDelta(weeklyGmvPaise, lastWeekGmvPaise),
-    },
-    windows: {
-      now,
-      thisWeekStart,
-      lastWeekStart,
-    },
+    activeSellers: { current: thisWeekSellers.length, prior: lastWeekSellers.length },
+    billsPerSellerPerDayMedian: Math.round(median(ratesPerSeller) * 10) / 10,
+    voiceShare: { share: paidBills === 0 ? 0 : voiceBills / paidBills, voiceBills, paidBills, counterPaidBills },
+    gmvPaise: { current: thisWeekSum._sum.totalPaise ?? 0, prior: lastWeekSum._sum.totalPaise ?? 0 },
+    today: { paidBills: todaySum._count._all, gmvPaise: todaySum._sum.totalPaise ?? 0 },
+    instagram,
+    days,
+    tripwires: evaluateTripwires(days),
+    windows: { now, todayStart, thisWeekStart, lastWeekStart },
   };
 }

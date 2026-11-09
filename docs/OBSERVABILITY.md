@@ -116,14 +116,24 @@ to `/sign-in` by the middleware.
 It is an HTML page, not a JSON endpoint, and it emits no log lines, so it can't feed a log-drain
 alert. Every load runs Prisma queries, so don't put it on a poller.
 
-Shows, over rolling 7-day windows that start at IST midnight and count only `PAID` transactions:
+Shows the last 7 complete IST days, compared with the 7 before (today so far is a separate card),
+counting only `PAID` transactions of real stores (no demo stores, no sample orders). Definitions in
+`docs/admin-redesign/PHASE-1.md`:
 
-- weekly active vendors (vendors with at least one paid bill);
-- median bills per vendor per day;
-- voice success rate: paid bills with `source = VOICE` ÷ all paid bills. This is the voice
-  *adoption* share, not the parse or transcription success rate;
-- weekly GMV;
-- week-over-week change in active vendors and GMV.
+- active sellers (at least one paid bill), with the change from the previous 7 days;
+- sales (GMV), with the change from the previous 7 days;
+- median bills per seller per day;
+- voice share: paid bills with `source = VOICE` ÷ all paid bills. It is the share of bills rung up
+  by voice, not a parse or transcription success rate. Bills before the Phase 1 till fix are all
+  `MANUAL`;
+- today so far;
+- orders from Instagram, counted from 04/11/2026, when `orderChannel` was first written.
+
+A change is shown as an absolute difference with a "small base" tag while the previous window is
+under `ADMIN_METRICS_CONFIG.smallBase` (20 sellers, ₹10,000), and as a percentage at or above it.
+"Tracking checks" (`lib/admin-tripwires.ts`) flag a metric stuck at exactly 0 for 7 tracked days
+while the metric feeding it is above 0, with a dismissible "Possible tracking issue" banner. They
+are evaluated on page load only.
 
 There is no receipt-delivery rate, voice latency or escalation rate on it. For STT health use the
 transcribe log lines in §2; parse-level telemetry goes to `VoiceParseLog` through the
