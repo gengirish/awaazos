@@ -149,6 +149,13 @@ Below the cards:
 Nudge and Remind (wa.me links to the seller, prefilled from `content/admin-nudges/`) show to
 `SUPER_ADMIN` only; for `ADMIN` the page reads no contact details.
 
+`/admin/bets` (`docs/admin-redesign/PHASE-4.md`) is the companion page:
+- **Bet Board**: each bet is checked against the same 7-day numbers as above.
+- **GTM timeline**: 60 days of paid bills and sales, with admin and derived markers.
+- **Activation by city**: demo created → claimed → first paid bill.
+
+It is also read on page load only, so don't put it on a poller.
+
 There is no receipt-delivery rate, voice latency or escalation rate on it. For STT health use the
 transcribe log lines in §2; parse-level telemetry goes to `VoiceParseLog` through the
 `voice-parse-log` queue, which only fills when the Fly worker is running.

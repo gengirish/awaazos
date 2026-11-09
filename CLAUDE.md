@@ -753,6 +753,21 @@ The same questions are public at `/survey` (no sign-in, `noindex`, `POST /api/su
 sellers with no account. `PublicSurveyResponse` holds the answers and nothing else: no store, name, number or IP.
 `/admin/survey` counts them apart from the stores', because anyone can answer twice, and they never inform a price.
 
+### Admin decision pages (`/admin/metrics`, `/admin/bets`)
+
+Platform ADMIN, read on page render only (no timers, no polling). Design notes: `docs/admin-redesign/`.
+
+- `/admin/metrics` has the weekly cards, the order leak map (`lib/order-funnel.ts`) and the seller heartbeat (`lib/seller-heartbeat.ts`).
+  All windows are the last 7 complete IST days.
+- `/admin/bets` has three parts:
+  - the Bet Board: `AdminBet`, a hypothesis tied to one metric key in `BET_METRICS` (`lib/admin-bets.ts`), the same 7-day numbers as `/admin/metrics`;
+  - the GTM timeline: 60 days of paid bills and GMV, with `AdminTimelineMarker` rows plus derived demo-created and first-paid markers (`lib/gtm-timeline.ts`);
+  - activation by city: demo created → claimed → first paid bill, read from `DemoAuditLog` (`lib/activation-funnel.ts`).
+- `/api/admin/bets/**` and `/api/admin/timeline-markers/**` are ADMIN routes. They parse their answers through Zod output schemas
+  (`betOutputSchema`, `markerOutputSchema`) before sending, the only routes that do.
+- A bet target is an integer in the metric's unit: basis points for a share, a count, or paise.
+- Nudge and Remind (wa.me links to the seller, copy in `content/admin-nudges/`) are SUPER_ADMIN only.
+
 ### Referrals ("Refer a seller")
 
 Stores refer other stores; buyers are not part of it. Rules in the header of `lib/referral.ts`

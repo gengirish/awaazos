@@ -1044,3 +1044,64 @@ enum ReferralCreditStatus {
   PENDING // recorded, refund not yet confirmed by Razorpay
   REFUNDED
 }
+
+// ─── /admin/bets (docs/admin-redesign/PHASE-4.md) ─────────────────────────────
+
+enum BetComparator {
+  GTE // the metric must reach the target or more
+  LTE // the metric must stay at the target or less
+}
+
+enum BetDecision {
+  PENDING
+  KEEP
+  KILL
+}
+
+enum TimelineMarkerKind {
+  OUTREACH
+  EVENT
+  LAUNCH
+}
+
+// A product bet the founders track on /admin/bets: a hypothesis tied to one metric
+// (lib/admin-bets.ts), a target and a deadline, then a keep / kill decision.
+// Platform data, not tenant data: no vendorId.
+model AdminBet {
+  id          String        @id @default(cuid())
+  title       String        @db.VarChar(80)
+  hypothesis  String        @db.VarChar(500)
+  metricKey   String        @db.VarChar(40)
+  // In the metric's unit (BET_METRICS): basis points for a share, a count, or paise.
+  targetValue Int
+  comparator  BetComparator
+  // IST calendar day, inclusive: "by 15/12/2026" means through the end of that day.
+  deadline    DateTime      @db.Date
+  decision    BetDecision   @default(PENDING)
+  notes       String?       @db.VarChar(1000)
+  // The admin's User.id, as written; no relation, so deleting an admin keeps the bet.
+  createdById String?
+  updatedById String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  @@index([deadline])
+  @@map("admin_bets")
+}
+
+// A go-to-market moment an admin marks on the /admin/bets timeline (an outreach
+// push, an event, a launch). Demo stores and first paid bills are marked
+// automatically from their own rows and are not stored here.
+model AdminTimelineMarker {
+  id          String             @id @default(cuid())
+  kind        TimelineMarkerKind
+  label       String             @db.VarChar(60)
+  note        String?            @db.VarChar(300)
+  // IST calendar day.
+  occurredOn  DateTime           @db.Date
+  createdById String?
+  createdAt   DateTime           @default(now())
+
+  @@index([occurredOn])
+  @@map("admin_timeline_markers")
+}
