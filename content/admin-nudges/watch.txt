@@ -1,0 +1,5 @@
+Hi {firstName}, {senderName} from AwaazOS here.
+
+It's been {daysIdle} days since the last paid order on {storeName}. Just checking in: is everything working for you?
+
+Your store: {storeUrl}

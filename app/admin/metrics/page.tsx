@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 
 import { AdminNav } from "@/components/admin/AdminNav";
+import { SellerHeartbeat } from "@/components/admin/SellerHeartbeat";
 import { TrackingTripwireBanner } from "@/components/admin/TrackingTripwireBanner";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { type MetricChange, describeChange } from "@/lib/admin-metric-change";
@@ -10,6 +11,8 @@ import type { TripwireResult } from "@/lib/admin-tripwires";
 import { formatINR } from "@/lib/currency";
 import { formatIstDate } from "@/lib/datetime";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
+import { countByBadge, parseBadgeFilter } from "@/lib/seller-heartbeat";
+import { loadNudgeTemplates, loadSellerHeartbeat, nudgeMessageFor } from "@/lib/seller-heartbeat-server";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -53,12 +56,15 @@ function checkLabel(check: TripwireResult): string {
   return `Waiting: ${check.trackedDays} of ${check.requiredDays} tracked days`;
 }
 
-export default async function AdminMetricsPage() {
+export default async function AdminMetricsPage(props: { searchParams: Promise<{ badge?: string | string[] }> }) {
   let canManageStores = false;
+  let adminName: string | null = null;
   // Re-read the User row rather than trusting `session.user.role` off the JWT, so a
   // role revoked in the database takes effect immediately instead of at token expiry.
   try {
-    canManageStores = (await requirePlatformRole("ADMIN")).user.role === "SUPER_ADMIN";
+    const { user } = await requirePlatformRole("ADMIN");
+    canManageStores = user.role === "SUPER_ADMIN";
+    adminName = user.name;
   } catch (err) {
     // 404, not 403 — never disclose that this admin surface exists.
     if (err instanceof AuthError) notFound();
@@ -66,7 +72,17 @@ export default async function AdminMetricsPage() {
   }
 
   const now = new Date();
-  const metrics = await getAdminMetrics(now);
+  const { badge } = await props.searchParams;
+  const badgeFilter = parseBadgeFilter(badge);
+  // Owner contacts are SUPER_ADMIN-only (as on /admin/vendors): an ADMIN sees the grid without Nudge.
+  const [metrics, heartbeat, templates] = await Promise.all([
+    getAdminMetrics(now),
+    loadSellerHeartbeat(now, { withContacts: canManageStores }),
+    canManageStores ? loadNudgeTemplates() : Promise.resolve(null),
+  ]);
+  const nudgeMessages = templates
+    ? Object.fromEntries(heartbeat.map((row) => [row.id, nudgeMessageFor(row, templates, adminName)]))
+    : null;
 
   const { smallBase } = ADMIN_METRICS_CONFIG;
   const sellersChange = describeChange(
@@ -169,7 +185,8 @@ export default async function AdminMetricsPage() {
             <CardContent>
               <p className="text-4xl font-bold tabular-nums text-foreground">{formatINR(metrics.today.gmvPaise)}</p>
               <p className="mt-2 text-xs text-muted-foreground">
-                {metrics.today.paidBills.toLocaleString("en-IN")} paid bills since midnight IST, not in the 7 days
+                {metrics.today.paidBills.toLocaleString("en-IN")} paid {metrics.today.paidBills === 1 ? "bill" : "bills"}{" "}
+                since midnight IST, not in the 7 days
               </p>
             </CardContent>
           </Card>
@@ -216,6 +233,13 @@ export default async function AdminMetricsPage() {
             </ul>
           </section>
         </div>
+
+        <SellerHeartbeat
+          rows={heartbeat}
+          counts={countByBadge(heartbeat)}
+          filter={badgeFilter}
+          messages={nudgeMessages}
+        />
       </main>
     </div>
   );

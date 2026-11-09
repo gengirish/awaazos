@@ -18,6 +18,19 @@ export const ADMIN_METRICS_CONFIG = {
   tripwireDays: 7,
   /** Days a dismissed "Possible tracking issue" banner stays hidden on that device. */
   tripwireSnoozeDays: 7,
+  /** Seller heartbeat badges (lib/seller-heartbeat.ts). Days are IST calendar days. */
+  heartbeat: {
+    /** Idle under this many days: Healthy. */
+    watchIdleDays: 3,
+    /** Idle this many days or more: At risk. Between the two: Watch. */
+    atRiskIdleDays: 7,
+    /** A store younger than this is New, whatever its activity. */
+    newSellerDays: 14,
+    /** At risk when this week's paid bills are at most this share of last week's… */
+    dropShare: 0.5,
+    /** …and last week had at least this many, so 2 → 1 doesn't count as a collapse. */
+    dropMinPriorBills: 4,
+  },
   tracking: {
     /**
      * `Transaction.orderChannel` was first written by PR #126 (migration
