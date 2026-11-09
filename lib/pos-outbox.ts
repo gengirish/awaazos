@@ -42,6 +42,8 @@ export type OutboxSaleBody = {
   upiRef: string | null;
   /** Cash handed over (lib/cash-tender.ts). Absent when not entered. */
   cashReceivedPaise?: number | null;
+  /** lib/pos-sale-source.ts. Absent on sales queued before it existed: the server reads MANUAL. */
+  source?: "VOICE" | "MANUAL";
 };
 
 export type OutboxSale = {

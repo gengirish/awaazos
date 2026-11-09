@@ -26,7 +26,8 @@ import { useQrDataUrl } from "@/hooks/useQrDataUrl";
 import { checkoutSale, saleRejectedMessage, saleUnsavedMessage } from "@/lib/pos-outbox";
 import { paySheetShortcut } from "@/lib/pay-sheet-keys";
 import { buildUpiUri } from "@/lib/upi";
-import type { CartLine } from "@/lib/cartStore";
+import { useCartStore, type CartLine } from "@/lib/cartStore";
+import { counterSaleSource } from "@/lib/pos-sale-source";
 import { discountLabel } from "@/lib/offers";
 import type { PayTotals } from "@/lib/pos-totals";
 import { cn } from "@/lib/utils";
@@ -197,6 +198,7 @@ export function UpiQRModal({
           paymentMethod,
           upiRef: payMode === "UPI" ? (upiRef.trim() || null) : null,
           ...(payMode === "CASH" && tender.kind === "change" ? { cashReceivedPaise: tender.receivedPaise } : {}),
+          source: counterSaleSource(items, useCartStore.getState().voiceAddedIds),
         },
         { clientRef: unsavedRef.current ?? undefined },
       );
