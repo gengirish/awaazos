@@ -21,6 +21,7 @@ const ADMIN_PAGES: readonly { path: string; open: readonly AdminRole[] }[] = [
   { path: "/admin/demo-stores/new", open: ["SALES", "ADMIN", "SUPER_ADMIN"] },
   { path: "/admin/earnings", open: ["SALES", "SUPER_ADMIN"] },
   { path: "/admin/metrics", open: ["ADMIN", "SUPER_ADMIN"] },
+  { path: "/admin/bets", open: ["ADMIN", "SUPER_ADMIN"] },
   { path: "/admin/communities", open: ["ADMIN", "SUPER_ADMIN"] },
   { path: "/admin/pricing", open: ["ADMIN", "SUPER_ADMIN"] },
   { path: "/admin/admins", open: ["SUPER_ADMIN"] },
