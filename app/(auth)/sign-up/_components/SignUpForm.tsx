@@ -21,7 +21,7 @@ import { clearStoredReferral, syncStoredReferral } from "@/components/auth/refer
 import { useStoreHandleCheck } from "@/hooks/useStoreHandleCheck";
 import { STALL_TYPES } from "@/lib/constants";
 import { STALL_TYPE_OTHER_MAX, STALL_TYPE_OTHER_MESSAGE, stallTypeOtherSchema } from "@/lib/stall-type";
-import { HOME_PATH } from "@/lib/home";
+import { safeCallbackPath } from "@/lib/home";
 import { checkPasswordPolicy } from "@/lib/password-strength";
 import { REFERRAL_QUERY_PARAM, REFERRED_TRIAL_DAYS } from "@/lib/referral";
 import {
@@ -126,7 +126,7 @@ export function SignUpForm({
   const searchParams = useSearchParams();
   // A new store still has setup to finish, so the landing resolver sends it
   // to /onboarding (lib/home.ts). An explicit callbackUrl still wins.
-  const callbackUrl = searchParams.get("callbackUrl") || HOME_PATH;
+  const callbackUrl = safeCallbackPath(searchParams.get("callbackUrl"));
   const refParam = searchParams.get(REFERRAL_QUERY_PARAM);
 
   const [name, setName] = useState("");

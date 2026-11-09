@@ -544,7 +544,8 @@ idle timeout — each tick's session check reads Postgres.
 vendor's opted-in staff devices (`PushSubscription`, one row per device). Event-driven only — never
 add a timer. `notifyVendorInBackground` wraps the send in `waitUntil` so it never blocks a buyer.
 Payloads carry bill number, amount and item count only — **no buyer name, phone or address** (lock
-screens are public). 404/410 from the push service deletes the row. Feature-gated on
+screens are public). 404/410 from the push service deletes the row. A new device's endpoint must be on a browser push service
+(`isPushServiceEndpoint`, `lib/push-devices.ts`), since our server POSTs to it. Feature-gated on
 `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`. `public/sw.js`, the manifest,
 `offline.html` and the icons are excluded from middleware; iPhones need the site added to the Home Screen.
 
@@ -859,7 +860,10 @@ import; `lib/auth.ts` adds the Prisma adapter and Credentials provider on Node. 
 JWT (Credentials requires it). Type augmentation lives in `src/types/next-auth.d.ts` — putting it at
 the workspace root shadows the package import. `POST /api/auth/register` creates
 User + Vendor + VendorSettings + StaffMember(OWNER) in a single `prisma.$transaction`, mapping
-Prisma `P2002` → 409.
+Prisma `P2002` → 409. Password sign-in (`authorize()`) is limited per IP and per hashed email before any DB
+read (`SignInRateLimited`, `res.code === "rate_limited"`) and runs bcrypt even for an unknown email. Every guard
+that reads the user, `requireUser` included, rejects a session older than the last password reset
+(`isSessionStale`, `lib/session-freshness.ts`). `?callbackUrl=` goes through `safeCallbackPath` (`lib/home.ts`).
 
 ### Env validation
 
