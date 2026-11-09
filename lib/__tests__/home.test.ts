@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { HOME_PATH, resolveHomePath } from "@/lib/home";
+import { HOME_PATH, resolveHomePath, safeCallbackPath } from "@/lib/home";
 
 describe("resolveHomePath", () => {
   it("sends a published storefront to the orders board", () => {
@@ -26,6 +26,39 @@ describe("resolveHomePath", () => {
       for (const publishStorefront of [true, false, null, undefined]) {
         expect(resolveHomePath({ onboardingDone, publishStorefront })).not.toBe(HOME_PATH);
       }
+    }
+  });
+});
+
+describe("safeCallbackPath", () => {
+  it("keeps a path on this site, with its query and hash", () => {
+    expect(safeCallbackPath("/onboarding")).toBe("/onboarding");
+    expect(safeCallbackPath("/settings/billing?plan=starter&interval=yearly")).toBe(
+      "/settings/billing?plan=starter&interval=yearly",
+    );
+    expect(safeCallbackPath("/orders#top")).toBe("/orders#top");
+  });
+
+  it("falls back to the landing when there is none", () => {
+    expect(safeCallbackPath(null)).toBe(HOME_PATH);
+    expect(safeCallbackPath(undefined)).toBe(HOME_PATH);
+    expect(safeCallbackPath("")).toBe(HOME_PATH);
+  });
+
+  it("refuses anything that could leave the site", () => {
+    for (const raw of [
+      "https://evil.example/",
+      "//evil.example",
+      "/\\evil.example",
+      "\\evil.example",
+      "/%2F%2Fevil.example",
+      "/%5cevil.example",
+      "javascript:alert(1)",
+      "/\tevil",
+      " /orders",
+      "/" + "a".repeat(600),
+    ]) {
+      expect(safeCallbackPath(raw), raw).toBe(HOME_PATH);
     }
   });
 });

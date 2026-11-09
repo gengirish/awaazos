@@ -7,6 +7,7 @@ import { auth } from "@/lib/auth";
 import { PLAN_RANK } from "@/lib/constants";
 import { billingAccess, effectivePlan, type BillingAccess } from "@/lib/plan";
 import { prisma } from "@/lib/prisma";
+import { isSessionStale } from "@/lib/session-freshness";
 
 const USER_ROLE_RANK: Record<UserRole, number> = {
   USER: 0,
@@ -80,27 +81,19 @@ export function requirePlan(vendor: { plan: Plan }, minPlan: Plan): void {
 }
 
 /**
- * Reject a session that was minted before the account's last password change.
- *
- * Auth.js JWT sessions are stateless, so resetting a password cannot revoke an
- * already-issued token on its own. This is the enforcement half of
- * `User.passwordChangedAt`, which POST /api/auth/reset-password writes.
+ * Reject a session that was minted before the account's last password change
+ * (rule in lib/session-freshness.ts).
  *
  * It lives here rather than in the `jwt` callback because that callback is in
  * lib/auth.config.ts, which must stay edge-safe (no Prisma) — see
  * .cursor/rules/auth-rbac.mdc. Every protected route already funnels through
- * these two guards, so this is the natural chokepoint.
- *
- * Fail-safe: only rejects when BOTH timestamps are present, so accounts that
- * have never reset a password are never locked out.
+ * these guards (and `requireUser` in lib/auth.ts), so this is the chokepoint.
  */
 function assertSessionNotStale(
   user: { passwordChangedAt: Date | null },
   tokenIssuedAt: number | undefined,
 ): void {
-  if (!user.passwordChangedAt || typeof tokenIssuedAt !== "number") return;
-  // `iat` is seconds since epoch; allow 5s of clock skew between issuer and reader.
-  if (tokenIssuedAt * 1000 + 5_000 < user.passwordChangedAt.getTime()) {
+  if (isSessionStale(user.passwordChangedAt, tokenIssuedAt)) {
     throw new AuthError(401, "Session expired. Please sign in again.");
   }
 }

@@ -27,12 +27,34 @@ export function hashEndpoint(endpoint: string): string {
 
 const BASE64URL = /^[A-Za-z0-9_-]+={0,2}$/;
 
+/**
+ * The browsers' push services. Every new order POSTs to each saved endpoint
+ * from our server, so an endpoint on any other host would let a staff member
+ * point our server at a URL of their choosing.
+ * Chrome, Android, Samsung Internet, Opera → FCM; Firefox → Mozilla;
+ * Safari / iOS Home Screen apps → Apple; Edge → Windows Push.
+ */
+const PUSH_SERVICE_HOSTS = ["fcm.googleapis.com", "android.googleapis.com", "web.push.apple.com"];
+const PUSH_SERVICE_SUFFIXES = [".push.services.mozilla.com", ".notify.windows.com", ".push.apple.com"];
+
+export function isPushServiceEndpoint(endpoint: string): boolean {
+  let url: URL;
+  try {
+    url = new URL(endpoint);
+  } catch {
+    return false;
+  }
+  if (url.protocol !== "https:" || url.port !== "" || url.username || url.password) return false;
+  const host = url.hostname.toLowerCase();
+  return PUSH_SERVICE_HOSTS.includes(host) || PUSH_SERVICE_SUFFIXES.some((s) => host.endsWith(s));
+}
+
 export const subscribeSchema = z.object({
   endpoint: z
     .string()
     .max(2048)
     .url()
-    .refine((u) => u.startsWith("https://"), { message: "Endpoint must be an https URL" }),
+    .refine(isPushServiceEndpoint, { message: "Endpoint must be a browser push service URL" }),
   keys: z.object({
     // Uncompressed P-256 public key = 65 bytes ≈ 87 base64url chars.
     p256dh: z.string().min(80).max(120).regex(BASE64URL, "Must be base64url"),

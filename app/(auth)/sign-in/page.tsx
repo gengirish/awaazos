@@ -10,14 +10,14 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/co
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
-import { HOME_PATH } from "@/lib/home";
+import { safeCallbackPath } from "@/lib/home";
 
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   // An explicit callbackUrl (a deep link, or the page middleware bounced) wins;
   // otherwise the landing resolver picks the screen (lib/home.ts).
-  const callbackUrl = searchParams.get("callbackUrl") || HOME_PATH;
+  const callbackUrl = safeCallbackPath(searchParams.get("callbackUrl"));
   // ResetPasswordForm sends people here with ?reset=ok.
   const passwordReset = searchParams.get("reset") === "ok";
 
@@ -48,8 +48,13 @@ function SignInForm() {
     }
     if (res.error) {
       // "Configuration" is Auth.js for "authorize() threw" (the database, not the password).
+      // "rate_limited" is SignInRateLimited in lib/auth.ts.
       setError(
-        res.error === "Configuration" ? "Could not sign you in right now. Try again." : "Invalid email or password.",
+        res.code === "rate_limited"
+          ? "Too many attempts. Wait 15 minutes, then try again."
+          : res.error === "Configuration"
+            ? "Could not sign you in right now. Try again."
+            : "Invalid email or password.",
       );
       setSubmitting(false);
       return;

@@ -38,3 +38,24 @@ export function resolveHomePath(input: HomeInput): HomeDestination {
   if (!input.onboardingDone) return "/onboarding";
   return input.publishStorefront === true ? "/orders" : "/pos";
 }
+
+/**
+ * Where to go after sign-in or sign-up: `?callbackUrl=` when it is a path on
+ * this site, otherwise HOME_PATH. Anything that could leave the origin
+ * (`//evil.com`, `/\evil.com`, `https://…`, encoded slashes, control
+ * characters) is refused, so the link can't be used as an open redirect.
+ */
+export function safeCallbackPath(raw: string | null | undefined): string {
+  if (!raw || raw.length > 512) return HOME_PATH;
+  if (!raw.startsWith("/") || raw.startsWith("//")) return HOME_PATH;
+  if (raw.includes("\\") || /%(2f|5c)/i.test(raw)) return HOME_PATH;
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f\s]/.test(raw)) return HOME_PATH;
+  const base = "https://awaazos.invalid";
+  try {
+    const url = new URL(raw, base);
+    return url.origin === base ? `${url.pathname}${url.search}${url.hash}` : HOME_PATH;
+  } catch {
+    return HOME_PATH;
+  }
+}
