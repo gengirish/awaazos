@@ -19,6 +19,7 @@ import {
   UtensilsCrossed,
   Wallet,
 } from "lucide-react";
+import { headers } from "next/headers";
 import Image from "next/image";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -58,8 +59,10 @@ import { instagramProfileUrl } from "@/lib/instagram";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
 import { offersForItems, resolveOffers, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
 import { loadOfferRules, type OfferSource } from "@/lib/offers-server";
+import { orderChannelFor, parseOrderSrc } from "@/lib/order-channel";
 import { publicRatingText } from "@/lib/order-feedback";
 import { loadRatingSummary } from "@/lib/order-feedback-server";
+import { funnelSourceOf, isCountableStoreView } from "@/lib/order-funnel";
 import { prisma } from "@/lib/prisma";
 import {
   buyerWhatsappNumber,
@@ -83,6 +86,7 @@ import { viewerIsStoreStaff } from "@/lib/storefront-viewer";
 import { buildUpiCollectLink } from "@/lib/upi";
 import { storeBackgroundStyle } from "@/lib/store-background";
 import { storeThemeAttribute } from "@/lib/store-theme";
+import { countStoreView } from "@/lib/store-views";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -657,7 +661,10 @@ function DropSection({
   );
 }
 
-export default async function StorefrontPage(props: { params: Promise<{ slug: string }> }) {
+export default async function StorefrontPage(props: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ src?: string | string[] }>;
+}) {
   const params = await props.params;
   const vendor = await loadStorefront(params.slug);
   if (!vendor) notFound();
@@ -723,6 +730,19 @@ export default async function StorefrontPage(props: { params: Promise<{ slug: st
     viewerIsStoreStaff(vendor.id),
     vendor.isDemo ? null : loadRatingSummary(vendor.id),
   ]);
+  // A buyer arriving, for the order leak map on /admin/metrics (lib/store-views.ts):
+  // counted in Upstash in the background, never for demo stores or the store's own staff.
+  if (!vendor.isDemo && !isStaff) {
+    const requestHeaders = await headers();
+    if (isCountableStoreView(requestHeaders)) {
+      const { src } = await props.searchParams;
+      const channel = orderChannelFor({
+        src: parseOrderSrc(Array.isArray(src) ? src[0] : src),
+        userAgent: requestHeaders.get("user-agent"),
+      });
+      countStoreView(vendor.id, funnelSourceOf(channel), now);
+    }
+  }
   const prefill: BuyerPrefill | null = customer
     ? {
         name: customer.name,

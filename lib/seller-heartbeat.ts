@@ -9,7 +9,7 @@
  * days idle counts from the last paid bill at any time, today included.
  */
 import { ADMIN_METRICS_CONFIG } from "@/lib/admin-metrics-config";
-import { firstName as firstNameOf } from "@/lib/outreach-message";
+import { fillAdminTemplate } from "@/lib/admin-template";
 
 const MS_PER_DAY = 86_400_000;
 const IST_OFFSET_MS = 5.5 * 60 * 60 * 1000;
@@ -174,12 +174,13 @@ export type NudgeVars = {
  * as typed, so a typo in the file shows up in the message instead of vanishing.
  */
 export function fillNudgeTemplate(template: string, vars: NudgeVars): string {
-  const first = firstNameOf(vars.firstName);
-  return template
-    .trim()
-    .replace(/ ?\{firstName\}/g, (m) => (first ? m.replace("{firstName}", first) : ""))
-    .replace(/\{senderName\}/g, firstNameOf(vars.senderName) || "the team")
-    .replace(/\{storeName\}/g, vars.storeName)
-    .replace(/\{storeUrl\}/g, vars.storeUrl)
-    .replace(/\{daysIdle\}/g, vars.daysIdle === null ? "" : String(vars.daysIdle));
+  return fillAdminTemplate(template, {
+    firstName: vars.firstName,
+    senderName: vars.senderName,
+    values: {
+      storeName: vars.storeName,
+      storeUrl: vars.storeUrl,
+      daysIdle: vars.daysIdle === null ? "" : String(vars.daysIdle),
+    },
+  });
 }

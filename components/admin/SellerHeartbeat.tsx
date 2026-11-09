@@ -41,13 +41,15 @@ type Props = {
   filter: HeartbeatBadge | null;
   /** Prefilled Nudge text per row id; null when the viewer may not see contacts. */
   messages: Record<string, string> | null;
+  /** /admin/metrics with this filter, keeping the page's other query params. */
+  hrefFor: (badge: HeartbeatBadge | null) => string;
 };
 
 /**
  * One row per real store on /admin/metrics, riskiest first (lib/seller-heartbeat.ts).
  * The badge filter is a link (`?badge=`), so it works without client code.
  */
-export function SellerHeartbeat({ rows, counts, filter, messages }: Props) {
+export function SellerHeartbeat({ rows, counts, filter, messages, hrefFor }: Props) {
   const total = HEARTBEAT_BADGES.reduce((sum, b) => sum + counts[b], 0);
   const shown = filter ? rows.filter((r) => r.badge === filter) : rows;
   const chips: { key: HeartbeatBadge | null; label: string; count: number }[] = [
@@ -72,7 +74,7 @@ export function SellerHeartbeat({ rows, counts, filter, messages }: Props) {
           return (
             <Link
               key={c.label}
-              href={c.key ? `/admin/metrics?badge=${c.key}#heartbeat-heading` : "/admin/metrics#heartbeat-heading"}
+              href={hrefFor(c.key)}
               aria-current={active ? "page" : undefined}
               scroll={false}
               className={cn(

@@ -4,7 +4,7 @@ import { Check, Copy, MessageCircle, Share2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { InstagramStoryButton } from "@/components/drops/InstagramStoryButton";
-import { buildDropShareText, buildWhatsAppShareUrl } from "@/lib/drops-share";
+import { buildDropShareText, buildTaggedWhatsAppShareUrl } from "@/lib/drops-share";
 import { cn } from "@/lib/utils";
 
 export type ShareDropButtonProps = {
@@ -78,7 +78,7 @@ export function ShareDropButton(props: ShareDropButtonProps) {
   );
 
   function openWhatsApp() {
-    window.open(buildWhatsAppShareUrl(text), "_blank", "noopener,noreferrer");
+    window.open(buildTaggedWhatsAppShareUrl(text, url), "_blank", "noopener,noreferrer");
   }
 
   async function share() {

@@ -43,7 +43,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { AI_IMAGES_ENABLED } from "@/lib/ai-image-types";
-import { buildDropShareText, buildWhatsAppShareUrl, shareOrOpenWhatsApp } from "@/lib/drops-share";
+import { buildDropShareText, buildTaggedWhatsAppShareUrl, shareOrOpenWhatsApp } from "@/lib/drops-share";
 import { cn } from "@/lib/utils";
 
 /**
@@ -194,7 +194,7 @@ export function BoardShareMenu({
                 {copied ? "Copied" : drop ? "Copy message" : "Copy link"}
               </DropdownMenuItem>
               {drop && (
-                <DropdownMenuItem onSelect={() => window.open(buildWhatsAppShareUrl(shareText), "_blank", "noopener,noreferrer")}>
+                <DropdownMenuItem onSelect={() => window.open(buildTaggedWhatsAppShareUrl(shareText, url), "_blank", "noopener,noreferrer")}>
                   <MessageCircle aria-hidden />
                   WhatsApp
                 </DropdownMenuItem>

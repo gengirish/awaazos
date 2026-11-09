@@ -135,6 +135,20 @@ under `ADMIN_METRICS_CONFIG.smallBase` (20 sellers, ₹10,000), and as a percent
 while the metric feeding it is above 0, with a dismissible "Possible tracking issue" banner. They
 are evaluated on page load only.
 
+Below the cards:
+
+- **Order leak map** (`lib/order-funnel.ts`, `docs/admin-redesign/PHASE-3.md`): the window's storefront
+  orders stage by stage (store view → cart, not tracked → placed → payment started → paid), split by
+  Instagram / WhatsApp / Direct / Other, then the unpaid orders. Store views come from an Upstash hash
+  per IST day (`funnel:v1:views:<YYYYMMDD>`, 60-day TTL, `lib/store-views.ts`), bumped in the background
+  by the store page render. If Upstash is down the row says "Not tracked" and nothing else changes. A
+  warning appears if its order count ever differs from the Instagram card's.
+- **Seller heartbeat** (`lib/seller-heartbeat.ts`, `docs/admin-redesign/PHASE-2.md`): one row per live
+  store with a churn-risk badge.
+
+Nudge and Remind (wa.me links to the seller, prefilled from `content/admin-nudges/`) show to
+`SUPER_ADMIN` only; for `ADMIN` the page reads no contact details.
+
 There is no receipt-delivery rate, voice latency or escalation rate on it. For STT health use the
 transcribe log lines in §2; parse-level telemetry goes to `VoiceParseLog` through the
 `voice-parse-log` queue, which only fills when the Fly worker is running.

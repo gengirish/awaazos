@@ -7,6 +7,7 @@
  */
 
 import { formatFulfilmentWindow, formatIstTime } from "@/lib/drops-time";
+import { withWhatsAppTag } from "@/lib/order-channel";
 
 export const SHARE_MAX_ITEMS = 6;
 
@@ -58,6 +59,16 @@ export function buildWhatsAppShareUrl(text: string): string {
 }
 
 /**
+ * A wa.me link whose store link carries `src=wa` (lib/order-channel.ts), so an
+ * order placed from it counts as WhatsApp on /admin/metrics. Only for paths that
+ * certainly open WhatsApp: the device share sheet may hand the text to any app,
+ * so it keeps the plain link.
+ */
+export function buildTaggedWhatsAppShareUrl(text: string, storeUrl: string): string {
+  return buildWhatsAppShareUrl(storeUrl ? text.split(storeUrl).join(withWhatsAppTag(storeUrl)) : text);
+}
+
+/**
  * The device's share sheet, else a wa.me link. A dismissed sheet (AbortError) is
  * not an error; a refused one falls through to WhatsApp. Call it from a tap.
  */
@@ -70,5 +81,5 @@ export async function shareOrOpenWhatsApp({ title, text, url }: { title: string;
       if (err instanceof Error && err.name === "AbortError") return;
     }
   }
-  window.open(buildWhatsAppShareUrl(text), "_blank", "noopener,noreferrer");
+  window.open(buildTaggedWhatsAppShareUrl(text, url), "_blank", "noopener,noreferrer");
 }

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { isValidPincode, LANDMARK_MAX, LOCALITY_MAX } from "@/lib/delivery-address";
 import { PER_ORDER_OVER_MAX } from "@/lib/drops-builder";
 import { istToUtc, ymdToDbDate } from "@/lib/drops-time";
-import { INSTAGRAM_SRC } from "@/lib/order-channel";
+import { ORDER_SRCS } from "@/lib/order-channel";
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD");
 const hm = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Use HH:MM (24h)");
@@ -180,7 +180,7 @@ export const storefrontOrderSchema = z.object({
   ...deliveryAddressPartsShape,
   notes: z.string().trim().max(280).nullish(),
   paymentMethod: z.enum(["UPI", "CASH"]),
-  src: z.literal(INSTAGRAM_SRC).optional(),
+  src: z.enum(ORDER_SRCS).optional(),
 });
 
 export type StorefrontOrderInput = z.infer<typeof storefrontOrderSchema>;
@@ -214,7 +214,7 @@ export const storefrontMenuOrderSchema = z.object({
   ...deliveryAddressPartsShape,
   notes: z.string().trim().max(280).nullish(),
   paymentMethod: z.enum(["UPI", "CASH"]),
-  src: z.literal(INSTAGRAM_SRC).optional(),
+  src: z.enum(ORDER_SRCS).optional(),
   /** Start of the picked slot (lib/menu-slots.ts `MenuSlot.key`); the server re-derives the slot. */
   slotStart: z.string().datetime().nullish(),
 });

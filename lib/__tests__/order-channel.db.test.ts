@@ -130,6 +130,20 @@ describe.skipIf(!ENABLED)("order channel — DB integration", () => {
     expect(await channelOf(vendor.id, plain.json.data.billNumber)).toBeNull();
   });
 
+  it("records WhatsApp from the wa tag, and Facebook's browser as facebook", async () => {
+    const vendor = await seed();
+
+    const shared = await menuOrder(vendor, CHROME, { src: "wa" });
+    expect(shared.status).toBe(201);
+    expect(await channelOf(vendor.id, shared.json.data.billNumber)).toBe("whatsapp");
+
+    const facebook = await menuOrder(
+      vendor,
+      "Mozilla/5.0 (iPhone) AppleWebKit/605.1.15 Mobile/15E148 [FBAN/FBIOS;FBAV/440.0]",
+    );
+    expect(await channelOf(vendor.id, facebook.json.data.billNumber)).toBe("facebook");
+  });
+
   it("records it on a drop order too", async () => {
     const vendor = await seed();
     const drop = await seedDrop(vendor);
