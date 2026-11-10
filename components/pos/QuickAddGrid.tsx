@@ -10,6 +10,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
+import { stockLabel } from "@/lib/inventory";
 import { STAFF_SEARCH_MIN_ITEMS, itemSearchText, matchesSearch, searchTerms } from "@/lib/store-search";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
@@ -25,6 +26,12 @@ export type MenuTile = {
   imageUrl?: string | null;
   /** Voice spellings ("bhel" for "Bhel Puri"); the search matches them too. */
   aliases?: string[];
+  /**
+   * Stock left for a tracked item (lib/inventory.ts), absent or null when not
+   * tracked. Display only: the counter never refuses a sale over stock (rule 5).
+   */
+  stockLeft?: number | null;
+  lowStockAt?: number | null;
 };
 
 export type QuickAddGridProps = {
@@ -278,6 +285,8 @@ function QuickAddTile({ item: it, qty }: { item: MenuTile; qty: number }) {
   };
 
   const inCart = qty > 0;
+  const stock = stockLabel(it.stockLeft ?? null, it.lowStockAt ?? null);
+  const stockShort = it.stockLeft != null && it.stockLeft <= 0;
 
   return (
     <Button
@@ -334,6 +343,10 @@ function QuickAddTile({ item: it, qty }: { item: MenuTile; qty: number }) {
       )}
       <span className="line-clamp-2 w-full whitespace-normal break-words text-center text-sm font-medium text-foreground">{it.name}</span>
       <span className="font-mono text-xs tabular-nums text-muted-foreground">{formatINR(it.priceInPaise)}</span>
+      {stock ? (
+        // After the price, so the accessible name still starts with "{name} {price}".
+        <span className={cn("text-xs text-muted-foreground", stockShort && "font-semibold text-destructive")}>{stock}</span>
+      ) : null}
       {inCart ? (
         <>
           {/* After name and price, so the accessible name still starts with the item name. */}

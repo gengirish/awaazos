@@ -1,25 +1,28 @@
 "use client";
 
-import type { MenuItem } from "@prisma/client";
 import Image from "next/image";
 import { ArrowDown, ArrowUp, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { StockStepper, type StockSaved } from "@/components/menu/StockStepper";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { formatINR } from "@/lib/currency";
+import type { MenuRow } from "@/lib/menu-stock";
 import { cn } from "@/lib/utils";
 
 export type MenuMoveDirection = "up" | "down";
 
 export type MenuItemCardProps = {
-  item: MenuItem;
-  onEdit: (item: MenuItem) => void;
+  item: MenuRow;
+  onEdit: (item: MenuRow) => void;
   onChanged: () => void;
+  /** A stock change saved from the card (tracked items only). */
+  onStockSaved?: (id: string, saved: StockSaved) => void;
   /** Reorder by one place. Leave out to hide the Move buttons. */
-  onMove?: (item: MenuItem, direction: MenuMoveDirection) => void;
+  onMove?: (item: MenuRow, direction: MenuMoveDirection) => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
 };
@@ -31,7 +34,15 @@ export type MenuItemCardProps = {
 const MOVE_BUTTON =
   "inline-flex min-h-11 min-w-11 items-center justify-center rounded-md border border-input bg-background text-foreground opacity-0 transition-opacity hover:bg-accent focus-visible:opacity-100 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 group-hover/card:opacity-100 pointer-coarse:opacity-100 disabled:cursor-not-allowed disabled:text-muted-foreground/50 motion-reduce:transition-none";
 
-export function MenuItemCard({ item, onEdit, onChanged, onMove, canMoveUp = false, canMoveDown = false }: MenuItemCardProps) {
+export function MenuItemCard({
+  item,
+  onEdit,
+  onChanged,
+  onStockSaved,
+  onMove,
+  canMoveUp = false,
+  canMoveDown = false,
+}: MenuItemCardProps) {
   const [saving, setSaving] = useState(false);
 
   async function patch(body: { isAvailable: boolean } | { showOnline: boolean }): Promise<boolean> {
@@ -148,6 +159,10 @@ export function MenuItemCard({ item, onEdit, onChanged, onMove, canMoveUp = fals
             <span className="ml-1 rounded-full bg-primary/15 px-2 py-0.5 text-xs font-medium text-primary">Popular</span>
           ) : null}
         </div>
+        {/* Only once the seller tracks stock for this item (lib/inventory.ts rule 1). */}
+        {item.stockQty !== null ? (
+          <StockStepper item={item} onSaved={(id, saved) => onStockSaved?.(id, saved)} />
+        ) : null}
         <div className="flex items-center gap-1 text-sm">
           <Switch
             checked={item.showOnline}

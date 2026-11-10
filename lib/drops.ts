@@ -12,6 +12,9 @@
  *      (`SELECT … FOR UPDATE`), so concurrent orders for the same Drop serialise
  *      and the sold-count check cannot race. Home-kitchen volume is tens of
  *      orders per drop; per-drop serialisation costs nothing at that scale.
+ *      A drop item whose product tracks stock (lib/inventory.ts) is also capped
+ *      by that stock: after the drop row, the tracked MenuItem rows are locked
+ *      in id order, and the smaller of the two limits wins (`combinedRemaining`).
  *
  *   3. **Sold counts are derived, never stored.** An unpaid UPI order holds its
  *      stock for PENDING_HOLD_MINUTES, then silently stops counting. Cancelling
@@ -43,6 +46,8 @@ import { sumPaise } from "@/lib/currency";
 import { deliveryFields } from "@/lib/delivery-address";
 import { deliveryFeeFor, parseDeliveryAreas } from "@/lib/delivery-areas";
 import { bumpOrderSignal } from "@/lib/drops-signal";
+import { combinedRemaining } from "@/lib/inventory";
+import { lockTrackedMenuItems, stockLeftByMenuItem } from "@/lib/inventory-server";
 import { applyOffers, giftLineName, withGiftsThatFit } from "@/lib/offers";
 import { loadResolvedOffers } from "@/lib/offers-server";
 import type { OrderChannel } from "@/lib/order-channel";
@@ -203,6 +208,36 @@ export async function soldQtyByDropItem(
 export function remainingQty(maxQty: number | null, sold: number): number | null {
   if (maxQty === null) return null;
   return Math.max(0, maxQty - sold);
+}
+
+/**
+ * dropItemId → units a buyer can still order right now: the drop item's own
+ * cap (`maxQty` minus sold) and its product's stock left, whichever is smaller
+ * (lib/inventory.ts rule 6). null = no limit. For pages; the order path checks
+ * again under its locks. `drop` must already be this vendor's.
+ */
+export async function remainingByDropItem(
+  db: Db,
+  vendorId: string,
+  drop: { id: string; items: { id: string; menuItemId: string; maxQty: number | null }[] },
+  now: Date = new Date(),
+): Promise<Map<string, number | null>> {
+  const [sold, tracked] = await Promise.all([
+    drop.items.some((i) => i.maxQty !== null) ? soldQtyByDropItem(db, drop.id, now) : new Map<string, number>(),
+    drop.items.length > 0
+      ? db.menuItem.findMany({
+          where: { vendorId, id: { in: drop.items.map((i) => i.menuItemId) }, stockQty: { not: null } },
+          select: { id: true, stockQty: true, stockCountedAt: true },
+        })
+      : [],
+  ]);
+  const left = await stockLeftByMenuItem(db, vendorId, tracked, now);
+  return new Map(
+    drop.items.map((i) => [
+      i.id,
+      combinedRemaining(remainingQty(i.maxQty, sold.get(i.id) ?? 0), left.get(i.menuItemId) ?? null),
+    ]),
+  );
 }
 
 // ─── Totals ─────────────────────────────────────────────────────────
@@ -404,6 +439,27 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
       const byId = new Map(drop.items.map((i) => [i.id, i]));
       const sold = await soldQtyByDropItem(tx, drop.id, now);
 
+      // Offers are priced here, from this vendor's rows, inside the same
+      // transaction: the buyer's browser never sends a price or a discount.
+      const offerRules = await loadResolvedOffers(tx, vendorId, { channel: "DROP", dropId: drop.id, now });
+
+      // Product stock (lib/inventory.ts rules 4 and 6): after the drop row, lock
+      // the tracked MenuItems behind the ordered lines and any gift of this drop,
+      // in id order. Untracked products take no lock; only the drop cap applies.
+      const giftItemFor = (menuItemId: string) => drop.items.find((i) => i.menuItemId === menuItemId);
+      const tracked = await lockTrackedMenuItems(tx, vendorId, [
+        ...lines.flatMap((l) => {
+          const item = byId.get(l.dropItemId);
+          return item ? [item.menuItemId] : [];
+        }),
+        ...offerRules.flatMap((o) =>
+          o.freeItem && giftItemFor(o.freeItem.menuItemId) ? [o.freeItem.menuItemId] : [],
+        ),
+      ]);
+      const stockLeft = await stockLeftByMenuItem(tx, vendorId, tracked, now);
+      const remainingFor = (item: { id: string; menuItemId: string; maxQty: number | null }) =>
+        combinedRemaining(remainingQty(item.maxQty, sold.get(item.id) ?? 0), stockLeft.get(item.menuItemId) ?? null);
+
       const priced = lines.map((l) => {
         const item = byId.get(l.dropItemId);
         if (!item) throw new OrderRejected({ code: "item_not_found", dropItemId: l.dropItemId });
@@ -414,7 +470,7 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
             limit: item.perOrderLimit,
           });
         }
-        const remaining = remainingQty(item.maxQty, sold.get(item.id) ?? 0);
+        const remaining = remainingFor(item);
         if (remaining !== null && l.qty > remaining) {
           throw new OrderRejected({ code: "sold_out", dropItemId: item.id, remaining });
         }
@@ -437,17 +493,15 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
         throw new OrderRejected({ code: "monthly_txn_cap_reached" });
       }
 
-      // Offers are priced here, from this vendor's rows, inside the same
-      // transaction: the buyer's browser never sends a price or a discount.
-      // A gift comes out of this drop's stock, so it has to be one of its items
-      // with enough left after the paid lines (lib/offers.ts rule 6).
-      const giftItemFor = (menuItemId: string) => drop.items.find((i) => i.menuItemId === menuItemId);
+      // A gift comes out of this drop's stock (and its product's, when tracked),
+      // so it has to be one of its items with enough left after the paid lines
+      // (lib/offers.ts rule 6).
       const offers = withGiftsThatFit(
-        await loadResolvedOffers(tx, vendorId, { channel: "DROP", dropId: drop.id, now }),
+        offerRules,
         (menuItemId, qty) => {
           const item = giftItemFor(menuItemId);
           if (!item) return false;
-          const remaining = remainingQty(item.maxQty, sold.get(item.id) ?? 0);
+          const remaining = remainingFor(item);
           const paid = priced.reduce((n, p) => n + (p.item.id === item.id ? p.qty : 0), 0);
           return remaining === null || remaining - paid >= qty;
         },

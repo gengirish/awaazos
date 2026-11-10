@@ -1,6 +1,5 @@
 "use client";
 
-import type { MenuItem } from "@prisma/client";
 import { zodResolver } from "@hookform/resolvers/zod";
 import Image from "next/image";
 import { ChevronDown } from "lucide-react";
@@ -31,6 +30,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { paiseToRupees } from "@/lib/currency";
+import { parseStockInput, type MenuRow, type MenuStockFields } from "@/lib/menu-stock";
 import { suggestEmoji } from "@/lib/menu-suggestions";
 import { isValidMenuUnit, MENU_UNIT_MAX, MENU_UNIT_MESSAGE, normaliseMenuUnit } from "@/lib/menu-unit";
 import { categoryOptions, paiseToRupeeInput, parseRupeeInput } from "@/lib/menu-voice";
@@ -144,7 +144,7 @@ const defaultCreateValues: MenuItemFormValues = {
 type MenuItemFormProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  item: MenuItem | null;
+  item: MenuRow | null;
   onSaved: () => void;
   /** Create only: pre-fill the name (e.g. a dish heard by the voice drop builder). */
   defaultName?: string;
@@ -157,6 +157,12 @@ type MenuItemFormProps = {
 const FOOD_VOCAB = vocabularyForKind("food");
 
 const NO_CATEGORIES: readonly string[] = [];
+
+/** "In stock now" as first shown: what is left (never below 0), or blank when untracked. */
+function initialStockText(item: MenuRow | null): string {
+  if (!item || item.stockQty === null) return "";
+  return String(Math.max(0, item.stockLeft ?? item.stockQty));
+}
 
 export function MenuItemForm({
   open,
@@ -190,6 +196,14 @@ export function MenuItemForm({
   // an existing item's emoji is the vendor's data.
   const [emojiPicked, setEmojiPicked] = useState(false);
   const [emojiSuggested, setEmojiSuggested] = useState(false);
+  // Stock (lib/menu-stock.ts) sits beside the RHF fields: a count is only sent
+  // when the seller changes it, since sending one records a fresh count.
+  const [trackStock, setTrackStock] = useState(false);
+  const [stockText, setStockText] = useState("");
+  const [lowText, setLowText] = useState("");
+  const [stockError, setStockError] = useState<{ field: "stock" | "low"; message: string } | null>(null);
+  const stockInputRef = useRef<HTMLInputElement>(null);
+  const lowInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<MenuItemFormValues>({
     resolver: zodResolver(menuItemFormSchema),
@@ -207,6 +221,10 @@ export function MenuItemForm({
     setImageBusy(false);
     setEmojiPicked(false);
     setEmojiSuggested(false);
+    setTrackStock(item?.stockQty != null);
+    setStockText(initialStockText(item));
+    setLowText(item?.lowStockAt != null ? String(item.lowStockAt) : "");
+    setStockError(null);
     // On edit, open "More options" when one of its text fields is in use.
     setMoreOpen(Boolean(item && (item.aliases.length > 0 || item.tags.length > 0 || item.hsnCode)));
     if (item) {
@@ -306,6 +324,28 @@ export function MenuItemForm({
     }
   }
 
+  /** The stock keys to send, or null after showing an error on the field. */
+  function stockBody(): MenuStockFields | null {
+    const wasTracked = item?.stockQty != null;
+    if (!trackStock) return wasTracked ? { stockQty: null } : {};
+    const count = parseStockInput(stockText);
+    if ("error" in count || count.value === null) {
+      setStockError({ field: "stock", message: "error" in count ? count.error : "Enter how many you have" });
+      stockInputRef.current?.focus();
+      return null;
+    }
+    const low = parseStockInput(lowText);
+    if ("error" in low) {
+      setStockError({ field: "low", message: low.error });
+      lowInputRef.current?.focus();
+      return null;
+    }
+    const out: MenuStockFields = {};
+    if (!wasTracked || stockText.trim() !== initialStockText(item)) out.stockQty = count.value;
+    if (low.value !== (item?.lowStockAt ?? null)) out.lowStockAt = low.value;
+    return out;
+  }
+
   /** `addAnother` (create only): keep the sheet open, cleared, for the next item. */
   async function save(values: MenuItemFormValues, addAnother: boolean) {
     const price = parseRupeeInput(values.priceInRupees);
@@ -313,6 +353,8 @@ export function MenuItemForm({
       form.setError("priceInRupees", { message: price.error }, { shouldFocus: true });
       return;
     }
+    const stock = stockBody();
+    if (!stock) return;
     const fields = {
       name: values.name,
       priceInRupees: paiseToRupees(price.paise),
@@ -332,7 +374,7 @@ export function MenuItemForm({
         const res = await fetch(`/api/menu/${item.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
+          body: JSON.stringify({ ...body, ...stock }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -344,7 +386,7 @@ export function MenuItemForm({
         const res = await fetch("/api/menu", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...fields, hsnCode: values.hsnCode ?? "" }),
+          body: JSON.stringify({ ...fields, hsnCode: values.hsnCode ?? "", ...stock }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -364,6 +406,9 @@ export function MenuItemForm({
           setEmojiPicked(false);
           setEmojiSuggested(false);
           setMoreOpen(false);
+          setTrackStock(false);
+          setStockText("");
+          setLowText("");
           onSaved();
           form.setFocus("name");
           return;
@@ -753,6 +798,80 @@ export function MenuItemForm({
                   </FormItem>
                 )}
               />
+              <div className="space-y-3">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-3">
+                    <Switch
+                      id="trackStock"
+                      checked={trackStock}
+                      onCheckedChange={(on) => {
+                        setTrackStock(on);
+                        setStockError(null);
+                      }}
+                      aria-describedby="trackStock-help"
+                    />
+                    <label htmlFor="trackStock" className="cursor-pointer text-sm">
+                      Track stock
+                    </label>
+                  </div>
+                  <p id="trackStock-help" className="text-xs text-muted-foreground">
+                    {trackStock
+                      ? `Every sale takes one off. Online orders stop when this ${vocab.item} runs out.`
+                      : `Off: no count kept for this ${vocab.item}.`}
+                  </p>
+                </div>
+                {trackStock ? (
+                  <div className="space-y-3">
+                    <div className="space-y-1">
+                      <label htmlFor="stockQty" className="block text-sm font-medium">
+                        In stock now
+                      </label>
+                      <Input
+                        ref={stockInputRef}
+                        id="stockQty"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        value={stockText}
+                        aria-invalid={stockError?.field === "stock" ? true : undefined}
+                        aria-describedby={stockError?.field === "stock" ? "stockQty-error" : undefined}
+                        onChange={(e) => {
+                          setStockText(e.target.value);
+                          setStockError(null);
+                        }}
+                      />
+                      {stockError?.field === "stock" ? (
+                        <p id="stockQty-error" className="text-xs text-destructive">
+                          {stockError.message}
+                        </p>
+                      ) : null}
+                    </div>
+                    <div className="space-y-1">
+                      <label htmlFor="lowStockAt" className="block text-sm font-medium">
+                        Warn me when this many are left (optional)
+                      </label>
+                      <Input
+                        ref={lowInputRef}
+                        id="lowStockAt"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        placeholder="e.g. 3"
+                        value={lowText}
+                        aria-invalid={stockError?.field === "low" ? true : undefined}
+                        aria-describedby={stockError?.field === "low" ? "lowStockAt-error" : undefined}
+                        onChange={(e) => {
+                          setLowText(e.target.value);
+                          setStockError(null);
+                        }}
+                      />
+                      {stockError?.field === "low" ? (
+                        <p id="lowStockAt-error" className="text-xs text-destructive">
+                          {stockError.message}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
               <FormField
                 control={form.control}
                 name="showOnline"

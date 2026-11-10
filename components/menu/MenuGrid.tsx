@@ -1,41 +1,43 @@
 "use client";
 
-import type { MenuItem } from "@prisma/client";
 import { Package, Search, UtensilsCrossed } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
 
 import { MenuItemCard, type MenuMoveDirection } from "@/components/menu/MenuItemCard";
+import type { StockSaved } from "@/components/menu/StockStepper";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { RadioOption } from "@/components/ui/radio-option";
 import {
-  MENU_STATUS_FILTERS,
   MENU_STATUS_LABELS,
   isMenuFilterEmpty,
   menuItemMatches,
+  menuStatusFilters,
   type MenuStatusFilter,
 } from "@/lib/menu-search";
+import type { MenuRow } from "@/lib/menu-stock";
 import { STAFF_SEARCH_MIN_ITEMS, searchTerms } from "@/lib/store-search";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
+import { cn } from "@/lib/utils";
 
 
 type MenuGridProps = {
   /** The list on screen; MenuScreen owns it because the page header needs it too. */
-  items: MenuItem[];
-  setItems: (items: MenuItem[]) => void;
+  items: MenuRow[];
+  setItems: Dispatch<SetStateAction<MenuRow[]>>;
   /** What the server last sent: a failed reorder goes back to this. */
-  initialItems: MenuItem[];
+  initialItems: MenuRow[];
   onAdd: () => void;
-  onEdit: (item: MenuItem) => void;
+  onEdit: (item: MenuRow) => void;
   /** The store's words (lib/store-vocabulary.ts). */
   vocab: StoreVocabulary;
 };
 
 /** One request for the whole order (POST /api/menu/reorder). False when it did not save. */
-async function saveOrder(rows: MenuItem[]): Promise<boolean> {
+async function saveOrder(rows: MenuRow[]): Promise<boolean> {
   try {
     const res = await fetch("/api/menu/reorder", {
       method: "POST",
@@ -53,7 +55,7 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
   const gridRef = useRef<HTMLDivElement>(null);
   // Reorder saves run one at a time; taps made meanwhile collapse into one more save.
   const savingOrder = useRef(false);
-  const queuedOrder = useRef<MenuItem[] | null>(null);
+  const queuedOrder = useRef<MenuRow[] | null>(null);
   // The Move button to put focus back on once the cards have swapped places.
   const refocusMove = useRef<{ id: string; direction: MenuMoveDirection } | null>(null);
   const [query, setQuery] = useState("");
@@ -62,9 +64,12 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
   // Search and the Selling / Sold out filter only earn their space on a long
   // list (lib/menu-search.ts). They hide cards; `items` stays the whole menu.
   const searchable = items.length > STAFF_SEARCH_MIN_ITEMS;
+  // "Low stock" joins the filter once any item tracks stock; a kitchen sees no change.
+  const statusFilters = menuStatusFilters(items.some((item) => item.stockQty !== null));
+  const shownStatus = statusFilters.includes(status) ? status : "all";
   const filter = useMemo(
-    () => (searchable ? { terms: searchTerms(query), status } : { terms: [], status: "all" as const }),
-    [searchable, query, status],
+    () => (searchable ? { terms: searchTerms(query), status: shownStatus } : { terms: [], status: "all" as const }),
+    [searchable, query, shownStatus],
   );
   const filtering = !isMenuFilterEmpty(filter);
   const visibleItems = useMemo(
@@ -93,7 +98,15 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
     router.refresh();
   }, [router]);
 
-  async function applyReorder(next: MenuItem[]) {
+  // The card already shows its own figure; this keeps the list (and its filter) in step.
+  const onStockSaved = useCallback(
+    (id: string, saved: StockSaved) => {
+      setItems((rows) => rows.map((row) => (row.id === id ? { ...row, ...saved } : row)));
+    },
+    [setItems],
+  );
+
+  async function applyReorder(next: MenuRow[]) {
     setItems(next);
     if (savingOrder.current) {
       queuedOrder.current = next;
@@ -123,7 +136,7 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
     refresh();
   }
 
-  function move(item: MenuItem, direction: MenuMoveDirection) {
+  function move(item: MenuRow, direction: MenuMoveDirection) {
     const from = items.findIndex((x) => x.id === item.id);
     const to = direction === "up" ? from - 1 : from + 1;
     if (from < 0 || to < 0 || to >= items.length) return;
@@ -198,15 +211,22 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
                   />
                 </div>
               </div>
-              <div role="radiogroup" aria-label="Show" className="grid max-w-sm grid-cols-3 gap-2">
-                {MENU_STATUS_FILTERS.map((value) => (
+              <div
+                role="radiogroup"
+                aria-label="Show"
+                className={cn(
+                  "grid gap-2",
+                  statusFilters.length > 3 ? "max-w-lg grid-cols-2 sm:grid-cols-4" : "max-w-sm grid-cols-3",
+                )}
+              >
+                {statusFilters.map((value) => (
                   <RadioOption
                     key={value}
                     size="compact"
                     name="menu-status"
                     value={value}
                     label={MENU_STATUS_LABELS[value]}
-                    checked={status === value}
+                    checked={shownStatus === value}
                     onChange={() => setStatus(value)}
                   />
                 ))}
@@ -232,7 +252,7 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
           {visibleItems.length === 0 ? (
             <EmptyState
               role="status"
-              title={query.trim() ? `No items match “${query.trim()}”` : `No ${MENU_STATUS_LABELS[status].toLowerCase()} items`}
+              title={query.trim() ? `No items match “${query.trim()}”` : `No ${MENU_STATUS_LABELS[shownStatus].toLowerCase()} items`}
               description="Try another word, or clear the search to see everything."
               action={
                 <Button type="button" variant="outline" className="min-h-11" onClick={clearFilter}>
@@ -255,6 +275,7 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
                     item={item}
                     onEdit={onEdit}
                     onChanged={refresh}
+                    onStockSaved={onStockSaved}
                     onMove={filtering ? undefined : move}
                     canMoveUp={index > 0}
                     canMoveDown={index < items.length - 1}

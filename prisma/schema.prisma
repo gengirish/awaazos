@@ -197,6 +197,11 @@ model MenuItem {
   unit         String? // Selling unit shown after the price ("kg", "piece"); null = none
   description  String?  @db.VarChar(200) // One line for buyers under the name on /s/[slug]; never in the voice prompt
   hsnCode      String? // HSN/SAC; falls back to VendorSettings.hsnDefault
+  // Inventory (lib/inventory.ts): units on hand at the last count; null = stock not tracked.
+  // Left = stockQty − units in stock-holding OrderItems created after stockCountedAt. Never decremented.
+  stockQty       Int?
+  stockCountedAt DateTime?
+  lowStockAt     Int? // "Low stock" from this many left; null = no warning
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 
@@ -562,6 +567,7 @@ model OrderItem {
   isGift        Boolean     @default(false) // A FREE_ITEM offer's gift: priced 0, never re-ordered
 
   @@index([transactionId])
+  @@index([menuItemId])
   @@map("order_items")
 }
 
