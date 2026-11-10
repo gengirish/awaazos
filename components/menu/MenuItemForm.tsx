@@ -30,7 +30,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { paiseToRupees } from "@/lib/currency";
-import { parseStockInput, type MenuRow, type MenuStockFields } from "@/lib/menu-stock";
+import { onShelfCount, parseStockInput, setAsideHint, type MenuRow, type MenuStockFields } from "@/lib/menu-stock";
 import { suggestEmoji } from "@/lib/menu-suggestions";
 import { isValidMenuUnit, MENU_UNIT_MAX, MENU_UNIT_MESSAGE, normaliseMenuUnit } from "@/lib/menu-unit";
 import { categoryOptions, paiseToRupeeInput, parseRupeeInput } from "@/lib/menu-voice";
@@ -158,10 +158,11 @@ const FOOD_VOCAB = vocabularyForKind("food");
 
 const NO_CATEGORIES: readonly string[] = [];
 
-/** "In stock now" as first shown: what is left (never below 0), or blank when untracked. */
+/** "In stock now" as first shown: the pieces on the shelf (lib/menu-stock.ts `onShelfCount`), or blank when untracked. */
 function initialStockText(item: MenuRow | null): string {
   if (!item || item.stockQty === null) return "";
-  return String(Math.max(0, item.stockLeft ?? item.stockQty));
+  if (item.stockLeft === null) return String(item.stockQty);
+  return String(onShelfCount(item));
 }
 
 export function MenuItemForm({
@@ -833,12 +834,15 @@ export function MenuItemForm({
                         autoComplete="off"
                         value={stockText}
                         aria-invalid={stockError?.field === "stock" ? true : undefined}
-                        aria-describedby={stockError?.field === "stock" ? "stockQty-error" : undefined}
+                        aria-describedby={stockError?.field === "stock" ? "stockQty-help stockQty-error" : "stockQty-help"}
                         onChange={(e) => {
                           setStockText(e.target.value);
                           setStockError(null);
                         }}
                       />
+                      <p id="stockQty-help" className="text-xs text-muted-foreground">
+                        {setAsideHint(item?.stockSetAside ?? null)}
+                      </p>
                       {stockError?.field === "stock" ? (
                         <p id="stockQty-error" className="text-xs text-destructive">
                           {stockError.message}

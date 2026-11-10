@@ -7,13 +7,18 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { stockLabel, stockState } from "@/lib/inventory";
-import { parseStockInput } from "@/lib/menu-stock";
+import { onShelfCount, parseStockInput, setAsideHint } from "@/lib/menu-stock";
 import { cn } from "@/lib/utils";
 
-export type StockSaved = { stockQty: number | null; stockLeft: number | null; lowStockAt: number | null };
+export type StockSaved = {
+  stockQty: number | null;
+  stockLeft: number | null;
+  stockSetAside: number | null;
+  lowStockAt: number | null;
+};
 
 type StockStepperProps = {
-  item: { id: string; name: string; stockLeft: number | null; lowStockAt: number | null };
+  item: { id: string; name: string; stockLeft: number | null; stockSetAside: number | null; lowStockAt: number | null };
   /** The server's answer, so the list (and its Low stock filter) catches up. */
   onSaved: (id: string, saved: StockSaved) => void;
 };
@@ -97,6 +102,7 @@ export function StockStepper({ item, onSaved }: StockStepperProps) {
   const Icon = state === "in_stock" ? Package : state === "low" ? AlertTriangle : Ban;
   const countId = `${uid}-count`;
   const errorId = `${uid}-error`;
+  const hintId = `${uid}-hint`;
 
   return (
     <div className="space-y-2">
@@ -131,6 +137,9 @@ export function StockStepper({ item, onSaved }: StockStepperProps) {
           <label htmlFor={countId} className="block text-xs font-medium text-muted-foreground">
             How many do you have now?
           </label>
+          <p id={hintId} className="text-xs text-muted-foreground">
+            {setAsideHint(item.stockSetAside)}
+          </p>
           <div className="flex gap-2">
             <Input
               id={countId}
@@ -139,7 +148,7 @@ export function StockStepper({ item, onSaved }: StockStepperProps) {
               autoFocus
               value={countText}
               aria-invalid={countError ? true : undefined}
-              aria-describedby={countError ? errorId : undefined}
+              aria-describedby={countError ? `${hintId} ${errorId}` : hintId}
               onChange={(e) => {
                 setCountText(e.target.value);
                 setCountError(null);
@@ -169,7 +178,8 @@ export function StockStepper({ item, onSaved }: StockStepperProps) {
           size="sm"
           className="min-h-11 w-full"
           onClick={() => {
-            setCountText(String(Math.max(0, left)));
+            // The shelf, not what's left: pieces packed for open orders are still here (rule 2b).
+            setCountText(String(onShelfCount({ stockLeft: left, stockSetAside: item.stockSetAside })));
             setCountError(null);
             setSetting(true);
           }}

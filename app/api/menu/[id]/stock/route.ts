@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-import { lockTrackedMenuItems, recordStockCount, stockLeftByMenuItem } from "@/lib/inventory-server";
-import { adjustedCount, stockChangeSchema } from "@/lib/menu-stock";
+import { lockTrackedMenuItems, recordStockAdjust, recordStockCount, stockLeftByMenuItem } from "@/lib/inventory-server";
+import { withStockLeft } from "@/lib/menu-stock-server";
+import { adjustDelta, stockChangeSchema } from "@/lib/menu-stock";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
@@ -33,8 +34,10 @@ class StockRouteError extends Error {
 
 /**
  * POST /api/menu/[id]/stock — `{ set: n }` records a count; `{ adjust: ±n }`
- * ("+5 received", "−1 damaged") records stock left + n as a new count
- * (lib/menu-stock.ts `adjustedCount`). Rules in lib/inventory.ts. Not a sale,
+ * ("+5 received", "−1 damaged") moves the count so left becomes left + n
+ * (kept at 0 or more), without moving `stockCountedAt`: open orders keep
+ * counting, and a lapsed hold or a cancel still gives stock back. Rules in
+ * lib/inventory.ts (2a). Not a sale,
  * so no billing lock: a locked store can still count its shelf.
  */
 export async function POST(req: NextRequest, props: { params: Promise<{ id: string }> }) {
@@ -51,25 +54,29 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
       });
       if (!item) throw new StockRouteError(404, "Not found");
 
-      let count: number;
       if ("set" in body) {
-        count = body.set;
+        await recordStockCount(tx, vendorId, item.id, body.set);
       } else {
         // The row lock serialises this with orders taking the same item, so
-        // "left" can't move between the read and the new count (rule 4).
+        // "left" can't move between the read and the change (rule 4).
         const [locked] = await lockTrackedMenuItems(tx, vendorId, [item.id]);
         if (!locked) throw new StockRouteError(409, "stock_not_tracked");
         const left = (await stockLeftByMenuItem(tx, vendorId, [locked])).get(item.id) ?? 0;
-        count = adjustedCount(left, body.adjust);
+        const delta = adjustDelta(left, body.adjust);
+        if (delta !== 0) await recordStockAdjust(tx, vendorId, item.id, delta);
       }
 
-      await recordStockCount(tx, vendorId, item.id, count);
       const row = await tx.menuItem.findUniqueOrThrow({
         where: { id: item.id, vendorId },
         select: { id: true, stockQty: true, stockCountedAt: true, lowStockAt: true },
       });
-      const left = await stockLeftByMenuItem(tx, vendorId, [row]);
-      return { stockQty: row.stockQty, stockLeft: left.get(row.id) ?? null, lowStockAt: row.lowStockAt };
+      const [stock] = await withStockLeft(tx, vendorId, [row]);
+      return {
+        stockQty: row.stockQty,
+        stockLeft: stock.stockLeft,
+        stockSetAside: stock.stockSetAside,
+        lowStockAt: row.lowStockAt,
+      };
     });
 
     return withVendorCookie(NextResponse.json({ data }), ctx.setVendorCookie);

@@ -15,12 +15,16 @@ const ENABLED = process.env.DROPS_DB_TEST === "1";
 type MenuOrdersModule = typeof import("@/lib/menu-orders");
 type DropsModule = typeof import("@/lib/drops");
 type InventoryServerModule = typeof import("@/lib/inventory-server");
+type ActionsModule = typeof import("@/lib/storefront-order-actions");
+type MenuStockModule = typeof import("@/lib/menu-stock");
 type PrismaModule = typeof import("@/lib/prisma");
 
 describe.skipIf(!ENABLED)("inventory — DB integration", () => {
   let mo: MenuOrdersModule;
   let drops: DropsModule;
   let inv: InventoryServerModule;
+  let actions: ActionsModule;
+  let menuStock: MenuStockModule;
   let prisma: PrismaModule["prisma"];
   const vendorIds: string[] = [];
   const MIN = 60_000;
@@ -33,6 +37,8 @@ describe.skipIf(!ENABLED)("inventory — DB integration", () => {
     mo = await import("@/lib/menu-orders");
     drops = await import("@/lib/drops");
     inv = await import("@/lib/inventory-server");
+    actions = await import("@/lib/storefront-order-actions");
+    menuStock = await import("@/lib/menu-stock");
     ({ prisma } = await import("@/lib/prisma"));
   });
 
@@ -101,6 +107,33 @@ describe.skipIf(!ENABLED)("inventory — DB integration", () => {
       select: { id: true, stockQty: true, stockCountedAt: true },
     });
     return (await inv.stockLeftByMenuItem(prisma, s.vendor.id, [item])).get(item.id);
+  }
+
+  async function setAsideOf(s: Awaited<ReturnType<typeof seed>>) {
+    const item = await prisma.menuItem.findFirstOrThrow({
+      where: { id: s.tracked.id, vendorId: s.vendor.id },
+      select: { id: true, stockQty: true, stockCountedAt: true },
+    });
+    return (await inv.stockSetAsideByMenuItem(prisma, s.vendor.id, [item])).get(item.id);
+  }
+
+  /** The /menu −1 / +1 path (POST /api/menu/[id]/stock { adjust }): delta on the count, time kept. */
+  async function adjust(s: Awaited<ReturnType<typeof seed>>, delta: number) {
+    const left = (await leftOf(s)) ?? 0;
+    const d = menuStock.adjustDelta(left, delta);
+    if (d !== 0) await inv.recordStockAdjust(prisma, s.vendor.id, s.tracked.id, d);
+  }
+
+  /** The board's "Delivered" tap on a menu order. */
+  function deliver(s: Awaited<ReturnType<typeof seed>>, orderId: string, now?: Date) {
+    return prisma.$transaction((tx) =>
+      actions.applyStorefrontOrderAction(tx, {
+        scope: { id: orderId, vendorId: s.vendor.id, source: "STOREFRONT", dropId: null },
+        action: "deliver",
+        dropStatus: null,
+        now,
+      }),
+    );
   }
 
   /** A counter sale (source ≠ STOREFRONT) of the tracked product. */
@@ -288,7 +321,8 @@ describe.skipIf(!ENABLED)("inventory — DB integration", () => {
     expect(lines.some((l) => l.isGift)).toBe(false);
     expect(await leftOf(s)).toBe(0);
 
-    // With stock for it, the gift is added and leaves the shelf.
+    // Handed over, then a recount: with stock for it, the gift is added and leaves the shelf.
+    await deliver(s, res.order.id);
     await inv.recordStockCount(prisma, s.vendor.id, s.tracked.id, 2, new Date(Date.now() + 1000));
     await new Promise((r) => setTimeout(r, 1100));
     const withGift = await menuOrder(s, [{ menuItemId: s.untracked.id, qty: 2 }]);
@@ -297,5 +331,81 @@ describe.skipIf(!ENABLED)("inventory — DB integration", () => {
     const giftLines = await prisma.orderItem.findMany({ where: { transactionId: withGift.order.id, isGift: true } });
     expect(giftLines).toHaveLength(1);
     expect(await leftOf(s)).toBe(1);
+  });
+
+  it("an adjust keeps open orders counting: a lapsed hold or a cancel after it still gives stock back", async () => {
+    const s = await seed(5);
+    const upi = await menuOrder(s, [{ menuItemId: s.tracked.id, qty: 2 }], "UPI");
+    expect(upi.ok).toBe(true);
+    if (!upi.ok) return;
+    expect(await leftOf(s)).toBe(3);
+    await adjust(s, 1); // "+1 received" while the UPI order is still held
+    expect(await leftOf(s)).toBe(4);
+    // The hold lapses: its 2 come back on top of the +1.
+    await prisma.transaction.updateMany({
+      where: { id: upi.order.id, vendorId: s.vendor.id },
+      data: { createdAt: new Date(Date.now() - 20 * MIN) },
+    });
+    expect(await leftOf(s)).toBe(6);
+
+    const cash = await menuOrder(s, [{ menuItemId: s.tracked.id, qty: 2 }]);
+    expect(cash.ok).toBe(true);
+    if (!cash.ok) return;
+    await adjust(s, -1); // "−1 damaged"
+    expect(await leftOf(s)).toBe(3);
+    await prisma.$transaction((tx) => drops.cancelOrder(tx, { vendorId: s.vendor.id, transactionId: cash.order.id }));
+    expect(await leftOf(s)).toBe(5);
+  });
+
+  it("an adjust never takes stock below 0 and never lifts an oversold item on a decrease", async () => {
+    const s = await seed(1);
+    await adjust(s, -3);
+    expect(await leftOf(s)).toBe(0);
+    await counterSale(s, 2);
+    expect(await leftOf(s)).toBe(-2);
+    await adjust(s, -1);
+    expect(await leftOf(s)).toBe(-2);
+    await adjust(s, 1);
+    expect(await leftOf(s)).toBe(-1);
+    // Another vendor's adjust changes nothing (compound scope).
+    const other = await seed(1);
+    expect((await inv.recordStockAdjust(prisma, other.vendor.id, s.tracked.id, 50)).count).toBe(0);
+  });
+
+  it("a count includes pieces packed for orders not handed over yet", async () => {
+    const s = await seed(5);
+    const waiting = await menuOrder(s, [{ menuItemId: s.tracked.id, qty: 2 }]); // pay on delivery, still here
+    expect(waiting.ok).toBe(true);
+    if (!waiting.ok) return;
+    const gone = await menuOrder(s, [{ menuItemId: s.tracked.id, qty: 1 }]);
+    expect(gone.ok).toBe(true);
+    if (!gone.ok) return;
+    await deliver(s, gone.order.id); // handed over before the count: not on the shelf
+    expect(await leftOf(s)).toBe(2);
+    expect(await setAsideOf(s)).toBe(2);
+
+    // The seller counts the shelf: 4, the 2 packed pieces included.
+    await inv.recordStockCount(prisma, s.vendor.id, s.tracked.id, 4, new Date(Date.now() + 1000));
+    expect(await leftOf(s)).toBe(2);
+    // Counting the same shelf again (what "Set count" pre-fills) changes nothing.
+    expect(menuStock.onShelfCount({ stockLeft: 2, stockSetAside: 2 })).toBe(4);
+
+    // Handed over after the count: they left a shelf the count included, so left stays.
+    await deliver(s, waiting.order.id, new Date(Date.now() + 2000));
+    expect(await leftOf(s)).toBe(2);
+    expect(await setAsideOf(s)).toBe(0);
+  });
+
+  it("a packed order cancelled after the count frees its pieces", async () => {
+    const s = await seed(5);
+    const waiting = await menuOrder(s, [{ menuItemId: s.tracked.id, qty: 2 }]);
+    expect(waiting.ok).toBe(true);
+    if (!waiting.ok) return;
+    await inv.recordStockCount(prisma, s.vendor.id, s.tracked.id, 5, new Date(Date.now() + 1000));
+    expect(await leftOf(s)).toBe(3);
+    await prisma.$transaction((tx) =>
+      drops.cancelOrder(tx, { vendorId: s.vendor.id, transactionId: waiting.order.id }),
+    );
+    expect(await leftOf(s)).toBe(5);
   });
 });

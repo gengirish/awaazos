@@ -64,7 +64,7 @@ test.describe("inventory", () => {
 
     const set = await page.request.post(`/api/menu/${item.id}/stock`, { data: { set: 10 } });
     expect(set.status()).toBe(200);
-    expect((await set.json()).data).toEqual({ stockQty: 10, stockLeft: 10, lowStockAt: null });
+    expect((await set.json()).data).toEqual({ stockQty: 10, stockLeft: 10, stockSetAside: 0, lowStockAt: null });
 
     const received = await page.request.post(`/api/menu/${item.id}/stock`, { data: { adjust: 5 } });
     expect((await received.json()).data).toMatchObject({ stockQty: 15, stockLeft: 15 });

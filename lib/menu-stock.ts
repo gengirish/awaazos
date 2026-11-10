@@ -73,11 +73,22 @@ export const stockChangeSchema = z.union([
 export type StockChange = z.infer<typeof stockChangeSchema>;
 
 /**
- * The count an adjust records: what is left now plus the change, kept within
- * 0..MAX_STOCK_QTY. An oversold item (left < 0) that gets +5 has 3 left.
+ * Units left after an adjust: what is left now plus the change, never taken
+ * below 0 by a decrease and never above MAX_STOCK_QTY. An oversold item
+ * (left < 0) moves by the change like any other: +5 on −2 is 3, +1 is −1;
+ * a decrease leaves it where it is.
  */
 export function adjustedCount(left: number, delta: number): number {
-  return Math.min(MAX_STOCK_QTY, Math.max(0, left + delta));
+  return Math.min(MAX_STOCK_QTY, Math.max(Math.min(0, left), left + delta));
+}
+
+/**
+ * How much an adjust moves `stockQty` so that left becomes `adjustedCount`.
+ * `stockCountedAt` stays put (lib/inventory.ts rule 2a), so this is a delta,
+ * not a new count.
+ */
+export function adjustDelta(left: number, delta: number): number {
+  return adjustedCount(left, delta) - left;
 }
 
 /** A count typed in the form or the "Set count" box: "" → null, else a whole number in range. */
@@ -90,8 +101,27 @@ export function parseStockInput(text: string): { value: number | null } | { erro
   return { value: n };
 }
 
-/** What GET /api/menu and the /menu page add to each row. */
-export type WithStockLeft = { stockLeft: number | null };
+/**
+ * What GET /api/menu and the /menu page add to each row. `stockSetAside`:
+ * units in open storefront orders not handed over yet (lib/inventory.ts 2b).
+ * Both null on untracked rows.
+ */
+export type WithStockLeft = { stockLeft: number | null; stockSetAside: number | null };
+
+/**
+ * What "Set count" and "In stock now" start from: the pieces on the shelf,
+ * which is what is left plus what is set aside. Never below 0.
+ */
+export function onShelfCount(row: WithStockLeft): number {
+  return Math.max(0, (row.stockLeft ?? 0) + (row.stockSetAside ?? 0));
+}
 
 /** One row on the /menu screen. */
 export type MenuRow = MenuItem & WithStockLeft;
+
+/** Under "In stock now" and "Set count": what to count (lib/inventory.ts rule 2b). */
+export function setAsideHint(setAside: number | null): string {
+  return setAside && setAside > 0
+    ? `Count all you have, including the ${setAside} packed for orders not handed over yet.`
+    : "Count all you have, including any packed for orders not handed over yet.";
+}

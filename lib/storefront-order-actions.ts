@@ -169,7 +169,8 @@ export async function applyStorefrontOrderAction(
     case "deliver": {
       const r = await tx.transaction.updateMany({
         where: { ...scope, fulfilmentStatus: { in: ["PLACED", "CONFIRMED"] } },
-        data: { fulfilmentStatus: "DELIVERED" },
+        // deliveredAt: when the goods left the shelf (lib/inventory.ts rule 2b).
+        data: { fulfilmentStatus: "DELIVERED", deliveredAt: args.now ?? new Date() },
       });
       applied = r.count === 1;
       if (applied && order.paymentMethod === "CASH" && order.paymentStatus !== "PAID") {
@@ -182,7 +183,7 @@ export async function applyStorefrontOrderAction(
     case "undeliver": {
       const r = await tx.transaction.updateMany({
         where: { ...scope, fulfilmentStatus: "DELIVERED" },
-        data: { fulfilmentStatus: "CONFIRMED" },
+        data: { fulfilmentStatus: "CONFIRMED", deliveredAt: null },
       });
       applied = r.count === 1;
       break;

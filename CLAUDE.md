@@ -731,11 +731,16 @@ them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireAc
 ### Inventory (stock per product)
 
 Opt-in per item: `MenuItem.stockQty` null = not tracked (kitchens see nothing new). Rules in the header of
-`lib/inventory.ts` (pure), database side in `lib/inventory-server.ts`. **Stock left is derived, never
-decremented**: the seller records a count (`stockQty` at `stockCountedAt`, via `recordStockCount` only) and
-left = count minus units in stock-taking `OrderItem`s created after it: every counter sale, and storefront
-orders that `stockHoldingOrderWhere` holds (so lapsed holds, cancels and POS undo give stock back with no
-write and no timer); samples never count. Online orders lock the tracked `MenuItem` rows (`FOR UPDATE`, id
+`lib/inventory.ts` (pure), database side in `lib/inventory-server.ts`, plan in `docs/INVENTORY_PLAN.md`.
+**Stock left is derived, never decremented**: the seller records a count (`stockQty` at `stockCountedAt`,
+via `recordStockCount` only) and left = count minus units in stock-taking `OrderItem`s created after it:
+every counter sale, and storefront orders that `stockHoldingOrderWhere` holds (so lapsed holds, cancels and
+POS undo give stock back with no write and no timer); samples never count. −1 / +1 / "received" go through
+`recordStockAdjust`: they move `stockQty` and **never** `stockCountedAt` (re-basing would freeze open orders
+as sold). A count is the whole shelf, pieces packed for open orders included, so left also subtracts
+storefront orders placed by the count that still hold stock and weren't handed over by then
+(`Transaction.deliveredAt`, stamped by the `deliver` action only); "Set count" pre-fills left + set aside
+(`onShelfCount`). Online orders lock the tracked `MenuItem` rows (`FOR UPDATE`, id
 order, after the drop row) and refuse a shortfall (`out_of_stock` for menu orders, `sold_out` for drops,
 whose cap becomes the smaller of `maxQty` and stock left). The counter never refuses a sale over stock, so
 left can go negative ("Oversold by N"). Buyers see "Sold out" and "Only N left" (at or below `lowStockAt`,
