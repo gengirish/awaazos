@@ -28,6 +28,7 @@ import {
   stockLabel,
   type OrderApiError,
 } from "@/lib/storefront-order";
+import { cartAfterStockRejection, stockBadgeText } from "@/lib/storefront-stock";
 import { cn } from "@/lib/utils";
 
 export type { BuyerPrefill } from "@/components/storefront/StorefrontCheckout";
@@ -53,8 +54,14 @@ export type DropOrderItem = {
   /** One line under the name; null = none. */
   description?: string | null;
   priceInPaise: number;
-  /** null = unlimited */
+  /** null = unlimited. The smaller of the drop's cap and the product's stock (lib/inventory.ts rule 6). */
   remaining: number | null;
+  /**
+   * Set when the product's stock is what limits this row (lib/storefront-stock.ts
+   * `dropItemStock`): "Only N left" follows the store's low-stock line, null = no hint.
+   * Absent = the drop's own cap, labelled from `remaining` as before.
+   */
+  onlyLeft?: number | null;
   perOrderLimit: number | null;
   /**
    * DOM id of the same item's row on the orderable everyday menu, when it is
@@ -204,12 +211,7 @@ export function DropOrder(props: DropOrderProps) {
       const left = Math.max(0, err.remaining ?? 0);
       const id = err.dropItemId;
       setRemainingOverride((o) => ({ ...o, [id]: left }));
-      setCart((c) => {
-        const next = { ...c };
-        if (left <= 0) delete next[id];
-        else if ((next[id] ?? 0) > left) next[id] = left;
-        return next;
-      });
+      setCart((c) => cartAfterStockRejection(c, id, left));
       router.refresh();
     } else if (err.error === "per_order_limit" && err.dropItemId && err.limit) {
       const id = err.dropItemId;
@@ -237,7 +239,11 @@ export function DropOrder(props: DropOrderProps) {
           const max = maxOrderableQty(remaining, item.perOrderLimit);
           const qty = cart[item.id] ?? 0;
           const soldOut = remaining !== null && remaining <= 0;
-          const badge = stockLabel(remaining);
+          // Product stock binds: never print a count above the store's low-stock line.
+          const badge =
+            item.onlyLeft !== undefined && remainingOverride[item.id] === undefined
+              ? stockBadgeText({ soldOut, onlyLeft: item.onlyLeft })
+              : stockLabel(remaining);
           return (
             <li key={item.id} className="flex items-center gap-3 py-3 sm:gap-4">
               {item.imageUrl ? (

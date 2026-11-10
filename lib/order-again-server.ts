@@ -1,4 +1,5 @@
-import { soldQtyByDropItem } from "@/lib/drops";
+import { remainingByDropItem } from "@/lib/drops";
+import { stockLeftByMenuItem } from "@/lib/inventory-server";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
 import type { OrderableNow } from "@/lib/order-again";
 import { prisma } from "@/lib/prisma";
@@ -15,7 +16,10 @@ export async function loadOrderableNow(vendorId: string, now: Date = new Date())
       where: { id: vendorId },
       select: {
         settings: { select: { acceptMenuOrders: true } },
-        menuItems: { where: STOREFRONT_MENU_ITEM_WHERE, select: { id: true } },
+        menuItems: {
+          where: STOREFRONT_MENU_ITEM_WHERE,
+          select: { id: true, stockQty: true, stockCountedAt: true },
+        },
         drops: {
           where: {
             status: "OPEN",
@@ -34,13 +38,18 @@ export async function loadOrderableNow(vendorId: string, now: Date = new Date())
 
   const drops = await Promise.all(
     vendor.drops.map(async (drop) => {
-      const sold = drop.items.some((i) => i.maxQty !== null)
-        ? await soldQtyByDropItem(prisma, drop.id, now)
-        : new Map<string, number>();
-      const inStock = drop.items.filter((i) => i.maxQty === null || i.maxQty - (sold.get(i.id) ?? 0) > 0);
+      // The drop's own caps and the products' stock (lib/inventory.ts rule 6).
+      const remaining = await remainingByDropItem(prisma, vendorId, drop, now);
+      const inStock = drop.items.filter((i) => {
+        const r = remaining.get(i.id) ?? null;
+        return r === null || r > 0;
+      });
       return { dropId: drop.id, items: new Map(inStock.map((i) => [i.menuItemId, i.id])) };
     }),
   );
   const menuOpen = (vendor.settings?.acceptMenuOrders ?? false) && !menuHidden;
-  return { menu: new Set(menuOpen ? vendor.menuItems.map((i) => i.id) : []), drops };
+  // A tracked product with nothing left can't be ordered from the menu (lib/inventory.ts rule 4).
+  const left = menuOpen ? await stockLeftByMenuItem(prisma, vendorId, vendor.menuItems, now) : new Map<string, number>();
+  const menu = menuOpen ? vendor.menuItems.filter((i) => (left.get(i.id) ?? 1) > 0).map((i) => i.id) : [];
+  return { menu: new Set(menu), drops };
 }

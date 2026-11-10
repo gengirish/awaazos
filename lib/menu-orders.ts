@@ -8,8 +8,12 @@
  * payment paths (markOrderPaid / cancelOrder keep DailySummary right), same
  * plan-cap rule. What differs:
  *
- *   - No cut-off and no stock caps, so no row lock: only `isAvailable` items
- *     of a vendor with `VendorSettings.acceptMenuOrders` can be ordered.
+ *   - No cut-off and no drop row lock: only `isAvailable` items of a vendor
+ *     with `VendorSettings.acceptMenuOrders` can be ordered. Items the seller
+ *     tracks stock for (lib/inventory.ts) are row-locked (`FOR UPDATE`, id
+ *     order) inside the transaction, and a line that needs more than is left is
+ *     refused with `out_of_stock`. A free gift that wouldn't fit is dropped.
+ *     Untracked items take no lock.
  *   - Fulfilment mode, delivery fee and pickup note come from VendorSettings
  *     (menuFulfilmentMode / menuDeliveryFeePaise / menuPickupNote).
  *
@@ -30,7 +34,9 @@ import { deliveryFields } from "@/lib/delivery-address";
 import { deliveryFeeFor, parseDeliveryAreas } from "@/lib/delivery-areas";
 import { bumpOrderSignal } from "@/lib/drops-signal";
 import { findMenuSlot, parseMenuSlots, type MenuSlot } from "@/lib/menu-slots";
-import { applyOffers, giftLineName } from "@/lib/offers";
+import { firstShortfall } from "@/lib/inventory";
+import { lockTrackedMenuItems, stockLeftByMenuItem } from "@/lib/inventory-server";
+import { applyOffers, giftLineName, withGiftsThatFit } from "@/lib/offers";
 import { loadResolvedOffers } from "@/lib/offers-server";
 import type { OrderChannel } from "@/lib/order-channel";
 import { effectivePlan, isBillingLocked } from "@/lib/plan";
@@ -84,6 +90,8 @@ export type PlaceMenuOrderError =
   | { code: "menu_orders_disabled" }
   | { code: "menu_paused_for_drop" }
   | { code: "item_not_found"; menuItemId: string }
+  /** A tracked product has fewer left than the line asks for (lib/inventory.ts rule 4). */
+  | { code: "out_of_stock"; menuItemId: string; remaining: number }
   | { code: "fulfilment_unavailable" }
   | { code: "address_required" }
   | { code: "outside_delivery_area" }
@@ -216,7 +224,24 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
       }
 
       // Same rule as drops: offers are priced server-side from this vendor's rows.
-      const offers = await loadResolvedOffers(tx, vendorId, { channel: "MENU", now });
+      const offerRules = await loadResolvedOffers(tx, vendorId, { channel: "MENU", now });
+
+      // Stock (lib/inventory.ts rule 4): lock the tracked products behind the
+      // lines and any gift, in id order, then refuse a line that needs more than
+      // is left. Untracked items are not locked and always pass.
+      const tracked = await lockTrackedMenuItems(tx, vendorId, [
+        ...priced.map((p) => p.item.id),
+        ...offerRules.flatMap((o) => (o.freeItem ? [o.freeItem.menuItemId] : [])),
+      ]);
+      const left = await stockLeftByMenuItem(tx, vendorId, tracked, now);
+      const need = new Map(priced.map((p) => [p.item.id, p.qty]));
+      const shortfall = firstShortfall(need, left);
+      if (shortfall) throw new MenuOrderRejected({ code: "out_of_stock", ...shortfall });
+      // A gift leaves the shelf too: an offer whose gift doesn't fit after the paid lines is skipped.
+      const offers = withGiftsThatFit(offerRules, (menuItemId, qty) => {
+        const l = left.get(menuItemId);
+        return l === undefined || (need.get(menuItemId) ?? 0) + qty <= l;
+      });
       const offered = applyOffers(
         priced.map((p) => ({
           key: p.item.id,

@@ -1,6 +1,5 @@
 "use client";
 
-import type { MenuItem } from "@prisma/client";
 import { Mic, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -10,10 +9,11 @@ import { MenuItemForm } from "@/components/menu/MenuItemForm";
 import { VoiceMenuPanel } from "@/components/menu/VoiceMenuPanel";
 import { Button } from "@/components/ui/button";
 import { MENU_CHANGED_EVENT } from "@/lib/menu-events";
+import type { MenuRow } from "@/lib/menu-stock";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
 
 type MenuScreenProps = {
-  initialItems: MenuItem[];
+  initialItems: MenuRow[];
   voiceLang: string;
   /** Open the voice panel on first render (`/menu?voice=1`). */
   voiceOpen: boolean;
@@ -26,11 +26,11 @@ type MenuScreenProps = {
 /** The header's two actions open things lower down, so the state they share lives here. */
 export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vocab }: MenuScreenProps) {
   const router = useRouter();
-  const [items, setItems] = useState<MenuItem[]>(initialItems);
+  const [items, setItems] = useState<MenuRow[]>(initialItems);
   const [voiceExpanded, setVoiceExpanded] = useState(initialItems.length === 0 || voiceOpen);
   const [formOpen, setFormOpen] = useState(Boolean(prefillName));
   const [defaultName, setDefaultName] = useState(prefillName ?? "");
-  const [editing, setEditing] = useState<MenuItem | null>(null);
+  const [editing, setEditing] = useState<MenuRow | null>(null);
   const micRef = useRef<HTMLButtonElement>(null);
   const expandRef = useRef<HTMLButtonElement>(null);
 
@@ -48,7 +48,7 @@ export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vo
       try {
         const res = await fetch("/api/menu", { credentials: "include" });
         if (!res.ok) return;
-        const body = (await res.json()) as { data?: MenuItem[] };
+        const body = (await res.json()) as { data?: MenuRow[] };
         if (body.data) setItems(body.data);
       } catch {
         // Offline: the list catches up on the next page load.
@@ -64,7 +64,7 @@ export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vo
     setFormOpen(true);
   }
 
-  function openEdit(item: MenuItem) {
+  function openEdit(item: MenuRow) {
     setEditing(item);
     setFormOpen(true);
   }

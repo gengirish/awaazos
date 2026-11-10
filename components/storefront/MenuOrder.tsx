@@ -2,7 +2,7 @@
 
 import { CalendarClock, MapPin, ShoppingBag, Sparkles, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useCartHubEntry } from "@/components/storefront/CartHub";
 import { ItemPhoto } from "@/components/storefront/ItemPhoto";
@@ -29,9 +29,18 @@ import {
   maxOrderableQty,
   menuItemAnchor,
   orderErrorMessage,
+  restoreCartLines,
+  sameCartLines,
   toMenuOrderLines,
   type OrderApiError,
 } from "@/lib/storefront-order";
+import {
+  cartAfterStockRejection,
+  stockBadgeText,
+  withStockOverride,
+  type StorefrontStock,
+} from "@/lib/storefront-stock";
+import { cn } from "@/lib/utils";
 
 /**
  * "Order from menu" on the public storefront: the vendor's everyday menu with
@@ -39,7 +48,9 @@ import {
  * `VendorSettings.acceptMenuOrders` is on; otherwise the page keeps its
  * read-only menu rows.
  *
- * No stock, no cut-off: only items the server already filtered to
+ * No cut-off. Stock only for items the seller tracks (lib/inventory.ts):
+ * `stock` says "Sold out" / "Only N left" and caps the stepper, and an
+ * `out_of_stock` rejection cuts the cart down to what is left. Only items the server already filtered to
  * `isAvailable && showOnline` reach this component (so a restored cart drops
  * anything no longer offered online), and app/api/s/[slug]/menu-orders
  * re-checks both and re-reads every price. Only menuItemId + qty leave the
@@ -57,6 +68,8 @@ export type MenuOrderItem = {
   isPopular: boolean;
   /** One line under the name; null = none. */
   description?: string | null;
+  /** Product stock (lib/storefront-stock.ts); null / absent = not tracked. */
+  stock?: StorefrontStock | null;
 };
 
 export type MenuOrderCategory = {
@@ -136,13 +149,39 @@ export function MenuOrder(props: MenuOrderProps) {
     [categories, matchesSearch],
   );
 
-  // Saved per store; items no longer on the (available + online) menu are dropped on restore.
-  const max = maxOrderableQty(null, null);
+  // Stock learned from an out_of_stock rejection, until the refreshed props land.
+  const [stockOverride, setStockOverride] = useState<Record<string, number>>({});
+  useEffect(() => setStockOverride({}), [categories]);
+
+  function stockFor(item: MenuOrderItem): StorefrontStock | null {
+    return withStockOverride(item.stock ?? null, stockOverride[item.id]);
+  }
+  /** Stepper ceiling: the line cap, or less when stock is tracked. */
+  function maxFor(item: MenuOrderItem): number {
+    return maxOrderableQty(stockFor(item)?.maxQty ?? null, null);
+  }
+
+  // Saved per store; items no longer on the (available + online) menu are
+  // dropped on restore, and tracked items are cut down to the stock left.
   const { cart, setCart, clearCart } = usePersistedCart({
     storageKey: cartStorageKey(slug, { kind: "menu" }),
     accepting: true,
-    maxFor: (id) => (byId.has(id) ? max : null),
+    maxFor: (id) => {
+      const item = byId.get(id);
+      return item ? maxFor(item) : null;
+    },
   });
+
+  // A refresh can bring less stock (or a sold-out item) than the cart holds.
+  useEffect(() => {
+    setCart((c) => {
+      const next = restoreCartLines(c, (id) => {
+        const item = byId.get(id);
+        return item ? maxOrderableQty(item.stock?.maxQty ?? null, null) : null;
+      });
+      return sameCartLines(next, c) ? c : next;
+    });
+  }, [byId, setCart]);
 
   function setQty(itemId: string, qty: number) {
     setCart((c) => {
@@ -182,7 +221,13 @@ export function MenuOrder(props: MenuOrderProps) {
   function onRejected(err: OrderApiError): string {
     const item = err.menuItemId ? byId.get(err.menuItemId) : undefined;
     const message = orderErrorMessage(err, item?.name);
-    if (err.error === "item_not_found" && err.menuItemId) {
+    if (err.error === "out_of_stock" && err.menuItemId) {
+      const id = err.menuItemId;
+      const left = Math.max(0, err.remaining ?? 0);
+      setStockOverride((o) => ({ ...o, [id]: left }));
+      setCart((c) => cartAfterStockRejection(c, id, left));
+      router.refresh();
+    } else if (err.error === "item_not_found" && err.menuItemId) {
       const id = err.menuItemId;
       setCart((c) => {
         const next = { ...c };
@@ -211,10 +256,20 @@ export function MenuOrder(props: MenuOrderProps) {
     }
   }
 
-  // Price (sale-aware, lib/offers.ts), unit and the Popular badge: the same line in both layouts.
-  const priceLine = (item: MenuOrderItem) => (
+  // Price (sale-aware, lib/offers.ts), unit, stock and the Popular badge: the same line in both layouts.
+  const priceLine = (item: MenuOrderItem, stock: StorefrontStock | null) => (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
       <ItemPrice priceInPaise={item.priceInPaise} sale={salePriceFor(offers, item.id, item.priceInPaise)} unit={item.unit} />
+      {stockBadgeText(stock) ? (
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide",
+            stock?.soldOut ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary",
+          )}
+        >
+          {stockBadgeText(stock)}
+        </span>
+      ) : null}
       {item.isPopular ? (
         <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
           <Sparkles className="h-3 w-3" aria-hidden="true" />
@@ -276,14 +331,32 @@ export function MenuOrder(props: MenuOrderProps) {
                   : "divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs"
               }
             >
-              {items.map((item) =>
-                layout === "gallery" ? (
+              {items.map((item) => {
+                const stock = stockFor(item);
+                const soldOut = stock?.soldOut ?? false;
+                // Sold out: no stepper, like a sold-out pre-order item; the badge says why.
+                const stepper = soldOut ? null : (
+                  <QtyStepper
+                    itemName={item.name}
+                    qty={cart[item.id] ?? 0}
+                    max={maxFor(item)}
+                    onChange={(q) => setQty(item.id, q)}
+                  />
+                );
+                return layout === "gallery" ? (
                   <li
                     key={item.id}
                     id={menuItemAnchor(item.id)}
                     className="flex scroll-mt-20 flex-col gap-2 rounded-2xl border border-border/60 bg-background p-2.5 shadow-xs target:bg-primary/8"
                   >
-                    <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="tile" enlarge />
+                    <ItemPhoto
+                      src={item.imageUrl}
+                      emoji={item.emoji}
+                      name={item.name}
+                      size="tile"
+                      enlarge
+                      dimmed={soldOut}
+                    />
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">
                         {item.name}
@@ -291,14 +364,9 @@ export function MenuOrder(props: MenuOrderProps) {
                       {item.description ? (
                         <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
                       ) : null}
-                      {priceLine(item)}
+                      {priceLine(item, stock)}
                     </span>
-                    <QtyStepper
-                      itemName={item.name}
-                      qty={cart[item.id] ?? 0}
-                      max={max}
-                      onChange={(q) => setQty(item.id, q)}
-                    />
+                    {stepper}
                   </li>
                 ) : (
                   <li
@@ -306,7 +374,7 @@ export function MenuOrder(props: MenuOrderProps) {
                     id={menuItemAnchor(item.id)}
                     className="flex scroll-mt-20 items-center gap-3 px-3 py-3 target:bg-primary/8 sm:gap-4 sm:px-4"
                   >
-                    <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="row" />
+                    <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="row" dimmed={soldOut} />
 
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">
@@ -315,18 +383,13 @@ export function MenuOrder(props: MenuOrderProps) {
                       {item.description ? (
                         <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
                       ) : null}
-                      {priceLine(item)}
+                      {priceLine(item, stock)}
                     </span>
 
-                    <QtyStepper
-                      itemName={item.name}
-                      qty={cart[item.id] ?? 0}
-                      max={max}
-                      onChange={(q) => setQty(item.id, q)}
-                    />
+                    {stepper}
                   </li>
-                ),
-              )}
+                );
+              })}
             </ul>
           </section>
         ))}
@@ -366,7 +429,7 @@ export function MenuOrder(props: MenuOrderProps) {
           name: l.item.name,
           priceInPaise: l.item.priceInPaise,
           qty: l.qty,
-          max,
+          max: maxFor(l.item),
         }))}
         onChangeQty={setQty}
         discount={appliedOffer}

@@ -728,6 +728,19 @@ them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireAc
   (the cart's discount row does).
 - Test store data: `npm run seed:quiche-plans -- <slug>` (dry run; `--create` writes).
 
+### Inventory (stock per product)
+
+Opt-in per item: `MenuItem.stockQty` null = not tracked (kitchens see nothing new). Rules in the header of
+`lib/inventory.ts` (pure), database side in `lib/inventory-server.ts`. **Stock left is derived, never
+decremented**: the seller records a count (`stockQty` at `stockCountedAt`, via `recordStockCount` only) and
+left = count minus units in stock-taking `OrderItem`s created after it: every counter sale, and storefront
+orders that `stockHoldingOrderWhere` holds (so lapsed holds, cancels and POS undo give stock back with no
+write and no timer); samples never count. Online orders lock the tracked `MenuItem` rows (`FOR UPDATE`, id
+order, after the drop row) and refuse a shortfall (`out_of_stock` for menu orders, `sold_out` for drops,
+whose cap becomes the smaller of `maxQty` and stock left). The counter never refuses a sale over stock, so
+left can go negative ("Oversold by N"). Buyers see "Sold out" and "Only N left" (at or below `lowStockAt`,
+else 3), never the count above it. Sizes and colours (variants) are not built yet.
+
 ### Customer feedback
 
 Rules in the header of `lib/order-feedback.ts` (pure), database side in `lib/order-feedback-server.ts`.

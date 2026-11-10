@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { loadMenuCreateContext, prepareMenuItemCreate } from "@/lib/menu-create";
+import { menuStockFieldsSchema, splitStockFields } from "@/lib/menu-stock";
+import { withStockLeft } from "@/lib/menu-stock-server";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { menuItemCreateSchema } from "@/lib/zod-menu";
@@ -28,7 +30,8 @@ export async function GET(req: NextRequest) {
       where: { vendorId: ctx.vendor.id },
       orderBy: { sortOrder: "asc" },
     });
-    const res = NextResponse.json({ data: items });
+    // `stockLeft` is derived (lib/inventory.ts rule 2); null on untracked rows.
+    const res = NextResponse.json({ data: await withStockLeft(prisma, ctx.vendor.id, items) });
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {
     if (err instanceof AuthError) {
@@ -42,14 +45,17 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
-    const body = menuItemCreateSchema.parse(await req.json());
+    const { stock, rest } = splitStockFields(await req.json());
+    const body = menuItemCreateSchema.parse(rest);
+    const stockFields = menuStockFieldsSchema.parse(stock);
 
     const menuCtx = await loadMenuCreateContext(prisma, ctx.vendor.id);
     const created = await prisma.menuItem.create({
-      data: prepareMenuItemCreate(menuCtx, ctx.vendor.id, body),
+      data: prepareMenuItemCreate(menuCtx, ctx.vendor.id, { ...body, ...stockFields }),
     });
 
-    const res = NextResponse.json({ data: created }, { status: 201 });
+    // A new row has no orders yet: what was counted is what is left.
+    const res = NextResponse.json({ data: { ...created, stockLeft: created.stockQty } }, { status: 201 });
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {
     if (err instanceof AuthError) {

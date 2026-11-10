@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { rupeesToPaise } from "@/lib/currency";
+import { recordStockCount, stockLeftByMenuItem } from "@/lib/inventory-server";
+import { hasStockFields, menuStockFieldsSchema, splitStockFields } from "@/lib/menu-stock";
 import { deduplicateSlug, generateSlug } from "@/lib/menu-suggestions";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
@@ -27,7 +29,11 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   const params = await props.params;
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
-    const body = menuItemUpdateSchema.parse(await req.json());
+    // Stock keys have their own schema (lib/menu-stock.ts); a body may carry only them.
+    const { stock, rest } = splitStockFields(await req.json());
+    const stockFields = menuStockFieldsSchema.parse(stock);
+    const stockOnly = hasStockFields(stockFields) && Object.keys(rest as object).length === 0;
+    const body = stockOnly ? {} : menuItemUpdateSchema.parse(rest);
 
     const data: Record<string, unknown> = {};
     if (body.name !== undefined) {
@@ -63,11 +69,23 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     // `null` clears the photo. The blob itself is removed by
     // DELETE /api/menu/[id]/image, which is the path the UI uses.
     if (body.imageUrl !== undefined) data.imageUrl = body.imageUrl;
+    if (stockFields.lowStockAt !== undefined) data.lowStockAt = stockFields.lowStockAt;
 
     try {
-      const updated = await prisma.menuItem.update({
-        where: { id: params.id, vendorId: ctx.vendor.id },
-        data: data as Prisma.MenuItemUpdateInput,
+      const vendorId = ctx.vendor.id;
+      const updated = await prisma.$transaction(async (tx) => {
+        // Also the tenant check: P2025 for another vendor's id, before any count is written.
+        let row = await tx.menuItem.update({
+          where: { id: params.id, vendorId },
+          data: data as Prisma.MenuItemUpdateInput,
+        });
+        if (stockFields.stockQty !== undefined) {
+          // A new count (or null = stop tracking) moves stockCountedAt (lib/inventory.ts rule 2).
+          await recordStockCount(tx, vendorId, row.id, stockFields.stockQty);
+          row = await tx.menuItem.findUniqueOrThrow({ where: { id: row.id, vendorId } });
+        }
+        const left = await stockLeftByMenuItem(tx, vendorId, [row]);
+        return { ...row, stockLeft: left.get(row.id) ?? null };
       });
       const res = NextResponse.json({ data: updated });
       return withVendorCookie(res, ctx.setVendorCookie);

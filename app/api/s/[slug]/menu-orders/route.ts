@@ -26,6 +26,9 @@ export const runtime = "nodejs";
  *     alert, and when). No contact PII is loaded;
  *   - prices are never taken from the client — placeMenuOrder re-reads every
  *     line from available MenuItem rows of this vendor.
+ *   - a product whose stock the seller tracks (lib/inventory.ts) with fewer
+ *     left than a line asks for → 409 `out_of_stock` { menuItemId, remaining },
+ *     the same shape as a drop's `sold_out`.
  *
  * PII: the body carries buyer name, phone, address and notes. None of them may
  * appear in a log line — log vendorId and error codes only.

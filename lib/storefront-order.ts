@@ -502,7 +502,7 @@ export function checkoutErrorsFromIssues(issues: unknown): CheckoutFieldErrors |
 export type OrderApiError = {
   error: string;
   dropItemId?: string;
-  /** Set on menu-order (no drop) `item_not_found` rejections. */
+  /** Set on menu-order (no drop) `item_not_found` and `out_of_stock` rejections. */
   menuItemId?: string;
   remaining?: number;
   limit?: number;
@@ -517,6 +517,7 @@ export function orderErrorMessage(err: OrderApiError, itemName?: string): string
   const name = itemName ?? "One item";
   switch (err.error) {
     case "sold_out":
+    case "out_of_stock":
       return err.remaining && err.remaining > 0
         ? `${name}: only ${err.remaining} left now. We've updated your cart — please check and try again.`
         : `${name} just sold out. We've removed it from your cart.`;

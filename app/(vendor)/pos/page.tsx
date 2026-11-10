@@ -7,6 +7,7 @@ import { PosShell } from "@/components/pos/PosShell";
 import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
 import { getIstTodayStart } from "@/lib/billing-period";
 import { PLAN_LIMITS } from "@/lib/constants";
+import { withStockLeft } from "@/lib/menu-stock-server";
 import { loadResolvedOffers } from "@/lib/offers-server";
 import { prisma } from "@/lib/prisma";
 import type { BillingAccess } from "@/lib/plan";
@@ -77,8 +78,11 @@ export default async function PosPage() {
         isPopular: true,
         category: true,
         aliases: true,
+        stockQty: true,
+        stockCountedAt: true,
+        lowStockAt: true,
       },
-    }),
+    }).then((rows) => withStockLeft(prisma, vendorId, rows)),
     prisma.vendor.findUnique({
       where: { id: vendorId },
       include: { settings: true },
@@ -118,6 +122,9 @@ export default async function PosPage() {
     isPopular: it.isPopular,
     category: it.category,
     aliases: it.aliases,
+    // A label only: the counter never refuses a sale over stock (lib/inventory.ts rule 5).
+    stockLeft: it.stockLeft,
+    lowStockAt: it.lowStockAt,
   }));
 
   return (

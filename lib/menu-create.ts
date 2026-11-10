@@ -39,6 +39,10 @@ export type MenuItemCreateFields = {
   unit?: string | null;
   /** One line for buyers, already normalised (lib/zod-menu.ts); null or absent = none. */
   description?: string | null;
+  /** Units on hand (lib/inventory.ts); null or absent = stock not tracked. */
+  stockQty?: number | null;
+  /** "Low stock" from this many left; null or absent = no warning. */
+  lowStockAt?: number | null;
 };
 
 /** Every slug the vendor uses, and the sortOrder after the current last item. */
@@ -63,7 +67,9 @@ export function prepareMenuItemCreate(
   ctx: MenuCreateContext,
   vendorId: string,
   input: MenuItemCreateFields,
+  now: Date = new Date(),
 ): Prisma.MenuItemUncheckedCreateInput {
+  const stockQty = input.stockQty ?? null;
   const slug = deduplicateSlug(generateSlug(input.name), ctx.slugs);
   ctx.slugs.add(slug);
   const sortOrder = ctx.nextSortOrder;
@@ -83,6 +89,10 @@ export function prepareMenuItemCreate(
     showOnline: input.showOnline,
     unit: input.unit ?? null,
     description: input.description ?? null,
+    // A count is taken now, so every order from here on comes out of it.
+    stockQty,
+    stockCountedAt: stockQty === null ? null : now,
+    lowStockAt: input.lowStockAt ?? null,
     sortOrder,
   };
 }

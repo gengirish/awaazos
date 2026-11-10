@@ -1,7 +1,7 @@
-import type { MenuItem } from "@prisma/client";
 import { redirect } from "next/navigation";
 
 import { MenuScreen } from "@/components/menu/MenuScreen";
+import { withStockLeft } from "@/lib/menu-stock-server";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
@@ -28,11 +28,14 @@ export default async function MenuPage(props: {
     throw e;
   }
 
-  const [items, settings]: [MenuItem[], { voiceLang: string } | null] = await Promise.all([
-    prisma.menuItem.findMany({
-      where: { vendorId },
-      orderBy: { sortOrder: "asc" },
-    }),
+  const [items, settings] = await Promise.all([
+    prisma.menuItem
+      .findMany({
+        where: { vendorId },
+        orderBy: { sortOrder: "asc" },
+      })
+      // Stock left is derived (lib/inventory.ts); no query when nothing is tracked.
+      .then((rows) => withStockLeft(prisma, vendorId, rows)),
     prisma.vendorSettings.findUnique({ where: { vendorId }, select: { voiceLang: true } }),
   ]);
 

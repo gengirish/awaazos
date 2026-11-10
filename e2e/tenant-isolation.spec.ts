@@ -59,6 +59,25 @@ test.describe("tenant isolation", () => {
     expect(stillThere?.isAvailable).toBe(true);
   });
 
+  test("vendor B cannot count or move vendor A's stock (404, not 403)", async () => {
+    const itemA = await createMenuItem(pageA, { name: "A Stock Tee", priceInRupees: 499 });
+    const tracked = await pageA.request.post(`/api/menu/${itemA.id}/stock`, { data: { set: 8 } });
+    expect(tracked.status()).toBe(200);
+
+    for (const data of [{ set: 0 }, { adjust: -5 }]) {
+      const res = await pageB.request.post(`/api/menu/${itemA.id}/stock`, { data });
+      expect(res.status(), `cross-tenant stock ${JSON.stringify(data)} must 404, never 403`).toBe(404);
+    }
+    const patch = await pageB.request.patch(`/api/menu/${itemA.id}`, { data: { stockQty: 0 } });
+    expect(patch.status(), "cross-tenant stock PATCH must 404").toBe(404);
+
+    const listA = await pageA.request.get("/api/menu");
+    type StockRow = MenuItemRow & { stockQty: number | null; stockLeft: number | null };
+    const rowA = ((await listA.json()) as { data: StockRow[] }).data.find((i) => i.id === itemA.id);
+    expect(rowA?.stockQty).toBe(8);
+    expect(rowA?.stockLeft).toBe(8);
+  });
+
   test("vendor B's menu listing never contains vendor A's items", async () => {
     const itemA = await createMenuItem(pageA, { name: "A Only Chai", priceInRupees: 10 });
     await createMenuItem(pageB, { name: "B Only Coffee", priceInRupees: 20 });
