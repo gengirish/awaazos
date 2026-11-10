@@ -233,10 +233,12 @@ describe("applyStorefrontOrderAction", () => {
 
   it("deliver on unpaid cash marks it paid in the same transaction", async () => {
     const { tx, asTx } = fakeTx(placedCash);
-    await applyStorefrontOrderAction(asTx, { scope: scopeMenu, action: "deliver", dropStatus: null });
+    const now = new Date("2026-11-10T10:00:00Z");
+    await applyStorefrontOrderAction(asTx, { scope: scopeMenu, action: "deliver", dropStatus: null, now });
+    // deliveredAt: when it left the shelf (lib/inventory.ts rule 2b).
     expect(tx.transaction.updateMany).toHaveBeenCalledWith({
       where: { ...scopeMenu, fulfilmentStatus: { in: ["PLACED", "CONFIRMED"] } },
-      data: { fulfilmentStatus: "DELIVERED" },
+      data: { fulfilmentStatus: "DELIVERED", deliveredAt: now },
     });
     expect(markOrderPaid).toHaveBeenCalledTimes(1);
   });
@@ -258,7 +260,7 @@ describe("applyStorefrontOrderAction", () => {
     await applyStorefrontOrderAction(asTx, { scope: scopeDrop, action: "undeliver", dropStatus: "OPEN" });
     expect(tx.transaction.updateMany).toHaveBeenCalledWith({
       where: { ...scopeDrop, fulfilmentStatus: "DELIVERED" },
-      data: { fulfilmentStatus: "CONFIRMED" },
+      data: { fulfilmentStatus: "CONFIRMED", deliveredAt: null },
     });
     expect(markOrderPaid).not.toHaveBeenCalled();
   });

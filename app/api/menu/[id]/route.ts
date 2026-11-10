@@ -3,8 +3,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { rupeesToPaise } from "@/lib/currency";
-import { recordStockCount, stockLeftByMenuItem } from "@/lib/inventory-server";
+import { recordStockCount } from "@/lib/inventory-server";
 import { hasStockFields, menuStockFieldsSchema, splitStockFields } from "@/lib/menu-stock";
+import { withStockLeft } from "@/lib/menu-stock-server";
 import { deduplicateSlug, generateSlug } from "@/lib/menu-suggestions";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
@@ -84,8 +85,8 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
           await recordStockCount(tx, vendorId, row.id, stockFields.stockQty);
           row = await tx.menuItem.findUniqueOrThrow({ where: { id: row.id, vendorId } });
         }
-        const left = await stockLeftByMenuItem(tx, vendorId, [row]);
-        return { ...row, stockLeft: left.get(row.id) ?? null };
+        const [withStock] = await withStockLeft(tx, vendorId, [row]);
+        return withStock;
       });
       const res = NextResponse.json({ data: updated });
       return withVendorCookie(res, ctx.setVendorCookie);

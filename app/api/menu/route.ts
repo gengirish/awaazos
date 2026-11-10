@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     });
 
     // A new row has no orders yet: what was counted is what is left.
-    const res = NextResponse.json({ data: { ...created, stockLeft: created.stockQty } }, { status: 201 });
+    const res = NextResponse.json({ data: { ...created, stockLeft: created.stockQty, stockSetAside: created.stockQty === null ? null : 0 } }, { status: 201 });
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {
     if (err instanceof AuthError) {

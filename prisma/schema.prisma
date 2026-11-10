@@ -457,6 +457,9 @@ model Transaction {
   riderToken       String?           @unique
   // The buyer tapped "I've received my order" on their order page.
   buyerReceivedAt  DateTime?
+  // When the order was marked DELIVERED (cleared by undeliver). Inventory counts use it:
+  // an order handed over after a stock count left the shelf the count included (lib/inventory.ts).
+  deliveredAt      DateTime?
   customerId       String?
   customer         Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   cancelledAt      DateTime?

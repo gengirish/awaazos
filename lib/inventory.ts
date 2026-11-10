@@ -12,6 +12,17 @@
  *      stock-holding OrderItems created after it. Same idea as drops
  *      (lib/drops.ts rule 3), so a lapsed UPI hold, a cancel or a POS undo gives
  *      stock back with no extra write, and nothing runs on a timer.
+ *      a. Only "Set count" (and switching tracking on) moves `stockCountedAt`.
+ *         −1 / +1 / "received" change `stockQty` by the difference and leave
+ *         the time alone; re-basing there would freeze every open order as
+ *         sold, so a hold that later lapses or a cancel would lose its stock.
+ *      b. A count is what is on the shelf, including pieces set aside for
+ *         storefront orders not handed over yet. So left also subtracts the
+ *         orders placed by the count that still hold stock and were not
+ *         DELIVERED by then (`Transaction.deliveredAt`). One handed over after
+ *         the count keeps counting (it left a shelf the count included); one
+ *         that lapses or is cancelled stops (its piece is free again). Counter
+ *         sales leave with the buyer, so a count never includes them.
  *   3. What holds stock: storefront orders that `stockHoldingOrderWhere` says
  *      hold (paid, pay on delivery, claimed, confirmed, or unpaid < 15 min), and
  *      every counter sale (source ≠ STOREFRONT). Gift lines count (they leave

@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { MAX_STOCK_QTY } from "@/lib/inventory";
 import { prepareMenuItemCreate } from "@/lib/menu-create";
 import {
+  adjustDelta,
   adjustedCount,
   hasStockFields,
   menuStockFieldsSchema,
@@ -70,10 +71,27 @@ describe("adjustedCount", () => {
     expect(adjustedCount(4, -1)).toBe(3);
   });
 
-  it("starts from what is left when oversold, and never records below 0 or above the cap", () => {
+  it("starts from what is left when oversold, and never goes below 0 or above the cap", () => {
     expect(adjustedCount(-2, 5)).toBe(3);
+    expect(adjustedCount(-2, 1)).toBe(-1);
+    expect(adjustedCount(-2, -1)).toBe(-2);
     expect(adjustedCount(0, -1)).toBe(0);
+    expect(adjustedCount(1, -3)).toBe(0);
     expect(adjustedCount(MAX_STOCK_QTY, 1)).toBe(MAX_STOCK_QTY);
+  });
+});
+
+describe("adjustDelta", () => {
+  it("is the change to the count, so left lands on adjustedCount", () => {
+    expect(adjustDelta(4, 5)).toBe(5);
+    expect(adjustDelta(4, -1)).toBe(-1);
+  });
+
+  it("never lifts an oversold item on a decrease, and stops at 0 going down", () => {
+    expect(adjustDelta(-2, 5)).toBe(5);
+    expect(adjustDelta(-2, -1)).toBe(0);
+    expect(adjustDelta(0, -1)).toBe(0);
+    expect(adjustDelta(1, -3)).toBe(-1);
   });
 });
 
