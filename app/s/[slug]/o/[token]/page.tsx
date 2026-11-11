@@ -7,9 +7,11 @@ import {
   CircleDot,
   Clock,
   MapPin,
+  Megaphone,
   MessageCircle,
   QrCode,
   ShoppingBag,
+  UsersRound,
   XCircle,
 } from "lucide-react";
 import Link from "next/link";
@@ -54,6 +56,7 @@ import { appBaseUrl, isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/
 import { qrPngDataUrl, qrSvgDataUrl } from "@/lib/qr";
 import { buildUpiDeepLink } from "@/lib/upi";
 import { cn } from "@/lib/utils";
+import { whatsappCommunityLabel, whatsappCommunityLink } from "@/lib/whatsapp-community";
 import { storeThemeAttribute } from "@/lib/store-theme";
 
 export const dynamic = "force-dynamic";
@@ -174,6 +177,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
               theme: true,
               whatsappNumber: true,
               acceptWhatsappOrders: true,
+              whatsappCommunityUrl: true,
               fssaiNumber: true,
               menuPickupNote: true,
               ...RAZORPAY_CRED_SELECT,
@@ -367,6 +371,7 @@ export default async function StorefrontOrderPage(props: {
     ? formatWindowWithDay(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt, now)
     : orderSlotLabel(order.fulfilAt, order.fulfilUntil, now);
   const waNumber = buyerWhatsappNumber(vendor.settings);
+  const community = whatsappCommunityLink(vendor.settings?.whatsappCommunityUrl);
   const waLink = waNumber
     ? whatsappChatLink(
         waNumber,
@@ -796,6 +801,36 @@ export default async function StorefrontOrderPage(props: {
           createdAt={order.createdAt.toISOString()}
           vendorName={vendor.name}
         />
+
+        {/* The seller's own group or channel (lib/whatsapp-community.ts): the buyer joins it themselves. */}
+        {community ? (
+          <section
+            aria-labelledby="community-heading"
+            className="space-y-3 rounded-2xl border border-border bg-background p-4 text-center sm:p-6"
+          >
+            <h2 id="community-heading" className="font-display text-lg font-bold text-awaaz-charcoal">
+              Hear about {vendor.name}&apos;s next orders
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              {community.kind === "group"
+                ? "Join their WhatsApp group for updates and offers."
+                : "Follow their WhatsApp channel for updates and offers."}
+            </p>
+            <a
+              href={community.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(WA_BUTTON, "w-full")}
+            >
+              {community.kind === "group" ? (
+                <UsersRound className="h-5 w-5" aria-hidden="true" />
+              ) : (
+                <Megaphone className="h-5 w-5" aria-hidden="true" />
+              )}
+              {whatsappCommunityLabel(community.kind)}
+            </a>
+          </section>
+        ) : null}
 
         {/* After an order is the moment a buyer wants the store one tap away (lib/store-app.ts). */}
         {vendor.isDemo ? null : <StoreInstall slug={vendor.slug} storeName={vendor.name} />}

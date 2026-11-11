@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { CommunitiesClient } from "@/components/settings/CommunitiesClient";
 import { FssaiNumberClient } from "@/components/settings/FssaiNumberClient";
 import { InstagramHandleClient } from "@/components/settings/InstagramHandleClient";
+import { WhatsappCommunityClient } from "@/components/settings/WhatsappCommunityClient";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { StoreDetailsClient } from "@/components/settings/StoreDetailsClient";
 import { StoreHandleClient } from "@/components/settings/StoreHandleClient";
@@ -31,6 +32,7 @@ export default async function StoreSettingsPage() {
         publishStorefront: true,
         fssaiNumber: true,
         instagramHandle: true,
+        whatsappCommunityUrl: true,
         theme: true,
         tagline: true,
         ...RAZORPAY_CRED_SELECT,
@@ -117,6 +119,12 @@ export default async function StoreSettingsPage() {
         ) : null}
         <SettingsCard title="Instagram" description="Shown on your store page as a link to your profile.">
           <InstagramHandleClient initialHandle={settings?.instagramHandle ?? null} isOwner={isOwner} />
+        </SettingsCard>
+        <SettingsCard
+          title="WhatsApp group or channel"
+          description="Shown on your store page and on every order page, so customers can join for your updates."
+        >
+          <WhatsappCommunityClient initialUrl={settings?.whatsappCommunityUrl ?? null} isOwner={isOwner} />
         </SettingsCard>
         {/* Many non-food products (supplements, herbal teas) need an FSSAI licence too, so every store keeps the field. */}
         <SettingsCard

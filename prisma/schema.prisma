@@ -102,6 +102,7 @@ model VendorSettings {
   // Opt-in: every visitor of /s/<slug> sees a WhatsApp chat link to whatsappNumber.
   showWhatsappOnStore      Boolean        @default(false)
   instagramHandle          String? // bare, lower-case (lib/instagram.ts); linked on the storefront
+  whatsappCommunityUrl     String? // seller's own group invite / channel link, canonical (lib/whatsapp-community.ts); on store + order pages
   tagline                  String?        @db.VarChar(120) // One line under the store name on /s/[slug] (lib/store-tagline.ts)
   voiceLang                String         @default("en-IN") // hi-IN, te-IN, kn-IN, ta-IN
   receiptFooter            String? // "Thanks for visiting!"
