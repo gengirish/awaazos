@@ -19,7 +19,7 @@ import { ItemPrice } from "@/components/storefront/ItemPrice";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
 import type { DeliveryArea } from "@/lib/delivery-areas";
-import { applyOffers, salePriceFor, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
+import { applyOffers, offerSetAsideText, salePriceFor, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
 import { itemSearchText } from "@/lib/store-search";
 import {
   cartStorageKey,
@@ -197,7 +197,7 @@ export function DropOrder(props: DropOrderProps) {
     itemCount,
     subtotalPaise: payablePaise,
     canPay,
-    note: offerCartNoteText(appliedOffer?.name ?? null, offered.nudge, offered.gift),
+    note: offerCartNoteText(offered),
     onCheckout: () => setOpen(true),
     enabled: orderable,
   });
@@ -317,12 +317,7 @@ export function DropOrder(props: DropOrderProps) {
       {orderable && !canPay ? <NoPaymentNotice /> : null}
 
       {orderable ? (
-        <OfferCartNote
-          appliedName={appliedOffer?.name ?? null}
-          nudge={offered.nudge}
-          gift={offered.gift}
-          inCartBar={inHub}
-        />
+        <OfferCartNote offered={offered} inCartBar={inHub} />
       ) : null}
 
       {orderable && !inHub ? (
@@ -355,6 +350,7 @@ export function DropOrder(props: DropOrderProps) {
         onChangeQty={setQty}
         discount={appliedOffer}
         gift={offered.gift}
+        setAsideNote={offerSetAsideText(offered)}
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
         deliveryAreas={deliveryAreas}

@@ -204,14 +204,6 @@ export function toMenuOrderLines(cart: Record<string, number>): { menuItemId: st
   return out;
 }
 
-/** "Delivery or pickup" / "Delivery only" / "Pickup only" for a fulfilment option list. */
-export function fulfilmentOptionsLabel(types: readonly ("DELIVERY" | "PICKUP")[]): string {
-  const delivery = types.includes("DELIVERY");
-  const pickup = types.includes("PICKUP");
-  if (delivery && pickup) return "Delivery or pickup";
-  return delivery ? "Delivery only" : "Pickup only";
-}
-
 // ─── Cart persistence (device-local) ────────────────────────────────
 
 /** A saved cart older than this is discarded on restore. */

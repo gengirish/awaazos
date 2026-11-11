@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, Clock, Gift, Loader2, MapPin, Minus, Plus, ShieldCheck, ShoppingBag, Smartphone } from "lucide-react";
+import { AlertCircle, Clock, Gift, Loader2, MapPin, Minus, Plus, ShieldCheck, ShoppingBag, Smartphone, Tag } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 
@@ -387,6 +387,8 @@ export type CheckoutSheetProps = {
   discount?: { name: string; discountPaise: number } | null;
   /** A free item the cart earns (lib/offers.ts). Shown as a ₹0 line; the server adds it. */
   gift?: { name: string; qty: number } | null;
+  /** Why the line prices are above the sale prices on the cards (`offerSetAsideText`), or null. */
+  setAsideNote?: string | null;
   fulfilmentTypes: FulfilmentType[];
   deliveryFeePaise: number;
   /** Where to collect, as the vendor wrote it. Never invented when absent. */
@@ -452,6 +454,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
     onChangeQty,
     discount,
     gift,
+    setAsideNote,
     fulfilmentTypes,
     deliveryFeePaise,
     pickupNote,
@@ -891,6 +894,13 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                     <dd className="font-mono tabular-nums">{formatINR(totalPaise)}</dd>
                   </div>
                 </dl>
+              ) : null}
+              {/* A plan beat the sale prices the cards showed: say why the line prices went back up. */}
+              {setAsideNote && lines.length > 0 ? (
+                <p className="mt-3 flex items-start gap-2 rounded-xl bg-primary/10 px-3 py-2 text-sm text-foreground">
+                  <Tag className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  <span>{setAsideNote}</span>
+                </p>
               ) : null}
             </CheckoutCard>
 

@@ -25,6 +25,8 @@
  *      either its sale prices or the one plan with the largest discount,
  *      whichever saves more; a tie keeps the sale prices the buyer was shown.
  *      Between plans, ties go to the higher `minQty`, then to the older offer.
+ *      When a plan replaces sale prices the cards showed, `setAsideSales` says
+ *      which, so the cart can explain why its line prices went back up.
  *   2. **Only eligible lines are discounted.** A cart that mixes quiches with a
  *      Bhel Puri gets the percentage off the quiches alone. Delivery fees are
  *      never discounted.
@@ -54,6 +56,8 @@
  * prices, "cheapest one free", a buyer choosing the gift, stacking a plan on
  * sales, recurring subscriptions.
  */
+
+import { formatINR } from "@/lib/currency";
 
 export type OfferChannel = "MENU" | "DROP" | "POS";
 
@@ -179,6 +183,11 @@ export type OffersResult = {
   nudge: OfferNudge | null;
   /** The free item this order gets, or null. Not part of any total. */
   gift: OfferGift | null;
+  /**
+   * The sales a winning plan replaced (combined name, what they would have
+   * taken off), or null. Display only: the buyer saw these prices on the cards.
+   */
+  setAsideSales: AppliedDiscount | null;
 };
 
 export const OFFER_NAME_MAX = 60;
@@ -608,6 +617,15 @@ export function applyOffers(lines: readonly OfferLine[], offers: readonly Resolv
       gift ? gift.valuePaise : discountTotalPaise,
     ),
     gift,
+    setAsideSales:
+      plan !== null && sales.discountPaise > 0
+        ? {
+            offerId: sales.used[0]!.offerId,
+            name: combinedSaleName(sales.used),
+            percentBps: Math.max(...sales.used.map((d) => d.percentBps)),
+            discountPaise: sales.discountPaise,
+          }
+        : null,
   };
 }
 
@@ -688,6 +706,24 @@ export function offerRuleSummary(o: OfferRuleSummaryInput, giftName: string | nu
 /** The cart's line for a gift it has earned: "Festive gift: free Evil Eye Bracelet added." */
 export function offerGiftText(g: OfferGift): string {
   return `${g.offerName}: ${freeItemPhrase(g)} added.`;
+}
+
+/**
+ * Why the cart's prices are above the sale prices on the cards: "Free Bhel
+ * (worth ₹80.00) instead of Diwali sale (₹43.75 off): offers don't combine." A
+ * percentage plan reads "Weekly Plan (₹120.00 off) instead of …". null when no sale was set aside.
+ */
+export function offerSetAsideText(r: Pick<OffersResult, "gift" | "applied" | "setAsideSales">): string | null {
+  const sale = r.setAsideSales;
+  if (!sale) return null;
+  const gift = r.gift ? freeItemPhrase(r.gift) : null;
+  const winner = gift
+    ? `${gift.charAt(0).toUpperCase()}${gift.slice(1)} (worth ${formatINR(r.gift!.valuePaise)})`
+    : r.applied
+      ? `${r.applied.name} (${formatINR(r.applied.discountPaise)} off)`
+      : null;
+  if (!winner) return null;
+  return `${winner} instead of ${sale.name} (${formatINR(sale.discountPaise)} off): offers don't combine.`;
 }
 
 // ─── Overlapping plans (seller-side warning) ────────────────────────
