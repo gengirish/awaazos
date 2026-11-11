@@ -101,6 +101,10 @@ cookie banner, `next/link`).
 - **Do not lazy-load what the POS needs to take a payment** (`UpiQRModal`, `ReceiptModal`,
   `lib/qr.ts`). The service worker caches the chunks referenced by the `/pos` HTML; a chunk that is
   only fetched when a modal opens is not there when the counter is offline.
+- **`/menu` fetches the item form on the first Add / Edit** (`next/dynamic` in
+  `components/menu/MenuScreen.tsx`; react-hook-form, its zod resolver and the photo upload):
+  303.6 → 281.6 kB (2026-11-11). Don't import from `MenuItemForm.tsx` elsewhere on the page, or it
+  comes back in the first load; shared bits live in `lib/` (the emoji grids: `lib/menu-emoji.ts`).
 - **The cookie banner is server-rendered.** It must stay in the first HTML: rendering it after
   hydration made it the LCP element at ~4.5 s. Returning visitors are handled by the inline script
   in `lib/cookie-pref.ts` + the `html[data-cookie-pref]` rule in `app/globals.css`.

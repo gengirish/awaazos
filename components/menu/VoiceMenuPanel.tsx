@@ -4,12 +4,12 @@ import { AlertCircle, CheckCircle2, HelpCircle, Loader2, Mic, Plus, RotateCcw, S
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type RefObject } from "react";
 
-import { defaultEmoji, emojiChoices } from "@/components/menu/MenuItemForm";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useOnline } from "@/hooks/useOnline";
 import { useVoiceDictation, type DictationError } from "@/hooks/useVoiceDictation";
 import { formatINRCompact } from "@/lib/currency";
+import { defaultEmoji, emojiChoices } from "@/lib/menu-emoji";
 import { MENU_CHANGED_EVENT } from "@/lib/menu-events";
 import { MENU_UNIT_MAX } from "@/lib/menu-unit";
 import {

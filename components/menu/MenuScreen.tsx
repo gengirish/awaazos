@@ -1,16 +1,22 @@
 "use client";
 
 import { Mic, Plus } from "lucide-react";
+import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { MenuGrid } from "@/components/menu/MenuGrid";
-import { MenuItemForm } from "@/components/menu/MenuItemForm";
 import { VoiceMenuPanel } from "@/components/menu/VoiceMenuPanel";
 import { Button } from "@/components/ui/button";
 import { MENU_CHANGED_EVENT } from "@/lib/menu-events";
 import type { MenuRow } from "@/lib/menu-stock";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
+
+// The item form (react-hook-form, zod, photo upload) is fetched on the first
+// "Add item" / "Edit", not with the page: /menu sits at its bundle budget.
+const MenuItemForm = dynamic(() => import("@/components/menu/MenuItemForm").then((m) => m.MenuItemForm), {
+  ssr: false,
+});
 
 type MenuScreenProps = {
   initialItems: MenuRow[];
@@ -29,6 +35,8 @@ export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vo
   const [items, setItems] = useState<MenuRow[]>(initialItems);
   const [voiceExpanded, setVoiceExpanded] = useState(initialItems.length === 0 || voiceOpen);
   const [formOpen, setFormOpen] = useState(Boolean(prefillName));
+  // Mounted from the first open on, so closing still plays the dialog's exit.
+  const [formMounted, setFormMounted] = useState(Boolean(prefillName));
   const [defaultName, setDefaultName] = useState(prefillName ?? "");
   const [editing, setEditing] = useState<MenuRow | null>(null);
   const micRef = useRef<HTMLButtonElement>(null);
@@ -61,11 +69,13 @@ export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vo
   function openCreate() {
     setDefaultName("");
     setEditing(null);
+    setFormMounted(true);
     setFormOpen(true);
   }
 
   function openEdit(item: MenuRow) {
     setEditing(item);
+    setFormMounted(true);
     setFormOpen(true);
   }
 
@@ -125,15 +135,17 @@ export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vo
           onEdit={openEdit}
           vocab={vocab}
         />
-        <MenuItemForm
-          open={formOpen}
-          onOpenChange={setFormOpen}
-          item={editing}
-          onSaved={() => router.refresh()}
-          defaultName={defaultName}
-          categories={categories}
-          vocab={vocab}
-        />
+        {formMounted ? (
+          <MenuItemForm
+            open={formOpen}
+            onOpenChange={setFormOpen}
+            item={editing}
+            onSaved={() => router.refresh()}
+            defaultName={defaultName}
+            categories={categories}
+            vocab={vocab}
+          />
+        ) : null}
       </main>
     </>
   );
