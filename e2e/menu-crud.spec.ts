@@ -72,6 +72,30 @@ test.describe("menu CRUD", () => {
     await expect(page.getByText("Masala Chai").first()).toBeVisible();
   });
 
+  // The item form loads on first open (components/menu/MenuScreen.tsx), so check
+  // the paths that mount it: the ?add= link, Edit, and reopening after a close.
+  test("item form opens pre-filled from ?add= and from Edit, and reopens", async ({ page, request }) => {
+    await createVendorSession(page, request, "menu-form");
+    await createMenuItem(page, { name: "Masala Chai", priceInRupees: 12 });
+
+    await page.goto("/menu?add=Ragi%20Laddu");
+    const dialog = page.getByRole("dialog");
+    await expect(dialog.getByRole("heading", { name: /^Add / })).toBeVisible();
+    await expect(dialog.getByLabel("Name")).toHaveValue("Ragi Laddu");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Edit Masala Chai" }).click();
+    await expect(dialog.getByRole("heading", { name: "Edit item" })).toBeVisible();
+    await expect(dialog.getByLabel("Name")).toHaveValue("Masala Chai");
+    await expect(dialog.getByLabel("Price (₹)")).toHaveValue("12");
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
+
+    await page.getByRole("button", { name: "Add item" }).click();
+    await expect(dialog.getByLabel("Name")).toHaveValue("");
+  });
+
   test("Show online switch marks an item counter only, keeping it available", async ({ page, request }) => {
     await createVendorSession(page, request, "menu-online");
     const item = await createMenuItem(page, { name: "Kesar Lassi", priceInRupees: 40 });

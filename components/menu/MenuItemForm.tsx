@@ -33,71 +33,11 @@ import { paiseToRupees } from "@/lib/currency";
 import { onShelfCount, parseStockInput, setAsideHint, type MenuRow, type MenuStockFields } from "@/lib/menu-stock";
 import { suggestEmoji } from "@/lib/menu-suggestions";
 import { isValidMenuUnit, MENU_UNIT_MAX, MENU_UNIT_MESSAGE, normaliseMenuUnit } from "@/lib/menu-unit";
+import { DEFAULT_EMOJI, defaultEmoji, emojiChoices } from "@/lib/menu-emoji";
 import { categoryOptions, paiseToRupeeInput, parseRupeeInput } from "@/lib/menu-voice";
 import { vocabularyForKind, type StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 import { MENU_DESCRIPTION_MAX, menuItemCreateInputSchema, menuItemUpdateSchema } from "@/lib/zod-menu";
-
-/** Starter emoji grid, shared with the voice menu builder's review rows. */
-export const FOOD_EMOJIS = [
-  "🍽️",
-  "🥘",
-  "🍛",
-  "🍜",
-  "🍲",
-  "🥗",
-  "🥪",
-  "🌯",
-  "🌮",
-  "🥙",
-  "🍕",
-  "🍔",
-  "🌭",
-  "🥨",
-  "🥐",
-  "🍞",
-  "🥖",
-  "🧀",
-  "🍳",
-  "🥞",
-] as const;
-
-/** The starter grid for a store that doesn't sell food (lib/store-vocabulary.ts). */
-export const GOODS_EMOJIS = [
-  "🛍️",
-  "📦",
-  "🎁",
-  "🌿",
-  "🍃",
-  "🌸",
-  "🫙",
-  "🍯",
-  "🫖",
-  "🧴",
-  "🧼",
-  "💊",
-  "🕯️",
-  "🪔",
-  "🧘",
-  "💆",
-  "👕",
-  "👜",
-  "💍",
-  "✨",
-] as const;
-
-const DEFAULT_EMOJI = "🍽️";
-const DEFAULT_GOODS_EMOJI = "🛍️";
-
-/** The emoji grid this store is offered. */
-export function emojiChoices(vocab: StoreVocabulary): readonly string[] {
-  return vocab.foodArt ? FOOD_EMOJIS : GOODS_EMOJIS;
-}
-
-/** The emoji a new row gets when nothing suggests one. */
-export function defaultEmoji(vocab: StoreVocabulary): string {
-  return vocab.foodArt ? DEFAULT_EMOJI : DEFAULT_GOODS_EMOJI;
-}
 
 /** Mirrors the server-side allowlist in app/api/menu/[id]/image/route.ts. */
 const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
