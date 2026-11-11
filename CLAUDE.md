@@ -699,6 +699,8 @@ them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireAc
 - **Plans never stack**, with each other or with sales: the cart gets its sale prices or the one plan
   with the largest discount, whichever saves more (a tie keeps the sale prices). Between plans, ties go
   to the higher `minQty`, then the older offer. Only eligible lines are discounted; delivery fees never are.
+  When a plan beats sale prices the cards showed, the cart bar and checkout name the sale it replaced
+  (`OffersResult.setAsideSales`, `offerSetAsideText`), so prices going back up are never unexplained.
 - **Free items** (`discountType` FREE_ITEM, `Offer.freeItemId` / `freeItemQty`): a plan whose reward is one
   catalogue item the seller picked ("4+ items → free Evil Eye Bracelet"), never a sale. It competes with the other
   plans and sales at the gift's catalogue value, but takes nothing off: the order gets an extra `OrderItem` at ₹0

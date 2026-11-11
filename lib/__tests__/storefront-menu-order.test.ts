@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   MAX_LINE_QTY,
-  fulfilmentOptionsLabel,
   orderErrorMessage,
   orderStatusLabel,
   toMenuOrderLines,
@@ -33,14 +32,6 @@ describe("toMenuOrderLines", () => {
       paymentMethod: "CASH",
     });
     expect(parsed.success).toBe(true);
-  });
-});
-
-describe("fulfilmentOptionsLabel", () => {
-  it("labels each mode", () => {
-    expect(fulfilmentOptionsLabel(["DELIVERY", "PICKUP"])).toBe("Delivery or pickup");
-    expect(fulfilmentOptionsLabel(["DELIVERY"])).toBe("Delivery only");
-    expect(fulfilmentOptionsLabel(["PICKUP"])).toBe("Pickup only");
   });
 });
 

@@ -12,6 +12,7 @@ import {
   offerIsLive,
   offerNudgeText,
   offerRuleSummary,
+  offerSetAsideText,
   offerSummary,
   overlappingOffers,
   resolveOffers,
@@ -311,6 +312,19 @@ describe("sales — offers that need no quantity", () => {
     const tie = applyOffers(four, offers([QUICHE_10, WEEKLY]));
     expect(tie.applied!.offerId).toBe("quiche10");
     expect(tie.discountTotalPaise).toBe(2800);
+    expect(tie.setAsideSales).toBeNull();
+  });
+
+  it("says which sale a winning plan set aside, so the cart can explain its prices", () => {
+    const four = cart({ q_pcc: 1, q_rbz: 1, q_pcz: 1, q_psp: 1 });
+    const q5 = sale({ id: "q5", name: "Quiche 5%", eligibility: "TAG", eligibleTag: "quiche", percentBps: 500 });
+    const r = applyOffers(four, offers([q5, WEEKLY]));
+    expect(r.setAsideSales).toMatchObject({ offerId: "q5", name: "Quiche 5%", discountPaise: 1400 });
+    expect(offerSetAsideText(r)).toBe("Weekly Plan (₹28.00 off) instead of Quiche 5% (₹14.00 off): offers don't combine.");
+    // No plan in play: nothing was set aside.
+    const salesOnly = applyOffers(four, offers([q5]));
+    expect(salesOnly.setAsideSales).toBeNull();
+    expect(offerSetAsideText(salesOnly)).toBeNull();
   });
 
   it("only nudges toward a plan that beats the sale already in the cart", () => {
@@ -463,6 +477,19 @@ describe("free-item plans", () => {
     // 3 × ₹450 at 50% saves ₹675, more than the bracelet.
     const r = applyOffers(lines({ jasper: 3 }), resolve([GIFT, sale]));
     expect(r.nudge).toBeNull();
+  });
+
+  it("explains a gift that replaced the sale prices on the cards", () => {
+    const small = rule({ ...TWENTY, id: "small", name: "Small sale", minQty: 1, percentBps: 1000 });
+    // 4 × ₹450 at 10% saves ₹180, less than the ₹250 bracelet: the cart goes back to list prices.
+    const r = applyOffers(lines({ jasper: 4 }), resolve([GIFT, small]));
+    expect(r.gift?.offerId).toBe("gift");
+    expect(r.totalPaise).toBe(180000);
+    expect(r.setAsideSales).toMatchObject({ offerId: "small", discountPaise: 18000 });
+    expect(offerSetAsideText(r)).toBe(
+      "Free Evil Eye Bracelet (worth ₹250.00) instead of Small sale (₹180.00 off): offers don't combine.",
+    );
+    expect(applyOffers(lines({ jasper: 4 }), resolve([GIFT])).setAsideSales).toBeNull();
   });
 
   it("gives several when the seller asks", () => {

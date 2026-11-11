@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarClock, MapPin, ShoppingBag, Sparkles, Truck } from "lucide-react";
+import { CalendarClock, MapPin, Sparkles, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
@@ -18,14 +18,12 @@ import {
 } from "@/components/storefront/StorefrontCheckout";
 import { ItemPrice } from "@/components/storefront/ItemPrice";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
-import { formatINRCompact } from "@/lib/currency";
 import { deliveryAreaSummary, type DeliveryArea } from "@/lib/delivery-areas";
 import type { MenuSlotRule } from "@/lib/menu-slots";
-import { applyOffers, salePriceFor, type ResolvedOffer } from "@/lib/offers";
+import { applyOffers, offerSetAsideText, salePriceFor, type ResolvedOffer } from "@/lib/offers";
 import { itemSearchText } from "@/lib/store-search";
 import {
   cartStorageKey,
-  fulfilmentOptionsLabel,
   maxOrderableQty,
   menuItemAnchor,
   orderErrorMessage,
@@ -213,7 +211,7 @@ export function MenuOrder(props: MenuOrderProps) {
     itemCount,
     subtotalPaise: payablePaise,
     canPay,
-    note: offerCartNoteText(appliedOffer?.name ?? null, offered.nudge, offered.gift),
+    note: offerCartNoteText(offered),
     onCheckout: () => setOpen(true),
     enabled: true,
   });
@@ -279,38 +277,30 @@ export function MenuOrder(props: MenuOrderProps) {
     </span>
   );
 
+  // The header already says "Pickup" and the plain delivery fee; areas carry their own fees.
+  const areaSummary = fulfilmentTypes.includes("DELIVERY") ? deliveryAreaSummary(deliveryAreas, deliveryFeePaise) : null;
+  const details = [
+    areaSummary ? { key: "areas", icon: Truck, text: areaSummary } : null,
+    fulfilmentTypes.includes("PICKUP") && pickupNote ? { key: "pickup", icon: MapPin, text: `Pickup: ${pickupNote}` } : null,
+    nextSlotLabel ? { key: "slot", icon: CalendarClock, text: `Next slot: ${nextSlotLabel}` } : null,
+  ].filter((d) => d !== null);
+
   return (
     <div id="menu-order" className="scroll-mt-16">
-      <div className="mb-6 rounded-2xl border border-primary/25 bg-linear-to-b from-primary/8 to-background px-4 py-3 text-sm">
-        <p className="flex items-center gap-2 font-bold text-awaaz-charcoal">
-          <ShoppingBag className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-          Order online · {fulfilmentOptionsLabel(fulfilmentTypes)}
-        </p>
-        <ul className="mt-1.5 space-y-1 text-muted-foreground">
-          {fulfilmentTypes.includes("DELIVERY") ? (
-            <li className="flex items-start gap-2">
-              <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              <span>
-                {deliveryAreaSummary(deliveryAreas, deliveryFeePaise) ??
-                  (deliveryFeePaise > 0 ? `Delivery fee ${formatINRCompact(deliveryFeePaise)}` : "Free delivery")}
-              </span>
+      {/* Only what the header's "Pickup · Free delivery · Pay …" line can't say: where, which areas, when. */}
+      {details.length > 0 ? (
+        <ul
+          aria-label="Pickup and delivery"
+          className="mb-4 space-y-1 rounded-xl border border-border/60 bg-background px-3 py-2 text-sm text-muted-foreground"
+        >
+          {details.map(({ key, icon: Icon, text }) => (
+            <li key={key} className="flex items-start gap-2">
+              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <span>{text}</span>
             </li>
-          ) : null}
-          {fulfilmentTypes.includes("PICKUP") && pickupNote ? (
-            <li className="flex items-start gap-2">
-              <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              <span>Pickup: {pickupNote}</span>
-            </li>
-          ) : null}
-          {nextSlotLabel ? (
-            <li className="flex items-start gap-2">
-              <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              <span>Next slot: {nextSlotLabel}</span>
-            </li>
-          ) : null}
-          <li>Tap + to add items, then check out.</li>
+          ))}
         </ul>
-      </div>
+      ) : null}
 
       <OfferChips offers={offers} />
 
@@ -397,12 +387,7 @@ export function MenuOrder(props: MenuOrderProps) {
 
       {!canPay ? <NoPaymentNotice /> : null}
 
-      <OfferCartNote
-        appliedName={appliedOffer?.name ?? null}
-        nudge={offered.nudge}
-        gift={offered.gift}
-        inCartBar={inHub}
-      />
+      <OfferCartNote offered={offered} inCartBar={inHub} />
 
       {inHub ? null : (
         <CartBar
@@ -434,6 +419,7 @@ export function MenuOrder(props: MenuOrderProps) {
         onChangeQty={setQty}
         discount={appliedOffer}
         gift={offered.gift}
+        setAsideNote={offerSetAsideText(offered)}
         fulfilmentTypes={fulfilmentTypes}
         deliveryFeePaise={deliveryFeePaise}
         deliveryAreas={deliveryAreas}
