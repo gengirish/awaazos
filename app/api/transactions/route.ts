@@ -1,3 +1,4 @@
+import { stampOrderCosts } from "@/lib/item-cost-server";
 import { Prisma, type PaymentMethod, type PaymentStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 
@@ -435,6 +436,8 @@ async function createSale(args: {
         },
       },
     });
+    // Each line keeps the cost of this moment (lib/item-cost.ts rule 4).
+    await stampOrderCosts(tx, vendorId, transactionRow.id);
 
     await tx.dailySummary.upsert({
       where: { vendorId_date: { vendorId, date: today } },

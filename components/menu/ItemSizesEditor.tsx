@@ -17,10 +17,13 @@ export function ItemSizesEditor({
   drafts,
   onChange,
   error,
+  showCost = false,
 }: {
   drafts: SizeDraft[];
   onChange: (next: SizeDraft[]) => void;
   error: SizeDraftError | null;
+  /** A cost per row, for MANAGER and up (lib/item-cost.ts). */
+  showCost?: boolean;
 }) {
   const uid = useId();
   const helpId = `${uid}-help`;
@@ -34,7 +37,7 @@ export function ItemSizesEditor({
       <legend className="text-sm font-medium">Sizes or colours (optional)</legend>
       <p id={helpId} className="text-xs text-muted-foreground">
         {drafts.length > 0
-          ? "Buyers pick one. Each has its own count, which includes any packed for orders not handed over yet. A blank price means the same as the item."
+          ? `Buyers pick one. Each has its own count, which includes any packed for orders not handed over yet. A blank price${showCost ? " or cost" : ""} means the same as the item.`
           : "For one product in S, M, L, or in red and blue. Each gets its own stock."}
       </p>
       {drafts.length > 0 ? (
@@ -45,8 +48,17 @@ export function ItemSizesEditor({
             const name = d.label.trim() || `row ${i + 1}`;
             return (
               <li key={d.key} className="space-y-1">
-                <div className="grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2">
-                  <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+                <div
+                  className={
+                    showCost
+                      ? // Four fields don't fit a phone in one line: the name takes its own.
+                        "grid grid-cols-[repeat(3,minmax(0,1fr))_auto] items-end gap-2 sm:grid-cols-[minmax(0,1.4fr)_repeat(3,minmax(0,1fr))_auto]"
+                      : "grid grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_minmax(0,1fr)_auto] items-end gap-2"
+                  }
+                >
+                  <label
+                    className={`flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground ${showCost ? "col-span-4 sm:col-span-1" : ""}`}
+                  >
                     Name
                     <Input
                       value={d.label}
@@ -70,6 +82,20 @@ export function ItemSizesEditor({
                       onChange={(e) => update(i, { price: e.target.value })}
                     />
                   </label>
+                  {showCost ? (
+                    <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
+                      Cost (₹)
+                      <Input
+                        value={d.cost}
+                        inputMode="decimal"
+                        placeholder="Same"
+                        autoComplete="off"
+                        aria-invalid={rowError?.field === "cost" ? true : undefined}
+                        aria-describedby={rowError?.field === "cost" ? errorId : undefined}
+                        onChange={(e) => update(i, { cost: e.target.value })}
+                      />
+                    </label>
+                  ) : null}
                   <label className="flex min-w-0 flex-col gap-1 text-xs font-medium text-muted-foreground">
                     In stock
                     <Input

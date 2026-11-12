@@ -7,6 +7,7 @@
 import { z } from "zod";
 
 import { rupeesToPaise } from "@/lib/currency";
+import { costInRupeesSchema } from "@/lib/item-cost-schema";
 import { MAX_STOCK_QTY } from "@/lib/inventory";
 import { MAX_VARIANTS_PER_ITEM, normaliseVariantLabel, VARIANT_LABEL_MAX } from "@/lib/item-variants";
 
@@ -49,6 +50,8 @@ const variantInputSchema = z
     /** A new count (moves `stockCountedAt`); null stops tracking; absent leaves it. */
     stockQty: stockCount.nullable().optional(),
     lowStockAt: stockCount.nullable().optional(),
+    /** This size's own cost; null = the item's; absent leaves it. MANAGER and up (lib/item-cost.ts). */
+    costInRupees: costInRupeesSchema.optional(),
   })
   .strict();
 

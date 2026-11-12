@@ -73,6 +73,7 @@ of `lib/item-variants.ts`. Three PRs:
 
 ## Later
 
+- Cost price, purchase records and a profit report: its own plan, `docs/COST_AND_PROFIT_PLAN.md` (step 1 built).
 - Low-stock push to the owner when a sale crosses the line (event-driven, never a timer).
 - Restock by voice ("kurti M 10 aur aaye") through a forced tool like the menu builder.
 - Stock CSV export.

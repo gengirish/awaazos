@@ -46,6 +46,8 @@ export async function withVariants<T extends { id: string }>(
   vendorId: string,
   items: T[],
   now: Date = new Date(),
+  /** `cost: true` only for MANAGER and up (lib/item-cost.ts rule 2); otherwise every cost is null. */
+  opts: { cost?: boolean } = {},
 ): Promise<(T & { variants: VariantRow[] })[]> {
   if (items.length === 0) return [];
   const rows = await db.itemVariant.findMany({
@@ -60,7 +62,7 @@ export async function withVariants<T extends { id: string }>(
   const byItem = new Map<string, VariantRow[]>();
   for (const { menuItemId, stockCountedAt: _counted, ...v } of rows) {
     const list = byItem.get(menuItemId) ?? [];
-    list.push({ ...v, stockLeft: left.get(v.id) ?? null, stockSetAside: setAside.get(v.id) ?? null });
+    list.push({ ...v, costInPaise: opts.cost ? v.costInPaise : null, stockLeft: left.get(v.id) ?? null, stockSetAside: setAside.get(v.id) ?? null });
     byItem.set(menuItemId, list);
   }
   return items.map((item) => ({ ...item, variants: byItem.get(item.id) ?? [] }));
@@ -76,4 +78,5 @@ const VARIANT_ROW_SELECT = {
   stockQty: true,
   stockCountedAt: true,
   lowStockAt: true,
+  costInPaise: true,
 } as const;

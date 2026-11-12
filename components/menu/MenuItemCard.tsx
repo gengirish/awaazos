@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { formatINR } from "@/lib/currency";
 import { stockLabel } from "@/lib/inventory";
+import { costLine } from "@/lib/item-cost";
 import type { MenuRow } from "@/lib/menu-stock";
 import { cn } from "@/lib/utils";
 
@@ -116,6 +117,10 @@ export function MenuItemCard({
                 {formatINR(item.priceInPaise)}
                 {item.unit ? ` / ${item.unit}` : null}
               </p>
+              {/* Null for anyone below MANAGER: their rows carry no cost (lib/item-cost.ts rule 2). */}
+              {costLine(item.priceInPaise, item.costInPaise) ? (
+                <p className="text-xs text-muted-foreground">{costLine(item.priceInPaise, item.costInPaise)}</p>
+              ) : null}
               <p className="text-xs text-muted-foreground">{item.category}</p>
               {item.hsnCode ? <p className="text-xs text-muted-foreground">HSN/SAC: {item.hsnCode}</p> : null}
             </div>

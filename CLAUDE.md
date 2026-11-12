@@ -782,6 +782,13 @@ of the item; each tracked size caps itself (`sold_out` + `variantId`); the packi
 The store page's picker is `components/storefront/SizePicker.tsx` (menu and drops). Not yet: free gifts with sizes
 (that offer is skipped), order again.
 
+**Cost price** (rules in the header of `lib/item-cost.ts`, plan in `docs/COST_AND_PROFIT_PLAN.md`): optional
+`costInPaise` on `MenuItem` and `ItemVariant` (a size without one uses the item's); null means not recorded, never
+zero. MANAGER and OWNER only: every other viewer's rows carry null (`rowsForRole`, `withVariants(..., { cost })`), a
+cost a cashier sends is ignored, and it is never in a public select or the voice prompt. Each bill line keeps the
+cost of its moment in `OrderItem.costInPaise`, written by `stampOrderCosts` inside all three order-creating
+transactions. Not built yet: purchase records, the profit report.
+
 ### Customer feedback
 
 Rules in the header of `lib/order-feedback.ts` (pure), database side in `lib/order-feedback-server.ts`.

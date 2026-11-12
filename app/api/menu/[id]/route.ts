@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { rupeesToPaise } from "@/lib/currency";
+import { canSeeCost, hideCost } from "@/lib/item-cost";
+import { takeCostField } from "@/lib/item-cost-schema";
 import { recordStockCount } from "@/lib/inventory-server";
 import { hasStockFields, menuStockFieldsSchema, splitStockFields } from "@/lib/menu-stock";
 import { withStockLeft } from "@/lib/menu-stock-server";
@@ -34,10 +36,19 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
     // Stock keys have their own schema (lib/menu-stock.ts); a body may carry only them.
-    const { stock, rest } = splitStockFields(await req.json());
+    const taken = takeCostField(await req.json());
+    // Cost is for MANAGER and up (lib/item-cost.ts rule 2); from anyone else it is ignored.
+    const seesCost = canSeeCost(ctx.staff.role);
+    const cost = seesCost ? taken.cost : undefined;
+    const { stock, rest } = splitStockFields(taken.rest);
     const stockFields = menuStockFieldsSchema.parse(stock);
-    const stockOnly = hasStockFields(stockFields) && Object.keys(rest as object).length === 0;
-    const body = stockOnly ? {} : menuItemUpdateSchema.parse(rest);
+    // A body may carry only stock keys, only a cost, or both.
+    const extrasOnly =
+      (hasStockFields(stockFields) || taken.cost !== undefined) &&
+      rest !== null &&
+      typeof rest === "object" &&
+      Object.keys(rest).length === 0;
+    const body = extrasOnly ? {} : menuItemUpdateSchema.parse(rest);
 
     const data: Record<string, unknown> = {};
     if (body.name !== undefined) {
@@ -74,6 +85,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     // DELETE /api/menu/[id]/image, which is the path the UI uses.
     if (body.imageUrl !== undefined) data.imageUrl = body.imageUrl;
     if (stockFields.lowStockAt !== undefined) data.lowStockAt = stockFields.lowStockAt;
+    if (cost !== undefined) data.costInPaise = cost;
 
     try {
       const vendorId = ctx.vendor.id;
@@ -96,7 +108,7 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
           row = await tx.menuItem.findUniqueOrThrow({ where: { id: row.id, vendorId } });
         }
         const [withStock] = await withStockLeft(tx, vendorId, [row]);
-        return withStock;
+        return seesCost ? withStock : hideCost(withStock);
       });
       const res = NextResponse.json({ data: updated });
       return withVendorCookie(res, ctx.setVendorCookie);

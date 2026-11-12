@@ -29,10 +29,12 @@ type MenuScreenProps = {
   vocab: StoreVocabulary;
   /** Offer "Sizes or colours" in the item form (lib/item-variants.ts). */
   sizesEnabled?: boolean;
+  /** The viewer may see and set cost prices (lib/item-cost.ts rule 2). */
+  canSeeCost?: boolean;
 };
 
 /** The header's two actions open things lower down, so the state they share lives here. */
-export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vocab, sizesEnabled }: MenuScreenProps) {
+export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vocab, sizesEnabled, canSeeCost }: MenuScreenProps) {
   const router = useRouter();
   const [items, setItems] = useState<MenuRow[]>(initialItems);
   const [voiceExpanded, setVoiceExpanded] = useState(initialItems.length === 0 || voiceOpen);
@@ -147,6 +149,7 @@ export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vo
             categories={categories}
             vocab={vocab}
             sizesEnabled={sizesEnabled}
+            canSeeCost={canSeeCost}
           />
         ) : null}
       </main>

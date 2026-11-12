@@ -43,6 +43,8 @@ export type MenuItemCreateFields = {
   stockQty?: number | null;
   /** "Low stock" from this many left; null or absent = no warning. */
   lowStockAt?: number | null;
+  /** What one unit costs the seller (lib/item-cost.ts); null or absent = not recorded. */
+  costInPaise?: number | null;
 };
 
 /** Every slug the vendor uses, and the sortOrder after the current last item. */
@@ -93,6 +95,7 @@ export function prepareMenuItemCreate(
     stockQty,
     stockCountedAt: stockQty === null ? null : now,
     lowStockAt: input.lowStockAt ?? null,
+    costInPaise: input.costInPaise ?? null,
     sortOrder,
   };
 }

@@ -1,3 +1,4 @@
+import { rowsForRole } from "@/lib/item-cost";
 import { put } from "@vercel/blob";
 import { Prisma } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         data: { imageUrl: blob.url },
       });
       await deleteBlobQuietly(existing.imageUrl, token, TAG);
-      const res = NextResponse.json({ data: updated });
+      const res = NextResponse.json({ data: rowsForRole([updated], ctx.staff.role)[0] });
       return withVendorCookie(res, ctx.setVendorCookie);
     } catch (e) {
       // Row vanished between the check and the write — don't leave the blob behind.

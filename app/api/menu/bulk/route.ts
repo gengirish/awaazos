@@ -1,3 +1,4 @@
+import { rowsForRole } from "@/lib/item-cost";
 import { Prisma, type MenuItem } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
@@ -134,7 +135,8 @@ export async function POST(req: NextRequest) {
           created = await tx.menuItem.createManyAndReturn({ data });
           created.sort((a, b) => a.sortOrder - b.sortOrder);
         }
-        return { created, updated };
+        // Cost is for MANAGER and up (lib/item-cost.ts rule 2).
+        return { created: rowsForRole(created, ctx.staff.role), updated: rowsForRole(updated, ctx.staff.role) };
       },
       { timeout: 15_000 },
     );

@@ -95,6 +95,8 @@ export type VariantRow = {
   lowStockAt: number | null;
   stockLeft: number | null;
   stockSetAside: number | null;
+  /** This size's own cost; null = the item's, or hidden from this viewer (lib/item-cost.ts). */
+  costInPaise: number | null;
 };
 
 /**

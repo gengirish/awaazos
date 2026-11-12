@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { rupeesToPaise } from "@/lib/currency";
+import { canSeeCost } from "@/lib/item-cost";
 import { itemVariantsSchema } from "@/lib/item-variants-schema";
 import { withVariants } from "@/lib/menu-stock-server";
 import { prisma } from "@/lib/prisma";
@@ -49,6 +50,8 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     const body = itemVariantsSchema.parse(await req.json());
     const vendorId = ctx.vendor.id;
     const now = new Date();
+    // Cost is for MANAGER and up (lib/item-cost.ts rule 2); from anyone else it is ignored.
+    const seesCost = canSeeCost(ctx.staff.role);
 
     const variants = await prisma.$transaction(async (tx) => {
       const item = await tx.menuItem.findFirst({
@@ -73,6 +76,9 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
           isAvailable: v.isAvailable ?? true,
           sortOrder,
           ...(v.lowStockAt !== undefined ? { lowStockAt: v.lowStockAt } : {}),
+          ...(seesCost && v.costInRupees !== undefined
+            ? { costInPaise: v.costInRupees === null ? null : rupeesToPaise(v.costInRupees) }
+            : {}),
           // A new count moves its time (lib/inventory.ts rule 2); absent leaves both.
           ...(v.stockQty !== undefined ? { stockQty: v.stockQty, stockCountedAt: v.stockQty === null ? null : now } : {}),
         };
@@ -91,7 +97,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
         });
       }
 
-      const [withRows] = await withVariants(tx, vendorId, [{ id: menuItemId }], now);
+      const [withRows] = await withVariants(tx, vendorId, [{ id: menuItemId }], now, { cost: seesCost });
       return withRows.variants;
     });
 

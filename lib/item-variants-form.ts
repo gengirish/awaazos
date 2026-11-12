@@ -8,6 +8,7 @@
  */
 
 import { paiseToRupees } from "@/lib/currency";
+import { parseCostInput } from "@/lib/item-cost";
 import {
   MAX_VARIANTS_PER_ITEM,
   normaliseVariantLabel,
@@ -24,6 +25,8 @@ export type SizeDraft = {
   label: string;
   /** Blank = the item's price. */
   price: string;
+  /** Blank = the item's cost (lib/item-cost.ts). Only shown to, and sent by, MANAGER and up. */
+  cost: string;
   /** Blank = not tracked. */
   stock: string;
   /** `stock` as first shown, to tell whether the seller changed it. */
@@ -31,7 +34,7 @@ export type SizeDraft = {
   isAvailable: boolean;
 };
 
-export type SizeDraftField = "label" | "price" | "stock";
+export type SizeDraftField = "label" | "price" | "cost" | "stock";
 export type SizeDraftError = { index: number; field: SizeDraftField; message: string };
 
 /** A saved variant's "In stock" as first shown: the pieces on the shelf, or blank. */
@@ -47,6 +50,7 @@ export function sizeDraftsFrom(variants: readonly VariantRow[] | undefined): Siz
     id: v.id,
     label: v.label,
     price: v.priceInPaise === null ? "" : paiseToRupeeInput(v.priceInPaise),
+    cost: v.costInPaise === null ? "" : paiseToRupeeInput(v.costInPaise),
     stock: shelfText(v),
     initialStock: shelfText(v),
     isAvailable: v.isAvailable,
@@ -56,7 +60,7 @@ export function sizeDraftsFrom(variants: readonly VariantRow[] | undefined): Siz
 let nextKey = 0;
 export function newSizeDraft(): SizeDraft {
   nextKey += 1;
-  return { key: `new-${nextKey}`, label: "", price: "", stock: "", initialStock: "", isAvailable: true };
+  return { key: `new-${nextKey}`, label: "", price: "", cost: "", stock: "", initialStock: "", isAvailable: true };
 }
 
 export type VariantsBody = {
@@ -66,11 +70,18 @@ export type VariantsBody = {
     priceInRupees: number | null;
     isAvailable: boolean;
     stockQty?: number | null;
+    costInRupees?: number | null;
   }[];
 };
 
-/** The PUT body, or the first row problem to show beside its field. */
-export function sizeDraftsToBody(drafts: readonly SizeDraft[]): { body: VariantsBody } | { error: SizeDraftError } {
+/**
+ * The PUT body, or the first row problem to show beside its field. `cost`:
+ * send each row's cost (the viewer may set it); otherwise costs are left as saved.
+ */
+export function sizeDraftsToBody(
+  drafts: readonly SizeDraft[],
+  opts: { cost?: boolean } = {},
+): { body: VariantsBody } | { error: SizeDraftError } {
   if (drafts.length > MAX_VARIANTS_PER_ITEM) {
     return { error: { index: MAX_VARIANTS_PER_ITEM, field: "label", message: `At most ${MAX_VARIANTS_PER_ITEM}` } };
   }
@@ -92,6 +103,13 @@ export function sizeDraftsToBody(drafts: readonly SizeDraft[]): { body: Variants
       priceInRupees = paiseToRupees(price.paise);
     }
 
+    let costInRupees: number | null = null;
+    if (opts.cost) {
+      const cost = parseCostInput(d.cost);
+      if ("error" in cost) return { error: { index, field: "cost", message: cost.error } };
+      costInRupees = cost.paise === null ? null : paiseToRupees(cost.paise);
+    }
+
     const stock = parseStockInput(d.stock);
     if ("error" in stock) return { error: { index, field: "stock", message: stock.error } };
     const changed = d.id === undefined ? stock.value !== null : d.stock.trim() !== d.initialStock;
@@ -102,6 +120,7 @@ export function sizeDraftsToBody(drafts: readonly SizeDraft[]): { body: Variants
       priceInRupees,
       isAvailable: d.isAvailable,
       ...(changed ? { stockQty: stock.value } : {}),
+      ...(opts.cost ? { costInRupees } : {}),
     });
   }
   return { body: { variants } };

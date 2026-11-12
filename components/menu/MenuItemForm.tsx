@@ -39,6 +39,7 @@ import {
   type SizeDraftError,
   type VariantsBody,
 } from "@/lib/item-variants-form";
+import { costLine, parseCostInput } from "@/lib/item-cost";
 import { onShelfCount, parseStockInput, setAsideHint, type MenuRow, type MenuStockFields } from "@/lib/menu-stock";
 import { suggestEmoji } from "@/lib/menu-suggestions";
 import { isValidMenuUnit, MENU_UNIT_MAX, MENU_UNIT_MESSAGE, normaliseMenuUnit } from "@/lib/menu-unit";
@@ -103,11 +104,21 @@ type MenuItemFormProps = {
   vocab?: StoreVocabulary;
   /** Offer "Sizes or colours" to a goods store (`ITEM_VARIANTS_ENABLED`, lib/item-variants.ts). */
   sizesEnabled?: boolean;
+  /** Show and send the cost price: MANAGER and up (lib/item-cost.ts rule 2). */
+  canSeeCost?: boolean;
 };
 
 const FOOD_VOCAB = vocabularyForKind("food");
 
 const NO_CATEGORIES: readonly string[] = [];
+
+/** "Cost ₹250 · Margin ₹150" once both figures are typed and valid, else null. */
+function costHint(priceText: string, costText: string): string | null {
+  const price = parseRupeeInput(priceText);
+  const cost = parseCostInput(costText);
+  if ("error" in price || "error" in cost) return null;
+  return costLine(price.paise, cost.paise);
+}
 
 /** "In stock now" as first shown: the pieces on the shelf (lib/menu-stock.ts `onShelfCount`), or blank when untracked. */
 function initialStockText(item: MenuRow | null): string {
@@ -125,6 +136,7 @@ export function MenuItemForm({
   categories = NO_CATEGORIES,
   vocab = FOOD_VOCAB,
   sizesEnabled = false,
+  canSeeCost = false,
 }: MenuItemFormProps) {
   const baseEmoji = defaultEmoji(vocab);
   const starterEmojis = emojiChoices(vocab);
@@ -157,6 +169,10 @@ export function MenuItemForm({
   const [stockError, setStockError] = useState<{ field: "stock" | "low"; message: string } | null>(null);
   const stockInputRef = useRef<HTMLInputElement>(null);
   const lowInputRef = useRef<HTMLInputElement>(null);
+  // Cost price (lib/item-cost.ts): blank = none recorded.
+  const [costText, setCostText] = useState("");
+  const [costError, setCostError] = useState<string | null>(null);
+  const costInputRef = useRef<HTMLInputElement>(null);
   // Sizes or colours (lib/item-variants-form.ts): saved after the item, by PUT /api/menu/[id]/variants.
   const [sizes, setSizes] = useState<SizeDraft[]>([]);
   const [sizeError, setSizeError] = useState<SizeDraftError | null>(null);
@@ -185,6 +201,8 @@ export function MenuItemForm({
     setStockText(initialStockText(item));
     setLowText(item?.lowStockAt != null ? String(item.lowStockAt) : "");
     setStockError(null);
+    setCostText(item?.costInPaise != null ? paiseToRupeeInput(item.costInPaise) : "");
+    setCostError(null);
     setSizes(sizeDraftsFrom(item?.variants));
     setSizeError(null);
     // On edit, open "More options" when one of its text fields is in use.
@@ -330,11 +348,22 @@ export function MenuItemForm({
       form.setError("priceInRupees", { message: price.error }, { shouldFocus: true });
       return;
     }
+    // Sent only by someone who may set it; blank clears it.
+    let cost: { costInRupees?: number | null } = {};
+    if (canSeeCost) {
+      const parsed = parseCostInput(costText);
+      if ("error" in parsed) {
+        setCostError(parsed.error);
+        costInputRef.current?.focus();
+        return;
+      }
+      cost = { costInRupees: parsed.paise === null ? null : paiseToRupees(parsed.paise) };
+    }
     const stock = stockBody();
     if (!stock) return;
     let sizesBody: VariantsBody | null = null;
     if (showSizes && (sizes.length > 0 || hadSizes)) {
-      const built = sizeDraftsToBody(sizes);
+      const built = sizeDraftsToBody(sizes, { cost: canSeeCost });
       if ("error" in built) {
         setSizeError(built.error);
         return;
@@ -360,7 +389,7 @@ export function MenuItemForm({
         const res = await fetch(`/api/menu/${item.id}`, {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...body, ...stock }),
+          body: JSON.stringify({ ...body, ...stock, ...cost }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -374,7 +403,7 @@ export function MenuItemForm({
         const res = await fetch("/api/menu", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...fields, hsnCode: values.hsnCode ?? "", ...stock }),
+          body: JSON.stringify({ ...fields, hsnCode: values.hsnCode ?? "", ...stock, ...cost }),
         });
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
@@ -399,6 +428,7 @@ export function MenuItemForm({
           setTrackStock(false);
           setStockText("");
           setLowText("");
+          setCostText("");
           setSizes([]);
           setSizeError(null);
           onSaved();
@@ -495,6 +525,36 @@ export function MenuItemForm({
                   </FormItem>
                 )}
               />
+              {canSeeCost ? (
+                <div className="space-y-2">
+                  <label htmlFor="costInRupees" className="block text-sm font-medium">
+                    Cost price (₹, optional)
+                  </label>
+                  <Input
+                    ref={costInputRef}
+                    id="costInRupees"
+                    inputMode="decimal"
+                    autoComplete="off"
+                    placeholder="e.g. 250"
+                    value={costText}
+                    aria-invalid={costError ? true : undefined}
+                    aria-describedby={costError ? "costInRupees-error costInRupees-help" : "costInRupees-help"}
+                    onChange={(e) => {
+                      setCostText(e.target.value);
+                      setCostError(null);
+                    }}
+                  />
+                  {costError ? (
+                    <p id="costInRupees-error" className="text-sm font-medium text-destructive">
+                      {costError}
+                    </p>
+                  ) : null}
+                  <p id="costInRupees-help" className="text-xs text-muted-foreground">
+                    {costHint(form.watch("priceInRupees"), costText) ??
+                      `What one ${vocab.item} costs you. Buyers and cashiers never see it.`}
+                  </p>
+                </div>
+              ) : null}
               <FormField
                 control={form.control}
                 name="unit"
@@ -879,6 +939,7 @@ export function MenuItemForm({
                     setSizeError(null);
                   }}
                   error={sizeError}
+                  showCost={canSeeCost}
                 />
               ) : null}
               <FormField
