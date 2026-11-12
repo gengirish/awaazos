@@ -600,8 +600,10 @@ Both are event-driven: no timers, no polling.
 `checklistForRole()` in `lib/settings-overview.ts`, loaded by `lib/setup-checklist-server.ts` on page
 render only) and `BillingAccessNotice` (`components/billing/TrialNotice.tsx`). Steps are role-trimmed;
 a CASHIER sees none. The phone tab bar depends on the store too: `appTabBarForRole(role, published)`
-in `lib/app-nav.ts` moves Sell behind More and puts Settings on the bar once the store is published,
-and `/help` must use the same function (`helpTopicsForRole(role, published)`).
+in `lib/app-nav.ts` is Orders · Menu · Store · Settings for a published store (Sell for an unpublished
+one; a cashier gets Orders · Sell · Store), Store raised in the middle (`APP_CENTRE_TAB`); Drops and the
+rest are behind More. `/store` (`components/store/StoreHubClient.tsx`) is the store's link, share, QR
+and the owner's Publish. `/help` must use the same function (`helpTopicsForRole(role, published)`).
 
 **Order from menu** (`lib/menu-orders.ts`, opt-in `VendorSettings.acceptMenuOrders`): buyers order
 everyday `MenuItem`s with no drop — same STOREFRONT transaction with `dropId = null`, same payment
