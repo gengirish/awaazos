@@ -60,6 +60,7 @@ model Vendor {
   updatedAt          DateTime  @updatedAt
 
   menuItems             MenuItem[]
+  itemVariants          ItemVariant[]
   transactions          Transaction[]
   receipts              Receipt[]
   staff                 StaffMember[]
@@ -180,38 +181,66 @@ model SubscriptionEvent {
 // ─── MENU ───────────────────────────────────────────────────────────
 
 model MenuItem {
-  id           String   @id @default(cuid())
-  vendorId     String
-  vendor       Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
-  name         String // Display name
-  slug         String? // URL/log-safe handle, e.g. "mohabbatein-sharbat" (unique per vendor)
-  aliases      String[] @default([]) // Voice recognition aliases (e.g. ["bhel", "lays bhel"])
-  tags         String[] @default([]) // Flexible labels for filtering & Claude context (e.g. ["drinks","cold"])
-  emoji        String   @default("🍽️")
-  category     String   @default("General")
-  priceInPaise Int // ALWAYS store in paise. ₹20 = 2000
-  isAvailable  Boolean  @default(true)
-  showOnline   Boolean  @default(true) // false = counter POS only, hidden from the storefront
-  isPopular    Boolean  @default(false)
-  sortOrder    Int      @default(0)
-  imageUrl     String?
-  unit         String? // Selling unit shown after the price ("kg", "piece"); null = none
-  description  String?  @db.VarChar(200) // One line for buyers under the name on /s/[slug]; never in the voice prompt
-  hsnCode      String? // HSN/SAC; falls back to VendorSettings.hsnDefault
+  id             String    @id @default(cuid())
+  vendorId       String
+  vendor         Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  name           String // Display name
+  slug           String? // URL/log-safe handle, e.g. "mohabbatein-sharbat" (unique per vendor)
+  aliases        String[]  @default([]) // Voice recognition aliases (e.g. ["bhel", "lays bhel"])
+  tags           String[]  @default([]) // Flexible labels for filtering & Claude context (e.g. ["drinks","cold"])
+  emoji          String    @default("🍽️")
+  category       String    @default("General")
+  priceInPaise   Int // ALWAYS store in paise. ₹20 = 2000
+  isAvailable    Boolean   @default(true)
+  showOnline     Boolean   @default(true) // false = counter POS only, hidden from the storefront
+  isPopular      Boolean   @default(false)
+  sortOrder      Int       @default(0)
+  imageUrl       String?
+  unit           String? // Selling unit shown after the price ("kg", "piece"); null = none
+  description    String?   @db.VarChar(200) // One line for buyers under the name on /s/[slug]; never in the voice prompt
+  hsnCode        String? // HSN/SAC; falls back to VendorSettings.hsnDefault
   // Inventory (lib/inventory.ts): units on hand at the last count; null = stock not tracked.
   // Left = stockQty − units in stock-holding OrderItems created after stockCountedAt. Never decremented.
   stockQty       Int?
   stockCountedAt DateTime?
   lowStockAt     Int? // "Low stock" from this many left; null = no warning
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   orderItems OrderItem[]
   dropItems  DropItem[]
+  variants   ItemVariant[]
 
   @@unique([vendorId, slug])
   @@index([vendorId, isAvailable])
   @@map("menu_items")
+}
+
+// Sizes or colours of one product ("Cotton kurti" in S / M / L). Rules in
+// lib/item-variants.ts. An item with variants is ordered by variant, and its
+// stock is per variant with the same derived rules as MenuItem (lib/inventory.ts);
+// the item's own stockQty is then null.
+model ItemVariant {
+  id             String    @id @default(cuid())
+  vendorId       String
+  vendor         Vendor    @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  menuItemId     String
+  menuItem       MenuItem  @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  label          String // "M", "Red / M"; unique per item, ignoring case
+  priceInPaise   Int? // null = the item's price
+  isAvailable    Boolean   @default(true)
+  sortOrder      Int       @default(0)
+  stockQty       Int?
+  stockCountedAt DateTime?
+  lowStockAt     Int?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  orderItems OrderItem[]
+
+  @@index([menuItemId])
+  @@index([vendorId])
+  @@map("item_variants")
 }
 
 // ─── OFFERS (quantity-based plan discounts) ────────────────────────
@@ -556,22 +585,25 @@ model CustomRazorpayPlan {
 }
 
 model OrderItem {
-  id            String      @id @default(cuid())
+  id            String       @id @default(cuid())
   transactionId String
-  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+  transaction   Transaction  @relation(fields: [transactionId], references: [id], onDelete: Cascade)
   menuItemId    String?
-  menuItem      MenuItem?   @relation(fields: [menuItemId], references: [id])
+  menuItem      MenuItem?    @relation(fields: [menuItemId], references: [id])
   dropItemId    String? // Set on storefront orders; drives stock counts
-  dropItem      DropItem?   @relation(fields: [dropItemId], references: [id], onDelete: SetNull)
+  dropItem      DropItem?    @relation(fields: [dropItemId], references: [id], onDelete: SetNull)
+  variantId     String? // The size / colour sold (lib/item-variants.ts); its stock counts per variant
+  variant       ItemVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
   name          String // Snapshot at time of sale
   priceInPaise  Int
-  qty           Int         @default(1)
+  qty           Int          @default(1)
   totalPaise    Int // priceInPaise * qty
-  discountPaise Int         @default(0) // This line's share of Transaction.discountPaise
-  isGift        Boolean     @default(false) // A FREE_ITEM offer's gift: priced 0, never re-ordered
+  discountPaise Int          @default(0) // This line's share of Transaction.discountPaise
+  isGift        Boolean      @default(false) // A FREE_ITEM offer's gift: priced 0, never re-ordered
 
   @@index([transactionId])
   @@index([menuItemId])
+  @@index([variantId])
   @@map("order_items")
 }
 

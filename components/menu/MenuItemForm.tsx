@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { ItemSizesEditor } from "@/components/menu/ItemSizesEditor";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -30,6 +31,14 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { paiseToRupees } from "@/lib/currency";
+import {
+  sizeDraftsFrom,
+  sizeDraftsToBody,
+  variantsErrorMessage,
+  type SizeDraft,
+  type SizeDraftError,
+  type VariantsBody,
+} from "@/lib/item-variants-form";
 import { onShelfCount, parseStockInput, setAsideHint, type MenuRow, type MenuStockFields } from "@/lib/menu-stock";
 import { suggestEmoji } from "@/lib/menu-suggestions";
 import { isValidMenuUnit, MENU_UNIT_MAX, MENU_UNIT_MESSAGE, normaliseMenuUnit } from "@/lib/menu-unit";
@@ -92,6 +101,8 @@ type MenuItemFormProps = {
   categories?: readonly string[];
   /** The store's words (lib/store-vocabulary.ts); a kitchen when not given. */
   vocab?: StoreVocabulary;
+  /** Offer "Sizes or colours" to a goods store (`ITEM_VARIANTS_ENABLED`, lib/item-variants.ts). */
+  sizesEnabled?: boolean;
 };
 
 const FOOD_VOCAB = vocabularyForKind("food");
@@ -113,6 +124,7 @@ export function MenuItemForm({
   defaultName = "",
   categories = NO_CATEGORIES,
   vocab = FOOD_VOCAB,
+  sizesEnabled = false,
 }: MenuItemFormProps) {
   const baseEmoji = defaultEmoji(vocab);
   const starterEmojis = emojiChoices(vocab);
@@ -145,6 +157,13 @@ export function MenuItemForm({
   const [stockError, setStockError] = useState<{ field: "stock" | "low"; message: string } | null>(null);
   const stockInputRef = useRef<HTMLInputElement>(null);
   const lowInputRef = useRef<HTMLInputElement>(null);
+  // Sizes or colours (lib/item-variants-form.ts): saved after the item, by PUT /api/menu/[id]/variants.
+  const [sizes, setSizes] = useState<SizeDraft[]>([]);
+  const [sizeError, setSizeError] = useState<SizeDraftError | null>(null);
+  const hadSizes = (item?.variants?.length ?? 0) > 0;
+  // Goods stores, while the feature is switched on; an item that already has sizes always shows them.
+  const showSizes = hadSizes || (sizesEnabled && vocab.kind === "goods");
+  const counted = showSizes && sizes.length > 0;
 
   const form = useForm<MenuItemFormValues>({
     resolver: zodResolver(menuItemFormSchema),
@@ -166,6 +185,8 @@ export function MenuItemForm({
     setStockText(initialStockText(item));
     setLowText(item?.lowStockAt != null ? String(item.lowStockAt) : "");
     setStockError(null);
+    setSizes(sizeDraftsFrom(item?.variants));
+    setSizeError(null);
     // On edit, open "More options" when one of its text fields is in use.
     setMoreOpen(Boolean(item && (item.aliases.length > 0 || item.tags.length > 0 || item.hsnCode)));
     if (item) {
@@ -267,6 +288,8 @@ export function MenuItemForm({
 
   /** The stock keys to send, or null after showing an error on the field. */
   function stockBody(): MenuStockFields | null {
+    // Counted per size instead: saving the sizes stops the item's own count (lib/item-variants.ts rule 4).
+    if (counted) return {};
     const wasTracked = item?.stockQty != null;
     if (!trackStock) return wasTracked ? { stockQty: null } : {};
     const count = parseStockInput(stockText);
@@ -287,6 +310,19 @@ export function MenuItemForm({
     return out;
   }
 
+  /** PUT the size list; false (after a toast) when it was refused. */
+  async function saveSizes(itemId: string, body: VariantsBody): Promise<boolean> {
+    const res = await fetch(`/api/menu/${itemId}/variants`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    if (res.ok) return true;
+    const json = await res.json().catch(() => ({}));
+    toast.error(variantsErrorMessage(json.error));
+    return false;
+  }
+
   /** `addAnother` (create only): keep the sheet open, cleared, for the next item. */
   async function save(values: MenuItemFormValues, addAnother: boolean) {
     const price = parseRupeeInput(values.priceInRupees);
@@ -296,6 +332,15 @@ export function MenuItemForm({
     }
     const stock = stockBody();
     if (!stock) return;
+    let sizesBody: VariantsBody | null = null;
+    if (showSizes && (sizes.length > 0 || hadSizes)) {
+      const built = sizeDraftsToBody(sizes);
+      if ("error" in built) {
+        setSizeError(built.error);
+        return;
+      }
+      sizesBody = built.body;
+    }
     const fields = {
       name: values.name,
       priceInRupees: paiseToRupees(price.paise),
@@ -322,6 +367,8 @@ export function MenuItemForm({
           toast.error(typeof json.error === "string" ? json.error : "Could not update item");
           return;
         }
+        // A refused size list keeps the sheet open: saving again is safe on edit.
+        if (sizesBody && !(await saveSizes(item.id, sizesBody))) return;
         toast.success(`${itemNoun} updated`);
       } else {
         const res = await fetch("/api/menu", {
@@ -340,6 +387,8 @@ export function MenuItemForm({
         if (pendingFile && typeof json?.data?.id === "string") {
           await uploadImage(json.data.id, pendingFile);
         }
+        // Same for the sizes: a refusal has toasted, and the seller can add them from Edit.
+        if (sizesBody && typeof json?.data?.id === "string") await saveSizes(json.data.id, sizesBody);
         if (addAnother) {
           // Same category again: sellers add a whole section in one go.
           form.reset({ ...defaultCreateValues, emoji: baseEmoji, category: values.category?.trim() ?? "" });
@@ -350,6 +399,8 @@ export function MenuItemForm({
           setTrackStock(false);
           setStockText("");
           setLowText("");
+          setSizes([]);
+          setSizeError(null);
           onSaved();
           form.setFocus("name");
           return;
@@ -739,6 +790,9 @@ export function MenuItemForm({
                   </FormItem>
                 )}
               />
+              {counted ? (
+                <p className="text-sm text-muted-foreground">Stock is counted for each size or colour below.</p>
+              ) : (
               <div className="space-y-3">
                 <div className="space-y-1">
                   <div className="flex items-center gap-3">
@@ -816,6 +870,17 @@ export function MenuItemForm({
                   </div>
                 ) : null}
               </div>
+              )}
+              {showSizes ? (
+                <ItemSizesEditor
+                  drafts={sizes}
+                  onChange={(next) => {
+                    setSizes(next);
+                    setSizeError(null);
+                  }}
+                  error={sizeError}
+                />
+              ) : null}
               <FormField
                 control={form.control}
                 name="showOnline"

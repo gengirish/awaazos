@@ -78,6 +78,36 @@ test.describe("tenant isolation", () => {
     expect(rowA?.stockLeft).toBe(8);
   });
 
+  test("vendor B cannot edit, count or borrow vendor A's sizes (404, not 403)", async () => {
+    const itemA = await createMenuItem(pageA, { name: "A Sized Kurti", priceInRupees: 599 });
+    const itemB = await createMenuItem(pageB, { name: "B Plain Kurti", priceInRupees: 599 });
+    const put = await pageA.request.put(`/api/menu/${itemA.id}/variants`, {
+      data: { variants: [{ label: "M", stockQty: 4 }] },
+    });
+    expect(put.status()).toBe(200);
+    const [sizeA] = ((await put.json()) as { data: { id: string }[] }).data;
+
+    const replace = await pageB.request.put(`/api/menu/${itemA.id}/variants`, { data: { variants: [] } });
+    expect(replace.status(), "cross-tenant variants PUT must 404, never 403").toBe(404);
+    // A's size id on B's own item: never moved over, never renamed.
+    const borrow = await pageB.request.put(`/api/menu/${itemB.id}/variants`, {
+      data: { variants: [{ id: sizeA.id, label: "hijacked" }] },
+    });
+    expect(borrow.status(), "a foreign variant id must 404").toBe(404);
+    const countOwn = await pageB.request.post(`/api/menu/${itemB.id}/stock`, { data: { variantId: sizeA.id, set: 0 } });
+    expect(countOwn.status(), "a foreign variant id on the stock route must 404").toBe(404);
+    const countA = await pageB.request.post(`/api/menu/${itemA.id}/stock`, { data: { variantId: sizeA.id, adjust: -4 } });
+    expect(countA.status(), "cross-tenant variant stock must 404").toBe(404);
+
+    const listA = await pageA.request.get("/api/menu");
+    type SizedRow = MenuItemRow & { variants: { id: string; label: string; stockLeft: number | null }[] };
+    const rowA = ((await listA.json()) as { data: SizedRow[] }).data.find((i) => i.id === itemA.id);
+    expect(rowA?.variants).toMatchObject([{ id: sizeA.id, label: "M", stockLeft: 4 }]);
+    const listB = await pageB.request.get("/api/menu");
+    const rowB = ((await listB.json()) as { data: SizedRow[] }).data.find((i) => i.id === itemB.id);
+    expect(rowB?.variants).toEqual([]);
+  });
+
   test("vendor B's menu listing never contains vendor A's items", async () => {
     const itemA = await createMenuItem(pageA, { name: "A Only Chai", priceInRupees: 10 });
     await createMenuItem(pageB, { name: "B Only Coffee", priceInRupees: 20 });

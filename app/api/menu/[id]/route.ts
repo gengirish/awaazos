@@ -26,6 +26,9 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
   return res;
 }
 
+/** A count sent for an item that has sizes / colours; rolls the update back. */
+class HasVariantsError extends Error {}
+
 export async function PATCH(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
@@ -81,6 +84,13 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
           data: data as Prisma.MenuItemUpdateInput,
         });
         if (stockFields.stockQty !== undefined) {
+          // An item with sizes / colours counts them, not itself (lib/item-variants.ts rule 4).
+          if (
+            stockFields.stockQty !== null &&
+            (await tx.itemVariant.count({ where: { menuItemId: row.id, vendorId } })) > 0
+          ) {
+            throw new HasVariantsError();
+          }
           // A new count (or null = stop tracking) moves stockCountedAt (lib/inventory.ts rule 2).
           await recordStockCount(tx, vendorId, row.id, stockFields.stockQty);
           row = await tx.menuItem.findUniqueOrThrow({ where: { id: row.id, vendorId } });
@@ -93,6 +103,9 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
         return NextResponse.json({ error: "Not found" }, { status: 404 });
+      }
+      if (e instanceof HasVariantsError) {
+        return NextResponse.json({ error: "has_variants" }, { status: 409 });
       }
       throw e;
     }

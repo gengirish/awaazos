@@ -62,6 +62,9 @@ const envSchema = z.object({
   INTERNAL_API_KEY: z.string().optional(),
   // Login of the internal account that owns demo stores until handover.
   DEMO_OWNER_EMAIL: z.string().optional(),
+  // "true" offers "Sizes or colours" in a goods store's item form (lib/item-variants.ts).
+  // Read on each /menu render, so it needs no rebuild. Stores that already have them keep them.
+  ITEM_VARIANTS_ENABLED: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

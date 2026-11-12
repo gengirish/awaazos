@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { loadMenuCreateContext, prepareMenuItemCreate } from "@/lib/menu-create";
 import { menuStockFieldsSchema, splitStockFields } from "@/lib/menu-stock";
-import { withStockLeft } from "@/lib/menu-stock-server";
+import { withStockLeft, withVariants } from "@/lib/menu-stock-server";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { menuItemCreateSchema } from "@/lib/zod-menu";
@@ -31,7 +31,9 @@ export async function GET(req: NextRequest) {
       orderBy: { sortOrder: "asc" },
     });
     // `stockLeft` is derived (lib/inventory.ts rule 2); null on untracked rows.
-    const res = NextResponse.json({ data: await withStockLeft(prisma, ctx.vendor.id, items) });
+    // `variants`: sizes / colours, each with its own stock (lib/item-variants.ts).
+    const rows = await withStockLeft(prisma, ctx.vendor.id, items);
+    const res = NextResponse.json({ data: await withVariants(prisma, ctx.vendor.id, rows) });
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {
     if (err instanceof AuthError) {

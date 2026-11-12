@@ -13,6 +13,7 @@ import type { MenuItem } from "@prisma/client";
 import { z } from "zod";
 
 import { MAX_STOCK_QTY } from "@/lib/inventory";
+import type { VariantRow } from "@/lib/item-variants";
 
 const stockCount = z
   .number({ error: "Enter a whole number" })
@@ -55,11 +56,15 @@ export function hasStockFields(fields: MenuStockFields): boolean {
   return fields.stockQty !== undefined || fields.lowStockAt !== undefined;
 }
 
+/** One size / colour of the item (lib/item-variants.ts); absent = the item itself. */
+const stockVariantId = z.string().min(1).max(64).optional();
+
 /** Body of POST /api/menu/[id]/stock: record a count, or move it by ±n. */
 export const stockChangeSchema = z.union([
-  z.object({ set: stockCount }).strict(),
+  z.object({ set: stockCount, variantId: stockVariantId }).strict(),
   z
     .object({
+      variantId: stockVariantId,
       adjust: z
         .number()
         .int("Enter a whole number")
@@ -116,8 +121,12 @@ export function onShelfCount(row: WithStockLeft): number {
   return Math.max(0, (row.stockLeft ?? 0) + (row.stockSetAside ?? 0));
 }
 
-/** One row on the /menu screen. */
-export type MenuRow = MenuItem & WithStockLeft;
+/**
+ * One row on the /menu screen. `variants`: its sizes / colours
+ * (lib/item-variants.ts); absent on a row a PATCH answered, which the screen
+ * merges into the row it already has.
+ */
+export type MenuRow = MenuItem & WithStockLeft & { variants?: VariantRow[] };
 
 /** Under "In stock now" and "Set count": what to count (lib/inventory.ts rule 2b). */
 export function setAsideHint(setAside: number | null): string {
