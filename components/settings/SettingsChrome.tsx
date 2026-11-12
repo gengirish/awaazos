@@ -24,13 +24,18 @@ export function SettingsPageHeader({ title, description }: { title: string; desc
   );
 }
 
-/** A titled block on a Settings page. Renders an h2 under the page's h1. */
+/**
+ * A titled block on a Settings page. Renders an h2 under the page's h1.
+ * `id` makes it a link target (`/settings/store#tagline`, from the Store screen).
+ */
 export function SettingsCard({
+  id,
   title,
   description,
   children,
   className,
 }: {
+  id?: string;
   title: string;
   description?: ReactNode;
   children: ReactNode;
@@ -39,8 +44,9 @@ export function SettingsCard({
   const headingId = useId();
   return (
     <section
+      id={id}
       aria-labelledby={headingId}
-      className={cn("rounded-lg border bg-card p-4 text-card-foreground shadow-xs sm:p-6", className)}
+      className={cn("scroll-mt-4 rounded-lg border bg-card p-4 text-card-foreground shadow-xs sm:p-6", className)}
     >
       <h2 id={headingId} className="font-display text-lg font-semibold leading-tight">
         {title}

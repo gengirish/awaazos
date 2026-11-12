@@ -122,7 +122,9 @@ test.describe("app shell navigation", () => {
     await expect(page.getByTestId("app-rail")).toBeHidden();
 
     const tab = (name: string) => tabs.getByRole("link", { name, exact: true });
-    for (const name of ["Orders", "Drops", "Sell", "Menu"]) {
+    // Not published yet: Store sits in the middle and Sell keeps the fourth slot.
+    await expect(tabs.getByRole("link")).toHaveText(["Orders", "Menu", "Store", "Sell"]);
+    for (const name of ["Orders", "Menu", "Store", "Sell"]) {
       await expect(tab(name)).toBeVisible();
       await expectTapTarget(tab(name), `${name} tab`);
     }
@@ -141,11 +143,11 @@ test.describe("app shell navigation", () => {
     await more.click();
     const sheet = page.getByRole("dialog", { name: "More" });
     await expect(sheet).toBeVisible();
-    for (const name of ["Transactions", "Analytics", "Settings", "Help"]) {
+    for (const name of ["Drops", "Transactions", "Analytics", "Settings", "Help"]) {
       await expect(sheet.getByRole("link", { name, exact: true })).toBeVisible();
     }
     await expect(sheet.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
-    // The store is not published yet, so there is nothing live to link to.
+    // The store's link lives on the Store screen now, not in this sheet.
     await expect(sheet.getByRole("link", { name: /Live store/ })).toHaveCount(0);
 
     // Escape closes and returns focus to the trigger.
@@ -162,43 +164,62 @@ test.describe("app shell navigation", () => {
     await expect(more).toHaveAttribute("aria-current", "page");
     await expect(tab("Sell")).not.toHaveAttribute("aria-current", "page");
 
-    // Tabs navigate, and a page inside a section keeps that section's tab marked.
-    await tab("Drops").click();
-    await expect(page).toHaveURL(/\/drops$/);
-    await expect(tab("Drops")).toHaveAttribute("aria-current", "page");
+    // Tabs navigate; Drops, behind More, marks More on its pages too.
+    await tab("Menu").click();
+    await expect(page).toHaveURL(/\/menu$/);
+    await expect(tab("Menu")).toHaveAttribute("aria-current", "page");
     await page.goto("/drops/new");
     await expect(page.getByRole("heading", { level: 1, name: "New drop" })).toBeVisible();
-    await expect(tab("Drops")).toHaveAttribute("aria-current", "page");
+    await expect(more).toHaveAttribute("aria-current", "page");
 
     await tab("Sell").click();
     await expect(page).toHaveURL(/\/pos$/);
   });
 
-  test("phone: Live store appears under More once the store is published", async ({ page, request }) => {
+  test("phone: Store is the centre tab and opens the store's link once published", async ({ page, request }) => {
     await createVendorSession(page, request, "shell-live");
     await createMenuItem(page, { name: "Dhokla", priceInRupees: 30 });
-    const publish = await page.request.patch("/api/vendor", {
-      data: { publishStorefront: true },
-      headers: { "Content-Type": "application/json" },
-    });
-    expect(publish.status()).toBe(200);
     await openPos(page, PHONE);
-
-    // A published store trades the Sell tab for Settings; Sell moves behind More.
     const tabs = page.getByRole("navigation", { name: "Main" });
-    for (const name of ["Orders", "Drops", "Menu", "Settings"]) {
-      await expect(tabs.getByRole("link", { name, exact: true })).toBeVisible();
-    }
-    await expect(tabs.getByRole("link", { name: "Sell", exact: true })).toHaveCount(0);
+
+    // Hidden store: the Store screen says so and offers the owner Publish.
+    await tabs.getByRole("link", { name: "Store", exact: true }).click();
+    await expect(page).toHaveURL(/\/store$/);
+    await expect(page.getByRole("heading", { level: 1, name: "Your store" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Hidden from buyers" })).toBeVisible();
+    // The owner sees what is left of the store's look, each row opening its Settings card.
+    await expect(page.getByRole("link", { name: /Tagline/ })).toHaveAttribute("href", "/settings/store#tagline");
+    await expect(page.getByText("Not taking orders yet.")).toBeVisible();
+    await page.getByRole("button", { name: "Publish store" }).click();
+    await expect(page.getByRole("heading", { name: "Open to buyers" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bring buyers to your store" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Copy Instagram bio link/ })).toBeVisible();
+
+    // Published: Settings takes the fourth slot, Sell and Drops move behind More, Store stays in the middle.
+    await expect(tabs.getByRole("link")).toHaveText(["Orders", "Menu", "Store", "Settings"]);
+    await expect(tabs.getByRole("link", { name: "Store", exact: true })).toHaveAttribute("aria-current", "page");
+    await expectTapTarget(tabs.getByRole("link", { name: "Store", exact: true }), "Store tab");
+
+    const live = page.getByRole("main").getByRole("link", { name: /Open live store/ });
+    await expect(live).toHaveAttribute("href", /^\/s\//);
+    await expect(live).toHaveAttribute("target", "_blank");
+    await expect(page.getByRole("button", { name: "Share link" })).toBeVisible();
+    await page.getByRole("button", { name: "Show QR code" }).click();
+    const qr = page.getByRole("dialog", { name: /QR code/ });
+    await expect(qr.getByRole("img", { name: /QR code for/ })).toBeVisible();
+    await page.keyboard.press("Escape");
 
     await tabs.getByRole("button", { name: "More" }).click();
     const sheet = page.getByRole("dialog", { name: "More" });
-    await expect(sheet.getByRole("link", { name: "Sell", exact: true })).toHaveAttribute("aria-current", "page");
-    await expect(sheet.getByRole("button", { name: "Share store link", exact: true })).toBeVisible();
-    const live = sheet.getByRole("link", { name: /Live store/ });
-    await expect(live).toBeVisible();
-    await expect(live).toHaveAttribute("href", /^\/s\//);
-    await expect(live).toHaveAttribute("target", "_blank");
+    for (const name of ["Drops", "Sell"]) {
+      await expect(sheet.getByRole("link", { name, exact: true })).toBeVisible();
+    }    await page.keyboard.press("Escape");
+
+    // A look row opens Settings → Online store scrolled to its card.
+    await tabs.getByRole("link", { name: "Store", exact: true }).click();
+    await page.getByRole("link", { name: /Banner & logo/ }).click();
+    await expect(page).toHaveURL(/\/settings\/store#banner-logo$/);
+    await expect(page.getByRole("heading", { level: 2, name: "Banner & logo" })).toBeInViewport();
   });
 
   test("desktop: a left rail lists every destination and there is no tab bar", async ({ page, request }) => {
@@ -212,7 +233,18 @@ test.describe("app shell navigation", () => {
     await expect(page.getByTestId("app-tabbar")).toBeHidden();
 
     const item = (name: string) => rail.getByRole("link", { name, exact: true });
-    for (const name of ["Orders", "Drops", "Sell", "Menu", "Transactions", "Analytics", "Settings", "Help"]) {
+    await expect(rail.getByRole("link")).toHaveText([
+      "Orders",
+      "Menu",
+      "Store",
+      "Drops",
+      "Sell",
+      "Transactions",
+      "Analytics",
+      "Settings",
+      "Help",
+    ]);
+    for (const name of ["Orders", "Menu", "Store", "Drops", "Sell", "Transactions", "Analytics", "Settings", "Help"]) {
       await expect(item(name)).toBeVisible();
       await expectTapTarget(item(name), `${name} rail link`);
     }
@@ -239,7 +271,7 @@ test.describe("app shell navigation", () => {
     await expect(page.getByRole("main").getByRole("link", { name: "Settings", exact: true })).toBeVisible();
   });
 
-  test("a cashier sees only Orders, Sell, Settings, Help and Sign out", async ({ page, request }) => {
+  test("a cashier sees only Orders, Sell, Store, Settings, Help and Sign out", async ({ page, request }) => {
     // Registration only creates an OWNER; the role is changed straight in the database.
     test.skip(!CAN_SET_BILLING, "needs a local throwaway database to demote the owner to CASHIER");
     const creds = await createVendorSession(page, request, "shell-cashier");
@@ -248,8 +280,7 @@ test.describe("app shell navigation", () => {
 
     await openPos(page, PHONE);
     const tabs = page.getByRole("navigation", { name: "Main" });
-    await expect(tabs.getByRole("link", { name: "Orders", exact: true })).toBeVisible();
-    await expect(tabs.getByRole("link", { name: "Sell", exact: true })).toBeVisible();
+    await expect(tabs.getByRole("link")).toHaveText(["Orders", "Sell", "Store"]);
     await expect(tabs.getByRole("link", { name: "Drops", exact: true })).toHaveCount(0);
     await expect(tabs.getByRole("link", { name: "Menu", exact: true })).toHaveCount(0);
 
@@ -263,7 +294,7 @@ test.describe("app shell navigation", () => {
 
     await page.setViewportSize(DESKTOP);
     const rail = page.getByRole("navigation", { name: "Main" });
-    await expect(rail.getByRole("link")).toHaveText(["Orders", "Sell", "Settings", "Help"]);
+    await expect(rail.getByRole("link")).toHaveText(["Orders", "Store", "Sell", "Settings", "Help"]);
 
     // Hiding links is cosmetic: the server still turns a cashier away from /drops.
     await page.goto("/drops");

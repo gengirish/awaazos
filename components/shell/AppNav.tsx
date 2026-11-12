@@ -4,14 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { StaffRole } from "@prisma/client";
-import { ChevronRight, ExternalLink, MoreHorizontal, Share2 } from "lucide-react";
-import { toast } from "sonner";
+import { ChevronRight, MoreHorizontal } from "lucide-react";
 
 import { VendorSignOutButton } from "@/components/auth/VendorSignOutButton";
 import { InstallRailButton, InstallSheetRow } from "@/components/pwa/InstallPrompt";
 import { appNavIcon } from "@/components/shell/nav-icons";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { appNavItemsForRole, appTabBarForRole, isAppNavItemActive } from "@/lib/app-nav";
+import { APP_CENTRE_TAB, appNavItemsForRole, appTabBarForRole, isAppNavItemActive } from "@/lib/app-nav";
 import type { StoreKind } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
@@ -39,6 +38,8 @@ const TAB =
 const TAB_ACTIVE =
   "font-bold text-foreground before:absolute before:inset-x-3 before:top-0 before:h-1 before:rounded-b-full before:bg-primary";
 const TAB_IDLE = "font-medium text-muted-foreground hover:text-foreground";
+/** The raised centre tab (Store) is marked by `aria-current` and bold text; its disc covers the edge bar. */
+const TAB_CENTRE_ACTIVE = "font-bold text-foreground";
 
 const RAIL_ITEM =
   "relative flex min-h-14 w-full flex-col items-center justify-center gap-1 rounded-md px-1 py-2 text-center text-xs transition-colors motion-reduce:transition-none";
@@ -48,33 +49,6 @@ const RAIL_IDLE = "font-medium text-muted-foreground hover:bg-muted/60 hover:tex
 
 const SHEET_ROW =
   "flex min-h-14 w-full items-center gap-3 rounded-md px-4 py-3 text-left ring-inset transition-colors hover:bg-muted/50 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none";
-
-const NEW_TAB_NOTE = <span className="sr-only"> (opens in a new tab)</span>;
-
-/**
- * "Share store link" in the More sheet. Same behaviour as the storefront's
- * ShareStoreButton: the phone's share sheet first (WhatsApp, Instagram…), a
- * copied link where there is none. Always the canonical `/s/<slug>` URL.
- * A dismissed share sheet (AbortError) is not an error.
- */
-async function shareStoreLink(storePath: string, vendorName: string): Promise<void> {
-  const url = `${window.location.origin}${storePath}`;
-  if (typeof navigator.share === "function") {
-    try {
-      await navigator.share({ title: vendorName, text: `Order from ${vendorName} online`, url });
-      return;
-    } catch (err) {
-      if (err instanceof Error && err.name === "AbortError") return;
-      // Share API present but refused (permission policy): copy instead.
-    }
-  }
-  try {
-    await navigator.clipboard.writeText(url);
-    toast.success("Store link copied.");
-  } catch {
-    toast.error("Could not copy the link. Open Live store and copy it from the address bar.");
-  }
-}
 
 /**
  * Phone navigation (below md): a fixed bottom tab bar. The destinations that
@@ -107,6 +81,24 @@ export function AppTabBar({ role, vendorId, vendorName, storePath, storeKind }: 
         {tabs.map((item) => {
           const active = isAppNavItemActive(item.href, pathname);
           const Icon = appNavIcon(item.id);
+          if (item.id === APP_CENTRE_TAB) {
+            return (
+              <li key={item.id} className="min-w-0 flex-1">
+                <Link
+                  href={item.href}
+                  aria-current={active ? "page" : undefined}
+                  data-testid="app-tabbar-centre"
+                  className={cn(TAB, active ? TAB_CENTRE_ACTIVE : TAB_IDLE)}
+                >
+                  {/* Raised above the bar; the ring in the page colour cuts it out of the bar's top border. */}
+                  <span className="-mt-6 flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-md ring-4 ring-background">
+                    <Icon className="h-6 w-6" aria-hidden="true" />
+                  </span>
+                  <span className="max-w-full truncate">{item.label}</span>
+                </Link>
+              </li>
+            );
+          }
           return (
             <li key={item.id} className="min-w-0 flex-1">
               <Link
@@ -164,41 +156,6 @@ export function AppTabBar({ role, vendorId, vendorName, storePath, storeKind }: 
                       </li>
                     );
                   })}
-                  {storePath ? (
-                    <li>
-                      <a
-                        href={storePath}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        onClick={() => setMoreOpen(false)}
-                        className={SHEET_ROW}
-                      >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
-                          <ExternalLink className="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <span className="min-w-0 flex-1 font-semibold text-foreground">
-                          Live store
-                          {NEW_TAB_NOTE}
-                        </span>
-                        <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
-                      </a>
-                    </li>
-                  ) : null}
-                  {storePath ? (
-                    <li>
-                      {/* The sheet stays open until the share sheet or the copy has finished: it holds the tap gesture. */}
-                      <button
-                        type="button"
-                        className={SHEET_ROW}
-                        onClick={() => void shareStoreLink(storePath, vendorName).then(() => setMoreOpen(false))}
-                      >
-                        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-foreground">
-                          <Share2 className="h-5 w-5" aria-hidden="true" />
-                        </span>
-                        <span className="min-w-0 flex-1 font-semibold text-foreground">Share store link</span>
-                      </button>
-                    </li>
-                  ) : null}
                   {/* "Install app" where this browser can install; nothing otherwise. */}
                   <InstallSheetRow rowClassName={SHEET_ROW} onPrompt={() => setMoreOpen(false)} />
                   <li className="mt-2 border-t border-border pt-2">
@@ -222,10 +179,10 @@ export function AppTabBar({ role, vendorId, vendorName, storePath, storeKind }: 
 
 /**
  * md+ navigation: a fixed left rail listing every destination (there is no
- * "More" here), with Live store and Sign out at the foot. Width is
+ * "More" here), with Install and Sign out at the foot. Width is
  * `--app-rail-w` (app/globals.css, `.app-shell`).
  */
-export function AppRail({ role, vendorId, vendorName, storePath, storeKind }: AppNavProps) {
+export function AppRail({ role, vendorId, vendorName, storeKind }: AppNavProps) {
   const pathname = usePathname() ?? "";
   const items = appNavItemsForRole(role, storeKind);
 
@@ -255,18 +212,6 @@ export function AppRail({ role, vendorId, vendorName, storePath, storeKind }: Ap
         })}
       </ul>
       <div className="space-y-1 border-t border-border px-1.5 py-2">
-        {storePath ? (
-          <a
-            href={storePath}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={cn(RAIL_ITEM, FOCUS_RING, RAIL_IDLE)}
-          >
-            <ExternalLink className="h-5 w-5 shrink-0" aria-hidden="true" />
-            <span className="max-w-full truncate">Live store</span>
-            {NEW_TAB_NOTE}
-          </a>
-        ) : null}
         <InstallRailButton className={cn(RAIL_ITEM, FOCUS_RING, RAIL_IDLE)} />
         <VendorSignOutButton
           variant="header"

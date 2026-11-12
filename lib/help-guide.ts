@@ -39,6 +39,7 @@ export const HELP_SCREEN_SUMMARY: Record<AppNavId, string> = {
   drops: "Pre-order batches with a cut-off. Create and edit drops here; their orders come in on the Orders screen.",
   sell: "The counter. Ring up a sale by tapping or by voice, and take payment.",
   menu: "Your {items}: names, prices, photos and what is available today.",
+  store: "Your store at a glance: open or hidden, what buyers can order now, ways to bring buyers in, and what is left to make it look like yours.",
   transactions: "Every bill you have made. Search, resend a receipt, or export.",
   analytics: "Sales totals, best-selling {items} and busy hours.",
   settings: "Your online store, payments, receipts, alerts and plan.",
@@ -203,6 +204,14 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     steps: "With {catalogueOrdersTitle} on, tap Share on the Orders screen: Share store link, Copy link, or Instagram story for a ready-made image of your {catalogue}. Open store shows your store as customers see it.",
     nav: "orders",
     keywords: "post link promote story bio",
+  },
+  {
+    id: "store-link-qr",
+    group: "orders",
+    title: "Open, share or print your store link",
+    steps: "Tap Store in the middle of the bar. Open live store shows it as buyers see it. Under Bring buyers to your store: Copy Instagram bio link, Instagram story image, Share on WhatsApp, Show QR code and Copy link. A hidden store has Publish store here for the owner.",
+    nav: "store",
+    keywords: "qr code print poster url address live preview publish hidden",
   },
   {
     id: "new-drop",
