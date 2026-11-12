@@ -106,7 +106,7 @@ export function AppTabBar({ role, vendorId, vendorName, storePath, storeKind }: 
       <ul className="mx-auto flex h-full max-w-lg items-stretch">
         {tabs.map((item) => {
           const active = isAppNavItemActive(item.href, pathname);
-          const Icon = appNavIcon(item.id, storeKind);
+          const Icon = appNavIcon(item.id);
           return (
             <li key={item.id} className="min-w-0 flex-1">
               <Link
@@ -144,7 +144,7 @@ export function AppTabBar({ role, vendorId, vendorName, storePath, storeKind }: 
                 <ul>
                   {more.map((item) => {
                     const active = isAppNavItemActive(item.href, pathname);
-                    const Icon = appNavIcon(item.id, storeKind);
+                    const Icon = appNavIcon(item.id);
                     return (
                       <li key={item.id}>
                         <Link
@@ -239,7 +239,7 @@ export function AppRail({ role, vendorId, vendorName, storePath, storeKind }: Ap
       <ul className="flex-1 space-y-1 overflow-y-auto px-1.5 py-2">
         {items.map((item) => {
           const active = isAppNavItemActive(item.href, pathname);
-          const Icon = appNavIcon(item.id, storeKind);
+          const Icon = appNavIcon(item.id);
           return (
             <li key={item.id}>
               <Link
