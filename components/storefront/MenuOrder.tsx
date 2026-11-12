@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { useCartHubEntry } from "@/components/storefront/CartHub";
+import { SizePicker } from "@/components/storefront/SizePicker";
 import { ItemPhoto } from "@/components/storefront/ItemPhoto";
 import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
 import {
@@ -18,7 +19,6 @@ import {
 } from "@/components/storefront/StorefrontCheckout";
 import { ItemPrice } from "@/components/storefront/ItemPrice";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
-import { RadioOption } from "@/components/ui/radio-option";
 import { deliveryAreaSummary, type DeliveryArea } from "@/lib/delivery-areas";
 import {
   allSizesSoldOut,
@@ -84,9 +84,6 @@ export type MenuOrderItem = {
   /** Its available sizes / colours (lib/item-variants.ts); absent = it has none. */
   sizes?: StoreSize[];
 };
-
-/** Up to this many sizes are a row of options; more are a drop-down (design-system.mdc). */
-const SIZE_OPTIONS_MAX = 5;
 
 /** One cart line resolved against the page: the item, and its size when it has them. */
 type CartLine = { key: string; item: MenuOrderItem; size: StoreSize | null };
@@ -405,7 +402,8 @@ export function MenuOrder(props: MenuOrderProps) {
                 const sizes =
                   item.sizes && item.sizes.length > 0 && !itemSoldOut ? (
                     <SizePicker
-                      item={item}
+                      itemId={item.id}
+                      itemName={item.name}
                       sizes={item.sizes}
                       pickedId={size?.id ?? null}
                       onPick={(id) => setPicked((p) => ({ ...p, [item.id]: id }))}
@@ -521,91 +519,6 @@ export function MenuOrder(props: MenuOrderProps) {
         })}
         onRejected={onRejected}
       />
-    </div>
-  );
-}
-
-/**
- * Pick one size / colour of an item (lib/item-variants.ts). Up to
- * SIZE_OPTIONS_MAX are a row of options, more a native drop-down (the phone's
- * own picker, and no extra script on the store page). A sold-out size can't be
- * picked and says so in words. Under it: which sizes are already in the cart.
- */
-function SizePicker({
-  item,
-  sizes,
-  pickedId,
-  onPick,
-  inCart,
-  priceNote,
-}: {
-  item: MenuOrderItem;
-  sizes: StoreSize[];
-  pickedId: string | null;
-  onPick: (variantId: string) => void;
-  inCart: string[];
-  priceNote: string | null;
-}) {
-  const legend = `${item.name}: size or colour`;
-  return (
-    <div className="mt-1 flex flex-col gap-1">
-      {sizes.length <= SIZE_OPTIONS_MAX ? (
-        <fieldset>
-          <legend className="sr-only">{legend}</legend>
-          <div className="flex flex-wrap gap-1.5">
-            {sizes.map((v) => {
-              const soldOut = v.stock?.soldOut ?? false;
-              return (
-                <RadioOption
-                  key={v.id}
-                  name={`size-${item.id}`}
-                  value={v.id}
-                  size="compact"
-                  inputClassName="sr-only"
-                  className="min-w-11 px-3"
-                  checked={v.id === pickedId}
-                  disabled={soldOut}
-                  onChange={() => onPick(v.id)}
-                  label={
-                    soldOut ? (
-                      <>
-                        <span className="line-through" aria-hidden="true">
-                          {v.label}
-                        </span>
-                        <span className="sr-only">{`${v.label}, sold out`}</span>
-                      </>
-                    ) : (
-                      v.label
-                    )
-                  }
-                />
-              );
-            })}
-          </div>
-        </fieldset>
-      ) : (
-        <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
-          <span className="sr-only">{legend}</span>
-          <select
-            value={pickedId ?? ""}
-            onChange={(e) => onPick(e.target.value)}
-            className="min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            {sizes.map((v) => {
-              const soldOut = v.stock?.soldOut ?? false;
-              return (
-                <option key={v.id} value={v.id} disabled={soldOut}>
-                  {soldOut ? `${v.label} (sold out)` : v.label}
-                </option>
-              );
-            })}
-          </select>
-        </label>
-      )}
-      {priceNote ? <span className="text-xs text-muted-foreground">{priceNote}</span> : null}
-      {inCart.length > 0 ? (
-        <span className="text-xs font-semibold text-primary">In cart: {inCart.join(", ")}</span>
-      ) : null}
     </div>
   );
 }

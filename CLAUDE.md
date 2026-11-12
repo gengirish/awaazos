@@ -766,9 +766,11 @@ stock route takes `variantId`), shown for goods stores only while `ITEM_VARIANTS
 per render). The cart key is `itemId:variantId` (`cartLineKey`). At the counter a tile with sizes opens a
 picker (`components/pos/SizePickerDialog.tsx`); `POST /api/transactions` records the line's `variantId` only when
 it is this vendor's size of that item (live sale otherwise 400 `size_not_found`; a queued offline sale keeps the
-line without it), never refuses over stock or a missing size, and voice leaves sized items for a tap. Not yet:
-drops (an item with variants can't join a drop, nor get variants while in one that hasn't ended), free gifts with
-sizes (that offer is skipped), order again.
+line without it), never refuses over stock or a missing size, and voice leaves sized items for a tap. Drops sell
+by size too (rule 7): the line is priced from the size, else the drop; `maxQty` / `perOrderLimit` cover all sizes
+of the item; each tracked size caps itself (`sold_out` + `variantId`); the packing list splits each item by size.
+The store page's picker is `components/storefront/SizePicker.tsx` (menu and drops). Not yet: free gifts with sizes
+(that offer is skipped), order again.
 
 ### Customer feedback
 

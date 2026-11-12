@@ -64,6 +64,7 @@ export const boardOrderSelect = {
       id: true,
       dropItemId: true,
       menuItemId: true,
+      variantId: true,
       name: true,
       qty: true,
       priceInPaise: true,
@@ -138,7 +139,14 @@ export type BoardDrop = {
   fulfilmentEndsAt: string;
   pickupNote: string | null;
   deliveryFeePaise: number;
-  items: { id: string; name: string; emoji: string | null; maxQty: number | null }[];
+  items: {
+    id: string;
+    name: string;
+    emoji: string | null;
+    maxQty: number | null;
+    /** The product's sizes or colours in the seller's order (lib/item-variants.ts); empty = none. */
+    sizes: { id: string; label: string }[];
+  }[];
 };
 
 export type DropBoard = {
@@ -151,7 +159,15 @@ export type DropBoard = {
 const boardDropInclude = {
   items: {
     orderBy: { sortOrder: "asc" },
-    include: { menuItem: { select: { name: true, emoji: true } } },
+    include: {
+      menuItem: {
+        select: {
+          name: true,
+          emoji: true,
+          variants: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { id: true, label: true } },
+        },
+      },
+    },
   },
 } satisfies Prisma.DropInclude;
 
@@ -176,6 +192,7 @@ function toBoardDrop(drop: BoardDropRow, now: Date): BoardDrop {
       name: i.menuItem.name,
       emoji: i.menuItem.emoji,
       maxQty: i.maxQty,
+      sizes: i.menuItem.variants,
     })),
   };
 }

@@ -8,7 +8,6 @@ import {
   notFound,
   serializeDrop,
   unknownMenuItems,
-  sizedMenuItems,
   withVendorCookie,
 } from "@/lib/drops-api";
 import { planDropItemRemoval } from "@/lib/drops-builder";
@@ -59,11 +58,9 @@ export async function PUT(req: NextRequest, props: Params) {
 
     const owned = await prisma.menuItem.findMany({
       where: { vendorId, id: { in: body.items.map((i) => i.menuItemId) } },
-      select: { id: true, _count: { select: { variants: true } } },
+      select: { id: true },
     });
-    const bad =
-      unknownMenuItems(body.items, new Set(owned.map((m) => m.id))) ??
-      sizedMenuItems(body.items, new Set(owned.filter((m) => m._count.variants > 0).map((m) => m.id)));
+    const bad = unknownMenuItems(body.items, new Set(owned.map((m) => m.id)));
     if (bad) throw bad;
 
     await prisma.$transaction(async (tx) => {

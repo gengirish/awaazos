@@ -35,6 +35,8 @@ export type BoardOrderItem = {
   dropItemId: string | null;
   /** The catalogue item; null once it was deleted (the line keeps its snapshot name). */
   menuItemId?: string | null;
+  /** The size or colour (lib/item-variants.ts); null for an item without, or once deleted. */
+  variantId?: string | null;
   name: string;
   qty: number;
   priceInPaise: number;
@@ -254,7 +256,12 @@ export type PrepDropItem = {
   name: string;
   emoji: string | null;
   maxQty: number | null;
+  /** The product's sizes or colours, in the seller's order; absent or empty = none. */
+  sizes?: { id: string; label: string }[];
 };
+
+/** One size's share of a prep row; `variantId` null = lines that name no size (or a deleted one). */
+export type PrepSize = { variantId: string | null; label: string; qty: number };
 
 export type PrepRow = {
   dropItemId: string;
@@ -267,12 +274,17 @@ export type PrepRow = {
   maxQty: number | null;
   /** null = unlimited. Same rule as `remainingQty` in lib/drops.ts (never negative). */
   remaining: number | null;
+  /** For an item with sizes: how many of `qtyOrdered` are each size, in the seller's order; else []. */
+  sizes: PrepSize[];
 };
+
+/** Lines that name no size of an item that has sizes (ordered before it got them, or the size was deleted). */
+export const PREP_NO_SIZE_LABEL = "Size not given";
 
 type PrepOrderInput = {
   holdsStock: boolean;
   displayState: OrderDisplayState;
-  items: { dropItemId: string | null; qty: number; isGift?: boolean }[];
+  items: { dropItemId: string | null; variantId?: string | null; qty: number; isGift?: boolean }[];
 };
 
 /**
@@ -285,16 +297,30 @@ type PrepOrderInput = {
 export function prepFromOrders(dropItems: PrepDropItem[], orders: PrepOrderInput[]): PrepRow[] {
   const qty = new Map<string, number>();
   const free = new Map<string, number>();
+  // "dropItemId:variantId" (or the bare drop item id) → units.
+  const bySize = new Map<string, number>();
   for (const o of orders) {
     if (!o.holdsStock || o.displayState === "CANCELLED") continue;
     for (const it of o.items) {
       if (!it.dropItemId) continue;
       qty.set(it.dropItemId, (qty.get(it.dropItemId) ?? 0) + it.qty);
       if (it.isGift) free.set(it.dropItemId, (free.get(it.dropItemId) ?? 0) + it.qty);
+      const key = it.variantId ? `${it.dropItemId}:${it.variantId}` : it.dropItemId;
+      bySize.set(key, (bySize.get(key) ?? 0) + it.qty);
     }
   }
   return dropItems.map((d) => {
     const ordered = qty.get(d.id) ?? 0;
+    const sizes: PrepSize[] = [];
+    if (d.sizes && d.sizes.length > 0) {
+      let named = 0;
+      for (const v of d.sizes) {
+        const n = bySize.get(`${d.id}:${v.id}`) ?? 0;
+        named += n;
+        if (n > 0) sizes.push({ variantId: v.id, label: v.label, qty: n });
+      }
+      if (ordered - named > 0) sizes.push({ variantId: null, label: PREP_NO_SIZE_LABEL, qty: ordered - named });
+    }
     return {
       dropItemId: d.id,
       name: d.name,
@@ -303,6 +329,7 @@ export function prepFromOrders(dropItems: PrepDropItem[], orders: PrepOrderInput
       qtyFree: free.get(d.id) ?? 0,
       maxQty: d.maxQty,
       remaining: d.maxQty === null ? null : Math.max(0, d.maxQty - ordered),
+      sizes,
     };
   });
 }

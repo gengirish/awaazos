@@ -15,6 +15,10 @@
  *      A drop item whose product tracks stock (lib/inventory.ts) is also capped
  *      by that stock: after the drop row, the tracked MenuItem rows are locked
  *      in id order, and the smaller of the two limits wins (`combinedRemaining`).
+ *      An item with sizes or colours (lib/item-variants.ts rule 7) is ordered
+ *      by size: the drop's cap and per-order limit count every size of the
+ *      item together, each tracked size's own stock caps that size (locked
+ *      after the items), and the line is priced from the size, else the drop.
  *
  *   3. **Sold counts are derived, never stored.** An unpaid UPI order holds its
  *      stock for PENDING_HOLD_MINUTES, then silently stops counting. Cancelling
@@ -46,8 +50,9 @@ import { sumPaise } from "@/lib/currency";
 import { deliveryFields } from "@/lib/delivery-address";
 import { deliveryFeeFor, parseDeliveryAreas } from "@/lib/delivery-areas";
 import { bumpOrderSignal } from "@/lib/drops-signal";
-import { combinedRemaining } from "@/lib/inventory";
-import { lockTrackedMenuItems, stockLeftByMenuItem } from "@/lib/inventory-server";
+import { combinedRemaining, firstShortfall } from "@/lib/inventory";
+import { lockTrackedMenuItems, lockTrackedVariants, stockLeftByMenuItem, stockLeftByVariant } from "@/lib/inventory-server";
+import { cartLineKey, variantLineName } from "@/lib/item-variants";
 import { applyOffers, giftLineName, withGiftsThatFit } from "@/lib/offers";
 import { loadResolvedOffers } from "@/lib/offers-server";
 import type { OrderChannel } from "@/lib/order-channel";
@@ -339,7 +344,8 @@ export type PlaceOrderInput = {
   vendor: { id: string; plan: Plan; planExpiresAt?: Date | null; trialEndsAt?: Date | null };
   acceptPayOnDelivery: boolean;
   dropId: string;
-  items: { dropItemId: string; qty: number }[];
+  /** `variantId` names a size or colour of the line's item (lib/item-variants.ts). */
+  items: DropOrderLine[];
   customerName: string;
   customerPhone: string; // E.164, already validated
   fulfilmentType: FulfilmentType;
@@ -364,8 +370,11 @@ export type PlaceOrderInput = {
 export type PlaceOrderError =
   | { code: "drop_not_found" }
   | { code: "drop_not_open" }
-  | { code: "item_not_found"; dropItemId: string }
-  | { code: "sold_out"; dropItemId: string; remaining: number }
+  | { code: "item_not_found"; dropItemId: string; variantId?: string }
+  /** The item has sizes or colours and the line named none (lib/item-variants.ts rule 2). */
+  | { code: "size_required"; dropItemId: string }
+  /** `variantId` set: that size's own stock is what ran out; `remaining` is that size's. */
+  | { code: "sold_out"; dropItemId: string; variantId?: string; remaining: number }
   | { code: "per_order_limit"; dropItemId: string; limit: number }
   | { code: "fulfilment_unavailable" }
   | { code: "address_required" }
@@ -393,11 +402,18 @@ class OrderRejected extends Error {
   }
 }
 
-/** Merge duplicate lines for the same drop item ("2 laddu" tapped twice). */
-export function mergeOrderLines(items: { dropItemId: string; qty: number }[]) {
-  const merged = new Map<string, number>();
-  for (const i of items) merged.set(i.dropItemId, (merged.get(i.dropItemId) ?? 0) + i.qty);
-  return Array.from(merged, ([dropItemId, qty]) => ({ dropItemId, qty }));
+/** One line of a drop order: a drop item, or one of its item's sizes. */
+export type DropOrderLine = { dropItemId: string; variantId?: string | null; qty: number };
+
+/** Merge duplicate lines for the same drop item and size ("2 laddu" tapped twice). */
+export function mergeOrderLines(items: DropOrderLine[]): DropOrderLine[] {
+  const merged = new Map<string, { dropItemId: string; variantId: string | null; qty: number }>();
+  for (const i of items) {
+    const key = cartLineKey(i.dropItemId, i.variantId);
+    const prev = merged.get(key);
+    merged.set(key, { dropItemId: i.dropItemId, variantId: i.variantId ?? null, qty: (prev?.qty ?? 0) + i.qty });
+  }
+  return Array.from(merged.values(), (l) => (l.variantId ? l : { dropItemId: l.dropItemId, qty: l.qty }));
 }
 
 export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<PlaceOrderResult> {
@@ -418,7 +434,18 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
 
       const drop = await tx.drop.findFirst({
         where: { id: input.dropId, vendorId },
-        include: { items: { include: { menuItem: { select: { name: true } } } } },
+        include: {
+          items: {
+            include: {
+              menuItem: {
+                select: {
+                  name: true,
+                  variants: { select: { id: true, label: true, priceInPaise: true, isAvailable: true } },
+                },
+              },
+            },
+          },
+        },
       });
       if (!drop) throw new OrderRejected({ code: "drop_not_found" });
       if (!isAcceptingOrders(drop, now)) throw new OrderRejected({ code: "drop_not_open" });
@@ -460,22 +487,62 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
       const remainingFor = (item: { id: string; menuItemId: string; maxQty: number | null }) =>
         combinedRemaining(remainingQty(item.maxQty, sold.get(item.id) ?? 0), stockLeft.get(item.menuItemId) ?? null);
 
+      // Each line priced and named from its drop item, or from the size it names.
       const priced = lines.map((l) => {
         const item = byId.get(l.dropItemId);
         if (!item) throw new OrderRejected({ code: "item_not_found", dropItemId: l.dropItemId });
-        if (item.perOrderLimit !== null && l.qty > item.perOrderLimit) {
-          throw new OrderRejected({
-            code: "per_order_limit",
-            dropItemId: item.id,
-            limit: item.perOrderLimit,
-          });
+        const key = cartLineKey(item.id, l.variantId);
+        const sizes = item.menuItem.variants;
+        if (sizes.length === 0) {
+          if (l.variantId) throw new OrderRejected({ code: "item_not_found", dropItemId: item.id, variantId: l.variantId });
+          return { key, item, variantId: null, name: item.menuItem.name, priceInPaise: item.priceInPaise, qty: l.qty };
+        }
+        if (!l.variantId) throw new OrderRejected({ code: "size_required", dropItemId: item.id });
+        const size = sizes.find((v) => v.id === l.variantId && v.isAvailable);
+        if (!size) throw new OrderRejected({ code: "item_not_found", dropItemId: item.id, variantId: l.variantId });
+        return {
+          key,
+          item,
+          variantId: size.id,
+          name: variantLineName(item.menuItem.name, size.label),
+          // The size's own price, else today's price for the item in this drop.
+          priceInPaise: size.priceInPaise ?? item.priceInPaise,
+          qty: l.qty,
+        };
+      });
+
+      // The drop's cap and per-order limit count every size of an item together.
+      const qtyByDropItem = new Map<string, number>();
+      for (const p of priced) qtyByDropItem.set(p.item.id, (qtyByDropItem.get(p.item.id) ?? 0) + p.qty);
+      for (const [dropItemId, qty] of qtyByDropItem) {
+        const item = byId.get(dropItemId)!;
+        if (item.perOrderLimit !== null && qty > item.perOrderLimit) {
+          throw new OrderRejected({ code: "per_order_limit", dropItemId, limit: item.perOrderLimit });
         }
         const remaining = remainingFor(item);
-        if (remaining !== null && l.qty > remaining) {
-          throw new OrderRejected({ code: "sold_out", dropItemId: item.id, remaining });
+        if (remaining !== null && qty > remaining) {
+          throw new OrderRejected({ code: "sold_out", dropItemId, remaining });
         }
-        return { item, qty: l.qty };
-      });
+      }
+
+      // Each tracked size caps itself. Items were locked above; sizes now, in id order.
+      const sized = priced.flatMap((p) => (p.variantId ? [{ ...p, variantId: p.variantId }] : []));
+      const trackedSizes = await lockTrackedVariants(
+        tx,
+        vendorId,
+        sized.map((p) => p.variantId),
+      );
+      const sizeLeft = await stockLeftByVariant(tx, vendorId, trackedSizes, now);
+      const sizeShortfall = firstShortfall(new Map(sized.map((p) => [p.variantId, p.qty])), sizeLeft);
+      if (sizeShortfall) {
+        const variantId = sizeShortfall.menuItemId; // keyed by variant id here
+        throw new OrderRejected({
+          code: "sold_out",
+          dropItemId: sized.find((p) => p.variantId === variantId)!.item.id,
+          variantId,
+          remaining: sizeShortfall.remaining,
+        });
+      }
 
       const planFields = {
         plan: input.vendor.plan,
@@ -500,7 +567,8 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
         offerRules,
         (menuItemId, qty) => {
           const item = giftItemFor(menuItemId);
-          if (!item) return false;
+          // No gift with sizes yet (lib/item-variants.ts rule 5): the buyer would have to pick one.
+          if (!item || item.menuItem.variants.length > 0) return false;
           const remaining = remainingFor(item);
           const paid = priced.reduce((n, p) => n + (p.item.id === item.id ? p.qty : 0), 0);
           return remaining === null || remaining - paid >= qty;
@@ -508,9 +576,9 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
       );
       const offered = applyOffers(
         priced.map((p) => ({
-          key: p.item.id,
+          key: p.key,
           menuItemId: p.item.menuItemId,
-          priceInPaise: p.item.priceInPaise,
+          priceInPaise: p.priceInPaise,
           qty: p.qty,
         })),
         offers,
@@ -522,7 +590,7 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
 
       const deliveryFeePaise = input.fulfilmentType === "DELIVERY" && areaFee.ok ? areaFee.feePaise : 0;
       const { subtotalPaise, totalPaise } = computeOrderTotals(
-        priced.map((p) => ({ priceInPaise: p.item.priceInPaise, qty: p.qty })),
+        priced.map((p) => ({ priceInPaise: p.priceInPaise, qty: p.qty })),
         deliveryFeePaise,
         discountPaise,
       );
@@ -560,11 +628,12 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
               ...priced.map((p) => ({
                 menuItemId: p.item.menuItemId,
                 dropItemId: p.item.id,
-                name: p.item.menuItem.name, // snapshot
-                priceInPaise: p.item.priceInPaise,
+                variantId: p.variantId,
+                name: p.name, // snapshot ("Cotton kurti – M" for a size)
+                priceInPaise: p.priceInPaise,
                 qty: p.qty,
-                totalPaise: p.item.priceInPaise * p.qty,
-                discountPaise: discountByLine.get(p.item.id) ?? 0,
+                totalPaise: p.priceInPaise * p.qty,
+                discountPaise: discountByLine.get(p.key) ?? 0,
               })),
               // The gift: ₹0 and outside every total, but it holds stock like any line.
               ...(offered.gift && giftItem

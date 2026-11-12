@@ -282,6 +282,19 @@ const loadStorefront = cache(async (slug: string) => {
                   stockQty: true,
                   stockCountedAt: true,
                   lowStockAt: true,
+                  // Sizes / colours (lib/item-variants.ts rule 7), priced from the drop.
+                  variants: {
+                    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+                    select: {
+                      id: true,
+                      label: true,
+                      priceInPaise: true,
+                      isAvailable: true,
+                      stockQty: true,
+                      stockCountedAt: true,
+                      lowStockAt: true,
+                    },
+                  },
                 },
               },
             },
@@ -606,6 +619,8 @@ async function buildDropViews(
   foodArt: boolean,
   /** Product stock of tracked items (lib/inventory.ts rule 6 caps a drop item by it). */
   stock: ReadonlyMap<string, ItemStock>,
+  /** Sizes of each drop item's product, keyed by drop item id (lib/item-variants.ts rule 7). */
+  sizesByDropItem: ReadonlyMap<string, StoreSize[]>,
 ): Promise<DropView[]> {
   const visible = drops
     .map((drop) => ({
@@ -620,12 +635,19 @@ async function buildDropViews(
     visible.map(async ({ drop, visibility }) => {
       const sold =
         visibility === "open" ? await soldQtyByDropItem(prisma, drop.id, now) : new Map<string, number>();
-      const items: DropOrderItem[] = drop.items.map((i) => ({
-        ...dropItemStock(
-          remainingQty(i.maxQty, sold.get(i.id) ?? 0),
-          stock.get(i.menuItemId)?.left ?? null,
-          stock.get(i.menuItemId)?.lowStockAt ?? null,
-        ),
+      const items: DropOrderItem[] = drop.items.map((i) => {
+        const sizes = sizesByDropItem.get(i.id);
+        const dropRemaining = remainingQty(i.maxQty, sold.get(i.id) ?? 0);
+        return {
+        // An item with sizes keeps no stock of its own: the drop's cap covers all
+        // its sizes, each size carries its own badge, and none left reads sold out.
+        ...(sizes
+          ? { remaining: allSizesSoldOut(sizes) ? 0 : dropRemaining, sizes }
+          : dropItemStock(
+              dropRemaining,
+              stock.get(i.menuItemId)?.left ?? null,
+              stock.get(i.menuItemId)?.lowStockAt ?? null,
+            )),
         id: i.id,
         menuItemId: i.menuItemId,
         name: i.menuItem.name,
@@ -636,7 +658,8 @@ async function buildDropViews(
         priceInPaise: i.priceInPaise,
         perOrderLimit: i.perOrderLimit,
         menuAnchor: menuAnchorFor(i.menuItemId),
-      }));
+        };
+      });
       const soldOut = visibility === "open" && !dropHasStock(items);
       const offers =
         visibility === "open" && !soldOut
@@ -645,9 +668,12 @@ async function buildDropViews(
                 resolveOffers(offerSource.rules, offerSource.menuItems, { channel: "DROP", dropId: drop.id, now }),
                 drop.items.map((i) => i.menuItemId),
               ),
-              // A drop's gift is one of its own items, with stock left.
+              // A drop's gift is one of its own items, with stock left, and no sizes
+              // yet (lib/item-variants.ts rule 5; placeStorefrontOrder skips it too).
               (menuItemId, qty) =>
-                items.some((i) => i.menuItemId === menuItemId && (i.remaining === null || i.remaining >= qty)),
+                items.some(
+                  (i) => i.menuItemId === menuItemId && !i.sizes && (i.remaining === null || i.remaining >= qty),
+                ),
             )
           : [];
       return { drop, visibility, items, soldOut, offers };
@@ -890,7 +916,17 @@ export default async function StorefrontPage(props: {
       giftIds,
       now,
     ),
-    loadStoreSizes(vendor.id, menuHidden ? [] : vendor.menuItems, now),
+    // Menu items are keyed by their id, drop items by the drop item's id (priced from the drop).
+    loadStoreSizes(
+      vendor.id,
+      [
+        ...(menuHidden ? [] : vendor.menuItems),
+        ...vendor.drops.flatMap((d) =>
+          d.items.map((i) => ({ id: i.id, priceInPaise: i.priceInPaise, variants: i.menuItem.variants })),
+        ),
+      ],
+      now,
+    ),
     // No gift with sizes yet (lib/item-variants.ts rule 5): placeMenuOrder skips that offer too.
     giftIds.length === 0
       ? Promise.resolve(new Set<string>())
@@ -928,6 +964,7 @@ export default async function StorefrontPage(props: {
       offerSource,
       foodArt,
       itemStock,
+      storeSizes,
     ),
     getCurrentCustomer(),
     viewerIsStoreStaff(vendor.id),

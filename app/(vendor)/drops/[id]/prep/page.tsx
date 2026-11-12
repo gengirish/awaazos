@@ -192,6 +192,12 @@ export default async function DropPrepPage(props: Props) {
                     <td className="py-2 text-base">
                       {p.emoji && <span aria-hidden>{p.emoji} </span>}
                       {p.name}
+                      {p.sizes.length > 0 ? (
+                        // By size, for packing: "M 3 · L 2".
+                        <span className="mt-0.5 block text-sm text-muted-foreground print:text-foreground">
+                          {p.sizes.map((z) => `${z.label} ${z.qty}`).join(" · ")}
+                        </span>
+                      ) : null}
                     </td>
                     <td className="py-2 text-right font-mono text-xl font-bold tabular-nums">
                       {p.qtyOrdered}

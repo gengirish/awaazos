@@ -19,9 +19,8 @@
  *      OrderItems with that `variantId`, online orders lock the tracked variant
  *      rows (`FOR UPDATE`, id order) and refuse a shortfall. An item with variants
  *      keeps no stock of its own (`MenuItem.stockQty` null).
- *   5. Not yet: drops (an item with variants can't be added to a drop, and an item
- *      in a drop that hasn't ended can't get variants), free gifts (an offer whose
- *      gift has variants is skipped) and order again.
+ *   5. Not yet: free gifts (an offer whose gift has variants is skipped, on the
+ *      menu and in drops) and order again.
  *   6. The counter (POS) sells by size too: a tile with sizes opens a picker,
  *      the cart line is keyed `itemId:variantId` (`cartLineKey`), priced and
  *      named by rule 2–3, and `POST /api/transactions` records `variantId` once
@@ -30,6 +29,14 @@
  *      with items, the counter never refuses over stock, nor a line without a
  *      size (an old till copy). Voice can't pick a size: it leaves such items
  *      out and asks the cashier to tap them.
+ *   7. Drops sell by size too (`placeStorefrontOrder`, lib/drops.ts): every line
+ *      of a sized drop item names an available size (`size_required`), priced
+ *      from the size's own price, else the drop's price for the item. The drop
+ *      item's `maxQty` and `perOrderLimit` count all its sizes together; each
+ *      tracked size is also capped by its own stock (`sold_out` with
+ *      `variantId`). An item in a drop may get sizes at any time; older lines
+ *      without one show as "Size not given" on the packing list, which splits
+ *      each item by size (`prepFromOrders`).
  */
 
 /** Most variants one item can have. */

@@ -170,7 +170,14 @@ const deliveryAddressPartsShape = {
 export const storefrontOrderSchema = z.object({
   dropId: z.string().min(1),
   items: z
-    .array(z.object({ dropItemId: z.string().min(1), qty: z.number().int().min(1).max(99) }))
+    .array(
+      z.object({
+        dropItemId: z.string().min(1),
+        // A size or colour of the item (lib/item-variants.ts); required when it has any.
+        variantId: z.string().min(1).max(64).nullish(),
+        qty: z.number().int().min(1).max(99),
+      }),
+    )
     .min(1)
     .max(50),
   customerName: z.string().trim().min(1).max(80),

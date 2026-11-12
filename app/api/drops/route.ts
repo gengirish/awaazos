@@ -3,7 +3,6 @@ import { NextRequest, NextResponse } from "next/server";
 import {
   liveDropOrderWhere,
   dropErrorResponse,
-  sizedMenuItems,
   unknownMenuItems,
   withVendorCookie,
 } from "@/lib/drops-api";
@@ -59,11 +58,9 @@ export async function POST(req: NextRequest) {
 
     const owned = await prisma.menuItem.findMany({
       where: { vendorId: ctx.vendor.id, id: { in: body.items.map((i) => i.menuItemId) } },
-      select: { id: true, _count: { select: { variants: true } } },
+      select: { id: true },
     });
-    const bad =
-      unknownMenuItems(body.items, new Set(owned.map((m) => m.id))) ??
-      sizedMenuItems(body.items, new Set(owned.filter((m) => m._count.variants > 0).map((m) => m.id)));
+    const bad = unknownMenuItems(body.items, new Set(owned.map((m) => m.id)));
     if (bad) throw bad;
 
     const created = await prisma.drop.create({

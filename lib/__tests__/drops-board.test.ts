@@ -23,6 +23,7 @@ import {
   ordersInScope,
   ordersToPack,
   prepFromOrders,
+  PREP_NO_SIZE_LABEL,
   primaryOrderAction,
   searchOrders,
   shouldPollForOrders,
@@ -188,9 +189,36 @@ describe("prepFromOrders", () => {
       { holdsStock: true, displayState: "PAID", items: [{ dropItemId: null, qty: 7 }] },
     ]);
     expect(rows).toEqual([
-      { dropItemId: "laddu", name: "Besan laddu", emoji: null, qtyOrdered: 7, qtyFree: 0, maxQty: 10, remaining: 3 },
-      { dropItemId: "cake", name: "Eggless cake", emoji: null, qtyOrdered: 1, qtyFree: 0, maxQty: null, remaining: null },
-      { dropItemId: "chakli", name: "Chakli", emoji: null, qtyOrdered: 0, qtyFree: 0, maxQty: 5, remaining: 5 },
+      { dropItemId: "laddu", name: "Besan laddu", emoji: null, qtyOrdered: 7, qtyFree: 0, maxQty: 10, remaining: 3, sizes: [] },
+      { dropItemId: "cake", name: "Eggless cake", emoji: null, qtyOrdered: 1, qtyFree: 0, maxQty: null, remaining: null, sizes: [] },
+      { dropItemId: "chakli", name: "Chakli", emoji: null, qtyOrdered: 0, qtyFree: 0, maxQty: 5, remaining: 5, sizes: [] },
+    ]);
+  });
+
+  it("splits an item with sizes by size, in the seller's order, plus lines that name none", () => {
+    const kurti = {
+      id: "kurti",
+      name: "Cotton kurti",
+      emoji: null,
+      maxQty: 20,
+      sizes: [
+        { id: "s", label: "S" },
+        { id: "m", label: "M" },
+        { id: "l", label: "L" },
+      ],
+    };
+    const [row] = prepFromOrders([kurti], [
+      { holdsStock: true, displayState: "PAID", items: [{ dropItemId: "kurti", variantId: "l", qty: 2 }, { dropItemId: "kurti", variantId: "m", qty: 1 }] },
+      { holdsStock: true, displayState: "PAID", items: [{ dropItemId: "kurti", variantId: "m", qty: 2 }] },
+      // Placed before the item got sizes, or its size was deleted since.
+      { holdsStock: true, displayState: "PAID", items: [{ dropItemId: "kurti", qty: 1 }, { dropItemId: "kurti", variantId: "gone", qty: 1 }] },
+      { holdsStock: false, displayState: "CANCELLED", items: [{ dropItemId: "kurti", variantId: "s", qty: 4 }] },
+    ]);
+    expect(row).toMatchObject({ qtyOrdered: 7, remaining: 13 });
+    expect(row!.sizes).toEqual([
+      { variantId: "m", label: "M", qty: 3 },
+      { variantId: "l", label: "L", qty: 2 },
+      { variantId: null, label: PREP_NO_SIZE_LABEL, qty: 2 },
     ]);
   });
 

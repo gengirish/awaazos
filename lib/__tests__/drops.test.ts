@@ -312,4 +312,18 @@ describe("mergeOrderLines", () => {
   it("empty in, empty out", () => {
     expect(mergeOrderLines([])).toEqual([]);
   });
+  it("keeps one line per size of an item", () => {
+    expect(
+      mergeOrderLines([
+        { dropItemId: "k", variantId: "m", qty: 1 },
+        { dropItemId: "k", variantId: "l", qty: 2 },
+        { dropItemId: "k", variantId: "m", qty: 2 },
+        { dropItemId: "k", variantId: null, qty: 1 },
+      ]),
+    ).toEqual([
+      { dropItemId: "k", variantId: "m", qty: 3 },
+      { dropItemId: "k", variantId: "l", qty: 2 },
+      { dropItemId: "k", qty: 1 },
+    ]);
+  });
 });
