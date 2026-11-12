@@ -27,6 +27,7 @@ import {
   searchOrders,
   shouldPollForOrders,
   orderStateLabel,
+  paymentBadge,
   type BoardBucket,
   summarizeOrders,
   whatsappHref,
@@ -35,33 +36,46 @@ import { effectiveDropStatus, type OrderDisplayState } from "@/lib/drops";
 
 const NOW = new Date("2026-10-05T10:00:00.000Z");
 
-describe("boardBucket", () => {
+describe("boardBucket (the stage tabs)", () => {
   const cases: [OrderDisplayState, FulfilmentStatus | null, string][] = [
-    ["AWAITING_PAYMENT", "PLACED", "needs_action"],
-    ["PAYMENT_SUBMITTED", "PLACED", "needs_action"],
-    ["PAYMENT_SUBMITTED", "CONFIRMED", "needs_action"], // still has to tick "paid"
-    ["AWAITING_PAYMENT", "CONFIRMED", "needs_action"],
-    ["PAY_ON_DELIVERY", "PLACED", "needs_action"],
-    ["PAID", "PLACED", "needs_action"],
-    ["PAY_ON_DELIVERY", "CONFIRMED", "confirmed"],
-    ["PAID", "CONFIRMED", "confirmed"],
-    ["DELIVERED", "DELIVERED", "delivered"],
-    ["CANCELLED", "CANCELLED", "closed"],
-    ["EXPIRED", "PLACED", "closed"],
+    ["AWAITING_PAYMENT", "PLACED", "new"],
+    ["PAYMENT_SUBMITTED", "PLACED", "new"],
+    ["PAYMENT_SUBMITTED", "CONFIRMED", "new"], // the buyer's claim still waits for an answer
+    ["AWAITING_PAYMENT", "CONFIRMED", "preparing"], // payment is a badge, not a stage
+    ["PAY_ON_DELIVERY", "PLACED", "new"],
+    ["PAID", "PLACED", "new"],
+    ["PAY_ON_DELIVERY", "CONFIRMED", "preparing"],
+    ["PAID", "CONFIRMED", "preparing"],
+    ["DELIVERED", "DELIVERED", "done"],
+    ["CANCELLED", "CANCELLED", "done"],
+    ["EXPIRED", "PLACED", "done"],
   ];
   it.each(cases)("%s + %s → %s", (displayState, fulfilmentStatus, bucket) => {
     expect(boardBucket({ displayState, fulfilmentStatus })).toBe(bucket);
   });
 
-  it("filters and counts", () => {
+  it("is Ready once packed for pickup or out for delivery", () => {
+    const at = "2026-10-05T09:00:00.000Z";
+    expect(boardBucket({ displayState: "PAID", fulfilmentStatus: "CONFIRMED", readyAt: at })).toBe("ready");
+    expect(boardBucket({ displayState: "PAY_ON_DELIVERY", fulfilmentStatus: "CONFIRMED", outForDeliveryAt: at })).toBe(
+      "ready",
+    );
+    // An unanswered claim is still New, ready or not; a handed-over order is Done.
+    expect(boardBucket({ displayState: "PAYMENT_SUBMITTED", fulfilmentStatus: "CONFIRMED", readyAt: at })).toBe("new");
+    expect(boardBucket({ displayState: "DELIVERED", fulfilmentStatus: "DELIVERED", readyAt: at })).toBe("done");
+  });
+
+  it("has four tabs, and filters and counts by them", () => {
+    expect(BOARD_FILTERS.map((f) => f.label)).toEqual(["New", "Preparing", "Ready", "Done"]);
     const orders = [
-      { id: "a", bucket: "needs_action" as const },
-      { id: "b", bucket: "confirmed" as const },
-      { id: "c", bucket: "needs_action" as const },
+      { id: "a", bucket: "new" as const },
+      { id: "b", bucket: "preparing" as const },
+      { id: "c", bucket: "new" as const },
+      { id: "d", bucket: "ready" as const },
     ];
-    expect(filterOrders(orders, "needs_action").map((o) => o.id)).toEqual(["a", "c"]);
-    expect(filterOrders(orders, "all")).toHaveLength(3);
-    expect(countByFilter(orders)).toEqual({ needs_action: 2, confirmed: 1, delivered: 0, closed: 0, all: 3 });
+    expect(filterOrders(orders, "new").map((o) => o.id)).toEqual(["a", "c"]);
+    expect(filterOrders(orders, "ready").map((o) => o.id)).toEqual(["d"]);
+    expect(countByFilter(orders)).toEqual({ new: 2, preparing: 1, ready: 1, done: 0 });
   });
 });
 
@@ -79,28 +93,28 @@ describe("a Razorpay store's unpaid new order (awaiting_online)", () => {
     const bucket = (displayState: OrderDisplayState, fulfilmentStatus: FulfilmentStatus, onlineStore = true) =>
       boardBucket({ displayState, fulfilmentStatus, onlineStore });
     expect(bucket("AWAITING_PAYMENT", "PLACED")).toBe("awaiting_online");
-    expect(bucket("AWAITING_PAYMENT", "PLACED", false)).toBe("needs_action");
-    // The seller confirmed it: it holds stock until they answer, so it must stay reachable.
-    expect(bucket("AWAITING_PAYMENT", "CONFIRMED")).toBe("needs_action");
+    expect(bucket("AWAITING_PAYMENT", "PLACED", false)).toBe("new");
+    // The seller accepted it: it holds stock until they answer, so it must stay reachable.
+    expect(bucket("AWAITING_PAYMENT", "CONFIRMED")).toBe("preparing");
     // A claim or a lapsed hold: money may have come by direct UPI, so the seller can still mark it paid.
-    expect(bucket("PAYMENT_SUBMITTED", "PLACED")).toBe("needs_action");
-    expect(bucket("EXPIRED", "PLACED")).toBe("closed");
-    expect(bucket("PAY_ON_DELIVERY", "PLACED")).toBe("needs_action");
-    expect(bucket("PAID", "CONFIRMED")).toBe("confirmed");
+    expect(bucket("PAYMENT_SUBMITTED", "PLACED")).toBe("new");
+    expect(bucket("EXPIRED", "PLACED")).toBe("done");
+    expect(bucket("PAY_ON_DELIVERY", "PLACED")).toBe("new");
+    expect(bucket("PAID", "CONFIRMED")).toBe("preparing");
   });
 
-  it("is only listed under All", () => {
-    const orders = [{ id: "a", bucket: "awaiting_online" as const }, { id: "b", bucket: "needs_action" as const }];
+  it("has no tab or count of its own: it is listed last under New", () => {
+    const orders = [{ id: "a", bucket: "awaiting_online" as const }, { id: "b", bucket: "new" as const }];
     expect(BOARD_FILTERS.map((f) => f.id)).not.toContain("awaiting_online");
-    expect(filterOrders(orders, "needs_action").map((o) => o.id)).toEqual(["b"]);
-    expect(filterOrders(orders, "all").map((o) => o.id)).toEqual(["a", "b"]);
-    expect(countByFilter(orders)).toEqual({ needs_action: 1, confirmed: 0, delivered: 0, closed: 0, all: 2 });
+    expect(filterOrders(orders, "new").map((o) => o.id)).toEqual(["b", "a"]);
+    expect(filterOrders(orders, "preparing")).toEqual([]);
+    expect(countByFilter(orders)).toEqual({ new: 1, preparing: 0, ready: 0, done: 0 });
   });
 
   it("isn't in the summary", () => {
     const s = summarizeOrders([
       { displayState: "AWAITING_PAYMENT", paymentStatus: "PENDING", totalPaise: 12_000, bucket: "awaiting_online" },
-      { displayState: "AWAITING_PAYMENT", paymentStatus: "PENDING", totalPaise: 5_000, bucket: "needs_action" },
+      { displayState: "AWAITING_PAYMENT", paymentStatus: "PENDING", totalPaise: 5_000, bucket: "new" },
     ]);
     expect(s.pendingPaise).toBe(5_000);
     expect(s.activeOrders).toBe(1);
@@ -126,20 +140,20 @@ describe("a Razorpay store's unpaid new order (awaiting_online)", () => {
     const row = (id: string, bucket: BoardBucket) => ({ id, bucket });
     expect(newOrderIds([], [row("a", "awaiting_online")])).toEqual([]);
     expect(newOrderIds([row("a", "awaiting_online")], [row("a", "awaiting_online")])).toEqual([]);
-    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "confirmed")])).toEqual(["a"]);
-    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "needs_action")])).toEqual(["a"]);
-    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "closed")])).toEqual([]);
+    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "preparing")])).toEqual(["a"]);
+    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "new")])).toEqual(["a"]);
+    expect(newOrderIds([row("a", "awaiting_online")], [row("a", "done")])).toEqual([]);
     // Paid before the board ever saw it.
-    expect(newOrderIds([], [row("a", "confirmed")])).toEqual(["a"]);
+    expect(newOrderIds([], [row("a", "preparing")])).toEqual(["a"]);
     // An order already on the board moving tabs is not new.
-    expect(newOrderIds([row("a", "needs_action")], [row("a", "confirmed")])).toEqual([]);
+    expect(newOrderIds([row("a", "new")], [row("a", "preparing")])).toEqual([]);
   });
 
   it("\"N new orders — show\" lands where the new orders are", () => {
-    expect(newOrdersTab([{ bucket: "confirmed" }])).toBe("confirmed");
-    expect(newOrdersTab([{ bucket: "confirmed" }, { bucket: "needs_action" }])).toBe("needs_action");
-    expect(newOrdersTab([{ bucket: "needs_action" }])).toBe("needs_action");
-    expect(newOrdersTab([])).toBe("needs_action");
+    expect(newOrdersTab([{ bucket: "preparing" }])).toBe("preparing");
+    expect(newOrdersTab([{ bucket: "preparing" }, { bucket: "new" }])).toBe("new");
+    expect(newOrdersTab([{ bucket: "new" }])).toBe("new");
+    expect(newOrdersTab([])).toBe("new");
   });
 });
 
@@ -323,8 +337,87 @@ describe("availableOrderActions: out for delivery", () => {
     expect(availableOrderActions(card({ fulfilmentStatus: "CANCELLED" }), false).has("dispatch")).toBe(false);
   });
 
-  it("is never the card's primary step (Delivered stays primary)", () => {
-    expect(primaryOrderAction(card({ paymentMethod: "UPI", paymentStatus: "PAID" }), false)).toBe("deliver");
+  it("is a confirmed delivery's next step; once out, Delivered is", () => {
+    expect(primaryOrderAction(card({ paymentMethod: "UPI", paymentStatus: "PAID" }), false)).toBe("dispatch");
+    expect(
+      primaryOrderAction(
+        card({ paymentMethod: "UPI", paymentStatus: "PAID", outForDeliveryAt: "2026-10-16T10:00:00.000Z" }),
+        false,
+      ),
+    ).toBe("deliver");
+  });
+});
+
+describe("availableOrderActions: Mark ready and Not ready", () => {
+  const card = (over: Partial<Parameters<typeof availableOrderActions>[0]> = {}) => ({
+    fulfilmentStatus: "CONFIRMED" as FulfilmentStatus,
+    paymentStatus: "PAID" as PaymentStatus,
+    paymentMethod: "UPI" as PaymentMethod,
+    displayState: "PAID" as OrderDisplayState,
+    fulfilmentType: "PICKUP" as const,
+    ...over,
+  });
+  const at = "2026-10-16T10:00:00.000Z";
+
+  it("offers Mark ready on a live pickup order, frozen drop included (handover bookkeeping)", () => {
+    expect(availableOrderActions(card(), false).has("mark_ready")).toBe(true);
+    expect(availableOrderActions(card({ fulfilmentStatus: "PLACED" }), true).has("mark_ready")).toBe(true);
+    expect(primaryOrderAction(card(), false)).toBe("mark_ready");
+  });
+
+  it("not on a delivery (it goes out instead), once ready, or when finished", () => {
+    expect(availableOrderActions(card({ fulfilmentType: "DELIVERY" }), false).has("mark_ready")).toBe(false);
+    expect(availableOrderActions(card({ readyAt: at }), false).has("mark_ready")).toBe(false);
+    expect(availableOrderActions(card({ fulfilmentStatus: "DELIVERED" }), false).has("mark_ready")).toBe(false);
+    expect(availableOrderActions(card({ fulfilmentStatus: "CANCELLED" }), false).has("mark_ready")).toBe(false);
+  });
+
+  it("once ready, the next step is the handover, and Not ready takes it back", () => {
+    expect(primaryOrderAction(card({ readyAt: at }), false)).toBe("deliver");
+    expect(availableOrderActions(card({ readyAt: at }), false).has("unready")).toBe(true);
+    expect(availableOrderActions(card({ fulfilmentType: "DELIVERY", outForDeliveryAt: at }), false).has("unready")).toBe(true);
+    expect(availableOrderActions(card(), false).has("unready")).toBe(false);
+    expect(availableOrderActions(card({ readyAt: at, fulfilmentStatus: "DELIVERED" }), false).has("unready")).toBe(false);
+  });
+
+  it("checkOrderAction agrees on the server side", () => {
+    const o = { fulfilmentStatus: "CONFIRMED" as const, paymentStatus: "PAID" as const };
+    expect(checkOrderAction("mark_ready", null, o)).toEqual({ ok: true });
+    expect(checkOrderAction("mark_ready", "FROZEN", o)).toEqual({ ok: true });
+    expect(checkOrderAction("mark_ready", null, { ...o, fulfilmentStatus: "DELIVERED" })).toEqual({
+      ok: false,
+      error: "invalid_state",
+    });
+    expect(checkOrderAction("unready", "FULFILLED", o)).toEqual({ ok: true });
+    expect(checkOrderAction("unready", null, { ...o, fulfilmentStatus: "PLACED" })).toEqual({
+      ok: false,
+      error: "invalid_state",
+    });
+  });
+});
+
+describe("paymentBadge", () => {
+  const b = (
+    displayState: OrderDisplayState,
+    paymentStatus: PaymentStatus,
+    extra: { fulfilmentType?: "PICKUP" | "DELIVERY"; paidOnline?: boolean; bucket?: BoardBucket } = {},
+  ) => paymentBadge({ displayState, paymentStatus, fulfilmentType: extra.fulfilmentType ?? "DELIVERY", ...extra });
+
+  it("says where the money stands, in words", () => {
+    expect(b("PAID", "PAID")).toEqual({ kind: "paid", label: "Paid" });
+    expect(b("PAID", "PAID", { paidOnline: true }).label).toBe("Paid online");
+    expect(b("DELIVERED", "PAID")).toEqual({ kind: "paid", label: "Paid" });
+    expect(b("PAYMENT_SUBMITTED", "PENDING")).toEqual({ kind: "check", label: "Payment to check" });
+    expect(b("PAY_ON_DELIVERY", "PENDING").label).toBe("Pay on delivery");
+    expect(b("PAY_ON_DELIVERY", "PENDING", { fulfilmentType: "PICKUP" }).label).toBe("Pay at pickup");
+    expect(b("AWAITING_PAYMENT", "PENDING")).toEqual({ kind: "unpaid", label: "Not paid yet" });
+    expect(b("AWAITING_PAYMENT", "PENDING", { bucket: "awaiting_online" }).kind).toBe("waiting_online");
+    expect(b("CANCELLED", "PAID").kind).toBe("cancelled");
+    expect(b("EXPIRED", "PENDING").kind).toBe("expired");
+  });
+
+  it("flags a handed-over order that is still unpaid", () => {
+    expect(b("DELIVERED", "PENDING")).toEqual({ kind: "due", label: "Payment due" });
   });
 });
 
@@ -474,10 +567,11 @@ describe("primaryOrderAction", () => {
     ["new, UPI unpaid", o("AWAITING_PAYMENT", "PLACED", "PENDING", "UPI"), false, "confirm"],
     ["new, pay on delivery", o("PAY_ON_DELIVERY", "PLACED", "PENDING", "CASH"), false, "confirm"],
     ["new, already paid", o("PAID", "PLACED", "PAID", "UPI"), false, "confirm"],
-    ["new on a locked drop", o("PAY_ON_DELIVERY", "PLACED", "PENDING", "CASH"), true, "deliver"],
-    ["confirmed, paid", o("PAID", "CONFIRMED", "PAID", "UPI"), false, "deliver"],
-    ["confirmed, pay on delivery", o("PAY_ON_DELIVERY", "CONFIRMED", "PENDING", "CASH"), false, "deliver"],
-    ["confirmed, UPI unpaid", o("AWAITING_PAYMENT", "CONFIRMED", "PENDING", "UPI"), false, "deliver"],
+    // No fulfilmentType here, so these read as pickups: the next step is Mark ready.
+    ["new on a locked drop", o("PAY_ON_DELIVERY", "PLACED", "PENDING", "CASH"), true, "mark_ready"],
+    ["confirmed, paid", o("PAID", "CONFIRMED", "PAID", "UPI"), false, "mark_ready"],
+    ["confirmed, pay on delivery", o("PAY_ON_DELIVERY", "CONFIRMED", "PENDING", "CASH"), false, "mark_ready"],
+    ["confirmed, UPI unpaid", o("AWAITING_PAYMENT", "CONFIRMED", "PENDING", "UPI"), false, "mark_ready"],
     ["delivered, still unpaid", o("DELIVERED", "DELIVERED", "PENDING", "UPI"), false, "mark_paid"],
     ["delivered and paid", o("DELIVERED", "DELIVERED", "PAID", "UPI"), false, null],
     ["cancelled", o("CANCELLED", "CANCELLED", "PENDING", "UPI"), false, null],

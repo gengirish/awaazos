@@ -161,18 +161,23 @@ function catalogueBoardScope(vocab: StoreVocabulary): string {
 }
 
 const ACTION_DONE: Record<OrderAction, string> = {
-  confirm: "Order confirmed",
+  confirm: "Order accepted. It's in Preparing.",
   mark_paid: "Marked paid",
   reject_payment: "Marked not received",
   cancel: "Order cancelled",
-  dispatch: "Marked out for delivery",
+  mark_ready: "Marked ready. It's in Ready.",
+  unready: "Back in Preparing",
+  dispatch: "Out for delivery. It's in Ready.",
   deliver: "Marked delivered",
-  undeliver: "Moved back to confirmed",
+  undeliver: "Moved back: not handed over yet",
 };
 
-/** Summary tile: one line, label and figure. Four in a row from sm, 2×2 on phones. */
-const KPI_TILE = "flex min-w-0 flex-wrap items-center justify-between gap-x-1.5 rounded-lg border bg-card px-2.5 py-1.5";
-const KPI_VALUE = "font-mono text-sm font-bold tabular-nums";
+/** What an empty tab says when the store has orders, just none at this stage. */
+const EMPTY_STAGE: Record<Exclude<BoardFilter, "new">, string> = {
+  preparing: "Nothing being prepared right now. Accepted orders wait here.",
+  ready: "Nothing waiting to be picked up or delivered.",
+  done: "No finished orders in the last 3 days.",
+};
 
 const SEGMENT_BTN =
   "inline-flex min-h-11 items-center justify-center gap-1 rounded-md border px-2 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
@@ -217,7 +222,7 @@ export function OrdersBoard({
   const [pausedHere, setPausedHere] = useState(false);
   const [drops, setDrops] = useState(initialDrops);
   const [scope, setScope] = useState<BoardScope>(initialDropId ?? "all");
-  const [filter, setFilter] = useState<BoardFilter>("needs_action");
+  const [filter, setFilter] = useState<BoardFilter>("new");
   const [refreshing, setRefreshing] = useState(false);
   const [pending, setPending] = useState<{ orderId: string; action: OrderAction } | null>(null);
   const [selected, setSelected] = useState<ReadonlySet<string>>(EMPTY_SELECTION);
@@ -551,22 +556,19 @@ export function OrdersBoard({
   );
   const counts = useMemo(() => countByFilter(scoped), [scoped]);
   const inFilter = useMemo(() => filterOrders(scoped, filter), [scoped, filter]);
-  // Handover day: the Confirmed list splits into what is collected and what goes out.
+  // Handover day: Preparing and Ready split into what is collected and what goes out.
   const showHandover = useMemo(() => {
-    if (filter !== "confirmed") return false;
+    if (filter !== "preparing" && filter !== "ready") return false;
     const { pickup, delivery } = groupByFulfilment(inFilter);
     return pickup.length > 0 && delivery.length > 0;
   }, [filter, inFilter]);
   const activeHandover: HandoverFilter = showHandover ? handover : "all";
   const trimmedQuery = query.trim();
-  // Search is over the list already on the device: no request, no timer.
+  // Search is over the list already on the device (no request, no timer), and
+  // over every tab: a buyer asking "where's my order?" may be at any stage.
   const visible = useMemo(
-    () => searchOrders(filterByHandover(inFilter, activeHandover), trimmedQuery),
-    [inFilter, activeHandover, trimmedQuery],
-  );
-  const matchesInScope = useMemo(
-    () => (trimmedQuery ? searchOrders(scoped, trimmedQuery).length : 0),
-    [scoped, trimmedQuery],
+    () => (trimmedQuery ? searchOrders(scoped, trimmedQuery) : filterByHandover(inFilter, activeHandover)),
+    [scoped, inFilter, activeHandover, trimmedQuery],
   );
   const showSearch = scoped.length >= SEARCH_MIN_ORDERS || query !== "";
   const searchExpanded = searchOpen || query !== "";
@@ -808,58 +810,34 @@ export function OrdersBoard({
       </Link>
     </Button>
   ) : undefined;
-  const showAllAction = (
-    <Button type="button" variant="outline" onClick={() => changeFilter("all")}>
-      Show all orders
-    </Button>
-  );
-
   // Every empty list says what would fill it and offers the one next step.
   let empty: { title?: string; description: string; action?: ReactNode; live?: boolean };
   if (trimmedQuery && scoped.length > 0) {
-    const elsewhere = filter !== "all" || activeHandover !== "all" ? matchesInScope : 0;
     empty = {
       title: `No orders match “${trimmedQuery}”`,
-      description:
-        elsewhere > 0
-          ? `Not in this list, but ${elsewhere === 1 ? "1 order matches" : `${elsewhere} orders match`} in All.`
-          : "Try a name, a bill number or the last 4 digits of a phone number.",
-      action:
-        elsewhere > 0 ? (
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              setHandover("all");
-              changeFilter("all");
-            }}
-          >
-            Show in all orders
-          </Button>
-        ) : (
-          <Button type="button" variant="outline" onClick={() => setQuery("")}>
-            <X aria-hidden />
-            Clear search
-          </Button>
-        ),
+      description: "Try a name, a bill number or the last 4 digits of a phone number.",
+      action: (
+        <Button type="button" variant="outline" onClick={() => setQuery("")}>
+          <X aria-hidden />
+          Clear search
+        </Button>
+      ),
       live: true,
     };
   } else if (scoped.length > 0) {
     empty =
-      filter === "needs_action"
+      filter === "new"
         ? {
             title: "All caught up",
-            description: "No order needs you right now.",
+            description: "No new order needs you right now.",
             action:
-              counts.confirmed > 0 ? (
-                <Button type="button" variant="outline" onClick={() => changeFilter("confirmed")}>
-                  Show confirmed ({counts.confirmed})
+              counts.preparing > 0 ? (
+                <Button type="button" variant="outline" onClick={() => changeFilter("preparing")}>
+                  Show preparing ({counts.preparing})
                 </Button>
-              ) : (
-                showAllAction
-              ),
+              ) : undefined,
           }
-        : { description: "Nothing here right now.", action: showAllAction };
+        : { description: EMPTY_STAGE[filter] };
   } else if (drop) {
     empty =
       effective === "OPEN"
@@ -963,38 +941,33 @@ export function OrdersBoard({
         <h2 id="summary-h" className="sr-only">
           Summary
         </h2>
-        <ul className="grid grid-cols-2 gap-1.5 sm:grid-cols-4 sm:gap-2">
-          <li className={KPI_TILE}>
-            <p className="text-xs text-muted-foreground">Paid</p>
-            <p className={KPI_VALUE}>{formatINR(summary.paidPaise)}</p>
-          </li>
-          <li className={KPI_TILE}>
-            <p className="text-xs text-muted-foreground">To collect</p>
-            <p className={KPI_VALUE}>{formatINR(summary.pendingPaise)}</p>
-          </li>
-          <li className={KPI_TILE}>
-            <p className="text-xs text-muted-foreground">Live orders</p>
-            <p className={KPI_VALUE}>{summary.activeOrders}</p>
-          </li>
-          <li className={cn(KPI_TILE, summary.counts.PAYMENT_SUBMITTED > 0 && "border-warning bg-warning/10")}>
-            <p
-              className={cn(
-                "inline-flex items-center gap-1 text-xs",
-                summary.counts.PAYMENT_SUBMITTED > 0 ? "font-semibold text-foreground" : "text-muted-foreground",
-              )}
+        {/* One line: what came in and what is still to come. Stage counts are on the tabs below. */}
+        <p className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm">
+          <span>
+            <span className="text-muted-foreground">Paid </span>
+            <span className="font-mono font-bold tabular-nums">{formatINR(summary.paidPaise)}</span>
+          </span>
+          <span aria-hidden className="text-muted-foreground">
+            ·
+          </span>
+          <span>
+            <span className="text-muted-foreground">To collect </span>
+            <span className="font-mono font-bold tabular-nums">{formatINR(summary.pendingPaise)}</span>
+          </span>
+          {summary.counts.PAYMENT_SUBMITTED > 0 && (
+            // Only a buyer's "I've paid" claim is something to check; unpaid UPI orders just wait.
+            <button
+              type="button"
+              onClick={() => changeFilter("new")}
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-warning bg-warning/10 px-3 font-semibold text-foreground hover:bg-warning/20 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
-              {summary.counts.PAYMENT_SUBMITTED > 0 && <CircleAlert className="h-3.5 w-3.5 text-warning" aria-hidden />}
-              Payment to check
-            </p>
-            {/* Only a buyer's "I've paid" claim is something to check; unpaid UPI orders just wait. */}
-            <p className={KPI_VALUE}>{summary.counts.PAYMENT_SUBMITTED}</p>
-            {summary.counts.AWAITING_PAYMENT > 0 && (
-              <p className="basis-full text-xs text-muted-foreground">
-                Awaiting payment: <span className="font-mono tabular-nums">{summary.counts.AWAITING_PAYMENT}</span>
-              </p>
-            )}
-          </li>
-        </ul>
+              <CircleAlert className="h-4 w-4 text-warning" aria-hidden />
+              {summary.counts.PAYMENT_SUBMITTED === 1
+                ? "1 payment to check"
+                : `${summary.counts.PAYMENT_SUBMITTED} payments to check`}
+            </button>
+          )}
+        </p>
         {toCook.length > 0 && (
           <p className="mt-2 text-sm text-muted-foreground">
             <span className="font-medium text-foreground">{vocab.toPrepare}: </span>
@@ -1066,7 +1039,8 @@ export function OrdersBoard({
             role="tablist"
             aria-label="Order status"
             onKeyDown={onTabKeyDown}
-            className="grid min-w-0 flex-1 grid-cols-[repeat(4,minmax(0,1fr))_2.75rem] gap-0.5 md:flex md:gap-2 md:overflow-x-auto md:p-0.5"
+            // Four stage tabs share the row; the search icon (when shown) sits beside them.
+            className="grid min-w-0 flex-1 grid-cols-4 gap-0.5 md:flex md:gap-2 md:overflow-x-auto md:p-0.5"
           >
             {BOARD_FILTERS.map((f) => {
               const active = filter === f.id;
@@ -1148,7 +1122,7 @@ export function OrdersBoard({
       </nav>
 
       <section id="orders-list" role="tabpanel" aria-labelledby={`orders-tab-${filter}`} aria-busy={refreshing}>
-        {showHandover && (
+        {showHandover && !trimmedQuery && (
           <div role="radiogroup" aria-label="Pickup or delivery" className="mb-3 grid grid-cols-3 gap-1">
             {HANDOVER_FILTERS.map((h) => (
               <RadioOption
@@ -1169,6 +1143,11 @@ export function OrdersBoard({
               />
             ))}
           </div>
+        )}
+        {trimmedQuery && visible.length > 0 && (
+          <p className="mb-2 text-sm text-muted-foreground" role="status">
+            {visible.length === 1 ? "1 order matches" : `${visible.length} orders match`}, from every tab.
+          </p>
         )}
         {visible.length === 0 ? (
           <EmptyState

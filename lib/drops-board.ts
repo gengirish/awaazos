@@ -82,6 +82,8 @@ export type BoardOrder = {
   fulfilUntil?: string | null;
   /** A demo store's sample order (lib/demo-store.ts). */
   isSample?: boolean;
+  /** Packed and waiting for pickup ("Mark ready", ISO); absent or null when not yet. */
+  readyAt?: string | null;
   /** Handed to a rider (ISO), and who it went with; absent or null when not yet. */
   outForDeliveryAt?: string | null;
   riderName?: string | null;
@@ -106,18 +108,20 @@ export function balanceDuePaise(o: Pick<BoardOrder, "paymentStatus" | "totalPais
   return Math.max(0, o.totalPaise - advance);
 }
 
-// ─── Filter buckets ─────────────────────────────────────────────────
+// ─── Stages (the board's tabs) ──────────────────────────────────────
 
-/** `awaiting_online` has no tab of its own: those orders are only listed under All. */
-export type BoardBucket = "needs_action" | "confirmed" | "delivered" | "closed" | "awaiting_online";
-export type BoardFilter = Exclude<BoardBucket, "awaiting_online"> | "all";
+/**
+ * Where an order is in its life, one tab each: New → Preparing → Ready → Done.
+ * `awaiting_online` has no tab and no count: it is listed at the end of New.
+ */
+export type BoardBucket = "new" | "preparing" | "ready" | "done" | "awaiting_online";
+export type BoardFilter = Exclude<BoardBucket, "awaiting_online">;
 
 export const BOARD_FILTERS: { id: BoardFilter; label: string }[] = [
-  { id: "needs_action", label: "Needs action" },
-  { id: "confirmed", label: "Confirmed" },
-  { id: "delivered", label: "Delivered" },
-  { id: "closed", label: "Cancelled / Expired" },
-  { id: "all", label: "All" },
+  { id: "new", label: "New" },
+  { id: "preparing", label: "Preparing" },
+  { id: "ready", label: "Ready" },
+  { id: "done", label: "Done" },
 ];
 
 /**
@@ -135,42 +139,46 @@ export function isAwaitingOnlinePay(o: {
 }
 
 /**
- * Which tab an order lives under. "Needs action" = the vendor has something to
- * do: accept a new order, or check / chase a UPI payment (even on a confirmed
- * order — she still has to tick "paid"). `onlineStore`: the store takes Razorpay.
+ * Which tab an order lives under. Payment is never a stage (the card shows it as
+ * a badge): a confirmed order waiting for its UPI money is Preparing, a handed-over
+ * one still unpaid is Done with "Payment due" (and in To collect).
+ *   - New: not accepted yet, or the buyer says they paid and the seller hasn't answered.
+ *   - Preparing: accepted.
+ *   - Ready: packed for pickup (`readyAt`) or out for delivery (`outForDeliveryAt`).
+ *   - Done: handed over, cancelled or expired.
+ * `onlineStore`: the store takes Razorpay.
  */
 export function boardBucket(o: {
   displayState: OrderDisplayState;
   fulfilmentStatus: FulfilmentStatus | null;
   onlineStore?: boolean;
+  readyAt?: string | Date | null;
+  outForDeliveryAt?: string | Date | null;
 }): BoardBucket {
   if (isAwaitingOnlinePay({ ...o, onlineStore: o.onlineStore ?? false })) return "awaiting_online";
   switch (o.displayState) {
     case "CANCELLED":
     case "EXPIRED":
-      return "closed";
     case "DELIVERED":
-      return "delivered";
+      return "done";
     case "PAYMENT_SUBMITTED":
-    case "AWAITING_PAYMENT":
-      return "needs_action";
+      return "new";
     default:
-      return o.fulfilmentStatus === "PLACED" ? "needs_action" : "confirmed";
+      if (o.fulfilmentStatus === "PLACED") return "new";
+      return o.readyAt || o.outForDeliveryAt ? "ready" : "preparing";
   }
 }
 
+/** A tab's orders. New also lists the orders waiting for an online payment, last (nothing to do on them). */
 export function filterOrders<T extends { bucket: BoardBucket }>(orders: T[], filter: BoardFilter): T[] {
-  return filter === "all" ? orders : orders.filter((o) => o.bucket === filter);
+  if (filter === "new") {
+    return [...orders.filter((o) => o.bucket === "new"), ...orders.filter((o) => o.bucket === "awaiting_online")];
+  }
+  return orders.filter((o) => o.bucket === filter);
 }
 
 export function countByFilter(orders: { bucket: BoardBucket }[]): Record<BoardFilter, number> {
-  const out: Record<BoardFilter, number> = {
-    needs_action: 0,
-    confirmed: 0,
-    delivered: 0,
-    closed: 0,
-    all: orders.length,
-  };
+  const out: Record<BoardFilter, number> = { new: 0, preparing: 0, ready: 0, done: 0 };
   for (const o of orders) if (o.bucket !== "awaiting_online") out[o.bucket] += 1;
   return out;
 }
@@ -212,7 +220,7 @@ export function filterByHandover<T extends { fulfilmentType: FulfilmentType | nu
 
 export type BoardSummary = {
   counts: Record<OrderDisplayState, number>;
-  /** Orders still to finish: not delivered / picked up, cancelled or expired (the Needs action + Confirmed tabs). */
+  /** Orders still to finish: not delivered / picked up, cancelled or expired (New, Preparing and Ready). */
   activeOrders: number;
   /** Sum of totals already paid (excludes refunded / cancelled). */
   paidPaise: number;
@@ -347,6 +355,8 @@ export const ORDER_ACTIONS = [
   "mark_paid",
   "reject_payment",
   "cancel",
+  "mark_ready",
+  "unready",
   "dispatch",
   "deliver",
   "undeliver",
@@ -357,6 +367,8 @@ export type OrderAction = (typeof ORDER_ACTIONS)[number];
 const FROZEN_ALLOWED: ReadonlySet<OrderAction> = new Set<OrderAction>([
   "mark_paid",
   "reject_payment",
+  "mark_ready",
+  "unready",
   "dispatch",
   "deliver",
   "undeliver",
@@ -399,6 +411,12 @@ export function checkOrderAction(
         return fs !== "CANCELLED" && o.paymentStatus === "PENDING";
       case "cancel":
         return fs === "PLACED" || fs === "CONFIRMED";
+      case "mark_ready":
+        // Packed and waiting; marking it again restamps.
+        return fs === "PLACED" || fs === "CONFIRMED";
+      case "unready":
+        // Whether it was ready or out is checked by the conditional write.
+        return fs === "CONFIRMED";
       case "dispatch":
         // Handing a delivery to a rider; sending it again (another rider) restamps it.
         return o.fulfilmentType === "DELIVERY" && (fs === "PLACED" || fs === "CONFIRMED");
@@ -418,7 +436,9 @@ export function checkOrderAction(
  * delivered. "Not received" (`reject_payment`) is only offered while the buyer's
  * "I've paid" claim is waiting for an answer, and then "Confirm" is not: being
  * marked paid confirms the order too (`markOrderPaid`), so "Payment received"
- * is the one answer. An `awaiting_online` order offers only Cancel. Bulk selection
+ * is the one answer. "Mark ready" is for an order the buyer collects (a delivery
+ * goes "Out for delivery" instead); "Not ready" takes either stamp back. An
+ * `awaiting_online` order offers only Cancel. Bulk selection
  * (lib/order-bulk.ts) builds on the same list, so the card and the bulk bar never
  * disagree about what an order can do.
  */
@@ -429,7 +449,10 @@ export function availableOrderActions(
     paymentMethod: PaymentMethod;
     displayState?: OrderDisplayState;
     fulfilmentType?: FulfilmentType | null;
+    readyAt?: string | null;
     outForDeliveryAt?: string | null;
+    /** The buyer tapped "I've received my order": the handover is the next step. */
+    buyerReceivedAt?: string | null;
     bucket?: BoardBucket;
   },
   frozen: boolean,
@@ -446,6 +469,8 @@ export function availableOrderActions(
     out.add("mark_paid");
   }
   if (o.displayState === "PAYMENT_SUBMITTED") out.add("reject_payment");
+  if (live && o.fulfilmentType !== "DELIVERY" && !o.readyAt) out.add("mark_ready");
+  if (fs === "CONFIRMED" && (o.readyAt || o.outForDeliveryAt)) out.add("unready");
   if (live && o.fulfilmentType === "DELIVERY" && !o.outForDeliveryAt) out.add("dispatch");
   if (live) out.add("deliver");
   if (fs === "DELIVERED") out.add("undeliver");
@@ -456,19 +481,24 @@ export function availableOrderActions(
 type CardOrder = Parameters<typeof availableOrderActions>[0];
 
 /**
- * The one button a card draws as its next step; every other action is outline.
- * Always one of `availableOrderActions`, so it can never offer something the
- * card (or the bulk bar) would not:
- *   - a buyer's "I've paid" claim is waiting → answer it ("Payment received",
- *     which also confirms a new order);
- *   - a new order → "Confirm";
- *   - a confirmed order → hand it over ("Delivered" / "… collected");
- *   - handed over but still unpaid → "Payment received".
+ * The one big button on a card: the next step of its stage. Always one of
+ * `availableOrderActions`, so it can never offer something the card's menu (or
+ * the bulk bar) would not:
+ *   - a buyer's "I've paid" claim is waiting → answer it ("Yes, received",
+ *     which also accepts a new order);
+ *   - New → "Accept order";
+ *   - Preparing → "Mark ready" (pickup) / "Out for delivery" (delivery);
+ *   - Ready, or the buyer says it arrived → hand it over ("Picked up" /
+ *     "Delivered", "… collected" for cash);
+ *   - Done but still unpaid → "Payment received".
  */
 export function primaryOrderAction(o: CardOrder, frozen: boolean): OrderAction | null {
   const actions = availableOrderActions(o, frozen);
   if (o.displayState === "PAYMENT_SUBMITTED" && actions.has("mark_paid")) return "mark_paid";
   if (actions.has("confirm")) return "confirm";
+  if (o.buyerReceivedAt && actions.has("deliver")) return "deliver";
+  if (actions.has("mark_ready")) return "mark_ready";
+  if (actions.has("dispatch")) return "dispatch";
   if (actions.has("deliver")) return "deliver";
   if (actions.has("mark_paid")) return "mark_paid";
   return null;
@@ -622,14 +652,14 @@ export function newOrderIds(prev: ArrivingOrder[], next: ArrivingOrder[]): strin
     .filter((o) => {
       if (o.bucket === "awaiting_online") return false;
       if (!before.has(o.id)) return true;
-      return before.get(o.id) === "awaiting_online" && o.bucket !== "closed";
+      return before.get(o.id) === "awaiting_online" && o.bucket !== "done";
     })
     .map((o) => o.id);
 }
 
 /** Where "N new orders — show" lands. An order paid online is already confirmed. */
-export function newOrdersTab(unseen: { bucket: BoardBucket }[]): "needs_action" | "confirmed" {
-  return unseen.length > 0 && unseen.every((o) => o.bucket === "confirmed") ? "confirmed" : "needs_action";
+export function newOrdersTab(unseen: { bucket: BoardBucket }[]): "new" | "preparing" {
+  return unseen.length > 0 && unseen.every((o) => o.bucket === "preparing") ? "preparing" : "new";
 }
 
 export const DISPLAY_STATE_LABEL: Record<OrderDisplayState, string> = {
@@ -641,6 +671,32 @@ export const DISPLAY_STATE_LABEL: Record<OrderDisplayState, string> = {
   CANCELLED: "Cancelled",
   EXPIRED: "Expired (unpaid)",
 };
+
+export type PaymentBadgeKind = "paid" | "due" | "check" | "cash" | "unpaid" | "waiting_online" | "cancelled" | "expired";
+
+/**
+ * The payment badge on an order card. Payment is never a board stage, so this is
+ * where it shows: words always, colour only repeats them. A handed-over order
+ * still unpaid is "Payment due", the one that must not be forgotten.
+ */
+export function paymentBadge(o: {
+  displayState: OrderDisplayState;
+  paymentStatus: PaymentStatus;
+  fulfilmentType: FulfilmentType | null;
+  paidOnline?: boolean;
+  bucket?: BoardBucket;
+}): { kind: PaymentBadgeKind; label: string } {
+  if (o.displayState === "CANCELLED") return { kind: "cancelled", label: "Cancelled" };
+  if (o.displayState === "EXPIRED") return { kind: "expired", label: "Expired (unpaid)" };
+  if (o.paymentStatus === "PAID") return { kind: "paid", label: o.paidOnline ? "Paid online" : "Paid" };
+  if (o.displayState === "DELIVERED") return { kind: "due", label: "Payment due" };
+  if (o.displayState === "PAYMENT_SUBMITTED") return { kind: "check", label: "Payment to check" };
+  if (o.displayState === "PAY_ON_DELIVERY") {
+    return { kind: "cash", label: o.fulfilmentType === "PICKUP" ? "Pay at pickup" : "Pay on delivery" };
+  }
+  if (o.bucket === "awaiting_online") return { kind: "waiting_online", label: "Waiting for online payment" };
+  return { kind: "unpaid", label: "Not paid yet" };
+}
 
 /** `DISPLAY_STATE_LABEL`, except a handed-over pickup order reads "Picked up". */
 export function orderStateLabel(o: {

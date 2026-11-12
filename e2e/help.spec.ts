@@ -26,7 +26,8 @@ test.describe("help guide", () => {
 
     // The order's whole life, in order: customer places it … the rider taps Delivered … finish.
     const journey = main.getByRole("region", { name: "An online order, start to finish" });
-    await expect(journey.getByRole("listitem")).toHaveCount(7);
+    await expect(journey.getByRole("listitem")).toHaveCount(8);
+    await expect(journey).toContainText("Mark it ready");
     await expect(journey.getByRole("listitem").first()).toContainText("Customer places the order");
     await expect(journey).toContainText("Rider delivers and taps Delivered");
     await expect(journey.getByRole("listitem").last()).toContainText("Finish the order");

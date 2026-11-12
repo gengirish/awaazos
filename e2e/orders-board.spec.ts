@@ -91,17 +91,17 @@ test.describe("Orders board: menu and drop orders together", () => {
     await expect(dropCard).toBeVisible();
     await expect(menuCard.getByText("Menu order", { exact: true })).toBeVisible();
     await expect(dropCard.getByText(dropTitle, { exact: true })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Needs action (2)" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "New (2)" })).toBeVisible();
 
-    // ── One bulk confirm over both: each order goes to its own route ─────
+    // ── One bulk accept over both: each order goes to its own route ──────
     // "Last checked" is set on mount, so it marks the board as hydrated; a tap
     // on the server-rendered checkbox before that is lost.
     await expect(page.getByText(/^Last checked/)).toBeVisible();
     await page.getByRole("checkbox", { name: /select all/i }).check();
-    await page.getByRole("region", { name: "Bulk actions" }).getByRole("button", { name: "Confirm 2 orders" }).click();
-    await expect(page.getByRole("tab", { name: "Confirmed (2)" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "Needs action (0)" })).toBeVisible();
-    await page.getByRole("tab", { name: /^Confirmed/ }).click();
+    await page.getByRole("region", { name: "Bulk actions" }).getByRole("button", { name: "Accept 2 orders" }).click();
+    await expect(page.getByRole("tab", { name: "Preparing (2)" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "New (0)" })).toBeVisible();
+    await page.getByRole("tab", { name: /^Preparing/ }).click();
     await expect(menuCard).toBeVisible();
     await expect(dropCard).toBeVisible();
 
@@ -131,12 +131,12 @@ test.describe("Orders board: menu and drop orders together", () => {
     await expect(page).toHaveURL(new RegExp(`/orders\\?drop=${drop.id}$`));
     await expect(page.getByRole("heading", { level: 1, name: "Orders", exact: true })).toBeVisible();
     // Only the drop's one order is counted: the menu order is out of this view.
-    await expect(page.getByRole("tab", { name: "Confirmed (1)" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "All (1)" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Preparing (1)" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "Done (0)" })).toBeVisible();
     await expect(page.locator("p", { hasText: "To cook:" })).toContainText("Board Laddu 1");
   });
 
-  test("the Confirmed list splits into pickup and delivery, one radio at a time", async ({ page, request }) => {
+  test("the Preparing list splits into pickup and delivery, one radio at a time", async ({ page, request }) => {
     await createVendorSession(page, request, "board-handover");
     const json = { "Content-Type": "application/json" };
     const settings = await page.request.patch("/api/vendor", {
@@ -172,7 +172,7 @@ test.describe("Orders board: menu and drop orders together", () => {
 
     await page.setViewportSize({ width: 360, height: 740 });
     await page.goto("/orders");
-    await page.getByRole("tab", { name: /^Confirmed/ }).click();
+    await page.getByRole("tab", { name: /^Preparing/ }).click();
     const group = page.getByRole("radiogroup", { name: "Pickup or delivery" });
     await expect(group.getByRole("radio", { name: "All (3)" })).toBeChecked();
 

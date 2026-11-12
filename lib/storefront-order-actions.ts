@@ -10,6 +10,10 @@
  *              also drop the buyer's payment screenshot (lib/payment-proof.ts). The order stops holding stock once
  *              its 15-minute window has passed; a new claim then needs a UTR.
  *   cancel     cancelOrder (reverses revenue if it was paid; vendor refunds via UPI)
+ *   mark_ready packed and waiting ("Mark ready"): PLACED|CONFIRMED → CONFIRMED,
+ *              stamps readyAt. Marking it again restamps.
+ *   unready    "Not ready": clears readyAt and outForDeliveryAt (+ riderName) on a
+ *              CONFIRMED order, back to Preparing.
  *   dispatch   a DELIVERY order handed to a rider: PLACED|CONFIRMED → CONFIRMED,
  *              stamps outForDeliveryAt (+ riderName). Sending it again restamps.
  *   deliver    PLACED|CONFIRMED → DELIVERED; unpaid CASH is marked paid in the same txn
@@ -99,6 +103,8 @@ export async function applyStorefrontOrderAction(
       paymentStatus: true,
       paymentMethod: true,
       fulfilmentType: true,
+      readyAt: true,
+      outForDeliveryAt: true,
       riderToken: true,
       paymentProofUrl: true,
       upiRef: true,
@@ -154,6 +160,26 @@ export async function applyStorefrontOrderAction(
       applied = await cancelOrder(tx, { vendorId, transactionId, now: args.now });
       break;
     }
+    case "mark_ready": {
+      const r = await tx.transaction.updateMany({
+        where: { ...scope, fulfilmentStatus: { in: ["PLACED", "CONFIRMED"] } },
+        data: { fulfilmentStatus: "CONFIRMED", readyAt: args.now ?? new Date() },
+      });
+      applied = r.count === 1;
+      break;
+    }
+    case "unready": {
+      const r = await tx.transaction.updateMany({
+        where: {
+          ...scope,
+          fulfilmentStatus: "CONFIRMED",
+          OR: [{ readyAt: { not: null } }, { outForDeliveryAt: { not: null } }],
+        },
+        data: { readyAt: null, outForDeliveryAt: null, riderName: null },
+      });
+      applied = r.count === 1;
+      break;
+    }
     case "dispatch": {
       const r = await tx.transaction.updateMany({
         where: { ...scope, fulfilmentType: "DELIVERY", fulfilmentStatus: { in: ["PLACED", "CONFIRMED"] } },
@@ -193,7 +219,7 @@ export async function applyStorefrontOrderAction(
 
   // A delivery placed before rider links existed gets one when it is confirmed
   // (incl. by being paid) or sent out. `riderToken: null` in the where keeps the first one minted.
-  const confirms = action === "confirm" || action === "mark_paid" || action === "dispatch";
+  const confirms = action === "confirm" || action === "mark_paid" || action === "mark_ready" || action === "dispatch";
   if (confirms && order.fulfilmentType === "DELIVERY" && !order.riderToken) {
     await tx.transaction.updateMany({ where: { ...scope, riderToken: null }, data: { riderToken: generateOrderToken() } });
   }

@@ -46,7 +46,7 @@ describe("a Razorpay store's unpaid new order", () => {
 
 describe("BULK_ORDER_ACTIONS", () => {
   it("is the forward actions only — never cancel or undeliver", () => {
-    expect([...BULK_ORDER_ACTIONS]).toEqual(["confirm", "mark_paid", "deliver"]);
+    expect([...BULK_ORDER_ACTIONS]).toEqual(["confirm", "mark_paid", "mark_ready", "deliver"]);
   });
 });
 
@@ -69,7 +69,7 @@ describe("availableOrderActions: Not received", () => {
 describe("availableOrderActions (card buttons)", () => {
   it("matches the card rules for a new UPI order", () => {
     expect([...availableOrderActions(o("a", "PLACED"), false)].sort()).toEqual(
-      ["cancel", "confirm", "deliver", "mark_paid"].sort(),
+      ["cancel", "confirm", "deliver", "mark_paid", "mark_ready"].sort(),
     );
   });
 
@@ -103,16 +103,16 @@ describe("availableOrderActions (card buttons)", () => {
 });
 
 describe("bulkActionsFor / isBulkSelectable", () => {
-  it("offers confirm, mark paid and deliver on a new UPI order", () => {
-    expect(bulkActionsFor(o("a", "PLACED"), false)).toEqual(["confirm", "mark_paid", "deliver"]);
+  it("offers accept, mark paid, mark ready and deliver on a new UPI pickup order", () => {
+    expect(bulkActionsFor(o("a", "PLACED"), false)).toEqual(["confirm", "mark_paid", "mark_ready", "deliver"]);
   });
 
-  it("offers deliver only for a confirmed pay-on-delivery order", () => {
-    expect(bulkActionsFor(o("a", "CONFIRMED", "CASH"), false)).toEqual(["deliver"]);
+  it("offers mark ready and deliver only for a confirmed pay-on-delivery pickup", () => {
+    expect(bulkActionsFor(o("a", "CONFIRMED", "CASH"), false)).toEqual(["mark_ready", "deliver"]);
   });
 
   it("drops confirm on a frozen drop", () => {
-    expect(bulkActionsFor(o("a", "PLACED"), true)).toEqual(["mark_paid", "deliver"]);
+    expect(bulkActionsFor(o("a", "PLACED"), true)).toEqual(["mark_paid", "mark_ready", "deliver"]);
   });
 
   it("delivered-and-paid, cancelled and delivered-unpaid-UPI orders", () => {
@@ -140,15 +140,15 @@ describe("bulkTargets / bulkActionCounts", () => {
   });
 
   it("counts per action", () => {
-    expect(bulkActionCounts(orders, sel, false)).toEqual({ confirm: 2, mark_paid: 1, deliver: 3 });
-    expect(bulkActionCounts(orders, sel, true)).toEqual({ confirm: 0, mark_paid: 1, deliver: 3 });
+    expect(bulkActionCounts(orders, sel, false)).toEqual({ confirm: 2, mark_paid: 1, mark_ready: 3, deliver: 3 });
+    expect(bulkActionCounts(orders, sel, true)).toEqual({ confirm: 0, mark_paid: 1, mark_ready: 3, deliver: 3 });
   });
 
   it("asks the frozen rule per order when the list mixes frozen and open sources", () => {
     // p1 belongs to a frozen drop; p2 is a menu order.
     const frozen = (order: { id: string }) => order.id === "p1";
     expect(bulkTargets(orders, sel, "confirm", frozen).map((t) => t.id)).toEqual(["p2"]);
-    expect(bulkActionCounts(orders, sel, frozen)).toEqual({ confirm: 1, mark_paid: 1, deliver: 3 });
+    expect(bulkActionCounts(orders, sel, frozen)).toEqual({ confirm: 1, mark_paid: 1, mark_ready: 3, deliver: 3 });
     expect([...pruneSelection(sel, orders, frozen)]).toEqual(["p1", "p2", "c1"]);
   });
 });
@@ -202,7 +202,7 @@ describe("bulkResultMessage", () => {
   it("all succeeded", () => {
     expect(bulkResultMessage("confirm", { succeeded: ["a", "b"], failed: [] })).toEqual({
       kind: "success",
-      text: "2 orders confirmed",
+      text: "2 orders accepted",
     });
   });
 

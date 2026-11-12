@@ -98,6 +98,7 @@ export default async function StorefrontAccountPage(
           fulfilmentStatus: true,
           fulfilmentType: true,
           outForDeliveryAt: true,
+          readyAt: true,
           drop: { select: { title: true } },
           orderItems: { select: { menuItemId: true, name: true, qty: true, isGift: true }, orderBy: { id: "asc" } },
           feedback: { select: { rating: true } },
@@ -180,6 +181,7 @@ export default async function StorefrontAccountPage(
                       menuOrder: !o.drop,
                       fulfilmentType: o.fulfilmentType,
                       outForDelivery: o.fulfilmentType === "DELIVERY" && o.outForDeliveryAt !== null,
+                      readyForPickup: o.fulfilmentType !== "DELIVERY" && o.readyAt !== null,
                     });
                     const summary = orderItemsSummary(o.orderItems);
                     const againPlan =

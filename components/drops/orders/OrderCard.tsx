@@ -13,6 +13,8 @@ import {
   IndianRupee,
   LayoutGrid,
   Loader2,
+  MoreHorizontal,
+  PackageCheck,
   Phone,
   Send,
   ShoppingBag,
@@ -44,9 +46,11 @@ import {
   availableOrderActions,
   markPaidNeedsConfirm,
   orderStateLabel,
+  paymentBadge,
   primaryOrderAction,
   type BoardOrder,
   type OrderAction,
+  type PaymentBadgeKind,
 } from "@/lib/drops-board";
 import { formatIstDate, formatIstDayLabel, formatIstTime, utcToIstParts } from "@/lib/drops-time";
 import { orderSlotLabel } from "@/lib/menu-slots";
@@ -76,14 +80,15 @@ type Props = {
   locked?: boolean;
 };
 
-const STATE_STYLE: Record<BoardOrder["displayState"], string> = {
-  PAID: "border-primary/40 bg-primary/10 text-foreground",
-  DELIVERED: "border-border bg-muted text-foreground",
-  PAY_ON_DELIVERY: "border-border bg-secondary text-secondary-foreground",
-  PAYMENT_SUBMITTED: "border-amber-500/60 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100",
-  AWAITING_PAYMENT: "border-amber-500/60 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100",
-  CANCELLED: "border-destructive/40 bg-destructive/10 text-foreground",
-  EXPIRED: "border-border bg-muted text-muted-foreground",
+const BADGE_STYLE: Record<PaymentBadgeKind, string> = {
+  paid: "border-success/40 bg-success/10 text-foreground",
+  due: "border-destructive/50 bg-destructive/10 text-foreground",
+  check: "border-amber-500/60 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100",
+  cash: "border-border bg-secondary text-secondary-foreground",
+  unpaid: "border-amber-500/60 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100",
+  waiting_online: "border-border bg-muted text-muted-foreground",
+  cancelled: "border-destructive/40 bg-destructive/10 text-foreground",
+  expired: "border-border bg-muted text-muted-foreground",
 };
 
 /** "7:58 pm" for an order from today (IST), "Wed, 28 Oct · 7:58 pm" for an older one. */
@@ -92,20 +97,21 @@ function placedLabel(d: Date): string {
   return today ? formatIstTime(d) : `${formatIstDayLabel(d)} · ${formatIstTime(d)}`;
 }
 
-function StateIcon({ state }: { state: BoardOrder["displayState"] }) {
+function BadgeIcon({ kind }: { kind: PaymentBadgeKind }) {
   const cls = "h-4 w-4 shrink-0";
-  switch (state) {
-    case "PAID":
-    case "DELIVERED":
+  switch (kind) {
+    case "paid":
       return <CheckCircle2 className={cls} aria-hidden />;
-    case "PAYMENT_SUBMITTED":
+    case "due":
+    case "check":
       return <AlertTriangle className={cls} aria-hidden />;
-    case "AWAITING_PAYMENT":
-    case "EXPIRED":
+    case "unpaid":
+    case "waiting_online":
+    case "expired":
       return <Clock className={cls} aria-hidden />;
-    case "PAY_ON_DELIVERY":
+    case "cash":
       return <IndianRupee className={cls} aria-hidden />;
-    case "CANCELLED":
+    case "cancelled":
       return <XCircle className={cls} aria-hidden />;
   }
 }
@@ -126,11 +132,14 @@ export function OrderCard({
 }: Props) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmPaid, setConfirmPaid] = useState(false);
-  // Orders that need nothing from the vendor right now are a two-line summary
-  // until she opens them, so a long Confirmed / Delivered list stays scannable.
+  // The card's "⋯": a bottom sheet on phones (the dialog this card already loads
+  // for Cancel), so the board's first load carries no menu library.
+  const [moreOpen, setMoreOpen] = useState(false);
+  // Orders past New are a two-line summary (with their next step) until she
+  // opens them, so a long Preparing / Done list stays scannable.
   // Per card and on this device only.
   const [open, setOpen] = useState(false);
-  const collapsible = order.bucket !== "needs_action";
+  const collapsible = order.bucket !== "new";
   // A Razorpay store's new order, not paid yet: nothing to do but wait (or cancel it).
   const awaitingOnline = order.bucket === "awaiting_online";
   const expanded = !collapsible || open;
@@ -149,6 +158,10 @@ export function OrderCard({
   const isMenuOrder = order.dropId === null;
   const firstItem = order.items[0];
   const stateLabel = orderStateLabel(order);
+  const badge = paymentBadge(order);
+  const handedOver = order.displayState === "DELIVERED";
+  // Collapsed: a finished order says how it ended; a live one, where its money stands.
+  const summaryLabel = handedOver ? `${stateLabel}${badge.kind === "due" ? " · Payment due" : ""}` : badge.label;
 
   const actions = availableOrderActions(order, frozen);
   const canConfirm = actions.has("confirm");
@@ -158,11 +171,15 @@ export function OrderCard({
   const canDeliver = actions.has("deliver");
   const outAt = order.outForDeliveryAt ? new Date(order.outForDeliveryAt) : null;
   const outForDelivery = outAt !== null && (fs === "PLACED" || fs === "CONFIRMED");
+  const readyAt = order.readyAt ? new Date(order.readyAt) : null;
+  const readyNow = readyAt !== null && fs === "CONFIRMED" && !outForDelivery;
   // The buyer tapped "I've received my order" and it still waits on the seller (unpaid).
   const receivedAt = order.buyerReceivedAt ? new Date(order.buyerReceivedAt) : null;
   const buyerSaysReceived = receivedAt !== null && (fs === "PLACED" || fs === "CONFIRMED");
   const canUndeliver = actions.has("undeliver");
   const canCancel = actions.has("cancel");
+  const canMarkReady = actions.has("mark_ready");
+  const canUnready = actions.has("unready");
 
   const deliverLabel =
     order.paymentMethod === "CASH" && unpaid
@@ -171,7 +188,8 @@ export function OrderCard({
         ? "Picked up"
         : "Delivered";
 
-  // Exactly one primary button per order (`primaryOrderAction`); the rest are outline.
+  // One big button per order: its stage's next step (`primaryOrderAction`).
+  // Everything else is in the card's "⋯" menu.
   const primary = primaryOrderAction(order, frozen);
   // "Not received" answers the same question as "Payment received", so it sits beside it.
   const pairedReject = primary === "mark_paid" && canRejectPayment;
@@ -182,16 +200,18 @@ export function OrderCard({
     else onAction(order.id, action);
   };
 
+  const claimWaiting = order.displayState === "PAYMENT_SUBMITTED";
   const BUTTONS: { action: OrderAction; show: boolean; label: string; icon: ReactNode }[] = [
-    { action: "confirm", show: canConfirm, label: "Confirm", icon: <CheckCircle2 aria-hidden /> },
+    { action: "confirm", show: canConfirm, label: "Accept order", icon: <CheckCircle2 aria-hidden /> },
     {
       action: "mark_paid",
       show: canMarkPaid,
-      // Being paid confirms a new order too (`markOrderPaid`); say so on the button.
-      label: fs === "PLACED" ? "Payment received · Confirm" : "Payment received",
+      // Answering the buyer's claim; being paid accepts a new order too (`markOrderPaid`).
+      label: claimWaiting ? "Yes, received" : "Payment received",
       icon: <IndianRupee aria-hidden />,
     },
     { action: "reject_payment", show: canRejectPayment, label: "Not received", icon: <XCircle aria-hidden /> },
+    { action: "mark_ready", show: canMarkReady, label: "Mark ready", icon: <PackageCheck aria-hidden /> },
     { action: "dispatch", show: canDispatch, label: "Out for delivery", icon: <Send aria-hidden /> },
     {
       action: "deliver",
@@ -201,10 +221,12 @@ export function OrderCard({
     },
   ];
   const shown = BUTTONS.filter((b) => b.show);
-  // Primary first, its "Not received" partner next, then the others in their usual order.
-  const rank = (a: OrderAction) => (a === primary ? 0 : pairedReject && a === "reject_payment" ? 1 : 2);
-  const ordered = [...shown].sort((a, b) => rank(a.action) - rank(b.action));
+  // On the card: the primary, and "Not received" beside "Yes, received". The rest go in the menu.
+  const onCard = (a: OrderAction) => a === primary || (pairedReject && a === "reject_payment");
+  const cardButtons = shown.filter((b) => onCard(b.action)).sort((a) => (a.action === primary ? -1 : 1));
+  const menuButtons = shown.filter((b) => !onCard(b.action));
   const primaryButton = shown.find((b) => b.action === primary) ?? null;
+  const hasMenu = menuButtons.length > 0 || canUnready || canUndeliver || canCancel;
 
   const btn = ({ action, label, icon }: (typeof BUTTONS)[number]) => {
     const isPrimary = action === primary;
@@ -301,11 +323,9 @@ export function OrderCard({
         </div>
         <div className="shrink-0 text-right">
           <p className="font-mono text-lg font-bold tabular-nums">{formatINR(order.totalPaise)}</p>
-          {/* The status pill already says "Pay on delivery"; "Cash" under the amount would say it twice. */}
-          {order.displayState !== "PAY_ON_DELIVERY" && (
-            <p className="text-xs text-muted-foreground">
-              {order.paymentMethod === "CASH" ? "Cash" : order.paidOnline ? "Paid online" : "UPI"}
-            </p>
+          {/* How it is paid, unless the payment badge already says it ("Pay on delivery", "Paid online"). */}
+          {order.displayState !== "PAY_ON_DELIVERY" && !order.paidOnline && (
+            <p className="text-xs text-muted-foreground">{order.paymentMethod === "CASH" ? "Cash" : "UPI"}</p>
           )}
         </div>
       </header>
@@ -328,12 +348,14 @@ export function OrderCard({
               <span className="min-w-0 flex-1 text-muted-foreground">Hide details</span>
             ) : (
               <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                <StateIcon state={order.displayState} />
-                <span className="font-semibold">{stateLabel}</span>
+                <BadgeIcon kind={handedOver && badge.kind !== "due" ? "paid" : badge.kind} />
+                <span className="font-semibold">{summaryLabel}</span>
                 <span className="text-muted-foreground">
                   · {itemCount} {itemCount === 1 ? "item" : "items"} ·{" "}
                   {isPickup
-                    ? "Pickup"
+                    ? readyNow
+                      ? "Ready for pickup"
+                      : "Pickup"
                     : outForDelivery
                       ? `Out for delivery${order.riderName ? ` with ${order.riderName}` : ""}`
                       : "Delivery"}
@@ -385,16 +407,20 @@ export function OrderCard({
         {expanded && (
           <>
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
+              {handedOver && (
+                <p className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-semibold text-foreground">
+                  <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
+                  {stateLabel}
+                </p>
+              )}
               <p
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
-                  STATE_STYLE[order.displayState],
+                  BADGE_STYLE[badge.kind],
                 )}
               >
-                <StateIcon state={order.displayState} />
-                {stateLabel}
-                {fs === "CONFIRMED" && order.displayState !== "DELIVERED" && " · Confirmed"}
-                {fs === "PLACED" && order.displayState !== "EXPIRED" && !awaitingOnline && " · Not confirmed yet"}
+                <BadgeIcon kind={badge.kind} />
+                {badge.label}
               </p>
               {source && (
                 <p className="inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground">
@@ -417,6 +443,7 @@ export function OrderCard({
 
             {order.displayState === "PAYMENT_SUBMITTED" && (
               <div className="mt-3 rounded-md border border-amber-500/60 bg-amber-50 p-3 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100">
+                <p className="text-sm font-bold">Did {formatINR(order.totalPaise)} reach your UPI app?</p>
                 {order.upiRef ? (
                   <>
                     <p className="text-xs font-medium">Customer says they paid. Match this UTR in your UPI app:</p>
@@ -424,8 +451,7 @@ export function OrderCard({
             </>
           ) : (
             <p className="text-xs font-medium">
-              Customer says they paid {formatINR(order.totalPaise)}. Check your UPI app for that amount, then
-              answer below.
+              The customer says they paid. Check your UPI app for that amount, then answer below.
             </p>
           )}
           {order.hasPaymentProof && (
@@ -441,7 +467,7 @@ export function OrderCard({
             </a>
           )}
           {order.hasPaymentProof && (
-            <p className="mt-1 text-xs">A screenshot can be edited. Check your UPI app before you tap Payment received.</p>
+            <p className="mt-1 text-xs">A screenshot can be edited. Check your UPI app before you tap Yes, received.</p>
           )}
         </div>
       )}
@@ -533,6 +559,16 @@ export function OrderCard({
         </div>
       )}
 
+      {readyNow && readyAt && (
+        <p className="mt-2 flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold">
+          <PackageCheck className="h-4 w-4 shrink-0" aria-hidden />
+          <span>
+            Ready for pickup
+            <span className="font-normal text-muted-foreground"> · since {formatIstTime(readyAt)}</span>
+          </span>
+        </p>
+      )}
+
       {outForDelivery && outAt && (
         <p className="mt-2 flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold">
           <Send className="h-4 w-4 shrink-0" aria-hidden />
@@ -558,57 +594,37 @@ export function OrderCard({
         />
       )}
 
-      {/* Next step first: one primary button, the other ways forward in outline under it. */}
-      {ordered.length > 0 && <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">{ordered.map(btn)}</div>}
+      {/* The next step: one big button (with "Not received" beside "Yes, received"). */}
+      {cardButtons.length > 0 && <div className="mt-3 flex flex-wrap gap-2 border-t pt-3">{cardButtons.map(btn)}</div>}
 
-      {order.customerPhone && (
+      {/* Call and WhatsApp the buyer, and "⋯" for everything else this order can do. */}
+      {(order.customerPhone || hasMenu) && (
         <div className="mt-2 flex flex-wrap gap-2">
-          <a
-            href={`tel:${order.customerPhone}`}
-            className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={`Call ${order.customerName ?? "customer"}`}
-          >
-            <Phone className="h-4 w-4" aria-hidden />
-            Call
-          </a>
-          <BuyerWhatsAppLinks order={order} phone={order.customerPhone} vendorName={vendorName} />
-        </div>
-      )}
-
-      {/*
-        Going back or cancelling sits last, on its own line, small and at the
-        start edge: away from the full-width buttons a thumb aims for. Cancel
-        still asks before it does anything.
-      */}
-      {(canUndeliver || canCancel) && (
-        <div className="mt-2 flex flex-wrap items-center gap-2 border-t pt-2">
-          {canUndeliver && (
-            <Button
-              type="button"
-              variant="ghost"
-              className="min-h-11 px-2 text-sm first:-ml-2"
-              disabled={busy}
-              aria-busy={pendingAction === "undeliver"}
-              onClick={() => onAction(order.id, "undeliver")}
-            >
-              {pendingAction === "undeliver" ? (
-                <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden />
-              ) : (
-                <Undo2 aria-hidden />
-              )}
-              {isPickup ? "Undo picked up" : "Undo delivered"}
-            </Button>
+          {order.customerPhone && (
+            <>
+              <a
+                href={`tel:${order.customerPhone}`}
+                className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+                aria-label={`Call ${order.customerName ?? "customer"}`}
+              >
+                <Phone className="h-4 w-4" aria-hidden />
+                Call
+              </a>
+              <BuyerWhatsAppLinks order={order} phone={order.customerPhone} vendorName={vendorName} />
+            </>
           )}
-          {canCancel && (
+          {hasMenu && (
             <Button
               type="button"
-              variant="ghost"
-              className="min-h-11 px-2 text-sm text-destructive first:-ml-2 hover:bg-destructive/10 hover:text-destructive"
+              variant="outline"
+              size="icon"
+              className="min-h-11 min-w-11 shrink-0"
               disabled={busy}
-              onClick={() => setConfirmCancel(true)}
+              aria-label={`More for ${customerLabel}'s order`}
+              aria-haspopup="dialog"
+              onClick={() => setMoreOpen(true)}
             >
-              <Ban aria-hidden />
-              Cancel order
+              <MoreHorizontal aria-hidden />
             </Button>
           )}
         </div>
@@ -616,6 +632,86 @@ export function OrderCard({
           </>
         )}
       </div>
+
+      <ResponsiveDialog open={moreOpen} onOpenChange={setMoreOpen}>
+        <ResponsiveDialogContent>
+          <ResponsiveDialogHeader>
+            <ResponsiveDialogTitle>{customerLabel}&rsquo;s order</ResponsiveDialogTitle>
+            <ResponsiveDialogDescription>
+              {order.billNumber} · {formatINR(order.totalPaise)}
+            </ResponsiveDialogDescription>
+          </ResponsiveDialogHeader>
+          <ResponsiveDialogBody className="pb-6">
+            <ul className="flex flex-col gap-2">
+              {menuButtons.map((b) => (
+                <li key={b.action}>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-12 w-full justify-start text-sm font-medium"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      run(b.action);
+                    }}
+                  >
+                    {b.icon}
+                    {b.label}
+                  </Button>
+                </li>
+              ))}
+              {canUnready && (
+                <li>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-12 w-full justify-start text-sm font-medium"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      onAction(order.id, "unready");
+                    }}
+                  >
+                    <Undo2 aria-hidden />
+                    {outForDelivery ? "Not out for delivery yet" : "Not ready yet"}
+                  </Button>
+                </li>
+              )}
+              {canUndeliver && (
+                <li>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-12 w-full justify-start text-sm font-medium"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      onAction(order.id, "undeliver");
+                    }}
+                  >
+                    <Undo2 aria-hidden />
+                    {isPickup ? "Undo picked up" : "Undo delivered"}
+                  </Button>
+                </li>
+              )}
+              {canCancel && (
+                // Last and set apart: it asks again before it does anything.
+                <li className="mt-2 border-t pt-3">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    className="min-h-12 w-full justify-start text-sm font-medium text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    onClick={() => {
+                      setMoreOpen(false);
+                      setConfirmCancel(true);
+                    }}
+                  >
+                    <Ban aria-hidden />
+                    Cancel order
+                  </Button>
+                </li>
+              )}
+            </ul>
+          </ResponsiveDialogBody>
+        </ResponsiveDialogContent>
+      </ResponsiveDialog>
 
       <ConfirmDialog
         open={confirmPaid}
@@ -625,7 +721,7 @@ export function OrderCard({
           order.paymentMethod === "CASH"
             ? "Only do this after you have the cash in hand."
             : "Only do this after you have seen the money in your UPI app."
-        }${fs === "PLACED" ? " This also confirms the order." : ""}`}
+        }${fs === "PLACED" ? " This also accepts the order." : ""}`}
         confirmLabel="Yes, mark paid"
         cancelLabel="Go back"
         destructive={false}

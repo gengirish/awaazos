@@ -158,7 +158,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
       const card = page.getByRole("article", { name: /Priya Buyer/ });
       await expect(card).toBeVisible();
       await expect(card.getByText(`2 × ${laddu}`)).toBeVisible();
-      await expect(card.getByText("Pay on delivery")).toBeVisible();
+      await expect(card.getByText("Pay at pickup")).toBeVisible();
 
       await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible();
       await expect(await boardMenuItem(page, "More actions", "Prep sheet")).toHaveAttribute(
@@ -170,13 +170,18 @@ test.describe("drops: home-kitchen pre-order day", () => {
       await expect(await boardMenuItem(page, "Share", "Instagram story")).toBeVisible();
       await closeBoardMenu(page);
 
+      // New → Preparing → Ready → Done, one big button each.
+      await card.getByRole("button", { name: "Accept order" }).click();
+      await page.getByRole("tab", { name: /^Preparing/ }).click();
+      await card.getByRole("button", { name: "Mark ready" }).click();
+      await page.getByRole("tab", { name: /^Ready/ }).click();
       await card.getByRole("button", { name: /picked up · ₹240\.00 collected/i }).click();
 
-      await page.getByRole("tab", { name: /^Delivered/ }).click();
+      await page.getByRole("tab", { name: /^Done/ }).click();
       const delivered = page.getByRole("article", { name: /Priya Buyer/ });
       await expect(delivered.getByText("Picked up", { exact: true })).toBeVisible();
       // Cash collected at handover marks it paid.
-      await expect(page.getByRole("listitem").filter({ hasText: /^Paid/ })).toContainText("₹240.00");
+      await expect(page.getByRole("region", { name: "Summary" })).toContainText("Paid ₹240.00");
 
       // ── Buyer: stock reflects the sale; a stale cart cannot oversell ───
       await buyer.goto(`/s/${slug}`);

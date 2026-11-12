@@ -142,6 +142,7 @@ const loadOrder = cache(async (slug: string, token: string) => {
       fulfilmentStatus: true,
       fulfilmentType: true,
       outForDeliveryAt: true,
+      readyAt: true,
       buyerReceivedAt: true,
       isSample: true,
       feedback: { select: { rating: true } },
@@ -234,7 +235,7 @@ function ToneIcon({ tone }: { tone: StatusTone }) {
 type ProgressStep = { key: string; label: string; done: boolean };
 
 /**
- * Placed → Paid → Confirmed → (On the way, deliveries only) → Collected /
+ * Placed → Paid → Confirmed → On the way (delivery) / Ready (pickup) → Collected /
  * Delivered (pay on delivery: no Paid step, payment happens at the last one; paid
  * online: no Confirmed step, being paid is what confirmed it). Static: each step is an icon plus
  * words ("Done" / "Now"), and the step the order is waiting on carries
@@ -317,10 +318,13 @@ export default async function StorefrontOrderPage(props: {
   const { vendor, drop } = order;
   // Handed to a rider and not yet delivered. Who the rider is stays with the seller.
   const onTheWay = order.fulfilmentType === "DELIVERY" && order.outForDeliveryAt !== null;
+  // The seller tapped "Mark ready" on a pickup order (lib/drops-board.ts, stage Ready).
+  const readyForPickup = order.fulfilmentType !== "DELIVERY" && order.readyAt !== null;
   const status = orderStatusLabel(state, order.fulfilmentStatus, {
     menuOrder: !drop,
     fulfilmentType: order.fulfilmentType,
     outForDelivery: onTheWay,
+    readyForPickup,
   });
   const pickupNote = drop ? drop.pickupNote : (vendor.settings?.menuPickupNote ?? null);
   const slug = vendor.slug;
@@ -417,7 +421,9 @@ export default async function StorefrontOrderPage(props: {
           { key: "placed", label: "Placed", done: true },
           ...(payOnDelivery ? [] : [{ key: "paid", label: "Paid", done: order.paymentStatus === "PAID" }]),
           ...(paidOnline ? [] : [{ key: "confirmed", label: "Confirmed", done: confirmed || handedOver }]),
-          ...(order.fulfilmentType !== "DELIVERY" ? [] : [{ key: "on-the-way", label: "On the way", done: onTheWay || handedOver }]),
+          order.fulfilmentType === "DELIVERY"
+            ? { key: "on-the-way", label: "On the way", done: onTheWay || handedOver }
+            : { key: "ready", label: "Ready", done: readyForPickup || handedOver },
           { key: "handed", label: payOnDelivery ? `${lastStep} · pay then` : lastStep, done: handedOver },
         ];
   const storeHref = `/s/${slug}`;

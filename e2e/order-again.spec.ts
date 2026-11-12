@@ -55,8 +55,8 @@ test.describe("order again", () => {
         "href",
         /^https:\/\/wa\.me\/919848054321\?text=Hi%20Ravi%2C%20about%20your%20order/,
       );
-      await card.getByRole("button", { name: "Confirm" }).click();
-      await page.getByRole("tab", { name: /^Confirmed/ }).click();
+      await card.getByRole("button", { name: "Accept order" }).click();
+      await page.getByRole("tab", { name: /^Preparing/ }).click();
       const confirmed = page.getByRole("article", { name: /Ravi Buyer/ });
       await confirmed.getByRole("button", { name: /show details/i }).click();
       // The order link joins the text just after the card mounts, so wait for it.
@@ -67,8 +67,10 @@ test.describe("order again", () => {
       expect(await messageIn(update)).toContain("is confirmed.");
       const ready = confirmed.getByRole("link", { name: /ready for pickup/i });
       expect(await messageIn(ready)).toContain("is ready for pickup.");
+      await confirmed.getByRole("button", { name: "Mark ready" }).click();
+      await page.getByRole("tab", { name: /^Ready/ }).click();
       await confirmed.getByRole("button", { name: /picked up · ₹200\.00 collected/i }).click();
-      await page.getByRole("tab", { name: /^Delivered/ }).click();
+      await page.getByRole("tab", { name: /^Done/ }).click();
       await expect(page.getByRole("article", { name: /Ravi Buyer/ }).getByText("Picked up", { exact: true })).toBeVisible();
 
       // ── One item is no longer sold ───────────────────────────────────

@@ -109,7 +109,7 @@ test.describe("buyer says the order arrived", () => {
       fulfilmentStatus: "CONFIRMED",
     });
     await page.goto("/orders");
-    await page.getByRole("tab", { name: /^Confirmed/ }).click();
+    await page.getByRole("tab", { name: /^Preparing/ }).click();
     const card = page.getByRole("article", { name: /Asha Received/ });
     // The folded card's summary carries it; the details say what to do next.
     const summary = card.getByRole("button", { name: /Show details/ });
@@ -118,7 +118,7 @@ test.describe("buyer says the order arrived", () => {
     await expect(card.getByText("Customer says they got it")).toBeVisible();
     await expect(card.getByText("Collect the payment, then tap Delivered.")).toBeVisible();
     await card.getByRole("button", { name: /Delivered · ₹300\.00 collected/ }).click();
-    await page.getByRole("tab", { name: /^Delivered/ }).click();
+    await page.getByRole("tab", { name: /^Done/ }).click();
     await expect(page.getByRole("article", { name: /Asha Received/ })).toBeVisible();
   });
 
