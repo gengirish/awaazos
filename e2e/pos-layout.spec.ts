@@ -187,8 +187,13 @@ test.describe("app shell navigation", () => {
     await expect(page).toHaveURL(/\/store$/);
     await expect(page.getByRole("heading", { level: 1, name: "Your store" })).toBeVisible();
     await expect(page.getByRole("heading", { name: "Hidden from buyers" })).toBeVisible();
+    // The owner sees what is left of the store's look, each row opening its Settings card.
+    await expect(page.getByRole("link", { name: /Tagline/ })).toHaveAttribute("href", "/settings/store#tagline");
+    await expect(page.getByText("Not taking orders yet.")).toBeVisible();
     await page.getByRole("button", { name: "Publish store" }).click();
     await expect(page.getByRole("heading", { name: "Open to buyers" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Bring buyers to your store" })).toBeVisible();
+    await expect(page.getByRole("button", { name: /Copy Instagram bio link/ })).toBeVisible();
 
     // Published: Settings takes the fourth slot, Sell and Drops move behind More, Store stays in the middle.
     await expect(tabs.getByRole("link")).toHaveText(["Orders", "Menu", "Store", "Settings"]);
@@ -208,7 +213,13 @@ test.describe("app shell navigation", () => {
     const sheet = page.getByRole("dialog", { name: "More" });
     for (const name of ["Drops", "Sell"]) {
       await expect(sheet.getByRole("link", { name, exact: true })).toBeVisible();
-    }
+    }    await page.keyboard.press("Escape");
+
+    // A look row opens Settings → Online store scrolled to its card.
+    await tabs.getByRole("link", { name: "Store", exact: true }).click();
+    await page.getByRole("link", { name: /Banner & logo/ }).click();
+    await expect(page).toHaveURL(/\/settings\/store#banner-logo$/);
+    await expect(page.getByRole("heading", { level: 2, name: "Banner & logo" })).toBeInViewport();
   });
 
   test("desktop: a left rail lists every destination and there is no tab bar", async ({ page, request }) => {

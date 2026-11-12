@@ -602,8 +602,9 @@ render only) and `BillingAccessNotice` (`components/billing/TrialNotice.tsx`). S
 a CASHIER sees none. The phone tab bar depends on the store too: `appTabBarForRole(role, published)`
 in `lib/app-nav.ts` is Orders · Menu · Store · Settings for a published store (Sell for an unpublished
 one; a cashier gets Orders · Sell · Store), Store raised in the middle (`APP_CENTRE_TAB`); Drops and the
-rest are behind More. `/store` (`components/store/StoreHubClient.tsx`) is the store's link, share, QR
-and the owner's Publish. `/help` must use the same function (`helpTopicsForRole(role, published)`).
+rest are behind More. `/store` (`components/store/StoreHubClient.tsx`, words in `lib/store-hub.ts`) is a
+header preview, what buyers can order now, the tagged Instagram bio / WhatsApp links, story image, QR, the
+owner's Publish and look rows into `/settings/store#<card>`. `/help` must use the same function (`helpTopicsForRole(role, published)`).
 
 **Order from menu** (`lib/menu-orders.ts`, opt-in `VendorSettings.acceptMenuOrders`): buyers order
 everyday `MenuItem`s with no drop — same STOREFRONT transaction with `dropId = null`, same payment
