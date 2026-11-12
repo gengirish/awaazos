@@ -8,6 +8,7 @@ import { deliveryAreasSchema } from "@/lib/delivery-areas-schema";
 import { FSSAI_NUMBER_MESSAGE, FSSAI_NUMBER_PATTERN } from "@/lib/fssai";
 import { menuSlotsSchema } from "@/lib/menu-slots-schema";
 import { INSTAGRAM_HANDLE_MESSAGE, normaliseInstagramHandle } from "@/lib/instagram";
+import { normaliseWhatsappCommunityUrl, WHATSAPP_COMMUNITY_MESSAGE } from "@/lib/whatsapp-community";
 import { menuOrdersEnableBlocker, type MenuOrdersBlocker } from "@/lib/menu-orders-board";
 import {
   dropWillTakeOrdersWhere,
@@ -76,6 +77,15 @@ const patchSchema = z.object({
     .max(200)
     .refine((v) => normaliseInstagramHandle(v) !== null, INSTAGRAM_HANDLE_MESSAGE)
     .transform((v) => normaliseInstagramHandle(v))
+    .optional()
+    .nullable(),
+  // The seller's own WhatsApp group invite or channel link; stored canonical. "" or null clears it.
+  whatsappCommunityUrl: z
+    .string()
+    .trim()
+    .max(300)
+    .refine((v) => normaliseWhatsappCommunityUrl(v) !== null, WHATSAPP_COMMUNITY_MESSAGE)
+    .transform((v) => normaliseWhatsappCommunityUrl(v))
     .optional()
     .nullable(),
   voiceLang: z.enum(SUPPORTED_VOICE_LANGS).optional(),
@@ -335,6 +345,9 @@ export async function PATCH(req: NextRequest) {
       }
       if (vendorFields.instagramHandle !== undefined) {
         settingsUpdate.instagramHandle = vendorFields.instagramHandle || null;
+      }
+      if (vendorFields.whatsappCommunityUrl !== undefined) {
+        settingsUpdate.whatsappCommunityUrl = vendorFields.whatsappCommunityUrl || null;
       }
       if (vendorFields.theme !== undefined) {
         settingsUpdate.theme = vendorFields.theme;

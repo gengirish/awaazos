@@ -347,6 +347,17 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     keywords: "photo picture brand rename colour color theme tagline",
   },
   {
+    id: "whatsapp-group-link",
+    group: "setup",
+    title: "Add your WhatsApp group or channel",
+    steps: "In WhatsApp, copy your group's invite link (group info → Invite via link) or your channel's link (Share). Paste it under WhatsApp group or channel and save. Customers see a Join button on your store and on every order page, and join it themselves. AwaazOS never sends anything to your group: post your announcements there as you do now.",
+    nav: "settings",
+    href: "/settings/store",
+    trail: ["Online store"],
+    ownerOnly: true,
+    keywords: "community broadcast announcement customers bulk message invite join updates",
+  },
+  {
     id: "store-details",
     group: "setup",
     title: "Change what you sell or where you are",
