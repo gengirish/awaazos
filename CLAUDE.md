@@ -274,6 +274,11 @@ Rules every one of them follows:
   not only buyers, so `acceptWhatsappOrders` does not imply it. Instagram is
   `VendorSettings.instagramHandle` (Settings → Online store), stored bare and linked only through
   `instagramProfileUrl()` (`lib/instagram.ts`); saving a handle publishes it.
+- The seller's own WhatsApp group invite or channel (`VendorSettings.whatsappCommunityUrl`, Settings → Online
+  store) shows as "Join our WhatsApp group" / "Follow our WhatsApp channel" in the `/s/[slug]` header and on the
+  buyer's order page. Only `chat.whatsapp.com/<code>` and `whatsapp.com/channel/<id>` are accepted, stored
+  canonical and rendered only through `whatsappCommunityLink()` (`lib/whatsapp-community.ts`). Buyers join it
+  themselves: we never send to it, so there is no bulk messaging and no buyer number leaves our database.
 - Order pages are keyed on `Transaction.orderToken` alone (192-bit random, `generateOrderToken()`),
   always looked up together with the slug's `vendorId`. Never expose or accept a transaction `id`.
 - Every write is IP rate-limited (`makeLimiter` in `lib/ratelimit.ts`; buyer login also per-email).

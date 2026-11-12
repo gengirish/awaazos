@@ -7,6 +7,7 @@ import {
   Instagram,
   LayoutDashboard,
   MapPin,
+  Megaphone,
   MessageCircle,
   Package,
   QrCode,
@@ -16,6 +17,7 @@ import {
   Sparkles,
   Truck,
   UserRound,
+  UsersRound,
   UtensilsCrossed,
   Wallet,
 } from "lucide-react";
@@ -56,6 +58,7 @@ import { deliveryAreaSummary, parseDeliveryAreas, type DeliveryArea } from "@/li
 import { menuSlotLabel, parseMenuSlots, upcomingMenuSlots } from "@/lib/menu-slots";
 import { formatDropDayLabel, formatWindowWithDay } from "@/lib/drops-time";
 import { instagramProfileUrl } from "@/lib/instagram";
+import { whatsappCommunityLabel, whatsappCommunityLink } from "@/lib/whatsapp-community";
 import { stockLeftByMenuItem, stockLeftByVariant, type TrackedItem } from "@/lib/inventory-server";
 import { allSizesSoldOut, variantPriceRange, variantPricePaise, type StoreSize } from "@/lib/item-variants";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
@@ -177,7 +180,7 @@ type StorefrontVendor = NonNullable<Awaited<ReturnType<typeof loadStorefront>>>;
  */
 const BANNER_LOGO_OFFSET = "pt-[68px] sm:pt-[124px]";
 
-/** Header contact pills (WhatsApp chat, Instagram profile). */
+/** Header contact pills (WhatsApp chat, WhatsApp group / channel, Instagram profile). */
 const CONTACT_LINK =
   "inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background px-4 text-sm font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
 
@@ -235,6 +238,7 @@ const loadStorefront = cache(async (slug: string) => {
           acceptWhatsappOrders: true,
           showWhatsappOnStore: true,
           instagramHandle: true,
+          whatsappCommunityUrl: true,
           menuFulfilmentMode: true,
           menuDeliveryFeePaise: true,
           menuPickupNote: true,
@@ -985,6 +989,7 @@ export default async function StorefrontPage(props: {
   });
   const instagramHandle = vendor.settings?.instagramHandle ?? null;
   const instagramLink = instagramProfileUrl(instagramHandle);
+  const community = whatsappCommunityLink(vendor.settings?.whatsappCommunityUrl);
   // Everything the search bar can find: one text per row, as the rows match it.
   const searchIndex = [
     ...dropViews.flatMap((view) => view.items.map((item) => dropItemSearchText(item, view.drop.title))),
@@ -1152,13 +1157,25 @@ export default async function StorefrontPage(props: {
               </ul>
             ) : null}
 
-            {whatsappLink || instagramLink ? (
+            {whatsappLink || community || instagramLink ? (
               <ul aria-label="Contact" className="mt-3 flex flex-wrap items-center justify-start gap-2 sm:justify-center">
                 {whatsappLink ? (
                   <li>
                     <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>
                       <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
                       WhatsApp
+                    </a>
+                  </li>
+                ) : null}
+                {community ? (
+                  <li className="min-w-0">
+                    <a href={community.href} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>
+                      {community.kind === "group" ? (
+                        <UsersRound className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      ) : (
+                        <Megaphone className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      )}
+                      <span className="truncate">{whatsappCommunityLabel(community.kind)}</span>
                     </a>
                   </li>
                 ) : null}
