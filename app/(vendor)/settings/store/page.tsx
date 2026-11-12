@@ -4,6 +4,7 @@ import { CommunitiesClient } from "@/components/settings/CommunitiesClient";
 import { FssaiNumberClient } from "@/components/settings/FssaiNumberClient";
 import { InstagramHandleClient } from "@/components/settings/InstagramHandleClient";
 import { WhatsappCommunityClient } from "@/components/settings/WhatsappCommunityClient";
+import { ScrollToHash } from "@/components/settings/ScrollToHash";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { StoreDetailsClient } from "@/components/settings/StoreDetailsClient";
 import { StoreHandleClient } from "@/components/settings/StoreHandleClient";
@@ -44,6 +45,7 @@ export default async function StoreSettingsPage() {
 
   return (
     <>
+      <ScrollToHash />
       <SettingsPageHeader
         title="Online store"
         description={`A web page with your ${vocab.catalogue} that customers open from a QR or a WhatsApp link.`}
@@ -68,7 +70,7 @@ export default async function StoreSettingsPage() {
             isOwner={isOwner}
           />
         </SettingsCard>
-        <SettingsCard title="Tagline" description="One line under your store name on your store page, and under your link when it is shared.">
+        <SettingsCard id="tagline" title="Tagline" description="One line under your store name on your store page, and under your link when it is shared.">
           <StoreTaglineClient
             initialTagline={settings?.tagline ?? null}
             isOwner={isOwner}
@@ -79,7 +81,7 @@ export default async function StoreSettingsPage() {
             }
           />
         </SettingsCard>
-        <SettingsCard title="Banner & logo" description="Shown at the top of your store page.">
+        <SettingsCard id="banner-logo" title="Banner & logo" description="Shown at the top of your store page.">
           <StoreImagesClient
             storeName={vendor.name}
             initialBannerUrl={vendor.bannerUrl}
@@ -93,7 +95,7 @@ export default async function StoreSettingsPage() {
         >
           <StoreBackgroundClient storeName={vendor.name} initialUrl={vendor.backgroundUrl} isOwner={isOwner} />
         </SettingsCard>
-        <SettingsCard title="Store colour" description="Tints the buttons and links on your store page.">
+        <SettingsCard id="store-colour" title="Store colour" description="Tints the buttons and links on your store page.">
           <StoreThemeClient initialTheme={settings?.theme} isOwner={isOwner} />
         </SettingsCard>
         <SettingsCard title="Your store page">
@@ -117,7 +119,7 @@ export default async function StoreSettingsPage() {
             />
           </SettingsCard>
         ) : null}
-        <SettingsCard title="Instagram" description="Shown on your store page as a link to your profile.">
+        <SettingsCard id="instagram" title="Instagram" description="Shown on your store page as a link to your profile.">
           <InstagramHandleClient initialHandle={settings?.instagramHandle ?? null} isOwner={isOwner} />
         </SettingsCard>
         <SettingsCard
