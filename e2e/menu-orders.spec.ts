@@ -113,7 +113,7 @@ test.describe("menu orders: order straight from the everyday menu", () => {
     await expect(page.getByRole("heading", { name: "To make" })).toBeVisible();
 
     // Every filter tab is on screen at once (a phone used to cut the later ones off).
-    for (const name of [/^Needs action/, /^Confirmed/, /^Delivered/, /^Cancelled \/ Expired/, /^All/]) {
+    for (const name of [/^New/, /^Preparing/, /^Ready/, /^Done/]) {
       await expect(page.getByRole("tab", { name })).toBeInViewport();
     }
 
@@ -125,17 +125,19 @@ test.describe("menu orders: order straight from the everyday menu", () => {
 
     const card = page.getByRole("article", { name: /Ravi Buyer/ });
     await expect(card.getByText(`2 × ${bhel}`)).toBeVisible();
-    await card.getByRole("button", { name: "Confirm" }).click();
+    await card.getByRole("button", { name: "Accept order" }).click();
 
-    // Confirming moves the order to the Confirmed tab; follow it there.
-    await page.getByRole("tab", { name: /^Confirmed/ }).click();
+    // Accepting moves the order to Preparing, Mark ready to Ready; follow it there.
+    await page.getByRole("tab", { name: /^Preparing/ }).click();
     const confirmed = page.getByRole("article", { name: /Ravi Buyer/ });
+    await confirmed.getByRole("button", { name: "Mark ready" }).click();
+    await page.getByRole("tab", { name: /^Ready/ }).click();
     await confirmed.getByRole("button", { name: /picked up · ₹200\.00 collected/i }).click();
 
-    await page.getByRole("tab", { name: /^Delivered/ }).click();
+    await page.getByRole("tab", { name: /^Done/ }).click();
     const delivered = page.getByRole("article", { name: /Ravi Buyer/ });
     await expect(delivered.getByText("Picked up", { exact: true })).toBeVisible();
     // Cash collected at handover marks it paid.
-    await expect(page.getByRole("listitem").filter({ hasText: /^Paid/ })).toContainText("₹200.00");
+    await expect(page.getByRole("region", { name: "Summary" })).toContainText("Paid ₹200.00");
   });
 });

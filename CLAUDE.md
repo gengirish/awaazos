@@ -476,8 +476,8 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   never on `payment_processing`, so nobody is invited to pay twice. Closing Razorpay's window only leaves a quiet "Pay by UPI instead" link. Razorpay counts as a way to pay, so such a store needs no UPI ID (`payment.online`, `hasPaymentMethod`). Checkout sends a Razorpay order to the order page with `?pay=1`, which opens the window once and strips the param (`orderPagePath`).
 - **A Razorpay store's seller hears about paid orders** (`lib/storefront-online-paid.ts`). Placing a UPI order there
   only moves the board signal; verify or the webhook, whichever wins `markOrderPaid`, sends the one "New paid order" push.
-  On the board a new order the buyer hasn't paid (`isAwaitingOnlinePay`) is bucket `awaiting_online`: listed under All
-  only, not in the summary, no chime, Cancel its only action (`checkOrderAction` agrees, so a stale board can't make it
+  On the board a new order the buyer hasn't paid (`isAwaitingOnlinePay`) is bucket `awaiting_online`: listed last under
+  New with no count, not in the summary, no chime, Cancel its only action (`checkOrderAction` agrees, so a stale board can't make it
   hold stock for good). Stock and prep sheets still count it. A claim or an expired hold puts it back on the normal
   path, so a direct UPI payment can still be marked paid. `BoardOrder.paidOnline` and the buyer's page say "Paid online"
   from `razorpayPaymentId`, and the buyer's progress drops Confirmed.
@@ -513,8 +513,8 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   it never marks an order paid.
 - **Paid means confirmed.** `markOrderPaid` also moves a `PLACED` order to `CONFIRMED` (same txn), on
   every path — seller tap, bulk, Razorpay webhook / verify, cash at the door. So a claimed order's
-  card offers "Payment received · Confirm" / "Not received" and no separate Confirm
-  (`availableOrderActions`); an unclaimed one keeps Confirm for accepting before the money arrives.
+  card asks "Did ₹X reach your UPI app?" with "Yes, received" / "Not received" and no separate Accept
+  (`availableOrderActions`); an unclaimed one keeps "Accept order" for accepting before the money arrives.
 
 Buyer accounts are **not** NextAuth: `Customer` + passwordless email magic link
 (`lib/customer-auth.ts`), tokens and sessions stored as SHA-256 hashes only, session in the
@@ -537,6 +537,16 @@ compound scope; the frozen rule is per order (`isDropFrozen` on its drop).
 Billing notices and a checklist with open steps sit outside the slot. The header has one Share menu and one "⋯"
 menu (`BoardMenus.tsx`). In menu scope the status pill sets `acceptMenuOrders` for an OWNER through `PATCH
 /api/vendor`; it does not touch drops. Refresh, Sound and phone alerts are in the live sync bar at the bottom.
+
+**Stages** (`boardBucket` in `lib/drops-board.ts`): the board's tabs are New → Preparing → Ready → Done. New =
+not accepted, or a buyer's claim unanswered; Preparing = accepted; Ready = `Transaction.readyAt` ("Mark ready",
+pickups) or `outForDeliveryAt` ("Out for delivery"); Done = handed over, cancelled, expired. Payment is never a
+stage: the card shows it as a badge (`paymentBadge`), and a handed-over order still unpaid is Done with "Payment
+due". `readyAt` is a stamp like `outForDeliveryAt`, not a `FulfilmentStatus` (the order stays CONFIRMED);
+`mark_ready` sets it, `unready` ("Not ready yet") clears both stamps. Each card has one big button, its stage's
+next step (`primaryOrderAction`: Accept order → Mark ready / Out for delivery → Picked up / Delivered; Delivered
+first once the buyer says it arrived); everything else is in the card's ⋯ menu. Search covers every stage. The
+summary is one line: Paid · To collect, plus "N payments to check" when a claim waits.
 
 Orders board freshness: order placement and board actions bump one per-vendor Upstash counter
 (`bumpOrderSignal` in `lib/drops-signal.ts`, fire-and-forget). Instant alerts come from Web Push;
@@ -668,7 +678,7 @@ render (`lib/store-views.ts`: full page loads by a buyer's browser only, never d
 fire-and-forget, no PII, no Postgres write).
 
 **Bulk order actions** (`lib/order-bulk.ts` client-safe, `lib/storefront-order-bulk.ts` server): the
-board selects orders and applies confirm / mark_paid / deliver via `POST /api/drops/[id]/orders/bulk`
+board selects orders and applies confirm (Accept) / mark_paid / mark_ready / deliver via `POST /api/drops/[id]/orders/bulk`
 and `POST /api/storefront-orders/bulk` (`{ orderIds: 1..50 unique, action }`, CASHIER); a selection
 that mixes sources is split per route on the client (`groupIdsByDrop`). One
 transaction per order, run in sequence, each through `applyStorefrontOrderAction` with the

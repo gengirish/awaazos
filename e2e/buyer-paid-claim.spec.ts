@@ -3,7 +3,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { CONTEXT_OPTIONS, createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
- * Buyer "I've paid" → seller "Payment received" / "Not received".
+ * Buyer "I've paid" → seller "Yes, received" / "Not received".
  *
  * The buyer's tap only records a claim (UTR optional); the seller answers on
  * the orders board. After a "Not received" the next claim needs a UTR.
@@ -21,7 +21,7 @@ async function vendorSlug(page: Page): Promise<string> {
 }
 
 test.describe("buyer marks an order paid, seller confirms or rejects", () => {
-  test("I've paid → Not received → UTR → Payment received", async ({ page, request, browser }) => {
+  test("I've paid → Not received → UTR → Yes, received", async ({ page, request, browser }) => {
     test.setTimeout(300_000);
 
     const item = `Kaju Katli ${Math.random().toString(36).slice(2, 7)}`;
@@ -69,9 +69,9 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
       // ── Seller: sees the claim, answers "Not received" ──────────────
       await page.goto("/orders");
       const card = page.getByRole("article", { name: /Claim Buyer/ });
-      await expect(card.getByText(/customer says paid/i).first()).toBeVisible();
-      await expect(card.getByText(/Customer says they paid ₹120\.00/)).toBeVisible();
-      await expect(card.getByRole("button", { name: "Payment received" })).toBeVisible();
+      await expect(card.getByText(/payment to check/i).first()).toBeVisible();
+      await expect(card.getByText("Did ₹120.00 reach your UPI app?")).toBeVisible();
+      await expect(card.getByRole("button", { name: "Yes, received" })).toBeVisible();
       const notReceived = card.getByRole("button", { name: "Not received" });
       expect((await notReceived.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(44);
 
@@ -91,7 +91,7 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
 
       await notReceived.click();
       await expect(card.getByRole("button", { name: "Not received" })).toHaveCount(0);
-      await expect(card.getByText(/awaiting payment/i).first()).toBeVisible();
+      await expect(card.getByText(/not paid yet/i).first()).toBeVisible();
 
       // ── Buyer: told it wasn't found; a bare tap is no longer enough ──
       await buyer.reload();
@@ -106,14 +106,14 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
       await buyer.getByRole("button", { name: "Send to the store" }).click();
       await expect(buyer.getByRole("heading", { name: /payment submitted/i })).toBeVisible();
 
-      // ── Seller: sees the UTR, answers "Payment received" ────────────
+      // ── Seller: sees the UTR, answers "Yes, received" ───────────────
       await page.reload();
       const card2 = page.getByRole("article", { name: /Claim Buyer/ });
       await expect(card2.getByText("412345678901")).toBeVisible();
-      // One answer: no separate Confirm beside it, and paying confirms the order.
-      await expect(card2.getByRole("button", { name: "Confirm", exact: true })).toHaveCount(0);
-      await card2.getByRole("button", { name: "Payment received · Confirm" }).click();
-      await expect(card2.getByRole("button", { name: /Payment received/ })).toHaveCount(0);
+      // One answer: no separate Accept beside it, and paying accepts the order.
+      await expect(card2.getByRole("button", { name: "Accept order", exact: true })).toHaveCount(0);
+      await card2.getByRole("button", { name: "Yes, received" }).click();
+      await expect(card2.getByRole("button", { name: "Yes, received" })).toHaveCount(0);
       const after = (await (await page.request.get("/api/storefront-orders")).json()) as Board;
       expect(after.data.find((o) => o.id === orderId)).toMatchObject({ paymentStatus: "PAID", fulfilmentStatus: "CONFIRMED" });
 

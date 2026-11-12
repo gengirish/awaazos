@@ -73,6 +73,24 @@ describe("orderStatusLabel — out for delivery", () => {
   });
 });
 
+describe("orderStatusLabel — ready for pickup", () => {
+  const ready = { fulfilmentType: "PICKUP" as const, readyForPickup: true };
+
+  it("reads Ready for pickup once the seller marked it ready, keeping the payment line", () => {
+    expect(orderStatusLabel("PAY_ON_DELIVERY", "CONFIRMED", ready)).toEqual({
+      label: "Ready for pickup",
+      hint: "Pay when you collect",
+      tone: "success",
+    });
+    expect(orderStatusLabel("PAID", "CONFIRMED", ready)).toMatchObject({ label: "Ready for pickup", hint: "Paid" });
+  });
+
+  it("not before it is accepted, nor once collected", () => {
+    expect(orderStatusLabel("PAID", "PLACED", ready).label).toBe("Paid");
+    expect(orderStatusLabel("DELIVERED", "DELIVERED", ready).label).toBe("Collected");
+  });
+});
+
 describe("orderStatusLabel — menu orders", () => {
   it("drops the stock wording on an expired menu order", () => {
     expect(orderStatusLabel("EXPIRED", "PLACED", { menuOrder: true }).label).toBe("Expired — please order again");

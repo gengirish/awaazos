@@ -104,9 +104,9 @@ test.describe("delivery riders", () => {
 
     // ── Tapping it hands the order over: out for delivery, with Ramesh ─
     await send.click();
-    // It was a new order, so it moves to Confirmed: follow it there.
-    await page.getByRole("tab", { name: /^Confirmed/ }).click();
-    // Collapsed on Confirmed: the summary line already says so; the details give the time.
+    // It was a new order; gone out, it moves to Ready: follow it there.
+    await page.getByRole("tab", { name: /^Ready/ }).click();
+    // Collapsed on Ready: the summary line already says so; the details give the time.
     await expect(order).toContainText("Out for delivery with Ramesh");
     await order.getByRole("button", { name: /Show details/ }).click();
     await expect(order).toContainText(/Out for delivery · .+ · with Ramesh/);
@@ -131,7 +131,7 @@ test.describe("delivery riders", () => {
     await page.getByRole("button", { name: "Remove Ramesh" }).click();
     await expect(page.getByRole("region", { name: "Delivery riders" }).getByText("No riders saved yet.")).toBeVisible();
     await page.goto("/orders");
-    await page.getByRole("tab", { name: /^Confirmed/ }).click();
+    await page.getByRole("tab", { name: /^Ready/ }).click();
     const after = page.getByRole("article", { name: /Asha Rider-Test/ });
     await after.getByRole("button", { name: /Show details/ }).click();
     await expect(after.getByRole("button", { name: /Copy for rider/ })).toBeVisible();
@@ -190,14 +190,14 @@ test.describe("delivery riders", () => {
 
     // ── The seller's board: delivered, cash collected ──────────────────
     await page.goto("/orders");
-    await page.getByRole("tab", { name: /^Delivered/ }).click();
+    await page.getByRole("tab", { name: /^Done/ }).click();
     await expect(page.getByRole("article", { name: /Kiran Door-Test/ })).toBeVisible();
 
     // ── A buyer says they got theirs (pay on delivery: seller still collects) ─
     const token = await placeDeliveryOrder(request, slug, menuItemId, "Meena Got-It");
     await page.goto("/orders");
-    await page.getByRole("article", { name: /Meena Got-It/ }).getByRole("button", { name: "Confirm" }).click();
-    await expect(page.getByRole("tab", { name: /^Confirmed \(1\)/ })).toBeVisible();
+    await page.getByRole("article", { name: /Meena Got-It/ }).getByRole("button", { name: "Accept order" }).click();
+    await expect(page.getByRole("tab", { name: /^Preparing \(1\)/ })).toBeVisible();
 
     const buyerCtx = await browser.newContext(CONTEXT_OPTIONS);
     try {
@@ -210,7 +210,7 @@ test.describe("delivery riders", () => {
     }
 
     await page.goto("/orders");
-    await page.getByRole("tab", { name: /^Confirmed/ }).click();
+    await page.getByRole("tab", { name: /^Preparing/ }).click();
     const got = page.getByRole("article", { name: /Meena Got-It/ });
     await expect(got).toContainText("Customer got it");
     await got.getByRole("button", { name: /Show details/ }).click();

@@ -581,23 +581,30 @@ export type StatusTone = "success" | "warning" | "danger" | "neutral";
  * `fulfilmentType: "PICKUP"` swaps the delivery wording for pickup wording
  * ("Collected", "Pay when you collect"); the states themselves are the same.
  * `outForDelivery`: the seller handed it to a rider, so a confirmed order
- * reads "On the way" (the payment line moves to the hint).
+ * reads "On the way" (the payment line moves to the hint). `readyForPickup`: the
+ * seller marked a pickup order ready, so it reads "Ready for pickup" the same way.
  */
 export function orderStatusLabel(
   state: OrderDisplayStateName,
   fulfilmentStatus: FulfilmentStatus | null,
-  opts: { menuOrder?: boolean; fulfilmentType?: "DELIVERY" | "PICKUP" | null; outForDelivery?: boolean } = {},
+  opts: {
+    menuOrder?: boolean;
+    fulfilmentType?: "DELIVERY" | "PICKUP" | null;
+    outForDelivery?: boolean;
+    readyForPickup?: boolean;
+  } = {},
 ): { label: string; hint: string | null; tone: StatusTone } {
   const confirmed = fulfilmentStatus === "CONFIRMED";
   const payLater = payOnDeliveryLabel(opts.fulfilmentType);
-  if (confirmed && opts.outForDelivery) {
+  const handover = opts.outForDelivery ? "On the way" : opts.readyForPickup ? "Ready for pickup" : null;
+  if (confirmed && handover) {
     switch (state) {
       case "PAID":
-        return { label: "On the way", hint: "Paid", tone: "success" };
+        return { label: handover, hint: "Paid", tone: "success" };
       case "PAY_ON_DELIVERY":
-        return { label: "On the way", hint: payLater, tone: "success" };
+        return { label: handover, hint: payLater, tone: "success" };
       case "PAYMENT_SUBMITTED":
-        return { label: "On the way", hint: "Payment submitted — the store will confirm", tone: "success" };
+        return { label: handover, hint: "Payment submitted — the store will confirm", tone: "success" };
       default:
         break;
     }

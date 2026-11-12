@@ -48,13 +48,15 @@ test.describe("order feedback", () => {
 
       // ── Seller hands it over ─────────────────────────────────────────
       await page.goto("/orders");
-      await page.getByRole("article", { name: /Ravi Buyer/ }).getByRole("button", { name: "Confirm" }).click();
-      await page.getByRole("tab", { name: /^Confirmed/ }).click();
+      await page.getByRole("article", { name: /Ravi Buyer/ }).getByRole("button", { name: "Accept order" }).click();
+      await page.getByRole("tab", { name: /^Preparing/ }).click();
+      await page.getByRole("article", { name: /Ravi Buyer/ }).getByRole("button", { name: "Mark ready" }).click();
+      await page.getByRole("tab", { name: /^Ready/ }).click();
       await page
         .getByRole("article", { name: /Ravi Buyer/ })
         .getByRole("button", { name: /picked up · ₹75\.00 collected/i })
         .click();
-      await page.getByRole("tab", { name: /^Delivered/ }).click();
+      await page.getByRole("tab", { name: /^Done/ }).click();
       await expect(page.getByRole("article", { name: /Ravi Buyer/ })).toBeVisible();
 
       // ── Buyer rates: stars are required, then it is once only ────────
@@ -79,7 +81,7 @@ test.describe("order feedback", () => {
 
       // ── Seller sees stars and comment, on the card and in Settings ───
       await page.reload();
-      await page.getByRole("tab", { name: /^Delivered/ }).click();
+      await page.getByRole("tab", { name: /^Done/ }).click();
       const card = page.getByRole("article", { name: /Ravi Buyer/ });
       await expect(card.getByText("Rated 4 of 5")).toBeVisible();
       await card.getByRole("button", { name: /show details/i }).click();

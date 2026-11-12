@@ -198,21 +198,23 @@ test.describe("Razorpay first on the order page", () => {
       await placeOrder(buyer, slug, item);
       await expect(buyer.getByRole("button", { name: PAY_ONLINE })).toBeVisible();
 
-      // ── Not paid: not in Needs action, not counted, under All with only Cancel ──
+      // ── Not paid: not counted, listed last under New, with only Cancel ──
       await page.goto("/orders");
       const card = page.getByRole("article").filter({ hasText: "Online Buyer" });
-      await expect(page.getByRole("tab", { name: /needs action \(0\)/i })).toBeVisible();
-      await expect(card).toHaveCount(0);
-      await page.getByRole("tab", { name: /^all \(1\)/i }).click();
+      await expect(page.getByRole("tab", { name: /^new \(0\)/i })).toBeVisible();
       await expect(card).toBeVisible();
-      await expect(card.getByText("Awaiting payment")).toBeVisible();
+      await expect(card.getByText("Waiting for online payment")).toBeVisible();
       await expect(card.getByRole("checkbox")).toHaveCount(0);
       await card.getByRole("button", { name: /show details/i }).click();
       await expect(card.getByText(/hasn.t paid yet/i)).toBeVisible();
-      await expect(card.getByRole("button", { name: "Confirm", exact: true })).toHaveCount(0);
-      await expect(card.getByRole("button", { name: /payment received/i })).toHaveCount(0);
-      await expect(card.getByRole("button", { name: /^delivered|^picked up/i })).toHaveCount(0);
-      await expect(card.getByRole("button", { name: /cancel order/i })).toBeVisible();
+      await expect(card.getByRole("button", { name: "Accept order", exact: true })).toHaveCount(0);
+      await expect(card.getByRole("button", { name: /received/i })).toHaveCount(0);
+      await expect(card.getByRole("button", { name: /^delivered|^picked up|^mark ready/i })).toHaveCount(0);
+      await card.getByRole("button", { name: /^More for/ }).click();
+      const more = page.getByRole("dialog", { name: /Online Buyer.s order/ });
+      await expect(more.getByRole("button", { name: "Cancel order" })).toBeVisible();
+      await expect(more.getByRole("button", { name: /accept|received|ready|delivered|picked up/i })).toHaveCount(0);
+      await page.keyboard.press("Escape");
 
       // ── A stale board or a direct call can't confirm it either ──
       const list = (await (await page.request.get("/api/storefront-orders")).json()) as { data: { id: string }[] };
@@ -226,11 +228,11 @@ test.describe("Razorpay first on the order page", () => {
       // ── Paid: confirmed for the seller, one next step, and the buyer's page agrees ──
       await markPaidOnlineByOrderId(orderId);
       await page.goto("/orders");
-      await expect(page.getByRole("tab", { name: /needs action \(0\)/i })).toBeVisible();
-      await page.getByRole("tab", { name: /confirmed \(1\)/i }).click();
+      await expect(page.getByRole("tab", { name: /^new \(0\)/i })).toBeVisible();
+      await page.getByRole("tab", { name: /^preparing \(1\)/i }).click();
       await expect(card).toBeVisible();
       await expect(card.getByText("Paid online")).toBeVisible();
-      await expect(card.getByRole("button", { name: "Picked up" })).toBeVisible();
+      await expect(card.getByRole("button", { name: "Mark ready" })).toBeVisible();
 
       await buyer.reload();
       const progress = buyer.getByRole("list", { name: "Order progress" });

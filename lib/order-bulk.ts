@@ -4,8 +4,8 @@
  * routes (`POST /api/drops/[id]/orders/bulk`, `POST /api/storefront-orders/bulk`).
  * The board sends each selected order to its own route (`groupIdsByDrop`).
  *
- * Bulk-eligible actions are the forward, everyday ones: confirm, mark paid,
- * deliver. Cancel (moves money back, vendor must refund by hand) and undeliver
+ * Bulk-eligible actions are the forward, everyday ones: accept (confirm), mark
+ * paid, mark ready, deliver. Cancel (moves money back, vendor must refund by hand) and undeliver
  * (a one-off mistake fix) stay per-order on the card.
  *
  * Nothing in here touches Prisma, so client components can import it.
@@ -14,7 +14,7 @@
 import type { FulfilmentStatus, PaymentMethod, PaymentStatus } from "@prisma/client";
 import { availableOrderActions, type BoardBucket, type OrderAction } from "@/lib/drops-board";
 
-export const BULK_ORDER_ACTIONS = ["confirm", "mark_paid", "deliver"] as const satisfies readonly OrderAction[];
+export const BULK_ORDER_ACTIONS = ["confirm", "mark_paid", "mark_ready", "deliver"] as const satisfies readonly OrderAction[];
 export type BulkOrderAction = (typeof BULK_ORDER_ACTIONS)[number];
 
 export const BULK_ORDER_MAX = 50;
@@ -76,7 +76,7 @@ export function bulkActionCounts<T extends ActionableOrder>(
   selected: ReadonlySet<string>,
   frozen: FrozenRule<T>,
 ): Record<BulkOrderAction, number> {
-  const out: Record<BulkOrderAction, number> = { confirm: 0, mark_paid: 0, deliver: 0 };
+  const out: Record<BulkOrderAction, number> = { confirm: 0, mark_paid: 0, mark_ready: 0, deliver: 0 };
   for (const o of orders) {
     if (!selected.has(o.id)) continue;
     for (const a of bulkActionsFor(o, frozenFor(frozen, o))) out[a] += 1;
@@ -125,8 +125,9 @@ export function bulkNeedsConfirm(
 }
 
 const DONE_VERB: Record<BulkOrderAction, string> = {
-  confirm: "confirmed",
+  confirm: "accepted",
   mark_paid: "marked paid", // new ones are confirmed too (markOrderPaid)
+  mark_ready: "marked ready",
   deliver: "marked delivered",
 };
 

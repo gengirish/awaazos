@@ -193,24 +193,28 @@ test.describe("orders board layout", () => {
     await placeOrder(request, store, "CASH");
   });
 
-  test("Payment to check stands out only with a claim; the sync bar works", async ({ page, request }) => {
+  test("a payment to check shows up only with a claim; the sync bar works", async ({ page, request }) => {
     test.slow();
     const store = await storeWithOrder(page, request, "layout-sync");
     await placeOrder(request, store, "CASH");
     await page.goto("/orders");
     await expect(page.getByText(/^Last checked/)).toBeVisible();
 
-    const tile = page.getByRole("listitem").filter({ hasText: /^Payment to check/ });
-    await expect(tile).not.toHaveClass(/border-warning/);
+    const tile = page.getByRole("button", { name: /payments? to check/ });
+    await expect(tile).toHaveCount(0);
 
     const { data } = await placeOrder(request, store, "UPI");
     const claim = await request.post(`/api/s/${store.slug}/orders/${data.orderToken}/utr`, { data: {} });
     expect(claim.ok(), await claim.text()).toBe(true);
 
-    // Refresh picks the new orders up; the tile now stands out, and not by colour alone.
+    // Refresh picks the new orders up; the summary line now names it, with an icon,
+    // and a tap opens New, where the card asks the question.
     await page.getByRole("button", { name: "Refresh", exact: true }).click();
-    await expect(tile).toHaveClass(/border-warning/);
+    await expect(tile).toHaveText("1 payment to check");
     await expect(tile.locator("svg")).toBeVisible();
+    await tile.click();
+    await expect(page.getByRole("tab", { name: /^New/ })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText(/reach your UPI app\?/)).toBeVisible();
 
     // Sound toggles from the bar and says so.
     const bar = page.getByRole("group", { name: "Live updates" });
@@ -258,7 +262,7 @@ test.describe("orders board layout", () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/orders");
     await expect(page.getByRole("link", { name: /Add your FSSAI number/ })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /^Needs action/ })).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole("tab", { name: /^New/ })).toBeInViewport({ ratio: 1 });
     await expect(page.getByRole("article").first()).toBeInViewport();
   });
 });

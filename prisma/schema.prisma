@@ -477,6 +477,9 @@ model Transaction {
   deliveryPincode  String?           @db.VarChar(6) // PII
   deliveryFeePaise Int               @default(0)
   orderToken       String?           @unique // Unguessable handle for the buyer's order page
+  // A pickup order packed and waiting ("Mark ready"), the board's Ready stage.
+  // A stamp like outForDeliveryAt: the order stays CONFIRMED. Cleared by "Not ready".
+  readyAt          DateTime?
   // A delivery order handed to a rider ("Out for delivery"). A stamp, not a
   // FulfilmentStatus: the order stays CONFIRMED for stock, payment and lists.
   outForDeliveryAt DateTime?

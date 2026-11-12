@@ -1,6 +1,6 @@
 "use client";
 
-import { Bike, CheckCircle2, IndianRupee, Loader2, X } from "lucide-react";
+import { Bike, CheckCircle2, IndianRupee, Loader2, PackageCheck, X } from "lucide-react";
 import { useState, type ReactNode } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -28,18 +28,20 @@ type Props = {
 };
 
 const LABEL: Record<BulkOrderAction, string> = {
-  confirm: "Confirm",
+  confirm: "Accept",
   mark_paid: "Payment received",
+  mark_ready: "Mark ready",
   deliver: "Delivered",
 };
 
 const ICON: Record<BulkOrderAction, ReactNode> = {
   confirm: <CheckCircle2 aria-hidden />,
   mark_paid: <IndianRupee aria-hidden />,
+  mark_ready: <PackageCheck aria-hidden />,
   deliver: <Bike aria-hidden />,
 };
 
-const ORDER: BulkOrderAction[] = ["confirm", "mark_paid", "deliver"];
+const ORDER: BulkOrderAction[] = ["confirm", "mark_paid", "mark_ready", "deliver"];
 
 function nOrders(n: number) {
   return n === 1 ? "1 order" : `${n} orders`;
