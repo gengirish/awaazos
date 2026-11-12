@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { PaymentMethod } from "@prisma/client";
 import { toast } from "sonner";
@@ -68,6 +68,10 @@ export function PosShell({
   const outbox = usePosOutbox(vendor.id);
 
   const isDesktop = useIsDesktop();
+  const sizedItemIds = useMemo(
+    () => initialItems.filter((it) => (it.sizes?.length ?? 0) > 0).map((it) => it.id),
+    [initialItems],
+  );
   const [payOpen, setPayOpen] = useState(false);
   const [receiptOpen, setReceiptOpen] = useState(false);
   const [payTotals, setPayTotals] = useState<PayTotals>({
@@ -212,7 +216,7 @@ export function PosShell({
         className="mt-4 flex flex-col gap-8 md:mt-6 md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,24rem)] md:items-start md:gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)]"
       >
         <div className="flex min-w-0 flex-col gap-5 md:gap-8">
-          {settings.voiceBilling ? <VoiceOrderButton voiceLang={settings.voiceLang} /> : null}
+          {settings.voiceBilling ? <VoiceOrderButton voiceLang={settings.voiceLang} sizedItemIds={sizedItemIds} /> : null}
           <QuickAddGrid items={initialItems} vocab={vocab} />
         </div>
         <div

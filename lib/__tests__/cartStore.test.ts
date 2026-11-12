@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 
-import { useCartStore } from "@/lib/cartStore";
+import { lineKey, useCartStore } from "@/lib/cartStore";
 
 describe("cartStore", () => {
   beforeEach(() => {
@@ -137,6 +137,53 @@ describe("cartStore", () => {
       voiceAddedIds: [],
       voiceReview: null,
       lastRemoved: null,
+    });
+  });
+
+  describe("sizes (lib/item-variants.ts rule 6)", () => {
+    const kurti = { menuItemId: "k", emoji: "👗" };
+
+    it("keeps one line per size, keyed item:variant", () => {
+      const { addItem, incQty, decQty } = useCartStore.getState();
+      addItem({ ...kurti, variantId: "m", name: "Kurti – M", priceInPaise: 59900 });
+      addItem({ ...kurti, variantId: "l", name: "Kurti – L", priceInPaise: 64900 });
+      addItem({ ...kurti, variantId: "m", name: "Kurti – M", priceInPaise: 59900 });
+      expect(useCartStore.getState().items.map((l) => [lineKey(l), l.qty])).toEqual([
+        ["k:m", 2],
+        ["k:l", 1],
+      ]);
+      incQty("k:l");
+      decQty("k:m");
+      decQty("k:m");
+      expect(useCartStore.getState().items.map((l) => [lineKey(l), l.qty])).toEqual([["k:l", 2]]);
+      expect(useCartStore.getState().getSubtotalPaise()).toBe(129800);
+    });
+
+    it("remove and undo act on one size only", () => {
+      const { addItem, removeItem, undoRemove } = useCartStore.getState();
+      addItem({ ...kurti, variantId: "m", name: "Kurti – M", priceInPaise: 59900 });
+      addItem({ ...kurti, variantId: "l", name: "Kurti – L", priceInPaise: 64900 });
+      removeItem("k:m");
+      expect(useCartStore.getState().items.map(lineKey)).toEqual(["k:l"]);
+      undoRemove();
+      expect(useCartStore.getState().items.map(lineKey)).toEqual(["k:m", "k:l"]);
+    });
+
+    it("a line without a size keeps the plain item id as its key", () => {
+      useCartStore.getState().addItem({ menuItemId: "chai", name: "Chai", emoji: "☕", priceInPaise: 1000 });
+      const [line] = useCartStore.getState().items;
+      expect(line).not.toHaveProperty("variantId");
+      expect(lineKey(line!)).toBe("chai");
+    });
+
+    it("voice merges into the item's own line, never into a size line", () => {
+      const { addItem, setItemsFromVoice } = useCartStore.getState();
+      addItem({ ...kurti, variantId: "m", name: "Kurti – M", priceInPaise: 59900 });
+      setItemsFromVoice([{ menuItemId: "k", name: "Kurti", priceInPaise: 59900, qty: 1 }]);
+      expect(useCartStore.getState().items.map((l) => [lineKey(l), l.qty])).toEqual([
+        ["k:m", 1],
+        ["k", 1],
+      ]);
     });
   });
 });

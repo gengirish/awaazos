@@ -39,6 +39,18 @@ describe("computeCartTotals", () => {
     });
   });
 
+  it("counts two sizes of one item toward a plan, each at its own price", () => {
+    const m: CartLine = { ...line("quiche", 30000, 2), variantId: "m", name: "quiche – M" };
+    const l: CartLine = { ...line("quiche", 35000, 1), variantId: "l", name: "quiche – L" };
+    const paneer = line("paneer-quiche", 32000, 1);
+    // 4 eligible incl. 1 paneer: 10% of 60000 + 35000 + 32000 = 12700.
+    expect(computeCartTotals([m, l, paneer], { taxEnabled: false, taxPercent: "0", offers: [WEEKLY] })).toMatchObject({
+      subtotalPaise: 127000,
+      discountPaise: 12700,
+      itemCount: 4,
+    });
+  });
+
   it("floors tax in basis points", () => {
     // 1999 * 250 / 10000 = 49.975 → 49
     expect(computeCartTotals([line("a", 1999, 1)], { taxEnabled: true, taxPercent: "2.5" })).toMatchObject({

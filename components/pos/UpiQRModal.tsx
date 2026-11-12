@@ -184,6 +184,7 @@ export function UpiQRModal({
         {
           items: items.map((i) => ({
             menuItemId: i.menuItemId,
+            ...(i.variantId ? { variantId: i.variantId } : {}),
             name: i.name,
             priceInPaise: i.priceInPaise,
             qty: i.qty,

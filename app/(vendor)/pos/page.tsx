@@ -7,7 +7,8 @@ import { PosShell } from "@/components/pos/PosShell";
 import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
 import { getIstTodayStart } from "@/lib/billing-period";
 import { PLAN_LIMITS } from "@/lib/constants";
-import { withStockLeft } from "@/lib/menu-stock-server";
+import { variantPricePaise } from "@/lib/item-variants";
+import { withStockLeft, withVariants } from "@/lib/menu-stock-server";
 import { loadResolvedOffers } from "@/lib/offers-server";
 import { prisma } from "@/lib/prisma";
 import type { BillingAccess } from "@/lib/plan";
@@ -82,7 +83,9 @@ export default async function PosPage() {
         stockCountedAt: true,
         lowStockAt: true,
       },
-    }).then((rows) => withStockLeft(prisma, vendorId, rows)),
+    })
+      .then((rows) => withStockLeft(prisma, vendorId, rows))
+      .then((rows) => withVariants(prisma, vendorId, rows)),
     prisma.vendor.findUnique({
       where: { id: vendorId },
       include: { settings: true },
@@ -113,7 +116,10 @@ export default async function PosPage() {
 
   const todaysRevenuePaise = daily?.totalRevenuePaise ?? 0;
 
-  const initialItems = menuItems.map((it) => ({
+  // An item with sizes sells by size (lib/item-variants.ts rule 6); one whose
+  // sizes are all switched off has nothing to ring up.
+  const sellable = menuItems.filter((it) => it.variants.length === 0 || it.variants.some((v) => v.isAvailable));
+  const initialItems = sellable.map((it) => ({
     id: it.id,
     name: it.name,
     emoji: it.emoji,
@@ -125,6 +131,15 @@ export default async function PosPage() {
     // A label only: the counter never refuses a sale over stock (lib/inventory.ts rule 5).
     stockLeft: it.stockLeft,
     lowStockAt: it.lowStockAt,
+    sizes: it.variants
+      .filter((v) => v.isAvailable)
+      .map((v) => ({
+        id: v.id,
+        label: v.label,
+        priceInPaise: variantPricePaise(it.priceInPaise, v),
+        stockLeft: v.stockLeft,
+        lowStockAt: v.lowStockAt,
+      })),
   }));
 
   return (

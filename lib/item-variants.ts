@@ -21,7 +21,15 @@
  *      keeps no stock of its own (`MenuItem.stockQty` null).
  *   5. Not yet: drops (an item with variants can't be added to a drop, and an item
  *      in a drop that hasn't ended can't get variants), free gifts (an offer whose
- *      gift has variants is skipped), the counter (POS) and order again.
+ *      gift has variants is skipped) and order again.
+ *   6. The counter (POS) sells by size too: a tile with sizes opens a picker,
+ *      the cart line is keyed `itemId:variantId` (`cartLineKey`), priced and
+ *      named by rule 2–3, and `POST /api/transactions` records `variantId` once
+ *      it is checked to be this vendor's size of that item (else 400
+ *      `size_not_found`; a queued offline sale keeps the line without it). As
+ *      with items, the counter never refuses over stock, nor a line without a
+ *      size (an old till copy). Voice can't pick a size: it leaves such items
+ *      out and asks the cashier to tap them.
  */
 
 /** Most variants one item can have. */

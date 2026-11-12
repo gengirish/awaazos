@@ -201,6 +201,14 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "cash_received_invalid", code: "cash_received_invalid" }, { status: 400 });
     }
 
+    // A size names one of this store's sizes of that very item. A live sale
+    // naming any other is refused; a queued offline sale keeps the line and
+    // drops the size (it may have been deleted since), as the money is taken.
+    const variantIds = await saleVariantIds(vendor.id, body.items);
+    if (variantIds.some((v) => v === undefined) && !body.deferred) {
+      return NextResponse.json({ error: "size_not_found", code: "size_not_found" }, { status: 400 });
+    }
+
     const saleTime = resolveSaleTime(body);
     if (!saleTime.ok) {
       return NextResponse.json({ error: saleTime.code, code: saleTime.code }, { status: 422 });
@@ -269,6 +277,7 @@ export async function POST(req: NextRequest) {
       transaction = await createSale({
         vendorId: vendor.id,
         body,
+        variantIds,
         discount,
         today,
         paymentStatus,
@@ -335,12 +344,37 @@ export async function POST(req: NextRequest) {
 }
 
 /**
+ * The size each posted line names, checked against this vendor's variants of
+ * that line's item (compound scope): null for a line without a size, undefined
+ * for one naming a size that isn't this item's. The counter never refuses a
+ * line over stock or a missing size (lib/item-variants.ts rule 6).
+ */
+async function saleVariantIds(
+  vendorId: string,
+  items: TransactionPostBody["items"],
+): Promise<(string | null | undefined)[]> {
+  const wanted = Array.from(new Set(items.flatMap((i) => (i.variantId ? [i.variantId] : []))));
+  if (wanted.length === 0) return items.map(() => null);
+  const rows = await prisma.itemVariant.findMany({
+    where: { vendorId, id: { in: wanted } },
+    select: { id: true, menuItemId: true },
+  });
+  const itemOf = new Map(rows.map((r) => [r.id, r.menuItemId]));
+  return items.map((i) => {
+    if (!i.variantId) return null;
+    return i.menuItemId && itemOf.get(i.variantId) === i.menuItemId ? i.variantId : undefined;
+  });
+}
+
+/**
  * The single write for a counter sale: bill number → transaction + items →
  * DailySummary → receipt, all in one Postgres transaction.
  */
 async function createSale(args: {
   vendorId: string;
   body: TransactionPostBody;
+  /** One per posted item, same order (`saleVariantIds`): the size, or null. */
+  variantIds: (string | null | undefined)[];
   /** The server's verdict on `body.discountPaise` (lib/pos-offers.ts). */
   discount: Extract<PosDiscountResult, { ok: true }>;
   today: Date;
@@ -349,7 +383,7 @@ async function createSale(args: {
   /** Set for deferred (offline-queued) sales; live sales use the column default. */
   createdAt?: Date;
 }) {
-  const { vendorId, body, discount, today, paymentStatus, paidAt, createdAt } = args;
+  const { vendorId, body, variantIds, discount, today, paymentStatus, paidAt, createdAt } = args;
 
   return prisma.$transaction(async (tx) => {
     const seq = await tx.billSequence.upsert({
@@ -391,6 +425,7 @@ async function createSale(args: {
         orderItems: {
           create: body.items.map((i, index) => ({
             menuItemId: i.menuItemId ?? null,
+            variantId: variantIds[index] ?? null,
             name: i.name,
             priceInPaise: i.priceInPaise,
             qty: i.qty,

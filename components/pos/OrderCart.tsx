@@ -7,7 +7,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { formatINR } from "@/lib/currency";
-import { useCartStore } from "@/lib/cartStore";
+import { lineKey, useCartStore } from "@/lib/cartStore";
 import { discountLabel, offerNudgeText } from "@/lib/offers";
 import { computeCartTotals, toPayTotals, type PayTotals, type PosTaxSettings } from "@/lib/pos-totals";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
@@ -42,7 +42,9 @@ export function OrderCart({ settings, vocab, onCollectPayment }: OrderCartProps)
   const totals = computeCartTotals(items, settings);
   const { subtotalPaise, discountPaise, taxPaise, totalPaise, itemCount } = totals;
 
-  const showReview = voiceReview !== null && (voiceReview.lowConfidence || voiceReview.unmatched.length > 0);
+  const needsSize = voiceReview?.needsSize ?? [];
+  const showReview =
+    voiceReview !== null && (voiceReview.lowConfidence || voiceReview.unmatched.length > 0 || needsSize.length > 0);
 
   // `count` outlives `open` so the sheet's text holds still while it closes.
   const [confirmClear, setConfirmClear] = useState({ open: false, count: 0 });
@@ -60,8 +62,8 @@ export function OrderCart({ settings, vocab, onCollectPayment }: OrderCartProps)
     clearNow();
   };
 
-  const onRemove = (menuItemId: string, name: string) => {
-    removeItem(menuItemId);
+  const onRemove = (key: string, name: string) => {
+    removeItem(key);
     // The store keeps only one `lastRemoved`, so a fixed id makes each remove
     // replace the previous toast — an older "Undo" can never restore the wrong line.
     toast(`Removed ${name}`, {
@@ -118,6 +120,11 @@ export function OrderCart({ settings, vocab, onCollectPayment }: OrderCartProps)
                 Not on {vocab.catalogue}: {voiceReview.unmatched.join(", ")}
               </p>
             ) : null}
+            {needsSize.length > 0 ? (
+              <p className={cn(!voiceReview.lowConfidence && voiceReview.unmatched.length === 0 && "font-medium")}>
+                Tap to pick a size: {needsSize.join(", ")}
+              </p>
+            ) : null}
           </div>
           <Button
             type="button"
@@ -135,11 +142,12 @@ export function OrderCart({ settings, vocab, onCollectPayment }: OrderCartProps)
       ) : (
         <ul className="divide-y">
           {items.map((line) => {
-            const fromVoice = voiceAddedIds.includes(line.menuItemId);
+            const key = lineKey(line);
+            const fromVoice = voiceAddedIds.includes(key);
             const lineTotal = line.priceInPaise * line.qty;
             return (
               <li
-                key={line.menuItemId}
+                key={key}
                 // Phones: a three-row grid. The name gets the full width (two
                 // lines, then clamps); line total and "qty × price" stack on the
                 // left under it, with the 44px controls on the right. The two
@@ -180,7 +188,7 @@ export function OrderCart({ settings, vocab, onCollectPayment }: OrderCartProps)
                       size="icon"
                       className="h-11 w-11 shrink-0"
                       aria-label={`Decrease ${line.name}`}
-                      onClick={() => decQty(line.menuItemId)}
+                      onClick={() => decQty(key)}
                     >
                       <Minus className="h-4 w-4" aria-hidden />
                     </Button>
@@ -194,7 +202,7 @@ export function OrderCart({ settings, vocab, onCollectPayment }: OrderCartProps)
                       size="icon"
                       className="h-11 w-11 shrink-0"
                       aria-label={`Increase ${line.name}`}
-                      onClick={() => incQty(line.menuItemId)}
+                      onClick={() => incQty(key)}
                     >
                       <Plus className="h-4 w-4" aria-hidden />
                     </Button>
@@ -204,7 +212,7 @@ export function OrderCart({ settings, vocab, onCollectPayment }: OrderCartProps)
                       size="icon"
                       className="h-11 w-11 shrink-0 text-destructive hover:text-destructive"
                       aria-label={`Remove ${line.name}`}
-                      onClick={() => onRemove(line.menuItemId, line.name)}
+                      onClick={() => onRemove(key, line.name)}
                     >
                       <X className="h-4 w-4" aria-hidden />
                     </Button>
