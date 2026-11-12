@@ -98,6 +98,7 @@ describe("item variants: the form's rows", () => {
   const saved: VariantRow = {
     id: "v1",
     label: "S",
+    costInPaise: null,
     priceInPaise: null,
     isAvailable: true,
     sortOrder: 0,
@@ -109,7 +110,7 @@ describe("item variants: the form's rows", () => {
 
   it("starts a saved size from what is on the shelf (left + set aside)", () => {
     expect(sizeDraftsFrom([saved])).toEqual([
-      { key: "v1", id: "v1", label: "S", price: "", stock: "4", initialStock: "4", isAvailable: true },
+      { key: "v1", id: "v1", label: "S", price: "", cost: "", stock: "4", initialStock: "4", isAvailable: true },
     ]);
     expect(sizeDraftsFrom(undefined)).toEqual([]);
   });

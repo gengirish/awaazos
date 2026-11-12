@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { MenuScreen } from "@/components/menu/MenuScreen";
 import { env } from "@/lib/env";
+import { canSeeCost, rowsForRole } from "@/lib/item-cost";
 import { withStockLeft, withVariants } from "@/lib/menu-stock-server";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
@@ -18,10 +19,15 @@ export default async function MenuPage(props: {
 
   let vendorId: string;
   let vocab: StoreVocabulary;
+  let seesCost: boolean;
+  let role: Parameters<typeof canSeeCost>[0];
   try {
     const ctx = await requireVendorRole("CASHIER");
     vendorId = ctx.vendor.id;
     vocab = storeVocabulary(ctx.vendor.stallType);
+    role = ctx.staff.role;
+    // Cost prices are for MANAGER and up (lib/item-cost.ts rule 2).
+    seesCost = canSeeCost(role);
   } catch (e) {
     if (e instanceof AuthError) {
       redirect("/sign-in");
@@ -38,7 +44,8 @@ export default async function MenuPage(props: {
       // Stock left is derived (lib/inventory.ts); no query when nothing is tracked.
       .then((rows) => withStockLeft(prisma, vendorId, rows))
       // Sizes / colours, each with its own stock (lib/item-variants.ts).
-      .then((rows) => withVariants(prisma, vendorId, rows)),
+      .then((rows) => withVariants(prisma, vendorId, rows, new Date(), { cost: seesCost }))
+      .then((rows) => rowsForRole(rows, role)),
     prisma.vendorSettings.findUnique({ where: { vendorId }, select: { voiceLang: true } }),
   ]);
 
@@ -51,6 +58,7 @@ export default async function MenuPage(props: {
         prefillName={prefillName || undefined}
         vocab={vocab}
         sizesEnabled={env.ITEM_VARIANTS_ENABLED === "true"}
+        canSeeCost={seesCost}
       />
     </div>
   );

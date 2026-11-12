@@ -204,6 +204,9 @@ model MenuItem {
   stockQty       Int?
   stockCountedAt DateTime?
   lowStockAt     Int? // "Low stock" from this many left; null = no warning
+  // What one unit costs the seller (lib/item-cost.ts); null = not recorded. MANAGER and up only,
+  // never in a public select or the voice prompt.
+  costInPaise    Int?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -233,6 +236,7 @@ model ItemVariant {
   stockQty       Int?
   stockCountedAt DateTime?
   lowStockAt     Int?
+  costInPaise    Int? // null = the item's cost (lib/item-cost.ts)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
@@ -603,6 +607,7 @@ model OrderItem {
   totalPaise    Int // priceInPaise * qty
   discountPaise Int          @default(0) // This line's share of Transaction.discountPaise
   isGift        Boolean      @default(false) // A FREE_ITEM offer's gift: priced 0, never re-ordered
+  costInPaise   Int? // Per unit, snapshot of the item's or size's cost when the line was created; null = none recorded
 
   @@index([transactionId])
   @@index([menuItemId])

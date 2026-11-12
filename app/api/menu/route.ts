@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
+import { canSeeCost, hideCost, rowsForRole } from "@/lib/item-cost";
+import { takeCostField } from "@/lib/item-cost-schema";
 import { loadMenuCreateContext, prepareMenuItemCreate } from "@/lib/menu-create";
 import { menuStockFieldsSchema, splitStockFields } from "@/lib/menu-stock";
 import { withStockLeft, withVariants } from "@/lib/menu-stock-server";
@@ -33,7 +35,10 @@ export async function GET(req: NextRequest) {
     // `stockLeft` is derived (lib/inventory.ts rule 2); null on untracked rows.
     // `variants`: sizes / colours, each with its own stock (lib/item-variants.ts).
     const rows = await withStockLeft(prisma, ctx.vendor.id, items);
-    const res = NextResponse.json({ data: await withVariants(prisma, ctx.vendor.id, rows) });
+    // Cost is for MANAGER and up (lib/item-cost.ts rule 2): anyone else gets null.
+    const seesCost = canSeeCost(ctx.staff.role);
+    const withSizes = await withVariants(prisma, ctx.vendor.id, rows, new Date(), { cost: seesCost });
+    const res = NextResponse.json({ data: rowsForRole(withSizes, ctx.staff.role) });
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {
     if (err instanceof AuthError) {
@@ -47,17 +52,25 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
-    const { stock, rest } = splitStockFields(await req.json());
+    const { cost, rest: withoutCost } = takeCostField(await req.json());
+    const { stock, rest } = splitStockFields(withoutCost);
     const body = menuItemCreateSchema.parse(rest);
+    const seesCost = canSeeCost(ctx.staff.role);
     const stockFields = menuStockFieldsSchema.parse(stock);
 
     const menuCtx = await loadMenuCreateContext(prisma, ctx.vendor.id);
     const created = await prisma.menuItem.create({
-      data: prepareMenuItemCreate(menuCtx, ctx.vendor.id, { ...body, ...stockFields }),
+      data: prepareMenuItemCreate(menuCtx, ctx.vendor.id, {
+        ...body,
+        ...stockFields,
+        // A cost from someone who may not set it is ignored, not refused.
+        costInPaise: seesCost ? (cost ?? null) : null,
+      }),
     });
 
     // A new row has no orders yet: what was counted is what is left.
-    const res = NextResponse.json({ data: { ...created, stockLeft: created.stockQty, stockSetAside: created.stockQty === null ? null : 0 } }, { status: 201 });
+    const row = seesCost ? created : hideCost(created);
+    const res = NextResponse.json({ data: { ...row, stockLeft: created.stockQty, stockSetAside: created.stockQty === null ? null : 0 } }, { status: 201 });
     return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {
     if (err instanceof AuthError) {

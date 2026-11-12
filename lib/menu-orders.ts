@@ -38,6 +38,7 @@ import { deliveryFeeFor, parseDeliveryAreas } from "@/lib/delivery-areas";
 import { bumpOrderSignal } from "@/lib/drops-signal";
 import { findMenuSlot, parseMenuSlots, type MenuSlot } from "@/lib/menu-slots";
 import { firstShortfall } from "@/lib/inventory";
+import { stampOrderCosts } from "@/lib/item-cost-server";
 import {
   lockTrackedMenuItems,
   lockTrackedVariants,
@@ -396,6 +397,8 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
           },
         },
       });
+      // Each line keeps the cost of this moment (lib/item-cost.ts rule 4).
+      await stampOrderCosts(tx, vendorId, created.id);
 
       await tx.receipt.create({
         data: {

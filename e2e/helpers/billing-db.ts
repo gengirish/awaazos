@@ -146,3 +146,12 @@ export async function getVendorReferral(
     select: { id: true, referredByVendorId: true, trialEndsAt: true },
   });
 }
+
+/** Each line name and saved unit cost on one bill (lib/item-cost.ts rule 4); no API returns it yet. */
+export async function billLineCosts(transactionId: string): Promise<Record<string, number | null>> {
+  const lines = await db().orderItem.findMany({
+    where: { transactionId },
+    select: { name: true, costInPaise: true },
+  });
+  return Object.fromEntries(lines.map((l) => [l.name, l.costInPaise]));
+}

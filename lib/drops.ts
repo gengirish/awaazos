@@ -52,6 +52,7 @@ import { deliveryFeeFor, parseDeliveryAreas } from "@/lib/delivery-areas";
 import { bumpOrderSignal } from "@/lib/drops-signal";
 import { combinedRemaining, firstShortfall } from "@/lib/inventory";
 import { lockTrackedMenuItems, lockTrackedVariants, stockLeftByMenuItem, stockLeftByVariant } from "@/lib/inventory-server";
+import { stampOrderCosts } from "@/lib/item-cost-server";
 import { cartLineKey, variantLineName } from "@/lib/item-variants";
 import { applyOffers, giftLineName, withGiftsThatFit } from "@/lib/offers";
 import { loadResolvedOffers } from "@/lib/offers-server";
@@ -654,6 +655,8 @@ export async function placeStorefrontOrder(input: PlaceOrderInput): Promise<Plac
           },
         },
       });
+      // Each line keeps the cost of this moment (lib/item-cost.ts rule 4).
+      await stampOrderCosts(tx, vendorId, created.id);
 
       await tx.receipt.create({
         data: {
