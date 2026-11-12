@@ -5,12 +5,14 @@ import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 
+import { SizePickerDialog, type PosSize } from "@/components/pos/SizePickerDialog";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { formatINR } from "@/lib/currency";
 import { useCartStore } from "@/lib/cartStore";
 import { stockLabel } from "@/lib/inventory";
+import { variantLineName, variantPriceRange } from "@/lib/item-variants";
 import { STAFF_SEARCH_MIN_ITEMS, itemSearchText, matchesSearch, searchTerms } from "@/lib/store-search";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
@@ -32,6 +34,11 @@ export type MenuTile = {
    */
   stockLeft?: number | null;
   lowStockAt?: number | null;
+  /**
+   * Its available sizes or colours (lib/item-variants.ts), absent or empty for an
+   * item without. A tile with sizes opens the size picker instead of adding.
+   */
+  sizes?: PosSize[];
 };
 
 export type QuickAddGridProps = {
@@ -70,11 +77,18 @@ export function QuickAddGrid({ items, vocab }: QuickAddGridProps) {
   const cartItems = useCartStore((s) => s.items);
   const [query, setQuery] = useState("");
   const [pendingScroll, setPendingScroll] = useState<string | null>(null);
+  const [sizing, setSizing] = useState<MenuTile | null>(null);
+  const addItem = useCartStore((s) => s.addItem);
 
-  const qtyById = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const line of cartItems) m.set(line.menuItemId, line.qty);
-    return m;
+  // Per item, all its sizes together (the tile's badge); and per size (the picker).
+  const { qtyById, qtyByVariant } = useMemo(() => {
+    const byItem = new Map<string, number>();
+    const byVariant = new Map<string, number>();
+    for (const line of cartItems) {
+      byItem.set(line.menuItemId, (byItem.get(line.menuItemId) ?? 0) + line.qty);
+      if (line.variantId) byVariant.set(line.variantId, line.qty);
+    }
+    return { qtyById: byItem, qtyByVariant: byVariant };
   }, [cartItems]);
 
   // Category chips and search only earn their space on a long menu.
@@ -214,18 +228,42 @@ export function QuickAddGrid({ items, vocab }: QuickAddGridProps) {
               ) : null}
               <div className={cn("grid gap-2", "grid-cols-2 sm:grid-cols-3 md:grid-cols-4")}>
                 {group.items.map((it) => (
-                  <QuickAddTile key={it.id} item={it} qty={qtyById.get(it.id) ?? 0} />
+                  <QuickAddTile key={it.id} item={it} qty={qtyById.get(it.id) ?? 0} onPickSize={setSizing} />
                 ))}
               </div>
             </div>
           ))}
         </div>
       )}
+      <SizePickerDialog
+        item={sizing && sizing.sizes ? { name: sizing.name, sizes: sizing.sizes } : null}
+        qtyByVariant={qtyByVariant}
+        onClose={() => setSizing(null)}
+        onPick={(size) => {
+          if (!sizing) return;
+          addItem({
+            menuItemId: sizing.id,
+            variantId: size.id,
+            name: variantLineName(sizing.name, size.label),
+            emoji: sizing.emoji,
+            priceInPaise: size.priceInPaise,
+          });
+          setSizing(null);
+        }}
+      />
     </section>
   );
 }
 
-function QuickAddTile({ item: it, qty }: { item: MenuTile; qty: number }) {
+function QuickAddTile({
+  item: it,
+  qty,
+  onPickSize,
+}: {
+  item: MenuTile;
+  qty: number;
+  onPickSize: (item: MenuTile) => void;
+}) {
   const addItem = useCartStore((s) => s.addItem);
   const decQty = useCartStore((s) => s.decQty);
 
@@ -237,6 +275,8 @@ function QuickAddTile({ item: it, qty }: { item: MenuTile; qty: number }) {
   /** Latest qty, read at pointerdown: with nothing in the cart a long-press has nothing to take off. */
   const qtyRef = useRef(qty);
   qtyRef.current = qty;
+  const sizes = it.sizes ?? [];
+  const sized = sizes.length > 0;
 
   const cancelPress = () => {
     if (timerRef.current) {
@@ -260,7 +300,8 @@ function QuickAddTile({ item: it, qty }: { item: MenuTile; qty: number }) {
     longPressedRef.current = false;
     startRef.current = { x: e.clientX, y: e.clientY };
     // Not in the cart: arm no timer, so a slow tap still adds instead of being swallowed.
-    if (qtyRef.current === 0) return;
+    // With sizes there is no one line to take off: the cart's minus does that.
+    if (qtyRef.current === 0 || sized) return;
     setPressing(true);
     if (timerRef.current) clearTimeout(timerRef.current);
     timerRef.current = setTimeout(() => {
@@ -285,14 +326,16 @@ function QuickAddTile({ item: it, qty }: { item: MenuTile; qty: number }) {
   };
 
   const inCart = qty > 0;
-  const stock = stockLabel(it.stockLeft ?? null, it.lowStockAt ?? null);
-  const stockShort = it.stockLeft != null && it.stockLeft <= 0;
+  const stock = sized ? null : stockLabel(it.stockLeft ?? null, it.lowStockAt ?? null);
+  const stockShort = !sized && it.stockLeft != null && it.stockLeft <= 0;
+  const range = sized ? variantPriceRange(it.priceInPaise, sizes.map((s) => ({ priceInPaise: s.priceInPaise }))) : null;
+  const priceText = range ? `from ${formatINR(range.minPaise)}` : formatINR(sized ? sizes[0]!.priceInPaise : it.priceInPaise);
 
   return (
     <Button
       type="button"
       variant="outline"
-      title={TILE_HINT}
+      title={sized ? "Tap to pick a size or colour" : TILE_HINT}
       className={cn(
         "relative h-auto min-h-[72px] touch-manipulation select-none flex-col gap-1 py-3 text-left font-normal [-webkit-touch-callout:none]",
         "motion-safe:transition-transform motion-safe:duration-150 motion-safe:active:scale-95",
@@ -309,6 +352,10 @@ function QuickAddTile({ item: it, qty }: { item: MenuTile; qty: number }) {
         const swallow = longPressedRef.current && e.detail !== 0; // detail 0 = keyboard activation
         longPressedRef.current = false;
         if (swallow) return;
+        if (sized) {
+          onPickSize(it);
+          return;
+        }
         addItem({
           menuItemId: it.id,
           name: it.name,
@@ -342,7 +389,12 @@ function QuickAddTile({ item: it, qty }: { item: MenuTile; qty: number }) {
         </span>
       )}
       <span className="line-clamp-2 w-full whitespace-normal break-words text-center text-sm font-medium text-foreground">{it.name}</span>
-      <span className="font-mono text-xs tabular-nums text-muted-foreground">{formatINR(it.priceInPaise)}</span>
+      <span className="font-mono text-xs tabular-nums text-muted-foreground">{priceText}</span>
+      {sized ? (
+        <span className="text-xs text-muted-foreground">
+          {sizes.length === 1 ? sizes[0]!.label : `${sizes.length} options`}
+        </span>
+      ) : null}
       {stock ? (
         // After the price, so the accessible name still starts with "{name} {price}".
         <span className={cn("text-xs text-muted-foreground", stockShort && "font-semibold text-destructive")}>{stock}</span>

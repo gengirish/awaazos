@@ -59,7 +59,11 @@ of `lib/item-variants.ts`. Three PRs:
    - Buyer: a size picker on the store page (up to 5 as options, more as a drop-down), one cart line per
      size.
    - Migration `20261116000000_item_variants` must run on Neon before merge.
-3. **Everywhere else** (next): the counter (POS tiles pick a size), drops (today an item with sizes
+3. **Everywhere else**, one PR each:
+   - Counter (this step's first PR): a POS tile with sizes opens a size picker, one cart line per size,
+     the bill line keeps `variantId` (checked against the vendor's sizes of that item) and takes stock
+     from that size. Voice leaves sized items out and asks for a tap. No migration.
+   - Next: drops (today an item with sizes
    can't join one), free gifts with sizes (today that offer is skipped), order again (today a sized line
    is not refilled), the packing list grouped by size, and the voice menu builder. Then the flag goes.
 

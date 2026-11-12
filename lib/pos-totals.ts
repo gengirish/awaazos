@@ -1,4 +1,5 @@
 import type { CartLine } from "@/lib/cartStore";
+import { cartLineKey } from "@/lib/item-variants";
 import { applyOffers, type AppliedDiscount, type OfferNudge, type ResolvedOffer } from "@/lib/offers";
 
 export type PosTaxSettings = {
@@ -57,7 +58,7 @@ export function computeCartTotals(items: readonly CartLine[], settings: PosTaxSe
 
   const offered = applyOffers(
     items.map((line) => ({
-      key: line.menuItemId,
+      key: cartLineKey(line.menuItemId, line.variantId),
       menuItemId: line.menuItemId,
       priceInPaise: line.priceInPaise,
       qty: line.qty,

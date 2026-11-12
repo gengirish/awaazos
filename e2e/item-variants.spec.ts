@@ -186,6 +186,75 @@ test.describe("item variants", () => {
     }
   });
 
+  test("counter sells by size: picker, cart line, bill and stock per size", async ({ page, request }) => {
+    await createVendorSession(page, request, "variants-pos");
+    const kurti = await createMenuItem(page, { name: "Counter Kurti", priceInRupees: 599 });
+    const other = await createMenuItem(page, { name: "Other Kurti", priceInRupees: 499 });
+    const put = await putVariants(page, kurti.id, [
+      { label: "M", stockQty: 3 },
+      { label: "L", priceInRupees: 699 },
+      { label: "XL", isAvailable: false },
+    ]);
+    expect(put.status(), await put.text()).toBe(200);
+    const [m, l] = (await put.json()).data as VariantRow[];
+    const otherPut = await putVariants(page, other.id, [{ label: "S" }]);
+    const [otherS] = (await otherPut.json()).data as VariantRow[];
+
+    // A size that isn't this item's is refused on a live sale.
+    const sale = (variantId: string) => ({
+      items: [{ menuItemId: kurti.id, variantId, name: "Counter Kurti – M", priceInPaise: 59900, qty: 1 }],
+      subtotalPaise: 59900,
+      taxPaise: 0,
+      totalPaise: 59900,
+      paymentMethod: "CASH",
+      source: "MANUAL",
+    });
+    const foreign = await page.request.post("/api/transactions", { data: sale(otherS!.id), headers: JSON_HEADERS });
+    expect(foreign.status()).toBe(400);
+    expect(await foreign.json()).toMatchObject({ error: "size_not_found" });
+
+    await page.goto("/pos");
+    await expect(page.getByRole("heading", { name: "Quick add" })).toBeVisible();
+    const tile = page.getByRole("button", { name: /^Counter Kurti from ₹599\.00/ });
+    await tile.click();
+    const picker = page.getByRole("dialog", { name: "Counter Kurti" });
+    // Switched-off sizes are not offered.
+    await expect(picker.getByRole("button", { name: /^XL/ })).toHaveCount(0);
+    await picker.getByRole("button", { name: /^M ₹599\.00 3 in stock/ }).click();
+    await expect(picker).toBeHidden();
+    await tile.click();
+    await page.getByRole("dialog", { name: "Counter Kurti" }).getByRole("button", { name: /^L ₹699\.00/ }).click();
+
+    const cart = page.getByRole("region", { name: "Cart" });
+    await expect(cart.getByText("Counter Kurti – M")).toBeVisible();
+    await expect(cart.getByText("Counter Kurti – L")).toBeVisible();
+    await page.getByRole("button", { name: "Increase Counter Kurti – M" }).click();
+    await expect(tile).toHaveAccessibleName(/3 in cart/);
+
+    await page.getByRole("button", { name: "Collect payment" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByRole("radio", { name: "Cash" }).check();
+    await dialog.getByRole("button", { name: /Mark as paid/ }).click();
+    await expect(page.getByText(/Paid ₹1,897\.00 via Cash/)).toBeVisible();
+
+    // The bill names each size, and M's stock went down by the 2 sold.
+    await expect
+      .poll(async () => (await variantsOf(page, kurti.id)).find((v) => v.id === m!.id)?.stockLeft)
+      .toBe(1);
+    const bills = await page.request.get("/api/transactions?limit=5");
+    const list = (await bills.json()) as {
+      items: { orderItems: { name: string; qty: number; variantId: string | null; priceInPaise: number }[] }[];
+    };
+    expect(
+      list.items[0]!.orderItems.map((i) => [i.name, i.qty, i.priceInPaise, i.variantId]).sort(),
+    ).toEqual(
+      [
+        ["Counter Kurti – L", 1, 69900, l!.id],
+        ["Counter Kurti – M", 2, 59900, m!.id],
+      ].sort(),
+    );
+  });
+
   test("seller adds sizes in the item form (goods store, sizes switched on)", async ({ page, request }) => {
     test.skip(process.env.ITEM_VARIANTS_ENABLED !== "true", "needs ITEM_VARIANTS_ENABLED=true on the server");
     await createVendorSession(page, request, "variants-form");

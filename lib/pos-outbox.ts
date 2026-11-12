@@ -30,7 +30,7 @@ import { createStore, del, entries, get, set, type UseStore } from "idb-keyval";
 import { getIstTodayStart } from "@/lib/billing-period";
 
 export type OutboxSaleBody = {
-  items: { menuItemId?: string; name: string; priceInPaise: number; qty: number }[];
+  items: { menuItemId?: string; variantId?: string; name: string; priceInPaise: number; qty: number }[];
   subtotalPaise: number;
   /** Offer discount (lib/offers.ts). Absent on a bill without one. */
   discountPaise?: number;

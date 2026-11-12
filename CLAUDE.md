@@ -760,9 +760,12 @@ item's) and keeps `OrderItem.variantId` + the name snapshot "Cotton kurti – M"
 same derived rules (`stockLeftByVariant`, `lockTrackedVariants` after the item locks); the item keeps no count of
 its own (409 `has_variants`). Sellers edit them in the item form (`PUT /api/menu/[id]/variants`, the whole list;
 stock route takes `variantId`), shown for goods stores only while `ITEM_VARIANTS_ENABLED=true` (server env, read
-per render). The cart key is `itemId:variantId` (`cartLineKey`). Not yet: drops (an item with variants can't
-join a drop, nor get variants while in one that hasn't ended), free gifts with sizes (that offer is skipped),
-the counter, order again.
+per render). The cart key is `itemId:variantId` (`cartLineKey`). At the counter a tile with sizes opens a
+picker (`components/pos/SizePickerDialog.tsx`); `POST /api/transactions` records the line's `variantId` only when
+it is this vendor's size of that item (live sale otherwise 400 `size_not_found`; a queued offline sale keeps the
+line without it), never refuses over stock or a missing size, and voice leaves sized items for a tap. Not yet:
+drops (an item with variants can't join a drop, nor get variants while in one that hasn't ended), free gifts with
+sizes (that offer is skipped), order again.
 
 ### Customer feedback
 

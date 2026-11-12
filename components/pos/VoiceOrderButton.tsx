@@ -42,9 +42,10 @@ type VoiceCoreProps = {
   voiceLang: string;
   onCycleLang: () => void;
   onScheduleReset: () => void;
+  sizedItemIds: readonly string[];
 };
 
-function VoiceOrderButtonCore({ voiceLang, onCycleLang, onScheduleReset }: VoiceCoreProps) {
+function VoiceOrderButtonCore({ voiceLang, onCycleLang, onScheduleReset, sizedItemIds }: VoiceCoreProps) {
   const setItemsFromVoice = useCartStore((s) => s.setItemsFromVoice);
   const setVoiceReview = useCartStore((s) => s.setVoiceReview);
   const {
@@ -71,13 +72,17 @@ function VoiceOrderButtonCore({ voiceLang, onCycleLang, onScheduleReset }: Voice
     const sig = JSON.stringify(parsedItems);
     if (appliedVoiceSigRef.current === sig) return;
     appliedVoiceSigRef.current = sig;
-    setItemsFromVoice(parsedItems);
+    // Voice can't tell which size, so an item with sizes stays out of the cart
+    // and the review asks the cashier to tap it (lib/item-variants.ts rule 6).
+    const sized = new Set(sizedItemIds);
+    const needsSize = Array.from(new Set(parsedItems.filter((p) => sized.has(p.menuItemId)).map((p) => p.name)));
+    setItemsFromVoice(parsedItems.filter((p) => !sized.has(p.menuItemId)));
     setVoiceReview(
-      needsConfirmation || unmatched.length > 0
-        ? { lowConfidence: needsConfirmation, unmatched: [...unmatched] }
+      needsConfirmation || unmatched.length > 0 || needsSize.length > 0
+        ? { lowConfidence: needsConfirmation, unmatched: [...unmatched], needsSize }
         : null,
     );
-  }, [state, parsedItems, unmatched, needsConfirmation, setItemsFromVoice, setVoiceReview]);
+  }, [state, parsedItems, unmatched, needsConfirmation, setItemsFromVoice, setVoiceReview, sizedItemIds]);
 
   useEffect(() => {
     if (state !== "success") return;
@@ -201,9 +206,13 @@ function VoiceOrderButtonCore({ voiceLang, onCycleLang, onScheduleReset }: Voice
 export type VoiceOrderButtonProps = {
   /** The vendor's saved `VendorSettings.voiceLang`. */
   voiceLang: string;
+  /** Items that come in sizes: voice leaves them for the cashier to tap. */
+  sizedItemIds?: readonly string[];
 };
 
-export function VoiceOrderButton({ voiceLang: vendorLang }: VoiceOrderButtonProps) {
+const NO_SIZED: readonly string[] = [];
+
+export function VoiceOrderButton({ voiceLang: vendorLang, sizedItemIds = NO_SIZED }: VoiceOrderButtonProps) {
   const [tick, setTick] = useState(0);
   // Device-local override, read after mount so server and client markup match.
   const [override, setOverride] = useState<string | null>(null);
@@ -228,6 +237,7 @@ export function VoiceOrderButton({ voiceLang: vendorLang }: VoiceOrderButtonProp
       voiceLang={voiceLang}
       onCycleLang={cycleLang}
       onScheduleReset={scheduleReset}
+      sizedItemIds={sizedItemIds}
     />
   );
 }

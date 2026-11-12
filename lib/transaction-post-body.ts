@@ -3,6 +3,8 @@ import { z } from "zod";
 
 export const transactionPostItemSchema = z.object({
   menuItemId: z.string().min(1).optional(),
+  /** The size or colour sold (lib/item-variants.ts); needs `menuItemId`. */
+  variantId: z.string().min(1).max(64).optional(),
   name: z.string().min(1),
   priceInPaise: z.number().int().positive(),
   qty: z.number().int().positive(),

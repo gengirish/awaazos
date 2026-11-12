@@ -98,6 +98,18 @@ test.describe("tenant isolation", () => {
     expect(countOwn.status(), "a foreign variant id on the stock route must 404").toBe(404);
     const countA = await pageB.request.post(`/api/menu/${itemA.id}/stock`, { data: { variantId: sizeA.id, adjust: -4 } });
     expect(countA.status(), "cross-tenant variant stock must 404").toBe(404);
+    // A counter sale naming A's size is refused before anything is written.
+    const sale = await pageB.request.post("/api/transactions", {
+      data: {
+        items: [{ menuItemId: itemA.id, variantId: sizeA.id, name: "A Sized Kurti – M", priceInPaise: 59900, qty: 4 }],
+        subtotalPaise: 239600,
+        taxPaise: 0,
+        totalPaise: 239600,
+        paymentMethod: "CASH",
+        source: "MANUAL",
+      },
+    });
+    expect(sale.status(), "a foreign size on a counter sale must be refused").toBe(400);
 
     const listA = await pageA.request.get("/api/menu");
     type SizedRow = MenuItemRow & { variants: { id: string; label: string; stockLeft: number | null }[] };
