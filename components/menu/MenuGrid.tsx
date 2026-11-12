@@ -1,6 +1,6 @@
 "use client";
 
-import { Package, Search, UtensilsCrossed } from "lucide-react";
+import { LayoutGrid, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
@@ -174,7 +174,7 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
       {items.length === 0 ? (
         // The only "Add item" on the page while the menu is empty.
         <EmptyState
-          icon={vocab.foodArt ? UtensilsCrossed : Package}
+          icon={LayoutGrid}
           title="No items yet"
           description={`Add your first item here, or use Add ${vocab.items} by voice above to say several with their prices.`}
           action={

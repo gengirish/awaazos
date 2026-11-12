@@ -106,7 +106,7 @@ export default async function HelpPage() {
           </h2>
           <ul className="divide-y divide-border overflow-hidden rounded-lg border bg-card">
             {screens.map((item) => {
-              const Icon = appNavIcon(item.id, storeKind);
+              const Icon = appNavIcon(item.id);
               return (
                 <li key={item.id}>
                   <Link

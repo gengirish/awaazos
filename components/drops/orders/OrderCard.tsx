@@ -11,13 +11,13 @@ import {
   Clock,
   ImageIcon,
   IndianRupee,
+  LayoutGrid,
   Loader2,
   Phone,
   Send,
   ShoppingBag,
   Star,
   Undo2,
-  UtensilsCrossed,
   XCircle,
 } from "lucide-react";
 import { useState, type ReactNode } from "react";
@@ -401,7 +401,7 @@ export function OrderCard({
                   {source.kind === "drop" ? (
                     <CalendarClock className="h-4 w-4 shrink-0" aria-hidden />
                   ) : (
-                    <UtensilsCrossed className="h-4 w-4 shrink-0" aria-hidden />
+                    <LayoutGrid className="h-4 w-4 shrink-0" aria-hidden />
                   )}
                   <span className="sr-only">From: </span>
                   <span className="truncate">{source.label}</span>
