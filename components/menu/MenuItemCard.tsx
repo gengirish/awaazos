@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { formatINR } from "@/lib/currency";
+import { stockLabel } from "@/lib/inventory";
 import type { MenuRow } from "@/lib/menu-stock";
 import { cn } from "@/lib/utils";
 
@@ -162,6 +163,22 @@ export function MenuItemCard({
         {/* Only once the seller tracks stock for this item (lib/inventory.ts rule 1). */}
         {item.stockQty !== null ? (
           <StockStepper item={item} onSaved={(id, saved) => onStockSaved?.(id, saved)} />
+        ) : null}
+        {/* Sizes / colours (lib/item-variants.ts), each with its own price and stock; edited in the form. */}
+        {item.variants && item.variants.length > 0 ? (
+          <ul aria-label={`${item.name}: sizes or colours`} className="flex flex-wrap gap-1.5 text-xs">
+            {item.variants.map((v) => {
+              const stock = stockLabel(v.stockLeft, v.lowStockAt);
+              return (
+                <li key={v.id} className="rounded-full border border-border bg-background px-2 py-0.5 text-foreground">
+                  <span className="font-semibold">{v.label}</span>
+                  {v.priceInPaise !== null ? ` · ${formatINR(v.priceInPaise)}` : null}
+                  {stock ? ` · ${stock}` : null}
+                  {v.isAvailable ? null : " · Off"}
+                </li>
+              );
+            })}
+          </ul>
         ) : null}
         <div className="flex items-center gap-1 text-sm">
           <Switch

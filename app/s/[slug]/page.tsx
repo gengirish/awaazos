@@ -56,7 +56,8 @@ import { deliveryAreaSummary, parseDeliveryAreas, type DeliveryArea } from "@/li
 import { menuSlotLabel, parseMenuSlots, upcomingMenuSlots } from "@/lib/menu-slots";
 import { formatDropDayLabel, formatWindowWithDay } from "@/lib/drops-time";
 import { instagramProfileUrl } from "@/lib/instagram";
-import { stockLeftByMenuItem, type TrackedItem } from "@/lib/inventory-server";
+import { stockLeftByMenuItem, stockLeftByVariant, type TrackedItem } from "@/lib/inventory-server";
+import { allSizesSoldOut, variantPriceRange, variantPricePaise, type StoreSize } from "@/lib/item-variants";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
 import { offersForItems, resolveOffers, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
 import { loadOfferRules, type OfferSource } from "@/lib/offers-server";
@@ -300,6 +301,19 @@ const loadStorefront = cache(async (slug: string) => {
           stockQty: true,
           stockCountedAt: true,
           lowStockAt: true,
+          // Sizes / colours (lib/item-variants.ts); their stock is reduced the same way.
+          variants: {
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+            select: {
+              id: true,
+              label: true,
+              priceInPaise: true,
+              isAvailable: true,
+              stockQty: true,
+              stockCountedAt: true,
+              lowStockAt: true,
+            },
+          },
         },
       },
     },
@@ -345,7 +359,10 @@ function menuFulfilmentPhrase(mode: FulfilmentMode): string {
 
 
 /** Everyday rows as rendered: the stock columns never reach a row (see loadItemStock). */
-type StorefrontItems = Omit<StorefrontVendor["menuItems"][number], "stockQty" | "stockCountedAt" | "lowStockAt">[];
+type StorefrontItems = Omit<
+  StorefrontVendor["menuItems"][number],
+  "stockQty" | "stockCountedAt" | "lowStockAt" | "variants"
+>[];
 
 /** Preserves the query ordering; no re-sort. */
 function groupByCategory(items: StorefrontItems): [string, StorefrontItems][] {
@@ -414,6 +431,45 @@ async function loadItemStock(
   return out;
 }
 
+/**
+ * Each item's sizes / colours as buyers see them (lib/item-variants.ts): the
+ * available ones, priced, with buyer-facing stock from one grouped
+ * `stockLeftByVariant` read (none when no variant is tracked). Items without
+ * variants are absent.
+ */
+async function loadStoreSizes(
+  vendorId: string,
+  items: readonly Pick<StorefrontVendor["menuItems"][number], "id" | "priceInPaise" | "variants">[],
+  now: Date,
+): Promise<Map<string, StoreSize[]>> {
+  const out = new Map<string, StoreSize[]>();
+  const offered = items.flatMap((i) => i.variants.filter((v) => v.isAvailable));
+  const left = await stockLeftByVariant(
+    prisma,
+    vendorId,
+    offered.filter((v) => v.stockQty !== null),
+    now,
+  );
+  for (const item of items) {
+    if (item.variants.length === 0) continue;
+    out.set(
+      item.id,
+      item.variants
+        .filter((v) => v.isAvailable)
+        .map((v) => {
+          const l = left.get(v.id);
+          return {
+            id: v.id,
+            label: v.label,
+            priceInPaise: variantPricePaise(item.priceInPaise, v),
+            stock: l === undefined ? null : storefrontStock(l, v.lowStockAt),
+          };
+        }),
+    );
+  }
+  return out;
+}
+
 /** Small "Sold out" / "Only N left" pill: text, never colour alone. */
 function StockBadge({ stock }: { stock: StorefrontStock | null }) {
   const text = stockBadgeText(stock);
@@ -444,12 +500,18 @@ function MenuRow({
   item,
   layout,
   stock,
+  sizes,
 }: {
   item: StorefrontItems[number];
   layout: CatalogueLayout;
   stock: StorefrontStock | null;
+  /** Its sizes / colours (lib/item-variants.ts); absent when it has none. */
+  sizes?: StoreSize[];
 }) {
   const dimmed = stock?.soldOut ?? false;
+  const range = sizes ? variantPriceRange(item.priceInPaise, sizes) : null;
+  const fromPaise = range?.minPaise ?? sizes?.[0]?.priceInPaise ?? item.priceInPaise;
+  const sizeLine = sizes && sizes.length > 0 ? sizes.map((v) => v.label).join(" · ") : null;
   if (layout === "gallery") {
     return (
       <li className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-background p-2.5 shadow-xs">
@@ -459,9 +521,11 @@ function MenuRow({
           {item.description ? (
             <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
           ) : null}
+          {sizeLine ? <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{sizeLine}</span> : null}
           <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
             <span className="font-mono font-bold tabular-nums text-foreground">
-              {formatINRCompact(item.priceInPaise)}
+              {range ? <span className="font-sans font-medium text-muted-foreground">from </span> : null}
+              {formatINRCompact(fromPaise)}
               {item.unit ? <span className="font-sans font-medium text-muted-foreground"> / {item.unit}</span> : null}
             </span>
             <StockBadge stock={stock} />
@@ -496,10 +560,12 @@ function MenuRow({
         {item.description ? (
           <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
         ) : null}
+        {sizeLine ? <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{sizeLine}</span> : null}
       </span>
 
       <span className="shrink-0 rounded-lg bg-muted/70 px-2.5 py-1 font-mono text-sm font-bold tabular-nums text-foreground">
-        {formatINRCompact(item.priceInPaise)}
+        {range ? <span className="font-sans font-medium text-muted-foreground">from </span> : null}
+        {formatINRCompact(fromPaise)}
         {item.unit ? <span className="font-sans font-medium text-muted-foreground"> / {item.unit}</span> : null}
       </span>
     </li>
@@ -773,7 +839,7 @@ export default async function StorefrontPage(props: {
   const { foodArt, orderNoteExample } = storeVocabulary(vendor.stallType);
   // Stock columns stay out of the rows (see loadItemStock below).
   const menuItems = (menuHidden ? [] : vendor.menuItems).map(
-    ({ stockQty: _q, stockCountedAt: _c, lowStockAt: _l, ...item }) => ({
+    ({ stockQty: _q, stockCountedAt: _c, lowStockAt: _l, variants: _v, ...item }) => ({
       ...item,
       imageUrl: item.imageUrl ?? (foodArt ? foodImageFor(item.name, item.category) : null),
     }),
@@ -809,16 +875,30 @@ export default async function StorefrontPage(props: {
       ? await loadOfferRules(prisma, vendor.id, ["MENU", "DROP"])
       : { rules: [], menuItems: [] };
   // Product stock for every tracked item the page can sell (one read; none when nothing is tracked).
-  const itemStock = await loadItemStock(
-    vendor.id,
-    [
-      ...(menuHidden ? [] : vendor.menuItems),
-      ...vendor.drops.flatMap((d) => d.items.map((i) => ({ ...i.menuItem, id: i.menuItemId }))),
-    ],
-    offerSource.rules.flatMap((r) => (r.discountType === "FREE_ITEM" && r.freeItemId ? [r.freeItemId] : [])),
-    now,
-  );
+  const giftIds = offerSource.rules.flatMap((r) => (r.discountType === "FREE_ITEM" && r.freeItemId ? [r.freeItemId] : []));
+  const [itemStock, storeSizes, sizedGifts] = await Promise.all([
+    loadItemStock(
+      vendor.id,
+      [
+        ...(menuHidden ? [] : vendor.menuItems),
+        ...vendor.drops.flatMap((d) => d.items.map((i) => ({ ...i.menuItem, id: i.menuItemId }))),
+      ],
+      giftIds,
+      now,
+    ),
+    loadStoreSizes(vendor.id, menuHidden ? [] : vendor.menuItems, now),
+    // No gift with sizes yet (lib/item-variants.ts rule 5): placeMenuOrder skips that offer too.
+    giftIds.length === 0
+      ? Promise.resolve(new Set<string>())
+      : prisma.itemVariant
+          .findMany({ where: { vendorId: vendor.id, menuItemId: { in: giftIds } }, select: { menuItemId: true } })
+          .then((rows) => new Set(rows.map((r) => r.menuItemId))),
+  ]);
   const stockOf = (menuItemId: string): StorefrontStock | null => {
+    // An item with sizes has no stock of its own: each size carries its badge,
+    // and the item reads "Sold out" only when none can be bought.
+    const sizes = storeSizes.get(menuItemId);
+    if (sizes) return allSizesSoldOut(sizes) ? { soldOut: true, onlyLeft: null, maxQty: 0 } : null;
     const s = itemStock.get(menuItemId);
     return s ? storefrontStock(s.left, s.lowStockAt) : null;
   };
@@ -830,6 +910,7 @@ export default async function StorefrontPage(props: {
         ),
         // A sold-out gift can't be handed out: the order route would refuse it.
         (menuItemId, qty) => {
+          if (sizedGifts.has(menuItemId)) return false;
           const s = itemStock.get(menuItemId);
           return !s || s.left >= qty;
         },
@@ -922,6 +1003,7 @@ export default async function StorefrontPage(props: {
       isPopular: item.isPopular,
       description: item.description,
       stock: stockOf(item.id),
+      sizes: storeSizes.get(item.id),
     })),
   }));
 
@@ -1312,7 +1394,7 @@ export default async function StorefrontPage(props: {
                       <ul className={CATEGORY_LIST_CLASS[layout]}>
                         {items.map((item) => (
                           <Searchable key={item.id} texts={[menuItemSearchText(item, category)]}>
-                            <MenuRow item={item} layout={layout} stock={stockOf(item.id)} />
+                            <MenuRow item={item} layout={layout} stock={stockOf(item.id)} sizes={storeSizes.get(item.id)} />
                           </Searchable>
                         ))}
                       </ul>

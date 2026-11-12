@@ -37,6 +37,8 @@
  *      also capped by its stock left (the smaller wins).
  *   7. Buyers see "Sold out" at 0 and "Only N left" at or below the low-stock
  *      line (`lowStockAt`, else BUYER_HINT_DEFAULT). Never the exact count above it.
+ *   8. An item with sizes or colours counts each one with these same rules and
+ *      keeps no count of its own (lib/item-variants.ts rule 4).
  */
 
 /** "Only N left" shows to buyers from this many when the seller set no line. */

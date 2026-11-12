@@ -746,7 +746,18 @@ storefront orders placed by the count that still hold stock and weren't handed o
 order, after the drop row) and refuse a shortfall (`out_of_stock` for menu orders, `sold_out` for drops,
 whose cap becomes the smaller of `maxQty` and stock left). The counter never refuses a sale over stock, so
 left can go negative ("Oversold by N"). Buyers see "Sold out" and "Only N left" (at or below `lowStockAt`,
-else 3), never the count above it. Sizes and colours (variants) are not built yet.
+else 3), never the count above it.
+
+**Sizes and colours** (`ItemVariant`, rules in the header of `lib/item-variants.ts`, zod-free so the store page can
+import it; request schema in `lib/item-variants-schema.ts`): an item with variants is ordered by variant. Every
+menu-order line names an available one (`size_required` otherwise), takes its price (`priceInPaise`, else the
+item's) and keeps `OrderItem.variantId` + the name snapshot "Cotton kurti – M". Stock is per variant with the
+same derived rules (`stockLeftByVariant`, `lockTrackedVariants` after the item locks); the item keeps no count of
+its own (409 `has_variants`). Sellers edit them in the item form (`PUT /api/menu/[id]/variants`, the whole list;
+stock route takes `variantId`), shown for goods stores only while `ITEM_VARIANTS_ENABLED=true` (server env, read
+per render). The cart key is `itemId:variantId` (`cartLineKey`). Not yet: drops (an item with variants can't
+join a drop, nor get variants while in one that hasn't ended), free gifts with sizes (that offer is skipped),
+the counter, order again.
 
 ### Customer feedback
 

@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 
 import { MenuScreen } from "@/components/menu/MenuScreen";
-import { withStockLeft } from "@/lib/menu-stock-server";
+import { env } from "@/lib/env";
+import { withStockLeft, withVariants } from "@/lib/menu-stock-server";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
@@ -35,7 +36,9 @@ export default async function MenuPage(props: {
         orderBy: { sortOrder: "asc" },
       })
       // Stock left is derived (lib/inventory.ts); no query when nothing is tracked.
-      .then((rows) => withStockLeft(prisma, vendorId, rows)),
+      .then((rows) => withStockLeft(prisma, vendorId, rows))
+      // Sizes / colours, each with its own stock (lib/item-variants.ts).
+      .then((rows) => withVariants(prisma, vendorId, rows)),
     prisma.vendorSettings.findUnique({ where: { vendorId }, select: { voiceLang: true } }),
   ]);
 
@@ -47,6 +50,7 @@ export default async function MenuPage(props: {
         voiceOpen={voiceOpen}
         prefillName={prefillName || undefined}
         vocab={vocab}
+        sizesEnabled={env.ITEM_VARIANTS_ENABLED === "true"}
       />
     </div>
   );

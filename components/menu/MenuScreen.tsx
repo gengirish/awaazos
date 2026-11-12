@@ -27,10 +27,12 @@ type MenuScreenProps = {
   prefillName?: string;
   /** The store's words (lib/store-vocabulary.ts). */
   vocab: StoreVocabulary;
+  /** Offer "Sizes or colours" in the item form (lib/item-variants.ts). */
+  sizesEnabled?: boolean;
 };
 
 /** The header's two actions open things lower down, so the state they share lives here. */
-export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vocab }: MenuScreenProps) {
+export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vocab, sizesEnabled }: MenuScreenProps) {
   const router = useRouter();
   const [items, setItems] = useState<MenuRow[]>(initialItems);
   const [voiceExpanded, setVoiceExpanded] = useState(initialItems.length === 0 || voiceOpen);
@@ -144,6 +146,7 @@ export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vo
             defaultName={defaultName}
             categories={categories}
             vocab={vocab}
+            sizesEnabled={sizesEnabled}
           />
         ) : null}
       </main>

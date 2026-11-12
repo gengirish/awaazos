@@ -67,6 +67,19 @@ export function unknownMenuItems(items: { menuItemId: string }[], known: Set<str
   return issues.length ? new DropApiError(400, { error: "Invalid input", issues }) : null;
 }
 
+/**
+ * 400 for drop items whose product has sizes or colours: drops don't sell
+ * variants yet (lib/item-variants.ts rule 5). `sized` = their menuItemIds.
+ */
+export function sizedMenuItems(items: { menuItemId: string }[], sized: Set<string>): DropApiError | null {
+  const issues = items.flatMap((it, i) =>
+    sized.has(it.menuItemId)
+      ? [{ code: "custom", path: ["items", i, "menuItemId"], message: "Items with sizes or colours can't be in a drop yet" }]
+      : [],
+  );
+  return issues.length ? new DropApiError(400, { error: "Invalid input", issues }) : null;
+}
+
 export function allowedTransitions(drop: Pick<Drop, "status" | "opensAt" | "closesAt">, now: Date) {
   const eff = effectiveDropStatus(drop, now);
   return DROP_STATUSES.filter((to) => canTransition(eff, to));

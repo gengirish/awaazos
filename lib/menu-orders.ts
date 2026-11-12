@@ -14,6 +14,9 @@
  *     order) inside the transaction, and a line that needs more than is left is
  *     refused with `out_of_stock`. A free gift that wouldn't fit is dropped.
  *     Untracked items take no lock.
+ *   - An item with sizes or colours (lib/item-variants.ts) is ordered by
+ *     variant: each line names one (`size_required` otherwise), is priced and
+ *     named from it, and tracked variants are locked and checked like items.
  *   - Fulfilment mode, delivery fee and pickup note come from VendorSettings
  *     (menuFulfilmentMode / menuDeliveryFeePaise / menuPickupNote).
  *
@@ -35,7 +38,13 @@ import { deliveryFeeFor, parseDeliveryAreas } from "@/lib/delivery-areas";
 import { bumpOrderSignal } from "@/lib/drops-signal";
 import { findMenuSlot, parseMenuSlots, type MenuSlot } from "@/lib/menu-slots";
 import { firstShortfall } from "@/lib/inventory";
-import { lockTrackedMenuItems, stockLeftByMenuItem } from "@/lib/inventory-server";
+import {
+  lockTrackedMenuItems,
+  lockTrackedVariants,
+  stockLeftByMenuItem,
+  stockLeftByVariant,
+} from "@/lib/inventory-server";
+import { cartLineKey, variantLineName, variantPricePaise } from "@/lib/item-variants";
 import { applyOffers, giftLineName, withGiftsThatFit } from "@/lib/offers";
 import { loadResolvedOffers } from "@/lib/offers-server";
 import type { OrderChannel } from "@/lib/order-channel";
@@ -65,7 +74,7 @@ export type PlaceMenuOrderInput = {
    */
   vendor: { id: string; plan: Plan; planExpiresAt?: Date | null; trialEndsAt?: Date | null };
   settings: MenuOrderSettings;
-  items: { menuItemId: string; qty: number }[];
+  items: MenuLine[];
   customerName: string;
   customerPhone: string; // E.164, already validated
   fulfilmentType: FulfilmentType;
@@ -89,9 +98,11 @@ export type PlaceMenuOrderInput = {
 export type PlaceMenuOrderError =
   | { code: "menu_orders_disabled" }
   | { code: "menu_paused_for_drop" }
-  | { code: "item_not_found"; menuItemId: string }
-  /** A tracked product has fewer left than the line asks for (lib/inventory.ts rule 4). */
-  | { code: "out_of_stock"; menuItemId: string; remaining: number }
+  | { code: "item_not_found"; menuItemId: string; variantId?: string }
+  /** The item has sizes or colours and the line named none (lib/item-variants.ts rule 2). */
+  | { code: "size_required"; menuItemId: string }
+  /** A tracked product (or variant) has fewer left than the line asks for (lib/inventory.ts rule 4). */
+  | { code: "out_of_stock"; menuItemId: string; variantId?: string; remaining: number }
   | { code: "fulfilment_unavailable" }
   | { code: "address_required" }
   | { code: "outside_delivery_area" }
@@ -146,11 +157,17 @@ export async function everydayMenuHiddenByDrop(
   return hiding !== null;
 }
 
-/** Merge duplicate lines for the same menu item. */
-export function mergeMenuLines(items: { menuItemId: string; qty: number }[]) {
-  const merged = new Map<string, number>();
-  for (const i of items) merged.set(i.menuItemId, (merged.get(i.menuItemId) ?? 0) + i.qty);
-  return Array.from(merged, ([menuItemId, qty]) => ({ menuItemId, qty }));
+/** One line of a menu order: an item, or one of its variants (lib/item-variants.ts). */
+export type MenuLine = { menuItemId: string; variantId?: string | null; qty: number };
+
+/** Merge duplicate lines for the same menu item and variant. */
+export function mergeMenuLines(items: readonly MenuLine[]) {
+  const merged = new Map<string, { menuItemId: string; variantId: string | null; qty: number }>();
+  for (const i of items) {
+    const key = cartLineKey(i.menuItemId, i.variantId);
+    merged.set(key, { menuItemId: i.menuItemId, variantId: i.variantId ?? null, qty: (merged.get(key)?.qty ?? 0) + i.qty });
+  }
+  return Array.from(merged.values());
 }
 
 export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceMenuOrderResult> {
@@ -198,13 +215,38 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
       // Compound filter = tenant isolation; unavailable items can't be ordered.
       const menuItems = await tx.menuItem.findMany({
         where: { vendorId, isAvailable: true, showOnline: true, id: { in: lines.map((l) => l.menuItemId) } },
-        select: { id: true, name: true, priceInPaise: true },
+        select: {
+          id: true,
+          name: true,
+          priceInPaise: true,
+          variants: { select: { id: true, label: true, priceInPaise: true, isAvailable: true } },
+        },
       });
       const byId = new Map(menuItems.map((m) => [m.id, m]));
+      // Each line priced and named from its item, or from its variant (lib/item-variants.ts).
       const priced = lines.map((l) => {
         const item = byId.get(l.menuItemId);
         if (!item) throw new MenuOrderRejected({ code: "item_not_found", menuItemId: l.menuItemId });
-        return { item, qty: l.qty };
+        const key = cartLineKey(l.menuItemId, l.variantId);
+        if (item.variants.length === 0) {
+          if (l.variantId) {
+            throw new MenuOrderRejected({ code: "item_not_found", menuItemId: item.id, variantId: l.variantId });
+          }
+          return { key, item, variantId: null, name: item.name, priceInPaise: item.priceInPaise, qty: l.qty };
+        }
+        if (!l.variantId) throw new MenuOrderRejected({ code: "size_required", menuItemId: item.id });
+        const variant = item.variants.find((v) => v.id === l.variantId && v.isAvailable);
+        if (!variant) {
+          throw new MenuOrderRejected({ code: "item_not_found", menuItemId: item.id, variantId: l.variantId });
+        }
+        return {
+          key,
+          item,
+          variantId: variant.id,
+          name: variantLineName(item.name, variant.label),
+          priceInPaise: variantPricePaise(item.priceInPaise, variant),
+          qty: l.qty,
+        };
       });
 
       const planFields = {
@@ -229,24 +271,57 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
       // Stock (lib/inventory.ts rule 4): lock the tracked products behind the
       // lines and any gift, in id order, then refuse a line that needs more than
       // is left. Untracked items are not locked and always pass.
-      const tracked = await lockTrackedMenuItems(tx, vendorId, [
-        ...priced.map((p) => p.item.id),
-        ...offerRules.flatMap((o) => (o.freeItem ? [o.freeItem.menuItemId] : [])),
+      // Items first, then variants: every order takes its locks in the same order.
+      const giftIds = offerRules.flatMap((o) => (o.freeItem ? [o.freeItem.menuItemId] : []));
+      const plain = priced.filter((p) => p.variantId === null);
+      const tracked = await lockTrackedMenuItems(tx, vendorId, [...plain.map((p) => p.item.id), ...giftIds]);
+      const sized = priced.flatMap((p) => (p.variantId ? [{ ...p, variantId: p.variantId }] : []));
+      const trackedVariants = await lockTrackedVariants(
+        tx,
+        vendorId,
+        sized.map((p) => p.variantId),
+      );
+      const [left, variantLeft] = await Promise.all([
+        stockLeftByMenuItem(tx, vendorId, tracked, now),
+        stockLeftByVariant(tx, vendorId, trackedVariants, now),
       ]);
-      const left = await stockLeftByMenuItem(tx, vendorId, tracked, now);
-      const need = new Map(priced.map((p) => [p.item.id, p.qty]));
+      const need = new Map(plain.map((p) => [p.item.id, p.qty]));
       const shortfall = firstShortfall(need, left);
       if (shortfall) throw new MenuOrderRejected({ code: "out_of_stock", ...shortfall });
+      // firstShortfall is keyed by whatever the map holds; here it is the variant id.
+      const variantShortfall = firstShortfall(new Map(sized.map((p) => [p.variantId, p.qty])), variantLeft);
+      if (variantShortfall) {
+        const variantId = variantShortfall.menuItemId;
+        throw new MenuOrderRejected({
+          code: "out_of_stock",
+          menuItemId: sized.find((p) => p.variantId === variantId)?.item.id ?? variantId,
+          variantId,
+          remaining: variantShortfall.remaining,
+        });
+      }
+      // No gift with sizes yet (lib/item-variants.ts rule 5): the buyer would have to pick one.
+      const sizedGifts =
+        giftIds.length === 0
+          ? new Set<string>()
+          : new Set(
+              (
+                await tx.itemVariant.findMany({
+                  where: { vendorId, menuItemId: { in: giftIds } },
+                  select: { menuItemId: true },
+                })
+              ).map((v) => v.menuItemId),
+            );
       // A gift leaves the shelf too: an offer whose gift doesn't fit after the paid lines is skipped.
       const offers = withGiftsThatFit(offerRules, (menuItemId, qty) => {
+        if (sizedGifts.has(menuItemId)) return false;
         const l = left.get(menuItemId);
         return l === undefined || (need.get(menuItemId) ?? 0) + qty <= l;
       });
       const offered = applyOffers(
         priced.map((p) => ({
-          key: p.item.id,
+          key: p.key,
           menuItemId: p.item.id,
-          priceInPaise: p.item.priceInPaise,
+          priceInPaise: p.priceInPaise,
           qty: p.qty,
         })),
         offers,
@@ -257,7 +332,7 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
 
       const deliveryFeePaise = input.fulfilmentType === "DELIVERY" && areaFee.ok ? areaFee.feePaise : 0;
       const { subtotalPaise, totalPaise } = computeOrderTotals(
-        priced.map((p) => ({ priceInPaise: p.item.priceInPaise, qty: p.qty })),
+        priced.map((p) => ({ priceInPaise: p.priceInPaise, qty: p.qty })),
         deliveryFeePaise,
         discountPaise,
       );
@@ -296,11 +371,12 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
             create: [
               ...priced.map((p) => ({
                 menuItemId: p.item.id,
-                name: p.item.name, // snapshot
-                priceInPaise: p.item.priceInPaise,
+                variantId: p.variantId,
+                name: p.name, // snapshot ("Cotton kurti – M" for a variant)
+                priceInPaise: p.priceInPaise,
                 qty: p.qty,
-                totalPaise: p.item.priceInPaise * p.qty,
-                discountPaise: discountByLine.get(p.item.id) ?? 0,
+                totalPaise: p.priceInPaise * p.qty,
+                discountPaise: discountByLine.get(p.key) ?? 0,
               })),
               // A free-item offer's gift: ₹0, outside every total (lib/offers.ts rule 6).
               ...(offered.gift

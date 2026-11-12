@@ -204,7 +204,14 @@ export const utrSubmitSchema = z.object({
 /** Public "order from menu" body (no drop). Prices are never accepted from the client. */
 export const storefrontMenuOrderSchema = z.object({
   items: z
-    .array(z.object({ menuItemId: z.string().min(1), qty: z.number().int().min(1).max(99) }))
+    .array(
+      z.object({
+        menuItemId: z.string().min(1),
+        /** The size / colour, for an item that has them (lib/item-variants.ts). */
+        variantId: z.string().min(1).max(64).nullish(),
+        qty: z.number().int().min(1).max(99),
+      }),
+    )
     .min(1)
     .max(50),
   customerName: z.string().trim().min(1).max(80),

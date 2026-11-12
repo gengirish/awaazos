@@ -82,6 +82,8 @@ jobs:
       DIRECT_URL: postgresql://ci:ci@localhost:5432/awaazos?schema=public
       # The internal account that owns demo stores (admin-demo-pipeline.spec.ts builds some).
       DEMO_OWNER_EMAIL: demo-owner@example.test
+      # "Sizes or colours" in the item form (lib/item-variants.ts); item-variants.spec.ts tests it.
+      ITEM_VARIANTS_ENABLED: "true"
     steps:
       - name: Checkout
         uses: actions/checkout@v7

@@ -10,6 +10,7 @@ import type { FulfilmentStatus } from "@prisma/client";
 import { formatINR } from "@/lib/currency";
 import { isValidPincode } from "@/lib/delivery-address";
 import { findDeliveryArea, type DeliveryArea } from "@/lib/delivery-areas";
+import { parseCartLineKey } from "@/lib/item-variants";
 import { discountLabel } from "@/lib/offers";
 
 const IST = "Asia/Kolkata";
@@ -191,15 +192,20 @@ export function stockLabel(remaining: number | null, lowThreshold = 5): string |
 // ─── Everyday-menu ordering ─────────────────────────────────────────
 
 /**
- * Cart (menuItemId → qty) → the `items` array storefrontMenuOrderSchema
- * accepts: drops empty / non-integer lines, clamps to the schema ceiling.
+ * Cart (line key → qty) → the `items` array storefrontMenuOrderSchema
+ * accepts: drops empty / non-integer lines, clamps to the schema ceiling. A key
+ * is a menuItemId, or "menuItemId:variantId" for a size (`cartLineKey`).
  * Never carries a price — the server re-reads every price from MenuItem.
  */
-export function toMenuOrderLines(cart: Record<string, number>): { menuItemId: string; qty: number }[] {
-  const out: { menuItemId: string; qty: number }[] = [];
-  for (const [menuItemId, qty] of Object.entries(cart)) {
-    if (!menuItemId || !Number.isInteger(qty) || qty < 1) continue;
-    out.push({ menuItemId, qty: Math.min(qty, MAX_LINE_QTY) });
+export function toMenuOrderLines(
+  cart: Record<string, number>,
+): { menuItemId: string; variantId?: string; qty: number }[] {
+  const out: { menuItemId: string; variantId?: string; qty: number }[] = [];
+  for (const [key, qty] of Object.entries(cart)) {
+    if (!key || !Number.isInteger(qty) || qty < 1) continue;
+    const { menuItemId, variantId } = parseCartLineKey(key);
+    if (!menuItemId) continue;
+    out.push({ menuItemId, ...(variantId ? { variantId } : {}), qty: Math.min(qty, MAX_LINE_QTY) });
   }
   return out;
 }
@@ -494,8 +500,10 @@ export function checkoutErrorsFromIssues(issues: unknown): CheckoutFieldErrors |
 export type OrderApiError = {
   error: string;
   dropItemId?: string;
-  /** Set on menu-order (no drop) `item_not_found` and `out_of_stock` rejections. */
+  /** Set on menu-order (no drop) `item_not_found`, `size_required` and `out_of_stock` rejections. */
   menuItemId?: string;
+  /** The size / colour the rejection is about (lib/item-variants.ts), when it is one. */
+  variantId?: string;
   remaining?: number;
   limit?: number;
 };
@@ -522,6 +530,8 @@ export function orderErrorMessage(err: OrderApiError, itemName?: string): string
       return err.menuItemId
         ? `${name} isn't available right now. We've removed it from your cart — please check and try again.`
         : `${name} is no longer available. Please refresh and try again.`;
+    case "size_required":
+      return `${name}: please pick a size or colour.`;
     case "menu_orders_disabled":
       return "This store has stopped taking online orders for now. Please check back later.";
     case "menu_paused_for_drop":

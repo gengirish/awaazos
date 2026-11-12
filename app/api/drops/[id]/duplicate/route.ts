@@ -29,7 +29,16 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     const src = await prisma.drop.findFirst({
       where: { id: params.id, vendorId },
       include: {
-        items: { select: { menuItemId: true, priceInPaise: true, maxQty: true, perOrderLimit: true, sortOrder: true } },
+        items: {
+          select: {
+            menuItemId: true,
+            priceInPaise: true,
+            maxQty: true,
+            perOrderLimit: true,
+            sortOrder: true,
+            menuItem: { select: { _count: { select: { variants: true } } } },
+          },
+        },
       },
     });
     if (!src) throw notFound();
@@ -50,7 +59,8 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         status: "DRAFT",
         ...fields,
         items: {
-          create: src.items.map((i) => ({
+          // An item that has since got sizes stays out: drops don't sell them yet (lib/item-variants.ts rule 5).
+          create: src.items.filter((i) => i.menuItem._count.variants === 0).map((i) => ({
             menuItemId: i.menuItemId,
             priceInPaise: i.priceInPaise,
             maxQty: i.maxQty,

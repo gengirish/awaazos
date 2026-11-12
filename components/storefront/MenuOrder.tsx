@@ -18,7 +18,16 @@ import {
 } from "@/components/storefront/StorefrontCheckout";
 import { ItemPrice } from "@/components/storefront/ItemPrice";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
+import { RadioOption } from "@/components/ui/radio-option";
 import { deliveryAreaSummary, type DeliveryArea } from "@/lib/delivery-areas";
+import {
+  allSizesSoldOut,
+  cartLineKey,
+  parseCartLineKey,
+  variantLineName,
+  variantPriceRange,
+  type StoreSize,
+} from "@/lib/item-variants";
 import type { MenuSlotRule } from "@/lib/menu-slots";
 import { applyOffers, offerSetAsideText, salePriceFor, type ResolvedOffer } from "@/lib/offers";
 import { itemSearchText } from "@/lib/store-search";
@@ -51,8 +60,12 @@ import { cn } from "@/lib/utils";
  * `out_of_stock` rejection cuts the cart down to what is left. Only items the server already filtered to
  * `isAvailable && showOnline` reach this component (so a restored cart drops
  * anything no longer offered online), and app/api/s/[slug]/menu-orders
- * re-checks both and re-reads every price. Only menuItemId + qty leave the
- * browser. Not rendered at all while an open drop hides the everyday menu.
+ * re-checks both and re-reads every price. Only menuItemId (+ variantId) + qty
+ * leave the browser. Not rendered at all while an open drop hides the everyday menu.
+ *
+ * An item with sizes or colours (lib/item-variants.ts) shows a picker; the
+ * stepper, price and stock badge follow the picked size, and each size is its
+ * own cart line ("itemId:variantId", `cartLineKey`).
  */
 
 export type MenuOrderItem = {
@@ -68,7 +81,15 @@ export type MenuOrderItem = {
   description?: string | null;
   /** Product stock (lib/storefront-stock.ts); null / absent = not tracked. */
   stock?: StorefrontStock | null;
+  /** Its available sizes / colours (lib/item-variants.ts); absent = it has none. */
+  sizes?: StoreSize[];
 };
+
+/** Up to this many sizes are a row of options; more are a drop-down (design-system.mdc). */
+const SIZE_OPTIONS_MAX = 5;
+
+/** One cart line resolved against the page: the item, and its size when it has them. */
+type CartLine = { key: string; item: MenuOrderItem; size: StoreSize | null };
 
 export type MenuOrderCategory = {
   category: string;
@@ -135,6 +156,30 @@ export function MenuOrder(props: MenuOrderProps) {
     for (const c of categories) for (const i of c.items) m.set(i.id, i);
     return m;
   }, [categories]);
+  /** A cart key → its item and size; null when either is no longer offered. */
+  const resolveKey = useMemo(
+    () =>
+      (key: string): CartLine | null => {
+        const { menuItemId, variantId } = parseCartLineKey(key);
+        const item = byId.get(menuItemId);
+        if (!item) return null;
+        if (!item.sizes) return variantId ? null : { key, item, size: null };
+        const size = variantId ? item.sizes.find((v) => v.id === variantId) : undefined;
+        return size ? { key, item, size } : null;
+      },
+    [byId],
+  );
+
+  // The size each item's picker shows: the buyer's pick, else the first one that isn't sold out.
+  const [picked, setPicked] = useState<Record<string, string>>({});
+  function sizeFor(item: MenuOrderItem): StoreSize | null {
+    if (!item.sizes || item.sizes.length === 0) return null;
+    return (
+      item.sizes.find((v) => v.id === picked[item.id]) ??
+      item.sizes.find((v) => !v.stock?.soldOut) ??
+      item.sizes[0]
+    );
+  }
 
   // The store page's search hides rows (and emptied categories); the cart keeps
   // whatever was added, so hidden rows still check out.
@@ -151,12 +196,14 @@ export function MenuOrder(props: MenuOrderProps) {
   const [stockOverride, setStockOverride] = useState<Record<string, number>>({});
   useEffect(() => setStockOverride({}), [categories]);
 
-  function stockFor(item: MenuOrderItem): StorefrontStock | null {
-    return withStockOverride(item.stock ?? null, stockOverride[item.id]);
+  /** Stock of one cart line: the size's when it has one, else the item's. */
+  function stockFor(item: MenuOrderItem, size: StoreSize | null): StorefrontStock | null {
+    const key = cartLineKey(item.id, size?.id);
+    return withStockOverride(size ? size.stock : (item.stock ?? null), stockOverride[key]);
   }
   /** Stepper ceiling: the line cap, or less when stock is tracked. */
-  function maxFor(item: MenuOrderItem): number {
-    return maxOrderableQty(stockFor(item)?.maxQty ?? null, null);
+  function maxFor(item: MenuOrderItem, size: StoreSize | null): number {
+    return maxOrderableQty(stockFor(item, size)?.maxQty ?? null, null);
   }
 
   // Saved per store; items no longer on the (available + online) menu are
@@ -164,39 +211,45 @@ export function MenuOrder(props: MenuOrderProps) {
   const { cart, setCart, clearCart } = usePersistedCart({
     storageKey: cartStorageKey(slug, { kind: "menu" }),
     accepting: true,
-    maxFor: (id) => {
-      const item = byId.get(id);
-      return item ? maxFor(item) : null;
+    maxFor: (key) => {
+      const line = resolveKey(key);
+      return line ? maxFor(line.item, line.size) : null;
     },
   });
 
   // A refresh can bring less stock (or a sold-out item) than the cart holds.
   useEffect(() => {
     setCart((c) => {
-      const next = restoreCartLines(c, (id) => {
-        const item = byId.get(id);
-        return item ? maxOrderableQty(item.stock?.maxQty ?? null, null) : null;
+      const next = restoreCartLines(c, (key) => {
+        const line = resolveKey(key);
+        if (!line) return null;
+        return maxOrderableQty((line.size ? line.size.stock : line.item.stock)?.maxQty ?? null, null);
       });
       return sameCartLines(next, c) ? c : next;
     });
-  }, [byId, setCart]);
+  }, [resolveKey, setCart]);
 
-  function setQty(itemId: string, qty: number) {
+  /** `key`: a cart line key (`cartLineKey`). */
+  function setQty(key: string, qty: number) {
     setCart((c) => {
       const next = { ...c };
-      if (qty <= 0) delete next[itemId];
-      else next[itemId] = qty;
+      if (qty <= 0) delete next[key];
+      else next[key] = qty;
       return next;
     });
   }
 
-  // Drop cart lines whose item vanished after a refresh (made unavailable).
-  const lines = toMenuOrderLines(cart)
-    .map((l) => ({ item: byId.get(l.menuItemId), qty: l.qty }))
-    .filter((l): l is { item: MenuOrderItem; qty: number } => !!l.item);
+  // Drop cart lines whose item (or size) vanished after a refresh (made unavailable).
+  const lines = toMenuOrderLines(cart).flatMap((l) => {
+    const line = resolveKey(cartLineKey(l.menuItemId, l.variantId));
+    if (!line) return [];
+    const priceInPaise = line.size?.priceInPaise ?? line.item.priceInPaise;
+    const name = line.size ? variantLineName(line.item.name, line.size.label) : line.item.name;
+    return [{ ...line, qty: l.qty, priceInPaise, name }];
+  });
   const itemCount = lines.reduce((s, l) => s + l.qty, 0);
   const offered = applyOffers(
-    lines.map((l) => ({ key: l.item.id, menuItemId: l.item.id, priceInPaise: l.item.priceInPaise, qty: l.qty })),
+    lines.map((l) => ({ key: l.key, menuItemId: l.item.id, priceInPaise: l.priceInPaise, qty: l.qty })),
     offers,
   );
   const appliedOffer = offered.applied;
@@ -218,18 +271,28 @@ export function MenuOrder(props: MenuOrderProps) {
 
   function onRejected(err: OrderApiError): string {
     const item = err.menuItemId ? byId.get(err.menuItemId) : undefined;
-    const message = orderErrorMessage(err, item?.name);
+    const size = err.variantId ? item?.sizes?.find((v) => v.id === err.variantId) : undefined;
+    const message = orderErrorMessage(err, item && size ? variantLineName(item.name, size.label) : item?.name);
     if (err.error === "out_of_stock" && err.menuItemId) {
-      const id = err.menuItemId;
+      const key = cartLineKey(err.menuItemId, err.variantId);
       const left = Math.max(0, err.remaining ?? 0);
-      setStockOverride((o) => ({ ...o, [id]: left }));
-      setCart((c) => cartAfterStockRejection(c, id, left));
+      setStockOverride((o) => ({ ...o, [key]: left }));
+      setCart((c) => cartAfterStockRejection(c, key, left));
       router.refresh();
     } else if (err.error === "item_not_found" && err.menuItemId) {
-      const id = err.menuItemId;
+      const key = cartLineKey(err.menuItemId, err.variantId);
       setCart((c) => {
         const next = { ...c };
-        delete next[id];
+        delete next[key];
+        return next;
+      });
+      router.refresh();
+    } else if (err.error === "size_required" && err.menuItemId) {
+      // The seller added sizes after this cart was built: the plain line can't be placed.
+      const key = err.menuItemId;
+      setCart((c) => {
+        const next = { ...c };
+        delete next[key];
         return next;
       });
       router.refresh();
@@ -255,9 +318,9 @@ export function MenuOrder(props: MenuOrderProps) {
   }
 
   // Price (sale-aware, lib/offers.ts), unit, stock and the Popular badge: the same line in both layouts.
-  const priceLine = (item: MenuOrderItem, stock: StorefrontStock | null) => (
+  const priceLine = (item: MenuOrderItem, priceInPaise: number, stock: StorefrontStock | null) => (
     <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-      <ItemPrice priceInPaise={item.priceInPaise} sale={salePriceFor(offers, item.id, item.priceInPaise)} unit={item.unit} />
+      <ItemPrice priceInPaise={priceInPaise} sale={salePriceFor(offers, item.id, priceInPaise)} unit={item.unit} />
       {stockBadgeText(stock) ? (
         <span
           className={cn(
@@ -322,17 +385,37 @@ export function MenuOrder(props: MenuOrderProps) {
               }
             >
               {items.map((item) => {
-                const stock = stockFor(item);
-                const soldOut = stock?.soldOut ?? false;
+                const size = sizeFor(item);
+                const key = cartLineKey(item.id, size?.id);
+                const stock = stockFor(item, size);
+                // An item with sizes is dimmed only when none can be bought; one sold-out size just has no stepper.
+                const itemSoldOut = item.sizes ? allSizesSoldOut(item.sizes) : (stock?.soldOut ?? false);
+                const soldOut = itemSoldOut || (stock?.soldOut ?? false);
+                const shownPrice = size?.priceInPaise ?? item.priceInPaise;
+                const range = item.sizes ? variantPriceRange(item.priceInPaise, item.sizes) : null;
                 // Sold out: no stepper, like a sold-out pre-order item; the badge says why.
                 const stepper = soldOut ? null : (
                   <QtyStepper
-                    itemName={item.name}
-                    qty={cart[item.id] ?? 0}
-                    max={maxFor(item)}
-                    onChange={(q) => setQty(item.id, q)}
+                    itemName={size ? variantLineName(item.name, size.label) : item.name}
+                    qty={cart[key] ?? 0}
+                    max={maxFor(item, size)}
+                    onChange={(q) => setQty(key, q)}
                   />
                 );
+                const sizes =
+                  item.sizes && item.sizes.length > 0 && !itemSoldOut ? (
+                    <SizePicker
+                      item={item}
+                      sizes={item.sizes}
+                      pickedId={size?.id ?? null}
+                      onPick={(id) => setPicked((p) => ({ ...p, [item.id]: id }))}
+                      inCart={item.sizes.flatMap((v) => {
+                        const q = cart[cartLineKey(item.id, v.id)] ?? 0;
+                        return q > 0 ? [`${v.label} × ${q}`] : [];
+                      })}
+                      priceNote={range ? "Price depends on the size" : null}
+                    />
+                  ) : null;
                 return layout === "gallery" ? (
                   <li
                     key={item.id}
@@ -345,7 +428,7 @@ export function MenuOrder(props: MenuOrderProps) {
                       name={item.name}
                       size="tile"
                       enlarge
-                      dimmed={soldOut}
+                      dimmed={itemSoldOut}
                     />
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">
@@ -354,8 +437,9 @@ export function MenuOrder(props: MenuOrderProps) {
                       {item.description ? (
                         <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
                       ) : null}
-                      {priceLine(item, stock)}
+                      {priceLine(item, shownPrice, itemSoldOut ? { soldOut: true, onlyLeft: null, maxQty: 0 } : stock)}
                     </span>
+                    {sizes}
                     {stepper}
                   </li>
                 ) : (
@@ -364,7 +448,7 @@ export function MenuOrder(props: MenuOrderProps) {
                     id={menuItemAnchor(item.id)}
                     className="flex scroll-mt-20 items-center gap-3 px-3 py-3 target:bg-primary/8 sm:gap-4 sm:px-4"
                   >
-                    <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="row" dimmed={soldOut} />
+                    <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="row" dimmed={itemSoldOut} />
 
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
                       <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">
@@ -373,7 +457,8 @@ export function MenuOrder(props: MenuOrderProps) {
                       {item.description ? (
                         <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
                       ) : null}
-                      {priceLine(item, stock)}
+                      {priceLine(item, shownPrice, itemSoldOut ? { soldOut: true, onlyLeft: null, maxQty: 0 } : stock)}
+                      {sizes}
                     </span>
 
                     {stepper}
@@ -410,11 +495,11 @@ export function MenuOrder(props: MenuOrderProps) {
         description={vendorName}
         storeName={vendorName}
         lines={lines.map((l) => ({
-          id: l.item.id,
-          name: l.item.name,
-          priceInPaise: l.item.priceInPaise,
+          id: l.key,
+          name: l.name,
+          priceInPaise: l.priceInPaise,
           qty: l.qty,
-          max: maxFor(l.item),
+          max: maxFor(l.item, l.size),
         }))}
         onChangeQty={setQty}
         discount={appliedOffer}
@@ -431,11 +516,96 @@ export function MenuOrder(props: MenuOrderProps) {
         returnFocusRef={inHub ? undefined : checkoutRef}
         onOrdered={clearCart}
         buildBody={(d) => ({
-          items: lines.map((l) => ({ menuItemId: l.item.id, qty: l.qty })),
+          items: lines.map((l) => ({ menuItemId: l.item.id, ...(l.size ? { variantId: l.size.id } : {}), qty: l.qty })),
           ...d,
         })}
         onRejected={onRejected}
       />
+    </div>
+  );
+}
+
+/**
+ * Pick one size / colour of an item (lib/item-variants.ts). Up to
+ * SIZE_OPTIONS_MAX are a row of options, more a native drop-down (the phone's
+ * own picker, and no extra script on the store page). A sold-out size can't be
+ * picked and says so in words. Under it: which sizes are already in the cart.
+ */
+function SizePicker({
+  item,
+  sizes,
+  pickedId,
+  onPick,
+  inCart,
+  priceNote,
+}: {
+  item: MenuOrderItem;
+  sizes: StoreSize[];
+  pickedId: string | null;
+  onPick: (variantId: string) => void;
+  inCart: string[];
+  priceNote: string | null;
+}) {
+  const legend = `${item.name}: size or colour`;
+  return (
+    <div className="mt-1 flex flex-col gap-1">
+      {sizes.length <= SIZE_OPTIONS_MAX ? (
+        <fieldset>
+          <legend className="sr-only">{legend}</legend>
+          <div className="flex flex-wrap gap-1.5">
+            {sizes.map((v) => {
+              const soldOut = v.stock?.soldOut ?? false;
+              return (
+                <RadioOption
+                  key={v.id}
+                  name={`size-${item.id}`}
+                  value={v.id}
+                  size="compact"
+                  inputClassName="sr-only"
+                  className="min-w-11 px-3"
+                  checked={v.id === pickedId}
+                  disabled={soldOut}
+                  onChange={() => onPick(v.id)}
+                  label={
+                    soldOut ? (
+                      <>
+                        <span className="line-through" aria-hidden="true">
+                          {v.label}
+                        </span>
+                        <span className="sr-only">{`${v.label}, sold out`}</span>
+                      </>
+                    ) : (
+                      v.label
+                    )
+                  }
+                />
+              );
+            })}
+          </div>
+        </fieldset>
+      ) : (
+        <label className="flex flex-col gap-1 text-xs font-semibold text-muted-foreground">
+          <span className="sr-only">{legend}</span>
+          <select
+            value={pickedId ?? ""}
+            onChange={(e) => onPick(e.target.value)}
+            className="min-h-11 w-full rounded-xl border border-input bg-background px-3 text-sm font-semibold text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {sizes.map((v) => {
+              const soldOut = v.stock?.soldOut ?? false;
+              return (
+                <option key={v.id} value={v.id} disabled={soldOut}>
+                  {soldOut ? `${v.label} (sold out)` : v.label}
+                </option>
+              );
+            })}
+          </select>
+        </label>
+      )}
+      {priceNote ? <span className="text-xs text-muted-foreground">{priceNote}</span> : null}
+      {inCart.length > 0 ? (
+        <span className="text-xs font-semibold text-primary">In cart: {inCart.join(", ")}</span>
+      ) : null}
     </div>
   );
 }

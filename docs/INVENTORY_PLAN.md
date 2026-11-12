@@ -41,17 +41,27 @@ Two holes in the count arithmetic, both found in review after #187 merged.
 
 Migration `20261114000000_transaction_delivered_at` (one nullable column) must run on Neon before merge.
 
-## Phase 2: sizes and colours (not started)
+## Phase 2: sizes and colours
 
-The clothing store's real need: one kurti in S / M / L, each with its own stock.
+The clothing store's real need: one kurti in S / M / L, each with its own stock. Rules in the header
+of `lib/item-variants.ts`. Three PRs:
 
-- `ItemVariant` under `MenuItem`: label ("M", "Red / M"), optional price override, its own
-  `stockQty` / `stockCountedAt` / `lowStockAt`, `sortOrder`.
-- `OrderItem.variantId` plus the name snapshot ("Cotton kurti – M"), so old bills stay right.
-- The same derived-stock rules per variant; the item is sold out when every variant is.
-- Touches the storefront card and cart (pick a size first), checkout and both order paths, POS tiles,
-  receipts, offers (a variant counts as its item for eligibility), order again, the prep / packing
-  list, and the voice menu builder. Goods stores only (`storeKind() === "goods"`).
+1. **Room on /menu** (#190, merged): the item form loads on first open; /menu 303.6 → 281.6 kB.
+2. **Sizes in the data, the seller's form and the store page** (this PR, behind `ITEM_VARIANTS_ENABLED`):
+   - `ItemVariant` under `MenuItem`: label ("M", "Red / M"), optional price, `isAvailable`, its own
+     `stockQty` / `stockCountedAt` / `lowStockAt`, `sortOrder`. `OrderItem.variantId` plus the name
+     snapshot ("Cotton kurti – M"), so old bills stay right after a rename or delete.
+   - The same derived-stock rules per variant; the item keeps no count of its own and reads "Sold out"
+     when every variant is.
+   - Menu orders: each line names a variant, priced from it; tracked variants are locked and checked.
+     Offers treat a variant as its item.
+   - Seller: "Sizes or colours" rows in the item form (goods stores, flag on), chips on the menu card.
+   - Buyer: a size picker on the store page (up to 5 as options, more as a drop-down), one cart line per
+     size.
+   - Migration `20261115000000_item_variants` must run on Neon before merge.
+3. **Everywhere else** (next): the counter (POS tiles pick a size), drops (today an item with sizes
+   can't join one), free gifts with sizes (today that offer is skipped), order again (today a sized line
+   is not refilled), the packing list grouped by size, and the voice menu builder. Then the flag goes.
 
 ## Later
 
