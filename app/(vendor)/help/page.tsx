@@ -55,12 +55,7 @@ export default async function HelpPage() {
   const screens = items.filter((item) => item.id !== "help");
   const bar = appTabBarForRole(role, storePath !== null, storeKind);
   const tabs = bar.tabs.map((item) => item.label);
-  const behindMore = [
-    ...bar.more.map((item) => item.label),
-    ...(storePath ? ["Live store", "Share store link"] : []),
-    "Sign out",
-  ];
-  const railFoot = storePath ? "Live store and Sign out are" : "Sign out is";
+  const behindMore = [...bar.more.map((item) => item.label), "Sign out"];
 
   return (
     <div className="bg-background p-4 pb-10 md:p-6">
@@ -94,7 +89,7 @@ export default async function HelpPage() {
               On a tablet or computer
             </p>
             <p className="mt-1.5 text-muted-foreground">
-              Every screen is in the strip down the left side. {railFoot} at the bottom of it.
+              Every screen is in the strip down the left side. Sign out is at the bottom of it.
             </p>
             <p className="mt-1.5 text-muted-foreground">The highlighted entry is the screen you are on.</p>
           </div>

@@ -7,6 +7,7 @@ import {
   LayoutGrid,
   ReceiptText,
   Settings,
+  Store,
   type LucideIcon,
 } from "lucide-react";
 
@@ -24,6 +25,7 @@ export const APP_NAV_ICONS: Record<AppNavId, LucideIcon> = {
   drops: CalendarClock,
   sell: Calculator,
   menu: LayoutGrid,
+  store: Store,
   transactions: ReceiptText,
   analytics: BarChart3,
   settings: Settings,
