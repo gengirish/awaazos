@@ -36,7 +36,6 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
             maxQty: true,
             perOrderLimit: true,
             sortOrder: true,
-            menuItem: { select: { _count: { select: { variants: true } } } },
           },
         },
       },
@@ -59,8 +58,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
         status: "DRAFT",
         ...fields,
         items: {
-          // An item that has since got sizes stays out: drops don't sell them yet (lib/item-variants.ts rule 5).
-          create: src.items.filter((i) => i.menuItem._count.variants === 0).map((i) => ({
+          create: src.items.map((i) => ({
             menuItemId: i.menuItemId,
             priceInPaise: i.priceInPaise,
             maxQty: i.maxQty,

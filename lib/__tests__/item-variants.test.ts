@@ -143,7 +143,7 @@ describe("item variants: the form's rows", () => {
   });
 
   it("explains a refusal", () => {
-    expect(variantsErrorMessage("item_in_drop")).toMatch(/drop that hasn't ended/);
+    expect(variantsErrorMessage("has_variants")).toBe("has_variants");
     expect(variantsErrorMessage(undefined)).toBe("Could not save the sizes or colours");
   });
 });

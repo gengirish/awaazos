@@ -63,9 +63,13 @@ of `lib/item-variants.ts`. Three PRs:
    - Counter (this step's first PR): a POS tile with sizes opens a size picker, one cart line per size,
      the bill line keeps `variantId` (checked against the vendor's sizes of that item) and takes stock
      from that size. Voice leaves sized items out and asks for a tap. No migration.
-   - Next: drops (today an item with sizes
-   can't join one), free gifts with sizes (today that offer is skipped), order again (today a sized line
-   is not refilled), the packing list grouped by size, and the voice menu builder. Then the flag goes.
+   - Drops (second PR): an item with sizes can join a drop and get sizes while in one. Buyers pick a
+     size; the drop's cap and per-order limit count every size together, and each tracked size is
+     capped by its own stock. Priced from the size, else the drop's price. The packing list splits each
+     item by size ("M 3 · L 2", lines without a size as "Size not given"). No migration: no per-size
+     cap in a drop; the size's own stock does that job.
+   - Next: free gifts with sizes (today that offer is skipped), order again (today a sized line is not
+     refilled), and the voice menu builder. Then the flag goes.
 
 ## Later
 

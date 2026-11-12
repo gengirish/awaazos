@@ -34,20 +34,13 @@ class VariantsRouteError extends Error {
 }
 
 /**
- * A drop that can still take orders, or be opened: a draft, or one whose
- * cut-off hasn't passed. Drops don't sell variants yet (lib/item-variants.ts rule 5).
- */
-function liveDropWhere(vendorId: string, now: Date): Prisma.DropWhereInput {
-  return { vendorId, OR: [{ status: "DRAFT" }, { status: { in: ["OPEN", "FROZEN"] }, closesAt: { gt: now } }] };
-}
-
-/**
  * PUT /api/menu/[id]/variants — replace the item's sizes / colours with
  * `{ variants: [...] }`, in that order (rules in lib/item-variants.ts). Ids not
  * in the list are deleted; their bills keep the name snapshot. A variant's
  * `stockQty` records a new count only when sent (null stops tracking). Giving
- * an item variants stops its own count. 409 `item_in_drop` while the item is in
- * a drop that hasn't ended. Returns the item's variants with their stock.
+ * an item variants stops its own count. An item in a drop may get sizes too:
+ * from then on its drop orders name one (lib/item-variants.ts rule 7). Returns
+ * the item's variants with their stock.
  */
 export async function PUT(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
@@ -64,14 +57,6 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
       });
       if (!item) throw new VariantsRouteError(404, "Not found");
       const menuItemId = item.id;
-
-      if (body.variants.length > 0) {
-        const inDrop = await tx.dropItem.findFirst({
-          where: { menuItemId, drop: liveDropWhere(vendorId, now) },
-          select: { id: true },
-        });
-        if (inDrop) throw new VariantsRouteError(409, "item_in_drop");
-      }
 
       // Every id sent must be one of this item's variants: another item's or
       // another store's is a 404, never a quiet move.

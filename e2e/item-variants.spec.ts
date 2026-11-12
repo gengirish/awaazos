@@ -108,41 +108,95 @@ test.describe("item variants", () => {
     expect(plain.status(), await plain.text()).toBe(201);
   });
 
-  test("drops don't take items with sizes yet, and an item in a drop can't get them", async ({ page, request }) => {
+  test("drops sell by size: order per size, one cap for all sizes, packing list by size", async ({
+    page,
+    request,
+    browser,
+  }) => {
     await createVendorSession(page, request, "variants-drops");
-    const sized = await createMenuItem(page, { name: "Linen Shirt", priceInRupees: 899 });
-    const plain = await createMenuItem(page, { name: "Tote Bag", priceInRupees: 299 });
-    expect((await putVariants(page, sized.id, [{ label: "M" }])).status()).toBe(200);
-
-    const dropBody = (items: { menuItemId: string; priceInPaise: number }[]) => ({
-      title: "Weekend stock",
-      note: "Ready on Saturday.",
-      date: istYmd(2),
-      fulfilmentMode: "PICKUP",
-      fulfilmentStart: "17:00",
-      fulfilmentEnd: "19:00",
-      pickupNote: "Gate 2",
-      deliveryFeePaise: 0,
-      closesAtDate: istYmd(1),
-      closesAtTime: "21:00",
-      showEverydayMenu: true,
-      items,
-    });
-    const refused = await page.request.post("/api/drops", {
-      data: dropBody([{ menuItemId: sized.id, priceInPaise: 89900 }]),
-      headers: JSON_HEADERS,
-    });
-    expect(refused.status()).toBe(400);
-    expect(JSON.stringify(await refused.json())).toContain("sizes or colours");
+    const shirt = await createMenuItem(page, { name: "Linen Shirt", priceInRupees: 899 });
+    const tote = await createMenuItem(page, { name: "Tote Bag", priceInRupees: 299 });
+    const store = await openStoreForMenuOrders(page);
+    const put = await putVariants(page, shirt.id, [{ label: "M", stockQty: 1 }, { label: "L", priceInRupees: 999 }]);
+    expect(put.status(), await put.text()).toBe(200);
+    const [m, l] = (await put.json()).data as VariantRow[];
 
     const created = await page.request.post("/api/drops", {
-      data: dropBody([{ menuItemId: plain.id, priceInPaise: 29900 }]),
+      data: {
+        title: "Weekend stock",
+        note: "Ready on Saturday.",
+        date: istYmd(2),
+        fulfilmentMode: "PICKUP",
+        fulfilmentStart: "17:00",
+        fulfilmentEnd: "19:00",
+        pickupNote: "Gate 2",
+        deliveryFeePaise: 0,
+        closesAtDate: istYmd(1),
+        closesAtTime: "21:00",
+        showEverydayMenu: true,
+        items: [
+          { menuItemId: shirt.id, priceInPaise: 84900, maxQty: 3 },
+          { menuItemId: tote.id, priceInPaise: 29900 },
+        ],
+      },
       headers: JSON_HEADERS,
     });
     expect(created.status(), await created.text()).toBe(201);
-    const inDrop = await putVariants(page, plain.id, [{ label: "Blue" }]);
-    expect(inDrop.status()).toBe(409);
-    expect(await inDrop.json()).toMatchObject({ error: "item_in_drop" });
+    const drop = (await created.json()).data as { id: string };
+    const opened = await page.request.patch(`/api/drops/${drop.id}/status`, { data: { status: "OPEN" }, headers: JSON_HEADERS });
+    expect(opened.status(), await opened.text()).toBe(200);
+    const detail = (await (await page.request.get(`/api/drops/${drop.id}`)).json()) as {
+      data: { items: { id: string; menuItemId: string }[] };
+    };
+    const shirtItem = detail.data.items.find((i) => i.menuItemId === shirt.id)!;
+
+    // An item already in the drop can get sizes now too.
+    expect((await putVariants(page, tote.id, [{ label: "Blue" }])).status()).toBe(200);
+
+    const order = (items: object[]) =>
+      page.request.post(`/api/s/${store.slug}/orders`, {
+        data: {
+          dropId: drop.id,
+          items,
+          customerName: "Meera",
+          customerPhone: "+919848054321",
+          fulfilmentType: "PICKUP",
+          paymentMethod: "CASH",
+        },
+        headers: JSON_HEADERS,
+      });
+    const noSize = await order([{ dropItemId: shirtItem.id, qty: 1 }]);
+    expect(noSize.status()).toBe(409);
+    expect(await noSize.json()).toMatchObject({ error: "size_required", dropItemId: shirtItem.id });
+    const tooManyM = await order([{ dropItemId: shirtItem.id, variantId: m!.id, qty: 2 }]);
+    expect(await tooManyM.json()).toMatchObject({ error: "sold_out", variantId: m!.id, remaining: 1 });
+    const ok = await order([
+      { dropItemId: shirtItem.id, variantId: m!.id, qty: 1 },
+      { dropItemId: shirtItem.id, variantId: l!.id, qty: 1 },
+    ]);
+    expect(ok.status(), await ok.text()).toBe(201);
+    // M at the drop's ₹849, L at its own ₹999.
+    expect((await ok.json()).data.totalPaise).toBe(84900 + 99900);
+    // The drop's 3 cover both sizes: 2 taken, so 2 more L is too many.
+    const overCap = await order([{ dropItemId: shirtItem.id, variantId: l!.id, qty: 2 }]);
+    expect(await overCap.json()).toMatchObject({ error: "sold_out", dropItemId: shirtItem.id, remaining: 1 });
+
+    // The buyer's page offers the sizes, M sold out.
+    const buyerCtx = await browser.newContext();
+    try {
+      const buyer = await buyerCtx.newPage();
+      await buyer.goto(`/s/${store.slug}`);
+      const options = buyer.getByRole("group", { name: "Linen Shirt: size or colour" }).first();
+      await expect(options.getByRole("radio", { name: "M, sold out" })).toBeDisabled();
+      await expect(options.getByRole("radio", { name: "L", exact: true })).toBeChecked();
+      await expect(buyer.getByRole("button", { name: "Add Linen Shirt – L" }).first()).toBeVisible();
+    } finally {
+      await buyerCtx.close();
+    }
+
+    // The packing list splits the shirt by size.
+    await page.goto(`/drops/${drop.id}/prep`);
+    await expect(page.getByText("M 1 · L 1")).toBeVisible();
   });
 
   test("buyer picks a size; the cart and checkout name it", async ({ page, request, browser }) => {

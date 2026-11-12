@@ -109,8 +109,5 @@ export function sizeDraftsToBody(drafts: readonly SizeDraft[]): { body: Variants
 
 /** Seller-facing copy for a refused PUT /api/menu/[id]/variants. */
 export function variantsErrorMessage(code: unknown): string {
-  if (code === "item_in_drop") {
-    return "This item is in a drop that hasn't ended. Add sizes or colours once the drop is over.";
-  }
   return typeof code === "string" && code !== "Invalid input" ? code : "Could not save the sizes or colours";
 }

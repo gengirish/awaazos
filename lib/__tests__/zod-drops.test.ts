@@ -193,7 +193,7 @@ describe("storefrontOrderSchema", () => {
     const keys = Object.keys(storefrontOrderSchema.shape);
     expect(keys.some((k) => /price|paise|total|fee/i.test(k))).toBe(false);
     const itemKeys = Object.keys(storefrontOrderSchema.shape.items.element.shape);
-    expect(itemKeys.sort()).toEqual(["dropItemId", "qty"]);
+    expect(itemKeys.sort()).toEqual(["dropItemId", "qty", "variantId"]);
 
     const r = storefrontOrderSchema.parse({
       ...order,

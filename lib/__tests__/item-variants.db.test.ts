@@ -13,6 +13,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 const ENABLED = process.env.DROPS_DB_TEST === "1";
 
 type MenuOrdersModule = typeof import("@/lib/menu-orders");
+type DropsModule = typeof import("@/lib/drops");
 type InventoryServerModule = typeof import("@/lib/inventory-server");
 type ActionsModule = typeof import("@/lib/storefront-order-actions");
 type MenuStockServerModule = typeof import("@/lib/menu-stock-server");
@@ -20,6 +21,7 @@ type PrismaModule = typeof import("@/lib/prisma");
 
 describe.skipIf(!ENABLED)("item variants — DB integration", () => {
   let mo: MenuOrdersModule;
+  let drops: DropsModule;
   let inv: InventoryServerModule;
   let actions: ActionsModule;
   let menuStockServer: MenuStockServerModule;
@@ -33,6 +35,7 @@ describe.skipIf(!ENABLED)("item variants — DB integration", () => {
       throw new Error("item-variants.db.test refuses to run against a non-local DATABASE_URL");
     }
     mo = await import("@/lib/menu-orders");
+    drops = await import("@/lib/drops");
     inv = await import("@/lib/inventory-server");
     actions = await import("@/lib/storefront-order-actions");
     menuStockServer = await import("@/lib/menu-stock-server");
@@ -256,5 +259,129 @@ describe.skipIf(!ENABLED)("item variants — DB integration", () => {
     await prisma.itemVariant.deleteMany({ where: { id: s.m.id, vendorId: s.vendor.id } });
     const [line] = await prisma.orderItem.findMany({ where: { transactionId: res.order.id } });
     expect(line).toMatchObject({ name: "Cotton kurti – M", variantId: null, priceInPaise: 64900 });
+  });
+  it("drop orders by size: size required, priced from the size else the drop, one cap for all sizes, each size's own stock", async () => {
+    const s = await seed();
+    const now = new Date();
+    const drop = await prisma.drop.create({
+      data: {
+        vendorId: s.vendor.id,
+        title: "Festive drop",
+        date: new Date(now.toISOString().slice(0, 10) + "T00:00:00.000Z"),
+        fulfilmentMode: "PICKUP",
+        fulfilmentStartsAt: new Date(now.getTime() + 48 * 60 * MIN),
+        fulfilmentEndsAt: new Date(now.getTime() + 51 * 60 * MIN),
+        closesAt: new Date(now.getTime() + 24 * 60 * MIN),
+        status: "OPEN",
+        // Today's drop price ₹549; the cap of 4 covers every size together.
+        items: { create: [{ menuItemId: s.kurti.id, priceInPaise: 54900, maxQty: 4, perOrderLimit: 3, sortOrder: 0 }] },
+      },
+      include: { items: true },
+    });
+    const [kurtiItem] = drop.items;
+    const dropOrder = (items: { variantId?: string | null; qty: number }[]) =>
+      drops.placeStorefrontOrder({
+        vendor: s.vendor,
+        acceptPayOnDelivery: true,
+        dropId: drop.id,
+        items: items.map((i) => ({ dropItemId: kurtiItem!.id, ...i })),
+        customerName: "Meera",
+        customerPhone: "+919876543210",
+        fulfilmentType: "PICKUP",
+        paymentMethod: "CASH",
+      });
+
+    expect(await dropOrder([{ qty: 1 }])).toEqual({
+      ok: false,
+      error: { code: "size_required", dropItemId: kurtiItem!.id },
+    });
+    // L is switched off.
+    expect(await dropOrder([{ variantId: s.l.id, qty: 1 }])).toEqual({
+      ok: false,
+      error: { code: "item_not_found", dropItemId: kurtiItem!.id, variantId: s.l.id },
+    });
+    // S has 2 of its own.
+    expect(await dropOrder([{ variantId: s.s.id, qty: 3 }])).toEqual({
+      ok: false,
+      error: { code: "sold_out", dropItemId: kurtiItem!.id, variantId: s.s.id, remaining: 2 },
+    });
+    // The per-order limit counts both sizes: 2 + 2 > 3.
+    expect(await dropOrder([{ variantId: s.s.id, qty: 2 }, { variantId: s.m.id, qty: 2 }])).toEqual({
+      ok: false,
+      error: { code: "per_order_limit", dropItemId: kurtiItem!.id, limit: 3 },
+    });
+
+    const placed = await dropOrder([{ variantId: s.s.id, qty: 1 }, { variantId: s.m.id, qty: 2 }]);
+    expect(placed.ok).toBe(true);
+    if (!placed.ok) return;
+    // S at the drop's price (no price of its own), M at its own ₹649.
+    expect(placed.order.subtotalPaise).toBe(54900 + 2 * 64900);
+    const lines = await prisma.orderItem.findMany({
+      where: { transactionId: placed.order.id },
+      orderBy: { name: "asc" },
+      select: { name: true, variantId: true, dropItemId: true, priceInPaise: true, qty: true },
+    });
+    expect(lines).toEqual([
+      { name: "Cotton kurti – M", variantId: s.m.id, dropItemId: kurtiItem!.id, priceInPaise: 64900, qty: 2 },
+      { name: "Cotton kurti – S", variantId: s.s.id, dropItemId: kurtiItem!.id, priceInPaise: 54900, qty: 1 },
+    ]);
+    expect(await variantLeft(s, s.s.id)).toBe(1);
+
+    // 3 of the drop's 4 are taken, whatever the size: M has no count of its own, the cap still binds.
+    expect(await dropOrder([{ variantId: s.m.id, qty: 2 }])).toEqual({
+      ok: false,
+      error: { code: "sold_out", dropItemId: kurtiItem!.id, remaining: 1 },
+    });
+    expect((await dropOrder([{ variantId: s.m.id, qty: 1 }])).ok).toBe(true);
+  });
+
+  it("a drop's free gift with sizes is skipped; the order still goes through", async () => {
+    const s = await seed();
+    const now = new Date();
+    await prisma.offer.create({
+      data: {
+        vendorId: s.vendor.id,
+        name: "Free kurti",
+        eligibility: "ALL",
+        minQty: 1,
+        discountType: "FREE_ITEM",
+        percentBps: 0,
+        freeItemId: s.kurti.id,
+        onPos: false,
+      },
+    });
+    const drop = await prisma.drop.create({
+      data: {
+        vendorId: s.vendor.id,
+        title: "Gift drop",
+        date: new Date(now.toISOString().slice(0, 10) + "T00:00:00.000Z"),
+        fulfilmentMode: "PICKUP",
+        fulfilmentStartsAt: new Date(now.getTime() + 48 * 60 * MIN),
+        fulfilmentEndsAt: new Date(now.getTime() + 51 * 60 * MIN),
+        closesAt: new Date(now.getTime() + 24 * 60 * MIN),
+        status: "OPEN",
+        items: {
+          create: [
+            { menuItemId: s.candle.id, priceInPaise: 29900, sortOrder: 0 },
+            { menuItemId: s.kurti.id, priceInPaise: 59900, sortOrder: 1 },
+          ],
+        },
+      },
+      include: { items: { orderBy: { sortOrder: "asc" } } },
+    });
+    const res = await drops.placeStorefrontOrder({
+      vendor: s.vendor,
+      acceptPayOnDelivery: true,
+      dropId: drop.id,
+      items: [{ dropItemId: drop.items[0]!.id, qty: 1 }],
+      customerName: "Meera",
+      customerPhone: "+919876543210",
+      fulfilmentType: "PICKUP",
+      paymentMethod: "CASH",
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) return;
+    const lines = await prisma.orderItem.findMany({ where: { transactionId: res.order.id } });
+    expect(lines.map((l) => l.isGift)).toEqual([false]);
   });
 });
