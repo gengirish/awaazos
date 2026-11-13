@@ -181,7 +181,7 @@ export function BoardShareMenu({
                 }
               >
                 <Share2 aria-hidden />
-                {drop ? "Share this drop" : "Share store link"}
+                {drop ? "Share this pre-order" : "Share store link"}
               </DropdownMenuItem>
               {/* Stays open: the item itself says "Copied". */}
               <DropdownMenuItem

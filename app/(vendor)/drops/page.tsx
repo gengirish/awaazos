@@ -131,7 +131,7 @@ export default async function DropsPage() {
       <header className="mx-auto mb-6 flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="font-display text-2xl font-semibold text-foreground">
-            Drops
+            Pre-orders
           </h1>
           <p className="text-sm text-muted-foreground">
             {vocab.kind === "food"
@@ -145,7 +145,7 @@ export default async function DropsPage() {
             className={`${primaryLinkBtn} flex-1 sm:flex-none`}
           >
             <Plus className="h-4 w-4" aria-hidden="true" />
-            New drop
+            New pre-order
           </Link>
         </div>
       </header>
@@ -166,12 +166,12 @@ export default async function DropsPage() {
           <EmptyState
             className="rounded-xl"
             icon={Package}
-            title="No drops yet"
+            title="No pre-orders yet"
             description={`Create one for ${vocab.nextBatch}, share the link on WhatsApp, and collect orders before the cut-off. You can fill it in by voice.`}
             action={
               <Link href="/drops/new" className={primaryLinkBtn}>
                 <Plus className="h-4 w-4" aria-hidden="true" />
-                New drop
+                New pre-order
               </Link>
             }
           />

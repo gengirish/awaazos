@@ -113,7 +113,7 @@ const fixLinkCls = "inline-flex min-h-11 items-center font-semibold underline un
 
 /** Publishing is the owner's call; a manager has nothing to tap, so say exactly what to ask for. */
 const ASK_OWNER_TO_PUBLISH =
-  "Only the owner can publish the store. Ask them to open orders on this drop, or to publish the store in Settings → Online store.";
+  "Only the owner can publish the store. Ask them to open orders on this pre-order, or to publish the store in Settings → Online store.";
 
 /** Link to the setting that fixes a given 409, if there is one. */
 function ConflictFix({ code, canPublishStore }: { code: string | null; canPublishStore: boolean }) {
@@ -394,7 +394,7 @@ export function DropForm({
     setOrder((o) => (o.includes(item.id) ? o : [...o, item.id]));
     setVoiceMarks((m) => (m.items.includes(item.id) ? m : { ...m, items: [...m.items, item.id] }));
     setFieldErrors((e) => (e.items ? { ...e, items: "" } : e));
-    toast.success(`${item.name} added to your ${vocab.catalogue} and ticked for this drop.`);
+    toast.success(`${item.name} added to your ${vocab.catalogue} and ticked for this pre-order.`);
   }, [vocab.catalogue]);
 
   /** Merge a parsed voice draft into the form. Never saves. */
@@ -461,7 +461,7 @@ export function DropForm({
     const fe: Record<string, string> = {};
     const ie: Record<string, string> = {};
 
-    if (!form.title.trim()) fe.title = `Give this drop a name, e.g. ${vocab.dropExample}`;
+    if (!form.title.trim()) fe.title = `Give this pre-order a name, e.g. ${vocab.dropExample}`;
 
     const deliveryFeePaise = form.fulfilmentMode === "PICKUP" ? 0 : rupeeInputToPaise(form.deliveryFee);
     if (deliveryFeePaise === null) fe.deliveryFeePaise = "Enter the fee in rupees, e.g. 30, or 0 for free delivery";
@@ -478,7 +478,7 @@ export function DropForm({
       else if (maxQty !== null && perOrderLimit !== null && perOrderLimit > maxQty) ie[id] = PER_ORDER_OVER_MAX;
       else items.push({ menuItemId: id, priceInPaise: price, maxQty, perOrderLimit, sortOrder: idx });
     });
-    if (selectedIds.length === 0) fe.items = "Pick at least one item for this drop";
+    if (selectedIds.length === 0) fe.items = "Pick at least one item for this pre-order";
 
     setFieldErrors(fe);
     setItemErrors(ie);
@@ -609,17 +609,17 @@ export function DropForm({
         if (res.status === 409 && body.error === "item_has_orders" && body.menuItemId) {
           const name = menuById.get(body.menuItemId)?.name ?? "This item";
           setItemErrors({ [body.menuItemId]: DROP_CONFLICT_MESSAGE.item_has_orders });
-          setFormError(`${name} already has orders, so it can't be removed from this drop.`);
+          setFormError(`${name} already has orders, so it can't be removed from this pre-order.`);
           return;
         }
         if (!res.ok) {
-          setFormError(conflictMessage(body, "Could not save this drop."));
+          setFormError(conflictMessage(body, "Could not save this pre-order."));
           return;
         }
         const id = dropId ?? body.data?.id;
         if (!id) return;
         if (!openAfter) {
-          toast.success(dropId ? "Drop saved." : "Draft saved. It stays hidden until you open orders.");
+          toast.success(dropId ? "Pre-order saved." : "Draft saved. It stays hidden until you open orders.");
           if (dropId) {
             router.refresh();
           } else {
@@ -683,7 +683,7 @@ export function DropForm({
     >
       {locked ? (
         <p role="status" className="rounded-md border border-border bg-muted/50 p-3 text-sm">
-          Orders are locked, so this drop can&apos;t be edited any more.
+          Orders are locked, so this pre-order can&apos;t be edited any more.
         </p>
       ) : null}
 
@@ -1072,7 +1072,7 @@ export function DropForm({
           </div>
           <div className="flex items-center justify-between gap-4">
             <label htmlFor="drop-opens-later" className="text-sm font-medium">
-              Start taking orders later, not as soon as I open the drop
+              Start taking orders later, not as soon as I open the pre-order
             </label>
             <Switch id="drop-opens-later" checked={form.useOpensAt} onCheckedChange={(next) => set("useOpensAt", next)} />
           </div>
@@ -1107,10 +1107,10 @@ export function DropForm({
           <div className="flex items-start justify-between gap-4">
             <div className="space-y-1">
               <label htmlFor="drop-everyday-menu" className="text-sm font-medium">
-                Also show my everyday {vocab.catalogue} while this drop is open
+                Also show my everyday {vocab.catalogue} while this pre-order is open
               </label>
               <p id="drop-everyday-help" className="text-xs text-muted-foreground">
-                Off: customers see only this drop. On: your regular {vocab.catalogue} appears below it.
+                Off: customers see only this pre-order. On: your regular {vocab.catalogue} appears below it.
               </p>
               <FromVoiceBadge show={fromVoice("showEverydayMenu")} />
             </div>
@@ -1164,7 +1164,7 @@ export function DropForm({
           <ResponsiveDialogHeader>
             <ResponsiveDialogTitle>Publish your store too?</ResponsiveDialogTitle>
             <ResponsiveDialogDescription>
-              Your drop is saved as a draft. Your store page is private, so customers can&apos;t order from it yet.
+              Your pre-order is saved as a draft. Your store page is private, so customers can&apos;t order from it yet.
               Publishing it lets anyone with the link see your item names and prices at{" "}
               <span className="break-all font-mono text-foreground">{openFlow?.storePath}</span>. You can make it
               private again in Settings → Online store.
@@ -1208,29 +1208,29 @@ function actionFor(from: EffectiveDropStatus, to: DropStatus): Action {
         to,
         label: "Unlock orders",
         variant: "outline",
-        help: "Lets you edit this drop again. Customers still can't order.",
+        help: "Lets you edit this pre-order again. Customers still can't order.",
       }
     : { to, label: "Close orders now", variant: "outline" };
 }
 
 /** Toast after orders open. With a later start time the drop is visible but not yet taking orders. */
 function openedMessage(effectiveAfter: EffectiveDropStatus | undefined): string {
-  return effectiveAfter === "SCHEDULED" ? "Drop is live. Ordering starts at the time you set." : "Orders are open";
+  return effectiveAfter === "SCHEDULED" ? "Pre-order is live. Ordering starts at the time you set." : "Orders are open";
 }
 
 /** Toast for each status change, in the seller's words (never built from a button label). */
 function changedMessage(from: EffectiveDropStatus, to: DropStatus, effectiveAfter?: EffectiveDropStatus): string {
   if (to === "OPEN") return openedMessage(effectiveAfter);
-  return from === "FROZEN" ? "Orders unlocked. You can edit this drop again." : "Orders closed.";
+  return from === "FROZEN" ? "Orders unlocked. You can edit this pre-order again." : "Orders closed.";
 }
 
 function statusHelp(status: EffectiveDropStatus, vocab: StoreVocabulary): string {
   const food = vocab.kind === "food";
   switch (status) {
     case "DRAFT":
-      return `Only you can see this drop. Tap Open orders below when the ${food ? "menu" : "list"} is ready.`;
+      return `Only you can see this pre-order. Tap Open orders below when the ${food ? "menu" : "list"} is ready.`;
     case "SCHEDULED":
-      return "Customers can see this drop. Ordering starts at the time you set.";
+      return "Customers can see this pre-order. Ordering starts at the time you set.";
     case "OPEN":
       return "Customers can order now, until the cut-off time.";
     case "CLOSED":
@@ -1238,7 +1238,7 @@ function statusHelp(status: EffectiveDropStatus, vocab: StoreVocabulary): string
     case "FROZEN":
       return "Orders are locked. Only payment and delivery can change.";
     case "FULFILLED":
-      return "All done. Copy this drop to sell it again.";
+      return "All done. Copy this pre-order to sell it again.";
   }
 }
 
@@ -1436,11 +1436,11 @@ export function DropStatusControls({
         const res = await fetch(`/api/drops/${dropId}`, { method: "DELETE", credentials: "include" });
         if (!res.ok) {
           const body = (await res.json().catch(() => ({}))) as ApiError;
-          setProblem({ code: body.error ?? null, message: conflictMessage(body, "Could not delete this drop.") });
+          setProblem({ code: body.error ?? null, message: conflictMessage(body, "Could not delete this pre-order.") });
           setConfirm(null);
           return;
         }
-        toast.success("Drop deleted.");
+        toast.success("Pre-order deleted.");
         router.push("/drops");
         router.refresh();
       } catch {
@@ -1459,7 +1459,7 @@ export function DropStatusControls({
       </div>
       <p className="text-sm text-muted-foreground">{statusHelp(effectiveStatus, vocab)}</p>
       {effectiveStatus === "OPEN" && hidesEverydayMenu ? (
-        <p className="text-sm">While this drop is open, your everyday {vocab.catalogue} is hidden from your store.</p>
+        <p className="text-sm">While this pre-order is open, your everyday {vocab.catalogue} is hidden from your store.</p>
       ) : null}
 
       {canOpen && openIssues.length ? (
@@ -1478,7 +1478,7 @@ export function DropStatusControls({
               <OpenCheckLine key={c.key} check={c} />
             ))}
           </ul>
-          <p className="text-xs text-muted-foreground">This list is for the drop as last saved.</p>
+          <p className="text-xs text-muted-foreground">This list is for the pre-order as last saved.</p>
         </div>
       ) : null}
 
@@ -1532,7 +1532,7 @@ export function DropStatusControls({
           onClick={() => setConfirm("DELETE")}
         >
           <Trash2 aria-hidden="true" />
-          Delete drop
+          Delete pre-order
         </Button>
       ) : null}
 
@@ -1540,14 +1540,14 @@ export function DropStatusControls({
         <ResponsiveDialogContent>
           <ResponsiveDialogHeader>
             <ResponsiveDialogTitle>
-              {confirm === "DELETE" ? "Delete this drop?" : "Publish your store too?"}
+              {confirm === "DELETE" ? "Delete this pre-order?" : "Publish your store too?"}
             </ResponsiveDialogTitle>
             <ResponsiveDialogDescription>
               {confirm === "DELETE" ? (
-                "The drop and its item list will be removed. This can't be undone."
+                "The pre-order and its item list will be removed. This can't be undone."
               ) : (
                 <>
-                  Your store page is private, so customers can&apos;t order from this drop yet. Publishing it lets
+                  Your store page is private, so customers can&apos;t order from this pre-order yet. Publishing it lets
                   anyone with the link see your item names and prices at{" "}
                   <span className="break-all font-mono text-foreground">{storePath}</span>. You can make it private
                   again in Settings → Online store.
@@ -1627,7 +1627,7 @@ export function CopyDropButton({
         });
         const body = (await res.json().catch(() => ({}))) as ApiError & { data?: { id: string } };
         if (!res.ok || !body.data?.id) {
-          toast.error(conflictMessage(body, "Could not copy this drop."));
+          toast.error(conflictMessage(body, "Could not copy this pre-order."));
           return;
         }
         toast.success("Copied for tomorrow. Check the times, then open orders.");

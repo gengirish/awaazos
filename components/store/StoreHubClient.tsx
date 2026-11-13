@@ -282,7 +282,7 @@ export function StoreHubClient(props: StoreHubClientProps) {
         <div className="mt-2 flex flex-wrap gap-x-4">
           {props.ordering.idle && props.canOpenDrop ? (
             <Link href="/drops/new" className="inline-flex min-h-11 items-center font-medium text-primary underline-offset-4 hover:underline">
-              Open a drop
+              Open a pre-order
             </Link>
           ) : null}
           {props.ordering.idle && isOwner ? (

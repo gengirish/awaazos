@@ -73,7 +73,7 @@ const ERROR_MESSAGES: Record<string, string> = {
   network_error: `No internet for voice — check your connection, or ${FORM_HINT}.`,
   empty_transcript: `Didn't hear anything — tap the mic and speak, or ${FORM_HINT}.`,
   no_speech_detected: `Didn't hear anything — tap the mic and speak, or ${FORM_HINT}.`,
-  nothing_found: `Couldn't find drop details in that — try again or ${FORM_HINT}.`,
+  nothing_found: `Couldn't find pre-order details in that — try again or ${FORM_HINT}.`,
 };
 const DEFAULT_ERROR = `Couldn't understand — try again or ${FORM_HINT}.`;
 
@@ -256,7 +256,7 @@ export function VoiceDropPanel({
           type="button"
           onClick={toggle}
           disabled={busy || offline}
-          aria-label="Speak your drop"
+          aria-label="Speak your pre-order"
           aria-pressed={state === "listening"}
           aria-describedby="voice-drop-status"
           className={cn(

@@ -302,7 +302,7 @@ describe("check and publish step", () => {
       ["Home kitchen", "Pune, Maharashtra"],
       ["UPI to amma@okaxis", "Pay on delivery"],
       ["4 dishes", "Puran Poli ₹60, Modak ₹25, Thalipeeth ₹80 and 1 more"],
-      ["Drops, and your menu any time"],
+      ["Pre-orders, and your menu any time"],
       ["Pickup or delivery, customers choose", "Pickup: Gate 2", "Delivery fee ₹30", "Delivers to Kothrud"],
       ["WhatsApp 98765 43210, shown to customers who order", "Instagram @amma.kitchen", "FSSAI 12345678901234"],
     ]);

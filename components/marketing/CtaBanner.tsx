@@ -8,7 +8,7 @@ export function CtaBanner() {
       <div className="mx-auto flex max-w-6xl flex-col items-center gap-6 text-center sm:flex-row sm:justify-between sm:text-left">
         <div>
           <h2 id="cta-heading" className="font-display text-2xl font-bold text-balance text-white sm:text-3xl">
-            Run your next drop on AwaazOS
+            Run your next pre-order on AwaazOS
           </h2>
           <p className="mt-2 max-w-xl text-white">
             Set up your store, share the link, and stop tracking orders in DMs and WhatsApp chats. {TRIAL_THEN_NOTE}

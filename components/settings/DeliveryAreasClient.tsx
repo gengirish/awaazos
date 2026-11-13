@@ -154,7 +154,7 @@ export function DeliveryAreasClient({ initialAreas, isOwner }: { initialAreas: D
             aria-live="polite"
             className={`text-sm ${error ? "text-destructive" : "text-muted-foreground"}`}
           >
-            {error ?? "0 is free delivery. Empty uses the fee you set for the menu or the drop."}
+            {error ?? "0 is free delivery. Empty uses the fee you set for the menu or the pre-order."}
           </p>
           <Button type="submit" variant="outline" disabled={disabled || !name.trim()}>
             <Plus className="h-4 w-4" aria-hidden />

@@ -201,7 +201,7 @@ describe("wording for a store that isn't a kitchen", () => {
     );
     expect(items.map((i) => i.id)).toEqual(["menu_items", "first_drop"]);
     expect(items[0]).toMatchObject({ text: "Add at least one item to your product list", linkText: "Go to Products", href: "/menu" });
-    expect(items[1]!.text).toBe("Create your first drop or turn on everyday orders");
+    expect(items[1]!.text).toBe("Create your first pre-order or turn on everyday orders");
     expect(JSON.stringify(items)).not.toMatch(/menu(?! ?_items)(?!")/i);
   });
 });

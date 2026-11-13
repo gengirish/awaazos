@@ -31,7 +31,7 @@ export default function manifest(): MetadataRoute.Manifest {
     // the app shell's tabs (lib/app-nav.ts); each page enforces its own role.
     shortcuts: [
       { name: "Orders", url: "/orders", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }] },
-      { name: "New drop", url: "/drops/new", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }] },
+      { name: "New pre-order", url: "/drops/new", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }] },
       { name: "Sell", url: "/pos", icons: [{ src: "/icon-192.png", sizes: "192x192", type: "image/png" }] },
     ],
     icons: [

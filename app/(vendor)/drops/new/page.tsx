@@ -85,7 +85,7 @@ export default async function NewDropPage() {
     <div className="bg-background p-4 md:p-6">
       <header className="mx-auto mb-6 flex max-w-2xl items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-foreground">New drop</h1>
+          <h1 className="font-display text-2xl font-semibold text-foreground">New pre-order</h1>
           <p className="text-sm text-muted-foreground">
             Pick what you&apos;re {vocab.kind === "food" ? "cooking" : "selling"} and when customers can order.
           </p>

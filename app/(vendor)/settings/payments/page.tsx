@@ -48,7 +48,7 @@ export default async function PaymentsSettingsPage(props: { searchParams: Promis
 
   return (
     <>
-      <SettingsPageHeader title="Payments" description="How customers pay you for online orders and Drops." />
+      <SettingsPageHeader title="Payments" description="How customers pay you for online orders and pre-orders." />
       <div className="space-y-4">
         <PaymentMethodsClient
           initialUpiId={vendor.upiId}

@@ -42,7 +42,7 @@ export default async function OrdersSettingsPage() {
     <>
       <SettingsPageHeader
         title="Online orders"
-        description={`Let customers order your everyday ${vocab.catalogue} from your store page, any time. No Drop needed.`}
+        description={`Let customers order your everyday ${vocab.catalogue} from your store page, any time. No pre-order needed.`}
       />
       <div className="space-y-4">
         <SettingsCard title={vocab.catalogueOrdersTitle}>
@@ -68,7 +68,7 @@ export default async function OrdersSettingsPage() {
 
         <SettingsCard
           title="Pickup and delivery times"
-          description={`When customers can get an order from your everyday ${vocab.catalogue}. With times set, checkout asks them to pick one, and the time shows on the order. Drops keep their own handover time.`}
+          description={`When customers can get an order from your everyday ${vocab.catalogue}. With times set, checkout asks them to pick one, and the time shows on the order. Pre-orders keep their own handover time.`}
         >
           <MenuSlotsClient initialSlots={parseMenuSlots(settings?.menuSlots)} isOwner={isOwner} />
         </SettingsCard>
@@ -103,13 +103,13 @@ export default async function OrdersSettingsPage() {
               Daily pre-orders
             </h2>
             <p className="text-sm text-muted-foreground">
-              Pre-orders with a cut-off time and limited stock are set up per drop.
+              Pre-orders with a cut-off time and limited stock are set up on the Pre-orders screen.
             </p>
             <Link
               href="/drops"
               className="mt-1 inline-flex min-h-11 items-center gap-1 text-sm font-medium text-primary underline-offset-4 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
             >
-              Go to Drops
+              Go to Pre-orders
               <ChevronRight className="h-4 w-4" aria-hidden="true" />
             </Link>
           </div>

@@ -60,7 +60,7 @@ export const ONBOARDING_STEPS: readonly {
   {
     title: "Pickup or delivery",
     short: "Handover",
-    description: "How customers get their order. Your first drop starts with these too.",
+    description: "How customers get their order. Your first pre-order starts with these too.",
   },
   {
     title: "Contact and alerts",
@@ -375,11 +375,11 @@ export function reviewRows(
 
   const orders =
     input.orderMode === "drops"
-      ? ["Drops, each with a cut-off"]
+      ? ["Pre-orders, each with a cut-off"]
       : input.orderMode === "menu"
         ? [`${vocab.catalogueOrdersTitle}: your ${vocab.catalogue} any time`]
         : input.orderMode === "both"
-          ? [`Drops, and your ${vocab.catalogue} any time`]
+          ? [`Pre-orders, and your ${vocab.catalogue} any time`]
           : [];
 
   const h = input.handover;

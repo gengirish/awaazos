@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 const steps = [
   {
     icon: CalendarClock,
-    title: "Build a drop",
+    title: "Build a pre-order",
     description:
       "List what you are making, the price, how many you can make and the order-by time. Type it in, or say it in English or Hindi.",
   },

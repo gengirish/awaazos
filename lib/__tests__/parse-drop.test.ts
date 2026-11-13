@@ -257,7 +257,7 @@ describe("postProcessDropDraft", () => {
       items: [{ menuItemId: "mi_laddu", spokenName: "laddu" }],
     });
     expect(pickup.deliveryFeePaise).toBe(0);
-    expect(pickup.warnings).toContain("A delivery fee was mentioned for a pickup-only drop — it was left out");
+    expect(pickup.warnings).toContain("A delivery fee was mentioned for a pickup-only pre-order — it was left out");
   });
 
   it("defaults the window end to start + 3h when only the start is said", () => {

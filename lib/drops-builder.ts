@@ -314,16 +314,16 @@ export const PER_ORDER_OVER_MAX = "Max per order can't be more than how many you
 
 /** Plain-language messages for the 409 codes the drops API returns. */
 export const DROP_CONFLICT_MESSAGE: Record<string, string> = {
-  invalid_transition: "That change isn't possible from the drop's current state. Refresh and try again.",
+  invalid_transition: "That change isn't possible from the pre-order's current state. Refresh and try again.",
   move_cutoff_first: "The order cut-off has already passed. Move the cut-off later, save, then reopen orders.",
   no_items: "Add at least one item before opening orders.",
   no_payment_method:
     "Customers have no way to pay yet. Add your UPI ID, or allow pay on delivery, in Settings → Payments.",
   storefront_not_published:
-    "Your store is private, so customers can't see this drop. Switch on \"Publish my store\" in Settings → Online store.",
+    "Your store is private, so customers can't see this pre-order. Switch on \"Publish my store\" in Settings → Online store.",
   owner_required: "Only the owner can publish the store.",
-  drop_locked: "Orders are locked, so this drop can no longer be edited.",
+  drop_locked: "Orders are locked, so this pre-order can no longer be edited.",
   item_has_orders: "Customers have already ordered this item, so it can't be removed. Lower its quantity instead.",
-  has_orders: "This drop has orders, so it can't be deleted. Close orders instead.",
-  stale: "This drop was changed somewhere else. Refresh and try again.",
+  has_orders: "This pre-order has orders, so it can't be deleted. Close orders instead.",
+  stale: "This pre-order was changed somewhere else. Refresh and try again.",
 };

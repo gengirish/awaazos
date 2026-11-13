@@ -82,14 +82,14 @@ export default async function EditDropPage(props: {
       <header className="mx-auto mb-6 flex max-w-2xl flex-wrap items-center justify-between gap-3">
         <div className="min-w-0">
           <h1 className="truncate font-display text-2xl font-semibold text-foreground">{drop.title}</h1>
-          <p className="text-sm text-muted-foreground">Edit drop</p>
+          <p className="text-sm text-muted-foreground">Edit pre-order</p>
         </div>
         <div className="flex gap-2">
           <Link
             href="/drops"
             className="inline-flex min-h-11 items-center justify-center rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           >
-            All drops
+            All pre-orders
           </Link>
           <Link
             href={dropOrdersHref(drop.id)}

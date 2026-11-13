@@ -138,7 +138,7 @@ export const PLAN_MARKETING: Record<MarketedPlan, PlanMarketing> = {
     summary: "The basics, for a store just starting out.",
     bullets: [
       "Your own store link for your Instagram bio and WhatsApp",
-      "Drops with a cut-off and stock limits",
+      "Pre-orders with a cut-off and stock limits",
       "UPI payments you confirm, or pay on delivery",
       "One orders board, a prep sheet and order alerts on your phone",
       "Receipts you send from your own WhatsApp",
@@ -150,12 +150,12 @@ export const PLAN_MARKETING: Record<MarketedPlan, PlanMarketing> = {
   },
   STARTER: {
     ...priceCopy("STARTER"),
-    teaser: `${trial}, no card needed. Your store link, drops with a cut-off, UPI orders on one board, receipts on WhatsApp, and ${billsPerMonth("STARTER").toLowerCase()}.`,
+    teaser: `${trial}, no card needed. Your store link, pre-orders with a cut-off, UPI orders on one board, receipts on WhatsApp, and ${billsPerMonth("STARTER").toLowerCase()}.`,
     summary: "Our best value: unlimited orders, and online payments marked paid automatically.",
     bullets: [
       `${trial} — no card needed`,
       "Your own store link for your Instagram bio and WhatsApp",
-      "Drops with a cut-off and stock limits, so you never oversell",
+      "Pre-orders with a cut-off and stock limits, so you never oversell",
       "Online payments into your own Razorpay account, marked paid by themselves",
       "UPI payments you confirm, or pay on delivery",
       "One orders board, a prep sheet and order alerts on your phone",
@@ -207,7 +207,7 @@ export const PLAN_COMPARISON: ComparisonRow[] = [
     ? [comparisonRow("AI images a month", (plan) => String(PLAN_LIMITS[plan].aiImagesPerMonth || "None"))]
     : []),
   comparisonRow("Store link", () => "Yes"),
-  comparisonRow("Drops", () => "Yes"),
+  comparisonRow("Pre-orders", () => "Yes"),
   comparisonRow("UPI and pay on delivery", () => "Yes"),
   comparisonRow("Order alerts", () => "Yes"),
   comparisonRow("Online payments (Razorpay)", (plan) => yesNo(PLAN_LIMITS[plan].razorpayLinks)),

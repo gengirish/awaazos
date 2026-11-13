@@ -110,7 +110,7 @@ test.describe("voice drop builder", () => {
     await expect(panel).toBeVisible();
     await expect(panel.getByText(/For example:/)).toBeVisible();
 
-    const mic = panel.getByRole("button", { name: "Speak your drop" });
+    const mic = panel.getByRole("button", { name: "Speak your pre-order" });
     const box = await mic.boundingBox();
     expect(box?.width).toBeGreaterThanOrEqual(80);
     expect(box?.height).toBeGreaterThanOrEqual(80);
@@ -224,7 +224,7 @@ test.describe("voice drop builder", () => {
 
     await page.goto("/drops/new");
     const panel = page.getByRole("region", { name: "Fill this form by voice" });
-    await panel.getByRole("button", { name: "Speak your drop" }).click();
+    await panel.getByRole("button", { name: "Speak your pre-order" }).click();
     await expect(panel.getByRole("alert")).toHaveText("Voice isn't available right now — fill the form below.");
     await expect(page.getByText("From voice", { exact: true })).toHaveCount(0);
     await expect(panel.getByRole("button", { name: "Undo voice changes" })).toHaveCount(0);
@@ -234,7 +234,7 @@ test.describe("voice drop builder", () => {
     await page.getByLabel("Title").fill("Typed by hand");
     await page.getByRole("checkbox", { name: new RegExp(menu.laddu.name) }).check();
     await expect(page.getByRole("checkbox", { name: new RegExp(menu.laddu.name) })).toBeChecked();
-    await expect(panel.getByRole("button", { name: "Speak your drop" })).toBeEnabled();
+    await expect(panel.getByRole("button", { name: "Speak your pre-order" })).toBeEnabled();
   });
 
   test("server STT cascade exhausted (fallback quickadd) points to the form", async ({ page, request }) => {
@@ -269,7 +269,7 @@ test.describe("voice drop builder", () => {
     await page.goto("/drops/new");
     const panel = page.getByRole("region", { name: "Fill this form by voice" });
     await expect(panel.getByText("తెలుగు (Telugu)")).toBeVisible();
-    const mic = panel.getByRole("button", { name: "Speak your drop" });
+    const mic = panel.getByRole("button", { name: "Speak your pre-order" });
     await mic.click();
     await expect(mic).toHaveAttribute("aria-pressed", "true");
     await mic.click(); // stop recording → upload
