@@ -14,7 +14,7 @@ test.describe("public surfaces", () => {
   test("landing page offers Install app, with written steps when the browser has no prompt", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: /install app/i }).click();
-    const dialog = page.getByRole("dialog", { name: /install awaazos/i });
+    const dialog = page.getByRole("dialog", { name: new RegExp(`install ${BRAND_NAME}`, "i") });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("listitem").first()).toBeVisible();
   });

@@ -14,7 +14,7 @@ import { BRAND_FORMER_NAME, BRAND_NAME, BRAND_SIGNOFF, BRAND_TAGLINE } from "@/l
  */
 
 const ROOT = path.resolve(__dirname, "..", "..");
-const CODE_DIRS = ["app", "components", "lib", "hooks", "workers"];
+const CODE_DIRS = ["app", "components", "lib", "hooks", "workers", "e2e"];
 const BRAND_FILE = path.join(ROOT, "lib", "brand.ts");
 
 function sourceFiles(dir: string): string[] {
@@ -30,10 +30,15 @@ function sourceFiles(dir: string): string[] {
   return out;
 }
 
-/** Text a user could see: string literals, template text and JSX text. */
-function shownText(file: string): string[] {
+/**
+ * Text a user could see, or a test matches against: string literals, template
+ * text, JSX text and regular expressions (compared case-insensitively, since a
+ * spec matching /install awaazos/i fails just the same).
+ */
+function formerNameUses(file: string): string[] {
   const src = fs.readFileSync(file, "utf8");
   const sf = ts.createSourceFile(file, src, ts.ScriptTarget.Latest, true, file.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const former = BRAND_FORMER_NAME.toLowerCase();
   const found: string[] = [];
   const visit = (node: ts.Node) => {
     if (
@@ -44,7 +49,10 @@ function shownText(file: string): string[] {
       ts.isTemplateTail(node) ||
       ts.isJsxText(node)
     ) {
-      found.push(node.text);
+      // Case-sensitive: lowercase `awaazos` is an identifier we keep (awaazos-pos, awaazos:…, "awaazos" as a reserved store link).
+      if (node.text.includes(BRAND_FORMER_NAME)) found.push(node.text);
+    } else if (ts.isRegularExpressionLiteral(node)) {
+      if (node.text.toLowerCase().includes(former)) found.push(node.text);
     }
     ts.forEachChild(node, visit);
   };
@@ -58,16 +66,14 @@ describe("brand", () => {
     expect(BRAND_NAME).not.toBe(BRAND_FORMER_NAME);
   });
 
-  it("never shows the former name as text in app code (read it from lib/brand.ts)", () => {
+  it("never shows the former name as text in app code or specs (read it from lib/brand.ts)", () => {
     const offenders: string[] = [];
     for (const dir of CODE_DIRS) {
       const abs = path.join(ROOT, dir);
       if (!fs.existsSync(abs)) continue;
       for (const file of sourceFiles(abs)) {
         if (file === BRAND_FILE) continue;
-        for (const text of shownText(file)) {
-          if (text.includes(BRAND_FORMER_NAME)) offenders.push(`${path.relative(ROOT, file)}: ${text.trim().slice(0, 80)}`);
-        }
+        for (const text of formerNameUses(file)) offenders.push(`${path.relative(ROOT, file)}: ${text.trim().slice(0, 80)}`);
       }
     }
     expect(offenders).toEqual([]);
