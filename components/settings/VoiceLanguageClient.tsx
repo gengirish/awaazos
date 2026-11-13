@@ -15,13 +15,22 @@ import { ALLOWED_VOICE_LANGS, VOICE_LANGUAGES } from "@/lib/constants";
 const VOICE_LANG_HINT: Record<string, string> = {
   "en-IN": "Web Speech API · best for English orders. For Hindi/Hinglish item names, prefer हिन्दी below.",
   "hi-IN": "Web Speech API · हिन्दी · recommended when you speak Hindi or Hinglish item names",
+  "kn-IN":
+    "ಕನ್ನಡ · your voice is sent to our speech service to be written down, so it needs a network. Included in the free trial, Starter and Pro.",
 };
+
+/** Languages with no Web Speech route: they go through POST /api/ai/transcribe (STARTER and up). */
+const SERVER_VOICE_LANGS = new Set<string>(["kn-IN"]);
+
+const NEEDS_STARTER_HINT = "Kannada voice is on the Starter and Pro plans. Tap items to add them in the meantime.";
 
 export type VoiceLanguageClientProps = {
   initialVoiceLang: string;
+  /** The store's plan passes the transcribe route's Starter gate (the trial does). */
+  serverVoiceAllowed: boolean;
 };
 
-export function VoiceLanguageClient({ initialVoiceLang }: VoiceLanguageClientProps) {
+export function VoiceLanguageClient({ initialVoiceLang, serverVoiceAllowed }: VoiceLanguageClientProps) {
   const initial = ALLOWED_VOICE_LANGS.includes(initialVoiceLang) ? initialVoiceLang : "en-IN";
   const [voiceLang, setVoiceLang] = useState<string>(initial);
   const [savedLang, setSavedLang] = useState<string>(initial);
@@ -68,16 +77,20 @@ export function VoiceLanguageClient({ initialVoiceLang }: VoiceLanguageClientPro
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
-            {VOICE_LANGUAGES.map((l) => (
-              <SelectItem key={l.value} value={l.value}>
-                {l.label}
-              </SelectItem>
-            ))}
+            {VOICE_LANGUAGES.map((l) => {
+              const locked = !serverVoiceAllowed && SERVER_VOICE_LANGS.has(l.value);
+              return (
+                <SelectItem key={l.value} value={l.value} disabled={locked && l.value !== voiceLang}>
+                  {locked ? `${l.label} · Starter plan` : l.label}
+                </SelectItem>
+              );
+            })}
           </SelectContent>
         </Select>
         <p className="text-sm text-muted-foreground">
           {VOICE_LANG_HINT[voiceLang] ?? "Speech-to-text language used by the POS mic button."}
         </p>
+        {!serverVoiceAllowed ? <p className="text-sm text-muted-foreground">{NEEDS_STARTER_HINT}</p> : null}
         <p className="text-sm text-muted-foreground">
           More languages are coming. Until then, tap items to add them: every voice step has a tap way too.
         </p>

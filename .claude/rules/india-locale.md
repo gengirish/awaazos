@@ -61,7 +61,7 @@ description: India-first locale, currency, and compliance conventions for AwaazO
 
 ## Languages
 
-- POS UI: en-IN (MVP). Voice input offered in the picker: en-IN, hi-IN only
-  (`VOICE_LANGUAGES` in `lib/constants.ts`). te-IN / kn-IN / ta-IN are
+- POS UI: en-IN (MVP). Voice input offered in the picker: en-IN, hi-IN and
+  kn-IN (`VOICE_LANGUAGES` in `lib/constants.ts`). te-IN / ta-IN are
   dormant: still in `SUPPORTED_VOICE_LANGS` and the Sarvam path, not offered.
 - WhatsApp receipts: en-IN only. There is no `voiceLang` greeting line.

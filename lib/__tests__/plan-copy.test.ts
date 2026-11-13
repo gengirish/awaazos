@@ -92,7 +92,7 @@ describe("plan marketing copy", () => {
   });
 
   it.each(MARKETED_PLANS)("%s copy only offers the voice languages in the picker", (plan) => {
-    expect(allCopy(plan)).not.toMatch(/telugu|kannada|tamil/i);
+    expect(allCopy(plan)).not.toMatch(/telugu|tamil/i);
   });
 
   it("leads with pre-orders, not the counter (docs/ICP.md)", () => {

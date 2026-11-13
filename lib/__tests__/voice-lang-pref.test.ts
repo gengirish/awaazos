@@ -43,28 +43,29 @@ describe("voiceLangLabel", () => {
 
 describe("voiceLangCycle", () => {
   it("is the offered languages for an offered vendor language", () => {
-    expect(voiceLangCycle("en-IN")).toEqual(["en-IN", "hi-IN"]);
-    expect(voiceLangCycle("hi-IN")).toEqual(["en-IN", "hi-IN"]);
+    expect(voiceLangCycle("en-IN")).toEqual(["en-IN", "hi-IN", "kn-IN"]);
+    expect(voiceLangCycle("hi-IN")).toEqual(["en-IN", "hi-IN", "kn-IN"]);
   });
 
   it("keeps a dormant saved language in the cycle", () => {
-    expect(voiceLangCycle("ta-IN")).toEqual(["en-IN", "hi-IN", "ta-IN"]);
+    expect(voiceLangCycle("ta-IN")).toEqual(["en-IN", "hi-IN", "kn-IN", "ta-IN"]);
   });
 
   it("ignores an unsupported saved language", () => {
-    expect(voiceLangCycle("fr-FR")).toEqual(["en-IN", "hi-IN"]);
+    expect(voiceLangCycle("fr-FR")).toEqual(["en-IN", "hi-IN", "kn-IN"]);
   });
 });
 
 describe("nextVoiceLang", () => {
-  it("toggles between en and hi", () => {
+  it("cycles through the offered languages and wraps", () => {
     expect(nextVoiceLang("en-IN", "en-IN")).toBe("hi-IN");
-    expect(nextVoiceLang("hi-IN", "en-IN")).toBe("en-IN");
+    expect(nextVoiceLang("hi-IN", "en-IN")).toBe("kn-IN");
+    expect(nextVoiceLang("kn-IN", "en-IN")).toBe("en-IN");
   });
 
   it("cycles through a dormant saved language and wraps", () => {
-    expect(nextVoiceLang("hi-IN", "kn-IN")).toBe("kn-IN");
-    expect(nextVoiceLang("kn-IN", "kn-IN")).toBe("en-IN");
+    expect(nextVoiceLang("kn-IN", "ta-IN")).toBe("ta-IN");
+    expect(nextVoiceLang("ta-IN", "ta-IN")).toBe("en-IN");
   });
 
   it("starts the cycle from an unknown current language", () => {

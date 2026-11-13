@@ -22,7 +22,7 @@
  * - Lead with pre-orders (store link, drops, UPI, the orders board): the
  *   customer is an Instagram home kitchen (docs/ICP.md). Counter billing is
  *   one line, not the pitch.
- * - Voice is English & Hindi only — te/kn/ta are dormant (`VOICE_LANGUAGES`).
+ * - Voice is English, Hindi & Kannada — te/ta are dormant (`VOICE_LANGUAGES`).
  * - `cta` is the ONE sign-up label on the marketing and sign-up surfaces.
  * - ENTERPRISE is not sold; it stays off the marketing surface.
  */

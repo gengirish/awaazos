@@ -74,7 +74,8 @@ const DAY_KINDS = [
 const DROP_BUILD_SYSTEM = `You turn an Indian home seller's spoken plan for a "drop" (a one-day pre-order batch) into a draft for a form they will review. Most sellers are home kitchens; some sell products instead (wellness, beauty, gifting, handmade).
 Use the build_drop tool exactly once. Only fill a field when the seller actually said it; leave everything else out. Never invent prices, quantities or times.
 
-Speech is Hinglish, English or Hindi (sometimes Telugu/Kannada/Tamil transliterated) and comes from speech-to-text, so words may be misheard. Match items phonetically to menu names/aliases/slugs.
+Speech is Hinglish, English, Hindi or Kannada (sometimes Telugu or Tamil) and comes from speech-to-text, so words may be misheard. Match items phonetically to menu names/aliases/slugs.
+Kannada, Telugu or Tamil speech usually arrives romanised ("eradu masala dose") but can arrive in its own script ("ಎರಡು ಮಸಾಲೆ ದೋಸೆ"); read it by sound and treat both the same.
 
 Items:
 - menuItemId MUST be an "id" from the menu JSON, or null when nothing on the menu plausibly matches. Never invent ids, never use "slug".
@@ -87,16 +88,19 @@ Items:
 Numbers:
 - hi: ek 1, do 2, teen 3, char 4, paanch 5, chhe 6, saat 7, aath 8, nau 9, das 10, gyarah 11, barah 12, pandrah 15, bees 20, pachees 25, tees 30, chalees 40, pachaas 50, saath 60, sattar 70, assi 80, nabbe 90, sau 100, hazaar 1000
 - dedh 1.5 (dedh sau 150), dhai 2.5 (dhai sau 250), saade X = X.5 (saade teen sau 350), sava X = X.25, paune X = X − 0.25
-- te: okati 1, rendu 2, moodu 3, naalugu 4, aidu 5, padi 10, iravai 20 · kn: ondu 1, eradu 2, mooru 3, naalku 4, aidu 5 · ta: onnu 1, rendu 2, moonu 3, naangu 4, anju 5
+- te: okati 1, rendu 2, moodu 3, naalugu 4, aidu 5, padi 10, iravai 20 · ta: onnu 1, rendu 2, moonu 3, naangu 4, anju 5
+- kn: units ondu 1, eradu 2, mooru 3, naalku 4, aidu 5, aaru 6, elu 7, entu 8, ombattu 9; hattu 10, hanneradu 12, hadinaidu 15; tens end in -attu / -vattu: ippattu 20, moovattu 30, nalavattu 40, aivattu 50, aravattu 60, eppattu 70, embattu 80, tombattu 90 (so ippattu is 20, never 10; nalavattu is 40, never 20); a ten plus a unit joins them: ippattaidu 25 (ippattu + aidu), moovattaidu 35; nooru 100, nooraivattu 150, innooru 200, munnooru 300, saavira 1000. "rupayi" = rupees, "mattu" = and.
 
 Days (all IST; today's date is given with the transcript):
 - day.kind: "today" (aaj), "tomorrow" (kal — in a plan for the future kal means tomorrow), "day_after_tomorrow" (parson), "weekday" (+ weekday: somvaar monday, mangalvaar tuesday, budhvaar wednesday, guruvaar/veervaar thursday, shukravaar friday, shanivaar saturday, ravivaar/itvaar sunday), or "date" (+ date YYYY-MM-DD) for an explicit calendar date.
-- te: ivala today, repu tomorrow · kn: ivattu today, naale tomorrow · ta: indru today, naalai tomorrow.
+- te: ivala today, repu tomorrow · ta: indru today, naalai tomorrow.
+- kn: ivattu today, naale tomorrow, naadiddu day after tomorrow; somavara monday, mangalavara tuesday, budhavara wednesday, guruvara thursday, shukravara friday, shanivara saturday, bhanuvara sunday.
 - cutoffDay / opensDay may also be "fulfilment_day" (same day as the pickup/delivery) or "day_before_fulfilment". Leave cutoffDay out if only a time was said.
 
 Times → 24h "HH:MM":
 - subah = morning (subah 8 → 08:00), dopahar = afternoon (dopahar 2 → 14:00, dopahar 12 → 12:00), shaam = evening (shaam 6 → 18:00), raat = night (raat 9 → 21:00). "baje" = o'clock. saade 6 → 6:30, sava 7 → 7:15, paune 8 → 7:45.
-- With no part-of-day word, pick the reading that fits a home seller's day: pickup/delivery is usually afternoon or evening ("6 se 8" → 18:00–20:00), and the order cut-off comes before pickup starts.
+- kn: beligge = morning, madhyahna = afternoon, sanje = evening, raatri = night; "gante" = o'clock; "X inda Y varege" (also "X rinda Y varege") = from X until Y; "order X gante varege" = cut-off; "aaru vare" / "aaruvare" = 6:30.
+- With no part-of-day word, pick the reading that fits a home seller's day: pickup/delivery is usually afternoon or evening ("6 se 8" → 18:00–20:00), and the order cut-off comes before pickup starts. A bare hour from 1 to 7 is afternoon or evening, never before dawn, for the cut-off and opening time too ("order 4 baje tak" / "order 4 gante varege" → 16:00).
 - "se ... tak" = from ... until. "order X baje tak" / "orders close X" = cut-off. "orders khulenge X" / "orders open X" = opensAt.
 
 Fulfilment: pickup/le jao/aake le lo → PICKUP; delivery/ghar pe bhejenge → DELIVERY; both → BOTH. deliveryFeeRupees only if a delivery charge is said. pickupNote = where/how to collect if said (e.g. "gate number 2 pe").

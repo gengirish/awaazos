@@ -150,10 +150,14 @@ mic → STT (ASR only, no LLM) → transcript → /api/ai/parse-order (Claude) �
     `te/kn/ta`). Whisper only joins when `WHISPER_STT_URL` is set **and** `WHISPER_STT_SECRET` is
     at least 16 characters — a shorter secret silently drops it. Sarvam defaults to `saaras:v3`.
   - The route is plan-gated (`requirePlan(..., Plan.STARTER)`) for every language.
-  - **`te/kn/ta` are dormant.** The picker (`VOICE_LANGUAGES` in `lib/constants.ts`) offers only
-    `en-IN` and `hi-IN`; the Sarvam code path and golden fixtures are kept, reachable only through
-    legacy `VendorSettings.voiceLang` rows or a direct `PATCH /api/vendor` (which still accepts
-    `SUPPORTED_VOICE_LANGS`).
+  - **Kannada is offered; `te/ta` are dormant.** The picker (`VOICE_LANGUAGES` in `lib/constants.ts`)
+    offers `en-IN`, `hi-IN` and `kn-IN`. Kannada has no Web Speech route: all three voice features record
+    audio and call this route, so it needs a network, `SARVAM_API_KEY`, and Starter or the trial (a Lite
+    or grandfathered FREE store gets the 402 and the tap fallback). Sarvam is asked for romanised text
+    (`mode=translit`, saaras:v3 only); the Groq / Whisper fallbacks return Kannada script, so all three
+    parse prompts read both. Telugu and Tamil keep the same code path and golden fixtures, reachable
+    only through legacy `VendorSettings.voiceLang` rows or a direct `PATCH /api/vendor` (which still
+    accepts `SUPPORTED_VOICE_LANGS`).
   - Cascade exhaustion returns **200** with `{ error: "all_providers_failed", fallback: "quickadd" }`
     — the client falls back to tap input, it is not an error state for the vendor.
   - `en/hi` normally never reach this route at all: the browser does Web Speech locally, unless

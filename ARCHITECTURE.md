@@ -393,11 +393,11 @@ mic → STT (ASR) → transcript string → parse-order (LLM) → cart
 | Lang | Order |
 | --- | --- |
 | `en-IN`, `hi-IN` | OpenAI → Groq → Whisper (self-hosted) |
-| `te-IN`, `kn-IN`, `ta-IN` (dormant) | Sarvam → Groq → Whisper (self-hosted) |
+| `kn-IN` (offered), `te-IN`, `ta-IN` (dormant) | Sarvam → Groq → Whisper (self-hosted) |
 
 Each hop has its own circuit breaker (`lib/circuit-breaker.ts`) and, for the paid APIs, a minute quota (`lib/ai-usage-guard.ts`). A provider whose env is missing is left out of the cascade: OpenAI needs an `sk-` key, Groq a `gsk_` key, and Whisper needs both `WHISPER_STT_URL` and a `WHISPER_STT_SECRET` of at least 16 characters. The route is plan-gated to STARTER. If every hop fails it returns **200** with `{ error: "all_providers_failed", fallback: "quickadd" }` and the POS falls back to the tap grid.
 
-**Which path runs.** The language picker (`VOICE_LANGUAGES` in `lib/constants.ts`) offers only `en-IN` and `hi-IN`, and those use the browser's Web Speech API by default, so in normal use this route is not called at all. It runs for en/hi only when the build-time flag `NEXT_PUBLIC_VOICE_FALLBACK_ENABLED=true` switches the hook to MediaRecorder. If Web Speech is missing in the browser, the hook shows an `stt_unsupported` error rather than falling back to the server. Telugu, Kannada and Tamil are **dormant**: the Sarvam code path and the `te/kn/ta` values in `SUPPORTED_VOICE_LANGS` remain so older `VendorSettings.voiceLang` rows keep working, but no vendor can pick them. There is no Marathi or Bengali support anywhere.
+**Which path runs.** The language picker (`VOICE_LANGUAGES` in `lib/constants.ts`) offers `en-IN`, `hi-IN` and `kn-IN`. English and Hindi use the browser's Web Speech API by default, so for them this route is not called at all; Kannada always records audio and calls it (Sarvam is asked for romanised text, `mode=translit`). It runs for en/hi only when the build-time flag `NEXT_PUBLIC_VOICE_FALLBACK_ENABLED=true` switches the hook to MediaRecorder. If Web Speech is missing in the browser, the hook shows an `stt_unsupported` error rather than falling back to the server. Telugu and Tamil are **dormant**: the Sarvam code path and the `te/ta` values in `SUPPORTED_VOICE_LANGS` remain so older `VendorSettings.voiceLang` rows keep working, but no vendor can pick them. There is no Marathi or Bengali support anywhere.
 
 **Consequences.**
 

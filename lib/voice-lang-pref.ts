@@ -4,7 +4,7 @@
  * The vendor's saved `VendorSettings.voiceLang` is the default. A cashier can
  * tap the language badge to switch this device between the offered languages
  * (`VOICE_LANGUAGES`); that choice lives in localStorage and wins over the
- * saved value. A dormant saved language (te/kn/ta) stays in the cycle so the
+ * saved value. A dormant saved language (te/ta) stays in the cycle so the
  * cashier can always get back to it.
  *
  * Pure apart from the storage helpers, which take the storage as an argument

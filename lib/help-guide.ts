@@ -483,7 +483,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     href: "/settings/voice",
     trail: ["Counter & voice"],
     ownerOnly: true,
-    keywords: "hindi english voice speech",
+    keywords: "hindi english kannada voice speech",
   },
   {
     id: "plan",

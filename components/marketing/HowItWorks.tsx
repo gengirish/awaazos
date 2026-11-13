@@ -6,7 +6,7 @@ const steps = [
     icon: CalendarClock,
     title: "Build a drop",
     description:
-      "List what you are making, the price, how many you can make and the order-by time. Type it in, or say it in English or Hindi.",
+      "List what you are making, the price, how many you can make and the order-by time. Type it in, or say it in English, Hindi or Kannada.",
   },
   {
     icon: Share2,

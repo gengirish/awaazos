@@ -63,7 +63,7 @@ const SONNET_REQUEST = { timeout: 25_000, maxRetries: 0 } as const;
 const MENU_BUILD_SYSTEM = `You turn an Indian home seller's spoken list of what they sell into draft catalogue rows they will review before saving. The seller may run a kitchen or food stall (dishes, sweets, bakes) or sell products (herbal powders, oils, teas, soaps, pickles, crafts, clothes).
 Use the add_menu_items tool exactly once, with one entry per item, in the order spoken. Never invent items, prices or pack sizes.
 
-Speech is Hinglish, English or Hindi (sometimes Telugu/Kannada/Tamil transliterated) and comes from speech-to-text, so words may be misheard. Fix obvious mishearings of common dish and product names (e.g. "masla chai" → "Masala Chai", "wada pav" → "Vada Pav", "ashwagandha powdar" → "Ashwagandha Powder").
+Speech is Hinglish, English, Hindi or Kannada (sometimes Telugu or Tamil) and comes from speech-to-text, so words may be misheard. Kannada, Telugu or Tamil speech usually arrives romanised ("eradu masala dose") but can arrive in its own script ("ಎರಡು ಮಸಾಲೆ ದೋಸೆ"); read it by sound and treat both the same. Names, units and categories you write are always in Latin script. Fix obvious mishearings of common dish and product names (e.g. "masla chai" → "Masala Chai", "wada pav" → "Vada Pav", "ashwagandha powdar" → "Ashwagandha Powder").
 
 Items:
 - name = the item as a menu or price list would print it, in Latin script, Title Case. Leave out prices, pack sizes, quantities and filler words ("aur", "and", "phir", "hai", "wala" when it is not part of the name).
@@ -83,12 +83,15 @@ Prices:
 - "ek plate", "do plate", "half", "full", "piece" describe the portion, not the price ("pav bhaji do plate 80" → 80). If half and full prices are given, make two dishes ("Pav Bhaji (Half)", "Pav Bhaji (Full)").
 - Hindi numbers: ek 1, do 2, teen 3, char 4, paanch 5, chhe 6, saat 7, aath 8, nau 9, das 10, gyarah 11, barah 12, terah 13, chaudah 14, pandrah 15, solah 16, satrah 17, atharah 18, unnees 19, bees 20, pachees 25, tees 30, paintees 35, chalees 40, pachaas 50, saath 60, sattar 70, assi 80, nabbe 90, sau 100, hazaar 1000.
 - dedh = 1.5 (dedh sau = 150), dhai = 2.5 (dhai sau = 250), saade X = X + 0.5 (saade teen sau = 350, saade das = 10.5), sava X = X + 0.25 (sava sau = 125), paune X = X − 0.25 (paune do sau = 175). "X sau Y" = X×100 + Y (do sau pachaas = 250).
-- te: okati 1, rendu 2, moodu 3, padi 10, iravai 20, vanda 100 · kn: ondu 1, eradu 2, hattu 10, ippattu 20, nooru 100 · ta: onnu 1, rendu 2, pathu 10, irupathu 20, nooru 100.
+- te: okati 1, rendu 2, moodu 3, padi 10, iravai 20, vanda 100 · ta: onnu 1, rendu 2, pathu 10, irupathu 20, nooru 100.
+- kn: units ondu 1, eradu 2, mooru 3, naalku 4, aidu 5, aaru 6, elu 7, entu 8, ombattu 9; hattu 10, hanneradu 12, hadinaidu 15; tens end in -attu / -vattu: ippattu 20, moovattu 30, nalavattu 40, aivattu 50, aravattu 60, eppattu 70, embattu 80, tombattu 90 (so ippattu is 20, never 10; nalavattu is 40, never 20); a ten plus a unit joins them: ippattaidu 25 (ippattu + aidu), moovattaidu 35; nooru 100, nooraivattu 150, innooru 200, munnooru 300, saavira 1000. "rupayi" = rupees, "mattu" = and, "ardha kilo" = 500 g.
 
 Categories:
 - "X mein", "X wale", "X wala section", "under X", "in X" name the category X for the run of items said just before it, back to the previous category phrase (or the start). Example: "chai 10, coffee 20 — drinks mein; samosa 15, kachori 20, snacks mein" → chai and coffee are Drinks, samosa and kachori are Snacks.
+- Kannada: "X alli" / "X nalli" = in X, and "ella X alli" = all of these in X ("chai 15, samosa 20 snacks alli" → both are Snacks).
 - A category said BEFORE a list ("snacks mein: samosa, kachori") applies to the items that follow, until the next category phrase.
 - When the owner names a category that matches one in "Existing categories" (ignoring case or plural), use the existing spelling.
+- A category the owner names is used as said, even when it is not in "Existing categories": never swap it for a different existing one ("tiffin mein" / "tiffin alli" / "tiffin lo" → Tiffin, not Breakfast; "thali mein" → Thali, not Meals).
 - When no category was said for an item, infer a short one from its type, preferring an existing category (Chai/Drinks for beverages, Snacks for fried snacks, Meals, Sweets, Herbal Powders, Oils, Teas, Soaps, …); use null if unsure.
 
 Put any fragment you could not turn into an item (instructions, chit-chat, unclear words) into unparsed.
