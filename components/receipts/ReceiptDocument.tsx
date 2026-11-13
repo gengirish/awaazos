@@ -3,6 +3,7 @@ import { formatIstDateTime } from "@/lib/datetime";
 import { discountLabel } from "@/lib/offers";
 import { DEFAULT_RECEIPT_FOOTER, receiptState, receiptStatusLine, type ReceiptView } from "@/lib/receipt";
 import { cn } from "@/lib/utils";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * The printed / on-screen receipt. One layout for the vendor print page
@@ -118,7 +119,7 @@ export function ReceiptDocument({
 
       <footer className="space-y-0.5 text-center">
         <p className="whitespace-pre-line break-words">{view.receiptFooter?.trim() || DEFAULT_RECEIPT_FOOTER}</p>
-        <p className={cn("text-[10px]", poweredByPrintOnly && "hidden print:block")}>Powered by AwaazOS</p>
+        <p className={cn("text-[10px]", poweredByPrintOnly && "hidden print:block")}>Powered by {BRAND_NAME}</p>
       </footer>
     </article>
   );

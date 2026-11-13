@@ -17,6 +17,7 @@ import {
 } from "@/lib/subscription";
 import { Button } from "@/components/ui/button";
 import { RadioOption } from "@/components/ui/radio-option";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * Plan picker and cancel control for the billing page. What it may offer comes
@@ -194,7 +195,7 @@ export function BillingManageClient({
       const rzp = new Razorpay({
         key: data.keyId,
         subscription_id: data.subscriptionId,
-        name: "AwaazOS",
+        name: `${BRAND_NAME}`,
         description: `${buttonLabel(plan, interval)} — ${formatINR(base + gstPaise(base))} incl. GST`,
         prefill: {
           ...(prefillName ? { name: prefillName } : {}),

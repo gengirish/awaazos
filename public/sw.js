@@ -1,4 +1,4 @@
-/* AwaazOS service worker: Web Push alerts + offline POS shell.
+/* AwaazDo service worker: Web Push alerts + offline POS shell.
  *
  * Plain JS, no build step. Served from /sw.js with no-cache headers
  * (next.config.mjs) so a new version is picked up on the next page load.
@@ -74,7 +74,7 @@ function safeNotificationPath(raw, origin) {
 }
 
 function parsePayload(event) {
-  var fallback = { title: "AwaazOS", body: "New activity", url: FALLBACK_PATH, tag: "awaazos" };
+  var fallback = { title: "AwaazDo", body: "New activity", url: FALLBACK_PATH, tag: "awaazos" };
   if (!event.data) return fallback;
   try {
     var p = event.data.json();

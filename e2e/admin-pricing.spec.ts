@@ -2,6 +2,7 @@ import { expect, test } from "@playwright/test";
 
 import { CAN_SET_BILLING, setPlatformRole } from "./helpers/billing-db";
 import { createVendorSession } from "./helpers/vendor";
+import { BRAND_NAME } from "../lib/brand";
 
 /** Pricing calculator (lib/pricing-calculator.ts): the two Razorpay bills it models. */
 test.describe("admin pricing calculator", () => {
@@ -34,7 +35,7 @@ test.describe("admin pricing calculator", () => {
       await expect(settlementRow).toContainText("₹230");
 
       // 20 kitchens at ₹649: ₹12,980, less ₹18.06 each to Razorpay.
-      await page.getByRole("tab", { name: "AwaazOS revenue" }).click();
+      await page.getByRole("tab", { name: `${BRAND_NAME} revenue` }).click();
       await expect(page.getByRole("row", { name: /^Per month/ })).toContainText("₹12,980");
       await expect(page.getByRole("row", { name: /Razorpay fee on our charges/ })).toContainText("₹361");
       await expect(page.getByRole("row", { name: /We keep, per month/ })).toContainText("₹12,618");

@@ -18,10 +18,11 @@ import { prisma } from "@/lib/prisma";
 import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 
 import { requireSettingsContext } from "../_context";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Online store · Settings · AwaazOS" };
+export const metadata: Metadata = { title: `Online store · Settings · ${BRAND_NAME}` };
 
 export default async function StoreSettingsPage() {
   const { vendor, isOwner, storeKind, vocab } = await requireSettingsContext();

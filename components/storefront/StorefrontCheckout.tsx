@@ -48,6 +48,7 @@ import {
   type OrderApiError,
 } from "@/lib/storefront-order";
 import { cn } from "@/lib/utils";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * Shared buyer-side checkout pieces for the public storefront, used by both
@@ -1313,7 +1314,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
             {/* True on every path: UPI goes to the store's own UPI ID, "Pay online" to its own Razorpay account. */}
             <p className="flex items-start gap-2.5 px-1 text-sm leading-snug text-muted-foreground">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              <span>You pay {storeName || "the store"} directly. AwaazOS never holds your money.</span>
+              <span>You pay {storeName || "the store"} directly. {BRAND_NAME} never holds your money.</span>
             </p>
           </ResponsiveDialogBody>
 

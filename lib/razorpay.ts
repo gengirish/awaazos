@@ -13,6 +13,7 @@ import {
   type SubscriptionSnapshot,
 } from "@/lib/subscription";
 import { withTimeout } from "@/lib/with-timeout";
+import { BRAND_NAME } from "@/lib/brand";
 
 const RAZORPAY_API_TIMEOUT_MS = 8_000;
 
@@ -147,7 +148,7 @@ export async function createRazorpayPlan({
       period: interval,
       interval: 1,
       item: {
-        name: `AwaazOS Starter ${interval} (store price)`,
+        name: `${BRAND_NAME} Starter ${interval} (store price)`,
         amount: amountPaise,
         currency: "INR",
         description: `${basePaise / 100} rupees + 18% GST`,

@@ -1,5 +1,5 @@
-Hi {firstName}, {senderName} from AwaazOS here.
+Hi {firstName}, {senderName} from AwaazDo here.
 
-{storeName} is doing well. Thank you for using AwaazOS! Is there one thing that would make it easier for you?
+{storeName} is doing well. Thank you for using AwaazDo! Is there one thing that would make it easier for you?
 
 Your store: {storeUrl}

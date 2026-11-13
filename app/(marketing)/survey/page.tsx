@@ -2,9 +2,10 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { OwnerSurveyForm } from "@/components/survey/OwnerSurveyForm";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Tell us what's hard — AwaazOS",
+  title: `Tell us what's hard — ${BRAND_NAME}`,
   description: "A short survey for home sellers on what slows your store down. No sign-in.",
   robots: { index: false, follow: false },
 };
@@ -23,7 +24,7 @@ export default function PublicSurveyPage() {
           <OwnerSurveyForm answers={null} isPublic />
         </div>
         <p className="mt-4 text-sm text-muted-foreground">
-          Already have a store on AwaazOS?{" "}
+          Already have a store on {BRAND_NAME}?{" "}
           <Link
             href="/settings/survey"
             className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-4"

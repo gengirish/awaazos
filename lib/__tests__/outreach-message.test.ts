@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { TRIAL_DAYS } from "@/lib/constants";
 import { firstName, outreachClaimMessage, outreachIntroMessage, outreachWhatsappUrl } from "@/lib/outreach-message";
+import { BRAND_NAME } from "@/lib/brand";
 
 const STORE_URL = "https://awaazos.intelliforge.tech/s/tasty-treats-by-lah-x5yj";
 
@@ -25,7 +26,7 @@ describe("outreachIntroMessage", () => {
 
   it("never calls anyone but a platform owner the founder", () => {
     const text = outreachIntroMessage({ senderName: "Asha Rao", storeName: "Frosted", storeUrl: STORE_URL });
-    expect(text.startsWith("Hi, I'm Asha from IntelliForge. We build AwaazOS")).toBe(true);
+    expect(text.startsWith(`Hi, I'm Asha from IntelliForge. We build ${BRAND_NAME}`)).toBe(true);
     expect(text).not.toContain("founder");
   });
 
@@ -37,7 +38,7 @@ describe("outreachIntroMessage", () => {
 
   it("reads naturally with no owner or sender name", () => {
     const text = outreachIntroMessage({ storeName: "Frosted", storeUrl: STORE_URL });
-    expect(text.startsWith("Hi, I'm writing from IntelliForge. We build AwaazOS")).toBe(true);
+    expect(text.startsWith(`Hi, I'm writing from IntelliForge. We build ${BRAND_NAME}`)).toBe(true);
     expect(text).not.toContain("undefined");
     expect(text).not.toContain("null");
   });

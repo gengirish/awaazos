@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 
 import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "DPDP Rights — AwaazOS",
-  description: "How AwaazOS supports rights under India’s DPDP Act.",
+  title: `DPDP Rights — ${BRAND_NAME}`,
+  description: `How ${BRAND_NAME} supports rights under India’s DPDP Act.`,
 };
 
 export default function DpdpRightsPage() {
@@ -14,7 +15,7 @@ export default function DpdpRightsPage() {
       <p>Last updated: 23 April 2026</p>
       <p>
         If you are a data principal under India’s Digital Personal Data Protection (DPDP) framework, you can exercise
-        your rights with AwaazOS.
+        your rights with {BRAND_NAME}.
       </p>
 
       <h2>Your rights</h2>

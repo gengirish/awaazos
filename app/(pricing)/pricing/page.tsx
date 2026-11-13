@@ -5,11 +5,12 @@ import { PricingPlanButtons } from "@/components/billing/PricingPlanButtons";
 import { auth } from "@/lib/auth";
 import { TRIAL_DAYS } from "@/lib/constants";
 import { MARKETED_PLANS, PLAN_COMPARISON, PLAN_MARKETING, YEARLY_DISCOUNT } from "@/lib/plan-copy";
+import { BRAND_NAME } from "@/lib/brand";
 
 const starter = PLAN_MARKETING.STARTER;
 
 export const metadata: Metadata = {
-  title: "Pricing — AwaazOS",
+  title: `Pricing — ${BRAND_NAME}`,
   description: `${starter.trial}, then plans from ${PLAN_MARKETING.LITE.price}. A store link for your Instagram bio, pre-orders with a cut-off, and UPI orders on one board.`,
 };
 

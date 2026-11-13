@@ -1,4 +1,5 @@
 import { referralSignUpPath } from "@/lib/referral";
+import { BRAND_NAME, BRAND_SIGNOFF } from "@/lib/brand";
 
 /**
  * The quiet AwaazOS line at the bottom of the public pages a buyer sees
@@ -20,7 +21,7 @@ export function PoweredByFooter({ slug, isDemo }: { slug: string | null | undefi
     >
       {/* The anchor is the 44px tap target; the pill inside keeps its size. */}
       <span className="inline-flex items-center rounded-full border border-border/60 bg-background px-4 py-2 text-xs font-semibold text-muted-foreground transition-colors group-hover:border-primary/40 group-hover:text-primary">
-        {referral ? "Powered by AwaazOS · Start your own store" : "Billing by AwaazOS — Bol. Bill. Becho."}
+        {referral ? `Powered by ${BRAND_NAME} · Start your own store` : `Billing by ${BRAND_SIGNOFF}`}
       </span>
     </a>
   );

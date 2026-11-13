@@ -17,10 +17,11 @@ import {
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 import { getShellContext } from "../_shell-context";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Help · AwaazOS" };
+export const metadata: Metadata = { title: `Help · ${BRAND_NAME}` };
 
 /** "A, B and C" */
 function listOf(labels: string[]): string {
@@ -61,7 +62,7 @@ export default async function HelpPage() {
     <div className="bg-background p-4 pb-10 md:p-6">
       <header className="mx-auto mb-4 max-w-3xl md:mb-6">
         <h1 className="font-display text-2xl font-bold text-foreground">Help</h1>
-        <p className="text-sm text-muted-foreground">Where everything is in AwaazOS, and how to get there.</p>
+        <p className="text-sm text-muted-foreground">Where everything is in {BRAND_NAME}, and how to get there.</p>
       </header>
 
       <main id="main" className="mx-auto max-w-3xl space-y-8">

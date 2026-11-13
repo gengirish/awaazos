@@ -19,6 +19,7 @@ import { prisma } from "@/lib/prisma";
 import { orderStatusLabel, type StatusTone } from "@/lib/storefront-order";
 import { cn } from "@/lib/utils";
 import { storeThemeAttribute } from "@/lib/store-theme";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -47,7 +48,7 @@ export async function generateMetadata(props: { params: Promise<{ slug: string }
   const params = await props.params;
   const vendor = await loadVendor(params.slug);
   return {
-    title: vendor ? `Your account — ${vendor.name}` : "Not found — AwaazOS",
+    title: vendor ? `Your account — ${vendor.name}` : `Not found — ${BRAND_NAME}`,
     robots: { index: false, follow: false },
     referrer: "no-referrer",
   };

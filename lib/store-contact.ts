@@ -9,6 +9,7 @@
  */
 import { firstName } from "@/lib/outreach-message";
 import { normaliseIndianMobile } from "@/lib/phone";
+import { BRAND_NAME } from "@/lib/brand";
 
 export type StoreOwnerContact = { name: string | null; email: string };
 
@@ -53,7 +54,7 @@ export function storeContact(input: StoreContactInput): StoreContact {
   return { ownerName, emails, phones };
 }
 
-export const FEEDBACK_EMAIL_SUBJECT = "How is AwaazOS working for you?";
+export const FEEDBACK_EMAIL_SUBJECT = `How is ${BRAND_NAME} working for you?`;
 
 /**
  * The ask: how it is going, what is hard, and whether a line from them may go
@@ -69,14 +70,14 @@ export function feedbackRequestMessage(opts: {
   return [
     owner ? `Hi ${owner},` : "Hi,",
     "",
-    `${sender ? `I'm ${sender} from` : "I'm writing from"} AwaazOS. Thank you for running ${opts.storeName} on it.`,
+    `${sender ? `I'm ${sender} from` : "I'm writing from"} ${BRAND_NAME}. Thank you for running ${opts.storeName} on it.`,
     "",
     "Could you tell me in a few lines how it is going? What works for you, and what is hard or missing?",
     "",
     "If you are happy with it, may we quote a line or two from you, with your store's name, on our website? We will only use it after you say yes in writing, and you can ask us to take it down at any time.",
     "",
     "Thank you,",
-    sender || "AwaazOS",
+    sender || `${BRAND_NAME}`,
   ].join("\n");
 }
 

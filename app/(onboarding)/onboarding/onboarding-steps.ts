@@ -4,6 +4,7 @@ import { FSSAI_NUMBER_MESSAGE, FSSAI_NUMBER_PATTERN } from "@/lib/fssai";
 import { INSTAGRAM_HANDLE_MESSAGE, normaliseInstagramHandle } from "@/lib/instagram";
 import { formatIndianMobile, normaliseIndianMobile } from "@/lib/phone";
 import type { StoreKind, StoreVocabulary } from "@/lib/store-vocabulary";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * Pure rules of the first-run setup (page.tsx), kept out of the page so they
@@ -44,7 +45,7 @@ export const ONBOARDING_STEPS: readonly {
   {
     title: "Getting paid",
     short: "Payment",
-    description: "Choose at least one way customers can pay. The money comes straight to you: AwaazOS never holds it.",
+    description: `Choose at least one way customers can pay. The money comes straight to you: ${BRAND_NAME} never holds it.`,
   },
   {
     title: "What you sell",

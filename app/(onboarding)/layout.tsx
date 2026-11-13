@@ -6,10 +6,11 @@ import { HOME_PATH } from "@/lib/home";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 import { SignOutLink } from "./SignOutLink";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Set up your store · AwaazOS", robots: { index: false, follow: false } };
+export const metadata = { title: `Set up your store · ${BRAND_NAME}`, robots: { index: false, follow: false } };
 
 /**
  * First-run setup. Every vendor page sends an unfinished store here

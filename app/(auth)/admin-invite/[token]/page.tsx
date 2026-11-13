@@ -5,9 +5,10 @@ import { ADMIN_INVITE_TTL_DAYS, loadAdminInvite, plausibleInviteToken } from "@/
 import { auth } from "@/lib/auth";
 
 import { AdminInviteForm } from "./_components/AdminInviteForm";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Join the AwaazOS outreach team", robots: { index: false, follow: false } };
+export const metadata = { title: `Join the ${BRAND_NAME} outreach team`, robots: { index: false, follow: false } };
 
 const LINK_CLASS = "inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline";
 
@@ -62,7 +63,7 @@ export default async function AdminInvitePage(props: { params: Promise<{ token: 
         <CardHeader>
           <h1 className="text-2xl font-semibold leading-none tracking-tight">Join the outreach team</h1>
           <CardDescription>
-            <span className="font-medium text-foreground">{invite.email}</span> already has an AwaazOS account. Sign
+            <span className="font-medium text-foreground">{invite.email}</span> already has an {BRAND_NAME} account. Sign
             in with it to accept.
           </CardDescription>
         </CardHeader>

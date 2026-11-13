@@ -1,4 +1,4 @@
-Hi {firstName}, {senderName} from AwaazOS here. Welcome!
+Hi {firstName}, {senderName} from AwaazDo here. Welcome!
 
 How are the first days with {storeName} going? If anything is confusing, reply here and I'll sort it out.
 

@@ -9,6 +9,7 @@ import {
   subscribeThisDevice,
   unsubscribeThisDevice,
 } from "@/lib/push-client";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * This device's phone-alert state, shared by every piece of UI that shows it.
@@ -49,7 +50,7 @@ export const PUSH_COPY = {
   notConfigured: "Phone alerts aren't set up on this server yet.",
   unsupported: "This browser can't show alerts. Try Chrome on Android.",
   iosInstall:
-    "On iPhone: tap Share → Add to Home Screen, then open AwaazOS from your Home Screen and turn on alerts here.",
+    `On iPhone: tap Share → Add to Home Screen, then open ${BRAND_NAME} from your Home Screen and turn on alerts here.`,
   denied: "Alerts are blocked for this site. Allow notifications in your browser settings, then try again.",
   subscribed: "Alerts on for this phone",
   dismissedPrompt: "Alerts not turned on. Tap the button again and choose Allow.",

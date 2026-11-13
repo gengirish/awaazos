@@ -14,10 +14,11 @@ import { parseMenuSlots } from "@/lib/menu-slots";
 import { prisma } from "@/lib/prisma";
 
 import { requireSettingsContext } from "../_context";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Online orders · Settings · AwaazOS" };
+export const metadata: Metadata = { title: `Online orders · Settings · ${BRAND_NAME}` };
 
 export default async function OrdersSettingsPage() {
   const { vendor, isOwner, storeKind, vocab } = await requireSettingsContext();

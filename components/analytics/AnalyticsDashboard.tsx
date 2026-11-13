@@ -86,7 +86,7 @@ export function AnalyticsDashboard({
 
       {!hasSales ? (
         <EmptyState
-          title="No sales yet — head to the POS and bol bill becho!"
+          title="No sales yet. Banao, batao, becho: head to the counter!"
           titleAs="h2"
           description="Charts and KPIs will fill in once you record bills."
           action={

@@ -8,8 +8,9 @@ import {
 } from "@/components/ui/card";
 
 import { ResetPasswordForm } from "./_components/ResetPasswordForm";
+import { BRAND_NAME } from "@/lib/brand";
 
-export const metadata = { title: "Reset password · AwaazOS" };
+export const metadata = { title: `Reset password · ${BRAND_NAME}` };
 
 /**
  * Server component on purpose: reading the token from `searchParams` here

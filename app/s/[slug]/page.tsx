@@ -93,6 +93,7 @@ import { buildUpiCollectLink } from "@/lib/upi";
 import { storeBackgroundStyle } from "@/lib/store-background";
 import { storeThemeAttribute } from "@/lib/store-theme";
 import { countStoreView } from "@/lib/store-views";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -344,7 +345,7 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const params = await props.params;
   const vendor = await loadStorefront(params.slug);
-  if (!vendor) return { title: "Not found — AwaazOS" };
+  if (!vendor) return { title: `Not found — ${BRAND_NAME}` };
 
   const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
   const title = `${displayStoreName(vendor)} — Online store`;

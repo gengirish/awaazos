@@ -3,6 +3,7 @@ import Link from "next/link";
 import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
 import { InstallAppButton } from "@/components/marketing/InstallAppButton";
 import { SupportWhatsappLink } from "@/components/marketing/SupportWhatsapp";
+import { BRAND_NAME } from "@/lib/brand";
 
 export function MarketingFooter() {
   return (
@@ -19,7 +20,7 @@ export function MarketingFooter() {
             <InstallAppButton />
           </div>
           <p className="text-sm text-muted-foreground">
-            © {new Date().getFullYear()} AwaazOS. All rights reserved.
+            © {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.
           </p>
         </div>
         <nav

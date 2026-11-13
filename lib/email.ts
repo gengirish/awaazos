@@ -22,6 +22,7 @@ import { formatINR } from "@/lib/currency";
 import { formatIstDate } from "@/lib/datetime";
 import { logger } from "@/lib/logger";
 import { trialEndsPhrase } from "@/lib/trial-alerts";
+import { BRAND_NAME, BRAND_SIGNOFF } from "@/lib/brand";
 
 export type SendPasswordResetEmailInput = {
   to: string;
@@ -62,14 +63,14 @@ function buildText(greetingName: string, url: string): string {
   return [
     `Namaste ${greetingName},`,
     "",
-    "We received a request to reset your AwaazOS password.",
+    `We received a request to reset your ${BRAND_NAME} password.`,
     "This link works once and expires in 30 minutes:",
     "",
     url,
     "",
     "If you didn't ask for this, you can ignore this email — your password will not change.",
     "",
-    "AwaazOS — Bol. Bill. Becho.",
+    BRAND_SIGNOFF,
   ].join("\n");
 }
 
@@ -80,11 +81,11 @@ function buildHtml(greetingName: string, url: string): string {
 <html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:32px;">
   <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e2e8f0;">
-    <div style="font-weight:700;font-size:18px;color:#FF6B00;">AwaazOS</div>
+    <div style="font-weight:700;font-size:18px;color:#FF6B00;">${BRAND_NAME}</div>
     <h1 style="font-size:22px;margin:24px 0 8px 0;color:#1a1a1a;">Reset your password</h1>
     <p style="color:#334155;line-height:1.5;">
       Namaste ${escapeHtml(greetingName)},<br><br>
-      We received a request to reset your AwaazOS password.
+      We received a request to reset your ${BRAND_NAME} password.
       This link works once and expires in 30 minutes.
     </p>
     <p style="margin:28px 0;">
@@ -98,7 +99,7 @@ function buildHtml(greetingName: string, url: string): string {
     </p>
     <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
     <p style="color:#94a3b8;font-size:11px;line-height:1.5;">
-      Someone — possibly you — asked to reset the password for this AwaazOS
+      Someone — possibly you — asked to reset the password for this ${BRAND_NAME}
       account. If it wasn't you, ignore this email; your password will not change.
     </p>
   </div>
@@ -173,7 +174,7 @@ export async function sendPasswordResetEmail(
 
   const messageId = await deliver(config, {
     to: [to],
-    subject: "Reset your AwaazOS password",
+    subject: `Reset your ${BRAND_NAME} password`,
     text: buildText(greetingName, url),
     html: buildHtml(greetingName, url),
     labels: ["password-reset", "transactional"],
@@ -211,7 +212,7 @@ function buildCustomerLoginText(storeName: string, url: string): string {
     "",
     "If you didn't ask for this, you can ignore this email.",
     "",
-    "AwaazOS — Bol. Bill. Becho.",
+    BRAND_SIGNOFF,
   ].join("\n");
 }
 
@@ -239,7 +240,7 @@ function buildCustomerLoginHtml(storeName: string, url: string): string {
     </p>
     <hr style="border:none;border-top:1px solid #e2e8f0;margin:24px 0;">
     <p style="color:#94a3b8;font-size:11px;line-height:1.5;">
-      Someone — possibly you — asked to sign in with this email on an AwaazOS
+      Someone — possibly you — asked to sign in with this email on an ${BRAND_NAME}
       storefront. If it wasn't you, ignore this email.
     </p>
   </div>
@@ -256,7 +257,7 @@ export async function sendCustomerLoginEmail(
 ): Promise<{ ok: true }> {
   try {
     const { to, url, expiresAt } = input;
-    const storeName = input.storeName.replace(/[\r\n]+/g, " ").trim().slice(0, 80) || "AwaazOS";
+    const storeName = input.storeName.replace(/[\r\n]+/g, " ").trim().slice(0, 80) || `${BRAND_NAME}`;
     const config = getConfig();
 
     if (!config) {
@@ -297,7 +298,7 @@ export async function sendCustomerLoginEmail(
 // vendor-authored: escaped in HTML, stripped of newlines in the subject.
 
 function buildSellerNoticeText(greetingName: string, paragraphs: string[], url: string): string {
-  return [`Namaste ${greetingName},`, "", ...paragraphs.flatMap((p) => [p, ""]), url, "", "AwaazOS — Bol. Bill. Becho."].join(
+  return [`Namaste ${greetingName},`, "", ...paragraphs.flatMap((p) => [p, ""]), url, "", BRAND_SIGNOFF].join(
     "\n",
   );
 }
@@ -317,7 +318,7 @@ function buildSellerNoticeHtml(input: {
 <html>
 <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:32px;">
   <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e2e8f0;">
-    <div style="font-weight:700;font-size:18px;color:#FF6B00;">AwaazOS</div>
+    <div style="font-weight:700;font-size:18px;color:#FF6B00;">${BRAND_NAME}</div>
     <h1 style="font-size:22px;margin:24px 0 8px 0;color:#1a1a1a;">${escapeHtml(input.heading)}</h1>
     <p style="color:#334155;line-height:1.5;">Namaste ${escapeHtml(input.greetingName)},</p>
     ${body}
@@ -398,7 +399,7 @@ export async function sendTrialReminderEmail(input: SendTrialReminderEmailInput)
     {
       to: input.to,
       name: input.name,
-      subject: `Your AwaazOS free trial ends ${when}`,
+      subject: `Your ${BRAND_NAME} free trial ends ${when}`,
       heading: `Your free trial ends ${when}`,
       paragraphs: [
         `The free trial for ${input.storeName} ends ${when} (${formatIstDate(input.endsAt)}). Subscribe to keep taking orders after that.`,
@@ -471,8 +472,8 @@ export async function sendDemoClaimEmail(input: SendDemoClaimEmailInput): Promis
       subject: `${input.storeName} is ready for you to claim`,
       heading: "Your store is ready",
       paragraphs: [
-        `We set up ${input.storeName} on AwaazOS for you. Claim it and the store moves to your account, with a ${TRIAL_DAYS}-day free trial.`,
-        "You'll choose a password, or sign in if you already use AwaazOS. You can hide or delete the sample orders, and you add your own UPI ID before taking real orders.",
+        `We set up ${input.storeName} on ${BRAND_NAME} for you. Claim it and the store moves to your account, with a ${TRIAL_DAYS}-day free trial.`,
+        `You'll choose a password, or sign in if you already use ${BRAND_NAME}. You can hide or delete the sample orders, and you add your own UPI ID before taking real orders.`,
         `The link works once, until ${formatIstDate(input.expiresAt)}.`,
       ],
       cta: "Claim my store",

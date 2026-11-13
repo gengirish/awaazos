@@ -8,6 +8,7 @@
  * hydrated, Instagram's in-app browser — gets written steps instead.
  */
 import { isIOS } from "@/lib/push-client";
+import { BRAND_NAME } from "@/lib/brand";
 
 export type InstallGuide = "in-app-browser" | "ios" | "android" | "desktop";
 
@@ -44,22 +45,22 @@ export const INSTALL_STEPS: Record<InstallGuide, { intro: string; steps: string[
     steps: [
       "Tap the Share button.",
       "Scroll down and tap Add to Home Screen.",
-      "Tap Add. AwaazOS now opens from your Home Screen.",
+      `Tap Add. ${BRAND_NAME} now opens from your Home Screen.`,
     ],
   },
   android: {
-    intro: "Add AwaazOS from your browser's menu.",
+    intro: `Add ${BRAND_NAME} from your browser's menu.`,
     steps: [
       "Tap the ⋮ menu at the top right.",
       "Tap Install app or Add to Home screen.",
-      "Tap Install. AwaazOS now opens from your Home screen.",
+      `Tap Install. ${BRAND_NAME} now opens from your Home screen.`,
     ],
   },
   desktop: {
-    intro: "Install AwaazOS from your browser. Chrome and Edge support this.",
+    intro: `Install ${BRAND_NAME} from your browser. Chrome and Edge support this.`,
     steps: [
       "Look for the install icon at the right of the address bar.",
-      "Or open the browser menu and choose Install AwaazOS.",
+      `Or open the browser menu and choose Install ${BRAND_NAME}.`,
       "Using a phone? Open this page there and tap Install app.",
     ],
   },
