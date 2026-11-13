@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 const leadFeatures = [
   {
     icon: CalendarClock,
-    title: "Drops with a cut-off",
+    title: "Pre-orders with a cut-off",
     description:
       "Sell a batch ahead of time: Saturday bakes or festive gift boxes, order by Friday 9 pm. Ordering closes by itself at the cut-off.",
   },
@@ -38,22 +38,22 @@ const moreFeatures = [
   {
     icon: Link2,
     title: "Store link for your bio",
-    description: "Banner, logo, open drops and your everyday list, in one link for Instagram or WhatsApp.",
+    description: "Banner, logo, open pre-orders and your everyday list, in one link for Instagram or WhatsApp.",
   },
   {
     icon: ClipboardList,
     title: "One orders board",
-    description: "Every order from every drop and your everyday list. Confirm, mark paid and delivered, several at once.",
+    description: "Every order from every pre-order and your everyday list. Confirm, mark paid and delivered, several at once.",
   },
   {
     icon: Printer,
     title: "Prep sheet or packing list",
-    description: "What to make or pack and a delivery list for each drop, ready to print.",
+    description: "What to make or pack and a delivery list for each pre-order, ready to print.",
   },
   {
     icon: ImageIcon,
     title: "Instagram story image",
-    description: "A story-sized image of each drop with its items, prices and cut-off.",
+    description: "A story-sized image of each pre-order with its items, prices and cut-off.",
   },
   {
     icon: BellRing,

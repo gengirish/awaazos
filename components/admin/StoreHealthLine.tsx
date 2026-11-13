@@ -22,7 +22,7 @@ export function StoreHealthLine({ health, now }: { health: StoreHealth; now: Dat
         <dd className="font-medium text-foreground">{health.published ? "Published" : "Not published"}</dd>
       </div>
       <div className="min-w-0">
-        <dt className="text-xs text-muted-foreground">Drops this week</dt>
+        <dt className="text-xs text-muted-foreground">Pre-orders this week</dt>
         <dd className="font-medium tabular-nums text-foreground">{health.dropsThisWeek}</dd>
       </div>
     </dl>

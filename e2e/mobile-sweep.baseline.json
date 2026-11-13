@@ -168,10 +168,10 @@
         "tapTargets": {
           "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "177x44" },
           "button \"Not now\"": { "count": 1, "size": "86x44" },
-          "button \"Share this drop: Weekend bakes\"": { "count": 1, "size": "294x44" },
+          "button \"Share this pre-order: Weekend bakes\"": { "count": 1, "size": "294x44" },
           "link \"Answer now\"": { "count": 1, "size": "112x44" },
           "link \"Edit Weekend bakes\"": { "count": 1, "size": "109x44" },
-          "link \"New drop\"": { "count": 1, "size": "328x44" }
+          "link \"New pre-order\"": { "count": 1, "size": "328x44" }
         }
       },
       "/drops@390": {
@@ -179,10 +179,10 @@
         "tapTargets": {
           "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "177x44" },
           "button \"Not now\"": { "count": 1, "size": "86x44" },
-          "button \"Share this drop: Weekend bakes\"": { "count": 1, "size": "324x44" },
+          "button \"Share this pre-order: Weekend bakes\"": { "count": 1, "size": "324x44" },
           "link \"Answer now\"": { "count": 1, "size": "112x44" },
           "link \"Edit Weekend bakes\"": { "count": 1, "size": "139x44" },
-          "link \"New drop\"": { "count": 1, "size": "358x44" }
+          "link \"New pre-order\"": { "count": 1, "size": "358x44" }
         }
       },
       "/drops@768": {
@@ -190,11 +190,11 @@
         "tapTargets": {
           "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "291x44" },
           "button \"Not now\"": { "count": 1, "size": "86x44" },
-          "button \"Share this drop: Weekend bakes\"": { "count": 1, "size": "582x44" },
+          "button \"Share this pre-order: Weekend bakes\"": { "count": 1, "size": "582x44" },
           "link \"Add your FSSAI number so buyers can trust your foodGo to Onl…\"": { "count": 1, "size": "614x44" },
           "link \"Answer now\"": { "count": 1, "size": "112x44" },
           "link \"Edit Weekend bakes\"": { "count": 1, "size": "283x44" },
-          "link \"New drop\"": { "count": 1, "size": "119x44" }
+          "link \"New pre-order\"": { "count": 1, "size": "119x44" }
         }
       },
       "/menu (add item dialog)@390": {
@@ -325,7 +325,7 @@
           "button \"Not now\"": { "count": 1, "size": "86x44" },
           "button \"Picked up · ₹##.## collected\"": { "count": 1, "size": "294x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "button \"Share this drop\"": { "count": 1, "size": "95x44" },
+          "button \"Share this pre-order\"": { "count": 1, "size": "95x44" },
           "combobox \"Show orders from\"": { "count": 1, "size": "254x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 1, "size": "44x44" },
           "link \"Answer now\"": { "count": 1, "size": "112x44" },
@@ -342,7 +342,7 @@
           "button \"Not now\"": { "count": 1, "size": "86x44" },
           "button \"Picked up · ₹##.## collected\"": { "count": 1, "size": "324x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "button \"Share this drop\"": { "count": 1, "size": "95x44" },
+          "button \"Share this pre-order\"": { "count": 1, "size": "95x44" },
           "combobox \"Show orders from\"": { "count": 1, "size": "284x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 1, "size": "44x44" },
           "link \"Answer now\"": { "count": 1, "size": "112x44" },
@@ -358,7 +358,7 @@
           "button \"Not now\"": { "count": 1, "size": "86x44" },
           "button \"Picked up · ₹##.## collected\"": { "count": 1, "size": "582x44" },
           "button \"Refresh\"": { "count": 1, "size": "107x44" },
-          "button \"Share this drop\"": { "count": 1, "size": "453x44" },
+          "button \"Share this pre-order\"": { "count": 1, "size": "453x44" },
           "button \"Sound on — tap to enable\"": { "count": 1, "size": "223x44" },
           "combobox \"Show orders from\"": { "count": 1, "size": "236x44" },
           "input[checkbox] \"Select order AWZ-########-#### from Priya Buyer\"": { "count": 1, "size": "44x44" },
@@ -681,7 +681,7 @@
           "input[radio] \"Pickup\"": { "count": 1, "size": "93x44" },
           "input[tel] \"WhatsApp number\"": { "count": 2, "size": "294x44" },
           "input[text] \"Name\"": { "count": 1, "size": "294x44" },
-          "link \"Go to Drops\"": { "count": 1, "size": "96x44" },
+          "link \"Go to Pre-orders\"": { "count": 1, "size": "96x44" },
           "link \"Open my store\"": { "count": 1, "size": "143x44" },
           "link \"See online orders\"": { "count": 1, "size": "136x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" },
@@ -698,7 +698,7 @@
           "input[radio] \"Pickup\"": { "count": 1, "size": "103x44" },
           "input[tel] \"WhatsApp number\"": { "count": 2, "size": "324x44" },
           "input[text] \"Name\"": { "count": 1, "size": "324x44" },
-          "link \"Go to Drops\"": { "count": 1, "size": "96x44" },
+          "link \"Go to Pre-orders\"": { "count": 1, "size": "96x44" },
           "link \"Open my store\"": { "count": 1, "size": "143x44" },
           "link \"See online orders\"": { "count": 1, "size": "136x44" },
           "link \"Settings\"": { "count": 1, "size": "88x44" },
@@ -717,7 +717,7 @@
           "input[text] \"Name\"": { "count": 1, "size": "149x44" },
           "link \"Counter & voice\"": { "count": 1, "size": "224x44" },
           "link \"Customer feedback\"": { "count": 1, "size": "224x44" },
-          "link \"Go to Drops\"": { "count": 1, "size": "96x44" },
+          "link \"Go to Pre-orders\"": { "count": 1, "size": "96x44" },
           "link \"Notifications\"": { "count": 1, "size": "224x44" },
           "link \"Offers\"": { "count": 1, "size": "224x44" },
           "link \"Online orders\"": { "count": 1, "size": "224x44" },

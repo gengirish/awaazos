@@ -98,7 +98,7 @@ describe("plan marketing copy", () => {
   it("leads with pre-orders, not the counter (docs/ICP.md)", () => {
     const copy = allCopy("STARTER");
     expect(copy).toMatch(/store link/i);
-    expect(copy).toMatch(/drops/i);
+    expect(copy).toMatch(/pre-orders/i);
     expect(copy).not.toMatch(/stall|busy counter/i);
   });
 

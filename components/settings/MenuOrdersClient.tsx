@@ -159,10 +159,10 @@ export function MenuOrdersClient({
           <p className="text-xs text-muted-foreground">
             {enabled
               ? `Customers can order available ${catalogueItems} from your store page. New orders show under Orders.`
-              : `Off. Customers can only see your ${vocab.catalogue} (and order from open Drops).`}
+              : `Off. Customers can only see your ${vocab.catalogue} (and order from open pre-orders).`}
           </p>
           <p className="text-xs text-muted-foreground">
-            Hide single items from your store with &ldquo;Show online&rdquo; on the {vocab.catalogueTitle} page. Drops
+            Hide single items from your store with &ldquo;Show online&rdquo; on the {vocab.catalogueTitle} page. Pre-orders
             hide the everyday {vocab.catalogue} unless you turn on &ldquo;Also show my everyday {vocab.catalogue}&rdquo;.
           </p>
           {!isOwner && <p className="text-xs text-muted-foreground">Only the owner can change this.</p>}

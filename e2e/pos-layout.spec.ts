@@ -143,7 +143,7 @@ test.describe("app shell navigation", () => {
     await more.click();
     const sheet = page.getByRole("dialog", { name: "More" });
     await expect(sheet).toBeVisible();
-    for (const name of ["Drops", "Transactions", "Analytics", "Settings", "Help"]) {
+    for (const name of ["Pre-orders", "Transactions", "Analytics", "Settings", "Help"]) {
       await expect(sheet.getByRole("link", { name, exact: true })).toBeVisible();
     }
     await expect(sheet.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
@@ -169,7 +169,7 @@ test.describe("app shell navigation", () => {
     await expect(page).toHaveURL(/\/menu$/);
     await expect(tab("Menu")).toHaveAttribute("aria-current", "page");
     await page.goto("/drops/new");
-    await expect(page.getByRole("heading", { level: 1, name: "New drop" })).toBeVisible();
+    await expect(page.getByRole("heading", { level: 1, name: "New pre-order" })).toBeVisible();
     await expect(more).toHaveAttribute("aria-current", "page");
 
     await tab("Sell").click();
@@ -211,7 +211,7 @@ test.describe("app shell navigation", () => {
 
     await tabs.getByRole("button", { name: "More" }).click();
     const sheet = page.getByRole("dialog", { name: "More" });
-    for (const name of ["Drops", "Sell"]) {
+    for (const name of ["Pre-orders", "Sell"]) {
       await expect(sheet.getByRole("link", { name, exact: true })).toBeVisible();
     }    await page.keyboard.press("Escape");
 
@@ -237,14 +237,14 @@ test.describe("app shell navigation", () => {
       "Orders",
       "Menu",
       "Store",
-      "Drops",
+      "Pre-orders",
       "Sell",
       "Transactions",
       "Analytics",
       "Settings",
       "Help",
     ]);
-    for (const name of ["Orders", "Menu", "Store", "Drops", "Sell", "Transactions", "Analytics", "Settings", "Help"]) {
+    for (const name of ["Orders", "Menu", "Store", "Pre-orders", "Sell", "Transactions", "Analytics", "Settings", "Help"]) {
       await expect(item(name)).toBeVisible();
       await expectTapTarget(item(name), `${name} rail link`);
     }
@@ -281,7 +281,7 @@ test.describe("app shell navigation", () => {
     await openPos(page, PHONE);
     const tabs = page.getByRole("navigation", { name: "Main" });
     await expect(tabs.getByRole("link")).toHaveText(["Orders", "Sell", "Store"]);
-    await expect(tabs.getByRole("link", { name: "Drops", exact: true })).toHaveCount(0);
+    await expect(tabs.getByRole("link", { name: "Pre-orders", exact: true })).toHaveCount(0);
     await expect(tabs.getByRole("link", { name: "Menu", exact: true })).toHaveCount(0);
 
     await tabs.getByRole("button", { name: "More" }).click();

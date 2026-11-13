@@ -10,7 +10,7 @@ const starter = PLAN_MARKETING.STARTER;
 
 export const metadata: Metadata = {
   title: "Pricing — AwaazOS",
-  description: `${starter.trial}, then plans from ${PLAN_MARKETING.LITE.price}. A store link for your Instagram bio, drops with a cut-off, and UPI orders on one board.`,
+  description: `${starter.trial}, then plans from ${PLAN_MARKETING.LITE.price}. A store link for your Instagram bio, pre-orders with a cut-off, and UPI orders on one board.`,
 };
 
 // A free trial, then Lite, Starter or Pro, monthly or yearly. FREE (grandfathered

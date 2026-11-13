@@ -83,7 +83,7 @@ describe("helpTopicsForRole", () => {
       behindMore: true,
     });
     expect(byId.get("ring-up-sale")).toMatchObject({ href: "/pos", path: ["Sell"], behindMore: false });
-    expect(byId.get("new-drop")).toMatchObject({ href: "/drops/new", path: ["Drops", "New drop"] });
+    expect(byId.get("new-drop")).toMatchObject({ href: "/drops/new", path: ["Pre-orders", "New pre-order"] });
   });
 });
 
@@ -140,9 +140,9 @@ describe("store wording", () => {
 
   it("reads as today for a kitchen", () => {
     const byId = new Map(helpTopicsForRole("OWNER").map((t) => [t.id, t]));
-    expect(byId.get("prep-sheet")).toMatchObject({ title: "Find out how much to cook", path: ["Orders", "choose the drop", "Prep sheet"] });
+    expect(byId.get("prep-sheet")).toMatchObject({ title: "Find out how much to cook", path: ["Orders", "choose the pre-order", "Prep sheet"] });
     expect(byId.get("edit-menu")!.title).toBe("Add a dish or change a price");
-    expect(byId.get("see-orders")!.steps).toContain("narrows the list to menu orders or to one drop");
+    expect(byId.get("see-orders")!.steps).toContain("narrows the list to menu orders or to one pre-order");
     expect(helpGroupsFor("food").find((g) => g.id === "menu")!.title).toBe("Menu");
   });
 
@@ -150,7 +150,7 @@ describe("store wording", () => {
     const text = allText("goods");
     expect(text).not.toMatch(/\bdish(es)?\b|\bcook|Menu screen|Prep sheet|home kitchens/i);
     const byId = new Map(helpTopicsForRole("OWNER", false, "goods").map((t) => [t.id, t]));
-    expect(byId.get("prep-sheet")).toMatchObject({ title: "Find out how much to pack", path: ["Orders", "choose the drop", "Packing list"] });
+    expect(byId.get("prep-sheet")).toMatchObject({ title: "Find out how much to pack", path: ["Orders", "choose the pre-order", "Packing list"] });
     expect(byId.get("voice-menu")!.steps).toContain("Add products by voice at the top of the Products screen");
     expect(byId.get("edit-menu")!.path).toEqual(["Products"]);
   });

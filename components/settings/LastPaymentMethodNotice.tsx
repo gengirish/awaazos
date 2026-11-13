@@ -9,12 +9,12 @@ import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
 /** Why the last way to pay can't go, naming the setting as this store's Settings does. */
 export function lastPaymentMethodMessage(kind: StoreKind = "food"): string {
   const setting = vocabularyForKind(kind).catalogueOrdersTitle;
-  return `Customers can order online right now (${setting} / an open drop), so keep at least one way to pay. Turn off ${setting} in Settings → Online orders or close the drop first.`;
+  return `Customers can order online right now (${setting} / an open pre-order), so keep at least one way to pay. Turn off ${setting} in Settings → Online orders or close the pre-order first.`;
 }
 
 const LINKS: Record<PaymentGuardBlocker, { href: string; text: string }> = {
   menu_orders: { href: "/settings/orders", text: "Go to Online orders" },
-  open_drop: { href: "/drops", text: "Go to Drops" },
+  open_drop: { href: "/drops", text: "Go to Pre-orders" },
 };
 
 /**

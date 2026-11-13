@@ -24,7 +24,7 @@ export default function PrivacyPage() {
       <ul>
         <li>Account data: name, email, phone number, hashed password, and role.</li>
         <li>
-          Business data: store profile and photos, menu or product list, drops, offers, transactions, receipts, and
+          Business data: store profile and photos, menu or product list, pre-orders, offers, transactions, receipts, and
           settings, including the store&apos;s UPI ID and, if connected, its Razorpay account (keys are stored
           encrypted).
         </li>

@@ -153,7 +153,7 @@ const MENU_MODE_LABEL: Record<FulfilmentMode, string> = {
 };
 
 function allBoardScope(vocab: StoreVocabulary): string {
-  return `Every online order, from your ${vocab.catalogue} and from your drops: the last 3 days, plus older ones still open.`;
+  return `Every online order, from your ${vocab.catalogue} and from your pre-orders: the last 3 days, plus older ones still open.`;
 }
 
 function catalogueBoardScope(vocab: StoreVocabulary): string {
@@ -797,7 +797,7 @@ export function OrdersBoard({
       ? undefined
       : o.dropId === null
         ? { kind: "menu", label: vocab.catalogueOrder }
-        : { kind: "drop", label: dropTitles.get(o.dropId) ?? "Drop" };
+        : { kind: "drop", label: dropTitles.get(o.dropId) ?? "Pre-order" };
 
   const storeIsLive = acceptMenuOrders || drops.some((d) => liveEffectiveStatus(d, now) === "OPEN");
 
@@ -806,7 +806,7 @@ export function OrdersBoard({
     <Button asChild>
       <Link href="/drops/new">
         <Plus aria-hidden />
-        New drop
+        New pre-order
       </Link>
     </Button>
   ) : undefined;
@@ -843,7 +843,7 @@ export function OrdersBoard({
       effective === "OPEN"
         ? {
             title: "No orders yet",
-            description: "Share your drop on WhatsApp to get the first one.",
+            description: "Share your pre-order on WhatsApp to get the first one.",
             action: (
               <div className="w-full max-w-sm">
                 <ShareDropButton
@@ -864,21 +864,21 @@ export function OrdersBoard({
         : effective === "DRAFT" && canEditDrops
           ? {
               title: "No orders yet",
-              description: "This drop is still a draft. Open it to start taking orders.",
+              description: "This pre-order is still a draft. Open it to start taking orders.",
               action: (
                 <Button asChild>
                   <Link href={`/drops/${drop.id}/edit`}>
                     <Pencil aria-hidden />
-                    Edit drop
+                    Edit pre-order
                   </Link>
                 </Button>
               ),
             }
-          : { description: "No orders on this drop.", action: newDropAction };
+          : { description: "No orders on this pre-order.", action: newDropAction };
   } else if (sources.length === 0) {
     empty = {
       title: "No orders yet",
-      description: `Turn on “${vocab.catalogueOrdersTitle}” in Settings → Online orders, or create a drop, to start taking them.`,
+      description: `Turn on “${vocab.catalogueOrdersTitle}” in Settings → Online orders, or create a pre-order, to start taking them.`,
       action: newDropAction,
     };
   } else if (activeScope === "menu" && !acceptMenuOrders) {
@@ -908,7 +908,7 @@ export function OrdersBoard({
   } else {
     empty = {
       title: "No orders yet",
-      description: "None of your drops is taking orders right now.",
+      description: "None of your pre-orders is taking orders right now.",
       action: newDropAction,
     };
   }

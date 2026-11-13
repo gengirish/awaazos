@@ -499,7 +499,7 @@ export function postProcessDropDraft(
   }
   if (feePaise !== undefined) {
     if (draft.fulfilmentMode === "PICKUP") {
-      if (feePaise > 0) warn("A delivery fee was mentioned for a pickup-only drop — it was left out");
+      if (feePaise > 0) warn("A delivery fee was mentioned for a pickup-only pre-order — it was left out");
       draft.deliveryFeePaise = 0;
     } else {
       draft.deliveryFeePaise = feePaise;

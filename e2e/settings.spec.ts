@@ -96,7 +96,7 @@ test.describe("settings hub", () => {
     // and "order from menu" is off. The live store link now sits in the card.
     await expect(checklist.getByRole("link", { name: /publish your online store/i })).toHaveCount(0);
     await expect(checklist.getByRole("link", { name: /UPI ID or allow pay on delivery/i })).toHaveCount(0);
-    await expect(checklist.getByRole("link", { name: /create your first drop/i })).toBeVisible();
+    await expect(checklist.getByRole("link", { name: /create your first pre-order/i })).toBeVisible();
     await expect(checklist.getByRole("button", { name: "Copy link" })).toBeVisible();
   });
 

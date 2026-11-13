@@ -112,11 +112,11 @@ export function ShareDropButton(props: ShareDropButtonProps) {
       <button
         type="button"
         onClick={share}
-        aria-label={`Share this drop: ${dropTitle}`}
+        aria-label={`Share this pre-order: ${dropTitle}`}
         className={cn(baseBtn, "w-full bg-primary text-primary-foreground hover:bg-primary/90")}
       >
         <Share2 className="h-4 w-4" aria-hidden="true" />
-        Share this drop
+        Share this pre-order
       </button>
     );
   }
@@ -125,7 +125,7 @@ export function ShareDropButton(props: ShareDropButtonProps) {
     <div className="flex flex-col gap-2">
       <button type="button" onClick={share} className={cn(baseBtn, "bg-primary text-primary-foreground hover:bg-primary/90")}>
         <Share2 className="h-4 w-4" aria-hidden="true" />
-        Share this drop
+        Share this pre-order
       </button>
       <div className="flex flex-wrap gap-2">
         <button

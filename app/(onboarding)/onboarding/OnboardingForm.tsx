@@ -720,7 +720,7 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
     const action = doneNextAction(orderMode, published);
     const primary =
       action === "first-drop"
-        ? { href: "/drops/new", label: "Create your first drop" }
+        ? { href: "/drops/new", label: "Create your first pre-order" }
         : action === "orders"
           ? { href: "/orders", label: "Go to your orders" }
           : { href: "/settings/store", label: "Publish your store" };
@@ -742,8 +742,8 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
           <p className="mt-1 text-sm text-muted-foreground">
             {action === "first-drop"
               ? published
-                ? "Next, put up a drop: what you're making, how many, and when orders close."
-                : "Next, put up a drop: what you're making, how many, and when orders close. You'll be asked to publish your store when you open it."
+                ? "Next, put up a pre-order: what you're making, how many, and when orders close."
+                : "Next, put up a pre-order: what you're making, how many, and when orders close. You'll be asked to publish your store when you open it."
               : action === "orders"
                 ? `Customers can order from your ${vocab.catalogue} now. New orders show up in Orders.`
                 : `Publish your store when you're ready, so customers can order from your ${vocab.catalogue}.`}
@@ -1137,7 +1137,7 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
                 }}
                 invalid={Boolean(errors["order-mode-drops"])}
                 aria-describedby={errors["order-mode-drops"] ? "order-mode-drops-error" : undefined}
-                label="Drops"
+                label="Pre-orders"
                 hint={`Batches you announce, like “${vocab.dropExample}”. Customers order until a cut-off you set.`}
               />
               <RadioOption
@@ -1162,7 +1162,7 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
                 }}
                 invalid={Boolean(errors["order-mode-drops"])}
                 label="Both"
-                hint={`Drops for special batches, and your ${vocab.catalogue} the rest of the time.`}
+                hint={`Pre-orders for special batches, and your ${vocab.catalogue} the rest of the time.`}
               />
               <FieldError id="order-mode-drops" message={errors["order-mode-drops"]} />
             </fieldset>

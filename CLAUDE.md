@@ -430,6 +430,12 @@ Core rules live in `lib/drops.ts` (read its header before touching it); buyers o
 `/s/[slug]`, the vendor builds drops on `/drops`, works their orders on `/orders` (the one orders
 board, see "One orders board" below) and prints from `/drops/[id]/prep`.
 
+**"Drop" is the code's word only. Sellers and buyers read "Pre-order"** ("New pre-order", the
+"Pre-orders" tab, "Share this pre-order"). Wording only, like the store vocabulary: routes (`/drops`,
+`/api/drops`, `?drop=`), the `Drop` model, API fields and error codes keep their names. New copy never
+says "drop"; a buyer's own purchase stays an "order". The voice drop builder's system prompt still says
+"drop" (changing it needs a golden run).
+
 Three invariants, enforced in `lib/drops.ts` and nowhere else:
 
 1. **No timers.** Cut-off is evaluated lazily on every read and order attempt

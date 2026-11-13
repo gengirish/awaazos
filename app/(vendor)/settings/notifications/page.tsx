@@ -13,7 +13,7 @@ export const dynamic = "force-dynamic";
 export const metadata: Metadata = { title: "Notifications · Settings · AwaazOS" };
 
 const WHAT_YOU_GET = [
-  { icon: BellRing, text: "A new order from your online store or a drop." },
+  { icon: BellRing, text: "A new order from your online store or a pre-order." },
   { icon: CreditCard, text: "A payment to check, when a customer sends a UPI reference." },
   { icon: MousePointerClick, text: "Tap the alert to open your orders board." },
   { icon: LockKeyhole, text: "No customer names or numbers on your lock screen — only the bill number and amount." },

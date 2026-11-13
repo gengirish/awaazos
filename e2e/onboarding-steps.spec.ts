@@ -191,14 +191,14 @@ test.describe("setup steps", () => {
     await page.reload();
     await expect(page.getByRole("heading", { name: "Check and publish" })).toBeVisible();
     await expect(page.getByText("UPI to e2e@okaxis")).toBeVisible();
-    await expect(page.getByText("Drops, each with a cut-off")).toBeVisible();
+    await expect(page.getByText("Pre-orders, each with a cut-off")).toBeVisible();
     await expect(page.getByText("Pickup: Gate 2")).toBeVisible();
     await expect(page.getByText("Nothing added")).toBeVisible();
 
     await page.getByRole("button", { name: "Finish without publishing" }).click();
     await expect(page.getByRole("heading", { name: "Setup is done" })).toBeVisible();
     await expect(page.getByText(/This link is not public yet/)).toBeVisible();
-    await expect(page.getByRole("link", { name: "Create your first drop" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Create your first pre-order" })).toBeVisible();
 
     const { vendor } = (await (await page.request.get("/api/vendor")).json()) as {
       vendor: { slug: string; onboardingDone: boolean; settings: { publishStorefront: boolean } };

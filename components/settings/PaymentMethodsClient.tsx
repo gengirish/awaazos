@@ -52,7 +52,7 @@ export function PaymentMethodsClient({
 
       <SettingsCard
         title="Pay on delivery"
-        description={`For online orders and Drops: let customers pay when they get their ${vocabularyForKind(storeKind).goods}.`}
+        description={`For online orders and pre-orders: let customers pay when they get their ${vocabularyForKind(storeKind).goods}.`}
       >
           <PayOnDeliveryClient
             initialAcceptPayOnDelivery={initialAcceptPayOnDelivery}

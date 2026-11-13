@@ -1,5 +1,5 @@
 Hi {firstName}, this is {senderName} from AwaazOS.
 
-{storeName} is set up, but no paid order has come through yet. Can I help you get the first one? I can help with your store link, your first drop, or anything else that's unclear.
+{storeName} is set up, but no paid order has come through yet. Can I help you get the first one? I can help with your store link, your first pre-order, or anything else that's unclear.
 
 Your store: {storeUrl}

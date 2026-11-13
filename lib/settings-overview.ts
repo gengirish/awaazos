@@ -228,9 +228,9 @@ export function setupChecklist(s: SetupChecklistInput, kind: StoreKind = "food")
   if (s.dropCount <= 0 && !s.acceptMenuOrders) {
     items.push({
       id: "first_drop",
-      text: `Create your first drop or turn on ${vocab.catalogueOrders.toLowerCase()}`,
+      text: `Create your first pre-order or turn on ${vocab.catalogueOrders.toLowerCase()}`,
       href: "/drops/new",
-      linkText: "Create a drop",
+      linkText: "Create a pre-order",
       minRole: "MANAGER",
       hint: `To sell from your everyday ${vocab.catalogue} instead, the owner turns on ${vocab.catalogueOrdersTitle} in Settings → Online orders.`,
     });

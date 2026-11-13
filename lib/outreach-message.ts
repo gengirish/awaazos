@@ -112,7 +112,7 @@ export function outreachTemplate(
         ? `Hi {firstName}, someone ordered from your AwaazOS store {storeUrl}. Claim it here to accept the order: {claimUrl}`
         : `Hi {firstName}, someone ordered from your AwaazOS store {storeUrl}. Send me your email and I'll send you the link that makes the store yours, so you can accept the order.`;
     case "going_quiet":
-      return `Hi {firstName}, {storeName} has had a quiet week. Want me to set up this week's drop for you?`;
+      return `Hi {firstName}, {storeName} has had a quiet week. Want me to set up this week's pre-order for you?`;
   }
 }
 

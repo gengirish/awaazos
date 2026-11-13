@@ -135,7 +135,7 @@ export function AddMenuItemDialog({ spokenName, onClose, onAdded, vocab }: AddMe
         <ResponsiveDialogHeader>
           <ResponsiveDialogTitle>Add to your {vocab.catalogue}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription>
-            It is saved to your {vocab.catalogue} and ticked for this drop. You can add a photo and more on the{" "}
+            It is saved to your {vocab.catalogue} and ticked for this pre-order. You can add a photo and more on the{" "}
             {vocab.catalogueTitle} page later.
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>

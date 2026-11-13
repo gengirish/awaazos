@@ -216,7 +216,7 @@ const ERROR_DEPENDENTS: Partial<Record<keyof FormState, (keyof FieldErrors)[]>> 
 /** `{catalogue}` is filled with the store's word for it (lib/store-vocabulary.ts). */
 const API_ERRORS: Record<string, string> = {
   unknown_items: "One of the chosen items is no longer on your {catalogue}. Pick the items again.",
-  unknown_drops: "One of the chosen drops no longer exists. Pick the drops again.",
+  unknown_drops: "One of the chosen pre-orders no longer exists. Pick the pre-orders again.",
   unknown_free_item: "The free item is no longer on your {catalogue}. Pick it again.",
   offer_limit_reached: "You have reached the limit of 20 offers. Delete one you no longer use.",
 };
@@ -224,7 +224,7 @@ const API_ERRORS: Record<string, string> = {
 function whereLabel(o: OfferDto, kind: StoreKind): string {
   const parts = [
     o.onMenuOrders ? (kind === "food" ? "Online menu" : "Online store") : null,
-    o.onDrops ? (o.dropIds.length > 0 ? `${o.dropIds.length} chosen ${o.dropIds.length === 1 ? "drop" : "drops"}` : "Drops") : null,
+    o.onDrops ? (o.dropIds.length > 0 ? `${o.dropIds.length} chosen ${o.dropIds.length === 1 ? "pre-order" : "pre-orders"}` : "Pre-orders") : null,
     o.onPos && o.discountType !== "FREE_ITEM" ? "Counter" : null,
   ].filter(Boolean);
   return parts.join(" · ");
@@ -672,7 +672,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
                     </select>
                     <p className="text-xs text-muted-foreground">
                       Added to the order at no charge once it qualifies, and it does not count toward the minimum. On a
-                      drop it must be one of the drop&apos;s items, and it comes out of that item&apos;s stock.
+                      pre-order it must be one of the pre-order&apos;s items, and it comes out of that item&apos;s stock.
                     </p>
                     {err("freeItemId")}
                   </div>
@@ -733,7 +733,7 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
                       checked={form.onDrops}
                       onChange={(e) => set("onDrops", e.target.checked)}
                     />
-                    Drops (pre-orders)
+                    Pre-orders
                   </label>
                   {form.reward === "PERCENT" ? (
                     <label className={CHECK_ROW}>
@@ -753,8 +753,8 @@ export function OffersClient({ initialOffers, menuItems, drops, canEdit, storeKi
 
                 {form.onDrops && drops.length > 0 ? (
                   <fieldset className="space-y-1">
-                    <legend className="text-sm font-medium">Only on these drops (optional)</legend>
-                    <p className="text-xs text-muted-foreground">Leave all unticked to use it on every drop.</p>
+                    <legend className="text-sm font-medium">Only on these pre-orders (optional)</legend>
+                    <p className="text-xs text-muted-foreground">Leave all unticked to use it on every pre-order.</p>
                     <div className="max-h-44 overflow-y-auto rounded-md border px-3">
                       {drops.map((d) => (
                         <label key={d.id} className={CHECK_ROW}>

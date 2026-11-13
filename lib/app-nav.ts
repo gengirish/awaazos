@@ -44,7 +44,7 @@ export const APP_NAV_ITEMS: readonly AppNavItem[] = [
   { id: "orders", href: "/orders", label: "Orders", managerOnly: false },
   { id: "menu", href: "/menu", label: "Menu", managerOnly: true },
   { id: "store", href: "/store", label: "Store", managerOnly: false },
-  { id: "drops", href: "/drops", label: "Drops", managerOnly: true },
+  { id: "drops", href: "/drops", label: "Pre-orders", managerOnly: true },
   { id: "sell", href: "/pos", label: "Sell", managerOnly: false },
   { id: "transactions", href: "/transactions", label: "Transactions", managerOnly: true },
   { id: "analytics", href: "/analytics", label: "Analytics", managerOnly: true },

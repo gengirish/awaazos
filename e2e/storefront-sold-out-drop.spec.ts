@@ -49,7 +49,7 @@ test("drop + menu carts share one bar; a sold-out drop hands the buyer to the me
 
   // ── Vendor: a drop with exactly one to sell ─────────────────────────
   await page.goto("/drops/new");
-  await expect(page.getByRole("heading", { name: "New drop" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "New pre-order" })).toBeVisible();
   await page.getByText("More options").click();
   await page.getByLabel("Title").fill(dropTitle);
   await page.getByRole("radio", { name: "Both" }).click();
