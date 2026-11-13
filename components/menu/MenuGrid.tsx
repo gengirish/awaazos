@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type 
 import { toast } from "sonner";
 
 import { MenuItemCard, type MenuMoveDirection } from "@/components/menu/MenuItemCard";
+import { ReceiveStockDialog, canReceiveStock } from "@/components/menu/ReceiveStockDialog";
 import type { StockSaved } from "@/components/menu/StockStepper";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -34,6 +35,8 @@ type MenuGridProps = {
   onEdit: (item: MenuRow) => void;
   /** The store's words (lib/store-vocabulary.ts). */
   vocab: StoreVocabulary;
+  /** MANAGER and up: the cards offer "Received stock" (lib/stock-purchase.ts rule 2). */
+  canSeeCost?: boolean;
 };
 
 /** One request for the whole order (POST /api/menu/reorder). False when it did not save. */
@@ -50,8 +53,9 @@ async function saveOrder(rows: MenuRow[]): Promise<boolean> {
   }
 }
 
-export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }: MenuGridProps) {
+export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab, canSeeCost = false }: MenuGridProps) {
   const router = useRouter();
+  const [receiving, setReceiving] = useState<MenuRow | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   // Reorder saves run one at a time; taps made meanwhile collapse into one more save.
   const savingOrder = useRef(false);
@@ -97,6 +101,19 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
   const refresh = useCallback(() => {
     router.refresh();
   }, [router]);
+
+  // After "Received stock": counts and the cost moved, so read the rows again.
+  // Fetched here because router.refresh() beside a save is sometimes not applied.
+  const reloadRows = useCallback(async () => {
+    try {
+      const res = await fetch("/api/menu", { credentials: "include" });
+      if (!res.ok) return;
+      const body = (await res.json()) as { data?: MenuRow[] };
+      if (body.data) setItems(body.data);
+    } catch {
+      // Offline: the list catches up on the next page load.
+    }
+  }, [setItems]);
 
   // The card already shows its own figure; this keeps the list (and its filter) in step.
   const onStockSaved = useCallback(
@@ -276,6 +293,7 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
                     onEdit={onEdit}
                     onChanged={refresh}
                     onStockSaved={onStockSaved}
+                    onReceive={canSeeCost && canReceiveStock(item) ? setReceiving : undefined}
                     onMove={filtering ? undefined : move}
                     canMoveUp={index > 0}
                     canMoveDown={index < items.length - 1}
@@ -286,6 +304,7 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab }
           )}
         </>
       )}
+      <ReceiveStockDialog item={receiving} onClose={() => setReceiving(null)} onSaved={() => void reloadRows()} />
     </div>
   );
 }

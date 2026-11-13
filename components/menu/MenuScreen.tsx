@@ -138,6 +138,7 @@ export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vo
           onAdd={openCreate}
           onEdit={openEdit}
           vocab={vocab}
+          canSeeCost={canSeeCost}
         />
         {formMounted ? (
           <MenuItemForm

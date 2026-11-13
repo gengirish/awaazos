@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { ArrowDown, ArrowUp, Pencil } from "lucide-react";
+import { ArrowDown, ArrowUp, PackagePlus, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -23,6 +23,8 @@ export type MenuItemCardProps = {
   onChanged: () => void;
   /** A stock change saved from the card (tracked items only). */
   onStockSaved?: (id: string, saved: StockSaved) => void;
+  /** Opens "Received stock" (lib/stock-purchase.ts). Leave out for a cashier, or when stock is not tracked. */
+  onReceive?: (item: MenuRow) => void;
   /** Reorder by one place. Leave out to hide the Move buttons. */
   onMove?: (item: MenuRow, direction: MenuMoveDirection) => void;
   canMoveUp?: boolean;
@@ -41,6 +43,7 @@ export function MenuItemCard({
   onEdit,
   onChanged,
   onStockSaved,
+  onReceive,
   onMove,
   canMoveUp = false,
   canMoveDown = false,
@@ -184,6 +187,19 @@ export function MenuItemCard({
               );
             })}
           </ul>
+        ) : null}
+        {onReceive ? (
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="min-h-11 w-full"
+            onClick={() => onReceive(item)}
+            aria-label={`Received stock for ${item.name}`}
+          >
+            <PackagePlus className="mr-1 h-4 w-4" aria-hidden />
+            Received stock
+          </Button>
         ) : null}
         <div className="flex items-center gap-1 text-sm">
           <Switch

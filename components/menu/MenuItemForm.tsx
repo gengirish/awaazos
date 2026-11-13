@@ -45,6 +45,7 @@ import { suggestEmoji } from "@/lib/menu-suggestions";
 import { isValidMenuUnit, MENU_UNIT_MAX, MENU_UNIT_MESSAGE, normaliseMenuUnit } from "@/lib/menu-unit";
 import { DEFAULT_EMOJI, defaultEmoji, emojiChoices } from "@/lib/menu-emoji";
 import { categoryOptions, paiseToRupeeInput, parseRupeeInput } from "@/lib/menu-voice";
+import { purchaseLine, type PurchaseRow } from "@/lib/stock-purchase";
 import { vocabularyForKind, type StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 import { MENU_DESCRIPTION_MAX, menuItemCreateInputSchema, menuItemUpdateSchema } from "@/lib/zod-menu";
@@ -171,6 +172,8 @@ export function MenuItemForm({
   const lowInputRef = useRef<HTMLInputElement>(null);
   // Cost price (lib/item-cost.ts): blank = none recorded.
   const [costText, setCostText] = useState("");
+  // The last few times stock came in (lib/stock-purchase.ts); MANAGER and up, existing items only.
+  const [purchases, setPurchases] = useState<PurchaseRow[]>([]);
   const [costError, setCostError] = useState<string | null>(null);
   const costInputRef = useRef<HTMLInputElement>(null);
   // Sizes or colours (lib/item-variants-form.ts): saved after the item, by PUT /api/menu/[id]/variants.
@@ -189,6 +192,25 @@ export function MenuItemForm({
   // A problem in a folded field must be visible, whatever the seller last tapped.
   const moreShown =
     moreOpen || Boolean(errors.aliasesCsv || errors.tagsCsv || errors.hsnCode || errors.emoji);
+
+  // Read when the form opens on an existing item; nothing polls.
+  const itemId = item?.id;
+  useEffect(() => {
+    setPurchases([]);
+    if (!open || !itemId || !canSeeCost) return;
+    let stale = false;
+    fetch(`/api/menu/${itemId}/purchases`, { credentials: "include" })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((body: { data?: PurchaseRow[] } | null) => {
+        if (!stale && body?.data) setPurchases(body.data);
+      })
+      .catch(() => {
+        // The list is extra: the form works without it.
+      });
+    return () => {
+      stale = true;
+    };
+  }, [open, itemId, canSeeCost]);
 
   useEffect(() => {
     if (!open) return;
@@ -553,6 +575,16 @@ export function MenuItemForm({
                     {costHint(form.watch("priceInRupees"), costText) ??
                       `What one ${vocab.item} costs you. Buyers and cashiers never see it.`}
                   </p>
+                </div>
+              ) : null}
+              {purchases.length > 0 ? (
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">Stock received</p>
+                  <ul className="space-y-0.5 text-xs text-muted-foreground">
+                    {purchases.map((p) => (
+                      <li key={p.id}>{purchaseLine(p)}</li>
+                    ))}
+                  </ul>
                 </div>
               ) : null}
               <FormField

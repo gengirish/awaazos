@@ -1,6 +1,7 @@
 # Cost price, purchases and profit plan
 
-Status: step 1 (cost price) built on `feat/item-cost`; steps 2 to 4 not started. Written 2026-11-12.
+Status: step 1 (cost price) merged 2026-11-12 (#199); step 2 (purchases) built on `feat/stock-purchases`;
+steps 3 and 4 not started. Written 2026-11-12.
 
 Why: a clothing seller (House of Kaara) ran her stock in a small app she built for herself before
 she came to us. It did three things AwaazOS does not: it kept a **cost price** per dress, a dated
@@ -105,17 +106,23 @@ model StockPurchase {
 }
 ```
 
-Work:
+As built (rules in the header of `lib/stock-purchase.ts`):
 
-- `POST /api/menu/[id]/stock` takes a third shape, `{ receive: n, costInPaise?, variantId? }`
-  (MANAGER). In one transaction: lock the row as today, `recordStockAdjust(+n)`, insert the purchase,
-  and when a cost is given, set it as the item's or size's cost. Compound `{ id, vendorId }` scope.
-- The stock stepper's "Received" opens a small sheet: quantity and cost each, pre-filled with the
-  current cost. −1 / +1 and "Set count" stay as they are and write no purchase.
+- Its own route, not a third shape on the stock route: `POST /api/menu/[id]/purchases`
+  `{ lines: [{ qty, variantId? }], costInRupees? }` (MANAGER), so one delivery covers several sizes in one
+  save. In one transaction: lock the rows as an order does, move each count up like +n
+  (`recordStockAdjust`, so `stockCountedAt` stays put), write one `StockPurchase` per line, and when a cost
+  is given make it the latest cost: a size with its own cost takes it, otherwise the item does.
+  `GET` on the same path returns the item's last 5 purchases.
+- The table also keeps `variantLabel`, so a purchase still names its size after the size is deleted.
+- Left blank, the cost on record at that moment is kept on the purchase (it may be none).
+- Only tracked stock can be received (409 `stock_not_tracked`); an item with sizes is received by size.
+- The item card has "Received stock" for MANAGER and up: a quantity per tracked size and one cost each,
+  pre-filled with the current cost. −1 / +1 and "Set count" stay as they are and write no purchase.
 - Switching tracking on, or the first "Set count", is opening stock: no purchase row.
-- The item form lists the last few purchases (date, quantity, cost). Delete of an item cascades them.
-- Tests: `inventory.db.test.ts` cases for receive (count moves, `stockCountedAt` doesn't, row written,
-  cost updated), and an `e2e/tenant-isolation.spec.ts` case for the new shape.
+- The item form lists the last purchases (date, size, quantity, cost). Deleting an item deletes them.
+- Tests: `lib/__tests__/stock-purchase.test.ts`, `stock-purchase.db.test.ts` (in `npm run test:drops:db`),
+  `e2e/stock-purchase.spec.ts`, and a case in `e2e/tenant-isolation.spec.ts`.
 
 ## Step 3: stock and profit report
 
@@ -171,7 +178,8 @@ off in production until the remaining phase 2 work in `docs/INVENTORY_PLAN.md` l
 
 1. Is latest cost enough for her, or does she buy the same dress at different costs often enough to
    want an average? Ask her before step 2.
-2. Should a purchase at a new cost change the item's cost without asking, or ask each time?
+2. Should a purchase at a new cost change the item's cost without asking, or ask each time? Built as:
+   it changes it, and the dialog says so under the cost field.
 3. Does profit sit behind a plan?
 4. Does she want her past sales visible inside AwaazOS at all? If yes, the smallest honest form is
    a "before AwaazOS" total per item on the report, not bills.
