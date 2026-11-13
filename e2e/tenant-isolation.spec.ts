@@ -120,6 +120,31 @@ test.describe("tenant isolation", () => {
     expect(rowB?.variants).toEqual([]);
   });
 
+  test("vendor B cannot record or read vendor A's stock purchases (404, not 403)", async () => {
+    const itemA = await createMenuItem(pageA, { name: "A Purchased Candle", priceInRupees: 299 });
+    const itemB = await createMenuItem(pageB, { name: "B Candle", priceInRupees: 299 });
+    await pageA.request.patch(`/api/menu/${itemA.id}`, { data: { stockQty: 5, costInRupees: 100 } });
+    await pageB.request.patch(`/api/menu/${itemB.id}`, { data: { stockQty: 5 } });
+    const own = await pageA.request.post(`/api/menu/${itemA.id}/purchases`, { data: { lines: [{ qty: 2 }] } });
+    expect(own.status()).toBe(201);
+
+    const receive = await pageB.request.post(`/api/menu/${itemA.id}/purchases`, {
+      data: { lines: [{ qty: 50 }], costInRupees: 1 },
+    });
+    expect(receive.status(), "cross-tenant purchase must 404, never 403").toBe(404);
+    const read = await pageB.request.get(`/api/menu/${itemA.id}/purchases`);
+    expect(read.status(), "cross-tenant purchase list must 404").toBe(404);
+    const ownList = await pageB.request.get(`/api/menu/${itemB.id}/purchases`);
+    expect(((await ownList.json()) as { data: unknown[] }).data).toEqual([]);
+
+    type CostedRow = MenuItemRow & { stockLeft: number | null; costInPaise: number | null };
+    const listA = await pageA.request.get("/api/menu");
+    const rowA = ((await listA.json()) as { data: CostedRow[] }).data.find((i) => i.id === itemA.id);
+    expect(rowA).toMatchObject({ stockLeft: 7, costInPaise: 10000 });
+    const purchasesA = await pageA.request.get(`/api/menu/${itemA.id}/purchases`);
+    expect(((await purchasesA.json()) as { data: unknown[] }).data).toHaveLength(1);
+  });
+
   test("vendor B's menu listing never contains vendor A's items", async () => {
     const itemA = await createMenuItem(pageA, { name: "A Only Chai", priceInRupees: 10 });
     await createMenuItem(pageB, { name: "B Only Coffee", priceInRupees: 20 });

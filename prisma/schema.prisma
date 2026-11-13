@@ -61,6 +61,7 @@ model Vendor {
 
   menuItems             MenuItem[]
   itemVariants          ItemVariant[]
+  stockPurchases        StockPurchase[]
   transactions          Transaction[]
   receipts              Receipt[]
   staff                 StaffMember[]
@@ -210,9 +211,10 @@ model MenuItem {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  orderItems OrderItem[]
-  dropItems  DropItem[]
-  variants   ItemVariant[]
+  orderItems     OrderItem[]
+  dropItems      DropItem[]
+  variants       ItemVariant[]
+  stockPurchases StockPurchase[]
 
   @@unique([vendorId, slug])
   @@index([vendorId, isAvailable])
@@ -240,11 +242,40 @@ model ItemVariant {
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 
-  orderItems OrderItem[]
+  orderItems     OrderItem[]
+  stockPurchases StockPurchase[]
 
   @@index([menuItemId])
   @@index([vendorId])
   @@map("item_variants")
+}
+
+// ─── STOCK PURCHASES ───────────────────────────────────────────────
+//
+// One row each time the seller records stock that came in ("Received"), with
+// what each piece cost. A record only: stock left still comes from the count
+// and the orders (lib/inventory.ts), never from summing these. Rules in
+// lib/stock-purchase.ts.
+
+model StockPurchase {
+  id              String       @id @default(cuid())
+  vendorId        String
+  vendor          Vendor       @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  menuItemId      String
+  menuItem        MenuItem     @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  variantId       String?
+  variant         ItemVariant? @relation(fields: [variantId], references: [id], onDelete: SetNull)
+  variantLabel    String? // Snapshot of the size / colour, kept when it is deleted
+  qty             Int
+  unitCostInPaise Int? // null = no cost recorded for this purchase
+  purchasedAt     DateTime     @default(now())
+  createdByUserId String?
+  createdAt       DateTime     @default(now())
+
+  @@index([vendorId, purchasedAt])
+  @@index([menuItemId, purchasedAt])
+  @@index([variantId])
+  @@map("stock_purchases")
 }
 
 // ─── OFFERS (quantity-based plan discounts) ────────────────────────

@@ -787,7 +787,14 @@ The store page's picker is `components/storefront/SizePicker.tsx` (menu and drop
 zero. MANAGER and OWNER only: every other viewer's rows carry null (`rowsForRole`, `withVariants(..., { cost })`), a
 cost a cashier sends is ignored, and it is never in a public select or the voice prompt. Each bill line keeps the
 cost of its moment in `OrderItem.costInPaise`, written by `stampOrderCosts` inside all three order-creating
-transactions. Not built yet: purchase records, the profit report.
+transactions. Not built yet: the profit report.
+
+**Stock purchases** (rules in the header of `lib/stock-purchase.ts`): "Received stock" on an item card (MANAGER and
+up) posts `{ lines: [{ qty, variantId? }], costInRupees? }` to `POST /api/menu/[id]/purchases`. In one transaction it
+moves each count up through `recordStockAdjust` (never `stockCountedAt`), writes one `StockPurchase` row per line and,
+when a cost is given, makes it the latest cost (a size with its own cost takes it, else the item). A record only: stock
+left never comes from summing purchases. Only tracked stock can be received (409 `stock_not_tracked`); an item with sizes
+is received by size. `GET` on the same path lists the last 5 for the item form. No edit or undo yet.
 
 ### Customer feedback
 

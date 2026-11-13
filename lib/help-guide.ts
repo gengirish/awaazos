@@ -285,7 +285,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "track-stock",
     group: "menu",
     title: "Keep count of how many you have",
-    steps: "Tap Edit on a {item}, switch on Track stock and enter how many are in stock now. Each sale takes one off, and your online store stops taking orders at 0. Use − and + on the {item} when stock comes in or gets damaged, or Set count after a recount. Count everything you have, including any packed for orders not handed over yet: those orders are taken off for you.",
+    steps: "Tap Edit on a {item}, switch on Track stock and enter how many are in stock now. Each sale takes one off, and your online store stops taking orders at 0. Use − and + on the {item} when stock comes in or gets damaged, or Set count after a recount. An owner or manager can also tap Received stock to add a delivery in one go and note what each piece cost. Count everything you have, including any packed for orders not handed over yet: those orders are taken off for you.",
     nav: "menu",
     keywords: "stock inventory quantity count oversell low stock left warn",
   },
