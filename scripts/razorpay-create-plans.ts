@@ -28,6 +28,7 @@ import {
   type BillingInterval,
   type SubscribablePlan,
 } from "../lib/subscription";
+import { BRAND_NAME } from "../lib/brand";
 
 function loadEnvLocal(): void {
   const file = path.join(process.cwd(), ".env.local");
@@ -50,7 +51,7 @@ const PLANS: { plan: SubscribablePlan; interval: BillingInterval; env: string; p
       interval,
       env: `RAZORPAY_PLAN_${plan}_${interval.toUpperCase()}`,
       period: interval,
-      name: `AwaazOS ${plan.charAt(0)}${plan.slice(1).toLowerCase()} (${interval})`,
+      name: `${BRAND_NAME} ${plan.charAt(0)}${plan.slice(1).toLowerCase()} (${interval})`,
     })),
   );
 

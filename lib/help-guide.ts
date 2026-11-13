@@ -5,6 +5,7 @@ import { TRIAL_DAYS } from "@/lib/constants";
 import { PUBLIC_RATING_MIN } from "@/lib/order-feedback";
 import { REFERRAL_REWARD_CAP_PER_YEAR, REFERRED_TRIAL_DAYS, rewardMonthsFor } from "@/lib/referral";
 import { fillVocabulary, vocabularyForKind, type StoreKind, type StoreVocabulary } from "@/lib/store-vocabulary";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * Content of the in-app Help page (`/help`): what each screen is for and where
@@ -366,7 +367,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "whatsapp-group-link",
     group: "setup",
     title: "Add your WhatsApp group or channel",
-    steps: "In WhatsApp, copy your group's invite link (group info → Invite via link) or your channel's link (Share). Paste it under WhatsApp group or channel and save. Customers see a Join button on your store and on every order page, and join it themselves. AwaazOS never sends anything to your group: post your announcements there as you do now.",
+    steps: `In WhatsApp, copy your group's invite link (group info → Invite via link) or your channel's link (Share). Paste it under WhatsApp group or channel and save. Customers see a Join button on your store and on every order page, and join it themselves. ${BRAND_NAME} never sends anything to your group: post your announcements there as you do now.`,
     nav: "settings",
     href: "/settings/store",
     trail: ["Online store"],
@@ -468,7 +469,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     group: "setup",
     title: "Get an alert on this phone for new orders",
     steps:
-      "Turn alerts on for this device. On an iPhone, add AwaazOS to your Home Screen first. Turn on Voice alert to hear new orders spoken aloud while AwaazOS is open.",
+      `Turn alerts on for this device. On an iPhone, add ${BRAND_NAME} to your Home Screen first. Turn on Voice alert to hear new orders spoken aloud while ${BRAND_NAME} is open.`,
     nav: "settings",
     href: "/settings/notifications",
     trail: ["Notifications"],

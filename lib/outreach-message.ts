@@ -11,6 +11,7 @@
 import { TRIAL_DAYS } from "@/lib/constants";
 import { DEMO_CLAIM_TTL_DAYS } from "@/lib/demo-store-schema";
 import { receiptWhatsappUrl } from "@/lib/whatsapp-message";
+import { BRAND_NAME } from "@/lib/brand";
 
 /** First word of a name, or "" — "Lahari Pruthvi" → "Lahari". */
 export function firstName(name: string | null | undefined): string {
@@ -22,7 +23,7 @@ function greeting(ownerName: string | null | undefined): string {
   return first ? `Hi ${first},` : "Hi,";
 }
 
-const WHAT_WE_BUILD = "AwaazOS for home businesses that take orders on Instagram and WhatsApp.";
+const WHAT_WE_BUILD = `${BRAND_NAME} for home businesses that take orders on Instagram and WhatsApp.`;
 
 /** "Founder" only when it is true: everyone else on the team writes as themselves. */
 function introduction(senderName: string | null | undefined, senderIsFounder: boolean): string {
@@ -109,8 +110,8 @@ export function outreachTemplate(
       ].join("\n\n");
     case "orders_waiting":
       return input.withClaimLink
-        ? `Hi {firstName}, someone ordered from your AwaazOS store {storeUrl}. Claim it here to accept the order: {claimUrl}`
-        : `Hi {firstName}, someone ordered from your AwaazOS store {storeUrl}. Send me your email and I'll send you the link that makes the store yours, so you can accept the order.`;
+        ? `Hi {firstName}, someone ordered from your ${BRAND_NAME} store {storeUrl}. Claim it here to accept the order: {claimUrl}`
+        : `Hi {firstName}, someone ordered from your ${BRAND_NAME} store {storeUrl}. Send me your email and I'll send you the link that makes the store yours, so you can accept the order.`;
     case "going_quiet":
       return `Hi {firstName}, {storeName} has had a quiet week. Want me to set up this week's pre-order for you?`;
   }

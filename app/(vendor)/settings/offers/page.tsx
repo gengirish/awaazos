@@ -7,10 +7,11 @@ import { OFFER_RULE_SELECT, offerToDto } from "@/lib/offers-server";
 import { prisma } from "@/lib/prisma";
 
 import { requireSettingsContext } from "../_context";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Offers · Settings · AwaazOS" };
+export const metadata: Metadata = { title: `Offers · Settings · ${BRAND_NAME}` };
 
 export default async function OffersSettingsPage() {
   const { vendor, canManage, storeKind } = await requireSettingsContext();

@@ -1,6 +1,7 @@
 import { STORY_SAFE } from "@/lib/drop-story-image";
 import { OG_COLORS as C, truncate } from "@/lib/og-parts";
 import { REFERRED_TRIAL_DAYS } from "@/lib/referral";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * Instagram story image for Settings → Refer a seller (1080×1920 PNG),
@@ -35,7 +36,7 @@ export function ReferralStoryCard({ storeName, linkLabel }: { storeName: string;
 
       <div style={{ display: "flex", flexDirection: "column" }}>
         <div style={{ display: "flex", fontSize: 84, fontWeight: 700, lineHeight: 1.15 }}>
-          Start your own store on AwaazOS
+          {`Start your own store on ${BRAND_NAME}`}
         </div>
         <div style={{ display: "flex", fontSize: 44, color: C.muted, marginTop: 28, lineHeight: 1.3 }}>
           Take orders and UPI payments from one link, not DMs.

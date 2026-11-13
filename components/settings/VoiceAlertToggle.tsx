@@ -10,6 +10,7 @@ import {
   speakNewOrder,
   writeOrderSoundPref,
 } from "@/lib/order-voice";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * Settings → Notifications: the spoken new-order alert for this device. The
@@ -48,7 +49,7 @@ export function VoiceAlertToggle() {
             Voice alert on this device
           </label>
           <p className="text-sm text-muted-foreground">
-            Says “New order received from” and the customer&apos;s first name as soon as an order comes in, while AwaazOS
+            Says “New order received from” and the customer&apos;s first name as soon as an order comes in, while {BRAND_NAME}
             is open on this device and its volume is up. Needs alerts turned on above. With the screen locked or the app
             closed you still get the notification, but the phone can&apos;t speak it.
           </p>

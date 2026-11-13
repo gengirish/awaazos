@@ -34,10 +34,11 @@ import { fillVocabulary } from "@/lib/store-vocabulary";
 import { hasStoredRazorpayCreds, isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 
 import { requireSettingsContext } from "./_context";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Settings · AwaazOS" };
+export const metadata: Metadata = { title: `Settings · ${BRAND_NAME}` };
 
 function StatusLine({ status }: { status: SectionStatus }) {
   if (status.parts) {

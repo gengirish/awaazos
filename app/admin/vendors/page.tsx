@@ -22,9 +22,10 @@ import { billingAccess, trialDaysLeft } from "@/lib/plan";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
 import { storeContact } from "@/lib/store-contact";
 import { LIVE_SUBSCRIPTION_STATUSES } from "@/lib/subscription";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Admin stores — AwaazOS" };
+export const metadata = { title: `Admin stores — ${BRAND_NAME}` };
 
 /** Where the store stands today, and what a free-until date would change. */
 function describeBilling(vendor: AdminVendorRow, now: Date): { status: string; note: string | null } {
@@ -84,7 +85,7 @@ export default async function AdminVendorsPage(props: { searchParams: Promise<{ 
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Internal · Platform admin</p>
         <h1 className="mt-1 font-display text-3xl font-bold text-foreground">Stores</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Let a store use AwaazOS free until a date you pick, set its own price using what its owner told us in
+          Let a store use {BRAND_NAME} free until a date you pick, set its own price using what its owner told us in
           the survey, or ask its owner for feedback.
         </p>
         <AdminNav current="/admin/vendors" superAdmin />

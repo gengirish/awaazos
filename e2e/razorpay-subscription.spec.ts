@@ -1,6 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { registerOwnerAndSignIn } from "./helpers/register-owner";
+import { BRAND_NAME } from "../lib/brand";
 
 test.describe("Razorpay create-subscription API", () => {
   test("POST without session returns 401", async ({ request }) => {
@@ -155,7 +156,7 @@ test.describe("Billing page — subscribe with in-app Checkout", () => {
     expect(options).toMatchObject({
       key: "rzp_test_e2e_mock",
       subscription_id: "sub_e2e_mock",
-      name: "AwaazOS",
+      name: `${BRAND_NAME}`,
       prefill: { name: "E2E Billing Vendor" },
     });
     expect((options?.prefill as { email?: string }).email).toMatch(/^e2e-rzp-.*@example\.com$/);

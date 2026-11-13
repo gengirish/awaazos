@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 
 import { HOME_PATH } from "@/lib/home";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * Web app manifest, served at /manifest.webmanifest.
@@ -13,8 +14,8 @@ import { HOME_PATH } from "@/lib/home";
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "AwaazOS",
-    short_name: "AwaazOS",
+    name: `${BRAND_NAME}`,
+    short_name: `${BRAND_NAME}`,
     description: "Orders, UPI billing and receipts for home kitchens that sell on Instagram and WhatsApp.",
     // `id` is the app's identity: changing it would make every installed copy a
     // different app. `start_url` can move underneath it.

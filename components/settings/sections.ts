@@ -12,6 +12,7 @@ import {
   Wallet,
   type LucideIcon,
 } from "lucide-react";
+import { BRAND_NAME } from "@/lib/brand";
 
 /** The Settings areas, in the order the hub shows them. */
 export type SettingsSectionId =
@@ -101,7 +102,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
     group: "Money",
     href: "/settings/billing",
     title: "Plan & billing",
-    description: "Your AwaazOS plan, usage and upgrades.",
+    description: `Your ${BRAND_NAME} plan, usage and upgrades.`,
     icon: CreditCard,
   },
   {

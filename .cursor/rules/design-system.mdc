@@ -8,7 +8,7 @@ alwaysApply: false
 
 ## Brand
 
-- **Tagline:** "Bol. Bill. Becho." (always Latin script in UI; आवाज़ in logo only)
+- **Name and tagline:** `BRAND_NAME` / `BRAND_TAGLINE` in `lib/brand.ts` ("Banao. Batao. Becho.", always Latin script in UI; आवाज़ in logo only). Never write the name as a literal.
 - **Brand colour:** saffron orange `#FF6B00` — the logo and brand artwork only
   (`brand-saffron`). White text on it is 2.9:1, so it is never a UI fill.
 - **Primary (UI fills, links, focus ring):** `--primary: 25 100% 37%` (`#BD4F00`),

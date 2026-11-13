@@ -7,10 +7,11 @@ import { SettingsCard, SettingsPageHeader } from "@/components/settings/Settings
 import { VoiceAlertToggle } from "@/components/settings/VoiceAlertToggle";
 
 import { requireSettingsContext } from "../_context";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Notifications · Settings · AwaazOS" };
+export const metadata: Metadata = { title: `Notifications · Settings · ${BRAND_NAME}` };
 
 const WHAT_YOU_GET = [
   { icon: BellRing, text: "A new order from your online store or a pre-order." },

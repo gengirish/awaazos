@@ -1,9 +1,10 @@
 import { expect, test } from "@playwright/test";
+import { BRAND_NAME } from "../lib/brand";
 
 test.describe("public surfaces", () => {
   test("landing page renders hero + product badge + sign-up CTA", async ({ page }) => {
     await page.goto("/");
-    await expect(page).toHaveTitle(/AwaazOS/i);
+    await expect(page).toHaveTitle(new RegExp(BRAND_NAME, "i"));
     await expect(page.getByRole("heading", { level: 1 })).toContainText(/orders from Instagram and WhatsApp/i);
     await expect(page.getByText(/IntelliForge AI/i).first()).toBeVisible();
     await expect(page.getByRole("link", { name: /sign in/i }).first()).toBeVisible();
@@ -13,7 +14,7 @@ test.describe("public surfaces", () => {
   test("landing page offers Install app, with written steps when the browser has no prompt", async ({ page }) => {
     await page.goto("/");
     await page.getByRole("button", { name: /install app/i }).click();
-    const dialog = page.getByRole("dialog", { name: /install awaazos/i });
+    const dialog = page.getByRole("dialog", { name: new RegExp(`install ${BRAND_NAME}`, "i") });
     await expect(dialog).toBeVisible();
     await expect(dialog.getByRole("listitem").first()).toBeVisible();
   });

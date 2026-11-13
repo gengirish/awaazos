@@ -12,9 +12,10 @@ import {
   SURVEY_ADMIN_LIMIT,
 } from "@/lib/owner-survey-server";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Admin owner survey — AwaazOS" };
+export const metadata = { title: `Admin owner survey — ${BRAND_NAME}` };
 
 function BandList({ title, bands }: { title: string; bands: BandTally[] }) {
   return (

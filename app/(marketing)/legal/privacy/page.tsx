@@ -2,20 +2,21 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { BUSINESS_NAME, BusinessDetails } from "@/components/legal/BusinessDetails";
+import { BRAND_FORMER_NAME, BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Privacy Policy — AwaazOS",
-  description: "How AwaazOS collects, uses, stores, and protects data.",
+  title: `Privacy Policy — ${BRAND_NAME}`,
+  description: `How ${BRAND_NAME} collects, uses, stores, and protects data.`,
 };
 
 export default function PrivacyPage() {
   return (
     <>
       <h1>Privacy Policy</h1>
-      <p>Last updated: 08 November 2026</p>
+      <p>Last updated: 13 November 2026</p>
       <p>
-        AwaazOS is built and run by {BUSINESS_NAME} (IntelliForge AI), a proprietorship in Hyderabad, India. This
-        policy explains how we collect, use, and protect data when you use AwaazOS, whether you sell with it or buy
+        {BRAND_NAME} (formerly {BRAND_FORMER_NAME}) is built and run by {BUSINESS_NAME} (IntelliForge AI), a proprietorship in Hyderabad, India. This
+        policy explains how we collect, use, and protect data when you use {BRAND_NAME}, whether you sell with it or buy
         from a store that runs on it.
       </p>
 
@@ -28,7 +29,7 @@ export default function PrivacyPage() {
           settings, including the store&apos;s UPI ID and, if connected, its Razorpay account (keys are stored
           encrypted).
         </li>
-        <li>Billing data: your AwaazOS plan and Razorpay subscription and payment references.</li>
+        <li>Billing data: your {BRAND_NAME} plan and Razorpay subscription and payment references.</li>
         <li>Answers you give in the owner survey.</li>
         <li>Phone alerts: if you turn them on, a push subscription for that device.</li>
       </ul>
@@ -55,7 +56,7 @@ export default function PrivacyPage() {
         </li>
       </ul>
       <p>
-        We also keep the business name and public contact details of home businesses we approach about AwaazOS, and
+        We also keep the business name and public contact details of home businesses we approach about {BRAND_NAME}, and
         anonymous answers to our public seller survey.
       </p>
 
@@ -64,7 +65,7 @@ export default function PrivacyPage() {
         <li>To run the service: billing, orders, payments, receipts, alerts, and analytics for the seller.</li>
         <li>To send the emails you need: sign-in links, password resets, and billing notices.</li>
         <li>
-          To contact sellers about their store: to help, and to ask how AwaazOS is working for them. We quote a seller
+          To contact sellers about their store: to help, and to ask how {BRAND_NAME} is working for them. We quote a seller
           on our website only after they agree in writing.
         </li>
         <li>To secure accounts and prevent fraud and abuse.</li>
@@ -75,7 +76,7 @@ export default function PrivacyPage() {
       <p>
         When you order from a store, the seller sees the details you give at checkout so they can prepare, deliver,
         and settle your order. They may contact you, for example on WhatsApp, about that order. How a seller uses
-        your details outside AwaazOS is up to that seller. A seller never sees another store&apos;s customers.
+        your details outside {BRAND_NAME} is up to that seller. A seller never sees another store&apos;s customers.
       </p>
 
       <h2>PII and model providers</h2>
@@ -101,7 +102,7 @@ export default function PrivacyPage() {
         </li>
         <li>fal (AI images, when a seller asks for one; only the seller&apos;s description is sent)</li>
         <li>
-          Razorpay (AwaazOS subscriptions; and, for sellers who connect their own Razorpay account, the buyer&apos;s
+          Razorpay ({BRAND_NAME} subscriptions; and, for sellers who connect their own Razorpay account, the buyer&apos;s
           online payment to that seller)
         </li>
         <li>AgentMail (email delivery)</li>

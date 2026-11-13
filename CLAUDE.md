@@ -119,6 +119,15 @@ been applied; add a new one. Check a branch: `prisma migrate diff --from-migrati
 
 ## Architecture
 
+### Product name (`lib/brand.ts`)
+
+Every name the product shows (page titles, copy, emails, WhatsApp texts, share images, the manifest) reads
+`BRAND_NAME`, `BRAND_TAGLINE` or `BRAND_SIGNOFF`; never write the name as a literal. `lib/__tests__/brand.test.ts`
+fails on the former name in any string or JSX text, and checks the files that can't import the module
+(`public/sw.js`, `public/offline.html`, `content/admin-nudges/*.txt`). Identifiers devices and other systems hold
+keep the old spelling: `awaazos-pos` IndexedDB, `awz_*` cookies, `awz:` keys, `AWZ-` bill numbers, `awaazos:`
+events, manifest `id`, service and deploy names (`docs/REBRAND_AWAAZDO_PLAN.md`).
+
 ### Store wording: kitchens and everyone else (`lib/store-vocabulary.ts`)
 
 The app's words for the catalogue follow `Vendor.stallType`. `storeKind()` sorts every type into

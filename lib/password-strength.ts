@@ -59,6 +59,8 @@ const COMMON_PASSWORDS = new Set<string>([
   "awaazos1",
   "awaazos123",
   "awaaz123",
+  "awaazdo1",
+  "awaazdo123",
 ]);
 
 export function isCommonPassword(pw: string): boolean {

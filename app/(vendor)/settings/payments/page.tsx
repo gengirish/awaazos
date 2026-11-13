@@ -20,10 +20,11 @@ import {
 } from "@/lib/storefront-razorpay";
 
 import { requireSettingsContext } from "../_context";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Payments · Settings · AwaazOS" };
+export const metadata: Metadata = { title: `Payments · Settings · ${BRAND_NAME}` };
 
 export default async function PaymentsSettingsPage(props: { searchParams: Promise<{ razorpay?: string | string[] }> }) {
   const { vendor, isOwner, storeKind } = await requireSettingsContext();

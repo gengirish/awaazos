@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 
 import { DemoStoreForm } from "@/components/admin/DemoStoreForm";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Build a demo store — AwaazOS" };
+export const metadata = { title: `Build a demo store — ${BRAND_NAME}` };
 
 /** /admin/demo-stores/new — any platform ADMIN or SALES user builds a prospect's demo store (lib/demo-store-form.ts). */
 export default async function NewDemoStorePage() {

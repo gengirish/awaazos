@@ -6,6 +6,7 @@ import { formatFulfilmentWindow, formatIstDayLabel, formatIstTime } from "@/lib/
 import { fulfilmentModeLabel, OG_COLORS as C, Price, storeLogoDataUrl, truncate } from "@/lib/og-parts";
 import { prisma } from "@/lib/prisma";
 import { everydayMenuHiddenByDrops, STOREFRONT_MENU_ITEM_WHERE } from "@/lib/storefront-order";
+import { BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
 
 /**
  * Link-preview card for /s/<slug> — what WhatsApp shows when a vendor shares
@@ -37,7 +38,7 @@ import { everydayMenuHiddenByDrops, STOREFRONT_MENU_ITEM_WHERE } from "@/lib/sto
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const alt = "Order on AwaazOS";
+export const alt = `Order on ${BRAND_NAME}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -115,7 +116,7 @@ function Brand() {
           marginRight: 12,
         }}
       />
-      <span>AwaazOS · Bol. Bill. Becho.</span>
+      <span>{`${BRAND_NAME} · ${BRAND_TAGLINE}`}</span>
     </div>
   );
 }
@@ -173,7 +174,7 @@ function GenericCard() {
   return (
     <Frame>
       <div style={{ display: "flex", flexDirection: "column" }}>
-        <div style={{ display: "flex", fontSize: 72, fontWeight: 700 }}>Order on AwaazOS</div>
+        <div style={{ display: "flex", fontSize: 72, fontWeight: 700 }}>{`Order on ${BRAND_NAME}`}</div>
         <div style={{ display: "flex", fontSize: 36, color: C.muted, marginTop: 16 }}>
           Order online from local stores
         </div>

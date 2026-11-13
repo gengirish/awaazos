@@ -22,10 +22,11 @@ import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { canPromoteReferrals, referralDeliveryFor, referralPitch } from "@/lib/referral";
 import { LIVE_SUBSCRIPTION_STATUSES } from "@/lib/subscription";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Plan & billing · Settings · AwaazOS" };
+export const metadata: Metadata = { title: `Plan & billing · Settings · ${BRAND_NAME}` };
 
 function formatDateDdMmYyyyIst(d: Date | null): string {
   return d ? formatIstDate(d) : "—";
@@ -73,7 +74,7 @@ export default async function BillingSettingsPage({
 
     return (
       <>
-        <SettingsPageHeader title="Plan & billing" description="Manage your AwaazOS subscription." />
+        <SettingsPageHeader title="Plan & billing" description={`Manage your ${BRAND_NAME} subscription.`} />
         <div className="space-y-4">
           <section className="rounded-lg border bg-card p-4 shadow-xs sm:p-6">
             <h2 className="font-medium">Current plan</h2>

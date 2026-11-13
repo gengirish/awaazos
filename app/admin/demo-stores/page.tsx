@@ -11,9 +11,10 @@ import { DEMO_PIPELINE_LIMIT } from "@/lib/admin-demo-stores";
 import { loadPipelineItems } from "@/lib/demo-pipeline-server";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
 import { demoVendorIdsBuiltBy } from "@/lib/sales-scope";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Admin demo stores — AwaazOS" };
+export const metadata = { title: `Admin demo stores — ${BRAND_NAME}` };
 
 export default async function AdminDemoStoresPage() {
   // Role read from the database, 404 rather than 403. Any platform ADMIN runs

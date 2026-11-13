@@ -8,9 +8,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { listAdminCommunities } from "@/lib/community-server";
 import { formatIstDate } from "@/lib/datetime";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Admin community pages — AwaazOS" };
+export const metadata = { title: `Admin community pages — ${BRAND_NAME}` };
 
 /**
  * Community pages (lib/community.ts): one public page per housing society that

@@ -10,6 +10,7 @@ import { loadDropBoard } from "@/lib/drops-board-server";
 import { formatIstDate, formatIstTime } from "@/lib/drops-time";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { storeVocabulary } from "@/lib/store-vocabulary";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +18,9 @@ export const dynamic = "force-dynamic";
 export async function generateMetadata() {
   try {
     const ctx = await requireVendorRole("CASHIER");
-    return { title: `${storeVocabulary(ctx.vendor.stallType).prepSheet} · AwaazOS` };
+    return { title: `${storeVocabulary(ctx.vendor.stallType).prepSheet} · ${BRAND_NAME}` };
   } catch {
-    return { title: "Prep sheet · AwaazOS" };
+    return { title: `Prep sheet · ${BRAND_NAME}` };
   }
 }
 

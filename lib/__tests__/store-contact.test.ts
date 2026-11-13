@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { feedbackMailtoUrl, feedbackRequestMessage, storeContact } from "@/lib/store-contact";
+import { BRAND_NAME } from "@/lib/brand";
 
 describe("storeContact", () => {
   it("lists owner emails first, lower-cased, without repeats", () => {
@@ -42,7 +43,7 @@ describe("feedbackRequestMessage", () => {
   it("greets the owner, names the store and asks before quoting", () => {
     const text = feedbackRequestMessage({ ownerName: "Sam Rao", storeName: "Sam Store", senderName: "Girish H" });
     expect(text.startsWith("Hi Sam,")).toBe(true);
-    expect(text).toContain("I'm Girish from AwaazOS");
+    expect(text).toContain(`I'm Girish from ${BRAND_NAME}`);
     expect(text).toContain("Sam Store");
     expect(text).toContain("only use it after you say yes in writing");
   });
@@ -50,8 +51,8 @@ describe("feedbackRequestMessage", () => {
   it("falls back when names are missing", () => {
     const text = feedbackRequestMessage({ ownerName: null, storeName: "Sam Store", senderName: null });
     expect(text.startsWith("Hi,")).toBe(true);
-    expect(text).toContain("I'm writing from AwaazOS");
-    expect(text.endsWith("AwaazOS")).toBe(true);
+    expect(text).toContain(`I'm writing from ${BRAND_NAME}`);
+    expect(text.endsWith(`${BRAND_NAME}`)).toBe(true);
   });
 });
 
@@ -59,7 +60,7 @@ describe("feedbackMailtoUrl", () => {
   it("addresses every email and encodes subject and body", () => {
     const url = feedbackMailtoUrl(["a@x.com", "b@x.com"], "Hi & thanks\nok");
     expect(url).toBe(
-      "mailto:a@x.com,b@x.com?subject=How%20is%20AwaazOS%20working%20for%20you%3F&body=Hi%20%26%20thanks%0Aok",
+      `mailto:a@x.com,b@x.com?subject=How%20is%20${BRAND_NAME}%20working%20for%20you%3F&body=Hi%20%26%20thanks%0Aok`,
     );
   });
 
