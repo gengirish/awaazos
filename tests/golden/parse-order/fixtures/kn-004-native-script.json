@@ -1,0 +1,25 @@
+{
+  "id": "kn-004-native-script",
+  "lang": "kn-IN",
+  "transcript": "ಎರಡು ಮಸಾಲೆ ದೋಸೆ ಮತ್ತು ಒಂದು ಕಾಫಿ",
+  "expected": {
+    "items": [
+      {
+        "menuItemId": "masala-dosa",
+        "qty": 2
+      },
+      {
+        "menuItemId": "filter-coffee",
+        "qty": 1
+      }
+    ],
+    "unmatched": [],
+    "minConfidence": "medium"
+  },
+  "tags": [
+    "kannada",
+    "native-script",
+    "indic-numerals"
+  ],
+  "notes": "kn-001 in Kannada script, as a fallback STT provider returns it when Sarvam is down."
+}

@@ -2,6 +2,9 @@ import type { Metadata } from "next";
 
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { VoiceLanguageClient } from "@/components/settings/VoiceLanguageClient";
+import { Plan } from "@prisma/client";
+
+import { PLAN_RANK } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 
 import { requireSettingsContext } from "../_context";
@@ -25,7 +28,11 @@ export default async function VoiceSettingsPage() {
         title="Voice language"
         description="Pick the language your counter staff will speak when using the POS mic."
       >
-        <VoiceLanguageClient initialVoiceLang={settings?.voiceLang ?? "en-IN"} />
+        <VoiceLanguageClient
+          initialVoiceLang={settings?.voiceLang ?? "en-IN"}
+          // Same gate as POST /api/ai/transcribe; `vendor.plan` is the effective plan (trial = STARTER).
+          serverVoiceAllowed={PLAN_RANK[vendor.plan] >= PLAN_RANK[Plan.STARTER]}
+        />
       </SettingsCard>
     </>
   );

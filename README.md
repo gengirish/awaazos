@@ -82,7 +82,7 @@ All of this on a phone, in <8 seconds per transaction. **Hindi + English at MVP.
 ### Built and shipped
 
 - 🎙️ **Voice-first POS** — 80×80 mic button, 6 visual states (idle / listening / transcribing / parsing / success / error), distinguishable beyond color, full `aria-live` for screen readers
-- 🌍 **STT routing** — Web Speech in the browser for English & Hindi. A server cascade (`/api/ai/transcribe`, STARTER+) is wired with per-provider circuit breakers: OpenAI → Groq → self-hosted Whisper for en/hi, Sarvam Saaras v3 → Groq → Whisper for Telugu / Kannada / Tamil. te/kn/ta are **dormant**: the code and golden fixtures are kept, but the language picker offers only English and Hindi
+- 🌍 **STT routing** — Web Speech in the browser for English & Hindi. A server cascade (`/api/ai/transcribe`, STARTER+) is wired with per-provider circuit breakers: OpenAI → Groq → self-hosted Whisper for en/hi, Sarvam Saaras v3 → Groq → Whisper for Telugu / Kannada / Tamil. Kannada is offered in the language picker beside English and Hindi; Telugu and Tamil are **dormant**: the code and golden fixtures are kept, but the picker does not offer them
 - 🧠 **Two-tier AI parsing** — Claude Haiku 4.5 primary with ephemeral prompt caching on the menu, escalates to Sonnet 4.5 on empty or low-confidence results (`shouldEscalate()`) or a Haiku error
 - 💰 **Integer-paise math everywhere** — no `parseFloat`, no `toFixed` (single exception: UPI deep-link `am=` per spec)
 - 🔢 **Atomic bill numbering** — `AWZ-YYYYMMDD-NNNN` via `BillSequence.upsert` inside `prisma.$transaction`, race-safe across concurrent sales
@@ -150,7 +150,7 @@ cp .env.local.example .env.local
 # Required to boot: DATABASE_URL, AUTH_SECRET (set AUTH_URL too)
 # Required for voice parsing: ANTHROPIC_API_KEY
 # Optional server STT: OPENAI_API_KEY, GROQ_API_KEY, WHISPER_STT_URL + WHISPER_STT_SECRET
-#   (SARVAM_API_KEY only matters for the dormant te/kn/ta path)
+#   (SARVAM_API_KEY is needed for Kannada voice, and the dormant te/ta path)
 # Optional: RAZORPAY_* (incl. RAZORPAY_PLAN_STARTER_MONTHLY / _YEARLY), BLOB_READ_WRITE_TOKEN,
 #   VAPID keys (Web Push), AGENTMAIL_*, SENTRY_*
 # Redis: UPSTASH_REDIS_REST_* (HTTP) and REDIS_URL (TCP, BullMQ) — see "Two Redis surfaces" in CLAUDE.md

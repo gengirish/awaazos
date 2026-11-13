@@ -1,0 +1,25 @@
+{
+  "id": "kn-003-existing-update",
+  "lang": "kn-IN",
+  "transcript": "samosa ippattaidu rupayi mattu masala chai hadinaidu",
+  "expected": {
+    "items": [
+      {
+        "name": "Samosa",
+        "existingMenuItemId": "mi-samosa",
+        "priceInPaise": 2500
+      },
+      {
+        "name": "Masala Chai",
+        "existingMenuItemId": "mi-masala-chai",
+        "priceInPaise": 1500
+      }
+    ]
+  },
+  "tags": [
+    "kannada",
+    "indic-numerals",
+    "existing-item"
+  ],
+  "notes": "ippattaidu = 25, hadinaidu = 15, mattu = and. Both items are already on the menu."
+}

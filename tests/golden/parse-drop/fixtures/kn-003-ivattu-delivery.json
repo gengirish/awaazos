@@ -1,0 +1,28 @@
+{
+  "id": "kn-003-ivattu-delivery",
+  "lang": "kn-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "ivattu madhyahna 1 rinda 3 varege delivery, hanneradu samosa, aivattu chakli",
+  "expected": {
+    "date": "2026-10-08",
+    "fulfilmentMode": "DELIVERY",
+    "fulfilmentStart": "13:00",
+    "fulfilmentEnd": "15:00",
+    "items": [
+      {
+        "menuItemId": "samosa",
+        "maxQty": 12
+      },
+      {
+        "menuItemId": "chakli",
+        "maxQty": 50
+      }
+    ]
+  },
+  "tags": [
+    "kannada",
+    "indic-numerals",
+    "part-of-day"
+  ],
+  "notes": "ivattu = today, madhyahna = afternoon, hanneradu = 12, aivattu = 50."
+}

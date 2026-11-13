@@ -1,0 +1,25 @@
+{
+  "id": "kn-002-native-script",
+  "lang": "kn-IN",
+  "transcript": "ಕೇಸರಿ ಬಾತ್ ಅರವತ್ತು ರೂಪಾಯಿ, ಮೈಸೂರ್ ಪಾಕ್ ಮೂವತ್ತು",
+  "expected": {
+    "items": [
+      {
+        "name": "Kesari Bath",
+        "action": "create",
+        "priceInPaise": 6000
+      },
+      {
+        "name": "Mysore Pak",
+        "action": "create",
+        "priceInPaise": 3000
+      }
+    ]
+  },
+  "tags": [
+    "kannada",
+    "native-script",
+    "indic-numerals"
+  ],
+  "notes": "Kannada script from a fallback STT provider. New rows must still be written in Latin script."
+}
