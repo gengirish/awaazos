@@ -48,14 +48,14 @@ The same actions have a GUI for the outreach team; see "Admin GUI" below.
 | --- | --- |
 | `contact_name` (optional) | `DemoPipeline.contactName`, for outreach messages; never shown on the store |
 | `profile.name` | `Vendor.name` (stored clean; " (DEMO)" is added on display) |
-| `profile.category` | `Vendor.stallType`, shown as the store-type chip: `home_bakery` → HOME_BAKERY ("Home bakery"), likewise `home_kitchen`, `cloud_kitchen`, `cafe`, `sweets`, `catering`; `street_food`; `general` |
+| `profile.category` | `Vendor.stallType` (+ `stallTypeOther`), shown as the store-type chip. Food: `home_bakery` → HOME_BAKERY ("Home bakery"), likewise `home_kitchen`, `cloud_kitchen`, `cafe`, `sweets`, `catering`; `street_food`; `general` (a kitchen). Products: `jewellery_accessories` → OTHER "Jewellery & accessories", `clothing` → CLOTHING, `wellness` → OTHER "Wellness products", `crafts_decor` → OTHER "Crafts & decor", `kirana` → KIRANA. A product category gives the store "Products" wording, the photo gallery and product emoji; **never file a non-food seller as `general`**, or every item shows 🍽️ |
 | `profile.area` | `Vendor.city` |
 | `profile.instagram` | `VendorSettings.instagramHandle` (normalised; invalid → none) |
 | `profile.display_phone` | `VendorSettings.whatsappNumber`, not public |
 | `profile.languages` | `VendorSettings.voiceLang` = first of en/hi offered, else en (te/kn/ta are dormant) |
 | `profile.fulfilment` | `VendorSettings.menuFulfilmentMode`: `pickup` (default) / `delivery` / `both`. Sample orders are delivery orders (no address) only for `delivery` |
 | `profile.delivery_fee_paise` | `VendorSettings.menuDeliveryFeePaise` (0 … 100000, default 0) |
-| `items[].name` | `MenuItem.name`; the emoji is suggested from it (`suggestEmoji`: cake → 🎂, cupcake → 🧁, else 🍽️) |
+| `items[].name` | `MenuItem.name`; the emoji is suggested from it and the store kind (`suggestEmoji(name, kind)`: cake → 🎂, cupcake → 🧁; on a product store bracelet → 💍, hair clip → 🎀), else 🍽️ for a kitchen and 🛍️ for a product store |
 | `items[].unit` | `MenuItem.unit`, shown as "₹1,200 / kg" |
 | `sample_orders[]` | STOREFRONT `Transaction` with `isSample`, pickup, back-dated 47 min apart |
 | `…event_date` | `Transaction.fulfilAt` |
@@ -115,7 +115,7 @@ components:
             name: { type: string, maxLength: 113 }
             category:
               type: string
-              enum: [home_bakery, home_kitchen, cloud_kitchen, cafe, sweets, catering, street_food, general]
+              enum: [home_bakery, home_kitchen, cloud_kitchen, cafe, sweets, catering, street_food, general, jewellery_accessories, clothing, wellness, crafts_decor, kirana]
               default: general
             area: { type: string, maxLength: 120 }
             instagram: { type: string, maxLength: 120 }

@@ -18,14 +18,21 @@ import {
   type DemoStoreFormItem,
   type DemoStoreFormValues,
 } from "@/lib/demo-store-form";
-import { DEMO_CATEGORIES, DEMO_FULFILMENT, DEMO_LANGUAGES, type DemoLanguage } from "@/lib/demo-store-schema";
+import { storeKind } from "@/lib/store-vocabulary";
+import {
+  DEMO_CATEGORIES,
+  DEMO_FULFILMENT,
+  DEMO_LANGUAGES,
+  type DemoCategory,
+  type DemoLanguage,
+} from "@/lib/demo-store-schema";
 import { postPipelineAction } from "@/components/admin/pipeline/pipeline-api";
 import { outreachIntroMessage } from "@/lib/outreach-message";
 
 const FIELD =
   "flex min-h-11 w-full rounded-md border border-input bg-background px-3 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
 
-const CATEGORY_LABEL: Record<keyof typeof DEMO_CATEGORIES, string> = {
+const CATEGORY_LABEL: Record<DemoCategory, string> = {
   home_bakery: "Home bakery",
   home_kitchen: "Home kitchen",
   cloud_kitchen: "Cloud kitchen",
@@ -33,8 +40,25 @@ const CATEGORY_LABEL: Record<keyof typeof DEMO_CATEGORIES, string> = {
   sweets: "Sweets",
   catering: "Catering",
   street_food: "Street food",
-  general: "General",
+  general: "General food",
+  jewellery_accessories: "Jewellery & accessories",
+  clothing: "Clothing",
+  wellness: "Wellness products",
+  crafts_decor: "Crafts & decor",
+  kirana: "Kirana / grocery",
 };
+
+/**
+ * Food types get a menu; product types get "Products", the photo gallery and
+ * product emoji (lib/store-vocabulary.ts). A non-food seller filed under a
+ * food type shows 🍽️ on every item.
+ */
+const CATEGORY_GROUPS = (["food", "goods"] as const).map((kind) => ({
+  label: kind === "food" ? "Food" : "Products",
+  categories: (Object.keys(CATEGORY_LABEL) as DemoCategory[]).filter(
+    (c) => storeKind(DEMO_CATEGORIES[c]) === kind,
+  ),
+}));
 
 const FULFILMENT_LABEL: Record<keyof typeof DEMO_FULFILMENT, string> = {
   pickup: "Pickup only",
@@ -378,10 +402,14 @@ export function DemoStoreForm({ senderName, senderIsFounder }: { senderName: str
                   value={form.category}
                   onChange={(e) => set("category", e.target.value as DemoStoreFormValues["category"])}
                 >
-                  {(Object.keys(CATEGORY_LABEL) as (keyof typeof CATEGORY_LABEL)[]).map((c) => (
-                    <option key={c} value={c}>
-                      {CATEGORY_LABEL[c]}
-                    </option>
+                  {CATEGORY_GROUPS.map((g) => (
+                    <optgroup key={g.label} label={g.label}>
+                      {g.categories.map((c) => (
+                        <option key={c} value={c}>
+                          {CATEGORY_LABEL[c]}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
                 </select>
               </div>

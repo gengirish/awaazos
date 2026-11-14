@@ -506,7 +506,7 @@ export function postProcessMenuDraft(
         name,
         priceInPaise: priceInPaise ?? 0,
         category: resolveCategory(line.category),
-        emoji: suggestEmoji(name) ?? DEFAULT_EMOJI,
+        emoji: suggestEmoji(name, vocab.kind) ?? DEFAULT_EMOJI,
         unit: spokenUnit(line.unit),
         aliases: Array.from(new Set([...suggestAliases(name), ...spokenAliases])),
         action: "create",

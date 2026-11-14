@@ -7,13 +7,17 @@ import { samplePaymentFields } from "@/lib/demo-store";
 import { STALL_TYPES } from "@/lib/constants";
 import {
   DEMO_CATEGORIES,
+  DEMO_CATEGORY_OTHER,
   demoHandoverSchema,
+  demoStallType,
   demoStoreCreateSchema,
   demoVoiceLang,
   displayStoreName,
   findForbiddenPaymentField,
 } from "@/lib/demo-store-schema";
 import { INTERNAL_KEY_HEADER, isInternalCaller } from "@/lib/internal-auth";
+import { resolveStallTypeOther, stallTypeLabel } from "@/lib/stall-type";
+import { storeKind } from "@/lib/store-vocabulary";
 
 function body(overrides: Record<string, unknown> = {}) {
   return {
@@ -75,6 +79,45 @@ describe("demoStoreCreateSchema", () => {
     for (const t of Object.values(DEMO_CATEGORIES)) {
       expect(STALL_TYPES.some((s) => s.value === t)).toBe(true);
     }
+  });
+
+  it("files product categories as product stores, so their items don't get food wording or 🍽️", () => {
+    const kinds = Object.fromEntries(
+      (Object.keys(DEMO_CATEGORIES) as (keyof typeof DEMO_CATEGORIES)[]).map((c) => [c, storeKind(DEMO_CATEGORIES[c])]),
+    );
+    expect(kinds).toEqual({
+      home_bakery: "food",
+      home_kitchen: "food",
+      cloud_kitchen: "food",
+      cafe: "food",
+      sweets: "food",
+      catering: "food",
+      street_food: "food",
+      general: "food",
+      jewellery_accessories: "goods",
+      clothing: "goods",
+      wellness: "goods",
+      crafts_decor: "goods",
+      kirana: "goods",
+    });
+  });
+
+  it("gives every OTHER category a valid description for the store-type chip, and no other category one", () => {
+    for (const c of Object.keys(DEMO_CATEGORIES) as (keyof typeof DEMO_CATEGORIES)[]) {
+      const { stallType, stallTypeOther } = demoStallType(c);
+      const resolved = resolveStallTypeOther(stallType, stallTypeOther);
+      expect(resolved).toEqual({ ok: true, value: stallTypeOther });
+      if (stallType === "OTHER") expect(stallTypeOther).toBe(DEMO_CATEGORY_OTHER[c as keyof typeof DEMO_CATEGORY_OTHER]);
+      else expect(stallTypeOther).toBeNull();
+    }
+    expect(stallTypeLabel("OTHER", demoStallType("jewellery_accessories").stallTypeOther)).toBe("Jewellery & accessories");
+  });
+
+  it("accepts a product category", () => {
+    const r = demoStoreCreateSchema.parse(
+      body({ profile: { name: "Accessories Aura", category: "jewellery_accessories" } }),
+    );
+    expect(r.profile.category).toBe("jewellery_accessories");
   });
 
   it("accepts delivery options and rejects a bad mode or fee", () => {

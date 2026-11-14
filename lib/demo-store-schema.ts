@@ -27,7 +27,13 @@ const MAX_ITEMS = 100;
 const MAX_ORDERS = 50;
 const MAX_LINE_QTY = 99;
 
-/** Outreach category → StallType, shown as the store-type chip on /s/<slug>. */
+/**
+ * Outreach category → StallType, shown as the store-type chip on /s/<slug>.
+ * The type also decides the store's kind (lib/store-vocabulary.ts): the
+ * product categories get "Products" wording, the photo gallery and product
+ * emoji. `general` is a kitchen (the sign-up default), so a seller of
+ * anything else must not be filed under it.
+ */
 export const DEMO_CATEGORIES = {
   home_bakery: "HOME_BAKERY",
   home_kitchen: "HOME_KITCHEN",
@@ -37,9 +43,27 @@ export const DEMO_CATEGORIES = {
   catering: "CATERING",
   street_food: "STREET_FOOD",
   general: "GENERAL",
+  jewellery_accessories: "OTHER",
+  clothing: "CLOTHING",
+  wellness: "OTHER",
+  crafts_decor: "OTHER",
+  kirana: "KIRANA",
 } as const satisfies Record<string, StallType>;
 
-type DemoCategory = keyof typeof DEMO_CATEGORIES;
+export type DemoCategory = keyof typeof DEMO_CATEGORIES;
+
+/** What the store-type chip says for a category stored as OTHER (`Vendor.stallTypeOther`, ≤ 40 chars). */
+export const DEMO_CATEGORY_OTHER = {
+  jewellery_accessories: "Jewellery & accessories",
+  wellness: "Wellness products",
+  crafts_decor: "Crafts & decor",
+} as const satisfies Partial<Record<DemoCategory, string>>;
+
+/** The Vendor columns a category sets. */
+export function demoStallType(category: DemoCategory): { stallType: StallType; stallTypeOther: string | null } {
+  const other = (DEMO_CATEGORY_OTHER as Partial<Record<DemoCategory, string>>)[category];
+  return { stallType: DEMO_CATEGORIES[category], stallTypeOther: other ?? null };
+}
 
 /** How buyers get "Order from menu" orders → VendorSettings.menuFulfilmentMode. */
 export const DEMO_FULFILMENT = { pickup: "PICKUP", delivery: "DELIVERY", both: "BOTH" } as const satisfies Record<
