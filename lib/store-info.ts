@@ -41,11 +41,16 @@ export function storeInfoFacts(input: {
     }
   }
   if (input.menuOrdering || input.hasDrops) {
-    const payNow = input.online ? "Pay online" : "Pay by UPI";
-    const pay = input.upi && input.cod ? `${payNow} or on delivery` : input.upi ? payNow : input.cod ? "Pay on delivery" : null;
+    const pay = paymentFactText(input);
     if (pay) facts.push({ kind: "payment", text: pay });
   }
   const fssai = input.fssaiNumber?.trim();
   if (fssai) facts.push({ kind: "fssai", text: `FSSAI Lic. No. ${fssai}` });
   return facts;
+}
+
+/** "Pay by UPI or on delivery", "Pay online", "Pay on delivery"; null when there is no way to pay. */
+export function paymentFactText(input: { upi: boolean; cod: boolean; online?: boolean }): string | null {
+  const payNow = input.online ? "Pay online" : "Pay by UPI";
+  return input.upi && input.cod ? `${payNow} or on delivery` : input.upi ? payNow : input.cod ? "Pay on delivery" : null;
 }
