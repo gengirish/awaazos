@@ -2,11 +2,13 @@
 
 import { ArrowDown } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCartHubEntry } from "@/components/storefront/CartHub";
 import { ItemDetailSheet, ItemDetailTrigger } from "@/components/storefront/ItemDetailSheet";
+import { enterItemUrl, itemDetailPath, leaveItemUrl, useCloseOnBack } from "@/components/storefront/item-detail-url";
 import { ItemPhoto } from "@/components/storefront/ItemPhoto";
+import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import {
   CartBar,
   CheckoutSheet,
@@ -126,6 +128,8 @@ export type DropOrderProps = {
   offers?: readonly ResolvedOffer[];
   /** Handover window, cut-off, pickup, delivery and payment, for an item's detail sheet (`dropDetailFacts`). */
   facts?: readonly DetailFact[];
+  /** The drop item whose sheet is open on load (a product link); null = none. */
+  initialDetailId?: string | null;
 };
 
 const NO_OFFERS: readonly ResolvedOffer[] = [];
@@ -151,6 +155,7 @@ export function DropOrder(props: DropOrderProps) {
     prefill,
     offers = NO_OFFERS,
     facts = NO_FACTS,
+    initialDetailId = null,
   } = props;
   const router = useRouter();
 
@@ -167,15 +172,25 @@ export function DropOrder(props: DropOrderProps) {
   const [open, setOpen] = useState(false);
   // The item in the detail sheet (ItemDetailSheet). It stays set after closing, so the
   // sheet plays its close animation and Radix hands focus back to the item it came from.
-  const [detailId, setDetailId] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
-  const openDetailFor = (id: string) => {
-    setDetailId(id);
-    setDetailOpen(true);
-  };
+  // A product link (/s/<slug>/p/<menuItemId>) opens with its sheet already up.
+  const [detailId, setDetailId] = useState<string | null>(initialDetailId);
+  const [detailOpen, setDetailOpen] = useState(initialDetailId !== null);
   const checkoutRef = useRef<HTMLButtonElement>(null);
 
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  // The link names the product (menu item), not this drop's row of it.
+  const openDetailFor = (id: string) => {
+    setDetailId(id);
+    setDetailOpen(true);
+    const menuItemId = byId.get(id)?.menuItemId;
+    if (menuItemId) enterItemUrl(slug, menuItemId);
+  };
+  const onDetailOpenChange = (next: boolean) => {
+    setDetailOpen(next);
+    if (!next) leaveItemUrl(slug);
+  };
+  const closeDetail = useCallback(() => setDetailOpen(false), []);
+  useCloseOnBack(slug, detailOpen, closeDetail);
   /** A cart key → its drop item and size; null when either is no longer offered. */
   const resolveKey = useMemo(
     () =>
@@ -417,7 +432,15 @@ export function DropOrder(props: DropOrderProps) {
       (soldOut && item.menuAnchor ? (
         <a
           href={`#${item.menuAnchor}`}
-          onClick={() => setDetailOpen(false)}
+          onClick={(e) => {
+            // On the row this is a plain jump. In the sheet, close it first: its address
+            // step goes back, and the jump to the everyday row follows the close.
+            if (!detailOpen) return;
+            e.preventDefault();
+            const anchor = item.menuAnchor;
+            onDetailOpenChange(false);
+            if (anchor) setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ block: "center" }), 250);
+          }}
           className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-2 text-xs font-bold text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           aria-label={`${item.name} is in everyday items`}
         >
@@ -471,7 +494,15 @@ export function DropOrder(props: DropOrderProps) {
         <ItemDetailSheet
           open={detailOpen}
           triggerId={detailItem.id}
-          onOpenChange={setDetailOpen}
+          onOpenChange={onDetailOpenChange}
+          share={
+            <ShareStoreButton
+              vendorName={storeName ?? dropTitle}
+              slug={slug}
+              path={itemDetailPath(slug, detailItem.menuItemId)}
+              text={storeName ? `${detailItem.name} from ${storeName}` : detailItem.name}
+            />
+          }
           name={detailItem.name}
           emoji={detailItem.emoji}
           imageUrl={detailItem.imageUrl}

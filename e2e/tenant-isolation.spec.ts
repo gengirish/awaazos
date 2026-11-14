@@ -442,4 +442,28 @@ test.describe("tenant isolation", () => {
     expect(a.transaction.billNumber.slice(-4)).toBe("0001");
     expect(b.transaction.billNumber.slice(-4)).toBe("0001");
   });
+
+  test("vendor A's product link never shows vendor B's item", async ({ browser }) => {
+    const itemB = await createMenuItem(pageB, { name: "B Private Thali", priceInRupees: 120 });
+    await createMenuItem(pageA, { name: "A Public Chai", priceInRupees: 20 });
+    const publish = { data: { publishStorefront: true }, headers: { "Content-Type": "application/json" } };
+    expect((await pageA.request.patch("/api/vendor", publish)).ok()).toBe(true);
+    expect((await pageB.request.patch("/api/vendor", publish)).ok()).toBe(true);
+    const slugA = ((await (await pageA.request.get("/api/vendor")).json()) as { vendor: { slug: string } }).vendor.slug;
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    try {
+      const page = await anon.newPage();
+      const res = await page.goto(`/s/${slugA}/p/${itemB.id}`);
+      // The store renders with a notice, never a 404 or 403 that would say whether the id exists.
+      expect(res?.status()).toBe(200);
+      await expect(page.getByRole("status").filter({ hasText: "isn't on sale right now" })).toBeVisible();
+      await expect(page.getByText("A Public Chai")).toBeVisible();
+      await expect(page.getByText("B Private Thali")).toHaveCount(0);
+      await expect(page).not.toHaveTitle(/B Private Thali/);
+      expect(await page.content()).not.toContain("B Private Thali");
+    } finally {
+      await anon.close();
+    }
+  });
 });

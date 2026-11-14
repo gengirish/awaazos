@@ -234,6 +234,7 @@ storefront surface** — unauthenticated, and no longer read-only (buyers place 
 | Surface | What |
 | --- | --- |
 | `/s/[slug]` | Menu + open drops + checkout |
+| `/s/[slug]/p/[itemId]` | Product link: the store page with that item's detail sheet open, its own title and preview image (`lib/storefront-product.ts`); an item not on sale shows the store with a notice, never a 404 |
 | `/s/[slug]/o/[token]` | Buyer's order page (status, UPI pay, "I've paid" claim) |
 | `/s/[slug]/account` | Signed-in buyer's own orders/profile |
 | `/r/[token]` | Customer receipt page (see "Receipt module"; not gated on `publishStorefront`) |
@@ -273,7 +274,10 @@ Rules every one of them follows:
   photo (tap → full size), discount-first price, sizes, stock, the whole description, the offers it
   counts toward (`offersForItem`) and how it is handed over and paid for (`lib/item-detail.ts`, from what
   the page already loaded: no new query). It is rendered by the list that owns the cart (`MenuOrder`,
-  `DropOrder`), so its Add is the row's stepper; a read-only menu (`ReadOnlyMenuRow`) has no Add.
+  `DropOrder`), so its Add is the row's stepper; a read-only menu (`ReadOnlyMenuRow`) has no Add. The address
+  follows the sheet (`components/storefront/item-detail-url.ts`): a tap pushes `/s/<slug>/p/<menuItemId>` (the item
+  id, never `MenuItem.slug`, which a rename changes), Back closes it, and the query string (`src`) is kept both ways.
+  The seller's `/menu` card has "Copy link for Instagram" (`?src=ig`) and WhatsApp (`?src=wa`) once the store is published.
 - The vendor's WhatsApp number reaches a public page only through `buyerWhatsappNumber()`
   (`lib/storefront-order.ts`): `VendorSettings.whatsappNumber`, and only once the vendor opts in
   with `acceptWhatsappOrders` (default `false`; Settings → Online orders). A saved number is not

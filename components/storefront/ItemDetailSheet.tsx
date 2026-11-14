@@ -46,6 +46,8 @@ export type ItemDetailSheetProps = {
   /** `offersForItem`. */
   offers?: readonly ResolvedOffer[];
   facts?: readonly DetailFact[];
+  /** "Share this item" (a ShareStoreButton on the product link). */
+  share?: ReactNode;
   /** Price of the picked line, left of the action. */
   footerPrice?: ReactNode;
   /** The stepper, or a "Sold out" note; absent = no footer. */
@@ -62,7 +64,7 @@ const FACT_ICON: Record<DetailFactKind, typeof Clock> = {
 };
 
 export function ItemDetailSheet(props: ItemDetailSheetProps) {
-  const { open, onOpenChange, triggerId, name, emoji, imageUrl, description, price, badges, sizes, offers = [], facts = [], footerPrice, action, dimmed } = props;
+  const { open, onOpenChange, triggerId, name, emoji, imageUrl, description, price, badges, sizes, offers = [], facts = [], share, footerPrice, action, dimmed } = props;
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent
@@ -118,6 +120,8 @@ export function ItemDetailSheet(props: ItemDetailSheetProps) {
               })}
             </ul>
           ) : null}
+
+          {share ? <div className="flex justify-end">{share}</div> : null}
         </ResponsiveDialogBody>
         {action ? (
           <ResponsiveDialogFooter className="flex-row items-center justify-between gap-3 md:justify-between md:pt-3">

@@ -1,11 +1,13 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { ItemDetailSheet, ItemDetailTrigger } from "@/components/storefront/ItemDetailSheet";
+import { enterItemUrl, itemDetailPath, leaveItemUrl, useCloseOnBack } from "@/components/storefront/item-detail-url";
 import { ItemPhoto } from "@/components/storefront/ItemPhoto";
 import { ItemPriceHero } from "@/components/storefront/ItemPrice";
+import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import { formatINRCompact } from "@/lib/currency";
 import { variantPriceRange, type StoreSize } from "@/lib/item-variants";
 import { stockBadgeText, type StorefrontStock } from "@/lib/storefront-stock";
@@ -32,15 +34,31 @@ export function ReadOnlyMenuRow({
   layout,
   stock,
   sizes,
+  slug,
+  storeName,
+  initialOpen = false,
 }: {
   item: ReadOnlyMenuItem;
+  slug: string;
+  storeName: string;
+  /** Opened from its product link (`/s/<slug>/p/<id>`). */
+  initialOpen?: boolean;
   layout: "list" | "gallery";
   stock: StorefrontStock | null;
   /** Its sizes / colours (lib/item-variants.ts); absent when it has none. */
   sizes?: StoreSize[];
 }) {
-  const [open, setOpen] = useState(false);
-  const openDetail = () => setOpen(true);
+  const [open, setOpen] = useState(initialOpen);
+  const openDetail = () => {
+    setOpen(true);
+    enterItemUrl(slug, item.id);
+  };
+  const onOpenChange = (next: boolean) => {
+    setOpen(next);
+    if (!next) leaveItemUrl(slug);
+  };
+  const close = useCallback(() => setOpen(false), []);
+  useCloseOnBack(slug, open, close);
   const dimmed = stock?.soldOut ?? false;
   const range = sizes ? variantPriceRange(item.priceInPaise, sizes) : null;
   const fromPaise = range?.minPaise ?? sizes?.[0]?.priceInPaise ?? item.priceInPaise;
@@ -68,7 +86,15 @@ export function ReadOnlyMenuRow({
     <ItemDetailSheet
       open={open}
       triggerId={item.id}
-      onOpenChange={setOpen}
+      onOpenChange={onOpenChange}
+      share={
+        <ShareStoreButton
+          vendorName={storeName}
+          slug={slug}
+          path={itemDetailPath(slug, item.id)}
+          text={`${item.name} from ${storeName}`}
+        />
+      }
       name={item.name}
       emoji={item.emoji}
       imageUrl={item.imageUrl}

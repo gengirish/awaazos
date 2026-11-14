@@ -290,6 +290,14 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     keywords: "stock inventory quantity count oversell low stock left warn",
   },
   {
+    id: "item-link",
+    group: "menu",
+    title: "Share a link to one {item}",
+    steps: "Once your store is published, each {item} shown online has Copy link for Instagram on the {catalogueTitle} screen. Paste it in a post, story or bio: it opens your store with that {item}'s photo, price and Add button. The WhatsApp button next to it sends the same link from your own WhatsApp.",
+    nav: "menu",
+    keywords: "share link instagram whatsapp product post story bio",
+  },
+  {
     id: "find-item",
     group: "menu",
     title: "Find a {item} on a long {catalogue}",
