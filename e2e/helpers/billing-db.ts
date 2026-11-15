@@ -155,3 +155,20 @@ export async function billLineCosts(transactionId: string): Promise<Record<strin
   });
   return Object.fromEntries(lines.map((l) => [l.name, l.costInPaise]));
 }
+
+/**
+ * Give an item a cover and extra photos (lib/item-photos.ts) without Vercel Blob,
+ * which e2e runs don't have. `urls[0]` is the cover; use files under /public.
+ */
+export async function seedItemPhotos(menuItemId: string, urls: string[]): Promise<void> {
+  const item = await db().menuItem.findUnique({ where: { id: menuItemId }, select: { vendorId: true } });
+  if (!item) throw new Error("seedItemPhotos: no such item");
+  const [cover, ...rest] = urls;
+  await db().$transaction([
+    db().menuItem.update({ where: { id: menuItemId }, data: { imageUrl: cover ?? null } }),
+    db().menuItemImage.deleteMany({ where: { menuItemId } }),
+    db().menuItemImage.createMany({
+      data: rest.map((url, sortOrder) => ({ url, sortOrder, menuItemId, vendorId: item.vendorId })),
+    }),
+  ]);
+}

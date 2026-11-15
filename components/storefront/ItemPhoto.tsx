@@ -32,6 +32,8 @@ export type ItemPhotoProps = {
   onOpen?: () => void;
   /** Sold out: the picture is dimmed. */
   dimmed?: boolean;
+  /** The enlarge button's name; default "See the photo of <name>". */
+  label?: string;
 };
 
 const FRAME: Record<ItemPhotoProps["size"], string> = {
@@ -52,7 +54,7 @@ const EMOJI_SIZE: Record<ItemPhotoProps["size"], string> = {
   hero: "text-7xl",
 };
 
-export function ItemPhoto({ src, emoji, name, size, enlarge = false, onOpen, dimmed = false }: ItemPhotoProps) {
+export function ItemPhoto({ src, emoji, name, size, enlarge = false, onOpen, dimmed = false, label }: ItemPhotoProps) {
   const [open, setOpen] = useState(false);
 
   const picture = src ? (
@@ -94,7 +96,7 @@ export function ItemPhoto({ src, emoji, name, size, enlarge = false, onOpen, dim
       <button
         type="button"
         onClick={() => setOpen(true)}
-        aria-label={`See the photo of ${name}`}
+        aria-label={label ?? `See the photo of ${name}`}
         className={cn(
           FRAME[size],
           "block overflow-hidden ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",

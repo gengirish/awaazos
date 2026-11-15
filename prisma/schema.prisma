@@ -62,6 +62,7 @@ model Vendor {
   menuItems             MenuItem[]
   itemVariants          ItemVariant[]
   stockPurchases        StockPurchase[]
+  menuItemImages        MenuItemImage[]
   transactions          Transaction[]
   receipts              Receipt[]
   staff                 StaffMember[]
@@ -215,6 +216,7 @@ model MenuItem {
   dropItems      DropItem[]
   variants       ItemVariant[]
   stockPurchases StockPurchase[]
+  images         MenuItemImage[]
 
   @@unique([vendorId, slug])
   @@index([vendorId, isAvailable])
@@ -276,6 +278,24 @@ model StockPurchase {
   @@index([menuItemId, purchasedAt])
   @@index([variantId])
   @@map("stock_purchases")
+}
+
+// Extra photos of one item, after its cover (lib/item-photos.ts). MenuItem.imageUrl stays the cover
+// and is always the first photo, so the POS, voice, receipts and link previews read nothing new.
+// At most MAX_ITEM_PHOTOS in all, cover included. Public on the store page.
+model MenuItemImage {
+  id         String   @id @default(cuid())
+  vendorId   String
+  vendor     Vendor   @relation(fields: [vendorId], references: [id], onDelete: Cascade)
+  menuItemId String
+  menuItem   MenuItem @relation(fields: [menuItemId], references: [id], onDelete: Cascade)
+  url        String
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+
+  @@index([vendorId, menuItemId])
+  @@index([menuItemId, sortOrder])
+  @@map("menu_item_images")
 }
 
 // ─── OFFERS (quantity-based plan discounts) ────────────────────────

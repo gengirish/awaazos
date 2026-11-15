@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from "next/server";
 
 import { deleteBlobQuietly, ImageUploadError, readImageUpload } from "@/lib/blob-image";
 import { requireEnv } from "@/lib/env";
+import { COVER_ID, removePhoto } from "@/lib/item-photos";
+import { changeItemPhotos } from "@/lib/item-photos-server";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
@@ -16,6 +18,7 @@ export const runtime = "nodejs";
  *
  * POST   multipart/form-data, field `file` → { data: MenuItem }   200
  * DELETE (no body)                        → { success: true }     200
+ *        removes the cover; the next photo moves up (lib/item-photos.ts).
  *
  * Size/type rules and Blob housekeeping are shared with the store banner and
  * logo: lib/blob-image.ts.
@@ -96,25 +99,24 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
+    if (!existing.imageUrl) {
+      return withVendorCookie(NextResponse.json({ success: true }), ctx.setVendorCookie);
+    }
 
     // Resolved before the write so a missing token fails cleanly rather than
     // clearing the row and orphaning the blob.
-    const token = existing.imageUrl ? requireEnv("BLOB_READ_WRITE_TOKEN") : null;
+    const token = requireEnv("BLOB_READ_WRITE_TOKEN");
 
-    try {
-      await prisma.menuItem.update({
-        where: { id: params.id, vendorId: ctx.vendor.id },
-        data: { imageUrl: null },
-      });
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
-        return NextResponse.json({ error: "Not found" }, { status: 404 });
-      }
-      throw e;
+    // The next photo becomes the cover (lib/item-photos.ts rule 3).
+    const changed = await changeItemPhotos(ctx.vendor.id, params.id, (photos) => {
+      const cover = photos.find((p) => p.id === COVER_ID);
+      return cover ? { urls: removePhoto(photos, COVER_ID)!, result: cover.url } : { refuse: null };
+    });
+    if (!changed) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 });
     }
-
-    if (token) {
-      await deleteBlobQuietly(existing.imageUrl, token, TAG);
+    if (changed.outcome) {
+      await deleteBlobQuietly(changed.outcome, token, TAG);
     }
 
     const res = NextResponse.json({ success: true });

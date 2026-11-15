@@ -23,6 +23,8 @@ export type ReadOnlyMenuItem = {
   name: string;
   emoji: string;
   imageUrl: string | null;
+  /** Photos after the cover, for the detail sheet (lib/item-photos.ts). */
+  morePhotos?: string[];
   priceInPaise: number;
   unit: string | null;
   isPopular: boolean;
@@ -98,6 +100,7 @@ export function ReadOnlyMenuRow({
       name={item.name}
       emoji={item.emoji}
       imageUrl={item.imageUrl}
+      morePhotos={item.morePhotos}
       description={item.description}
       dimmed={dimmed}
       price={<ItemPriceHero priceInPaise={fromPaise} sale={null} unit={item.unit} from={range !== null} />}

@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { ItemPhotosField } from "@/components/menu/ItemPhotosField";
 import { ItemSizesEditor } from "@/components/menu/ItemSizesEditor";
 import { Button } from "@/components/ui/button";
 import {
@@ -151,8 +152,8 @@ export function MenuItemForm({
   const [moreOpen, setMoreOpen] = useState(false);
 
   // The photo is not part of the RHF schema: it round-trips through
-  // /api/menu/[id]/image, which needs an item id. On edit we upload
-  // immediately; on create we hold the file and upload once the id exists.
+  // /api/menu/[id]/image, which needs an item id. On create we hold the file and
+  // upload once the id exists; an existing item's photos are ItemPhotosField.
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [pendingFile, setPendingFile] = useState<File | null>(null);
   const [imageBusy, setImageBusy] = useState(false);
@@ -284,47 +285,14 @@ export function MenuItemForm({
       toast.error(problem);
       return;
     }
-    if (isEdit && item) {
-      setImageBusy(true);
-      try {
-        const url = await uploadImage(item.id, file);
-        if (url) {
-          setImageUrl(url);
-          toast.success("Photo updated");
-          onSaved();
-        }
-      } catch {
-        toast.error("Could not upload photo");
-      } finally {
-        setImageBusy(false);
-      }
-    } else {
-      setPendingFile(file);
-    }
+    // Existing items save their photos in ItemPhotosField; a new one holds its file until it has an id.
+    setPendingFile(file);
   }
 
-  async function removePhoto() {
-    if (pendingFile) {
-      setPendingFile(null);
-      return;
-    }
-    if (!item || !imageUrl) return;
-    setImageBusy(true);
-    try {
-      const res = await fetch(`/api/menu/${item.id}/image`, { method: "DELETE" });
-      if (!res.ok) {
-        toast.error("Could not remove photo");
-        return;
-      }
-      setImageUrl(null);
-      toast.success("Photo removed");
-      onSaved();
-    } catch {
-      toast.error("Could not remove photo");
-    } finally {
-      setImageBusy(false);
-    }
+  function removePhoto() {
+    setPendingFile(null);
   }
+
 
   /** The stock keys to send, or null after showing an error on the field. */
   function stockBody(): MenuStockFields | null {
@@ -609,83 +577,87 @@ export function MenuItemForm({
                   </FormItem>
                 )}
               />
-              <div className="space-y-2" role="group" aria-labelledby="menu-item-photo-label">
-                <p className="text-sm font-medium leading-none" id="menu-item-photo-label">
-                  Photo (optional)
-                </p>
-                {imageUrl ? (
-                  <Image
-                    src={imageUrl}
-                    alt={`Current photo of ${item?.name ?? "this item"}`}
-                    width={96}
-                    height={96}
-                    sizes="96px"
-                    className="h-24 w-24 rounded-md border object-cover"
-                  />
-                ) : null}
-                {pendingFile ? (
-                  <p className="text-sm text-foreground" aria-live="polite">
-                    Selected: {pendingFile.name} — uploads when you create the item.
+              {isEdit && item ? (
+                <ItemPhotosField itemId={item.id} itemName={item.name} onChanged={onSaved} />
+              ) : (
+                <div className="space-y-2" role="group" aria-labelledby="menu-item-photo-label">
+                  <p className="text-sm font-medium leading-none" id="menu-item-photo-label">
+                    Photo (optional)
                   </p>
-                ) : null}
-                <div className="flex flex-wrap gap-2">
-                  <label
-                    htmlFor="menu-item-photo"
-                    className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium ring-offset-background transition-colors hover:bg-accent focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
-                  >
-                    {imageUrl || pendingFile ? "Change photo" : "Choose photo"}
-                  </label>
-                  <input
-                    id="menu-item-photo"
-                    type="file"
-                    accept="image/*"
-                    className="sr-only"
-                    disabled={imageBusy}
-                    onChange={onPickFile}
-                  />
-                  {/*
-                    Separate camera input: `capture` restricts the picker to the
-                    camera on both iOS and Android, so it cannot be the only entry
-                    point — vendors also need the gallery.
-                  */}
-                  <input
-                    ref={cameraInputRef}
-                    type="file"
-                    accept="image/*"
-                    capture="environment"
-                    className="sr-only"
-                    aria-hidden
-                    tabIndex={-1}
-                    disabled={imageBusy}
-                    onChange={onPickFile}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-11 sm:hidden"
-                    disabled={imageBusy}
-                    onClick={() => cameraInputRef.current?.click()}
-                  >
-                    Take photo
-                  </Button>
-                  {imageUrl || pendingFile ? (
+                  {imageUrl ? (
+                    <Image
+                      src={imageUrl}
+                      alt={`Current photo of ${item?.name ?? "this item"}`}
+                      width={96}
+                      height={96}
+                      sizes="96px"
+                      className="h-24 w-24 rounded-md border object-cover"
+                    />
+                  ) : null}
+                  {pendingFile ? (
+                    <p className="text-sm text-foreground" aria-live="polite">
+                      Selected: {pendingFile.name} — uploads when you create the item.
+                    </p>
+                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <label
+                      htmlFor="menu-item-photo"
+                      className="inline-flex min-h-11 cursor-pointer items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium ring-offset-background transition-colors hover:bg-accent focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2"
+                    >
+                      {imageUrl || pendingFile ? "Change photo" : "Choose photo"}
+                    </label>
+                    <input
+                      id="menu-item-photo"
+                      type="file"
+                      accept="image/*"
+                      className="sr-only"
+                      disabled={imageBusy}
+                      onChange={onPickFile}
+                    />
+                    {/*
+                      Separate camera input: `capture` restricts the picker to the
+                      camera on both iOS and Android, so it cannot be the only entry
+                      point — vendors also need the gallery.
+                    */}
+                    <input
+                      ref={cameraInputRef}
+                      type="file"
+                      accept="image/*"
+                      capture="environment"
+                      className="sr-only"
+                      aria-hidden
+                      tabIndex={-1}
+                      disabled={imageBusy}
+                      onChange={onPickFile}
+                    />
                     <Button
                       type="button"
                       variant="outline"
-                      className="min-h-11"
+                      className="min-h-11 sm:hidden"
                       disabled={imageBusy}
-                      onClick={removePhoto}
+                      onClick={() => cameraInputRef.current?.click()}
                     >
-                      Remove photo
+                      Take photo
                     </Button>
-                  ) : null}
+                    {imageUrl || pendingFile ? (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="min-h-11"
+                        disabled={imageBusy}
+                        onClick={removePhoto}
+                      >
+                        Remove photo
+                      </Button>
+                    ) : null}
+                  </div>
+                  <p className="text-xs text-muted-foreground" aria-live="polite">
+                    {imageBusy
+                      ? "Uploading photo…"
+                      : "JPEG, PNG or WebP, up to 4MB. Shown on your store page and at the counter. Add more photos after you create it."}
+                  </p>
                 </div>
-                <p className="text-xs text-muted-foreground" aria-live="polite">
-                  {imageBusy
-                    ? "Uploading photo…"
-                    : "JPEG, PNG or WebP, up to 4MB. Shown on your store page and at the counter."}
-                </p>
-              </div>
+              )}
               <FormField
                 control={form.control}
                 name="category"

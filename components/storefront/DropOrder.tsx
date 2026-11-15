@@ -76,6 +76,8 @@ export type DropOrderItem = {
   name: string;
   emoji: string;
   imageUrl: string | null;
+  /** Photos after the cover, for the detail sheet (lib/item-photos.ts). */
+  morePhotos?: string[];
   /** One line under the name; null = none. */
   description?: string | null;
   priceInPaise: number;
@@ -506,6 +508,7 @@ export function DropOrder(props: DropOrderProps) {
           name={detailItem.name}
           emoji={detailItem.emoji}
           imageUrl={detailItem.imageUrl}
+          morePhotos={detailItem.morePhotos}
           description={detailItem.description}
           dimmed={detail.soldOut}
           price={<ItemPriceHero priceInPaise={detail.shownPrice} sale={detail.sale} />}
