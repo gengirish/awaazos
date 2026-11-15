@@ -60,7 +60,8 @@ const LOGO_MAX_BYTES = 1_500_000;
  * The store logo as a data URL for Satori, or null. A slow or missing blob
  * degrades to "no logo" rather than a broken image or a 500 half-way through
  * the render. PNG / JPEG only (Satori can't draw WebP). Used by the link
- * preview and the store's app icon (app/s/[slug]/app-icon/[size]).
+ * preview, the store's app icon (app/s/[slug]/app-icon/[size]) and a product link's
+ * preview, which draws the item's photo with it (app/s/[slug]/p/[itemId]).
  */
 export async function storeLogoDataUrl(url: string | null): Promise<string | null> {
   if (!url) return null;

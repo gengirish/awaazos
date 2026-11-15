@@ -83,4 +83,75 @@ test.describe("storefront: item detail sheet", () => {
       await buyerCtx.close();
     }
   });
+
+  test("a product link opens the item, keeps the Instagram tag and follows Back", async ({ page, request, browser }) => {
+    test.setTimeout(180_000);
+    const suffix = Math.random().toString(36).slice(2, 7);
+    const kurti = `Cotton Kurti ${suffix}`;
+    const hidden = `Counter Tea ${suffix}`;
+
+    await createVendorSession(page, request, "itemlink", "/menu");
+    const item = await createMenuItem(page, { name: kurti, priceInRupees: 650, category: "Kurtis" });
+    const counterOnly = await createMenuItem(page, { name: hidden, priceInRupees: 10, category: "Drinks" });
+    const off = await page.request.patch(`/api/menu/${counterOnly.id}`, {
+      data: { showOnline: false },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(off.ok()).toBe(true);
+    const { slug } = await openStoreForMenuOrders(page);
+
+    // The seller's menu card offers the link once the store is published.
+    await page.goto("/menu");
+    await expect(page.getByRole("button", { name: `Copy link to ${kurti} for Instagram` })).toBeVisible();
+    await expect(page.getByRole("button", { name: `Copy link to ${hidden} for Instagram` })).toHaveCount(0);
+
+    // Link previews: the item's own title and card.
+    const html = await (await request.get(`/s/${slug}/p/${item.id}`)).text();
+    expect(html).toContain(`<title>${kurti} · `);
+    const og = await request.get(`/s/${slug}/p/${item.id}/opengraph-image`);
+    expect(og.status()).toBe(200);
+    expect(og.headers()["content-type"]).toContain("image/png");
+
+    const ctx = await browser.newContext(CONTEXT_OPTIONS);
+    try {
+      const buyer = await ctx.newPage();
+      const res = await buyer.goto(`/s/${slug}/p/${item.id}?src=ig`);
+      expect(res?.status()).toBe(200);
+      const sheet = buyer.getByRole("dialog", { name: kurti });
+      await expect(sheet).toBeVisible();
+      await expect(sheet.getByRole("button", { name: "Share" })).toBeVisible();
+
+      // Closing goes to the store's address with the tag kept for checkout.
+      await sheet.getByRole("button", { name: "Close" }).click();
+      await expect(sheet).toBeHidden();
+      await expect(buyer).toHaveURL(new RegExp(`/s/${slug}[?]src=ig$`));
+
+      // A tap pushes the product address; the phone's Back closes the sheet.
+      await buyer.getByRole("button", { name: new RegExp(`^${kurti}`) }).click();
+      await expect(sheet).toBeVisible();
+      await expect(buyer).toHaveURL(new RegExp(`/s/${slug}/p/${item.id}[?]src=ig$`));
+      await buyer.goBack();
+      await expect(sheet).toBeHidden();
+      await expect(buyer).toHaveURL(new RegExp(`/s/${slug}[?]src=ig$`));
+
+      // A counter-only item and a made-up id: the store with a notice, never a 404.
+      for (const id of [counterOnly.id, "not-a-real-item"]) {
+        const r = await buyer.goto(`/s/${slug}/p/${id}`);
+        expect(r?.status()).toBe(200);
+        await expect(buyer.getByRole("status").filter({ hasText: "isn't on sale right now" })).toBeVisible();
+        await expect(buyer.getByRole("dialog")).toHaveCount(0);
+      }
+      await expect(buyer.getByText(hidden)).toHaveCount(0);
+    } finally {
+      await ctx.close();
+    }
+
+    // An unpublished store's product link is a 404, like the store itself.
+    const unpub = await page.request.patch("/api/vendor", {
+      data: { publishStorefront: false },
+      headers: { "Content-Type": "application/json" },
+    });
+    expect(unpub.ok()).toBe(true);
+    expect((await request.get(`/s/${slug}/p/${item.id}`)).status()).toBe(404);
+  });
 });

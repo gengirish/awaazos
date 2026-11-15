@@ -2,12 +2,14 @@
 
 import { CalendarClock, MapPin, Sparkles, Truck } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCartHubEntry } from "@/components/storefront/CartHub";
 import { SizePicker } from "@/components/storefront/SizePicker";
 import { ItemDetailSheet, ItemDetailTrigger } from "@/components/storefront/ItemDetailSheet";
+import { enterItemUrl, itemDetailPath, leaveItemUrl, useCloseOnBack } from "@/components/storefront/item-detail-url";
 import { ItemPhoto } from "@/components/storefront/ItemPhoto";
+import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
 import {
   CartBar,
@@ -124,6 +126,8 @@ export type MenuOrderProps = {
   layout?: "list" | "gallery";
   /** How an item is handed over and paid for, for its detail sheet (`menuDetailFacts`, lib/item-detail.ts). */
   facts?: readonly DetailFact[];
+  /** The item whose sheet is open on load (a product link, `/s/<slug>/p/<id>`); null = none. */
+  initialDetailId?: string | null;
 };
 
 const NO_OFFERS: readonly ResolvedOffer[] = [];
@@ -148,18 +152,27 @@ export function MenuOrder(props: MenuOrderProps) {
     offers = NO_OFFERS,
     layout = "list",
     facts = NO_FACTS,
+    initialDetailId = null,
   } = props;
   const router = useRouter();
 
   const [open, setOpen] = useState(false);
   // The item in the detail sheet (ItemDetailSheet). It stays set after closing, so the
   // sheet plays its close animation and Radix hands focus back to the item it came from.
-  const [detailId, setDetailId] = useState<string | null>(null);
-  const [detailOpen, setDetailOpen] = useState(false);
+  // A product link (/s/<slug>/p/<id>) opens with its sheet already up.
+  const [detailId, setDetailId] = useState<string | null>(initialDetailId);
+  const [detailOpen, setDetailOpen] = useState(initialDetailId !== null);
   const openDetailFor = (id: string) => {
     setDetailId(id);
     setDetailOpen(true);
+    enterItemUrl(slug, id);
   };
+  const onDetailOpenChange = (next: boolean) => {
+    setDetailOpen(next);
+    if (!next) leaveItemUrl(slug);
+  };
+  const closeDetail = useCallback(() => setDetailOpen(false), []);
+  useCloseOnBack(slug, detailOpen, closeDetail);
   const checkoutRef = useRef<HTMLButtonElement>(null);
   const refreshOnCloseRef = useRef(false);
 
@@ -506,7 +519,15 @@ export function MenuOrder(props: MenuOrderProps) {
         <ItemDetailSheet
           open={detailOpen}
           triggerId={detailItem.id}
-          onOpenChange={setDetailOpen}
+          onOpenChange={onDetailOpenChange}
+          share={
+            <ShareStoreButton
+              vendorName={vendorName}
+              slug={slug}
+              path={itemDetailPath(slug, detailItem.id)}
+              text={`${detailItem.name} from ${vendorName}`}
+            />
+          }
           name={detailItem.name}
           emoji={detailItem.emoji}
           imageUrl={detailItem.imageUrl}

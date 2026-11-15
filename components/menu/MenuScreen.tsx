@@ -31,10 +31,21 @@ type MenuScreenProps = {
   sizesEnabled?: boolean;
   /** The viewer may see and set cost prices (lib/item-cost.ts rule 2). */
   canSeeCost?: boolean;
+  /** The published store's link name (item product links); null = not published. */
+  storeSlug?: string | null;
 };
 
 /** The header's two actions open things lower down, so the state they share lives here. */
-export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vocab, sizesEnabled, canSeeCost }: MenuScreenProps) {
+export function MenuScreen({
+  initialItems,
+  voiceLang,
+  voiceOpen,
+  prefillName,
+  vocab,
+  sizesEnabled,
+  canSeeCost,
+  storeSlug = null,
+}: MenuScreenProps) {
   const router = useRouter();
   const [items, setItems] = useState<MenuRow[]>(initialItems);
   const [voiceExpanded, setVoiceExpanded] = useState(initialItems.length === 0 || voiceOpen);
@@ -139,6 +150,7 @@ export function MenuScreen({ initialItems, voiceLang, voiceOpen, prefillName, vo
           onEdit={openEdit}
           vocab={vocab}
           canSeeCost={canSeeCost}
+          storeSlug={storeSlug}
         />
         {formMounted ? (
           <MenuItemForm
