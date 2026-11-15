@@ -5,7 +5,10 @@
  *   npm run demo:fix-store-kind -- <store-slug> --category=jewellery_accessories                 # dry run
  *   npm run demo:fix-store-kind -- <store-slug> --category=jewellery_accessories --apply --allow-remote
  *
- * Demo stores only: a real store stops it before any write. Only items still on 🍽️
+ * Demo stores only: a real store stops it before any write. `--claimed` also lets it
+ * fix a store a seller claimed from a demo (`demoExternalRef` still set) — that is a
+ * live seller's store, so only with the owner's OK. A store that never was a demo is
+ * always refused. Only items still on 🍽️
  * (or no emoji) with no photo get a new emoji; photos, prices and names are untouched.
  * Idempotent: a second run finds nothing to change.
  *
@@ -39,9 +42,10 @@ async function main(): Promise<void> {
   const category = args.find((a) => a.startsWith("--category="))?.slice("--category=".length);
   const apply = args.includes("--apply");
   const allowRemote = args.includes("--allow-remote");
+  const claimed = args.includes("--claimed");
   if (!slug || !isDemoCategory(category)) {
     console.error(
-      `Usage: npm run demo:fix-store-kind -- <store-slug> --category=${Object.keys(DEMO_CATEGORIES).join("|")} [--apply] [--allow-remote]`,
+      `Usage: npm run demo:fix-store-kind -- <store-slug> --category=${Object.keys(DEMO_CATEGORIES).join("|")} [--apply] [--allow-remote] [--claimed]`,
     );
     process.exit(1);
   }
@@ -70,16 +74,22 @@ async function main(): Promise<void> {
   try {
     const vendor = await prisma.vendor.findUnique({
       where: { slug },
-      select: { id: true, name: true, isDemo: true, stallType: true, stallTypeOther: true },
+      select: { id: true, name: true, isDemo: true, demoExternalRef: true, stallType: true, stallTypeOther: true },
     });
     if (!vendor) {
       console.error(`No store with the slug "${slug}".`);
       process.exit(1);
     }
-    if (!vendor.isDemo) {
-      console.error(`/s/${slug} is a real store. This script only re-files demo stores; nothing was written.`);
+    const wasDemo = vendor.demoExternalRef !== null;
+    if (!vendor.isDemo && !(claimed && wasDemo)) {
+      console.error(
+        wasDemo
+          ? `/s/${slug} was claimed by its seller. Pass --claimed to fix it anyway (with the owner's OK); nothing was written.`
+          : `/s/${slug} is a real store that never was a demo. This script won't touch it; nothing was written.`,
+      );
       process.exit(1);
     }
+    if (!vendor.isDemo) console.log(`  note: /s/${slug} is a claimed store (live seller), fixing it because of --claimed`);
     const items = await prisma.menuItem.findMany({
       where: { vendorId: vendor.id },
       select: { id: true, name: true, emoji: true, imageUrl: true },
@@ -106,7 +116,7 @@ async function main(): Promise<void> {
     await prisma.$transaction(async (tx) => {
       if (plan.storeChanges) {
         await tx.vendor.update({
-          where: { id: vendor.id, isDemo: true },
+          where: vendor.isDemo ? { id: vendor.id, isDemo: true } : { id: vendor.id, demoExternalRef: vendor.demoExternalRef ?? "" },
           data: { stallType: plan.stallType, stallTypeOther: plan.stallTypeOther },
         });
       }
