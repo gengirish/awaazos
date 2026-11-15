@@ -87,3 +87,51 @@ describe("suggestEmoji", () => {
     expect(suggestEmoji("Combo 1")).toBeNull();
   });
 });
+
+describe("suggestEmoji for a product store", () => {
+  // The live accessories demo store (accessories-aura-nwpa) whose every item fell back to 🍽️.
+  it.each([
+    ["Tulip bracelet", "💍"],
+    ["Anti Tarnish pendant with chain", "📿"],
+    ["Promise chain", "📿"],
+    ["Meenakari peacock earrings", "💍"],
+    ["Oxidised yellow stone drops", "💍"],
+    ["Butterfly hair clip set", "🎀"],
+    ["Organza bow clip", "🎀"],
+  ])("%s → %s", (name, emoji) => {
+    expect(suggestEmoji(name, "goods")).toBe(emoji);
+  });
+
+  it.each([
+    ["Silver key chain", "🔑"],
+    ["Diwali gift hamper with candles", "🎁"],
+    ["Cotton kurti", "👗"],
+    ["Banarasi silk saree", "🥻"],
+    ["Lavender soy candle", "🕯️"],
+    ["Hand-painted clay diyas", "🪔"],
+    ["Neem turmeric soap", "🧼"],
+    ["Onion hair oil", "🧴"],
+    ["Tulsi Green Tea", "🍵"],
+    ["Wild Forest Honey", "🍯"],
+    ["Mango pickle", "🫙"],
+    ["Jute tote bag", "👜"],
+  ])("%s → %s", (name, emoji) => {
+    expect(suggestEmoji(name, "goods")).toBe(emoji);
+  });
+
+  it("falls back to the food words, since product stores sell pickles and sweets too", () => {
+    expect(suggestEmoji("Besan Laddu", "goods")).toBe("🍬");
+    expect(suggestEmoji("Chocolate Brownies", "goods")).toBe("🍰");
+  });
+
+  it("returns null when nothing matches, so the caller picks the product fallback", () => {
+    expect(suggestEmoji("Mystery item", "goods")).toBeNull();
+  });
+
+  it("leaves kitchens on the food words: product nouns don't apply there", () => {
+    expect(suggestEmoji("Masala Chai")).toBe("☕");
+    expect(suggestEmoji("Masala Chai", "food")).toBe("☕");
+    expect(suggestEmoji("Tulip bracelet", "food")).toBeNull();
+    expect(suggestEmoji("Onion rings", "food")).toBeNull();
+  });
+});

@@ -245,7 +245,7 @@ export function MenuItemForm({
         description: item.description ?? "",
       });
     } else {
-      const suggestion = defaultName ? suggestEmoji(defaultName) : null;
+      const suggestion = defaultName ? suggestEmoji(defaultName, vocab.kind) : null;
       form.reset({
         ...defaultCreateValues,
         name: defaultName,
@@ -253,7 +253,7 @@ export function MenuItemForm({
       });
       setEmojiSuggested(suggestion !== null);
     }
-  }, [open, item, form, defaultName, baseEmoji]);
+  }, [open, item, form, defaultName, baseEmoji, vocab.kind]);
 
   function validateImage(file: File): string | null {
     if (!ALLOWED_IMAGE_TYPES.includes(file.type)) return "Use a JPEG, PNG or WebP photo";
@@ -496,7 +496,7 @@ export function MenuItemForm({
                         onChange={(e) => {
                           field.onChange(e);
                           if (isEdit || emojiPicked) return;
-                          const suggestion = suggestEmoji(e.target.value);
+                          const suggestion = suggestEmoji(e.target.value, vocab.kind);
                           form.setValue("emoji", suggestion ?? baseEmoji);
                           setEmojiSuggested(suggestion !== null);
                         }}

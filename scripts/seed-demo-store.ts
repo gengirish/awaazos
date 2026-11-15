@@ -30,6 +30,7 @@ import {
   isDemoFixtureCategory,
   type DemoFixtureCategory,
 } from "@/lib/demo-fixture";
+import type { DemoCategory } from "@/lib/demo-store-schema";
 
 function loadEnvFile(name: string): void {
   const file = path.join(process.cwd(), name);
@@ -47,11 +48,11 @@ function arg(args: string[], name: string): string | undefined {
 }
 
 /** Outreach category of the demo-store API for each fixture category. */
-const API_CATEGORY: Record<DemoFixtureCategory, "home_bakery" | "home_kitchen" | "general"> = {
+const API_CATEGORY: Record<DemoFixtureCategory, DemoCategory> = {
   bakery: "home_bakery",
   meals: "home_kitchen",
-  wellness: "general",
-  crafts: "general",
+  wellness: "wellness",
+  crafts: "crafts_decor",
 };
 
 async function main(): Promise<void> {

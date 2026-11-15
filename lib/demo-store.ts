@@ -29,11 +29,11 @@ import { Prisma } from "@prisma/client";
 
 import { TRIAL_DAYS } from "@/lib/constants";
 import {
-  DEMO_CATEGORIES,
   DEMO_CLAIM_TTL_DAYS,
   DEMO_CREATES_PER_DAY,
   DEMO_FULFILMENT,
   DEMO_UPI_ID,
+  demoStallType,
   demoVoiceLang,
   itemKey,
   type DemoSampleOrderInput,
@@ -42,8 +42,8 @@ import {
 import { computeOrderTotals, generateOrderToken, nextBillNumber } from "@/lib/drops";
 import { normaliseInstagramHandle } from "@/lib/instagram";
 import { loadMenuCreateContext, prepareMenuItemCreate } from "@/lib/menu-create";
+import { defaultEmoji } from "@/lib/menu-emoji";
 import { suggestEmoji } from "@/lib/menu-suggestions";
-import { DEFAULT_MENU_EMOJI } from "@/lib/menu-voice";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { checkPasswordPolicy } from "@/lib/password-strength";
 import { normaliseIndianMobile } from "@/lib/phone";
@@ -51,6 +51,7 @@ import { prisma } from "@/lib/prisma";
 import { generateReceiptToken } from "@/lib/receipt-data";
 import { appBaseUrl } from "@/lib/storefront-razorpay";
 import { newVendorSlug } from "@/lib/store-slug";
+import { storeKind, storeVocabulary } from "@/lib/store-vocabulary";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Sample orders are back-dated this far apart, newest first, so the board looks lived in. */
@@ -163,6 +164,10 @@ async function writeDemoStore(
   const ownerId = await demoOwnerId(tx);
   const instagram = normaliseInstagramHandle(profile.instagram) || null;
   const displayPhone = profile.display_phone ? normaliseIndianMobile(profile.display_phone) : null;
+  const { stallType, stallTypeOther } = demoStallType(profile.category);
+  // A jewellery store's items must not fall back to a 🍽️.
+  const kind = storeKind(stallType);
+  const fallbackEmoji = defaultEmoji(storeVocabulary(stallType));
 
   const vendor = await tx.vendor.create({
     data: {
@@ -171,7 +176,8 @@ async function writeDemoStore(
       ownerName: "IntelliForge demo",
       upiId: DEMO_UPI_ID,
       upiName: profile.name,
-      stallType: DEMO_CATEGORIES[profile.category],
+      stallType,
+      stallTypeOther,
       city: profile.area ?? null,
       onboardingDone: true,
       // No trial: billingAccess() treats trialEndsAt = null as "free", never
@@ -207,7 +213,7 @@ async function writeDemoStore(
       priceInPaise: item.price_paise,
       aliases: [],
       tags: [],
-      emoji: suggestEmoji(item.name) ?? DEFAULT_MENU_EMOJI,
+      emoji: suggestEmoji(item.name, kind) ?? fallbackEmoji,
       category: item.category ?? "General",
       hsnCode: null,
       isPopular: false,
