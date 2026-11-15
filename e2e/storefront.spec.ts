@@ -77,7 +77,7 @@ test.describe("public storefront", () => {
     const anonPage = await anon.newPage();
     try {
       await anonPage.goto(`/s/${slug}#menu`);
-      await anonPage.getByRole("button", { name: "Share" }).click();
+      await anonPage.getByRole("button", { name: "Share this store" }).click();
       await expect(anonPage.getByRole("button", { name: "Link copied" })).toBeVisible();
       const copied = await anonPage.evaluate(() => (window as unknown as { __copied?: string }).__copied);
       expect(copied).toBe(new URL(`/s/${slug}`, anonPage.url()).toString());

@@ -267,8 +267,13 @@ Rules every one of them follows:
   tagline is one line under the store name, the link-preview description and a line on the share
   image. `MenuItem.description` (≤ 200 chars, item form) is one line under the item's name. Neither
   reaches the voice prompt (`stableMenuJson()` selects its fields). A goods store (`storeKind() ===
-  "goods"`) lists items as a photo gallery (two columns, tap to enlarge,
-  `components/storefront/ItemPhoto.tsx`); a kitchen keeps the rows.
+  "goods"`) lists items as a photo gallery (two columns); a kitchen keeps the rows.
+- **Item detail sheet** (`components/storefront/ItemDetailSheet.tsx`, plan in `docs/PRODUCT_PAGE_PLAN.md`):
+  tapping an item's name or photo, on any list (menu, pre-order, read-only), opens a sheet with the big
+  photo (tap → full size), discount-first price, sizes, stock, the whole description, the offers it
+  counts toward (`offersForItem`) and how it is handed over and paid for (`lib/item-detail.ts`, from what
+  the page already loaded: no new query). It is rendered by the list that owns the cart (`MenuOrder`,
+  `DropOrder`), so its Add is the row's stepper; a read-only menu (`ReadOnlyMenuRow`) has no Add.
 - The vendor's WhatsApp number reaches a public page only through `buyerWhatsappNumber()`
   (`lib/storefront-order.ts`): `VendorSettings.whatsappNumber`, and only once the vendor opts in
   with `acceptWhatsappOrders` (default `false`; Settings → Online orders). A saved number is not

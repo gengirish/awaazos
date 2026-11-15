@@ -31,6 +31,7 @@ import { ItemPhoto } from "@/components/storefront/ItemPhoto";
 import { CartHubProvider } from "@/components/storefront/CartHub";
 import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
 import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
+import { ReadOnlyMenuRow } from "@/components/storefront/ReadOnlyMenuRow";
 import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
 import { RecentOrderLink } from "@/components/storefront/RecentOrderLink";
 import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
@@ -85,7 +86,8 @@ import { qrSvgDataUrl } from "@/lib/qr";
 import { stallTypeLabel } from "@/lib/stall-type";
 import { itemSearchText } from "@/lib/store-search";
 import { storeKind, storeVocabulary } from "@/lib/store-vocabulary";
-import { storeInfoFacts, type StoreFactKind } from "@/lib/store-info";
+import { paymentFactText, storeInfoFacts, type StoreFactKind } from "@/lib/store-info";
+import { dropDetailFacts, menuDetailFacts } from "@/lib/item-detail";
 import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 import { dropItemStock, stockBadgeText, storefrontStock, type StorefrontStock } from "@/lib/storefront-stock";
 import { viewerIsStoreStaff } from "@/lib/storefront-viewer";
@@ -487,23 +489,6 @@ async function loadStoreSizes(
   return out;
 }
 
-/** Small "Sold out" / "Only N left" pill: text, never colour alone. */
-function StockBadge({ stock }: { stock: StorefrontStock | null }) {
-  const text = stockBadgeText(stock);
-  if (!text) return null;
-  return (
-    <span
-      className={
-        stock?.soldOut
-          ? "rounded-full bg-muted px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-muted-foreground"
-          : "rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary"
-      }
-    >
-      {text}
-    </span>
-  );
-}
-
 /** How a store lists its items: rows for a kitchen, a photo gallery for goods. */
 type CatalogueLayout = "list" | "gallery";
 
@@ -512,82 +497,6 @@ const CATEGORY_LIST_CLASS: Record<CatalogueLayout, string> = {
   list: "divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs",
   gallery: "grid grid-cols-2 gap-3 sm:grid-cols-3",
 };
-
-function MenuRow({
-  item,
-  layout,
-  stock,
-  sizes,
-}: {
-  item: StorefrontItems[number];
-  layout: CatalogueLayout;
-  stock: StorefrontStock | null;
-  /** Its sizes / colours (lib/item-variants.ts); absent when it has none. */
-  sizes?: StoreSize[];
-}) {
-  const dimmed = stock?.soldOut ?? false;
-  const range = sizes ? variantPriceRange(item.priceInPaise, sizes) : null;
-  const fromPaise = range?.minPaise ?? sizes?.[0]?.priceInPaise ?? item.priceInPaise;
-  const sizeLine = sizes && sizes.length > 0 ? sizes.map((v) => v.label).join(" · ") : null;
-  if (layout === "gallery") {
-    return (
-      <li className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-background p-2.5 shadow-xs">
-        <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="tile" enlarge dimmed={dimmed} />
-        <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">{item.name}</span>
-          {item.description ? (
-            <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
-          ) : null}
-          {sizeLine ? <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{sizeLine}</span> : null}
-          <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-            <span className="font-mono font-bold tabular-nums text-foreground">
-              {range ? <span className="font-sans font-medium text-muted-foreground">from </span> : null}
-              {formatINRCompact(fromPaise)}
-              {item.unit ? <span className="font-sans font-medium text-muted-foreground"> / {item.unit}</span> : null}
-            </span>
-            <StockBadge stock={stock} />
-            {item.isPopular ? (
-              <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
-                <Sparkles className="h-3 w-3" aria-hidden="true" />
-                Popular
-              </span>
-            ) : null}
-          </span>
-        </span>
-      </li>
-    );
-  }
-  return (
-    <li className="flex items-center gap-3 px-3 py-3 transition-colors hover:bg-primary/4 sm:gap-4 sm:px-4">
-      <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="row" dimmed={dimmed} />
-
-      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="line-clamp-2 min-w-0 text-[15px] font-semibold leading-snug text-foreground">
-            {item.name}
-          </span>
-          <StockBadge stock={stock} />
-          {item.isPopular ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide text-primary">
-              <Sparkles className="h-3 w-3" aria-hidden="true" />
-              Popular
-            </span>
-          ) : null}
-        </span>
-        {item.description ? (
-          <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
-        ) : null}
-        {sizeLine ? <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{sizeLine}</span> : null}
-      </span>
-
-      <span className="shrink-0 rounded-lg bg-muted/70 px-2.5 py-1 font-mono text-sm font-bold tabular-nums text-foreground">
-        {range ? <span className="font-sans font-medium text-muted-foreground">from </span> : null}
-        {formatINRCompact(fromPaise)}
-        {item.unit ? <span className="font-sans font-medium text-muted-foreground"> / {item.unit}</span> : null}
-      </span>
-    </li>
-  );
-}
 
 type StorefrontDrop = StorefrontVendor["drops"][number];
 
@@ -844,6 +753,15 @@ function DropSection({
           theme={theme}
           notesExample={notesExample}
           offers={view.offers}
+          facts={dropDetailFacts({
+            handoverText: `${handoverKind} · ${handoverWindow}`,
+            deadlineText: orderable ? `Order by ${formatIstDeadline(drop.closesAt, now)}` : null,
+            delivery: types.includes("DELIVERY"),
+            pickupNote: types.includes("PICKUP") ? drop.pickupNote : null,
+            deliveryAreas,
+            deliveryFeePaise: drop.deliveryFeePaise,
+            paymentText: paymentFactText(payment),
+          })}
         />
       </div>
     </section>
@@ -887,6 +805,7 @@ export default async function StorefrontPage(props: {
   const layout: CatalogueLayout = storeKind(vendor.stallType) === "goods" ? "gallery" : "list";
 
   const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
+  const menuTypes = allowedFulfilmentTypes(vendor.settings?.menuFulfilmentMode ?? "PICKUP");
   // "When": the store's weekly slots for menu orders, and the first one open now.
   const deliveryAreas = parseDeliveryAreas(vendor.settings?.deliveryAreas);
   const menuSlotRules = menuOrdering ? parseMenuSlots(vendor.settings?.menuSlots) : [];
@@ -1415,7 +1334,7 @@ export default async function StorefrontPage(props: {
                     vendorName={vendor.name}
                     categories={menuCategories}
                     layout={layout}
-                    fulfilmentTypes={allowedFulfilmentTypes(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}
+                    fulfilmentTypes={menuTypes}
                     deliveryFeePaise={vendor.settings?.menuDeliveryFeePaise ?? 0}
                     deliveryAreas={deliveryAreas}
                     pickupNote={vendor.settings?.menuPickupNote ?? null}
@@ -1427,6 +1346,15 @@ export default async function StorefrontPage(props: {
                     theme={theme}
                     notesExample={orderNoteExample}
                     offers={menuOffers}
+                    facts={menuDetailFacts({
+                      pickup: menuTypes.includes("PICKUP"),
+                      delivery: menuTypes.includes("DELIVERY"),
+                      pickupNote: vendor.settings?.menuPickupNote ?? null,
+                      deliveryAreas,
+                      deliveryFeePaise: vendor.settings?.menuDeliveryFeePaise ?? 0,
+                      nextSlotLabel: nextMenuSlot ? menuSlotLabel(nextMenuSlot, now) : null,
+                      paymentText: paymentFactText(payment),
+                    })}
                   />
                 ) : null}
 
@@ -1448,7 +1376,7 @@ export default async function StorefrontPage(props: {
                       <ul className={CATEGORY_LIST_CLASS[layout]}>
                         {items.map((item) => (
                           <Searchable key={item.id} texts={[menuItemSearchText(item, category)]}>
-                            <MenuRow item={item} layout={layout} stock={stockOf(item.id)} sizes={storeSizes.get(item.id)} />
+                            <ReadOnlyMenuRow item={item} layout={layout} stock={stockOf(item.id)} sizes={storeSizes.get(item.id)} />
                           </Searchable>
                         ))}
                       </ul>
