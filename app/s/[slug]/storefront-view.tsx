@@ -61,6 +61,7 @@ import { formatDropDayLabel, formatWindowWithDay } from "@/lib/drops-time";
 import { instagramProfileUrl } from "@/lib/instagram";
 import { whatsappCommunityLabel, whatsappCommunityLink } from "@/lib/whatsapp-community";
 import { stockLeftByMenuItem, stockLeftByVariant, type TrackedItem } from "@/lib/inventory-server";
+import { storedHighlights, type Highlight } from "@/lib/item-highlights";
 import { MAX_ITEM_PHOTOS, photoUrls } from "@/lib/item-photos";
 import { allSizesSoldOut, variantPriceRange, variantPricePaise, type StoreSize } from "@/lib/item-variants";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
@@ -289,6 +290,10 @@ export const loadStorefront = cache(async (slug: string) => {
                   // Extra photos after the cover (lib/item-photos.ts), shown in the detail sheet.
                   images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], take: MAX_ITEM_PHOTOS - 1, select: { url: true } },
                   description: true,
+                  // Detail sheet text and the food mark (lib/item-highlights.ts).
+                  details: true,
+                  highlights: true,
+                  foodType: true,
                   // Stock (lib/inventory.ts): server-side only, reduced to `remaining` / `onlyLeft`.
                   stockQty: true,
                   stockCountedAt: true,
@@ -327,6 +332,10 @@ export const loadStorefront = cache(async (slug: string) => {
           // Extra photos after the cover (lib/item-photos.ts), shown in the detail sheet.
           images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], take: MAX_ITEM_PHOTOS - 1, select: { url: true } },
           description: true,
+          // Detail sheet text and the food mark (lib/item-highlights.ts).
+          details: true,
+          highlights: true,
+          foodType: true,
           // Stock (lib/inventory.ts): server-side only, reduced to `StorefrontStock` per item.
           stockQty: true,
           stockCountedAt: true,
@@ -386,8 +395,8 @@ function menuFulfilmentPhrase(mode: FulfilmentMode): string {
 /** Everyday rows as rendered: the stock columns never reach a row (see loadItemStock). */
 type StorefrontItems = (Omit<
   StorefrontVendor["menuItems"][number],
-  "stockQty" | "stockCountedAt" | "lowStockAt" | "variants" | "images"
-> & { morePhotos: string[] })[];
+  "stockQty" | "stockCountedAt" | "lowStockAt" | "variants" | "images" | "highlights"
+> & { morePhotos: string[]; highlights: Highlight[] })[];
 
 /** Preserves the query ordering; no re-sort. */
 function groupByCategory(items: StorefrontItems): [string, StorefrontItems][] {
@@ -571,6 +580,10 @@ async function buildDropViews(
         imageUrl: i.menuItem.imageUrl ?? (foodArt ? foodImageFor(i.menuItem.name) : null),
         morePhotos: morePhotosOf(i.menuItem.imageUrl, i.menuItem.images),
         description: i.menuItem.description,
+        details: i.menuItem.details,
+        highlights: storedHighlights(i.menuItem.highlights),
+        // The food mark is a kitchen's (foodArt = a food store).
+        foodType: foodArt ? i.menuItem.foodType : null,
         priceInPaise: i.priceInPaise,
         perOrderLimit: i.perOrderLimit,
         menuAnchor: menuAnchorFor(i.menuItemId),
@@ -799,8 +812,10 @@ export async function StorefrontView(props: {
   const { foodArt, orderNoteExample } = storeVocabulary(vendor.stallType);
   // Stock columns stay out of the rows (see loadItemStock below).
   const menuItems = (menuHidden ? [] : vendor.menuItems).map(
-    ({ stockQty: _q, stockCountedAt: _c, lowStockAt: _l, variants: _v, images, ...item }) => ({
+    ({ stockQty: _q, stockCountedAt: _c, lowStockAt: _l, variants: _v, images, highlights, foodType, ...item }) => ({
       ...item,
+      highlights: storedHighlights(highlights),
+      foodType: foodArt ? foodType : null,
       imageUrl: item.imageUrl ?? (foodArt ? foodImageFor(item.name, item.category) : null),
       morePhotos: morePhotosOf(item.imageUrl, images),
     }),
@@ -975,6 +990,9 @@ export async function StorefrontView(props: {
       emoji: item.emoji,
       imageUrl: item.imageUrl,
       morePhotos: item.morePhotos,
+      details: item.details,
+      highlights: item.highlights,
+      foodType: item.foodType,
       priceInPaise: item.priceInPaise,
       unit: item.unit,
       isPopular: item.isPopular,

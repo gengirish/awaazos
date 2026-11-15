@@ -1,6 +1,6 @@
 # Product detail and product links plan
 
-Status: step 1 (detail sheet) merged in #205; step 2 (product links) merged in #207; step 3 (photos) in PR #208; steps 4 and 5 not started. Written 2026-11-14.
+Status: step 1 (detail sheet) merged in #205; step 2 (product links) merged in #207; step 3 (photos) in PR #208; step 4 (highlights) built on `feat/item-highlights`; step 5 not started. Written 2026-11-14.
 
 Why: on `/s/[slug]` an item is a row (kitchens) or a tile (goods stores), and that is all a buyer
 gets. On a kitchen store the photo and name do nothing when tapped; on a goods store the photo opens
@@ -170,6 +170,11 @@ because e2e runs have no Blob token; the reorder goes through the real route.
 
 Tests: `item-highlights` unit tests (limits, trimming, empty rows dropped); E2E: save highlights and
 a veg mark, see them on the store; public select test that `costInPaise` still never appears.
+
+As built: the mark shows on list rows and in the sheet; gallery tiles are for goods stores, which
+never show it. Egg is a filled dot in a yellow square, with the word "Contains egg". Highlights and
+details sit in the main item form under the description, kept outside the react-hook-form schema
+like stock and cost.
 
 ## Step 5: list polish and "ordered N times" (no migration)
 

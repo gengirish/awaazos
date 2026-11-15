@@ -80,6 +80,10 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     if (body.showOnline !== undefined) data.showOnline = body.showOnline;
     if (body.unit !== undefined) data.unit = body.unit;
     if (body.description !== undefined) data.description = normaliseMenuDescription(body.description);
+    if (body.details !== undefined) data.details = body.details;
+    // Json columns take DbNull, not null, to clear.
+    if (body.highlights !== undefined) data.highlights = body.highlights ?? Prisma.DbNull;
+    if (body.foodType !== undefined) data.foodType = body.foodType;
     if (body.sortOrder !== undefined) data.sortOrder = body.sortOrder;
     // `null` clears the photo. The blob itself is removed by
     // DELETE /api/menu/[id]/image, which is the path the UI uses.

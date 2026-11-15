@@ -23,6 +23,7 @@ import { SizePicker } from "@/components/storefront/SizePicker";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
 import { formatINRCompact } from "@/lib/currency";
+import type { FoodType, Highlight } from "@/lib/item-highlights";
 import type { DeliveryArea } from "@/lib/delivery-areas";
 import type { DetailFact } from "@/lib/item-detail";
 import {
@@ -78,6 +79,10 @@ export type DropOrderItem = {
   imageUrl: string | null;
   /** Photos after the cover, for the detail sheet (lib/item-photos.ts). */
   morePhotos?: string[];
+  /** Detail sheet text and the food mark (lib/item-highlights.ts); the mark only in a food store. */
+  details?: string | null;
+  highlights?: Highlight[];
+  foodType?: FoodType | null;
   /** One line under the name; null = none. */
   description?: string | null;
   priceInPaise: number;
@@ -478,7 +483,7 @@ export function DropOrder(props: DropOrderProps) {
               />
 
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <ItemDetailTrigger detailId={item.id} name={item.name} description={item.description} onOpen={openDetail} />
+                <ItemDetailTrigger detailId={item.id} name={item.name} description={item.description} foodType={item.foodType} onOpen={openDetail} />
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
                   <ItemPrice priceInPaise={v.shownPrice} sale={v.sale} />
                   {v.badges}
@@ -509,6 +514,9 @@ export function DropOrder(props: DropOrderProps) {
           emoji={detailItem.emoji}
           imageUrl={detailItem.imageUrl}
           morePhotos={detailItem.morePhotos}
+          details={detailItem.details}
+          highlights={detailItem.highlights}
+          foodType={detailItem.foodType}
           description={detailItem.description}
           dimmed={detail.soldOut}
           price={<ItemPriceHero priceInPaise={detail.shownPrice} sale={detail.sale} />}

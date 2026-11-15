@@ -8,6 +8,7 @@ import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { ItemDetailFields, itemDetailDraftFrom, type ItemDetailDraft } from "@/components/menu/ItemDetailFields";
 import { ItemPhotosField } from "@/components/menu/ItemPhotosField";
 import { ItemSizesEditor } from "@/components/menu/ItemSizesEditor";
 import { Button } from "@/components/ui/button";
@@ -32,6 +33,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { paiseToRupees } from "@/lib/currency";
+import { normaliseHighlights } from "@/lib/item-highlights";
 import {
   sizeDraftsFrom,
   sizeDraftsToBody,
@@ -179,6 +181,9 @@ export function MenuItemForm({
   const costInputRef = useRef<HTMLInputElement>(null);
   // Sizes or colours (lib/item-variants-form.ts): saved after the item, by PUT /api/menu/[id]/variants.
   const [sizes, setSizes] = useState<SizeDraft[]>([]);
+  // Highlights, details and the food mark (lib/item-highlights.ts): sent with the item.
+  const [detail, setDetail] = useState<ItemDetailDraft>(() => itemDetailDraftFrom(null));
+  const [detailError, setDetailError] = useState<string | null>(null);
   const [sizeError, setSizeError] = useState<SizeDraftError | null>(null);
   const hadSizes = (item?.variants?.length ?? 0) > 0;
   // Goods stores, while the feature is switched on; an item that already has sizes always shows them.
@@ -224,6 +229,8 @@ export function MenuItemForm({
     setStockText(initialStockText(item));
     setLowText(item?.lowStockAt != null ? String(item.lowStockAt) : "");
     setStockError(null);
+    setDetail(itemDetailDraftFrom(item));
+    setDetailError(null);
     setCostText(item?.costInPaise != null ? paiseToRupeeInput(item.costInPaise) : "");
     setCostError(null);
     setSizes(sizeDraftsFrom(item?.variants));
@@ -360,6 +367,19 @@ export function MenuItemForm({
       }
       sizesBody = built.body;
     }
+    // Refused here with the server's own rule, so the seller sees it by the field.
+    const highlights = normaliseHighlights(detail.highlights);
+    if (!highlights.ok) {
+      setDetailError(highlights.error);
+      return;
+    }
+    setDetailError(null);
+    const detailFields = {
+      highlights: highlights.value,
+      details: detail.details,
+      // The food mark is a kitchen's; a goods store leaves whatever is stored alone.
+      ...(vocab.kind === "food" ? { foodType: detail.foodType } : {}),
+    };
     const fields = {
       name: values.name,
       priceInRupees: paiseToRupees(price.paise),
@@ -372,6 +392,7 @@ export function MenuItemForm({
       showOnline: values.showOnline,
       unit: normaliseMenuUnit(values.unit),
       description: values.description ?? "",
+      ...detailFields,
     };
     try {
       if (isEdit && item) {
@@ -421,6 +442,7 @@ export function MenuItemForm({
           setCostText("");
           setSizes([]);
           setSizeError(null);
+          setDetail(itemDetailDraftFrom(null));
           onSaved();
           form.setFocus("name");
           return;
@@ -501,6 +523,7 @@ export function MenuItemForm({
                   </FormItem>
                 )}
               />
+              <ItemDetailFields value={detail} onChange={setDetail} vocab={vocab} error={detailError} />
               <FormField
                 control={form.control}
                 name="priceInRupees"

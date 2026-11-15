@@ -22,6 +22,7 @@ import {
 } from "@/components/storefront/StorefrontCheckout";
 import { ItemPrice, ItemPriceHero } from "@/components/storefront/ItemPrice";
 import { formatINRCompact } from "@/lib/currency";
+import type { FoodType, Highlight } from "@/lib/item-highlights";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { deliveryAreaSummary, type DeliveryArea } from "@/lib/delivery-areas";
 import {
@@ -80,6 +81,10 @@ export type MenuOrderItem = {
   imageUrl: string | null;
   /** Photos after the cover, for the detail sheet (lib/item-photos.ts). */
   morePhotos?: string[];
+  /** Detail sheet text and the food mark (lib/item-highlights.ts); the mark only in a food store. */
+  details?: string | null;
+  highlights?: Highlight[];
+  foodType?: FoodType | null;
   priceInPaise: number;
   /** Selling unit ("kg", "piece"), shown after the price; null = none. */
   unit?: string | null;
@@ -481,7 +486,7 @@ export function MenuOrder(props: MenuOrderProps) {
                       dimmed={v.itemSoldOut}
                     />
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <ItemDetailTrigger detailId={item.id} name={item.name} description={item.description} onOpen={openDetail} />
+                      <ItemDetailTrigger detailId={item.id} name={item.name} description={item.description} foodType={item.foodType} onOpen={openDetail} />
                       {v.priceLine}
                     </span>
                     {v.sizes}
@@ -503,7 +508,7 @@ export function MenuOrder(props: MenuOrderProps) {
                     />
 
                     <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                      <ItemDetailTrigger detailId={item.id} name={item.name} description={item.description} onOpen={openDetail} />
+                      <ItemDetailTrigger detailId={item.id} name={item.name} description={item.description} foodType={item.foodType} onOpen={openDetail} />
                       {v.priceLine}
                       {v.sizes}
                     </span>
@@ -534,6 +539,9 @@ export function MenuOrder(props: MenuOrderProps) {
           emoji={detailItem.emoji}
           imageUrl={detailItem.imageUrl}
           morePhotos={detailItem.morePhotos}
+          details={detailItem.details}
+          highlights={detailItem.highlights}
+          foodType={detailItem.foodType}
           description={detailItem.description}
           dimmed={detail.itemSoldOut}
           price={
