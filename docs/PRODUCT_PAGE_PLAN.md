@@ -1,6 +1,6 @@
 # Product detail and product links plan
 
-Status: step 1 (detail sheet) in PR #205; step 2 (product links) built on `feat/product-links`; steps 3 to 5 not started. Written 2026-11-14.
+Status: step 1 (detail sheet) merged in #205; step 2 (product links) in PR #207; step 3 (photos) built on `feat/item-photos`; steps 4 and 5 not started. Written 2026-11-14.
 
 Why: on `/s/[slug]` an item is a row (kitchens) or a tile (goods stores), and that is all a buyer
 gets. On a kitchen store the photo and name do nothing when tapped; on a goods store the photo opens
@@ -145,6 +145,11 @@ unpublished store's product link is 404; the preview image route answers 200 wit
 
 Tests: unit tests for the order rule (first = cover); E2E: upload two photos, reorder, the store's
 sheet shows both in order; tenant case for the delete route.
+
+As built: the routes are CASHIER, like the single-photo route (whoever can edit an item edits its
+photos), not MANAGER. Reorder is arrow buttons only, no drag: they work by keyboard and on a phone.
+`GET /api/menu/[id]/images` lists the photos for the form. The E2E seeds photos in the local database
+because e2e runs have no Blob token; the reorder goes through the real route.
 
 ## Step 4: details, highlights and the veg mark (migration)
 

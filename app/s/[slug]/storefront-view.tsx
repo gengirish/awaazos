@@ -61,6 +61,7 @@ import { formatDropDayLabel, formatWindowWithDay } from "@/lib/drops-time";
 import { instagramProfileUrl } from "@/lib/instagram";
 import { whatsappCommunityLabel, whatsappCommunityLink } from "@/lib/whatsapp-community";
 import { stockLeftByMenuItem, stockLeftByVariant, type TrackedItem } from "@/lib/inventory-server";
+import { MAX_ITEM_PHOTOS, photoUrls } from "@/lib/item-photos";
 import { allSizesSoldOut, variantPriceRange, variantPricePaise, type StoreSize } from "@/lib/item-variants";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
 import { offersForItems, resolveOffers, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
@@ -203,6 +204,11 @@ const FACT_ICON: Record<StoreFactKind, typeof Store> = {
  * Deduped across generateMetadata() and the page render — React `cache` keeps
  * this to a single query per request.
  */
+/** Photos after the cover for the detail sheet; none without a seller's cover (lib/item-photos.ts rule 3). */
+function morePhotosOf(cover: string | null, images: { url: string }[]): string[] {
+  return photoUrls(cover, images.map((p) => p.url)).slice(1);
+}
+
 export const loadStorefront = cache(async (slug: string) => {
   const yesterday = new Date(getIstTodayStart().getTime() - 24 * 60 * 60 * 1000);
   return prisma.vendor.findFirst({
@@ -279,6 +285,8 @@ export const loadStorefront = cache(async (slug: string) => {
                   name: true,
                   emoji: true,
                   imageUrl: true,
+                  // Extra photos after the cover (lib/item-photos.ts), shown in the detail sheet.
+                  images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], take: MAX_ITEM_PHOTOS - 1, select: { url: true } },
                   description: true,
                   // Stock (lib/inventory.ts): server-side only, reduced to `remaining` / `onlyLeft`.
                   stockQty: true,
@@ -315,6 +323,8 @@ export const loadStorefront = cache(async (slug: string) => {
           unit: true,
           isPopular: true,
           imageUrl: true,
+          // Extra photos after the cover (lib/item-photos.ts), shown in the detail sheet.
+          images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], take: MAX_ITEM_PHOTOS - 1, select: { url: true } },
           description: true,
           // Stock (lib/inventory.ts): server-side only, reduced to `StorefrontStock` per item.
           stockQty: true,
@@ -373,10 +383,10 @@ function menuFulfilmentPhrase(mode: FulfilmentMode): string {
 
 
 /** Everyday rows as rendered: the stock columns never reach a row (see loadItemStock). */
-type StorefrontItems = Omit<
+type StorefrontItems = (Omit<
   StorefrontVendor["menuItems"][number],
-  "stockQty" | "stockCountedAt" | "lowStockAt" | "variants"
->[];
+  "stockQty" | "stockCountedAt" | "lowStockAt" | "variants" | "images"
+> & { morePhotos: string[] })[];
 
 /** Preserves the query ordering; no re-sort. */
 function groupByCategory(items: StorefrontItems): [string, StorefrontItems][] {
@@ -558,6 +568,7 @@ async function buildDropViews(
         emoji: i.menuItem.emoji,
         // The seller's photo, else (food stores) a drawing of the dish (lib/food-images.ts), else the emoji.
         imageUrl: i.menuItem.imageUrl ?? (foodArt ? foodImageFor(i.menuItem.name) : null),
+        morePhotos: morePhotosOf(i.menuItem.imageUrl, i.menuItem.images),
         description: i.menuItem.description,
         priceInPaise: i.priceInPaise,
         perOrderLimit: i.perOrderLimit,
@@ -787,9 +798,10 @@ export async function StorefrontView(props: {
   const { foodArt, orderNoteExample } = storeVocabulary(vendor.stallType);
   // Stock columns stay out of the rows (see loadItemStock below).
   const menuItems = (menuHidden ? [] : vendor.menuItems).map(
-    ({ stockQty: _q, stockCountedAt: _c, lowStockAt: _l, variants: _v, ...item }) => ({
+    ({ stockQty: _q, stockCountedAt: _c, lowStockAt: _l, variants: _v, images, ...item }) => ({
       ...item,
       imageUrl: item.imageUrl ?? (foodArt ? foodImageFor(item.name, item.category) : null),
+      morePhotos: morePhotosOf(item.imageUrl, images),
     }),
   );
   const categories = groupByCategory(menuItems);
@@ -961,6 +973,7 @@ export async function StorefrontView(props: {
       name: item.name,
       emoji: item.emoji,
       imageUrl: item.imageUrl,
+      morePhotos: item.morePhotos,
       priceInPaise: item.priceInPaise,
       unit: item.unit,
       isPopular: item.isPopular,

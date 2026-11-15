@@ -278,6 +278,12 @@ Rules every one of them follows:
   follows the sheet (`components/storefront/item-detail-url.ts`): a tap pushes `/s/<slug>/p/<menuItemId>` (the item
   id, never `MenuItem.slug`, which a rename changes), Back closes it, and the query string (`src`) is kept both ways.
   The seller's `/menu` card has "Copy link for Instagram" (`?src=ig`) and WhatsApp (`?src=wa`) once the store is published.
+- **Several photos per item** (`lib/item-photos.ts`, database side `lib/item-photos-server.ts`): up to 6.
+  `MenuItem.imageUrl` stays the cover and is always the first photo; the rest are `MenuItemImage` rows, so the
+  POS, voice, receipts and link previews read nothing new. Only the detail sheet shows them, as a swipeable gallery
+  (`ItemPhotoGallery`, scroll-snap). The item form saves each change at once (`GET`/`POST /api/menu/[id]/images`,
+  `DELETE …/images/[imageId]` with `cover` for the cover, `PUT …/images/order`, CASHIER, compound scope); every
+  change rewrites the whole list under a row lock on the item, and removing the cover moves the next photo up.
 - The vendor's WhatsApp number reaches a public page only through `buyerWhatsappNumber()`
   (`lib/storefront-order.ts`): `VendorSettings.whatsappNumber`, and only once the vendor opts in
   with `acceptWhatsappOrders` (default `false`; Settings → Online orders). A saved number is not

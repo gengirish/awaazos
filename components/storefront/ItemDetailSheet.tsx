@@ -4,6 +4,7 @@ import { CalendarClock, Clock, MapPin, Tag, Truck, Wallet } from "lucide-react";
 import type { ReactNode } from "react";
 
 import { ItemPhoto } from "@/components/storefront/ItemPhoto";
+import { ItemPhotoGallery } from "@/components/storefront/ItemPhotoGallery";
 import {
   ResponsiveDialog,
   ResponsiveDialogBody,
@@ -36,6 +37,8 @@ export type ItemDetailSheetProps = {
   name: string;
   emoji: string;
   imageUrl: string | null;
+  /** Photos after the cover; with any, the top is a swipeable gallery (ItemPhotoGallery). */
+  morePhotos?: readonly string[];
   description?: string | null;
   /** `ItemPriceHero`. */
   price: ReactNode;
@@ -64,7 +67,7 @@ const FACT_ICON: Record<DetailFactKind, typeof Clock> = {
 };
 
 export function ItemDetailSheet(props: ItemDetailSheetProps) {
-  const { open, onOpenChange, triggerId, name, emoji, imageUrl, description, price, badges, sizes, offers = [], facts = [], share, footerPrice, action, dimmed } = props;
+  const { open, onOpenChange, triggerId, name, emoji, imageUrl, morePhotos = [], description, price, badges, sizes, offers = [], facts = [], share, footerPrice, action, dimmed } = props;
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent
@@ -86,7 +89,11 @@ export function ItemDetailSheet(props: ItemDetailSheetProps) {
           </ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         <ResponsiveDialogBody className="space-y-4">
-          <ItemPhoto src={imageUrl} emoji={emoji} name={name} size="hero" enlarge dimmed={dimmed} />
+          {imageUrl && morePhotos.length > 0 ? (
+            <ItemPhotoGallery photos={[imageUrl, ...morePhotos]} name={name} dimmed={dimmed} />
+          ) : (
+            <ItemPhoto src={imageUrl} emoji={emoji} name={name} size="hero" enlarge dimmed={dimmed} />
+          )}
 
           {badges ? <div className="flex flex-wrap items-center gap-2">{badges}</div> : null}
 

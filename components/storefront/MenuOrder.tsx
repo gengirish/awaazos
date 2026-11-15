@@ -78,6 +78,8 @@ export type MenuOrderItem = {
   name: string;
   emoji: string;
   imageUrl: string | null;
+  /** Photos after the cover, for the detail sheet (lib/item-photos.ts). */
+  morePhotos?: string[];
   priceInPaise: number;
   /** Selling unit ("kg", "piece"), shown after the price; null = none. */
   unit?: string | null;
@@ -531,6 +533,7 @@ export function MenuOrder(props: MenuOrderProps) {
           name={detailItem.name}
           emoji={detailItem.emoji}
           imageUrl={detailItem.imageUrl}
+          morePhotos={detailItem.morePhotos}
           description={detailItem.description}
           dimmed={detail.itemSoldOut}
           price={
