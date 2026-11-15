@@ -24,6 +24,7 @@
     "billing:keep-signup-price": "tsx scripts/keep-signup-price.ts",
     "seed:quiche-plans": "tsx scripts/seed-quiche-plans.ts",
     "seed:demo-store": "tsx scripts/seed-demo-store.ts",
+    "demo:fix-store-kind": "tsx scripts/fix-demo-store-kind.ts",
     "test:golden": "vitest run tests/golden/parse-order/live.test.ts",
     "test:golden:validate": "vitest run tests/golden/parse-order/validate.test.ts",
     "test:golden:drop": "vitest run tests/golden/parse-drop/live.test.ts",
