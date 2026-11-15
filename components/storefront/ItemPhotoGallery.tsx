@@ -1,7 +1,7 @@
 "use client";
 
 import { ChevronLeft, ChevronRight } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ItemPhoto } from "@/components/storefront/ItemPhoto";
 import { cn } from "@/lib/utils";
@@ -13,25 +13,61 @@ import { cn } from "@/lib/utils";
  * Each photo still opens full-size on a tap (`ItemPhoto enlarge`).
  *
  * Which photo is showing is read from the scroll position on each scroll
- * event: no timer, no autoplay.
+ * event: no timer, no autoplay. While an arrow's smooth scroll is on its way,
+ * the in-between positions are ignored (`pending`), so a second quick tap moves
+ * on from where the first was going, not from where the scroll happened to be.
+ * A finger or wheel on the photos hands control back to the scroll position.
  */
+/** Which photo the track is showing, from its scroll position. */
+function positionIn(el: HTMLDivElement, count: number): number {
+  return Math.min(count - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth)));
+}
+
+/** The track settled on photo `at`: show it, unless an arrow is still on its way elsewhere. */
+function arrived(pending: { current: number | null }, setIndex: (i: number) => void, at: number) {
+  if (pending.current !== null) {
+    if (at !== pending.current) return;
+    pending.current = null;
+  }
+  setIndex(at);
+}
+
 export function ItemPhotoGallery({ photos, name, dimmed }: { photos: readonly string[]; name: string; dimmed?: boolean }) {
   const track = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
+  /** The photo an arrow is scrolling to; null once it arrives or the buyer takes over. */
+  const pending = useRef<number | null>(null);
   const count = photos.length;
 
   function onScroll() {
     const el = track.current;
-    if (!el || el.clientWidth === 0) return;
-    const at = Math.min(count - 1, Math.max(0, Math.round(el.scrollLeft / el.clientWidth)));
-    if (at !== index) setIndex(at);
+    if (el && el.clientWidth > 0) arrived(pending, setIndex, positionIn(el, count));
   }
 
-  function go(to: number) {
+  // Also on scrollend: a smooth scroll can stop between snap points' rounding halves.
+  useEffect(() => {
     const el = track.current;
     if (!el) return;
-    const target = Math.min(count - 1, Math.max(0, to));
+    const settle = () => {
+      if (el.clientWidth > 0) arrived(pending, setIndex, positionIn(el, count));
+    };
+    el.addEventListener("scrollend", settle);
+    return () => el.removeEventListener("scrollend", settle);
+  }, [count]);
+
+  /** The buyer's finger or wheel takes over from an arrow. */
+  function takeOver() {
+    pending.current = null;
+  }
+
+  /** An arrow: one photo on from where the last arrow was heading, not from mid-scroll. */
+  function step(dir: -1 | 1) {
+    const el = track.current;
+    if (!el) return;
+    const from = pending.current ?? index;
+    const target = Math.min(count - 1, Math.max(0, from + dir));
     const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    pending.current = target === positionIn(el, count) ? null : target;
     el.scrollTo({ left: target * el.clientWidth, behavior: reduce ? "auto" : "smooth" });
     setIndex(target);
   }
@@ -45,6 +81,8 @@ export function ItemPhotoGallery({ photos, name, dimmed }: { photos: readonly st
         <div
           ref={track}
           onScroll={onScroll}
+          onPointerDown={takeOver}
+          onWheel={takeOver}
           className="flex snap-x snap-mandatory overflow-x-auto overscroll-x-contain rounded-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           data-testid="item-photo-track"
         >
@@ -70,7 +108,7 @@ export function ItemPhotoGallery({ photos, name, dimmed }: { photos: readonly st
         <button
           type="button"
           className={cn(arrow, "left-2")}
-          onClick={() => go(index - 1)}
+          onClick={() => step(-1)}
           disabled={index === 0}
           aria-label="Previous photo"
         >
@@ -79,7 +117,7 @@ export function ItemPhotoGallery({ photos, name, dimmed }: { photos: readonly st
         <button
           type="button"
           className={cn(arrow, "right-2")}
-          onClick={() => go(index + 1)}
+          onClick={() => step(1)}
           disabled={index === count - 1}
           aria-label="Next photo"
         >

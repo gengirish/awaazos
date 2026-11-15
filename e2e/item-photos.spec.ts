@@ -62,11 +62,16 @@ test.describe("item photos", () => {
       await expect(gallery.getByRole("group", { name: /^Photo \d of 3$/ })).toHaveCount(3);
       await expect(gallery.getByText("1 / 3")).toBeVisible();
       await expect(gallery.getByRole("button", { name: "Previous photo" })).toBeDisabled();
-      await gallery.getByRole("button", { name: "Next photo" }).click();
+      const next = gallery.getByRole("button", { name: "Next photo" });
+      await next.click();
       await expect(gallery.getByText("2 / 3")).toBeVisible();
-      await gallery.getByRole("button", { name: "Next photo" }).click();
+      await gallery.getByRole("button", { name: "Previous photo" }).click();
+      await expect(gallery.getByText("1 / 3")).toBeVisible();
+      // Two quick taps while the first scroll is still moving land on the third photo.
+      await next.click();
+      await next.click();
       await expect(gallery.getByText("3 / 3")).toBeVisible();
-      await expect(gallery.getByRole("button", { name: "Next photo" })).toBeDisabled();
+      await expect(next).toBeDisabled();
       // Each photo still opens full size.
       await gallery.getByRole("button", { name: `See photo 3 of 3 of ${name}` }).click();
       await expect(buyer.getByRole("img", { name })).toBeVisible();
