@@ -4,6 +4,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { HelpTopicList } from "@/components/help/HelpTopicList";
+import { HelpVideoButton } from "@/components/help/HelpVideoButton";
 import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
 import { appNavIcon } from "@/components/shell/nav-icons";
 import { appNavItemsForRole, appTabBarForRole } from "@/lib/app-nav";
@@ -14,6 +15,8 @@ import {
   orderJourneyFor,
   type OrderJourneyStep,
 } from "@/lib/help-guide";
+import { helpVideosFor } from "@/lib/help-videos";
+import { env } from "@/lib/env";
 import { AuthError, requireVendorRole } from "@/lib/rbac";
 
 import { getShellContext } from "../_shell-context";
@@ -39,6 +42,8 @@ function journeyHeading(step: OrderJourneyStep): string {
  * each screen is for, and a searchable "How do I…" list. Everything is trimmed
  * to the viewer's role from lib/app-nav.ts, so it never points at a screen the
  * navigation doesn't show them. Static content: no reads beyond the shell's.
+ * Short films (lib/help-videos.ts) appear once HELP_VIDEO_BASE_URL names the
+ * folder they were published to; it is read on each render, so no rebuild.
  */
 export default async function HelpPage() {
   let ctx: Awaited<ReturnType<typeof requireVendorRole>>;
@@ -56,6 +61,7 @@ export default async function HelpPage() {
   const bar = appTabBarForRole(role, storePath !== null, storeKind);
   const tabs = bar.tabs.map((item) => item.label);
   const behindMore = [...bar.more.map((item) => item.label), "Sign out"];
+  const videos = helpVideosFor(storeKind, env.HELP_VIDEO_BASE_URL);
 
   return (
     <div className="bg-background p-4 pb-10 md:p-6">
@@ -152,6 +158,11 @@ export default async function HelpPage() {
                     ) : null}
                   </p>
                   <p className="mt-0.5 text-muted-foreground">{step.text}</p>
+                  {videos.journey[step.id]?.map((video) => (
+                    <div key={video.id} className="-mx-2">
+                      <HelpVideoButton video={video} />
+                    </div>
+                  ))}
                 </div>
               </li>
             ))}
@@ -165,6 +176,7 @@ export default async function HelpPage() {
           <HelpTopicList
             topics={helpTopicsForRole(role, storePath !== null, storeKind)}
             groups={helpGroupsFor(storeKind)}
+            videos={videos.topics}
           />
         </section>
 

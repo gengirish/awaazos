@@ -51,4 +51,31 @@ test.describe("help guide", () => {
     await expect(page).toHaveURL(/\/settings\/payments$/);
     await expect(page.getByRole("heading", { level: 1, name: "Payments" })).toBeVisible();
   });
+
+  // Films are offered once HELP_VIDEO_BASE_URL names their folder (CI sets a site path
+  // with no files in it: this checks the buttons and the sheet, not playback).
+  test("a topic with a film opens it in a sheet, loaded only on the tap", async ({ page, request }) => {
+    test.skip(!process.env.HELP_VIDEO_BASE_URL, "HELP_VIDEO_BASE_URL is not set for this server");
+    await createVendorSession(page, request, "help-videos", "/help");
+
+    const main = page.getByRole("main");
+    await expect(main.locator("video")).toHaveCount(0);
+
+    const watch = main.getByRole("button", { name: /^Watch: Ring up a sale and take cash/ });
+    await expect(watch).toBeVisible();
+    // The journey's first step has the buyer's film.
+    const journey = main.getByRole("region", { name: "An online order, start to finish" });
+    await expect(journey.getByRole("button", { name: /^Watch: How a customer orders/ })).toBeVisible();
+
+    await watch.click();
+    const sheet = page.getByRole("dialog", { name: "Ring up a sale and take cash" });
+    await expect(sheet).toBeVisible();
+    await expect(sheet.locator("video")).toHaveAttribute("src", /\/f3-tap-billing-cash\.mp4$/);
+    await sheet.getByText("What the video says").click();
+    await expect(sheet).toContainText("Tap the note they hand you, and see the change to give back.");
+
+    await page.keyboard.press("Escape");
+    await expect(sheet).toBeHidden();
+    await expect(page.locator("video")).toHaveCount(0);
+  });
 });
