@@ -1,0 +1,80 @@
+---
+description: Current voice pipeline (STT cascade, parse-order, voice drop and menu builders), moved from CLAUDE.md
+paths: ["lib/anthropic.ts","lib/sarvam.ts","lib/stt-source.ts","lib/parse-*.ts","lib/circuit-breaker.ts","lib/ai-usage-guard.ts","app/api/ai/**","hooks/useVoice*.ts","components/ai/**","components/pos/**","tests/golden/**","workers/voiceLog.worker.ts"]
+---
+
+<!-- Generated from .cursor/rules/voice-pipeline.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
+
+# Current voice pipeline (STT cascade
+
+Moved out of CLAUDE.md so it loads only when matching files are in play. CLAUDE.md keeps the cross-cutting rules.
+
+## Voice pipeline: STT and NLU are deliberately separate (see ARCHITECTURE.md §3 ADR)
+
+```
+mic → STT (ASR only, no LLM) → transcript → /api/ai/parse-order (Claude) → cart
+```
+
+- **Never send audio to Anthropic. Never use Claude for transcription.** Only `transcript` + `menu`
+  enter the LLM prompt.
+- `POST /api/ai/transcribe` runs a per-language provider cascade, each hop guarded by its own
+  circuit breaker (`lib/circuit-breaker.ts`, Upstash-backed) and minute quota (`lib/ai-usage-guard.ts`):
+  - `te/kn/ta` → Sarvam → Groq → Whisper
+  - `en/hi` → OpenAI → Groq → Whisper
+  - OpenAI, Groq and Whisper are skipped when not configured (Sarvam is always tried for
+    `te/kn/ta`). Whisper only joins when `WHISPER_STT_URL` is set **and** `WHISPER_STT_SECRET` is
+    at least 16 characters — a shorter secret silently drops it. Sarvam defaults to `saaras:v3`.
+  - The route is plan-gated (`requirePlan(..., Plan.STARTER)`) for every language.
+  - **Kannada is offered; `te/ta` are dormant.** The picker (`VOICE_LANGUAGES` in `lib/constants.ts`)
+    offers `en-IN`, `hi-IN` and `kn-IN`. Kannada has no Web Speech route: all three voice features record
+    audio and call this route, so it needs a network, `SARVAM_API_KEY`, and Starter or the trial (a Lite
+    or grandfathered FREE store gets the 402 and the tap fallback). Sarvam is asked for romanised text
+    (`mode=translit`, saaras:v3 only); the Groq / Whisper fallbacks return Kannada script, so all three
+    parse prompts read both. Telugu and Tamil keep the same code path and golden fixtures, reachable
+    only through legacy `VendorSettings.voiceLang` rows or a direct `PATCH /api/vendor` (which still
+    accepts `SUPPORTED_VOICE_LANGS`).
+  - Cascade exhaustion returns **200** with `{ error: "all_providers_failed", fallback: "quickadd" }`
+    — the client falls back to tap input, it is not an error state for the vendor.
+  - `en/hi` normally never reach this route at all: the browser does Web Speech locally, unless
+    `NEXT_PUBLIC_VOICE_FALLBACK_ENABLED=true` routes them through the server cascade.
+  - Provider ids are one list, `STT_SOURCES` in `lib/stt-source.ts`.
+- `POST /api/ai/parse-order` runs two-tier Claude with forced `add_items` tool-use
+  (`lib/anthropic.ts`). Haiku 4.5 primary → escalates to Sonnet 4.5 per `shouldEscalate()`
+  (empty cart on a >3-word transcript, empty cart with no unmatched, or low confidence + unmatched)
+  and on any Haiku throw. The menu JSON block carries `cache_control: ephemeral` and is emitted by
+  `stableMenuJson()` — **key ordering and sort order are load-bearing for the prompt cache; don't
+  reorder them casually.**
+- Model output is not trusted directly: `alignParsedItemsToMenu()` re-anchors ids/prices to real
+  menu rows and `rescueMatchFromTranscript()` (`lib/parse-order-align.ts`) does a last-ditch
+  string match when the model returns nothing.
+- Telemetry is fire-and-forget: enqueue `voice-parse-log` on BullMQ, never await, swallow enqueue
+  failures. The cashier never waits on logging.
+
+**Voice drop builder** — `POST /api/ai/parse-drop` (`lib/parse-drop.ts`, MANAGER) turns a cook's
+spoken plan ("aaj ke liye 20 ragi laddu 150 rupaye, pickup shaam 6 se 8, order 4 baje tak") into a
+**draft** `DropDraft` (`lib/parse-drop-types.ts`, client-safe) for the drop form; it saves nothing.
+Same shape as parse-order: forced `build_drop` tool, Haiku → Sonnet (`shouldEscalateDrop()`: Haiku
+throws, empty items on a >3-word transcript, or ≥ half the items without a valid menu id), menu block
+from `stableMenuJson()` with `cache_control`, and today's IST date/time only in the uncached
+transcript block. `postProcessDropDraft()` never trusts the model: relative days resolve from server
+time in IST, times are re-validated, items re-anchor to this vendor's menu (unknown ids → name match
+via `rescueMatchFromTranscript()`, else `unmatched`), rupees go through `rupeesToPaise`, counts clamp,
+and anything `dropUpsertSchema` would reject becomes a `warnings` entry, not an error. Missing
+`ANTHROPIC_API_KEY` → 503 `{ error: "voice_unavailable", fallback: "form" }`. No `voice-parse-log`
+(the log has no kind column). Golden set `tests/golden/parse-drop/`:
+`npm run test:golden:drop:validate` offline, `GOLDEN_PARSE_DROP_LIVE=1 npm run test:golden:drop` live.
+
+**Voice menu builder** — `POST /api/ai/parse-menu` (`lib/parse-menu.ts`, CASHIER) turns a spoken dish
+list ("masala chai 15, samosa 20, vada pav 25 — snacks mein; mango lassi 60, drinks") into a **draft**
+`MenuDraft` (`lib/parse-menu-types.ts`, client-safe); it saves nothing. Forced `add_menu_items` tool,
+Haiku → Sonnet (`shouldEscalateMenu()`: Haiku throws, empty items on a >3-word transcript, or most
+dishes priceless although the transcript has numbers); cached block = `stableMenuJson()` of the
+vendor's WHOLE menu (unavailable items too) + its sorted category list. `postProcessMenuDraft()`
+never trusts the model: existing items match by exact name/alias, then a model id only if it is this
+vendor's and ≥ 0.6 similar, then server fuzzy ≥ 0.85 with a clear winner (else a new dish);
+`rupeesToPaise`, prices ≤ 0 or > ₹1,00,000 dropped (`priceSpoken: false`, new rows carry 0 — the UI
+must ask), repeats merged (last price wins), 50-row cap, categories snapped to existing spellings.
+The UI saves confirmed rows with `POST /api/menu/bulk` (one `$transaction`: price-only updates with
+compound `where { id, vendorId }`, foreign ids → `skipped`; creates via `lib/menu-create.ts`, the same
+slug/alias/sortOrder path as `POST /api/menu`). Golden set `tests/golden/parse-menu/`:
+`npm run test:golden:menu:validate` offline, `GOLDEN_PARSE_MENU_LIVE=1 npm run test:golden:menu` live.
