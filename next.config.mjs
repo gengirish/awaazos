@@ -16,6 +16,8 @@ const CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://*.razorpay.com https://*.public.blob.vercel-storage.com",
   "font-src 'self' data:",
+  // Help page films (lib/help-videos.ts) live in the public Blob store.
+  "media-src 'self' https://*.public.blob.vercel-storage.com",
   // Push service worker (/sw.js) and the web app manifest — same origin only.
   "worker-src 'self'",
   "manifest-src 'self'",

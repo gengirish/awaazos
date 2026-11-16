@@ -4,9 +4,11 @@ import { useId, useMemo, useState } from "react";
 import Link from "next/link";
 import { ChevronRight, Lock, Search } from "lucide-react";
 
+import { HelpVideoButton } from "@/components/help/HelpVideoButton";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { matchesHelpQuery, type HelpGroupId, type ResolvedHelpTopic } from "@/lib/help-guide";
+import type { ResolvedHelpVideo } from "@/lib/help-videos";
 
 /** "More › Settings › Payments" on a phone, "Settings › Payments" from md up (the rail has no More). */
 function WherePath({ topic }: { topic: ResolvedHelpTopic }) {
@@ -23,13 +25,18 @@ function WherePath({ topic }: { topic: ResolvedHelpTopic }) {
  * The "How do I…" list of the Help page, with a search box that filters it in
  * the browser. The topics arrive already trimmed to the viewer's role, and
  * topics and group titles already in the store's words (`helpGroupsFor`).
+ * A topic with a film (lib/help-videos.ts) gets a Watch button under its link:
+ * a sibling of the link, never inside it, so each is its own tap target.
  */
 export function HelpTopicList({
   topics,
   groups: groupList,
+  videos = {},
 }: {
   topics: ResolvedHelpTopic[];
   groups: { id: HelpGroupId; title: string }[];
+  /** Films per topic id; empty when none are published. */
+  videos?: Record<string, ResolvedHelpVideo[]>;
 }) {
   const [query, setQuery] = useState("");
   const inputId = useId();
@@ -105,6 +112,13 @@ export function HelpTopicList({
                       </span>
                       <ChevronRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden="true" />
                     </Link>
+                    {videos[topic.id]?.length ? (
+                      <div className="-mt-2 flex flex-col items-start px-2 pb-1.5">
+                        {videos[topic.id].map((video, _i, all) => (
+                          <HelpVideoButton key={video.id} video={video} showTitle={all.length > 1} />
+                        ))}
+                      </div>
+                    ) : null}
                   </li>
                 ))}
               </ul>

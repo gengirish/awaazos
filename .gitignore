@@ -80,3 +80,7 @@ tests/golden/stt/audio/*
 
 # founder-outreach working files (seller contacts, demo-store payloads, API scripts); local only
 outreach/
+
+# Help page films: encoded by npm run help-videos:publish, hosted on Blob (lib/help-videos.ts)
+/demo-output/
+/public/help-videos/

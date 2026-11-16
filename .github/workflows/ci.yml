@@ -84,6 +84,8 @@ jobs:
       DEMO_OWNER_EMAIL: demo-owner@example.test
       # "Sizes or colours" in the item form (lib/item-variants.ts); item-variants.spec.ts tests it.
       ITEM_VARIANTS_ENABLED: "true"
+      # Help page films (lib/help-videos.ts); help-videos.spec.ts checks the buttons, not playback.
+      HELP_VIDEO_BASE_URL: /help-videos
     steps:
       - name: Checkout
         uses: actions/checkout@v7

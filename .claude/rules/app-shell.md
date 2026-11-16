@@ -63,3 +63,11 @@ through `lib/app-nav.ts`, so it never points a cashier at a screen their navigat
 static — no reads beyond the shell's. **When you rename a screen, a Settings section or a button the
 guide quotes, update `lib/help-guide.ts`**; `lib/__tests__/help-guide.test.ts` catches drifted
 Settings titles and uncovered destinations, not button labels.
+
+**Help videos** (`lib/help-videos.ts`): short narrated phone films from the demo-video pipeline, each tied to
+`HELP_TOPICS` / `ORDER_JOURNEY` ids, get a "Watch · 40 s" button that opens a `ResponsiveDialog` (the `<video>`
+mounts only on open, so the page loads nothing extra; the transcript sits under it). Kitchen films are offered to food
+stores only (`kinds`). The files are public Blob objects at `help-videos/<id>.mp4` / `.jpg`, encoded and uploaded by
+`npm run help-videos:publish -- --from=<reels> --upload`; `HELP_VIDEO_BASE_URL` (server env, read per render) names the
+folder, unset → no buttons. CSP `media-src` allows the Blob host. Re-record a film when the screen it shows changes,
+and keep its `lines` in step with the captions.
