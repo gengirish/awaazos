@@ -85,3 +85,15 @@ Map Prisma `P2002` → HTTP 409.
 | `session.user.role` is undefined | Add `jwt`+`session` callbacks AND `JWT` augmentation |
 | Edge runtime: PrismaAdapter not supported | Middleware imports `auth.ts` — change to `auth.config.ts` |
 | Database session strategy doesn't work | Credentials requires JWT — set `session: { strategy: 'jwt' }` |
+
+## Current auth notes (moved from CLAUDE.md)
+
+`lib/auth.config.ts` is edge-safe (no Prisma) and is the **only** auth module `middleware.ts` may
+import; `lib/auth.ts` adds the Prisma adapter and Credentials provider on Node. Session strategy is
+JWT (Credentials requires it). Type augmentation lives in `src/types/next-auth.d.ts` — putting it at
+the workspace root shadows the package import. `POST /api/auth/register` creates
+User + Vendor + VendorSettings + StaffMember(OWNER) in a single `prisma.$transaction`, mapping
+Prisma `P2002` → 409. Password sign-in (`authorize()`) is limited per IP and per hashed email before any DB
+read (`SignInRateLimited`, `res.code === "rate_limited"`) and runs bcrypt even for an unknown email. Every guard
+that reads the user, `requireUser` included, rejects a session older than the last password reset
+(`isSessionStale`, `lib/session-freshness.ts`). `?callbackUrl=` goes through `safeCallbackPath` (`lib/home.ts`).
