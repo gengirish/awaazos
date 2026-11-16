@@ -1,0 +1,126 @@
+---
+description: Feedback, owner survey, admin pages, referrals, demo stores and outreach, moved from CLAUDE.md
+globs: ["app/admin/**","app/api/admin/**","app/api/internal/**","app/api/demo-claim/**","app/api/survey/**","app/api/vendor/survey/**","app/(auth)/claim/**","components/admin/**","components/referrals/**","components/survey/**","lib/demo-*.ts","lib/referral*.ts","lib/owner-survey*.ts","lib/order-feedback*.ts","lib/admin-*.ts","lib/sales-*.ts","lib/gtm-timeline.ts","lib/activation-funnel.ts","lib/seller-heartbeat.ts","lib/order-funnel.ts","lib/outreach-message.ts","content/admin-nudges/**","scripts/**"]
+alwaysApply: false
+---
+
+# Feedback
+
+Moved out of CLAUDE.md so it loads only when matching files are in play. CLAUDE.md keeps the cross-cutting rules.
+
+## Customer feedback
+
+Rules in the header of `lib/order-feedback.ts` (pure), database side in `lib/order-feedback-server.ts`.
+A buyer rates a handed-over order once, on its order page (`POST /api/s/[slug]/orders/[token]/feedback`,
+IP-limited; 1 to 5 stars, optional comment ≤ 500 chars; `OrderFeedback`, unique per transaction). Not
+sample orders. The seller sees it on the order card and in Settings → Customer feedback (the board drops
+old orders, so the push links there). Push and logs never carry the comment. The public store gets only
+the average and count, from `PUBLIC_RATING_MIN` (5) ratings, not on demo stores, computed on each render:
+no timers, nothing cached on `Vendor`. There are no per-item ratings.
+
+## Owner survey
+
+Rules in the header of `lib/owner-survey.ts` (pure), database side in `lib/owner-survey-server.ts`. An OWNER
+of a real store answers once, changeably, in Settings → Tell us what's hard (`PUT /api/vendor/survey`,
+`OwnerSurveyResponse`, one row per store): which problems, which hurts most, orders a week, the most they can handle, what they would
+pay, an optional comment. `/orders` shows a prompt until answered, once per browser session ("Not now" snoozes it for 14 days on that device); Help lists it too.
+`/admin/survey` (SUPER_ADMIN) ranks the problems to decide what to build; `/admin/vendors` shows one store's
+answers beside its price. Answers never set a price by themselves, and `SURVEY_USE_NOTICE` tells the owner they
+may inform it: keep it on the form. Pain keys are stored, so retire one rather than renaming it. The comment is
+free text: never in a log. Read on page render only: no timers.
+
+The same questions are public at `/survey` (no sign-in, `noindex`, `POST /api/survey`, 5 per IP per hour), for
+sellers with no account. `PublicSurveyResponse` holds the answers and nothing else: no store, name, number or IP.
+`/admin/survey` counts them apart from the stores', because anyone can answer twice, and they never inform a price.
+
+## Admin decision pages (`/admin/metrics`, `/admin/bets`)
+
+Platform ADMIN, read on page render only (no timers, no polling). Design notes: `docs/admin-redesign/`.
+
+- `/admin/metrics` has the weekly cards, the order leak map (`lib/order-funnel.ts`) and the seller heartbeat (`lib/seller-heartbeat.ts`).
+  All windows are the last 7 complete IST days.
+- `/admin/bets` has three parts:
+  - the Bet Board: `AdminBet`, a hypothesis tied to one metric key in `BET_METRICS` (`lib/admin-bets.ts`), the same 7-day numbers as `/admin/metrics`;
+  - the GTM timeline: 60 days of paid bills and GMV, with `AdminTimelineMarker` rows plus derived demo-created and first-paid markers (`lib/gtm-timeline.ts`);
+  - activation by city: demo created → claimed → first paid bill, read from `DemoAuditLog` (`lib/activation-funnel.ts`).
+- `/api/admin/bets/**` and `/api/admin/timeline-markers/**` are ADMIN routes. They parse their answers through Zod output schemas
+  (`betOutputSchema`, `markerOutputSchema`) before sending, the only routes that do.
+- A bet target is an integer in the metric's unit: basis points for a share, a count, or paise.
+- Nudge and Remind (wa.me links to the seller, copy in `content/admin-nudges/`) are SUPER_ADMIN only.
+
+## Referrals ("Refer a seller")
+
+Stores refer other stores; buyers are not part of it. Rules in the header of `lib/referral.ts`
+(pure), database side in `lib/referral-server.ts`; design in `docs/REFERRALS.md`.
+
+- The code is the referrer's slug: `/sign-up?ref=<slug>`, shared from Settings → Refer a seller
+  (OWNER: link, wa.me text, story image) and carried by the "Powered by AwaazOS" footer on
+  `/s/[slug]`, the buyer's order page and `/r/[token]` (not on demo stores). The sign-up page keeps
+  the code in localStorage for 30 days and posts it as `ref`.
+- `POST /api/auth/register` sets `Vendor.referredByVendorId` once (`resolveReferrerForSignUp`:
+  unknown, inactive, demo or self-referring stores are ignored, sign-up never fails over a code)
+  and gives a `REFERRED_TRIAL_DAYS` (60) trial instead of 30.
+- **Paid in free time, never cash.** The referred store's first `subscription.charged` with a
+  positive amount earns one `ReferralReward` (1 month, 2 for yearly; unique per referred store;
+  ≤ 12 months per referrer per rolling year), inside `recordSubscriptionEvent`'s transaction.
+- **No timers.** A referrer on the trial or locked with no live subscription gets `trialEndsAt`
+  moved forward at once. Otherwise the reward is banked (`EARNED`) and `create-subscription`
+  redeems it into `trialEndsAt` just before computing `start_at`.
+- **A paying referrer's months are refunds.** Razorpay can't skip or discount a UPI AutoPay charge,
+  so the referrer's own next `subscription.charged` uses banked months (`creditForCharge`: monthly
+  refunded in full, yearly 1/12 per month) and records a `ReferralCredit` in the same transaction;
+  the webhook then refunds it on the platform account (`settleReferralCredit`, row-locked, matched
+  by `notes.referralCreditId` so it never refunds twice). A refusal stays PENDING with a retry on
+  `/admin/referrals`; the webhook never 500s over it. A charge refunded in full earns its own
+  referrer nothing, and `/admin/earnings` nets the refund out.
+- Admin: `/admin/referrals` (SUPER_ADMIN) and two figures on `/admin/metrics`.
+- DB tests: `npm run test:referrals:db` (throwaway `DATABASE_URL`).
+
+## Internal demo stores (founder outreach)
+
+`/api/internal/demo-stores` (POST create, GET / DELETE `/{external_ref}`, POST `/{external_ref}/handover`)
+builds a prospect's demo store in one call; full contract, OpenAPI and a sample curl in
+`docs/INTERNAL_DEMO_STORES.md`. Auth is `x-internal-api-key` = `INTERNAL_API_KEY` (≥ 32 chars, server
+only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts` (+ `lib/demo-store-schema.ts`):
+
+- A demo store is a normal `Vendor` with `isDemo`, `demoExternalRef` (idempotency key) and one OWNER, the
+  internal `DEMO_OWNER_EMAIL` user. Created in one transaction; nothing is sent (no WhatsApp, email, push).
+- UPI is always `demo@upi`; payment-credential keys or VPA-looking values anywhere → 400. Sample phones must
+  match `9199999xxxxx`. Sample orders carry `Transaction.isSample`: never in `DailySummary`, not billable
+  (`billableTxnWhere`), not in `/admin/metrics`. Demo vendors can't subscribe and have no trial.
+- Display only: "(DEMO)" via `displayStoreName()` (storefront, app shell), `noindex` on `/s/[slug]`.
+- Handover stores a SHA-256 claim token (7 days); `/claim/[token]` → `POST /api/demo-claim` creates the
+  prospect's User (or, if the email already has an account, adds the store to it after checking that
+  account's password), moves OWNER, flips `isDemo`, clears `upiId`, starts the trial, sends the owner through setup
+  (`onboardingDone: false`), and archives
+  (`archivedAt`, hidden from board / transactions / CSV) or deletes the samples.
+- Every create, delete, handover and claim writes `DemoAuditLog`; its "create" rows are the 20/day limit.
+- **Admin GUI:** the same create / claim link / delete on `/admin/demo-stores` (+ `/new`), for any
+  platform ADMIN through `/api/admin/demo-stores/**` (`lib/admin-api.ts`; audit actor `admin:<User.id>`,
+  so the limit is per admin). SUPER_ADMIN invites admins on `/admin/admins` with one-time links
+  (`lib/admin-invites.ts`, `/admin-invite/[token]`); an ADMIN sees only the demo-store and metrics pages.
+  Each demo store and claim link has a "Message on WhatsApp" wa.me button with an editable pre-filled
+  message (`lib/outreach-message.ts`) to the seller's saved business number; nothing is sent server-side.
+  Making a claim link here also emails it to the seller (`sendDemoClaimEmail`), and the response says whether it
+  went (`emailed`). The internal API's handover still sends nothing.
+- **Outreach pipeline** (`docs/admin-pipeline.md`, `lib/demo-pipeline.ts` pure, `lib/demo-pipeline-server.ts`):
+  `/admin/demo-stores` opens on a Today queue, one store at a time. Status, follow-ups, stale archiving and queue
+  order are derived from `DemoPipeline`'s dates on every read: **no cron**, and a claim stops follow-ups because `isDemo`
+  flips. Every action writes a `DemoAuditLog` row whose payload holds what it replaced (never contact details), which
+  is what Undo restores. The page's delete is soft (`deletedAt` + `Vendor.isActive = false`); only the internal API
+  deletes for real. A claim link needs the seller's saved email, so the first invite carries the store link only.
+- **Sales interns:** platform role `SALES` (`USER < SALES < ADMIN < SUPER_ADMIN`), invited on `/admin/admins`.
+  They see only the demo stores they built (`lib/sales-scope.ts`, ownership = the audit "create" row), can't
+  delete, and everything at ADMIN or above stays 404. `/admin/earnings` reports their share
+  (`lib/sales-earnings.ts`: `SALES_SHARE_BPS` of what the store pays excluding GST, `SALES_SHARE_MONTHS` from
+  its first charge, read from `SubscriptionEvent`); it moves no money, records no payouts and doesn't see refunds.
+
+**Fixture demo stores** (`lib/demo-fixture.ts`, `lib/demo-fixture-server.ts`): `npm run seed:demo-store --
+--category=bakery|meals|wellness|crafts --city=<city> [--name=…] [--create] [--allow-remote]` builds a clean
+outreach store through `createDemoStore`, then `applyDemoFixture` adds the tagline, pictures (`public/food`,
+`public/demo`), one open drop (cut-off ~2 days out, one item at 3), a "2+ → free item" plan and slots. Idempotent,
+dry run by default, demo stores only. Decisions and the review it came from: `docs/UX_REVIEW_2026-11.md`.
+
+Also added with it, for real orders too: `MenuItem.unit` ("₹1,200 / kg" on the storefront),
+`Transaction.advancePaidPaise` (order stays PENDING; the board shows "Advance paid · Balance due") and
+`Transaction.fulfilAt` (shown on the board card). Nothing but the demo API writes them yet.
