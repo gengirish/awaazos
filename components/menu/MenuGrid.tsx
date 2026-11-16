@@ -280,7 +280,9 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab, 
               }
             />
           ) : (
-            <div ref={gridRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            // grid-cols-1, not an implicit column: that one grows to the longest description line
+            // and pushes every card off a 360 px screen (and off-centres dialogs opened over it).
+            <div ref={gridRef} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {visibleItems.map((item, index) => (
                 <div
                   key={item.id}

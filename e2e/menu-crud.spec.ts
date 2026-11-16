@@ -116,4 +116,22 @@ test.describe("menu CRUD", () => {
     expect(row?.showOnline).toBe(false);
     expect(row?.isAvailable).toBe(true);
   });
+
+  test("a long description never pushes the cards off a 360 px phone", async ({ page, request }) => {
+    // An implicit grid column grows to the longest unbroken description line, so the
+    // page scrolled sideways and dialogs opened off-centre (fixed with grid-cols-1).
+    await page.setViewportSize({ width: 360, height: 740 });
+    await createVendorSession(page, request, "menu-narrow", "/menu");
+    await createMenuItem(page, {
+      name: "Oxidised Silver Jhumkas",
+      priceInRupees: 450,
+      description: "Light enough to wear all day. Silver-tone with a stone, and a matching pouch.",
+    });
+    await page.goto("/menu");
+    await expect(page.getByText("Oxidised Silver Jhumkas")).toBeVisible();
+    const overflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(overflow, "the menu page should not scroll sideways").toBeLessThanOrEqual(0);
+  });
 });
