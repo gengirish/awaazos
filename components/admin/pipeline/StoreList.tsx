@@ -200,6 +200,7 @@ export function StoreList({ items, now, canDelete, sender, handlers, healthLines
                     message={templateFor(templateKindFor(item.facts, now), { ...item, contactEmail: null }, sender)}
                     contactEmail={item.contactEmail}
                     canDelete={canDelete}
+                    canSetLogin={!isSales}
                     onSent={(opened) => handlers.markSent(item, opened)}
                     onArchive={() => handlers.archive(item)}
                     onDelete={() => handlers.remove(item)}

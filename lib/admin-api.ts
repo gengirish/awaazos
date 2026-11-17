@@ -32,6 +32,9 @@ export function adminRoute<P>(
     try {
       return await handler(req, { params: await routeCtx.params, user, actor: `admin:${user.id}` });
     } catch (err) {
+      if (err instanceof DemoStoreError && err.reason) {
+        return NextResponse.json({ error: err.code, reason: err.reason }, { status: err.status });
+      }
       if (err instanceof DemoStoreError || err instanceof AdminInviteError || err instanceof CommunityError) {
         return NextResponse.json({ error: err.code }, { status: err.status });
       }
