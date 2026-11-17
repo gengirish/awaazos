@@ -8,6 +8,7 @@ import { fixtureDropTimes } from "@/lib/demo-fixture-server";
 import { istToUtc } from "@/lib/drops-time";
 import { parseMenuSlots } from "@/lib/menu-slots";
 import { storeHandleProblem } from "@/lib/store-handle";
+import { MAX_VARIANTS_PER_ITEM, VARIANT_LABEL_MAX } from "@/lib/item-variants";
 import { isValidStoreTagline } from "@/lib/store-tagline";
 import { STORE_THEMES } from "@/lib/store-theme";
 
@@ -46,6 +47,21 @@ describe.each(DEMO_FIXTURE_CATEGORIES)("demo fixture: %s", (category) => {
   it("the free item costs less than every item that earns it", () => {
     for (const i of f.everyday) expect(f.gift.rupees).toBeLessThan(i.rupees);
     expect(f.offer.minQty).toBe(2);
+  });
+
+  it("colours are valid variants, and the free item has none", () => {
+    // A free item with sizes is skipped by the offer rules (lib/offers.ts).
+    expect(f.gift.colours ?? []).toEqual([]);
+    for (const i of f.everyday) {
+      const labels = (i.colours ?? []).map((c) => c.label.toLowerCase());
+      expect(new Set(labels).size).toBe(labels.length);
+      expect(labels.length).toBeLessThanOrEqual(MAX_VARIANTS_PER_ITEM);
+      for (const c of i.colours ?? []) {
+        expect(c.label.length).toBeLessThanOrEqual(VARIANT_LABEL_MAX);
+        if (c.stock !== undefined) expect(Number.isInteger(c.stock) && c.stock >= 0).toBe(true);
+      }
+      if (i.stock !== undefined) expect(Number.isInteger(i.stock) && i.stock >= 0).toBe(true);
+    }
   });
 
   it("has slots checkout can offer", () => {
