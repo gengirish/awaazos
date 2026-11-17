@@ -288,24 +288,32 @@ function resolve(video: HelpVideo, base: string): ResolvedHelpVideo {
   };
 }
 
+export type HelpVideosForStore = {
+  /** Every film this store is offered, in HELP_VIDEOS order: the row at the top of the page. */
+  list: ResolvedHelpVideo[];
+  /** The films each "How do I…" topic offers, keyed by topic id. */
+  topics: Record<string, ResolvedHelpVideo[]>;
+  /** The films each journey step offers, keyed by step id. */
+  journey: Record<string, ResolvedHelpVideo[]>;
+};
+
 /**
- * The films each topic and journey step offers this store, keyed by their id.
- * Empty when no folder is published. Only ids the viewer's page shows are looked
- * up, so a topic trimmed for a cashier never surfaces a film.
+ * The films this store is offered: all of them, and per topic and journey step.
+ * Empty when no folder is published. The page looks topics up only by the ids it
+ * shows, so a topic trimmed for a cashier never surfaces a film there.
  */
-export function helpVideosFor(
-  kind: StoreKind,
-  rawBase: string | undefined,
-): { topics: Record<string, ResolvedHelpVideo[]>; journey: Record<string, ResolvedHelpVideo[]> } {
+export function helpVideosFor(kind: StoreKind, rawBase: string | undefined): HelpVideosForStore {
+  const list: ResolvedHelpVideo[] = [];
   const topics: Record<string, ResolvedHelpVideo[]> = {};
   const journey: Record<string, ResolvedHelpVideo[]> = {};
   const base = helpVideoBase(rawBase);
-  if (!base) return { topics, journey };
+  if (!base) return { list, topics, journey };
   for (const video of HELP_VIDEOS) {
     if (!video.kinds.includes(kind)) continue;
     const resolved = resolve(video, base);
+    list.push(resolved);
     for (const id of video.topics) (topics[id] ??= []).push(resolved);
     for (const id of video.journey ?? []) (journey[id] ??= []).push(resolved);
   }
-  return { topics, journey };
+  return { list, topics, journey };
 }

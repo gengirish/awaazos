@@ -31,9 +31,9 @@ describe("help videos", () => {
   });
 
   it("shows nothing until a folder is published", () => {
-    expect(helpVideosFor("food", undefined)).toEqual({ topics: {}, journey: {} });
-    expect(helpVideosFor("food", "  ")).toEqual({ topics: {}, journey: {} });
-    expect(helpVideosFor("food", "javascript:alert(1)")).toEqual({ topics: {}, journey: {} });
+    expect(helpVideosFor("food", undefined)).toEqual({ list: [], topics: {}, journey: {} });
+    expect(helpVideosFor("food", "  ")).toEqual({ list: [], topics: {}, journey: {} });
+    expect(helpVideosFor("food", "javascript:alert(1)")).toEqual({ list: [], topics: {}, journey: {} });
   });
 
   it("resolves files against the folder", () => {
@@ -42,6 +42,13 @@ describe("help videos", () => {
     expect(topics["check-payment"][0].src).toBe("https://x.public.blob.vercel-storage.com/help-videos/b4-check-upi-payment.mp4");
     expect(topics["check-payment"][0].poster).toBe("https://x.public.blob.vercel-storage.com/help-videos/b4-check-upi-payment.jpg");
     expect(journey.place[0].id).toBe("c1-buyer-order");
+  });
+
+  it("lists every film the store is offered once, in order", () => {
+    const food = helpVideosFor("food", "/help-videos").list.map((v) => v.id);
+    expect(food).toEqual(HELP_VIDEOS.map((v) => v.id));
+    const goods = helpVideosFor("goods", "/help-videos").list.map((v) => v.id);
+    expect(goods).toEqual(HELP_VIDEOS.filter((v) => v.kinds.includes("goods")).map((v) => v.id));
   });
 
   it("accepts a site path or an http(s) URL as the folder", () => {
