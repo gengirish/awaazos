@@ -215,6 +215,17 @@ export type DemoSampleOrderInput = DemoStoreCreateInput["sample_orders"][number]
 
 export const demoHandoverSchema = z.object({ owner_email: z.string().trim().toLowerCase().email().max(254) }).strict();
 
+/** "Set up their login" (POST …/handover/login): the admin picks the seller's email and password. */
+export const demoLoginHandoverSchema = z
+  .object({
+    owner_name: z.string().trim().min(1).max(80),
+    owner_email: z.string().trim().toLowerCase().email().max(254),
+    // The policy (lib/password-strength.ts) is checked in handOverWithLogin, with its reason.
+    password: z.string().min(1).max(128),
+    sample_orders: z.enum(["archive", "delete"]).default("archive"),
+  })
+  .strict();
+
 /** Items are matched by name, trimmed and case-insensitive. */
 export function itemKey(name: string): string {
   return name.trim().toLowerCase();

@@ -103,6 +103,10 @@ only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts`
   message (`lib/outreach-message.ts`) to the seller's saved business number; nothing is sent server-side.
   Making a claim link here also emails it to the seller (`sendDemoClaimEmail`), and the response says whether it
   went (`emailed`). The internal API's handover still sends nothing.
+  A platform ADMIN (never SALES) can instead "Set up their login" (`POST …/handover/login`, `handOverWithLogin`):
+  they pick a new account's email and password (`lib/handover-password.ts` suggests one) and the store is handed
+  over at once through the same `transferDemoStore` as a claim. An email that already has an account gets 409
+  `email_in_use` (send a claim link). The password is shown once to copy, never returned, logged or sent by us.
 - **Outreach pipeline** (`docs/admin-pipeline.md`, `lib/demo-pipeline.ts` pure, `lib/demo-pipeline-server.ts`):
   `/admin/demo-stores` opens on a Today queue, one store at a time. Status, follow-ups, stale archiving and queue
   order are derived from `DemoPipeline`'s dates on every read: **no cron**, and a claim stops follow-ups because `isDemo`
