@@ -1,0 +1,7 @@
+# False positives: made-up test passwords in commit 0eb7509 (PR #218), replaced by generated ones in the next commit.
+0eb7509141958a8b8d0ed9c2e972a18499772359:lib/__tests__/handover-password.test.ts:generic-api-key:22
+0eb7509141958a8b8d0ed9c2e972a18499772359:lib/__tests__/handover-password.test.ts:generic-api-key:25
+0eb7509141958a8b8d0ed9c2e972a18499772359:lib/__tests__/demo-stores.db.test.ts:generic-api-key:514
+0eb7509141958a8b8d0ed9c2e972a18499772359:lib/__tests__/demo-stores.db.test.ts:generic-api-key:529
+0eb7509141958a8b8d0ed9c2e972a18499772359:lib/__tests__/demo-stores.db.test.ts:generic-api-key:536
+0eb7509141958a8b8d0ed9c2e972a18499772359:lib/__tests__/demo-stores.db.test.ts:generic-api-key:547
