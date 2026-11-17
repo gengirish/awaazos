@@ -19,9 +19,10 @@ describe("generateHandoverPassword", () => {
 
 describe("handoverLoginText", () => {
   it("carries the link, email and password", () => {
-    const text = handoverLoginText({ storeName: "Moti Lane", email: "a@b.in", password: "kqvt-7392-mxzh", signInUrl: "https://x/sign-in" });
+    const pw = generateHandoverPassword();
+    const text = handoverLoginText({ storeName: "Moti Lane", email: "a@b.in", password: pw, signInUrl: "https://x/sign-in" });
     expect(text).toContain("https://x/sign-in");
     expect(text).toContain("Email: a@b.in");
-    expect(text).toContain("Password: kqvt-7392-mxzh");
+    expect(text).toContain(`Password: ${pw}`);
   });
 });

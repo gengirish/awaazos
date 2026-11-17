@@ -504,6 +504,8 @@ describe.skipIf(!ENABLED)("internal demo-store API — DB integration", () => {
   it("an admin-set login hands the store over at once, like a claim, and voids open claim links", async () => {
     const { handOverWithLogin } = await import("@/lib/demo-store");
     const { verifyPassword } = await import("@/lib/password");
+    const { generateHandoverPassword } = await import("@/lib/handover-password");
+    const pw = generateHandoverPassword();
     const r = ref("adminlogin");
     const { json } = await create(r);
     const id = json.store_id as string;
@@ -511,7 +513,7 @@ describe.skipIf(!ENABLED)("internal demo-store API — DB integration", () => {
     const email = `adminset-${TAG}@example.test`;
     emails.push(email);
 
-    const out = await handOverWithLogin(r, { name: "Moti", email: email.toUpperCase(), password: "kqvt-7392-mxzh", sampleOrders: "archive" }, "admin:test");
+    const out = await handOverWithLogin(r, { name: "Moti", email: email.toUpperCase(), password: pw, sampleOrders: "archive" }, "admin:test");
     expect(out).toEqual({ slug: json.slug, email });
 
     const v = await prisma.vendor.findUniqueOrThrow({
@@ -525,26 +527,27 @@ describe.skipIf(!ENABLED)("internal demo-store API — DB integration", () => {
     expect(v.staff).toHaveLength(1);
     expect(v.staff[0]).toMatchObject({ role: "OWNER", user: { email } });
     // Hashed, and the seller can sign in with it.
-    expect(v.staff[0]!.user.passwordHash).not.toContain("kqvt");
-    expect(await verifyPassword("kqvt-7392-mxzh", v.staff[0]!.user.passwordHash!)).toBe(true);
+    expect(v.staff[0]!.user.passwordHash).not.toContain(pw);
+    expect(await verifyPassword(pw, v.staff[0]!.user.passwordHash!)).toBe(true);
     expect((await prisma.transaction.findMany({ where: { vendorId: id } })).every((t) => t.archivedAt !== null)).toBe(true);
     expect(await prisma.demoAuditLog.findFirst({ where: { externalRef: r, action: "claim" } })).toMatchObject({ actor: "admin:test" });
 
     // The earlier claim link no longer works, and a second handover is refused.
     expect(await redeem(tokenOf(pending))).toMatchObject({ status: 400, json: { error: "invalid_or_expired" } });
     await expect(
-      handOverWithLogin(r, { name: "X", email: `again-${TAG}@example.test`, password: "kqvt-7392-mxzh", sampleOrders: "archive" }, "admin:test"),
+      handOverWithLogin(r, { name: "X", email: `again-${TAG}@example.test`, password: pw, sampleOrders: "archive" }, "admin:test"),
     ).rejects.toMatchObject({ status: 409, code: "not_a_demo_store" });
   });
 
   it("an admin can't set a login for an email that already has an account, a weak password or the demo account", async () => {
     const { handOverWithLogin } = await import("@/lib/demo-store");
+    const { generateHandoverPassword } = await import("@/lib/handover-password");
     const r = ref("adminlogin2");
     const { json } = await create(r);
     const taken = `hasacct-${TAG}@example.test`;
     emails.push(taken);
     await prisma.user.create({ data: { email: taken, name: "Taken", passwordHash: "x" } });
-    const base = { name: "Moti", password: "kqvt-7392-mxzh", sampleOrders: "archive" as const };
+    const base = { name: "Moti", password: generateHandoverPassword(), sampleOrders: "archive" as const };
 
     await expect(handOverWithLogin(r, { ...base, email: taken }, "admin:test")).rejects.toMatchObject({ status: 409, code: "email_in_use" });
     await expect(handOverWithLogin(r, { ...base, email: process.env.DEMO_OWNER_EMAIL! }, "admin:test")).rejects.toMatchObject({
