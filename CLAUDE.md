@@ -243,6 +243,7 @@ receipts after 7 years, the numbers the Privacy page promises. The daily Vercel 
 `.cursor/rules/*.mdc` are the enforced conventions: `security-first`, `tenant-isolation`, `india-locale`
 always apply; the rest are scoped by glob (`money`, `voice-ai`, `api-routes`, `auth-rbac` (includes the
 auth edge split), `design-system`, `accessibility`, plus the area files above).
+Skill `modern-web-guidance` (Chrome's web-platform guides): new UI components, forms, dialogs/sheets/carousels, perf or a11y work only.
 
 `.cursor/` is the source of truth. `.claude/rules/*.md` and `.claude/skills/` are generated from it
 by `npm run sync:agent-rules` (`.mdc` `globs` → `.md` `paths`); edit the `.cursor/` file and re-run,
