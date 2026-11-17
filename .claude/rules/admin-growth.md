@@ -117,9 +117,9 @@ only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts`
   its first charge, read from `SubscriptionEvent`); it moves no money, records no payouts and doesn't see refunds.
 
 **Fixture demo stores** (`lib/demo-fixture.ts`, `lib/demo-fixture-server.ts`): `npm run seed:demo-store --
---category=bakery|meals|wellness|crafts --city=<city> [--name=…] [--create] [--allow-remote]` builds a clean
+--category=bakery|meals|wellness|crafts|jewellery --city=<city> [--name=…] [--create] [--allow-remote]` builds a clean
 outreach store through `createDemoStore`, then `applyDemoFixture` adds the tagline, pictures (`public/food`,
-`public/demo`), one open drop (cut-off ~2 days out, one item at 3), a "2+ → free item" plan and slots. Idempotent,
+`public/demo`), one open drop (cut-off ~2 days out, one item at 3), a "2+ → free item" plan and slots (jewellery adds colours with stock per colour and one last piece). Idempotent,
 dry run by default, demo stores only. Decisions and the review it came from: `docs/UX_REVIEW_2026-11.md`.
 
 Also added with it, for real orders too: `MenuItem.unit` ("₹1,200 / kg" on the storefront),
