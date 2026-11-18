@@ -5,6 +5,7 @@ import { ArrowDown, ArrowUp, PackagePlus, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ItemShareRow } from "@/components/menu/ItemShareRow";
 import { StockStepper, type StockSaved } from "@/components/menu/StockStepper";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -29,6 +30,8 @@ export type MenuItemCardProps = {
   onMove?: (item: MenuRow, direction: MenuMoveDirection) => void;
   canMoveUp?: boolean;
   canMoveDown?: boolean;
+  /** The published store's link name: the card offers this item's product link (ItemShareRow). null = not published. */
+  storeSlug?: string | null;
 };
 
 /**
@@ -47,6 +50,7 @@ export function MenuItemCard({
   onMove,
   canMoveUp = false,
   canMoveDown = false,
+  storeSlug = null,
 }: MenuItemCardProps) {
   const [saving, setSaving] = useState(false);
 
@@ -215,6 +219,8 @@ export function MenuItemCard({
             </span>
           ) : null}
         </div>
+        {/* A counter-only item has no page buyers can open. */}
+        {storeSlug && item.showOnline ? <ItemShareRow storeSlug={storeSlug} itemId={item.id} itemName={item.name} /> : null}
         <Button
           type="button"
           variant="outline"

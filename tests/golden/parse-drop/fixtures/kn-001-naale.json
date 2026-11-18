@@ -1,0 +1,31 @@
+{
+  "id": "kn-001-naale",
+  "lang": "kn-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "naale sanje 6 rinda 8 varege pickup, ippattu ragi laddu nooraivattu rupayi, hadinaidu thepla, order 4 gante varege",
+  "expected": {
+    "date": "2026-10-09",
+    "fulfilmentMode": "PICKUP",
+    "fulfilmentStart": "18:00",
+    "fulfilmentEnd": "20:00",
+    "closesAtTime": "16:00",
+    "items": [
+      {
+        "menuItemId": "ragi-laddu",
+        "maxQty": 20,
+        "priceInPaise": 15000
+      },
+      {
+        "menuItemId": "methi-thepla",
+        "maxQty": 15
+      }
+    ]
+  },
+  "tags": [
+    "kannada",
+    "indic-numerals",
+    "alias-resolution",
+    "cutoff"
+  ],
+  "notes": "Romanised Kannada as Sarvam returns it with mode=translit. naale = tomorrow, sanje = evening, X rinda Y varege = from X until Y, nooraivattu = 150, gante varege = cut-off time."
+}

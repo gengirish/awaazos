@@ -12,7 +12,8 @@ paths: ["lib/anthropic.ts","lib/sarvam.ts","hooks/useVoice*.ts","app/api/ai/**/*
 | Lang | STT |
 |---|---|
 | `en-IN`, `hi-IN` | Web Speech API (browser, free, all plans). Only when the build flag `NEXT_PUBLIC_VOICE_FALLBACK_ENABLED=true` is set does the client record audio and call `/api/ai/transcribe` instead (STARTER+). |
-| `te-IN`, `kn-IN`, `ta-IN` | **Dormant.** Sarvam Saaras v3 (`saaras:v3`, override with `SARVAM_STT_MODEL`) via `/api/ai/transcribe` (STARTER+). The code path is kept, but the picker (`VOICE_LANGUAGES` in `lib/constants.ts`) offers only en-IN / hi-IN, so only legacy `voiceLang` rows reach it. |
+| `kn-IN` | Offered in the picker. Sarvam Saaras v3 (`saaras:v3`, override with `SARVAM_STT_MODEL`) via `/api/ai/transcribe` (STARTER+, needs a network). Sarvam is asked for romanised output (`mode=translit`); the Groq / Whisper fallbacks return Kannada script, so the parse prompts read both. |
+| `te-IN`, `ta-IN` | **Dormant.** Same Sarvam path, but the picker (`VOICE_LANGUAGES` in `lib/constants.ts`) does not offer them, so only legacy `voiceLang` rows reach it. |
 
 **STT vs NLU:** STT turns audio → text (ASR only — no Claude). NLU
 (`/api/ai/parse-order`) turns text + menu → cart (Claude Haiku/Sonnet).

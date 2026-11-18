@@ -38,6 +38,7 @@ import {
   type DeliveryArea,
 } from "@/lib/delivery-areas";
 import { HOME_PATH } from "@/lib/home";
+import { isCommitEnter } from "@/lib/ime-enter";
 import { formatIndianMobile } from "@/lib/phone";
 import { MENU_CHANGED_EVENT } from "@/lib/menu-events";
 import { connectOutcomeMessage, razorpayConnectHref } from "@/lib/razorpay-connect";
@@ -1286,7 +1287,8 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
                                 clearError("area-name");
                               }}
                               onKeyDown={(e) => {
-                                if (e.key === "Enter") {
+                                // Not the Enter that confirms a word on a Hindi or Kannada keyboard.
+                                if (isCommitEnter(e)) {
                                   e.preventDefault();
                                   addArea();
                                 }

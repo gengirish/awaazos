@@ -1,0 +1,92 @@
+---
+description: Trial, lock, platform subscriptions, store prices and seller alerts, moved from CLAUDE.md
+globs: ["lib/plan*.ts","lib/subscription*.ts","lib/billing*.ts","lib/custom-subscription-plan.ts","lib/admin-free-access.ts","lib/trial-alerts*.ts","lib/store-contact.ts","lib/razorpay.ts","lib/razorpay-checkout.ts","lib/constants.ts","app/api/razorpay/**","app/api/webhooks/razorpay/**","app/api/cron/**","app/api/admin/vendors/**","app/(pricing)/**","app/(vendor)/settings/billing/**","components/billing/**","e2e/helpers/billing-db.ts"]
+alwaysApply: false
+---
+
+# Trial
+
+Moved out of CLAUDE.md so it loads only when matching files are in play. CLAUDE.md keeps the cross-cutting rules.
+
+## Billing: trial, lock and platform subscriptions
+
+Full design in `docs/RAZORPAY_SUBSCRIPTIONS_PLAN.md`. A `TRIAL_DAYS` (30) day free trial with STARTER
+limits, then LITE, STARTER or PRO, monthly or yearly (`SUBSCRIBABLE_PLANS`). Starter is the plan we want
+chosen: Lite is a decoy just under its price with far less, Pro a high anchor (`lib/plan-copy.ts`). Prices exclude 18% GST
+(`GST_BPS`); the Razorpay plan amount is base + GST (`subscriptionChargePaise`).
+
+`billingAccess(vendor)` in `lib/plan.ts` derives one of four states from `Vendor.plan`,
+`planExpiresAt` and `trialEndsAt` on every read. **No timers** — nothing is written when a date
+passes, so Neon can sleep.
+
+| State | When | Effect |
+| --- | --- | --- |
+| `paid` | paid plan, not past `planExpiresAt` + 3-day grace | that plan's limits |
+| `trial` | not paid, before `trialEndsAt` (set at sign-up) | STARTER limits |
+| `locked` | not paid, `trialEndsAt` passed | no new sales, storefront orders or AI calls |
+| `free` | not paid, `trialEndsAt` null (signed up before the trial) | FREE limits, never locked |
+
+- `requireVendorRole` returns `access` and the effective `vendor.plan`. Anything that makes a new
+  sale, takes a new order or spends on AI calls `requireActiveBilling(ctx)` → 402
+  `{ error: "billing_locked" }`. **Never call it on reads, settings, billing, CSV export, or
+  actions that finish an existing order** — a locked vendor keeps access to their records.
+- Code that loads a vendor without `requireVendorRole` (storefront routes) must select
+  `planExpiresAt` **and** `trialEndsAt`; leaving `trialEndsAt` out treats a trial vendor as FREE.
+  Buyers of a locked vendor get `orders_paused` (409) and are never told why.
+- A `deferred` offline sale rung up before the lock (`clientCreatedAt < access.since`) still syncs.
+- The subscription webhook (`/api/webhooks/razorpay`) is idempotent through the `SubscriptionEvent`
+  ledger (unique `x-razorpay-event-id`). Transitions are the pure `applySubscriptionEvent`
+  (`lib/subscription.ts`): `planExpiresAt` comes from Razorpay's `current_end`, only moves forward,
+  and the webhook never downgrades a paying vendor — expiry is lazy.
+- Subscribing happens on the billing page with Razorpay Checkout in place
+  (`components/billing/BillingManageClient.tsx`, loader shared with the storefront in
+  `lib/razorpay-checkout.ts`): `create-subscription` → Checkout → `POST
+  /api/razorpay/verify-subscription`. Verify never trusts the browser: it checks
+  `HMAC(payment_id|subscription_id)` with the platform key secret, requires the subscription to be
+  the one on file for the signed-in vendor (else 404), then reads its state from Razorpay.
+- **What can be bought now** is one rule, `subscribeDecision` / `plansOnOffer` in `lib/billing-actions.ts`, used by the billing page and
+  `create-subscription`, so neither can offer what the other refuses. Not renewing (cancelled, also at cycle end, halted, expired, none) and paying:
+  the same or a lower plan starts at `planExpiresAt` with nothing charged today (`notes.resumesPaidPeriod`: its `authenticated` grants nothing and an
+  uncharged cancel takes nothing back); a higher plan starts today. A halted or paused subscription is cancelled first, since Razorpay can charge it again.
+  `/pricing` links carry the pick: `/settings/billing?plan=starter&interval=yearly` (`billingSelectionPath`), through sign-in for a signed-out seller. Sign-up carries no pick: a new store goes through onboarding first.
+  `/pricing` is in its own `(pricing)` route group because its header reads the session; the `(marketing)` layout must stay static.
+- **One write path:** the webhook and verify both go through `recordSubscriptionEvent`
+  (`lib/subscription-store.ts`), so whichever lands second changes nothing. Don't write
+  `plan` / `planExpiresAt` anywhere else.
+- Marketing copy (`lib/plan-copy.ts`) and the legal pages read the trial length and prices from
+  the constants. FREE is not marketed.
+- **Three plans:** LITE ranks below STARTER, so `requirePlan(STARTER)` gates and `razorpayLinks` shut it out. Counter billing by voice is off on Lite (`PLAN_LIMITS.voiceBilling`, `POST /api/ai/parse-order`: Web Speech skips the transcribe gate); grandfathered FREE keeps it, and the voice menu and drop builders stay on every plan. The per-plan AI image cap is `PLAN_LIMITS.aiImagesPerMonth`. It never
+  cuts a running trial short (`billingAccess`). A store with `customPricePaise` is offered Starter only. Moving up
+  goes through `create-subscription`: Razorpay can't move a UPI AutoPay subscription between plans, so it cancels the
+  live one first (a failed cancel stops there, so nobody is charged twice), then starts the new one. Moving down is
+  cancel, then pick the lower plan: it starts when the paid period ends. Plan ids: `npm run razorpay:create-plans`.
+- **Changing a list price:** Razorpay plan amounts are fixed, so set the new constants, create new plans and put their ids
+  on Vercel in the same deploy. Old ids go in `RAZORPAY_RETIRED_PLANS` so existing subscribers stay credited, and
+  `resolveSubscriptionPlanId` refuses a list plan whose Razorpay amount differs from `subscriptionChargePaise`.
+  `npm run billing:keep-signup-price -- --price=<rupees> --before=<time>` keeps stores that signed up earlier on the price they were told (`customPricePaise`).
+- **Owner contacts:** `/admin/vendors` (SUPER_ADMIN only) shows each real store's owners: account names and
+  emails, sign-up phone and email, business WhatsApp (`lib/store-contact.ts`), with a feedback and testimonial
+  ask that opens the admin's own email (mailto) or WhatsApp (wa.me); nothing is sent from the server. Demo stores
+  show none (their owner is the internal account). Search also matches owner emails. A quote goes on the site
+  only with the owner's written yes (`lib/proof-stories.ts`).
+- **Free access by hand:** a platform SUPER_ADMIN picks a "free until" day for a store on
+  `/admin/vendors` (`PATCH /api/admin/vendors/[id]/free-access`, `lib/admin-free-access.ts`). It only
+  moves `trialEndsAt` (23:59 IST that day, today … +24 months), so the store is on the trial for
+  longer; `plan` / `planExpiresAt` are untouched. Anyone else gets 404. The log line
+  "admin granted free access" is the only audit trail.
+- **Seller alerts** (`lib/trial-alerts.ts`, `lib/trial-alerts-server.ts`): reminder emails 5 and 1 IST days
+  before `trialEndsAt`, from a daily cron, `GET /api/cron/trial-reminders` (`vercel.json`, 09:00
+  IST, `Authorization: Bearer $CRON_SECRET`; secret unset → 401 and no reminders). It only reads Postgres and
+  never changes billing state. When a buyer hits `orders_paused` or `monthly_txn_cap_reached`, the route pushes and
+  emails the store's owners, at most once a day, with nothing about the buyer. Each send is claimed in Upstash (`SET NX`); no KV → no alert.
+- **A store's own price:** a platform SUPER_ADMIN sets `Vendor.customPricePaise` on `/admin/vendors`
+  (`PATCH /api/admin/vendors/[id]/price`; whole rupees, ₹49 to ₹4,999 a month before GST; a year is ten
+  months). Rules in `lib/subscription.ts`. Show a seller their price through `storeBasePaise` /
+  `storeChargePaise`, never the list constants; marketing pages keep the list price. Razorpay plans are
+  immutable, so `resolveSubscriptionPlanId` (`lib/custom-subscription-plan.ts`) makes one per price and
+  interval when an owner subscribes, shared through `CustomRazorpayPlan`. A custom plan id is in no env var:
+  `toSubscriptionSnapshot` maps it from the subscription's `notes` (`plan`, `interval`), which
+  `createSubscription` writes. A live subscription keeps its price; a new one applies when they next subscribe.
+  The log line "admin set store price" is the only audit trail.
+- E2E: new vendors are on the trial. Specs that need another state set it in the database with
+  `e2e/helpers/billing-db.ts` (local databases only).

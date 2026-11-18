@@ -1,11 +1,14 @@
 "use client";
 
 import { ArrowDown } from "lucide-react";
-import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCartHubEntry } from "@/components/storefront/CartHub";
+import { ItemDetailSheet, ItemDetailTrigger } from "@/components/storefront/ItemDetailSheet";
+import { enterItemUrl, itemDetailPath, leaveItemUrl, useCloseOnBack } from "@/components/storefront/item-detail-url";
+import { ItemPhoto } from "@/components/storefront/ItemPhoto";
+import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import {
   CartBar,
   CheckoutSheet,
@@ -15,11 +18,13 @@ import {
   type BuyerPrefill,
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
-import { ItemPrice } from "@/components/storefront/ItemPrice";
+import { ItemPrice, ItemPriceHero } from "@/components/storefront/ItemPrice";
 import { SizePicker } from "@/components/storefront/SizePicker";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
 import { useStoreSearchMatch } from "@/components/storefront/StoreSearch";
+import { formatINRCompact } from "@/lib/currency";
 import type { DeliveryArea } from "@/lib/delivery-areas";
+import type { DetailFact } from "@/lib/item-detail";
 import {
   cartLineKey,
   parseCartLineKey,
@@ -27,7 +32,14 @@ import {
   variantPriceRange,
   type StoreSize,
 } from "@/lib/item-variants";
-import { applyOffers, offerSetAsideText, salePriceFor, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
+import {
+  applyOffers,
+  offerSetAsideText,
+  offersForItem,
+  salePriceFor,
+  withGiftsThatFit,
+  type ResolvedOffer,
+} from "@/lib/offers";
 import { itemSearchText } from "@/lib/store-search";
 import {
   cartStorageKey,
@@ -64,6 +76,8 @@ export type DropOrderItem = {
   name: string;
   emoji: string;
   imageUrl: string | null;
+  /** Photos after the cover, for the detail sheet (lib/item-photos.ts). */
+  morePhotos?: string[];
   /** One line under the name; null = none. */
   description?: string | null;
   priceInPaise: number;
@@ -114,9 +128,14 @@ export type DropOrderProps = {
   prefill?: BuyerPrefill | null;
   /** Offers live on this drop (lib/offers.ts). Preview only; the server re-prices. */
   offers?: readonly ResolvedOffer[];
+  /** Handover window, cut-off, pickup, delivery and payment, for an item's detail sheet (`dropDetailFacts`). */
+  facts?: readonly DetailFact[];
+  /** The drop item whose sheet is open on load (a product link); null = none. */
+  initialDetailId?: string | null;
 };
 
 const NO_OFFERS: readonly ResolvedOffer[] = [];
+const NO_FACTS: readonly DetailFact[] = [];
 
 export function DropOrder(props: DropOrderProps) {
   const {
@@ -137,6 +156,8 @@ export function DropOrder(props: DropOrderProps) {
     notesExample,
     prefill,
     offers = NO_OFFERS,
+    facts = NO_FACTS,
+    initialDetailId = null,
   } = props;
   const router = useRouter();
 
@@ -151,9 +172,27 @@ export function DropOrder(props: DropOrderProps) {
   // The size each item's picker shows: the buyer's pick, else the first one that isn't sold out.
   const [picked, setPicked] = useState<Record<string, string>>({});
   const [open, setOpen] = useState(false);
+  // The item in the detail sheet (ItemDetailSheet). It stays set after closing, so the
+  // sheet plays its close animation and Radix hands focus back to the item it came from.
+  // A product link (/s/<slug>/p/<menuItemId>) opens with its sheet already up.
+  const [detailId, setDetailId] = useState<string | null>(initialDetailId);
+  const [detailOpen, setDetailOpen] = useState(initialDetailId !== null);
   const checkoutRef = useRef<HTMLButtonElement>(null);
 
   const byId = useMemo(() => new Map(items.map((i) => [i.id, i])), [items]);
+  // The link names the product (menu item), not this drop's row of it.
+  const openDetailFor = (id: string) => {
+    setDetailId(id);
+    setDetailOpen(true);
+    const menuItemId = byId.get(id)?.menuItemId;
+    if (menuItemId) enterItemUrl(slug, menuItemId);
+  };
+  const onDetailOpenChange = (next: boolean) => {
+    setDetailOpen(next);
+    if (!next) leaveItemUrl(slug);
+  };
+  const closeDetail = useCallback(() => setDetailOpen(false), []);
+  useCloseOnBack(slug, detailOpen, closeDetail);
   /** A cart key → its drop item and size; null when either is no longer offered. */
   const resolveKey = useMemo(
     () =>
@@ -328,6 +367,95 @@ export function DropOrder(props: DropOrderProps) {
     return message;
   }
 
+  /**
+   * What one drop item shows, on its row and in its detail sheet alike. `sizeGroup`
+   * names the size picker's radio group, so the row's and the sheet's never share one.
+   */
+  function viewOf(item: DropOrderItem, sizeGroup: string) {
+    const remaining = remainingFor(item);
+    const size = sizeFor(item);
+    const key = cartLineKey(item.id, size?.id);
+    const max = maxForLine(item, size);
+    const qty = cart[key] ?? 0;
+    const soldOut = remaining !== null && remaining <= 0;
+    const sizeStock = size ? withStockOverride(size.stock, sizeOverride[key]) : null;
+    // The picked size has none of its own left: no stepper, the badge says so.
+    const sizeSoldOut = sizeStock?.soldOut ?? false;
+    // Product stock binds: never print a count above the store's low-stock line.
+    const badge = sizeStock
+      ? stockBadgeText(sizeStock)
+      : item.onlyLeft !== undefined && remainingOverride[item.id] === undefined
+        ? stockBadgeText({ soldOut, onlyLeft: item.onlyLeft })
+        : stockLabel(remaining);
+    const range = item.sizes ? variantPriceRange(item.priceInPaise, item.sizes) : null;
+    const lineName = size ? variantLineName(item.name, size.label) : item.name;
+    const shownPrice = size?.priceInPaise ?? item.priceInPaise;
+    const sale = orderable ? salePriceFor(offers, item.menuItemId, shownPrice) : null;
+    const badges = (
+      <>
+        {badge ? (
+          <span
+            className={cn(
+              "rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide",
+              soldOut || sizeSoldOut ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary",
+            )}
+          >
+            {badge}
+          </span>
+        ) : null}
+        {/* Only when the per-order cap actually binds — once stock is at or
+            below it, "Only N left" already says how many you can get. */}
+        {item.perOrderLimit !== null && !soldOut && (remaining === null || remaining > item.perOrderLimit) ? (
+          <span className="text-xs text-muted-foreground">Max {item.perOrderLimit} per order</span>
+        ) : null}
+      </>
+    );
+    const sizes =
+      item.sizes && item.sizes.length > 0 && !soldOut ? (
+        <SizePicker
+          itemId={sizeGroup}
+          itemName={item.name}
+          sizes={item.sizes}
+          pickedId={size?.id ?? null}
+          onPick={(id) => setPicked((p) => ({ ...p, [item.id]: id }))}
+          inCart={item.sizes.flatMap((s) => {
+            const q = cart[cartLineKey(item.id, s.id)] ?? 0;
+            return q > 0 ? [`${s.label} × ${q}`] : [];
+          })}
+          priceNote={range ? "Price depends on the size" : null}
+        />
+      ) : null;
+    const stepper =
+      orderable && !soldOut && !sizeSoldOut ? (
+        <QtyStepper itemName={lineName} qty={qty} max={max} onChange={(q) => setQty(key, q)} />
+      ) : null;
+    const action =
+      stepper ??
+      (soldOut && item.menuAnchor ? (
+        <a
+          href={`#${item.menuAnchor}`}
+          onClick={(e) => {
+            // On the row this is a plain jump. In the sheet, close it first: its address
+            // step goes back, and the jump to the everyday row follows the close.
+            if (!detailOpen) return;
+            e.preventDefault();
+            const anchor = item.menuAnchor;
+            onDetailOpenChange(false);
+            if (anchor) setTimeout(() => document.getElementById(anchor)?.scrollIntoView({ block: "center" }), 250);
+          }}
+          className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-2 text-xs font-bold text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          aria-label={`${item.name} is in everyday items`}
+        >
+          Order below
+          <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
+        </a>
+      ) : null);
+    return { soldOut, sizeSoldOut, shownPrice, sale, badge, badges, sizes, stepper, action };
+  }
+
+  const detailItem = detailId ? (byId.get(detailId) ?? null) : null;
+  const detail = detailItem ? viewOf(detailItem, `detail-${detailItem.id}`) : null;
+
   return (
     <div>
       {orderable ? <OfferChips offers={offers} /> : null}
@@ -336,110 +464,71 @@ export function DropOrder(props: DropOrderProps) {
           beside the 72 px photo and the stepper. */}
       <ul className="divide-y divide-border/50 border-y border-border/50">
         {visibleItems.map((item) => {
-          const remaining = remainingFor(item);
-          const size = sizeFor(item);
-          const key = cartLineKey(item.id, size?.id);
-          const max = maxForLine(item, size);
-          const qty = cart[key] ?? 0;
-          const soldOut = remaining !== null && remaining <= 0;
-          const sizeStock = size ? withStockOverride(size.stock, sizeOverride[key]) : null;
-          // The picked size has none of its own left: no stepper, the badge says so.
-          const sizeSoldOut = sizeStock?.soldOut ?? false;
-          // Product stock binds: never print a count above the store's low-stock line.
-          const badge = sizeStock
-            ? stockBadgeText(sizeStock)
-            : item.onlyLeft !== undefined && remainingOverride[item.id] === undefined
-              ? stockBadgeText({ soldOut, onlyLeft: item.onlyLeft })
-              : stockLabel(remaining);
-          const range = item.sizes ? variantPriceRange(item.priceInPaise, item.sizes) : null;
-          const lineName = size ? variantLineName(item.name, size.label) : item.name;
+          const v = viewOf(item, item.id);
+          const openDetail = () => openDetailFor(item.id);
           return (
             <li key={item.id} className="flex items-center gap-3 py-3 sm:gap-4">
-              {item.imageUrl ? (
-                <Image
-                  src={item.imageUrl}
-                  alt=""
-                  width={80}
-                  height={80}
-                  className={cn(
-                    "h-20 w-20 shrink-0 rounded-xl object-cover ring-1 ring-border/60",
-                    soldOut && "opacity-50",
-                  )}
-                />
-              ) : (
-                <span
-                  aria-hidden="true"
-                  className={cn(
-                    "flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-3xl",
-                    soldOut && "opacity-50",
-                  )}
-                >
-                  {item.emoji}
-                </span>
-              )}
+              <ItemPhoto
+                src={item.imageUrl}
+                emoji={item.emoji}
+                name={item.name}
+                size="row"
+                onOpen={openDetail}
+                dimmed={v.soldOut}
+              />
 
               <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                <span className="line-clamp-2 text-[15px] font-semibold leading-snug text-foreground">{item.name}</span>
-                {item.description ? (
-                  <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{item.description}</span>
-                ) : null}
+                <ItemDetailTrigger detailId={item.id} name={item.name} description={item.description} onOpen={openDetail} />
                 <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
-                  <ItemPrice
-                    priceInPaise={size?.priceInPaise ?? item.priceInPaise}
-                    sale={
-                      orderable
-                        ? salePriceFor(offers, item.menuItemId, size?.priceInPaise ?? item.priceInPaise)
-                        : null
-                    }
-                  />
-                  {badge ? (
-                    <span
-                      className={cn(
-                        "rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide",
-                        soldOut || sizeSoldOut ? "bg-muted text-muted-foreground" : "bg-primary/10 text-primary",
-                      )}
-                    >
-                      {badge}
-                    </span>
-                  ) : null}
-                  {/* Only when the per-order cap actually binds — once stock is at or
-                      below it, "Only N left" already says how many you can get. */}
-                  {item.perOrderLimit !== null && !soldOut && (remaining === null || remaining > item.perOrderLimit) ? (
-                    <span className="text-xs text-muted-foreground">Max {item.perOrderLimit} per order</span>
-                  ) : null}
+                  <ItemPrice priceInPaise={v.shownPrice} sale={v.sale} />
+                  {v.badges}
                 </span>
-                {item.sizes && item.sizes.length > 0 && !soldOut ? (
-                  <SizePicker
-                    itemId={item.id}
-                    itemName={item.name}
-                    sizes={item.sizes}
-                    pickedId={size?.id ?? null}
-                    onPick={(id) => setPicked((p) => ({ ...p, [item.id]: id }))}
-                    inCart={item.sizes.flatMap((v) => {
-                      const q = cart[cartLineKey(item.id, v.id)] ?? 0;
-                      return q > 0 ? [`${v.label} × ${q}`] : [];
-                    })}
-                    priceNote={range ? "Price depends on the size" : null}
-                  />
-                ) : null}
+                {v.sizes}
               </span>
 
-              {orderable && !soldOut && !sizeSoldOut ? (
-                <QtyStepper itemName={lineName} qty={qty} max={max} onChange={(q) => setQty(key, q)} />
-              ) : soldOut && item.menuAnchor ? (
-                <a
-                  href={`#${item.menuAnchor}`}
-                  className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-xl px-2 text-xs font-bold text-primary underline-offset-2 hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-                  aria-label={`${item.name} is in everyday items`}
-                >
-                  Order below
-                  <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
-                </a>
-              ) : null}
+              {v.action}
             </li>
           );
         })}
       </ul>
+
+      {detailItem && detail ? (
+        <ItemDetailSheet
+          open={detailOpen}
+          triggerId={detailItem.id}
+          onOpenChange={onDetailOpenChange}
+          share={
+            <ShareStoreButton
+              vendorName={storeName ?? dropTitle}
+              slug={slug}
+              path={itemDetailPath(slug, detailItem.menuItemId)}
+              text={storeName ? `${detailItem.name} from ${storeName}` : detailItem.name}
+            />
+          }
+          name={detailItem.name}
+          emoji={detailItem.emoji}
+          imageUrl={detailItem.imageUrl}
+          morePhotos={detailItem.morePhotos}
+          description={detailItem.description}
+          dimmed={detail.soldOut}
+          price={<ItemPriceHero priceInPaise={detail.shownPrice} sale={detail.sale} />}
+          badges={detail.badge || detailItem.perOrderLimit !== null ? detail.badges : null}
+          sizes={detail.sizes}
+          offers={orderable ? offersForItem(offers, detailItem.menuItemId) : []}
+          facts={facts}
+          footerPrice={formatINRCompact(detail.sale?.salePricePaise ?? detail.shownPrice)}
+          action={
+            // A preview (not taking orders yet, or closed) has no footer; sold out says so.
+            orderable
+              ? (detail.action ?? (
+                  <span className="inline-flex min-h-11 items-center rounded-xl bg-muted px-4 text-sm font-bold text-muted-foreground">
+                    Sold out
+                  </span>
+                ))
+              : null
+          }
+        />
+      ) : null}
 
       {orderable && !canPay ? <NoPaymentNotice /> : null}
 

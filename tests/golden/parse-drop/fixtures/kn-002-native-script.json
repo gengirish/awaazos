@@ -1,0 +1,28 @@
+{
+  "id": "kn-002-native-script",
+  "lang": "kn-IN",
+  "now": "2026-10-08T04:30:00.000Z",
+  "transcript": "ನಾಳೆ ಸಂಜೆ 6 ರಿಂದ 8 ರವರೆಗೆ ಪಿಕಪ್, ಇಪ್ಪತ್ತು ರಾಗಿ ಲಡ್ಡು, ಹತ್ತು ಬನಾನಾ ಬ್ರೆಡ್",
+  "expected": {
+    "date": "2026-10-09",
+    "fulfilmentMode": "PICKUP",
+    "fulfilmentStart": "18:00",
+    "fulfilmentEnd": "20:00",
+    "items": [
+      {
+        "menuItemId": "ragi-laddu",
+        "maxQty": 20
+      },
+      {
+        "menuItemId": "banana-bread",
+        "maxQty": 10
+      }
+    ]
+  },
+  "tags": [
+    "kannada",
+    "native-script",
+    "indic-numerals"
+  ],
+  "notes": "Kannada script, as the Groq / Whisper fallbacks return it when Sarvam is down."
+}

@@ -1,0 +1,33 @@
+{
+  "id": "kn-001-tiffin",
+  "lang": "kn-IN",
+  "transcript": "idli ippattu rupayi, masala dose nalavattu, uppittu moovattu, ella tiffin alli",
+  "expected": {
+    "items": [
+      {
+        "name": "Idli",
+        "action": "create",
+        "priceInPaise": 2000,
+        "category": "Tiffin"
+      },
+      {
+        "name": "Masala Dose",
+        "action": "create",
+        "priceInPaise": 4000,
+        "category": "Tiffin"
+      },
+      {
+        "name": "Uppittu",
+        "action": "create",
+        "priceInPaise": 3000,
+        "category": "Tiffin"
+      }
+    ]
+  },
+  "tags": [
+    "kannada",
+    "indic-numerals",
+    "category-scope"
+  ],
+  "notes": "Romanised Kannada. ella tiffin alli = all of these in Tiffin. Names stay as the seller said them (dose, uppittu)."
+}

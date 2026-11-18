@@ -18,12 +18,14 @@ export default async function MenuPage(props: {
   const voiceOpen = voice === "1";
 
   let vendorId: string;
+  let vendorSlug: string;
   let vocab: StoreVocabulary;
   let seesCost: boolean;
   let role: Parameters<typeof canSeeCost>[0];
   try {
     const ctx = await requireVendorRole("CASHIER");
     vendorId = ctx.vendor.id;
+    vendorSlug = ctx.vendor.slug;
     vocab = storeVocabulary(ctx.vendor.stallType);
     role = ctx.staff.role;
     // Cost prices are for MANAGER and up (lib/item-cost.ts rule 2).
@@ -46,7 +48,7 @@ export default async function MenuPage(props: {
       // Sizes / colours, each with its own stock (lib/item-variants.ts).
       .then((rows) => withVariants(prisma, vendorId, rows, new Date(), { cost: seesCost }))
       .then((rows) => rowsForRole(rows, role)),
-    prisma.vendorSettings.findUnique({ where: { vendorId }, select: { voiceLang: true } }),
+    prisma.vendorSettings.findUnique({ where: { vendorId }, select: { voiceLang: true, publishStorefront: true } }),
   ]);
 
   return (
@@ -59,6 +61,8 @@ export default async function MenuPage(props: {
         vocab={vocab}
         sizesEnabled={env.ITEM_VARIANTS_ENABLED === "true"}
         canSeeCost={seesCost}
+        // Product links (/s/<slug>/p/<id>) exist only once the store is published.
+        storeSlug={settings?.publishStorefront ? vendorSlug : null}
       />
     </div>
   );

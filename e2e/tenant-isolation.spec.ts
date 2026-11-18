@@ -442,4 +442,48 @@ test.describe("tenant isolation", () => {
     expect(a.transaction.billNumber.slice(-4)).toBe("0001");
     expect(b.transaction.billNumber.slice(-4)).toBe("0001");
   });
+
+  test("vendor B cannot read, reorder, add or remove vendor A's item photos (404, not 403)", async () => {
+    const itemA = await createMenuItem(pageA, { name: "A Photo Kurti", priceInRupees: 899 });
+
+    const list = await pageB.request.get(`/api/menu/${itemA.id}/images`);
+    expect(list.status(), "cross-tenant photo list must 404").toBe(404);
+    const order = await pageB.request.put(`/api/menu/${itemA.id}/images/order`, { data: { order: ["cover"] } });
+    expect(order.status(), "cross-tenant reorder must 404").toBe(404);
+    const add = await pageB.request.post(`/api/menu/${itemA.id}/images`, {
+      multipart: { file: { name: "x.png", mimeType: "image/png", buffer: Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]) } },
+    });
+    expect(add.status(), "cross-tenant upload must 404 before any upload").toBe(404);
+    // 503 when this server has no Blob token: the check before the write. With one, 404.
+    const del = await pageB.request.delete(`/api/menu/${itemA.id}/images/cover`);
+    expect([404, 503], "cross-tenant photo delete must never succeed or 403").toContain(del.status());
+
+    const own = await pageA.request.get(`/api/menu/${itemA.id}/images`);
+    expect(own.status()).toBe(200);
+    expect(((await own.json()) as { data: unknown[] }).data).toEqual([]);
+  });
+
+  test("vendor A's product link never shows vendor B's item", async ({ browser }) => {
+    const itemB = await createMenuItem(pageB, { name: "B Private Thali", priceInRupees: 120 });
+    await createMenuItem(pageA, { name: "A Public Chai", priceInRupees: 20 });
+    const publish = { data: { publishStorefront: true }, headers: { "Content-Type": "application/json" } };
+    expect((await pageA.request.patch("/api/vendor", publish)).ok()).toBe(true);
+    expect((await pageB.request.patch("/api/vendor", publish)).ok()).toBe(true);
+    const slugA = ((await (await pageA.request.get("/api/vendor")).json()) as { vendor: { slug: string } }).vendor.slug;
+
+    const anon = await browser.newContext(CONTEXT_OPTIONS);
+    try {
+      const page = await anon.newPage();
+      const res = await page.goto(`/s/${slugA}/p/${itemB.id}`);
+      // The store renders with a notice, never a 404 or 403 that would say whether the id exists.
+      expect(res?.status()).toBe(200);
+      await expect(page.getByRole("status").filter({ hasText: "isn't on sale right now" })).toBeVisible();
+      await expect(page.getByText("A Public Chai")).toBeVisible();
+      await expect(page.getByText("B Private Thali")).toHaveCount(0);
+      await expect(page).not.toHaveTitle(/B Private Thali/);
+      expect(await page.content()).not.toContain("B Private Thali");
+    } finally {
+      await anon.close();
+    }
+  });
 });

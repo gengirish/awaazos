@@ -17,7 +17,7 @@
 import type { Prisma, PrismaClient } from "@prisma/client";
 
 import { rupeesToPaise } from "@/lib/currency";
-import { fixtureMenuItems, type DemoFixture } from "@/lib/demo-fixture";
+import { fixtureMenuItems, type DemoFixture, type DemoFixtureItem } from "@/lib/demo-fixture";
 import { istToUtc, ymdToDbDate } from "@/lib/drops-time";
 import { loadMenuCreateContext, prepareMenuItemCreate } from "@/lib/menu-create";
 import { storeHandleProblem } from "@/lib/store-handle";
@@ -27,6 +27,41 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 function istYmd(d: Date): string {
   return new Date(d.getTime() + IST_OFFSET_MS).toISOString().slice(0, 10);
+}
+
+/**
+ * An item's colours and stock, written only when the item has none yet, so a re-run
+ * never resets counts the store (or its sample orders) have moved since. An item
+ * with colours keeps no count of its own (lib/item-variants.ts).
+ */
+async function applyFixtureStock(
+  tx: Prisma.TransactionClient,
+  vendorId: string,
+  menuItemId: string,
+  item: Pick<DemoFixtureItem, "stock" | "colours">,
+  now: Date,
+): Promise<void> {
+  if (item.colours?.length) {
+    const has = await tx.itemVariant.count({ where: { vendorId, menuItemId } });
+    if (has > 0) return;
+    await tx.itemVariant.createMany({
+      data: item.colours.map((c, i) => ({
+        vendorId,
+        menuItemId,
+        label: c.label,
+        sortOrder: i,
+        stockQty: c.stock ?? null,
+        stockCountedAt: c.stock === undefined ? null : now,
+      })),
+    });
+    await tx.menuItem.update({ where: { id: menuItemId, vendorId }, data: { stockQty: null, stockCountedAt: null } });
+    return;
+  }
+  if (item.stock === undefined) return;
+  await tx.menuItem.updateMany({
+    where: { id: menuItemId, vendorId, stockQty: null },
+    data: { stockQty: item.stock, stockCountedAt: now },
+  });
 }
 
 /** The drop's dates, from today: handover `daysAhead` days out, cut-off the evening before. */
@@ -143,6 +178,7 @@ export async function applyDemoFixture(
           idByName.set(item.name, row.id);
           itemsCreated++;
         }
+        await applyFixtureStock(tx, vendor.id, idByName.get(item.name)!, item, now);
       }
       // Anything else on the store ("test" rows from an earlier build) goes quiet.
       const keep = [...idByName.values()];

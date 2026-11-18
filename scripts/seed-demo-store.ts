@@ -5,7 +5,7 @@
  *   npm run seed:demo-store -- --category=bakery --city=Hyderabad --create        # writes it
  *   npm run seed:demo-store -- --category=wellness --city=Bengaluru --name="Tulsi & Thyme" --create
  *
- * Options: --category=bakery|meals|wellness|crafts (default bakery), --city (required),
+ * Options: --category=bakery|meals|wellness|crafts|jewellery (default bakery), --city (required),
  * --name (default: the category's sample name), --ref (the demo store's external ref,
  * default "fixture-<slug>"), --allow-remote (anything but a local database).
  *
@@ -30,6 +30,7 @@ import {
   isDemoFixtureCategory,
   type DemoFixtureCategory,
 } from "@/lib/demo-fixture";
+import type { DemoCategory } from "@/lib/demo-store-schema";
 
 function loadEnvFile(name: string): void {
   const file = path.join(process.cwd(), name);
@@ -47,11 +48,12 @@ function arg(args: string[], name: string): string | undefined {
 }
 
 /** Outreach category of the demo-store API for each fixture category. */
-const API_CATEGORY: Record<DemoFixtureCategory, "home_bakery" | "home_kitchen" | "general"> = {
+const API_CATEGORY: Record<DemoFixtureCategory, DemoCategory> = {
   bakery: "home_bakery",
   meals: "home_kitchen",
-  wellness: "general",
-  crafts: "general",
+  wellness: "wellness",
+  crafts: "crafts_decor",
+  jewellery: "jewellery_accessories",
 };
 
 async function main(): Promise<void> {

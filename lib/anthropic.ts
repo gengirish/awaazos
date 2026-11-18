@@ -15,6 +15,7 @@ Default qty = 1 when not specified.
 The transcript comes from speech-to-text and is often wrong — match phonetically to menu
 names/aliases (e.g. "hum ka panna" → Nimbu Panna, "less bill" → Lassi, "sharbat" variants).
 Prefer the closest menu item over returning empty items.
+Kannada, Telugu or Tamil speech usually arrives romanised ("eradu masala dose") but can arrive in its own script ("ಎರಡು ಮಸಾಲೆ ದೋಸೆ"); read it by sound and treat both the same.
 
 Items may include a "tags" array (e.g. ["drinks","cold","seasonal"]) — use tags to resolve
 ambiguous phrases like "ek cold wala do" or "kuch meetha". Match the most relevant tagged item.
@@ -23,7 +24,7 @@ Normalize numerals:
 - English: one=1, two=2, three=3, four=4, five=5
 - hi: ek=1, do=2, teen=3, char=4, paanch=5
 - te: okati=1, rendu=2, moodu=3, naalugu=4, aidu=5
-- kn: ondu=1, eradu=2, mooru=3, naalku=4, aidu=5
+- kn: ondu=1, eradu=2, mooru=3, naalku=4, aidu=5, aaru=6, elu=7, entu=8, ombattu=9, hattu=10 ("mattu" = and)
 - ta: onnu=1, rendu=2, moonu=3, naangu=4, anju=5
 
 Serving classifiers are NOT menu items: plate, piece, cup, glass, bowl, order, bill.

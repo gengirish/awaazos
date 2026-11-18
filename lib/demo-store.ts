@@ -29,11 +29,11 @@ import { Prisma } from "@prisma/client";
 
 import { TRIAL_DAYS } from "@/lib/constants";
 import {
-  DEMO_CATEGORIES,
   DEMO_CLAIM_TTL_DAYS,
   DEMO_CREATES_PER_DAY,
   DEMO_FULFILMENT,
   DEMO_UPI_ID,
+  demoStallType,
   demoVoiceLang,
   itemKey,
   type DemoSampleOrderInput,
@@ -42,8 +42,8 @@ import {
 import { computeOrderTotals, generateOrderToken, nextBillNumber } from "@/lib/drops";
 import { normaliseInstagramHandle } from "@/lib/instagram";
 import { loadMenuCreateContext, prepareMenuItemCreate } from "@/lib/menu-create";
+import { defaultEmoji } from "@/lib/menu-emoji";
 import { suggestEmoji } from "@/lib/menu-suggestions";
-import { DEFAULT_MENU_EMOJI } from "@/lib/menu-voice";
 import { hashPassword, verifyPassword } from "@/lib/password";
 import { checkPasswordPolicy } from "@/lib/password-strength";
 import { normaliseIndianMobile } from "@/lib/phone";
@@ -51,6 +51,7 @@ import { prisma } from "@/lib/prisma";
 import { generateReceiptToken } from "@/lib/receipt-data";
 import { appBaseUrl } from "@/lib/storefront-razorpay";
 import { newVendorSlug } from "@/lib/store-slug";
+import { storeKind, storeVocabulary } from "@/lib/store-vocabulary";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** Sample orders are back-dated this far apart, newest first, so the board looks lived in. */
@@ -163,6 +164,10 @@ async function writeDemoStore(
   const ownerId = await demoOwnerId(tx);
   const instagram = normaliseInstagramHandle(profile.instagram) || null;
   const displayPhone = profile.display_phone ? normaliseIndianMobile(profile.display_phone) : null;
+  const { stallType, stallTypeOther } = demoStallType(profile.category);
+  // A jewellery store's items must not fall back to a 🍽️.
+  const kind = storeKind(stallType);
+  const fallbackEmoji = defaultEmoji(storeVocabulary(stallType));
 
   const vendor = await tx.vendor.create({
     data: {
@@ -171,7 +176,8 @@ async function writeDemoStore(
       ownerName: "IntelliForge demo",
       upiId: DEMO_UPI_ID,
       upiName: profile.name,
-      stallType: DEMO_CATEGORIES[profile.category],
+      stallType,
+      stallTypeOther,
       city: profile.area ?? null,
       onboardingDone: true,
       // No trial: billingAccess() treats trialEndsAt = null as "free", never
@@ -207,7 +213,7 @@ async function writeDemoStore(
       priceInPaise: item.price_paise,
       aliases: [],
       tags: [],
-      emoji: suggestEmoji(item.name) ?? DEFAULT_MENU_EMOJI,
+      emoji: suggestEmoji(item.name, kind) ?? fallbackEmoji,
       category: item.category ?? "General",
       hsnCode: null,
       isPopular: false,
@@ -486,53 +492,146 @@ export async function claimDemoStore(input: ClaimInput, now: Date = new Date()):
       if (burned.count !== 1) throw new DemoStoreError(400, "invalid_or_expired");
 
       const user = existing ?? (await tx.user.create({ data: { email: h.email, name, passwordHash, role: "USER" } }));
-      const demoOwner = await demoOwnerId(tx);
-
-      // Leave nothing of the demo account behind on this store.
-      await tx.staffMember.deleteMany({ where: { vendorId: h.vendorId, userId: demoOwner } });
-      await tx.pushSubscription.deleteMany({ where: { vendorId: h.vendorId, userId: demoOwner } });
-      await tx.staffMember.create({ data: { vendorId: h.vendorId, userId: user.id, name, role: "OWNER" } });
-
-      // The trial starts now, unless an admin already granted free access
-      // further out (/admin/vendors moves trialEndsAt); never shorten that.
-      const current = await tx.vendor.findUniqueOrThrow({ where: { id: h.vendorId }, select: { trialEndsAt: true } });
-      const trialEnd = new Date(now.getTime() + TRIAL_DAYS * DAY_MS);
-      const vendor = await tx.vendor.update({
-        where: { id: h.vendorId },
-        data: {
-          isDemo: false,
-          ownerName: name,
-          email: h.email,
-          // The placeholder must not take a real buyer's money: the owner adds
-          // their own UPI id in Settings before taking payments.
-          upiId: null,
-          // The new owner goes through setup (docs/ONBOARDING_PLAN.md, decision 3):
-          // what the demo filled in shows on each step, and payment needs their own answer.
-          onboardingDone: false,
-          onboardingStep: null,
-          trialEndsAt: current.trialEndsAt && current.trialEndsAt > trialEnd ? current.trialEndsAt : trialEnd,
-        },
-        select: { slug: true },
+      const slug = await transferDemoStore(tx, {
+        vendorId: h.vendorId,
+        externalRef: h.vendor.demoExternalRef ?? "",
+        userId: user.id,
+        name,
+        email: h.email,
+        sampleOrders: input.sampleOrders,
+        actor: "claim",
+        now,
       });
+      return { slug, email: h.email };
+    });
+  } catch (err) {
+    if (isUniqueViolation(err, "email")) throw new DemoStoreError(409, "email_in_use");
+    throw err;
+  }
+}
 
-      if (input.sampleOrders === "delete") {
-        await tx.transaction.deleteMany({ where: { vendorId: h.vendorId, isSample: true } });
-      } else {
-        await tx.transaction.updateMany({
-          where: { vendorId: h.vendorId, isSample: true, archivedAt: null },
-          data: { archivedAt: now },
-        });
-      }
-      await tx.demoHandover.deleteMany({ where: { vendorId: h.vendorId, usedAt: null } });
-      await tx.demoAuditLog.create({
-        data: {
-          action: "claim",
-          externalRef: h.vendor.demoExternalRef ?? "",
-          vendorId: h.vendorId,
-          actor: "claim",
-        },
+/**
+ * The one way a demo store becomes a real one, shared by the claim link and the
+ * admin's "Set up their login": `userId` becomes OWNER, the demo account leaves,
+ * `isDemo` flips, the trial starts, setup restarts and the sample orders are
+ * archived or deleted. Runs inside the caller's transaction; returns the slug.
+ */
+async function transferDemoStore(
+  tx: Prisma.TransactionClient,
+  t: {
+    vendorId: string;
+    externalRef: string;
+    userId: string;
+    name: string;
+    email: string;
+    sampleOrders: "archive" | "delete";
+    actor: string;
+    now: Date;
+  },
+): Promise<string> {
+  const demoOwner = await demoOwnerId(tx);
+
+  // Leave nothing of the demo account behind on this store.
+  await tx.staffMember.deleteMany({ where: { vendorId: t.vendorId, userId: demoOwner } });
+  await tx.pushSubscription.deleteMany({ where: { vendorId: t.vendorId, userId: demoOwner } });
+  await tx.staffMember.create({ data: { vendorId: t.vendorId, userId: t.userId, name: t.name, role: "OWNER" } });
+
+  // The trial starts now, unless an admin already granted free access
+  // further out (/admin/vendors moves trialEndsAt); never shorten that.
+  const current = await tx.vendor.findUniqueOrThrow({ where: { id: t.vendorId }, select: { trialEndsAt: true } });
+  const trialEnd = new Date(t.now.getTime() + TRIAL_DAYS * DAY_MS);
+  const vendor = await tx.vendor.update({
+    where: { id: t.vendorId },
+    data: {
+      isDemo: false,
+      ownerName: t.name,
+      email: t.email,
+      // The placeholder must not take a real buyer's money: the owner adds
+      // their own UPI id in Settings before taking payments.
+      upiId: null,
+      // The new owner goes through setup (docs/ONBOARDING_PLAN.md, decision 3):
+      // what the demo filled in shows on each step, and payment needs their own answer.
+      onboardingDone: false,
+      onboardingStep: null,
+      trialEndsAt: current.trialEndsAt && current.trialEndsAt > trialEnd ? current.trialEndsAt : trialEnd,
+    },
+    select: { slug: true },
+  });
+
+  if (t.sampleOrders === "delete") {
+    await tx.transaction.deleteMany({ where: { vendorId: t.vendorId, isSample: true } });
+  } else {
+    await tx.transaction.updateMany({
+      where: { vendorId: t.vendorId, isSample: true, archivedAt: null },
+      data: { archivedAt: t.now },
+    });
+  }
+  await tx.demoHandover.deleteMany({ where: { vendorId: t.vendorId, usedAt: null } });
+  await tx.demoAuditLog.create({
+    data: { action: "claim", externalRef: t.externalRef, vendorId: t.vendorId, actor: t.actor },
+  });
+  return vendor.slug;
+}
+
+export type LoginHandoverInput = {
+  name: string;
+  email: string;
+  /** Chosen by the admin, who passes it to the seller. Never stored or logged in clear. */
+  password: string;
+  sampleOrders: "archive" | "delete";
+};
+
+/**
+ * The admin hands the store over with a login they set: a new account for
+ * `email` with `password`, made the store's OWNER through the same transfer as
+ * a claim. Only for an email with no account yet (an existing account proves
+ * itself through a claim link instead, so nobody can attach a store to, or
+ * learn anything about, someone else's account). Sends nothing.
+ */
+export async function handOverWithLogin(
+  externalRef: string,
+  input: LoginHandoverInput,
+  actor: string,
+  now: Date = new Date(),
+): Promise<{ slug: string; email: string }> {
+  const email = input.email.trim().toLowerCase();
+  const name = input.name.trim();
+  if (!name) throw new DemoStoreError(400, "name_required");
+  if (email === demoOwnerEmail()) throw new DemoStoreError(409, "email_in_use");
+  const policy = checkPasswordPolicy(input.password);
+  if (!policy.ok) throw new DemoStoreError(400, "weak_password", policy.reason);
+
+  const v = await prisma.vendor.findUnique({
+    where: { demoExternalRef: externalRef },
+    select: { id: true, isDemo: true, isActive: true },
+  });
+  if (!v || !v.isActive) throw new DemoStoreError(404, "not_found");
+  if (!v.isDemo) throw new DemoStoreError(409, "not_a_demo_store");
+  if (await prisma.user.findUnique({ where: { email }, select: { id: true } })) {
+    throw new DemoStoreError(409, "email_in_use");
+  }
+  const passwordHash = await hashPassword(input.password);
+
+  try {
+    return await prisma.$transaction(async (tx) => {
+      // Re-checked inside: a claim or a second admin may have got here first.
+      const still = await tx.vendor.updateMany({
+        where: { id: v.id, isDemo: true, isActive: true },
+        data: { isDemo: true },
       });
-      return { slug: vendor.slug, email: h.email };
+      if (still.count !== 1) throw new DemoStoreError(409, "not_a_demo_store");
+      const user = await tx.user.create({ data: { email, name, passwordHash, role: "USER" } });
+      const slug = await transferDemoStore(tx, {
+        vendorId: v.id,
+        externalRef,
+        userId: user.id,
+        name,
+        email,
+        sampleOrders: input.sampleOrders,
+        actor,
+        now,
+      });
+      return { slug, email };
     });
   } catch (err) {
     if (isUniqueViolation(err, "email")) throw new DemoStoreError(409, "email_in_use");

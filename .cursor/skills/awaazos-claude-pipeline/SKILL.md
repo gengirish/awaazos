@@ -111,8 +111,9 @@ quota, skipping providers that aren't configured:
 
 - en/hi → OpenAI → Groq → Whisper (only reached when the browser isn't using
   Web Speech)
-- te/kn/ta → Sarvam → Groq → Whisper — **dormant**: the language picker
-  (`VOICE_LANGUAGES` in `lib/constants.ts`) offers only en-IN / hi-IN
+- te/kn/ta → Sarvam → Groq → Whisper. Kannada is offered in the language
+  picker (`VOICE_LANGUAGES` in `lib/constants.ts`: en-IN, hi-IN, kn-IN);
+  te/ta are **dormant**. Sarvam is asked for romanised text (`mode=translit`)
 
 Exhaustion returns 200 `{ error: "all_providers_failed", fallback: "quickadd" }`.
 STT source ids live in `lib/stt-source.ts`.

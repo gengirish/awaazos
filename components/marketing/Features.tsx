@@ -30,7 +30,7 @@ const leadFeatures = [
     icon: Mic,
     title: "Bills at the counter too",
     description:
-      "Selling at a pop-up or from your door? Tap the items, or speak the order in English or Hindi (more languages are coming). Show a UPI QR and keep billing without a network.",
+      "Selling at a pop-up or from your door? Tap the items, or speak the order in English, Hindi or Kannada (more languages are coming). Show a UPI QR and keep billing without a network.",
   },
 ] as const;
 

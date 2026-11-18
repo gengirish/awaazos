@@ -1,0 +1,117 @@
+---
+description: Menu catalogue: offers, inventory, sizes, cost price, stock purchases, AI images, moved from CLAUDE.md
+paths: ["lib/offers.ts","lib/pos-offers.ts","lib/inventory*.ts","lib/item-*.ts","lib/stock-purchase.ts","lib/menu-create.ts","lib/ai-image.ts","app/api/menu/**","app/api/offers/**","app/api/vendor/banner/**","app/(vendor)/menu/**","app/(vendor)/settings/offers/**","components/menu/**","components/pos/SizePickerDialog.tsx","components/storefront/SizePicker.tsx","components/storefront/ItemPrice.tsx"]
+---
+
+<!-- Generated from .cursor/rules/catalogue.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
+
+# Menu catalogue: offers
+
+Moved out of CLAUDE.md so it loads only when matching files are in play. CLAUDE.md keeps the cross-cutting rules.
+
+## AI images (fal)
+
+`lib/ai-image.ts` (server-only) turns a seller's description into a picture with `fal-ai/flux/schnell`,
+for two uses that store nothing themselves. A banner is previewed (`POST /api/vendor/banner/generate`,
+OWNER) and "Use this banner" sends it through the normal upload. A story background is composited on
+`POST` to either story-image route (MANAGER; the tenant check runs first, so a miss never reaches fal).
+`FAL_KEY` never reaches the browser; unset → 503. The controls are hidden until
+`NEXT_PUBLIC_AI_IMAGES_ENABLED=true`. Only the seller's own words go to fal, and the prompt is never logged.
+Every call is billed and nothing retries. `reserveFalImage` (`lib/ai-usage-guard.ts`) caps images per plan
+and fails **closed** in production, unlike the POS guards. `requireActiveBilling` applies.
+
+## Offers (sales and quantity plans)
+
+An `Offer` is a vendor's sale ("Diwali sale: 10% off everything") or plan ("4+ quiches incl. 1 paneer →
+10% off"); `isSaleOffer` tells them apart (`minQty` 1, no "at least N of tag X"). The rules live in
+`lib/offers.ts` (pure, client-safe; read its header before touching it) and nowhere else. Sellers edit
+them in Settings → Offers (`/api/offers`, MANAGER, no plan gate, no `requireActiveBilling`).
+
+- **Eligibility:** all items, chosen item ids, or a `MenuItem.tags` tag (seller free text, edited in
+  the menu item form; compared trimmed and case-insensitively). The optional "at least N of tag X" is
+  counted among the eligible lines only.
+- **Sales price each item.** Every item takes its deepest live sale, so one order can use several
+  sales, and the storefront card shows the struck-out price and `salePriceFor()` before the item is in
+  the cart (`components/storefront/ItemPrice.tsx`). A sale rounds down per unit, so card price × qty is
+  exactly the bill.
+- **Plans never stack**, with each other or with sales: the cart gets its sale prices or the one plan
+  with the largest discount, whichever saves more (a tie keeps the sale prices). Between plans, ties go
+  to the higher `minQty`, then the older offer. Only eligible lines are discounted; delivery fees never are.
+  When a plan beats sale prices the cards showed, the cart bar and checkout name the sale it replaced
+  (`OffersResult.setAsideSales`, `offerSetAsideText`), so prices going back up are never unexplained.
+- **Free items** (`discountType` FREE_ITEM, `Offer.freeItemId` / `freeItemQty`): a plan whose reward is one
+  catalogue item the seller picked ("4+ items → free Evil Eye Bracelet"), never a sale. It competes with the other
+  plans and sales at the gift's catalogue value, but takes nothing off: the order gets an extra `OrderItem` at ₹0
+  with `isGift` and the name `giftLineName()` ("… (free gift)"), so subtotal, discount and total are unchanged and
+  every bill, board and receipt shows it as is. The gift doesn't count toward the minimum. Online only (never
+  resolved on POS). On a drop it must be one of the drop's items and comes out of its stock (`withGiftsThatFit`,
+  server and cart alike). Order again skips gift lines. Settings → Offers warns when two switched-on offers, one a
+  plan, can meet in one order (`overlappingOffers`).
+- **One name per bill:** `OffersResult.applied` is what `Transaction.offerId` / `offerName` record (the
+  plan, the sale, or several sales as "A + B" / "A + 2 more", ≤ 60 chars). Never read `discounts[0]`.
+- **Rounding:** a plan takes `floor(eligibleSubtotal × bps / 10 000)`, split across eligible lines by
+  largest remainder into `OrderItem.discountPaise` (item analytics are net of it).
+  `subtotal − discount + delivery + tax = total`; counter tax is charged on `subtotal − discount`.
+- **No timers.** `startsAt` / `endsAt` are compared on every read (`offerIsLive`).
+- **The server prices; browsers preview.** `placeStorefrontOrder` and `placeMenuOrder` call
+  `applyOffers` inside their transaction (buyers send ids and quantities only), so `totalPaise`, and
+  with it the Razorpay amount, UPI QR and `DailySummary`, is the server's. The POS prices its own cart
+  (it works offline), so `POST /api/transactions` re-prices it (`lib/pos-offers.ts`): a live sale
+  whose discount is neither the server's figure nor 0 gets 400 `discount_mismatch`; a `deferred` sale
+  is kept as rung up.
+- **Public pages get resolved offers only** (`resolveOffers` → `offersForItems`): name, description,
+  numbers and the item ids already on that page. Raw tags stay on the server.
+- `Transaction.offerName` is a snapshot (`offerId` is set null on delete), so old bills keep their
+  line. Receipts, WhatsApp text, boards and the CSV label it with `discountLabel()`.
+- Not built: coupon codes, per-customer limits, fixed amount / bundle price (enum values reserved),
+  cheapest-one-free, a buyer choosing the gift, free items at the counter, a plan on top of sales, recurring subscriptions. POS item tiles don't show sale prices
+  (the cart's discount row does).
+- Test store data: `npm run seed:quiche-plans -- <slug>` (dry run; `--create` writes).
+
+## Inventory (stock per product)
+
+Opt-in per item: `MenuItem.stockQty` null = not tracked (kitchens see nothing new). Rules in the header of
+`lib/inventory.ts` (pure), database side in `lib/inventory-server.ts`, plan in `docs/INVENTORY_PLAN.md`.
+**Stock left is derived, never decremented**: the seller records a count (`stockQty` at `stockCountedAt`,
+via `recordStockCount` only) and left = count minus units in stock-taking `OrderItem`s created after it:
+every counter sale, and storefront orders that `stockHoldingOrderWhere` holds (so lapsed holds, cancels and
+POS undo give stock back with no write and no timer); samples never count. −1 / +1 / "received" go through
+`recordStockAdjust`: they move `stockQty` and **never** `stockCountedAt` (re-basing would freeze open orders
+as sold). A count is the whole shelf, pieces packed for open orders included, so left also subtracts
+storefront orders placed by the count that still hold stock and weren't handed over by then
+(`Transaction.deliveredAt`, stamped by the `deliver` action only); "Set count" pre-fills left + set aside
+(`onShelfCount`). Online orders lock the tracked `MenuItem` rows (`FOR UPDATE`, id
+order, after the drop row) and refuse a shortfall (`out_of_stock` for menu orders, `sold_out` for drops,
+whose cap becomes the smaller of `maxQty` and stock left). The counter never refuses a sale over stock, so
+left can go negative ("Oversold by N"). Buyers see "Sold out" and "Only N left" (at or below `lowStockAt`,
+else 3), never the count above it.
+
+**Sizes and colours** (`ItemVariant`, rules in the header of `lib/item-variants.ts`, zod-free so the store page can
+import it; request schema in `lib/item-variants-schema.ts`): an item with variants is ordered by variant. Every
+menu-order line names an available one (`size_required` otherwise), takes its price (`priceInPaise`, else the
+item's) and keeps `OrderItem.variantId` + the name snapshot "Cotton kurti – M". Stock is per variant with the
+same derived rules (`stockLeftByVariant`, `lockTrackedVariants` after the item locks); the item keeps no count of
+its own (409 `has_variants`). Sellers edit them in the item form (`PUT /api/menu/[id]/variants`, the whole list;
+stock route takes `variantId`), shown for goods stores only while `ITEM_VARIANTS_ENABLED=true` (server env, read
+per render). The cart key is `itemId:variantId` (`cartLineKey`). At the counter a tile with sizes opens a
+picker (`components/pos/SizePickerDialog.tsx`); `POST /api/transactions` records the line's `variantId` only when
+it is this vendor's size of that item (live sale otherwise 400 `size_not_found`; a queued offline sale keeps the
+line without it), never refuses over stock or a missing size, and voice leaves sized items for a tap. Drops sell
+by size too (rule 7): the line is priced from the size, else the drop; `maxQty` / `perOrderLimit` cover all sizes
+of the item; each tracked size caps itself (`sold_out` + `variantId`); the packing list splits each item by size.
+The store page's picker is `components/storefront/SizePicker.tsx` (menu and drops). Not yet: free gifts with sizes
+(that offer is skipped), order again.
+
+**Cost price** (rules in the header of `lib/item-cost.ts`, plan in `docs/COST_AND_PROFIT_PLAN.md`): optional
+`costInPaise` on `MenuItem` and `ItemVariant` (a size without one uses the item's); null means not recorded, never
+zero. MANAGER and OWNER only: every other viewer's rows carry null (`rowsForRole`, `withVariants(..., { cost })`), a
+cost a cashier sends is ignored, and it is never in a public select or the voice prompt. Each bill line keeps the
+cost of its moment in `OrderItem.costInPaise`, written by `stampOrderCosts` inside all three order-creating
+transactions. Not built yet: the profit report.
+
+**Stock purchases** (rules in the header of `lib/stock-purchase.ts`): "Received stock" on an item card (MANAGER and
+up) posts `{ lines: [{ qty, variantId? }], costInRupees? }` to `POST /api/menu/[id]/purchases`. In one transaction it
+moves each count up through `recordStockAdjust` (never `stockCountedAt`), writes one `StockPurchase` row per line and,
+when a cost is given, makes it the latest cost (a size with its own cost takes it, else the item). A record only: stock
+left never comes from summing purchases. Only tracked stock can be received (409 `stock_not_tracked`); an item with sizes
+is received by size. `GET` on the same path lists the last 5 for the item form. No edit or undo yet.

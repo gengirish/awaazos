@@ -139,20 +139,19 @@ export const STALL_TYPES: { value: StallType; label: string }[] = [
 ];
 
 /**
- * Voice languages exposed in the user-facing picker (onboarding/settings).
+ * Voice languages offered in the picker (onboarding / Settings → Voice) and in
+ * the POS mic's language cycle.
  *
- * Intentionally restricted to en-IN + hi-IN for the YC pitch — these are the
- * two locales where the Claude → Sarvam → cart pipeline is end-to-end solid.
- *
- * STT capability for te-IN / kn-IN / ta-IN is preserved in `hooks/useVoiceOrder.ts`
- * (SARVAM_LANGS / WEBSPEECH_LANGS) and `lib/sarvam.ts` — they're just not surfaced
- * in the picker. If a vendor has an older stored preference like `te-IN`, the
- * picker normalises the rendered value to `hi-IN` while leaving the DB row
- * untouched (see onboarding page for the `displayVoiceLang` derivation).
+ * en-IN and hi-IN run on Web Speech in the browser (free, every plan). kn-IN
+ * has no Web Speech route here: it records audio and goes through
+ * `/api/ai/transcribe` (Sarvam → Groq → Whisper), which is STARTER and up.
+ * te-IN / ta-IN stay dormant: same code path, not offered. A stored value that
+ * is not offered renders as English in the picker and the row is left alone.
  */
 export const VOICE_LANGUAGES = [
   { value: "en-IN", label: "English" },
   { value: "hi-IN", label: "हिन्दी (Hindi)" },
+  { value: "kn-IN", label: "ಕನ್ನಡ (Kannada)" },
 ] as const;
 
 /** Allowed picker values — used to normalise stale stored preferences at render time. */

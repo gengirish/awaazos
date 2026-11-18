@@ -37,6 +37,8 @@ type MenuGridProps = {
   vocab: StoreVocabulary;
   /** MANAGER and up: the cards offer "Received stock" (lib/stock-purchase.ts rule 2). */
   canSeeCost?: boolean;
+  /** The published store's link name, for each card's product link; null = not published. */
+  storeSlug?: string | null;
 };
 
 /** One request for the whole order (POST /api/menu/reorder). False when it did not save. */
@@ -53,7 +55,7 @@ async function saveOrder(rows: MenuRow[]): Promise<boolean> {
   }
 }
 
-export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab, canSeeCost = false }: MenuGridProps) {
+export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab, canSeeCost = false, storeSlug = null }: MenuGridProps) {
   const router = useRouter();
   const [receiving, setReceiving] = useState<MenuRow | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -278,7 +280,9 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab, 
               }
             />
           ) : (
-            <div ref={gridRef} className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            // grid-cols-1, not an implicit column: that one grows to the longest description line
+            // and pushes every card off a 360 px screen (and off-centres dialogs opened over it).
+            <div ref={gridRef} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {visibleItems.map((item, index) => (
                 <div
                   key={item.id}
@@ -297,6 +301,7 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab, 
                     onMove={filtering ? undefined : move}
                     canMoveUp={index > 0}
                     canMoveDown={index < items.length - 1}
+                    storeSlug={storeSlug}
                   />
                 </div>
               ))}

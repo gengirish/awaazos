@@ -6,6 +6,8 @@
  * suggestAliases  → derive voice-match aliases from a name automatically
  */
 
+import type { StoreKind } from "@/lib/store-vocabulary";
+
 const SLUG_STOP_WORDS = new Set([
   "a", "an", "the", "and", "or", "of", "with", "in", "on", "at",
 ]);
@@ -135,19 +137,66 @@ const EMOJI_RULES: ReadonlyArray<readonly [emoji: string, terms: readonly string
   ["🍬", ["sweet", "sweets", "mithai"]],
 ];
 
-const EMOJI_MATCHERS: ReadonlyArray<readonly [string, RegExp]> = EMOJI_RULES.map(([emoji, terms]) => [
-  emoji,
-  new RegExp(`(?:^| )(?:${terms.join("|")})(?:e?s)?(?= |$)`),
-]);
+/**
+ * The same, for a store that sells products (storeKind "goods"): checked
+ * before EMOJI_RULES, so "Promise chain" is a 📿 and "Tulsi Green Tea" a 🍵,
+ * while a pickle or ladoo seller filed as "Other" still gets food emoji.
+ * Specific nouns first: "Hair clip" before anything else, "Key ring" before
+ * "ring", "Gift box" before what is in it.
+ */
+const GOODS_EMOJI_RULES: ReadonlyArray<readonly [emoji: string, terms: readonly string[]]> = [
+  ["🔑", ["keychain", "key chain", "key ring", "keyring"]],
+  ["🎁", ["hamper", "gift box", "gift set", "gift hamper", "gift pack"]],
+  // Hair accessories before jewellery: "Pearl hair clip" is a clip.
+  ["🎀", ["clip", "hair clip", "hairclip", "bow", "scrunchie", "hairband", "hair band", "headband", "head band", "hair tie", "claw clip", "tic tac", "hair pin", "hairpin", "juda pin"]],
+  ["📿", ["necklace", "chain", "pendant", "locket", "choker", "mala", "mangalsutra", "beads", "rudraksha"]],
+  ["💍", ["ring", "bracelet", "bangle", "kada", "kangan", "anklet", "payal", "earring", "ear ring", "jhumka", "jhumki", "stud", "nose pin", "nosepin", "nath", "maang tikka", "jewellery", "jewelry", "oxidised", "oxidized", "charm", "brooch"]],
+  ["👜", ["bag", "handbag", "tote", "purse", "clutch", "pouch", "wallet", "sling", "potli", "backpack"]],
+  ["🥻", ["saree", "sari"]],
+  ["🧣", ["dupatta", "stole", "scarf", "shawl", "muffler"]],
+  ["👗", ["kurti", "kurta", "dress", "gown", "lehenga", "frock", "anarkali", "salwar", "co ord", "coord", "top"]],
+  ["👕", ["shirt", "t shirt", "tshirt", "tee", "hoodie", "sweatshirt"]],
+  ["👖", ["jeans", "pant", "trouser", "legging", "palazzo", "skirt"]],
+  ["🧦", ["sock"]],
+  ["👡", ["sandal", "chappal", "jutti", "mojari", "kolhapuri", "slipper", "heels"]],
+  ["👟", ["shoe", "sneaker"]],
+  ["🕯️", ["candle", "tealight", "tea light", "wax melt"]],
+  ["🪔", ["diya", "deepam", "lamp"]],
+  ["🌿", ["incense", "agarbatti", "dhoop", "sambrani"]],
+  ["🧼", ["soap", "bath bar"]],
+  ["💄", ["lipstick", "kajal", "kohl", "eyeliner", "mascara", "nail polish", "lip tint"]],
+  ["🧴", ["oil", "hair oil", "serum", "lotion", "shampoo", "conditioner", "balm", "lip balm", "scrub", "face wash", "facewash", "face pack", "moisturiser", "moisturizer", "sunscreen", "body butter", "face cream", "perfume", "attar", "ittar", "mist"]],
+  ["💊", ["capsule", "tablet", "supplement"]],
+  ["🍵", ["tea", "green tea", "herbal tea", "kadha", "infusion", "tisane"]],
+  ["🍯", ["honey", "ghee", "jam"]],
+  ["🫙", ["pickle", "achar", "achaar", "podi", "powder", "masala", "spice", "chutney", "jar"]],
+  ["🧸", ["toy", "teddy", "plush", "soft toy", "doll"]],
+  ["🧶", ["crochet", "knit", "knitted", "yarn", "macrame", "embroidery", "embroidered"]],
+  ["🖼️", ["painting", "frame", "art print", "canvas", "wall art", "wall hanging", "poster"]],
+  ["🪴", ["plant", "planter", "succulent"]],
+  ["🏺", ["pottery", "vase", "terracotta", "ceramic"]],
+  ["📒", ["diary", "notebook", "journal", "planner"]],
+  ["💐", ["bouquet", "flower"]],
+];
+
+const toMatchers = (rules: ReadonlyArray<readonly [string, readonly string[]]>): ReadonlyArray<readonly [string, RegExp]> =>
+  rules.map(([emoji, terms]) => [emoji, new RegExp(`(?:^| )(?:${terms.join("|")})(?:e?s)?(?= |$)`)]);
+
+const EMOJI_MATCHERS = toMatchers(EMOJI_RULES);
+/** Product rules first, then the food ones. */
+const GOODS_EMOJI_MATCHERS = [...toMatchers(GOODS_EMOJI_RULES), ...EMOJI_MATCHERS];
 
 /**
  * Suggest a menu emoji from an item name, or null when nothing matches.
- * "Aam Ka Panna" → 🥭, "Lemonade Candy" → 🍬, "Lays Bhel" → 🥗.
+ * "Aam Ka Panna" → 🥭, "Lemonade Candy" → 🍬, "Lays Bhel" → 🥗; for a store
+ * that sells products (`kind` "goods") "Tulip bracelet" → 💍 and
+ * "Organza bow clip" → 🎀. The caller's fallback must follow the kind too
+ * (`defaultEmoji` in lib/menu-emoji.ts), never a bare 🍽️.
  *
  * Only a suggestion for a NEW item's picker — an existing item's emoji is
  * vendor-chosen data and is never rewritten from this.
  */
-export function suggestEmoji(name: string): string | null {
+export function suggestEmoji(name: string, kind: StoreKind = "food"): string | null {
   const norm = name
     .normalize("NFD")
     .replace(/[̀-ͯ]/g, "")
@@ -155,7 +204,7 @@ export function suggestEmoji(name: string): string | null {
     .replace(/[^a-z0-9]+/g, " ")
     .trim();
   if (!norm) return null;
-  for (const [emoji, re] of EMOJI_MATCHERS) {
+  for (const [emoji, re] of kind === "goods" ? GOODS_EMOJI_MATCHERS : EMOJI_MATCHERS) {
     if (re.test(norm)) return emoji;
   }
   return null;

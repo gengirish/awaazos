@@ -108,6 +108,11 @@ receipt `/r/…`, an email (claim link or trial reminder) and the installed app 
 
 ## Step 3, later and only if wanted: a new domain
 
+**18/11/2026:** `awaazdo.store` is bought and live on the Vercel project as an **extra** host (Production; www
+308 → apex). Nothing else has moved: `AUTH_URL`, `NEXT_PUBLIC_APP_URL`, emails, Razorpay webhook and redirect URLs
+and every link already sent still use `awaazos.intelliforge.tech`, which keeps serving as before. Owning the
+domain does not clear the trademark conflicts in the Status line.
+
 Recommendation: **ship Steps 1 and 2 on `awaazos.intelliforge.tech` and decide the domain afterwards.** A
 different name on the same host costs nothing. A host move costs a lot, because everything below is tied to the
 origin:
@@ -127,4 +132,4 @@ and `/s/**`. Redirect only marketing pages, and mint new links on the new host. 
 1. Step 0 checks. Stop if the trademark search finds a conflict.
 2. Step 1 as one PR (about a day of work, mostly copy and test updates).
 3. Step 2 in the days after merge.
-4. Step 3 is undecided.
+4. Step 3 is undecided (the domain is held and serving; the move itself is not planned).

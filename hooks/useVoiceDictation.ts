@@ -19,7 +19,7 @@ import { mapWebSpeechErrorCode, type VoiceErrorReason } from "@/lib/voice-error"
  * Capture only — STT, never NLU. Same routing as `useVoiceOrder`:
  * - en-IN / hi-IN → Web Speech in the browser (unless
  *   NEXT_PUBLIC_VOICE_FALLBACK_ENABLED flips them to the server cascade);
- * - te-IN / kn-IN / ta-IN → MediaRecorder → POST /api/ai/transcribe.
+ * - kn-IN (offered) and te-IN / ta-IN (dormant) → MediaRecorder → POST /api/ai/transcribe.
  *
  * The final transcript is handed to `onTranscript`; while that promise runs the
  * state is "parsing". If it resolves to an error code the hook ends in "error"

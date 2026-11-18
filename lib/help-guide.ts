@@ -262,7 +262,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "edit-menu",
     group: "menu",
     title: "Add a {item} or change a price",
-    steps: "Tap Add item for a new {item}, or Edit on a {item} to change its name, price, photo, description and category.",
+    steps: "Tap Add item for a new {item}, or Edit on a {item} to change its name, price, photos, description and category. An {item} can have up to 6 photos: the first is the cover, and buyers swipe through the rest when they open it.",
     nav: "menu",
     keywords: "item rate cost picture image dish product pack size unit description",
   },
@@ -289,6 +289,14 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     steps: "Tap Edit on a {item}, switch on Track stock and enter how many are in stock now. Each sale takes one off, and your online store stops taking orders at 0. Use − and + on the {item} when stock comes in or gets damaged, or Set count after a recount. An owner or manager can also tap Received stock to add a delivery in one go and note what each piece cost. Count everything you have, including any packed for orders not handed over yet: those orders are taken off for you.",
     nav: "menu",
     keywords: "stock inventory quantity count oversell low stock left warn",
+  },
+  {
+    id: "item-link",
+    group: "menu",
+    title: "Share a link to one {item}",
+    steps: "Once your store is published, each {item} shown online has Copy link for Instagram on the {catalogueTitle} screen. Paste it in a post, story or bio: it opens your store with that {item}'s photo, price and Add button. The WhatsApp button next to it sends the same link from your own WhatsApp.",
+    nav: "menu",
+    keywords: "share link instagram whatsapp product post story bio",
   },
   {
     id: "find-item",
@@ -484,7 +492,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     href: "/settings/voice",
     trail: ["Counter & voice"],
     ownerOnly: true,
-    keywords: "hindi english voice speech",
+    keywords: "hindi english kannada voice speech",
   },
   {
     id: "plan",

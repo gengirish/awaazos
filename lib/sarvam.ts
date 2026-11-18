@@ -32,6 +32,10 @@ export async function transcribeAudio(
   body.append("file", audio, "recording.webm");
   body.append("model", model);
   body.append("language_code", lang);
+  // Latin-script output ("eradu masala dosa"), which is what the menu, the
+  // parse prompts and the server-side name match are written in. The default
+  // mode returns native script. `mode` exists on saaras:v3 only.
+  if (model.startsWith("saaras:v3")) body.append("mode", "translit");
 
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), STT_TIMEOUT_MS);

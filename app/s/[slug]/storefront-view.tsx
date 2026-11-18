@@ -1,0 +1,1501 @@
+import type { FulfilmentMode } from "@prisma/client";
+import type { Metadata } from "next";
+import {
+  ArrowUp,
+  FileText,
+  CalendarClock,
+  Instagram,
+  LayoutDashboard,
+  MapPin,
+  Megaphone,
+  MessageCircle,
+  Package,
+  QrCode,
+  ShoppingBag,
+  Star,
+  Store,
+  Sparkles,
+  Truck,
+  UserRound,
+  UsersRound,
+  UtensilsCrossed,
+  Wallet,
+} from "lucide-react";
+import { headers } from "next/headers";
+import Image from "next/image";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import { cache } from "react";
+
+import { ItemPhoto } from "@/components/storefront/ItemPhoto";
+import { CartHubProvider } from "@/components/storefront/CartHub";
+import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
+import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
+import { ReadOnlyMenuRow } from "@/components/storefront/ReadOnlyMenuRow";
+import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
+import { RecentOrderLink } from "@/components/storefront/RecentOrderLink";
+import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
+import { StoreBackButton } from "@/components/storefront/StoreBackButton";
+import { StoreInstall } from "@/components/storefront/StoreInstall";
+import { StorePageRefresh } from "@/components/storefront/StorePageRefresh";
+import {
+  HideWhileSearching,
+  Searchable,
+  StoreSearchBar,
+  StoreSearchEmpty,
+  StoreSearchProvider,
+} from "@/components/storefront/StoreSearch";
+import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
+import { UpiQrImage } from "@/components/storefront/UpiQrImage";
+import { EmptyState } from "@/components/ui/empty-state";
+import { getIstTodayStart } from "@/lib/billing-period";
+import { formatINRCompact } from "@/lib/currency";
+import { foodImageFor } from "@/lib/food-images";
+import { getCurrentCustomer } from "@/lib/customer-auth";
+import { displayStoreName } from "@/lib/demo-store-schema";
+import { allowedFulfilmentTypes, effectiveDropStatus, remainingQty, soldQtyByDropItem } from "@/lib/drops";
+import { dropStateLabel } from "@/lib/drop-state";
+import { deliveryAreaSummary, parseDeliveryAreas, type DeliveryArea } from "@/lib/delivery-areas";
+import { menuSlotLabel, parseMenuSlots, upcomingMenuSlots } from "@/lib/menu-slots";
+import { formatDropDayLabel, formatWindowWithDay } from "@/lib/drops-time";
+import { instagramProfileUrl } from "@/lib/instagram";
+import { whatsappCommunityLabel, whatsappCommunityLink } from "@/lib/whatsapp-community";
+import { stockLeftByMenuItem, stockLeftByVariant, type TrackedItem } from "@/lib/inventory-server";
+import { MAX_ITEM_PHOTOS, photoUrls } from "@/lib/item-photos";
+import { allSizesSoldOut, variantPriceRange, variantPricePaise, type StoreSize } from "@/lib/item-variants";
+import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
+import { offersForItems, resolveOffers, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
+import { loadOfferRules, type OfferSource } from "@/lib/offers-server";
+import { orderChannelFor, parseOrderSrc } from "@/lib/order-channel";
+import { publicRatingText } from "@/lib/order-feedback";
+import { loadRatingSummary } from "@/lib/order-feedback-server";
+import { funnelSourceOf, isCountableStoreView } from "@/lib/order-funnel";
+import { prisma } from "@/lib/prisma";
+import {
+  buyerWhatsappNumber,
+  dropHasStock,
+  formatIstDeadline,
+  formatTimeLeft,
+  menuItemAnchor,
+  STOREFRONT_MENU_ITEM_WHERE,
+  storefrontDropVisibility,
+  storeWhatsappNumber,
+  whatsappChatLink,
+  type StorefrontDropVisibility,
+} from "@/lib/storefront-order";
+import { qrSvgDataUrl } from "@/lib/qr";
+import { stallTypeLabel } from "@/lib/stall-type";
+import { itemSearchText } from "@/lib/store-search";
+import { storeKind, storeVocabulary } from "@/lib/store-vocabulary";
+import { paymentFactText, storeInfoFacts, type StoreFactKind } from "@/lib/store-info";
+import { dropDetailFacts, menuDetailFacts } from "@/lib/item-detail";
+import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
+import { dropItemStock, stockBadgeText, storefrontStock, type StorefrontStock } from "@/lib/storefront-stock";
+import { viewerIsStoreStaff } from "@/lib/storefront-viewer";
+import { buildUpiCollectLink } from "@/lib/upi";
+import { storeBackgroundStyle } from "@/lib/store-background";
+import { storeThemeAttribute } from "@/lib/store-theme";
+import { countStoreView } from "@/lib/store-views";
+import { BRAND_NAME } from "@/lib/brand";
+
+// The routes that render this (page.tsx, p/[itemId]/page.tsx) set `dynamic = "force-dynamic"` and
+// `runtime = "nodejs"` themselves: route-segment config is read from the route file only.
+
+/**
+ * Public storefront — the only unauthenticated page that reads tenant data.
+ *
+ * Three rules hold this route together:
+ *
+ *   1. Opt-in only. `VendorSettings.publishStorefront` defaults to false, so a
+ *      menu and its prices go public exactly when the vendor says so.
+ *   2. A vendor who has not opted in is indistinguishable from one who does not
+ *      exist — both 404. Same reasoning as the cross-tenant 404 rule in
+ *      lib/rbac.ts: a 403 here would confirm the stall is on AwaazOS.
+ *   3. The `select` is an allowlist, never a spread. `Vendor.phone` and
+ *      `Vendor.email` are contact PII and must not reach a public page;
+ *      `upiId` is here only because collecting payment is the point.
+ *      Off VendorSettings, besides the publish gate itself, only: `theme`
+ *      (brand colour), `fssaiNumber` (food-safety licence, legally meant to be
+ *      displayed), `acceptPayOnDelivery` (whether to offer that option), and
+ *      the "Order from menu" switches: `acceptMenuOrders`, `menuFulfilmentMode`,
+ *      `menuDeliveryFeePaise`, `menuPickupNote` (rendered at checkout).
+ *
+ * Drops (daily pre-order menus) render above the regular menu. Only stored-OPEN
+ * drops from yesterday (IST) onward are read; the cut-off is evaluated here on
+ * every request (`effectiveDropStatus`), never by a timer — hence force-dynamic,
+ * and stock counts are recomputed per render. The order write path is
+ * app/api/s/[slug]/orders, held to the same gate.
+ *
+ * "Order from menu" (`acceptMenuOrders`): the everyday menu becomes orderable
+ * (MenuOrder: steppers, cart, checkout) via app/api/s/[slug]/menu-orders, held
+ * to the same gate. Off, the menu stays read-only with the generic UPI QR.
+ *
+ * Everyday menu visibility: only `isAvailable && showOnline` items are read
+ * (`showOnline = false` keeps an item on the counter POS only). While a drop is
+ * taking orders with `showEverydayMenu = false`, the whole everyday menu —
+ * rows, category pills, "Order now", the menu cart — is left out and only the
+ * drop(s) show (`everydayMenuHiddenByDrop` in lib/menu-orders.ts — the same check
+ * placeMenuOrder uses to refuse with `menu_paused_for_drop`).
+ *
+ * The open-amount "Scan to pay" QR shows only with a read-only menu. With a
+ * cart (menu ordering) or a drop holding the page, checkout gives the buyer an
+ * exact UPI amount and no second, open-amount QR is shown. With no items and no
+ * drops there is nothing to pay for: "Orders will open soon" replaces it.
+ *
+ * Offers (lib/offers.ts): each orderable section gets the offers live on it,
+ * resolved on the server to the item ids that section already shows plus the
+ * offer's name, description and numbers. Raw tags and the rest of the Offer row
+ * stay on the server; the browser only previews, the order routes price.
+ *
+ * Optional buyer sign-in (lib/customer-auth.ts): the `awz_cust` session, when
+ * present, only adds a header link and checkout prefill from the buyer's OWN
+ * Customer row. It never widens the vendor `select` above. Guests see the
+ * page exactly as before, plus a "Sign in" link. Signing out lives on the
+ * account page only, so the pill row fits a 360 px phone.
+ *
+ * `RecentOrderLink` (client, device-local) adds "Your recent order" to that
+ * pill row for a buyer who ordered from this device; nothing about it is read
+ * or rendered on the server. `StoreBackButton` adds Back when the tab has
+ * history.
+ *
+ * Staff viewing their own store (lib/storefront-viewer.ts): a signed-in
+ * AwaazOS user who is active staff of this vendor gets "Dashboard" (→ /home)
+ * in place of the buyer pill. Only a boolean comes back; nothing else about
+ * the user reaches the page.
+ *
+ * Product stock (lib/inventory.ts, lib/storefront-stock.ts): for the tracked
+ * items on the page (everyday rows, drop items, a menu offer's gift) one
+ * `stockLeftByMenuItem` read gives units left. Only `StorefrontStock`
+ * ("Sold out", "Only N left" at the low-stock line, the stepper's ceiling)
+ * reaches the browser; `stockQty`, `stockCountedAt` and `lowStockAt` stay
+ * here. A drop item's `remaining` becomes the smaller of its cap and stock.
+ *
+ * Header order: name → type · place → "About this store" facts (handover for
+ * the everyday menu, payment, FSSAI licence; lib/store-info.ts) → contact
+ * links → one call to action. The sticky bar under it starts with "Top".
+ */
+
+type StorefrontVendor = NonNullable<Awaited<ReturnType<typeof loadStorefront>>>;
+
+/**
+ * Top padding under a banner. On a phone the name sits beside the logo, so both
+ * start below the banner: banner height (112 px) − pill row above (56 px) + 12 px.
+ * From `sm` the 88 px logo straddles the bottom edge: 224 − 56 − half the logo.
+ */
+const BANNER_LOGO_OFFSET = "pt-[68px] sm:pt-[124px]";
+
+/** Header contact pills (WhatsApp chat, WhatsApp group / channel, Instagram profile). */
+const CONTACT_LINK =
+  "inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background px-4 text-sm font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
+
+/** Header pill-row pills (Back, Share, Sign in / My orders / Dashboard). */
+const PILL =
+  "inline-flex min-h-11 min-w-0 max-w-full items-center gap-1.5 rounded-full border border-border/70 bg-background/90 px-3.5 text-xs font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2";
+
+const FACT_ICON: Record<StoreFactKind, typeof Store> = {
+  pickup: Store,
+  delivery: Truck,
+  payment: Wallet,
+  // Not a tick: the number is checked for shape only, never verified with FSSAI.
+  fssai: FileText,
+  rating: Star,
+};
+
+/**
+ * Deduped across generateMetadata() and the page render — React `cache` keeps
+ * this to a single query per request.
+ */
+/** Photos after the cover for the detail sheet; none without a seller's cover (lib/item-photos.ts rule 3). */
+function morePhotosOf(cover: string | null, images: { url: string }[]): string[] {
+  return photoUrls(cover, images.map((p) => p.url)).slice(1);
+}
+
+export const loadStorefront = cache(async (slug: string) => {
+  const yesterday = new Date(getIstTodayStart().getTime() - 24 * 60 * 60 * 1000);
+  return prisma.vendor.findFirst({
+    where: {
+      slug,
+      isActive: true,
+      settings: { is: { publishStorefront: true } },
+    },
+    select: {
+      id: true, // tenant key for server-side checks only; never rendered
+      slug: true,
+      name: true,
+      isDemo: true,
+      city: true,
+      state: true,
+      stallType: true,
+      stallTypeOther: true, // the seller's own words for "Other"; shown as the store type
+      logoUrl: true,
+      bannerUrl: true,
+      backgroundUrl: true,
+      upiId: true,
+      upiName: true,
+      plan: true, // these three and the Razorpay columns only decide `payment.online`; only that boolean leaves the server
+      planExpiresAt: true,
+      trialEndsAt: true,
+      settings: {
+        select: {
+          ...RAZORPAY_CRED_SELECT,
+          theme: true,
+          tagline: true,
+          fssaiNumber: true,
+          acceptPayOnDelivery: true,
+          acceptMenuOrders: true,
+          whatsappNumber: true, // rendered only through storeWhatsappNumber(); else a boolean
+          acceptWhatsappOrders: true,
+          showWhatsappOnStore: true,
+          instagramHandle: true,
+          whatsappCommunityUrl: true,
+          menuFulfilmentMode: true,
+          menuDeliveryFeePaise: true,
+          menuPickupNote: true,
+          menuSlots: true,
+          deliveryAreas: true,
+        },
+      },
+      drops: {
+        where: { status: "OPEN", date: { gte: yesterday } },
+        orderBy: [{ date: "asc" }, { closesAt: "asc" }],
+        take: 10,
+        select: {
+          id: true,
+          title: true,
+          note: true,
+          date: true,
+          status: true,
+          opensAt: true,
+          closesAt: true,
+          fulfilmentMode: true,
+          fulfilmentStartsAt: true,
+          fulfilmentEndsAt: true,
+          pickupNote: true,
+          deliveryFeePaise: true,
+          showEverydayMenu: true,
+          items: {
+            orderBy: [{ sortOrder: "asc" }],
+            select: {
+              id: true,
+              priceInPaise: true,
+              maxQty: true,
+              perOrderLimit: true,
+              menuItemId: true,
+              menuItem: {
+                select: {
+                  name: true,
+                  emoji: true,
+                  imageUrl: true,
+                  // Extra photos after the cover (lib/item-photos.ts), shown in the detail sheet.
+                  images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], take: MAX_ITEM_PHOTOS - 1, select: { url: true } },
+                  description: true,
+                  // Stock (lib/inventory.ts): server-side only, reduced to `remaining` / `onlyLeft`.
+                  stockQty: true,
+                  stockCountedAt: true,
+                  lowStockAt: true,
+                  // Sizes / colours (lib/item-variants.ts rule 7), priced from the drop.
+                  variants: {
+                    orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+                    select: {
+                      id: true,
+                      label: true,
+                      priceInPaise: true,
+                      isAvailable: true,
+                      stockQty: true,
+                      stockCountedAt: true,
+                      lowStockAt: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+      menuItems: {
+        where: STOREFRONT_MENU_ITEM_WHERE,
+        orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
+        select: {
+          id: true,
+          name: true,
+          emoji: true,
+          category: true,
+          priceInPaise: true,
+          unit: true,
+          isPopular: true,
+          imageUrl: true,
+          // Extra photos after the cover (lib/item-photos.ts), shown in the detail sheet.
+          images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], take: MAX_ITEM_PHOTOS - 1, select: { url: true } },
+          description: true,
+          // Stock (lib/inventory.ts): server-side only, reduced to `StorefrontStock` per item.
+          stockQty: true,
+          stockCountedAt: true,
+          lowStockAt: true,
+          // Sizes / colours (lib/item-variants.ts); their stock is reduced the same way.
+          variants: {
+            orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
+            select: {
+              id: true,
+              label: true,
+              priceInPaise: true,
+              isAvailable: true,
+              stockQty: true,
+              stockCountedAt: true,
+              lowStockAt: true,
+            },
+          },
+        },
+      },
+    },
+  });
+});
+
+export async function storefrontMetadata(slug: string): Promise<Metadata> {
+  const vendor = await loadStorefront(slug);
+  if (!vendor) return { title: `Not found — ${BRAND_NAME}` };
+
+  const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
+  const title = `${displayStoreName(vendor)} — Online store`;
+  const where = place ? `${vendor.name}, ${place}` : vendor.name;
+  const menuHidden = await everydayMenuHiddenByDrop(prisma, vendor.id);
+  const ordering = !menuHidden && (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0;
+  const tagline = vendor.settings?.tagline ?? null;
+  const description = tagline
+    ? `${tagline} · ${where}`
+    : menuHidden
+    ? `Pre-order today's special from ${where}. Pay by UPI.`
+    : ordering
+      ? `Order online from ${where}. ${menuFulfilmentPhrase(vendor.settings?.menuFulfilmentMode ?? "PICKUP")}, pay by UPI.`
+      : `Items and prices for ${where}. Pay by UPI.`;
+
+  return {
+    title,
+    description,
+    openGraph: { title, description, type: "website" },
+    // Demo stores (lib/demo-store.ts) stay out of search results.
+    ...(vendor.isDemo ? { robots: { index: false, follow: false } } : {}),
+  };
+}
+
+/** "Pickup" / "Delivery" / "Pickup or delivery" — mirrors the OG card's line. */
+function menuFulfilmentPhrase(mode: FulfilmentMode): string {
+  return mode === "BOTH" ? "Pickup or delivery" : mode === "DELIVERY" ? "Delivery" : "Pickup";
+}
+
+
+/** Everyday rows as rendered: the stock columns never reach a row (see loadItemStock). */
+type StorefrontItems = (Omit<
+  StorefrontVendor["menuItems"][number],
+  "stockQty" | "stockCountedAt" | "lowStockAt" | "variants" | "images"
+> & { morePhotos: string[] })[];
+
+/** Preserves the query ordering; no re-sort. */
+function groupByCategory(items: StorefrontItems): [string, StorefrontItems][] {
+  const groups = new Map<string, StorefrontItems>();
+  for (const item of items) {
+    const bucket = groups.get(item.category);
+    if (bucket) bucket.push(item);
+    else groups.set(item.category, [item]);
+  }
+  return Array.from(groups.entries());
+}
+
+/**
+ * What the search bar matches for an everyday-menu row: name, description and
+ * category. No aliases: the index goes to every visitor (lib/store-search.ts).
+ */
+function menuItemSearchText(item: { name: string; description?: string | null }, category: string): string {
+  return itemSearchText({ name: item.name, description: item.description }, category);
+}
+
+/** A drop row: its name, description and the drop's title ("Saturday bakes"). */
+function dropItemSearchText(item: { name: string; description?: string | null }, dropTitle: string): string {
+  return itemSearchText({ name: item.name, description: item.description }, dropTitle);
+}
+
+/** Category names are vendor-authored free text; anchors must survive spaces and `&`. */
+function categoryAnchor(category: string, index: number): string {
+  const slug = category
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  return `cat-${slug || "items"}-${index}`;
+}
+
+/** Units left and the low-stock line of one tracked item. */
+type ItemStock = { left: number; lowStockAt: number | null };
+
+type StockRow = TrackedItem & { lowStockAt: number | null };
+
+/**
+ * Stock left for the tracked items among `rows`, plus `giftIds` (a menu
+ * offer's gift may be an item the page doesn't list). One grouped
+ * `stockLeftByMenuItem` read; nothing at all when nothing is tracked.
+ */
+async function loadItemStock(
+  vendorId: string,
+  rows: StockRow[],
+  giftIds: string[],
+  now: Date,
+): Promise<Map<string, ItemStock>> {
+  const byId = new Map<string, StockRow>();
+  for (const r of rows) if (r.stockQty !== null) byId.set(r.id, r);
+  const known = new Set(rows.map((r) => r.id));
+  const missingGifts = Array.from(new Set(giftIds.filter((id) => !known.has(id))));
+  if (missingGifts.length > 0) {
+    const gifts = await prisma.menuItem.findMany({
+      where: { vendorId, id: { in: missingGifts }, stockQty: { not: null } },
+      select: { id: true, stockQty: true, stockCountedAt: true, lowStockAt: true },
+    });
+    for (const g of gifts) byId.set(g.id, g);
+  }
+  const out = new Map<string, ItemStock>();
+  if (byId.size === 0) return out;
+  const left = await stockLeftByMenuItem(prisma, vendorId, Array.from(byId.values()), now);
+  for (const [id, l] of left) out.set(id, { left: l, lowStockAt: byId.get(id)?.lowStockAt ?? null });
+  return out;
+}
+
+/**
+ * Each item's sizes / colours as buyers see them (lib/item-variants.ts): the
+ * available ones, priced, with buyer-facing stock from one grouped
+ * `stockLeftByVariant` read (none when no variant is tracked). Items without
+ * variants are absent.
+ */
+async function loadStoreSizes(
+  vendorId: string,
+  items: readonly Pick<StorefrontVendor["menuItems"][number], "id" | "priceInPaise" | "variants">[],
+  now: Date,
+): Promise<Map<string, StoreSize[]>> {
+  const out = new Map<string, StoreSize[]>();
+  const offered = items.flatMap((i) => i.variants.filter((v) => v.isAvailable));
+  const left = await stockLeftByVariant(
+    prisma,
+    vendorId,
+    offered.filter((v) => v.stockQty !== null),
+    now,
+  );
+  for (const item of items) {
+    if (item.variants.length === 0) continue;
+    out.set(
+      item.id,
+      item.variants
+        .filter((v) => v.isAvailable)
+        .map((v) => {
+          const l = left.get(v.id);
+          return {
+            id: v.id,
+            label: v.label,
+            priceInPaise: variantPricePaise(item.priceInPaise, v),
+            stock: l === undefined ? null : storefrontStock(l, v.lowStockAt),
+          };
+        }),
+    );
+  }
+  return out;
+}
+
+/** How a store lists its items: rows for a kitchen, a photo gallery for goods. */
+type CatalogueLayout = "list" | "gallery";
+
+/** The `<ul>` of one category, per layout. */
+const CATEGORY_LIST_CLASS: Record<CatalogueLayout, string> = {
+  list: "divide-y divide-border/50 overflow-hidden rounded-2xl border border-border/60 bg-background shadow-xs",
+  gallery: "grid grid-cols-2 gap-3 sm:grid-cols-3",
+};
+
+type StorefrontDrop = StorefrontVendor["drops"][number];
+
+type DropView = {
+  drop: StorefrontDrop;
+  visibility: Exclude<StorefrontDropVisibility, "hidden">;
+  items: DropOrderItem[];
+  /** Open, but every item is sold out — nothing left to pre-order. */
+  soldOut: boolean;
+  /** Offers a buyer can earn on this drop right now. */
+  offers: ResolvedOffer[];
+};
+
+/**
+ * Effective status + live stock per drop. Sold counts are queried only for
+ * orderable drops; `soldQtyByDropItem` filters by dropId, and every drop here
+ * already came through the vendor-scoped, publish-gated query above.
+ *
+ * `menuAnchorFor` returns the everyday-menu row id for items the buyer can
+ * order there too (null when menu ordering is off), so a sold-out pre-order
+ * item can point at it.
+ */
+async function buildDropViews(
+  drops: StorefrontDrop[],
+  now: Date,
+  menuAnchorFor: (menuItemId: string) => string | null,
+  offerSource: OfferSource,
+  /** Dish drawings only for a food store (lib/store-vocabulary.ts `foodArt`). */
+  foodArt: boolean,
+  /** Product stock of tracked items (lib/inventory.ts rule 6 caps a drop item by it). */
+  stock: ReadonlyMap<string, ItemStock>,
+  /** Sizes of each drop item's product, keyed by drop item id (lib/item-variants.ts rule 7). */
+  sizesByDropItem: ReadonlyMap<string, StoreSize[]>,
+): Promise<DropView[]> {
+  const visible = drops
+    .map((drop) => ({
+      drop,
+      visibility: storefrontDropVisibility(effectiveDropStatus(drop, now), drop.closesAt, now),
+    }))
+    .filter(
+      (d): d is { drop: StorefrontDrop; visibility: DropView["visibility"] } => d.visibility !== "hidden",
+    );
+
+  return Promise.all(
+    visible.map(async ({ drop, visibility }) => {
+      const sold =
+        visibility === "open" ? await soldQtyByDropItem(prisma, drop.id, now) : new Map<string, number>();
+      const items: DropOrderItem[] = drop.items.map((i) => {
+        const sizes = sizesByDropItem.get(i.id);
+        const dropRemaining = remainingQty(i.maxQty, sold.get(i.id) ?? 0);
+        return {
+        // An item with sizes keeps no stock of its own: the drop's cap covers all
+        // its sizes, each size carries its own badge, and none left reads sold out.
+        ...(sizes
+          ? { remaining: allSizesSoldOut(sizes) ? 0 : dropRemaining, sizes }
+          : dropItemStock(
+              dropRemaining,
+              stock.get(i.menuItemId)?.left ?? null,
+              stock.get(i.menuItemId)?.lowStockAt ?? null,
+            )),
+        id: i.id,
+        menuItemId: i.menuItemId,
+        name: i.menuItem.name,
+        emoji: i.menuItem.emoji,
+        // The seller's photo, else (food stores) a drawing of the dish (lib/food-images.ts), else the emoji.
+        imageUrl: i.menuItem.imageUrl ?? (foodArt ? foodImageFor(i.menuItem.name) : null),
+        morePhotos: morePhotosOf(i.menuItem.imageUrl, i.menuItem.images),
+        description: i.menuItem.description,
+        priceInPaise: i.priceInPaise,
+        perOrderLimit: i.perOrderLimit,
+        menuAnchor: menuAnchorFor(i.menuItemId),
+        };
+      });
+      const soldOut = visibility === "open" && !dropHasStock(items);
+      const offers =
+        visibility === "open" && !soldOut
+          ? withGiftsThatFit(
+              offersForItems(
+                resolveOffers(offerSource.rules, offerSource.menuItems, { channel: "DROP", dropId: drop.id, now }),
+                drop.items.map((i) => i.menuItemId),
+              ),
+              // A drop's gift is one of its own items, with stock left, and no sizes
+              // yet (lib/item-variants.ts rule 5; placeStorefrontOrder skips it too).
+              (menuItemId, qty) =>
+                items.some(
+                  (i) => i.menuItemId === menuItemId && !i.sizes && (i.remaining === null || i.remaining >= qty),
+                ),
+            )
+          : [];
+      return { drop, visibility, items, soldOut, offers };
+    }),
+  );
+}
+
+function DropSection({
+  view,
+  slug,
+  storeName,
+  payment,
+  whatsapp,
+  now,
+  prefill,
+  menuOrdering,
+  theme,
+  notesExample,
+  deliveryAreas,
+  openDropItemId,
+}: {
+  view: DropView;
+  slug: string;
+  storeName: string;
+  payment: { upi: boolean; cod: boolean; online: boolean };
+  whatsapp: boolean;
+  now: Date;
+  prefill: BuyerPrefill | null;
+  /** Everyday menu is orderable — a sold-out drop points buyers at it. */
+  menuOrdering: boolean;
+  theme: string | undefined;
+  notesExample: string;
+  /** The store's delivery areas (lib/delivery-areas.ts); empty = anywhere. */
+  deliveryAreas: DeliveryArea[];
+  /** This drop's row a product link opened (`resolveOpenItem`); null = none. */
+  openDropItemId: string | null;
+}) {
+  const { drop, visibility, soldOut } = view;
+  const headingId = `drop-${drop.id}`;
+  const types = allowedFulfilmentTypes(drop.fulfilmentMode);
+  const orderable = visibility === "open" && !soldOut;
+  const timeLeft = orderable ? formatTimeLeft(drop.closesAt, now) : null;
+  const handoverWindow = formatWindowWithDay(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt, now);
+  const handoverKind =
+    types.includes("DELIVERY") && types.includes("PICKUP")
+      ? "Delivery or pickup"
+      : types.includes("DELIVERY")
+        ? "Delivery"
+        : "Pickup";
+
+  // Not open yet: a slim teaser (what, when it opens, when it's handed over), no item list to scroll past.
+  if (visibility === "scheduled") {
+    const names = view.items.map((i) => i.name);
+    return (
+      <section
+        aria-labelledby={headingId}
+        className="rounded-3xl border border-dashed border-primary/40 bg-background px-4 py-4 shadow-xs sm:p-5"
+      >
+        <p className="text-sm font-bold uppercase tracking-wide text-primary">Coming up</p>
+        <h3 id={headingId} className="mt-1 font-display text-xl font-bold leading-tight text-awaaz-charcoal">
+          {drop.title} {drop.opensAt ? (
+            <span className="font-semibold text-primary">— opens {formatIstDeadline(drop.opensAt, now)}</span>
+          ) : null}
+        </h3>
+        <p className="mt-1 flex items-start gap-2 text-sm text-muted-foreground">
+          <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span>
+            {handoverKind} · {handoverWindow}
+          </span>
+        </p>
+        {names.length > 0 ? (
+          <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+            {names.slice(0, 3).join(", ")}
+            {names.length > 3 ? ` +${names.length - 3} more` : ""}
+          </p>
+        ) : null}
+      </section>
+    );
+  }
+
+  return (
+    <section
+      aria-labelledby={headingId}
+      className="rounded-3xl border border-primary/25 bg-linear-to-b from-primary/8 to-background px-3 py-4 shadow-xs sm:p-5"
+    >
+      <p className="text-xs font-bold uppercase tracking-wide text-primary">
+        Pre-order · {formatDropDayLabel(drop.date)}
+      </p>
+      <h3 id={headingId} className="mt-1 font-display text-2xl font-bold leading-tight text-awaaz-charcoal">
+        {drop.title}
+      </h3>
+      {drop.note ? <p className="mt-1 text-sm text-muted-foreground">{drop.note}</p> : null}
+
+      <ul className="mt-3 space-y-1.5 text-sm">
+        <li className="flex items-start gap-2">
+          <CalendarClock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+          <span>
+            {handoverKind} · {handoverWindow}
+          </span>
+        </li>
+        {types.includes("DELIVERY") ? (
+          <li className="flex items-start gap-2">
+            <Truck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>
+              {deliveryAreaSummary(deliveryAreas, drop.deliveryFeePaise) ??
+                (drop.deliveryFeePaise > 0
+                  ? `Delivery fee ${formatINRCompact(drop.deliveryFeePaise)}`
+                  : "Free delivery")}
+            </span>
+          </li>
+        ) : null}
+        {types.includes("PICKUP") && drop.pickupNote ? (
+          <li className="flex items-start gap-2">
+            <MapPin className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+            <span>Pickup: {drop.pickupNote}</span>
+          </li>
+        ) : null}
+      </ul>
+
+      <p
+        className={
+          orderable
+            ? "mt-3 inline-flex flex-wrap items-center gap-x-2 rounded-full bg-primary px-3 py-1 text-sm font-bold text-primary-foreground"
+            : "mt-3 inline-flex rounded-full bg-muted px-3 py-1 text-sm font-bold text-muted-foreground"
+        }
+      >
+        {orderable ? (
+          <>
+            <span>Order by {formatIstDeadline(drop.closesAt, now)}</span>
+            {timeLeft ? <span className="font-semibold opacity-90">· {timeLeft}</span> : null}
+          </>
+        ) : (
+          // Sold out, or past its cut-off: always with the reason (lib/drop-state.ts).
+          dropStateLabel(drop, now, { soldOut, viewer: "buyer" })
+        )}
+      </p>
+
+      {soldOut ? (
+        <p className="mt-2 text-sm text-muted-foreground">
+          Everything in this batch has been ordered.
+          {menuOrdering ? (
+            <>
+              {" "}
+              <a
+                href="#menu-order"
+                className="font-semibold text-primary underline underline-offset-2 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
+                Order from everyday items
+              </a>
+            </>
+          ) : null}
+        </p>
+      ) : null}
+
+      <div className="mt-4">
+        <DropOrder
+          slug={slug}
+          dropId={drop.id}
+          dropTitle={drop.title}
+          storeName={storeName}
+          items={view.items}
+          orderable={orderable}
+          fulfilmentTypes={types}
+          deliveryFeePaise={drop.deliveryFeePaise}
+          deliveryAreas={deliveryAreas}
+          pickupNote={drop.pickupNote}
+          pickupWindow={handoverWindow}
+          payment={payment}
+          whatsapp={whatsapp}
+          prefill={prefill}
+          theme={theme}
+          notesExample={notesExample}
+          offers={view.offers}
+          initialDetailId={openDropItemId}
+          facts={dropDetailFacts({
+            handoverText: `${handoverKind} · ${handoverWindow}`,
+            deadlineText: orderable ? `Order by ${formatIstDeadline(drop.closesAt, now)}` : null,
+            delivery: types.includes("DELIVERY"),
+            pickupNote: types.includes("PICKUP") ? drop.pickupNote : null,
+            deliveryAreas,
+            deliveryFeePaise: drop.deliveryFeePaise,
+            paymentText: paymentFactText(payment),
+          })}
+        />
+      </div>
+    </section>
+  );
+}
+
+export async function StorefrontView(props: {
+  slug: string;
+  searchParams: Promise<{ src?: string | string[] }>;
+  /** `/s/<slug>/p/<menuItemId>`: the item whose detail sheet opens on load (docs/PRODUCT_PAGE_PLAN.md step 2). */
+  openItemId?: string;
+}) {
+  const vendor = await loadStorefront(props.slug);
+  if (!vendor) notFound();
+
+  const now = new Date();
+  // An open drop with showEverydayMenu=false takes over the page: no menu rows,
+  // pills, counts, "Order now" or menu cart — exactly as if the menu were empty.
+  // Same server check placeMenuOrder uses, so the page and checkout always agree.
+  const menuHidden = await everydayMenuHiddenByDrop(prisma, vendor.id, now);
+  // In a food store, items without a photo get a drawing of the dish when one
+  // matches (lib/food-images.ts); display only, nothing is stored. Any other
+  // store keeps the emoji: "Tulsi Tea" is a product, not a cup of chai.
+  const { foodArt, orderNoteExample } = storeVocabulary(vendor.stallType);
+  // Stock columns stay out of the rows (see loadItemStock below).
+  const menuItems = (menuHidden ? [] : vendor.menuItems).map(
+    ({ stockQty: _q, stockCountedAt: _c, lowStockAt: _l, variants: _v, images, ...item }) => ({
+      ...item,
+      imageUrl: item.imageUrl ?? (foodArt ? foodImageFor(item.name, item.category) : null),
+      morePhotos: morePhotosOf(item.imageUrl, images),
+    }),
+  );
+  const categories = groupByCategory(menuItems);
+  const popular = menuItems.filter((i) => i.isPopular).slice(0, 6);
+  const payeeName = vendor.upiName ?? vendor.name;
+  const upiLink = vendor.upiId
+    ? buildUpiCollectLink({ upiId: vendor.upiId, name: payeeName })
+    : null;
+  const place = [vendor.city, vendor.state].filter(Boolean).join(", ");
+  const theme = storeThemeAttribute(vendor.settings?.theme);
+  const tagline = vendor.settings?.tagline ?? null;
+  // A kitchen reads as a menu (rows); anything else as a gallery of its products.
+  const layout: CatalogueLayout = storeKind(vendor.stallType) === "goods" ? "gallery" : "list";
+
+  const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
+  const menuTypes = allowedFulfilmentTypes(vendor.settings?.menuFulfilmentMode ?? "PICKUP");
+  // "When": the store's weekly slots for menu orders, and the first one open now.
+  const deliveryAreas = parseDeliveryAreas(vendor.settings?.deliveryAreas);
+  const menuSlotRules = menuOrdering ? parseMenuSlots(vendor.settings?.menuSlots) : [];
+  const nextMenuSlot = upcomingMenuSlots(menuSlotRules, now)[0] ?? null;
+  // The open-amount "Scan to pay" QR, only for a read-only menu (see #pay below).
+  // Rendered here, not by a third-party image URL: no network hop for the buyer,
+  // and the payee VPA never leaves our server.
+  // Needs items on the page: with nothing to buy there is nothing to pay for.
+  const showOpenAmountQr = !!upiLink && !menuOrdering && !menuHidden && categories.length > 0;
+  const qrLarge = upiLink && showOpenAmountQr ? await qrSvgDataUrl(upiLink, 220) : "";
+  // Everyday-menu rows only take orders (and carry row ids) with menu ordering on.
+  const orderableMenuIds = new Set(menuOrdering ? menuItems.map((i) => i.id) : []);
+  // One read covers both channels; a store with nothing orderable skips it.
+  const offerSource: OfferSource =
+    menuOrdering || vendor.drops.length > 0
+      ? await loadOfferRules(prisma, vendor.id, ["MENU", "DROP"])
+      : { rules: [], menuItems: [] };
+  // Product stock for every tracked item the page can sell (one read; none when nothing is tracked).
+  const giftIds = offerSource.rules.flatMap((r) => (r.discountType === "FREE_ITEM" && r.freeItemId ? [r.freeItemId] : []));
+  const [itemStock, storeSizes, sizedGifts] = await Promise.all([
+    loadItemStock(
+      vendor.id,
+      [
+        ...(menuHidden ? [] : vendor.menuItems),
+        ...vendor.drops.flatMap((d) => d.items.map((i) => ({ ...i.menuItem, id: i.menuItemId }))),
+      ],
+      giftIds,
+      now,
+    ),
+    // Menu items are keyed by their id, drop items by the drop item's id (priced from the drop).
+    loadStoreSizes(
+      vendor.id,
+      [
+        ...(menuHidden ? [] : vendor.menuItems),
+        ...vendor.drops.flatMap((d) =>
+          d.items.map((i) => ({ id: i.id, priceInPaise: i.priceInPaise, variants: i.menuItem.variants })),
+        ),
+      ],
+      now,
+    ),
+    // No gift with sizes yet (lib/item-variants.ts rule 5): placeMenuOrder skips that offer too.
+    giftIds.length === 0
+      ? Promise.resolve(new Set<string>())
+      : prisma.itemVariant
+          .findMany({ where: { vendorId: vendor.id, menuItemId: { in: giftIds } }, select: { menuItemId: true } })
+          .then((rows) => new Set(rows.map((r) => r.menuItemId))),
+  ]);
+  const stockOf = (menuItemId: string): StorefrontStock | null => {
+    // An item with sizes has no stock of its own: each size carries its badge,
+    // and the item reads "Sold out" only when none can be bought.
+    const sizes = storeSizes.get(menuItemId);
+    if (sizes) return allSizesSoldOut(sizes) ? { soldOut: true, onlyLeft: null, maxQty: 0 } : null;
+    const s = itemStock.get(menuItemId);
+    return s ? storefrontStock(s.left, s.lowStockAt) : null;
+  };
+  const menuOffers = menuOrdering
+    ? withGiftsThatFit(
+        offersForItems(
+          resolveOffers(offerSource.rules, offerSource.menuItems, { channel: "MENU", now }),
+          orderableMenuIds,
+        ),
+        // A sold-out gift can't be handed out: the order route would refuse it.
+        (menuItemId, qty) => {
+          if (sizedGifts.has(menuItemId)) return false;
+          const s = itemStock.get(menuItemId);
+          return !s || s.left >= qty;
+        },
+      )
+    : [];
+  const [dropViews, customer, isStaff, ratings] = await Promise.all([
+    buildDropViews(
+      vendor.drops,
+      now,
+      (id) => (orderableMenuIds.has(id) ? menuItemAnchor(id) : null),
+      offerSource,
+      foodArt,
+      itemStock,
+      storeSizes,
+    ),
+    getCurrentCustomer(),
+    viewerIsStoreStaff(vendor.id),
+    vendor.isDemo ? null : loadRatingSummary(vendor.id),
+  ]);
+  // A buyer arriving, for the order leak map on /admin/metrics (lib/store-views.ts):
+  // counted in Upstash in the background, never for demo stores or the store's own staff.
+  if (!vendor.isDemo && !isStaff) {
+    const requestHeaders = await headers();
+    if (isCountableStoreView(requestHeaders)) {
+      const { src } = await props.searchParams;
+      const channel = orderChannelFor({
+        src: parseOrderSrc(Array.isArray(src) ? src[0] : src),
+        userAgent: requestHeaders.get("user-agent"),
+      });
+      countStoreView(vendor.id, funnelSourceOf(channel), now);
+    }
+  }
+  const prefill: BuyerPrefill | null = customer
+    ? {
+        name: customer.name,
+        phone: customer.phone,
+        address: customer.savedAddress,
+        locality: customer.savedLocality,
+        landmark: customer.savedLandmark,
+        pincode: customer.savedPincode,
+      }
+    : null;
+  // The drop a buyer has least time left to order from drives the header CTA.
+  // The sticky category bar (Top, Pre-order, categories, search, Share).
+  const hasJumpBar = categories.length + dropViews.length > 0;
+  const nextClosing = dropViews
+    .filter((d) => d.visibility === "open" && !d.soldOut)
+    .reduce<Date | null>((min, d) => (!min || d.drop.closesAt < min ? d.drop.closesAt : min), null);
+  // `upi` is "can pay now" (paymentMethod UPI): direct to the UPI ID, or through Razorpay, which needs no UPI ID.
+  const online = isOnlinePaymentEnabled(vendor, vendor.settings);
+  const payment = {
+    upi: !!vendor.upiId || online,
+    online,
+    cod: vendor.settings?.acceptPayOnDelivery ?? false,
+  };
+  // Opted in with a usable number → checkout also offers "Also send my order to the store on WhatsApp". Only the boolean reaches the client.
+  const whatsapp = buyerWhatsappNumber(vendor.settings) !== null;
+  // Header contact links. WhatsApp has its own opt-in (every visitor sees it, not only buyers).
+  const storeWhatsapp = storeWhatsappNumber(vendor.settings);
+  const whatsappLink = storeWhatsapp
+    ? whatsappChatLink(storeWhatsapp, `Hi ${vendor.name}, I saw your store and have a question.`)
+    : null;
+  const facts = storeInfoFacts({
+    menuOrdering,
+    fulfilmentMode: vendor.settings?.menuFulfilmentMode ?? "PICKUP",
+    deliveryFeePaise: vendor.settings?.menuDeliveryFeePaise ?? 0,
+    hasDrops: dropViews.length > 0,
+    upi: payment.upi,
+    cod: payment.cod,
+    online: payment.online,
+    fssaiNumber: vendor.settings?.fssaiNumber ?? null,
+    ratingText: ratings ? publicRatingText(ratings) : null,
+  });
+  const instagramHandle = vendor.settings?.instagramHandle ?? null;
+  const instagramLink = instagramProfileUrl(instagramHandle);
+  const community = whatsappCommunityLink(vendor.settings?.whatsappCommunityUrl);
+  // Everything the search bar can find: one text per row, as the rows match it.
+  const searchIndex = [
+    ...dropViews.flatMap((view) => view.items.map((item) => dropItemSearchText(item, view.drop.title))),
+    ...categories.flatMap(([category, items]) => items.map((item) => menuItemSearchText(item, category))),
+  ];
+  // A product link (/s/<slug>/p/<id>) opens one row's detail sheet, found only among what this page shows.
+  const openTarget = resolveOpenItem(props.openItemId ?? null, dropViews, categories);
+  const menuCategories: MenuOrderCategory[] = categories.map(([category, items], i) => ({
+    category,
+    anchor: categoryAnchor(category, i),
+    items: items.map((item) => ({
+      id: item.id,
+      name: item.name,
+      emoji: item.emoji,
+      imageUrl: item.imageUrl,
+      morePhotos: item.morePhotos,
+      priceInPaise: item.priceInPaise,
+      unit: item.unit,
+      isPopular: item.isPopular,
+      description: item.description,
+      stock: stockOf(item.id),
+      sizes: storeSizes.get(item.id),
+    })),
+  }));
+
+  return (
+    <div
+      id="store-top"
+      data-theme={theme}
+      className="min-h-screen bg-awaaz-cream/40"
+      style={storeBackgroundStyle(vendor.backgroundUrl)}
+    >
+      <StorePageRefresh />
+      <a
+        href="#menu"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-50 focus:rounded-md focus:bg-primary focus:px-4 focus:py-3 focus:text-sm focus:font-semibold focus:text-primary-foreground"
+      >
+        Skip to items
+      </a>
+
+      {vendor.isDemo ? (
+        <p className="relative z-10 bg-awaaz-charcoal px-4 py-2 text-center text-xs font-medium text-white">
+          This is a demo store. Orders placed here are samples and no payment is taken.
+        </p>
+      ) : null}
+
+      {/* Brand band. The vendor's theme colour is the only thing that differs
+          between one storefront and the next, so it carries the whole identity. */}
+      <header className="relative overflow-hidden border-b border-border/50 bg-linear-to-b from-primary/20 via-primary/[0.07] to-background">
+        {vendor.bannerUrl ? (
+          // Decorative cover photo. BANNER_LOGO_OFFSET below is derived from these heights.
+          <div aria-hidden="true" className="pointer-events-none absolute inset-x-0 top-0 h-28 sm:h-56">
+            <Image src={vendor.bannerUrl} alt="" fill priority sizes="100vw" className="object-cover" />
+            {/* Darkens the top edge so the Share / Sign in pills read on any photo. */}
+            <div className="absolute inset-0 bg-linear-to-b from-black/30 via-transparent to-transparent" />
+          </div>
+        ) : (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-0 opacity-40"
+            style={{
+              backgroundImage: "radial-gradient(hsl(var(--primary)) 1px, transparent 1px)",
+              backgroundSize: "18px 18px",
+              maskImage: "linear-gradient(to bottom, black, transparent 70%)",
+              WebkitMaskImage: "linear-gradient(to bottom, black, transparent 70%)",
+            }}
+          />
+        )}
+
+        <div className="relative mx-auto flex max-w-2xl items-center justify-end gap-2 px-4 pt-3 sm:px-6">
+          {/* Back and the recent-order pill appear after mount, left of the
+              right-aligned pills: nothing else moves. */}
+          <StoreBackButton />
+          <RecentOrderLink slug={vendor.slug} />
+          {/* With a category bar, Share rides in it and stays on screen while scrolling. */}
+          {hasJumpBar ? null : <ShareStoreButton vendorName={vendor.name} slug={vendor.slug} />}
+          {isStaff ? (
+            // The seller (or their staff) looking at their own store: they are
+            // signed in to AwaazOS, not as a buyer, so offer the way back in.
+            <Link href="/home" className={PILL}>
+              <LayoutDashboard className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">Dashboard</span>
+            </Link>
+          ) : (
+            <Link href={`/s/${vendor.slug}/account`} className={PILL}>
+              <UserRound className="h-4 w-4 shrink-0" aria-hidden="true" />
+              <span className="truncate">
+                {customer ? `Hi${customer.name ? `, ${customer.name.split(/\s+/)[0]}` : ""} · My orders` : "Sign in"}
+              </span>
+            </Link>
+          )}
+        </div>
+
+        <div
+          className={`relative mx-auto max-w-2xl px-4 pb-4 sm:px-6 sm:pb-9 ${
+            vendor.bannerUrl ? BANNER_LOGO_OFFSET : "pt-4 sm:pt-8"
+          }`}
+        >
+          {/* A phone keeps this short, so the items start high on the screen: name beside the logo. */}
+          <div className="flex flex-col items-start text-left sm:items-center sm:text-center">
+            <div className="flex w-full items-center gap-3 sm:flex-col sm:gap-0">
+            {vendor.logoUrl ? (
+              <Image
+                src={vendor.logoUrl}
+                alt=""
+                width={88}
+                height={88}
+                className="h-16 w-16 shrink-0 rounded-2xl bg-background object-cover shadow-lg ring-4 ring-background sm:h-[88px] sm:w-[88px]"
+              />
+            ) : (
+              <div
+                aria-hidden="true"
+                className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-primary font-display text-3xl font-bold text-primary-foreground shadow-lg ring-4 ring-background sm:h-[88px] sm:w-[88px] sm:text-4xl"
+              >
+                {vendor.name.slice(0, 1).toUpperCase()}
+              </div>
+            )}
+
+              <div className="min-w-0 sm:mt-3">
+                <h1 className="font-display text-2xl font-bold leading-tight tracking-tight text-awaaz-charcoal sm:text-4xl sm:leading-10">
+                  {displayStoreName(vendor)}
+                </h1>
+                {tagline ? (
+                  <p className="mt-1 max-w-md text-sm leading-snug text-muted-foreground sm:mx-auto sm:mt-2 sm:text-base">{tagline}</p>
+                ) : null}
+              </div>
+            </div>
+
+            {/* What and where, as one quiet line under the name. */}
+            <p className="mt-2 flex flex-wrap items-center justify-start gap-x-3 gap-y-1 text-sm font-semibold text-muted-foreground sm:justify-center">
+              {/* GENERAL is the sign-up default: it says nothing to a buyer. */}
+              {vendor.stallType !== "GENERAL" ? (
+                <span className="inline-flex items-center gap-1.5">
+                  {foodArt ? (
+                    <UtensilsCrossed className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  ) : (
+                    <Package className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  )}
+                  {stallTypeLabel(vendor.stallType, vendor.stallTypeOther)}
+                </span>
+              ) : null}
+              {place ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                  {place}
+                </span>
+              ) : null}
+            </p>
+
+            {/* How the store works: handover, payment, licence (lib/store-info.ts). */}
+            {facts.length > 0 ? (
+              <ul
+                aria-label="About this store"
+                className="mt-2 flex max-w-md flex-wrap items-center justify-start gap-x-3 gap-y-1 sm:mt-4 sm:justify-center sm:gap-2"
+              >
+                {facts.map((fact) => {
+                  const Icon = FACT_ICON[fact.kind];
+                  return (
+                    <li
+                      key={fact.kind}
+                      className="inline-flex items-center gap-1.5 text-xs font-semibold text-foreground sm:rounded-full sm:border sm:border-border/70 sm:bg-background sm:px-3 sm:py-1.5"
+                    >
+                      <Icon className="h-3.5 w-3.5 shrink-0 text-primary" aria-hidden="true" />
+                      {fact.text}
+                    </li>
+                  );
+                })}
+              </ul>
+            ) : null}
+
+            {whatsappLink || community || instagramLink ? (
+              <ul aria-label="Contact" className="mt-3 flex flex-wrap items-center justify-start gap-2 sm:justify-center">
+                {whatsappLink ? (
+                  <li>
+                    <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>
+                      <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      WhatsApp
+                    </a>
+                  </li>
+                ) : null}
+                {community ? (
+                  <li className="min-w-0">
+                    <a href={community.href} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>
+                      {community.kind === "group" ? (
+                        <UsersRound className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      ) : (
+                        <Megaphone className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      )}
+                      <span className="truncate">{whatsappCommunityLabel(community.kind)}</span>
+                    </a>
+                  </li>
+                ) : null}
+                {instagramLink ? (
+                  <li className="min-w-0">
+                    <a href={instagramLink} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>
+                      <Instagram className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      <span className="sr-only">Instagram: </span>
+                      <span className="truncate">@{instagramHandle}</span>
+                    </a>
+                  </li>
+                ) : null}
+              </ul>
+            ) : null}
+
+            {nextClosing ? (
+              <a
+                href="#drops"
+                className="mt-3 inline-flex min-h-11 max-w-full items-center gap-2 rounded-full bg-primary px-6 py-2 text-left text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 motion-reduce:transition-none"
+              >
+                <ShoppingBag className="h-4 w-4 shrink-0" aria-hidden="true" />
+                Pre-order · closes {formatIstDeadline(nextClosing, now)}
+              </a>
+            ) : menuOrdering ? (
+              // With no drop above it the menu starts right under this header,
+              // so a jump link would go nowhere; the cart bar is the next step.
+              dropViews.length > 0 ? (
+                <a
+                  href="#menu-order"
+                  className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                >
+                  <ShoppingBag className="h-4 w-4" aria-hidden="true" />
+                  Order now
+                </a>
+              ) : null
+            ) : showOpenAmountQr ? (
+              <a
+                href="#pay"
+                className="mt-3 inline-flex min-h-11 items-center gap-2 rounded-full bg-primary px-6 text-sm font-bold text-primary-foreground shadow-md transition-transform hover:scale-[1.02] focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+              >
+                <QrCode className="h-4 w-4" aria-hidden="true" />
+                Scan &amp; pay
+              </a>
+            ) : null}
+          </div>
+        </div>
+      </header>
+
+      <StoreSearchProvider index={searchIndex}>
+        {/* Category jump bar — a long mela menu on a phone is unusable without it.
+            Its search button swaps the pills for a search field (StoreSearch). */}
+        {hasJumpBar ? (
+          <nav
+            aria-label="Categories"
+            className="sticky top-0 z-20 border-b border-border/50 bg-background/85 backdrop-blur-sm supports-backdrop-filter:bg-background/70"
+          >
+            <StoreSearchBar trailing={<ShareStoreButton vendorName={vendor.name} slug={vendor.slug} compact />}>
+              <ul className="flex gap-2 overflow-x-auto scrollbar-none [&::-webkit-scrollbar]:hidden">
+                {/* "Home": back to the store's header from anywhere down the menu. */}
+                <li className="shrink-0">
+                  <a
+                    href="#store-top"
+                    aria-label={`Back to the top of ${vendor.name}`}
+                    className="inline-flex min-h-11 min-w-11 items-center justify-center gap-1.5 whitespace-nowrap rounded-full border border-border/70 px-3 text-sm font-bold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  >
+                    <ArrowUp className="h-4 w-4" aria-hidden="true" />
+                    <span className="hidden sm:inline">Top</span>
+                  </a>
+                </li>
+                {dropViews.length > 0 ? (
+                  <li className="shrink-0">
+                    <a
+                      href="#drops"
+                      className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-full border border-primary/40 bg-primary/10 px-4 text-sm font-bold text-primary transition-colors hover:bg-primary/15 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    >
+                      <CalendarClock className="h-4 w-4" aria-hidden="true" />
+                      Pre-order
+                    </a>
+                  </li>
+                ) : null}
+                {categories.map(([category], i) => (
+                  <li key={category} className="shrink-0">
+                    <a
+                      href={`#${categoryAnchor(category, i)}`}
+                      className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-border/70 px-4 text-sm font-bold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                    >
+                      {category}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </StoreSearchBar>
+          </nav>
+        ) : null}
+
+        <CartHubProvider>
+          <main id="menu" className="mx-auto max-w-2xl px-4 py-7 sm:px-6 sm:py-9">
+            {props.openItemId && !openTarget ? (
+              <p role="status" className="mb-6 rounded-xl border border-border/60 bg-background px-3 py-2 text-sm text-muted-foreground">
+                That item isn&apos;t on sale right now. Here is everything else.
+              </p>
+            ) : null}
+            {dropViews.length > 0 ? (
+              <div id="drops" className="mb-10 scroll-mt-20 space-y-6">
+                <h2 className="sr-only">Pre-orders</h2>
+                {dropViews.map((view) => (
+                  <Searchable
+                    key={view.drop.id}
+                    texts={view.items.map((item) => dropItemSearchText(item, view.drop.title))}
+                  >
+                    <DropSection
+                      view={view}
+                      slug={vendor.slug}
+                      storeName={vendor.name}
+                      payment={payment}
+                      whatsapp={whatsapp}
+                      now={now}
+                      prefill={prefill}
+                      menuOrdering={menuOrdering}
+                      theme={theme}
+                      notesExample={orderNoteExample}
+                      deliveryAreas={deliveryAreas}
+                      openDropItemId={
+                        openTarget?.kind === "drop" && openTarget.dropId === view.drop.id ? openTarget.dropItemId : null
+                      }
+                    />
+                  </Searchable>
+                ))}
+              </div>
+            ) : null}
+
+            {dropViews.length > 0 && categories.length > 0 ? (
+              <h2 className="mb-4 font-display text-lg font-bold text-awaaz-charcoal">Everyday items</h2>
+            ) : dropViews.length === 0 ? (
+              <h2 className="sr-only">Items</h2>
+            ) : null}
+
+            {categories.length === 0 ? (
+              dropViews.length > 0 ? null : (
+                <EmptyState
+                  className="rounded-2xl bg-background px-4 py-12"
+                  title="Orders will open soon"
+                  titleAs="h3"
+                  description={
+                    whatsappLink
+                      ? `${vendor.name} will start taking orders as soon as they're ready. Message them on WhatsApp to hear when orders open.`
+                      : `${vendor.name} will start taking orders as soon as they're ready. Please check back soon.`
+                  }
+                  action={
+                    whatsappLink ? (
+                      <a href={whatsappLink} target="_blank" rel="noopener noreferrer" className={CONTACT_LINK}>
+                        <MessageCircle className="h-4 w-4 shrink-0" aria-hidden="true" />
+                        WhatsApp
+                      </a>
+                    ) : null
+                  }
+                />
+              )
+            ) : (
+              <div className="space-y-8">
+                {/* With menu ordering on, rows carry their own "Popular" badge and a
+                    stepper; a second, non-orderable grid would only confuse. */}
+                {popular.length > 1 && !menuOrdering ? (
+                  <HideWhileSearching>
+                    <section aria-labelledby="popular-heading">
+                      <h3
+                        id="popular-heading"
+                        className="mb-3 flex items-center gap-2 font-display text-base font-bold text-awaaz-charcoal"
+                      >
+                        <Sparkles className="h-4 w-4 text-primary" aria-hidden="true" />
+                        Most loved
+                      </h3>
+                      <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {popular.map((item) => (
+                          <li
+                            key={item.id}
+                            className="flex flex-col gap-2 rounded-2xl border border-primary/20 bg-linear-to-b from-primary/10 to-background p-3 shadow-xs"
+                          >
+                            {item.imageUrl ? (
+                              <Image
+                                src={item.imageUrl}
+                                alt=""
+                                width={64}
+                                height={64}
+                                className="h-16 w-16 rounded-xl object-cover ring-1 ring-border/60"
+                              />
+                            ) : (
+                              <span aria-hidden="true" className="text-2xl leading-none">
+                                {item.emoji}
+                              </span>
+                            )}
+                            <span className="text-sm font-semibold leading-snug text-foreground">
+                              {item.name}
+                            </span>
+                            <span className="mt-auto font-mono text-sm font-bold tabular-nums text-primary">
+                              {formatINRCompact(item.priceInPaise)}
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    </section>
+                  </HideWhileSearching>
+                ) : null}
+
+                {menuOrdering ? (
+                  <MenuOrder
+                    slug={vendor.slug}
+                    vendorName={vendor.name}
+                    categories={menuCategories}
+                    layout={layout}
+                    fulfilmentTypes={menuTypes}
+                    deliveryFeePaise={vendor.settings?.menuDeliveryFeePaise ?? 0}
+                    deliveryAreas={deliveryAreas}
+                    pickupNote={vendor.settings?.menuPickupNote ?? null}
+                    slotRules={menuSlotRules}
+                    nextSlotLabel={nextMenuSlot ? menuSlotLabel(nextMenuSlot, now) : null}
+                    payment={payment}
+                    whatsapp={whatsapp}
+                    prefill={prefill}
+                    theme={theme}
+                    notesExample={orderNoteExample}
+                    offers={menuOffers}
+                    initialDetailId={openTarget?.kind === "menu" ? openTarget.menuItemId : null}
+                    facts={menuDetailFacts({
+                      pickup: menuTypes.includes("PICKUP"),
+                      delivery: menuTypes.includes("DELIVERY"),
+                      pickupNote: vendor.settings?.menuPickupNote ?? null,
+                      deliveryAreas,
+                      deliveryFeePaise: vendor.settings?.menuDeliveryFeePaise ?? 0,
+                      nextSlotLabel: nextMenuSlot ? menuSlotLabel(nextMenuSlot, now) : null,
+                      paymentText: paymentFactText(payment),
+                    })}
+                  />
+                ) : null}
+
+                {menuOrdering ? null : categories.map(([category, items], i) => (
+                  <Searchable key={category} texts={items.map((item) => menuItemSearchText(item, category))}>
+                    <section aria-labelledby={categoryAnchor(category, i)}>
+                      <div className="mb-3 flex items-baseline gap-3">
+                        <h3
+                          id={categoryAnchor(category, i)}
+                          className="scroll-mt-20 font-display text-base font-bold text-awaaz-charcoal"
+                        >
+                          {category}
+                        </h3>
+                        <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
+                        <span className="text-xs font-semibold text-muted-foreground">
+                          {items.length}
+                        </span>
+                      </div>
+                      <ul className={CATEGORY_LIST_CLASS[layout]}>
+                        {items.map((item) => (
+                          <Searchable key={item.id} texts={[menuItemSearchText(item, category)]}>
+                            <ReadOnlyMenuRow
+                              item={item}
+                              layout={layout}
+                              stock={stockOf(item.id)}
+                              sizes={storeSizes.get(item.id)}
+                              slug={vendor.slug}
+                              storeName={vendor.name}
+                              initialOpen={openTarget?.kind === "menu" && openTarget.menuItemId === item.id}
+                            />
+                          </Searchable>
+                        ))}
+                      </ul>
+                    </section>
+                  </Searchable>
+                ))}
+              </div>
+            )}
+
+            <StoreSearchEmpty />
+
+            {upiLink && showOpenAmountQr ? (
+              <section
+                id="pay"
+                aria-labelledby="pay-heading"
+                className="mt-10 scroll-mt-16 overflow-hidden rounded-2xl border border-primary/25 bg-background shadow-xs"
+              >
+                <div className="bg-linear-to-b from-primary/10 to-transparent px-4 py-6 text-center sm:px-6">
+                  <h3 id="pay-heading" className="font-display text-xl font-bold text-awaaz-charcoal">
+                    Scan to pay
+                  </h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Any UPI app. Enter the amount the seller tells you.
+                  </p>
+
+                  <div className="mx-auto mt-5 w-fit rounded-2xl bg-white p-3 shadow-md ring-1 ring-border/60">
+                    <UpiQrImage src={qrLarge} alt={`UPI QR code to pay ${payeeName}`} size={220} sample={vendor.isDemo} />
+                  </div>
+
+                  <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                    Paying {payeeName}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">Scan from another phone, or open your UPI app below.</p>
+                  {vendor.upiId ? (
+                    <UpiPayOptions
+                      upiLink={upiLink}
+                      upiId={vendor.upiId}
+                      genericLabel="Open UPI app"
+                      linksMobileOnly
+                      className="mt-4"
+                    />
+                  ) : null}
+                </div>
+              </section>
+            ) : null}
+
+            {/* The store's own app (lib/store-app.ts). Demo stores get no app: claiming one changes it. */}
+            {vendor.isDemo ? null : (
+              <StoreInstall slug={vendor.slug} storeName={vendor.name} className="mt-10" />
+            )}
+          </main>
+
+          <footer className="px-4 pb-10 pt-2 text-center">
+            <PoweredByFooter slug={vendor.slug} isDemo={vendor.isDemo} />
+          </footer>
+        </CartHubProvider>
+      </StoreSearchProvider>
+    </div>
+  );
+}
+
+/** The row a product link opens (`/s/<slug>/p/<menuItemId>`). */
+type OpenTarget = { kind: "drop"; dropId: string; dropItemId: string } | { kind: "menu"; menuItemId: string } | null;
+
+/**
+ * Which row a product link opens (docs/PRODUCT_PAGE_PLAN.md, decisions 3 and 4):
+ * a drop taking orders that still has stock, then any other drop on the page with
+ * its item list (sold out, or past its cut-off), then the everyday menu (orderable
+ * or read-only; the page renders one of them). Looked up only among the rows this
+ * render already holds, so an id from another store, or an item that is hidden,
+ * unavailable or in a closed drop, finds nothing: the page shows the store with a
+ * one-line notice, never a 404, and nothing about the id.
+ */
+function resolveOpenItem(
+  menuItemId: string | null,
+  dropViews: readonly DropView[],
+  categories: readonly [string, StorefrontItems][],
+): OpenTarget {
+  if (!menuItemId) return null;
+  const listed = dropViews.filter((v) => v.visibility !== "scheduled");
+  for (const views of [listed.filter((v) => v.visibility === "open" && !v.soldOut), listed]) {
+    for (const view of views) {
+      const row = view.items.find((i) => i.menuItemId === menuItemId);
+      if (row) return { kind: "drop", dropId: view.drop.id, dropItemId: row.id };
+    }
+  }
+  if (categories.some(([, items]) => items.some((i) => i.id === menuItemId))) return { kind: "menu", menuItemId };
+  return null;
+}

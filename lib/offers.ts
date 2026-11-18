@@ -799,3 +799,13 @@ export function discountLabel(offerName: string | null | undefined): string {
   const name = offerName?.trim();
   return name ? `Discount (${name})` : "Discount";
 }
+
+/**
+ * The offers on this page that one item counts toward, for its detail sheet:
+ * every offer whose eligible items include it (or cover everything). The
+ * "at least N of tag X" condition is part of `offerSummary`, so it is not
+ * filtered on here. Display only, like every other preview here.
+ */
+export function offersForItem(offers: readonly ResolvedOffer[], menuItemId: string): ResolvedOffer[] {
+  return offers.filter((o) => o.eligibleItemIds === null || o.eligibleItemIds.includes(menuItemId));
+}
