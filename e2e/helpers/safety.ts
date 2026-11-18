@@ -4,8 +4,11 @@
  * or a deployment. Pure, so lib/__tests__/e2e-safety.test.ts can pin them.
  */
 
+import { PRODUCTION_HOSTS as PRODUCTION_HOST_LIST } from "../../lib/canonical-host";
+
 const LOCAL_HOST = /^(localhost|127\.0\.0\.1|\[::1\])$/;
-const PRODUCTION_HOSTS = new Set(["awaazos.intelliforge.tech", "awaazos.vercel.app"]);
+// Old and new production domains alike (docs/DOMAIN_MOVE_PLAN.md).
+const PRODUCTION_HOSTS = new Set(PRODUCTION_HOST_LIST);
 
 function hostOf(url: string): string | null {
   try {

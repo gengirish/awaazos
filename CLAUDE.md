@@ -94,6 +94,10 @@ build, so preview deployments are off and a push to `main` is a production deplo
 named in `fly.toml` (`awaazos-workers`) does not currently exist (TODO.md 1.1), so nothing drains the
 BullMQ queues in production.
 
+**Domain move** (`docs/DOMAIN_MOVE_PLAN.md`): awaazdo.store is attached as an extra host. `CANONICAL_HOST`
+(unset = off) turns on the old-host 308 in `lib/canonical-host.ts`, which never redirects `/api/**`, PWA
+files or POSTs. Keep every old host in `LEGACY_HOSTS` and in the e2e production guard for good.
+
 **Two Redis surfaces, not interchangeable — the single easiest thing to get wrong:**
 
 - `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` → `lib/kv.ts` (@upstash/redis over HTTP).
