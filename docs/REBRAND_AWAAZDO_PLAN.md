@@ -1,9 +1,9 @@
 # Rebrand: AwaazOS → AwaazDo
 
 Status: **Step 1 is live.** PR #203 merged 18/11/2026 and the product reads AwaazDo in production; prose docs and
-agent rules followed in a docs PR the same day. Step 2 (outside the code) is open. The Step 0 trademark conflicts
-were not resolved before launch: Awaaz De Infosystems holds class 42 marks "Awaaz.De" (voice/IVR software),
-awaazdo.in is a pre-launch complaints platform, and Sony holds "Awaaz" in class 9. If the name has to change again,
+agent rules followed in a docs PR the same day. Step 2 (outside the code) is open. The founder confirmed the name
+cleared on 18/11/2026; the Step 0 search had found Awaaz De Infosystems' class 42 marks "Awaaz.De" (voice/IVR
+software), awaazdo.in (a pre-launch complaints platform) and Sony's "Awaaz" in class 9. If the name has to change again,
 the code reads it from `lib/brand.ts`, so it is a one-line change there plus the files that can't import it
 (`public/sw.js`, `public/offline.html`, `content/admin-nudges/*.txt`, `e2e/mobile-sweep.baseline.json`), and a
 `git grep AwaazDo` over the prose docs.
@@ -130,7 +130,7 @@ and `/s/**`. Redirect only marketing pages, and mint new links on the new host. 
 
 ## Order
 
-1. Step 0 checks. Conflicts found 13/11/2026; launched anyway.
+1. Step 0 checks. Conflicts found 13/11/2026; name confirmed cleared 18/11/2026.
 2. Step 1 as one PR: done (#203, live 18/11/2026), prose docs the same day.
 3. Step 2 in the days after merge: open.
 4. Step 3 is undecided (the domain is held and serving; the move itself is not planned).
