@@ -16,6 +16,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { paiseToRupees, rupeesToPaise } from "@/lib/currency";
+import { isCommitEnter } from "@/lib/ime-enter";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
 
 /** The menu row the drop form needs for a dish added from here. */
@@ -124,7 +125,7 @@ export function AddMenuItemDialog({ spokenName, onClose, onAdded, vocab }: AddMe
   }
 
   function saveOnEnter(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key !== "Enter") return;
+    if (!isCommitEnter(e)) return;
     e.preventDefault();
     void save();
   }
