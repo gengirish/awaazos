@@ -1,12 +1,25 @@
 # Domain move: awaazos.intelliforge.tech → awaazdo.store
 
-Status: plan, 2026-11-18. Nothing below has shipped. awaazdo.store already serves the production
-deployment as an **extra host** (Vercel, A `@` 216.150.1.1, `www` 308 → apex). Everything that builds a URL
-still uses awaazos.intelliforge.tech.
+Status: plan, 2026-11-18. awaazdo.store already serves the production deployment as an **extra host**
+(Vercel, A `@` 216.150.1.1, `www` 308 → apex). Everything that builds a URL still uses
+awaazos.intelliforge.tech.
+
+## Where it stands (2026-11-18)
+
+| Step | State |
+| --- | --- |
+| Phase 0: name cleared | **Done** 2026-11-18: owner confirmed "AwaazDo" is cleared. The rebrand (#203) is on `main`. |
+| Phase 1 code (#223) | **Merged** 06:13 UTC. `lib/canonical-host.ts` (production hosts incl. awaazdo.store for the e2e guard, redirect rule), `components/shell/MovedHostNotice.tsx`. Off: `CANONICAL_HOST` unset, the old host still answers `/s/zz-probe` with 404, not a redirect. |
+| `www.awaazdo.store` CNAME | **Done.** GoDaddy `www` → `cname.vercel-dns.com.`; Vercel shows it configured; `https://www.awaazdo.store` → 308 → `https://awaazdo.store/`. |
+| Razorpay partner app redirect URI | **Blocked.** Save returns **403** (`POST /merchant/api/live/oauth/applications/…`) for both Development and Production. The form and owner role are fine; likely the new domain must be approved on the account first. Read the 403 response body, or ask Razorpay support. Tip: a comma turns a URI into a chip; Enter submits the form. |
+| Razorpay partner app test webhook | Already points to `https://awaazdo.store/api/webhooks/razorpay-partner` (no live webhook). |
+| Razorpay merchant website change | **Not started.** Probably needed before the redirect URI saves. |
+| Phase 2 dry run | **Not started.** |
+| Phases 3 and 4 | **Not started.** Phase 0 is clear; next gates are the Razorpay redirect URI and the Phase 2 dry run. |
 
 ## Phase 0: gate (decide before any step below)
 
-1. **The name is not cleared.** The 2026-11-13 trademark check found Awaaz De Infosystems' registered
+1. **Cleared 2026-11-18** (owner confirmed). Background: the 2026-11-13 trademark check found Awaaz De Infosystems' registered
    class 42 marks "Awaaz.De" (3448631, 2380087), the same field (voice software). awaazdo.in uses the exact
    name. Moving the domain puts "awaazdo" in every link sellers print, post in bios and send to buyers. If
    the name changes later, all of that has to move a second time. Get a lawyer's opinion, or choose a new
@@ -79,7 +92,7 @@ Outside the code (user):
 - Vercel: fix `www.awaazdo.store`. The CNAME still points at GoDaddy's `awaazdo.store.`; set it to the
   value Vercel shows.
 - Razorpay partner app: **add** `https://awaazdo.store/api/vendor/payments/razorpay/callback` to the
-  redirect URIs (keep the old one). Press Enter so it saves as a chip.
+  redirect URIs (keep the old one). Type a comma to make it a chip, then press Save (Enter submits the form).
 - Razorpay merchant account: start the website change request, adding the new domain.
 
 ## Phase 2: dry run on the new host (2–3 days, test store only)
@@ -154,9 +167,11 @@ works, because the new host keeps serving.
 
 ## Checklist
 
-- [ ] Phase 0: name cleared, or a decision to go ahead anyway, recorded
-- [ ] Phase 1 PR merged (e2e guard, redirect behind a flag, banner, constants)
-- [ ] `www` CNAME fixed; new Razorpay redirect URI whitelisted; Razorpay website change filed
+- [x] Phase 0: name cleared (owner confirmed, 2026-11-18)
+- [x] Phase 1 PR merged (e2e guard, redirect behind a flag, banner; constants dropped), #223, 2026-11-18
+- [x] `www` CNAME fixed (2026-11-18)
+- [ ] New Razorpay redirect URI whitelisted (save returns 403)
+- [ ] Razorpay website change filed
 - [ ] Phase 2 dry run passed, including the Auth.js old-host sign-in check
 - [ ] 3a env flip and redeploy; primary domain swapped; Razorpay webhooks moved; sellers messaged
 - [ ] 3b `/pos` redirect on
