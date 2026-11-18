@@ -163,6 +163,8 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # Fails on high/critical; scripts/audit-high.mjs lists the few dated waivers
+      # (advisories with no patched release yet).
       - name: npm audit (high+)
-        run: npm audit --audit-level=high
+        run: node scripts/audit-high.mjs
 

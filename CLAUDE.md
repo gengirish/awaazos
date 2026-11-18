@@ -255,7 +255,7 @@ Accessibility is POS-critical: 44×44 px minimum tap targets, voice states disti
 ## Before pushing
 
 CI (`.github/workflows/ci.yml`) runs lint → typecheck → unit → build → bundle-size budget
-(`npm run perf:budget`, see `docs/PERFORMANCE.md`), plus gitleaks (full history) and `npm audit --audit-level=high`. Two Playwright jobs, `E2E (chromium)` and
+(`npm run perf:budget`, see `docs/PERFORMANCE.md`), plus gitleaks (full history) and an `npm audit` high+ gate (`scripts/audit-high.mjs`: dated waivers only for advisories with no patched release). Two Playwright jobs, `E2E (chromium)` and
 `E2E (mobile)`, run after that on a throwaway Postgres: they apply the migrations from empty and check them against the schema. `main` has no
 branch protection, so a red run does not stop a merge, which is a production deploy: look before merging. A husky
 pre-commit hook runs `lint-staged` (eslint `--max-warnings=0`) and gitleaks if installed locally.
