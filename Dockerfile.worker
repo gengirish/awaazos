@@ -1,4 +1,4 @@
-# AwaazOS BullMQ worker container — runs on Fly.io
+# AwaazDo BullMQ worker container — runs on Fly.io
 # Processes: voice-parse-log queue (and future receipt.worker, send-receipt, etc.)
 # Not a Next.js server — no HTTP port exposed.
 

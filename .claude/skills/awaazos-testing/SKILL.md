@@ -1,9 +1,9 @@
 ---
 name: awaazos-testing
-description: Testing conventions for AwaazOS — Vitest unit tests (node, plus opt-in DB integration files) + Playwright E2E. Use when adding tests for any new route, lib helper, component, or worker.
+description: Testing conventions for AwaazDo — Vitest unit tests (node, plus opt-in DB integration files) + Playwright E2E. Use when adding tests for any new route, lib helper, component, or worker.
 ---
 
-# AwaazOS Testing
+# AwaazDo Testing
 
 ## Stack
 

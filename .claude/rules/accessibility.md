@@ -5,7 +5,7 @@ paths: ["**/*.tsx"]
 
 <!-- Generated from .cursor/rules/accessibility.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
 
-# Accessibility — AwaazOS
+# Accessibility — AwaazDo
 
 The POS screen is mobile-first (390px) and the **primary input is voice**.
 Every voice-only path MUST have a tap fallback (`QuickAddGrid`).

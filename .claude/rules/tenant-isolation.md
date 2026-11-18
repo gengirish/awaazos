@@ -4,7 +4,7 @@ description: Strict per-vendor data isolation — every read/write must scope to
 
 <!-- Generated from .cursor/rules/tenant-isolation.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
 
-# Tenant Isolation — AwaazOS
+# Tenant Isolation — AwaazDo
 
 `Vendor` (Prisma model) is the tenant. `Vendor.id` IS the tenant id.
 A `User` (Auth.js) belongs to one or more vendors via `StaffMember`.

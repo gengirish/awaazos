@@ -4,14 +4,14 @@ description: |
   Search tool for modern web development best practices (each search is a network npx call, so use it only where it pays off).
   Use it before building a NEW UI component, a form (fields, validation, autofill, keyboard/IME handling), a dialog/sheet/popover/carousel, or for performance (CWV: LCP, INP, CLS; images, fetch priority) or accessibility work.
   DO NOT trigger for: copy edits, renames, small style tweaks (spacing, colours, one class), bug fixes that don't change markup or interaction, backend (SQL, ORMs, API routes), infra/scripts (CI/CD, Docker, Git), or tooling (tsconfig, ESLint, tests).
-  AwaazOS: don't apply legacy-scan's toSorted or AbortSignal.timeout findings (churn), and never change the sorts in stableMenuJson() in lib/anthropic.ts (prompt cache).
+  AwaazDo: don't apply legacy-scan's toSorted or AbortSignal.timeout findings (churn), and never change the sorts in stableMenuJson() in lib/anthropic.ts (prompt cache).
 ---
 
 # Modern Web Guidance
 
 Search and retrieve standardized modern web best practices at the **start** of building a new UI component, form, dialog/sheet/carousel, or performance or accessibility work, before writing ad-hoc solutions or adding dependencies. Skip it for copy edits and small style tweaks.
 
-> AwaazOS copy: synced from `.cursor/skills/` (source of truth) to `.claude/skills/` by `npm run sync:agent-rules`. The trigger above is narrowed from upstream (`.agents/skills/modern-web-guidance/`).
+> AwaazDo copy: synced from `.cursor/skills/` (source of truth) to `.claude/skills/` by `npm run sync:agent-rules`. The trigger above is narrowed from upstream (`.agents/skills/modern-web-guidance/`).
 
 ## Primary Workflow
 

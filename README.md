@@ -1,4 +1,6 @@
-# AwaazOS — Banao. Batao. Becho.
+# AwaazDo — Banao. Batao. Becho.
+
+*Formerly AwaazOS. The repo, packages and deploy names keep the old spelling.*
 
 > **Orders, UPI billing and receipts for India's home kitchens that sell on Instagram and WhatsApp.**
 > Post a batch with a cut-off or an everyday menu → buyers order from your link in bio or on WhatsApp → paid by UPI → cook list and delivery list on the day → receipt on WhatsApp. Voice POS for counter sales. 30 days free.
@@ -103,7 +105,7 @@ All of this on a phone, in <8 seconds per transaction. **Hindi + English at MVP.
 - ✅ **Setup checklist** — the steps to start taking orders follow the seller to `/orders`, `/drops` and `/pos`; in-app guide at `/help`
 - 🇮🇳 **India-first defaults** — IST timezone, DD/MM/YYYY dates, `+91` 10-digit phone validation, `Intl.NumberFormat('en-IN', { currency: 'INR' })`, `libphonenumber-js`
 - 🔐 **Auth.js v5 (NextAuth)** — Edge-split config, JWT sessions, Credentials provider with bcrypt, single `prisma.$transaction` for sign-up
-- 🎨 **Mobile-first UI** — Tailwind + shadcn/ui, saffron AwaazOS palette (primary tokens at 4.5:1 with white text), Baloo 2 headings + Nunito body, shared `EmptyState` / `Notice` / `ResponsiveDialog` primitives
+- 🎨 **Mobile-first UI** — Tailwind + shadcn/ui, saffron AwaazDo palette (primary tokens at 4.5:1 with white text), Baloo 2 headings + Nunito body, shared `EmptyState` / `Notice` / `ResponsiveDialog` primitives
 
 ### Roadmap
 
@@ -367,7 +369,7 @@ For internal contributors and coding agents, the canonical guide is [`CLAUDE.md`
 
 **Girish Hiremath** — 14+ years of enterprise software engineering across **compliance, pharma, banking, fintech, telecom, and IoT** for Fortune 500 companies. Currently **Principal Software Engineer** at a Compliance & RegTech company in Hyderabad, while pursuing an **M.Tech in Data Science & AI at IIIT Dharwad** (Institute of National Importance) — coursework includes Speech & NLP, Generative AI, Computer Vision, Financial Analytics, and AI in Healthcare.
 
-Indic AI is a **14-year through-line**, not a 2026 hobby. First production AI project in 2012: a **Hindi Reader Android app** using OpenCV + Artificial Neural Networks at a leading semiconductor company, presented at their developer conference. AwaazOS is the natural culmination of that arc — banking-grade reliability, pharma-grade data integrity, fintech-grade payment rails, applied to a problem only an Indian engineer who's lived through paper bills at a chai stall can really see clearly.
+Indic AI is a **14-year through-line**, not a 2026 hobby. First production AI project in 2012: a **Hindi Reader Android app** using OpenCV + Artificial Neural Networks at a leading semiconductor company, presented at their developer conference. AwaazDo is the natural culmination of that arc — banking-grade reliability, pharma-grade data integrity, fintech-grade payment rails, applied to a problem only an Indian engineer who's lived through paper bills at a chai stall can really see clearly.
 
 | | |
 | --- | --- |
@@ -380,7 +382,7 @@ Indic AI is a **14-year through-line**, not a 2026 hobby. First production AI pr
 
 ## 🏢 Built by IntelliForge AI
 
-AwaazOS is a flagship product of **[IntelliForge AI](https://www.intelliforge.tech)** — a Hyderabad-based AI engineering studio.
+AwaazDo is a flagship product of **[IntelliForge AI](https://www.intelliforge.tech)** — a Hyderabad-based AI engineering studio.
 
 | | |
 | --- | --- |
@@ -392,7 +394,7 @@ AwaazOS is a flagship product of **[IntelliForge AI](https://www.intelliforge.te
 
 ## 📄 License
 
-Proprietary. © 2026 AwaazOS · IntelliForge AI. Code published for transparency, not for redistribution. Reach out at **contact@intelliforge.tech** for licensing, partnership, or design-partner inquiries.
+Proprietary. © 2026 AwaazDo · IntelliForge AI. Code published for transparency, not for redistribution. Reach out at **contact@intelliforge.tech** for licensing, partnership, or design-partner inquiries.
 
 ---
 

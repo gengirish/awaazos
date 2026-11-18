@@ -1,4 +1,4 @@
-# AwaazOS — Agent Orientation
+# AwaazDo — Agent Orientation
 
 The agent guide for this repo is [`CLAUDE.md`](./CLAUDE.md). It covers commands, deploy topology,
 the voice pipeline, money, tenant isolation, the PII boundary and API conventions. Read it first;

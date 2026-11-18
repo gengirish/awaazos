@@ -1,11 +1,11 @@
 ---
-description: Voice STT + Claude NLU pipeline rules (the AwaazOS differentiator)
+description: Voice STT + Claude NLU pipeline rules (the AwaazDo differentiator)
 paths: ["lib/anthropic.ts","lib/sarvam.ts","hooks/useVoice*.ts","app/api/ai/**/*.ts","components/pos/VoiceOrderButton.tsx","workers/voiceLog.worker.ts"]
 ---
 
 <!-- Generated from .cursor/rules/voice-ai.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
 
-# Voice Pipeline Rules — AwaazOS
+# Voice Pipeline Rules — AwaazDo
 
 ## STT routing (by `VendorSettings.voiceLang`)
 

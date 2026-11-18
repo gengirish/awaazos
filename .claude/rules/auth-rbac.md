@@ -5,7 +5,7 @@ paths: ["app/api/**/*.ts","app/(vendor)/**/*.tsx","app/(onboarding)/**/*.tsx","l
 
 <!-- Generated from .cursor/rules/auth-rbac.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
 
-# Auth.js v5 + RBAC — AwaazOS
+# Auth.js v5 + RBAC — AwaazDo
 
 ## The edge split (mandatory)
 

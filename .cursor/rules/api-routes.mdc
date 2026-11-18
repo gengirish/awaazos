@@ -1,10 +1,10 @@
 ---
-description: Next.js App Router API conventions for AwaazOS
+description: Next.js App Router API conventions for AwaazDo
 globs: ["app/api/**/*.ts"]
 alwaysApply: false
 ---
 
-# API Route Conventions — AwaazOS
+# API Route Conventions — AwaazDo
 
 ## Route template
 

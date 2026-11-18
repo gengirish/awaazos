@@ -76,7 +76,7 @@ removed, `isDemo` → false, `upiId` → null (they add their own), the 30-day
 trial starts, and sample orders are archived (`archivedAt`, hidden from the
 board, transactions and CSV) or deleted.
 
-If the email already has an AwaazOS account, the page asks for that account's
+If the email already has an AwaazDo account, the page asks for that account's
 password instead of a new one (no name field) and the store is added to the
 existing `User`; the password is checked, never changed. A wrong password is
 `401 wrong_password` and an account with no password is `409 password_not_set`
@@ -88,7 +88,7 @@ sets the `awz_vendor` cookie, so an owner of several stores lands in this one.
 
 ```yaml
 openapi: 3.1.0
-info: { title: AwaazOS internal demo stores, version: 1.0.0 }
+info: { title: AwaazDo internal demo stores, version: 1.0.0 }
 servers: [{ url: https://<app-host> }]
 components:
   securitySchemes:

@@ -1,10 +1,10 @@
 ---
-description: AwaazOS visual design system — saffron-orange POS, mobile-first
+description: AwaazDo visual design system — saffron-orange POS, mobile-first
 globs: ["**/*.tsx", "**/*.css"]
 alwaysApply: false
 ---
 
-# AwaazOS Design System
+# AwaazDo Design System
 
 ## Brand
 

@@ -1,10 +1,10 @@
 ---
-description: India-first locale, currency, and compliance conventions for AwaazOS
+description: India-first locale, currency, and compliance conventions for AwaazDo
 ---
 
 <!-- Generated from .cursor/rules/india-locale.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
 
-# India Locale & Compliance — AwaazOS
+# India Locale & Compliance — AwaazDo
 
 ## Money — STRICTLY follow
 

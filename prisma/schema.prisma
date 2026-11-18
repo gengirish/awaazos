@@ -148,7 +148,7 @@ model VendorSettings {
   razorpayPublicToken      String? // Checkout key, rzp_(live|test)_oauth_… — public
   razorpayTokenExpiresAt   DateTime? // access token
   razorpayRefreshExpiresAt DateTime? // refresh token; past it the seller must reconnect
-  // Platform SaaS subscription (AwaazOS's own Razorpay account, not the
+  // Platform SaaS subscription (AwaazDo's own Razorpay account, not the
   // vendor's). Written by the subscription webhook / verify route only.
   razorpaySubId            String?
   razorpaySubStatus        String? // created|authenticated|active|pending|halted|cancelled|completed|paused
@@ -1043,7 +1043,7 @@ enum PaymentStatus {
 }
 
 enum OrderSource {
-  VOICE // Via AI voice (AwaazOS core)
+  VOICE // Via AI voice (AwaazDo core)
   MANUAL // Quick-add tap grid
   WHATSAPP // Future: WhatsApp ordering
   STOREFRONT // Pre-order placed by a buyer on /s/[slug]

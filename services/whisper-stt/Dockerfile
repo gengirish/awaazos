@@ -1,4 +1,4 @@
-# Self-hosted Whisper STT for AwaazOS — deploy as a separate Fly app (GPU optional).
+# Self-hosted Whisper STT for AwaazDo — deploy as a separate Fly app (GPU optional).
 # CPU spike uses `small` + int8; production Indic quality likely needs GPU + larger model.
 
 FROM python:3.11-slim-bookworm

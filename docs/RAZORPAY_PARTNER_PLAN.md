@@ -15,7 +15,7 @@ only the "buyer closed the tab" case breaks).
 
 With a Razorpay Technology Partner OAuth app the seller taps **Connect Razorpay**,
 approves on Razorpay, and is done. Money still settles into the seller's own
-account — AwaazOS stays out of the flow of funds (not a payment aggregator).
+account — AwaazDo stays out of the flow of funds (not a payment aggregator).
 **Never** use Razorpay's Aggregator / sub-merchant model for this. Commission on
 connected sellers' volume comes with the partner programme; it changes nothing in
 the money path.

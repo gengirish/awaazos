@@ -1,11 +1,11 @@
 ---
-description: AwaazOS visual design system — saffron-orange POS, mobile-first
+description: AwaazDo visual design system — saffron-orange POS, mobile-first
 paths: ["**/*.tsx","**/*.css"]
 ---
 
 <!-- Generated from .cursor/rules/design-system.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
 
-# AwaazOS Design System
+# AwaazDo Design System
 
 ## Brand
 

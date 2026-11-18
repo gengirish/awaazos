@@ -3,7 +3,7 @@ description: Secure defaults, secret hygiene, PII boundaries
 alwaysApply: true
 ---
 
-# Security First — AwaazOS
+# Security First — AwaazDo
 
 ## Secrets
 
