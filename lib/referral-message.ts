@@ -11,11 +11,12 @@
  */
 import { TRIAL_DAYS } from "@/lib/constants";
 import { REFERRED_TRIAL_DAYS } from "@/lib/referral";
+import { BRAND_NAME } from "@/lib/brand";
 
 /** Founder-to-founder note: who is writing, what AwaazOS does for them, the longer trial, the link. */
 export function referralWhatsappMessage(input: { storeName: string; link: string }): string {
   const storeName = input.storeName.trim();
-  const who = storeName ? `I run ${storeName} on AwaazOS.` : "I run my store on AwaazOS.";
+  const who = storeName ? `I run ${storeName} on ${BRAND_NAME}.` : `I run my store on ${BRAND_NAME}.`;
   return [
     `Hi! ${who} Customers order and pay by UPI from one link, instead of in DMs, and I see every order on one board.`,
     `If you sell on Instagram or WhatsApp, try it for your store. Sign up with my link and you get ${REFERRED_TRIAL_DAYS} days free instead of ${TRIAL_DAYS}:`,

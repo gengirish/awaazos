@@ -26,6 +26,7 @@ import {
   type PricingPlanKey,
   type Segment,
 } from "@/lib/pricing-calculator";
+import { BRAND_NAME } from "@/lib/brand";
 
 /** One colour per plan, shared by the cards, chart lines and legend. */
 const PLAN_COLOR: Record<PricingPlanKey, { dot: string; stroke: string }> = {
@@ -91,7 +92,7 @@ export function PricingCalculator() {
         {(
           [
             ["kitchen", "Kitchen view"],
-            ["platform", "AwaazOS revenue"],
+            ["platform", `${BRAND_NAME} revenue`],
           ] as const
         ).map(([key, label]) => (
           <button
@@ -171,7 +172,7 @@ export function PricingCalculator() {
           ) : null}
 
           <hr className="border-border" />
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">AwaazOS plans</h2>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{BRAND_NAME} plans</h2>
           <div className="grid grid-cols-2 gap-3">
             <TextField label="Flat / month (₹)" value={flat} onChange={setFlat} valid={wholeRupeesToPaise(flat) !== null} />
             <TextField label="Fee per order (%)" value={fee} onChange={setFee} valid={percentToBps(fee) !== null} />
@@ -190,7 +191,7 @@ export function PricingCalculator() {
               checked={chargeGst}
               onChange={(e) => setChargeGst(e.target.checked)}
             />
-            Add 18% GST to the AwaazOS fee
+            Add 18% GST to the {BRAND_NAME} fee
           </label>
           <TextField
             label="Delivery-app commission (%)"
@@ -206,7 +207,7 @@ export function PricingCalculator() {
                 value={platformGateway}
                 onChange={setPlatformGateway}
                 valid={percentToBps(platformGateway) !== null}
-                hint="Plus GST. Taken from AwaazOS, not the kitchen. Check the rate for subscriptions on our account."
+                hint={`Plus GST. Taken from ${BRAND_NAME}, not the kitchen. Check the rate for subscriptions on our account.`}
               />
               <TextField
                 label="Partner commission (%)"
@@ -313,8 +314,8 @@ function KitchenView({ c }: { c: PricingInputs }) {
               {c.instantSettlement ? (
                 <Row label="Instant settlement (incl. GST)" values={results.map((r) => r.cost.settlementPaise)} />
               ) : null}
-              <Row label="AwaazOS fee" values={results.map((r) => r.cost.feePaise)} />
-              {c.chargeGst ? <Row label="GST on AwaazOS fee" values={results.map((r) => r.cost.feeGstPaise)} /> : null}
+              <Row label={`${BRAND_NAME} fee`} values={results.map((r) => r.cost.feePaise)} />
+              {c.chargeGst ? <Row label={`GST on ${BRAND_NAME} fee`} values={results.map((r) => r.cost.feeGstPaise)} /> : null}
               <Row label="Total cost" bold values={results.map((r) => r.cost.totalPaise)} />
               <Row label="Kitchen receives" values={results.map((r) => c.salesPaise - r.cost.totalPaise)} />
               <Row
@@ -341,13 +342,13 @@ function KitchenView({ c }: { c: PricingInputs }) {
         </h2>
         <ul className="mt-2 list-disc space-y-1 pl-5">
           <li>
-            AwaazOS on the flat plan: <b>{formatRupees(flatAwaazos)}</b> a month (
+            {BRAND_NAME} on the flat plan: <b>{formatRupees(flatAwaazos)}</b> a month (
             {formatBps(shareBps(flatAwaazos, c.salesPaise))} of sales), no commission.
           </li>
           <li>
             {gatewayName} on {c.gatewayShareBps / 100}% of orders: <b>{formatRupees(flat.gatewayPaise)}</b>. Paid by direct
             UPI instead, the total cost would be <b>{formatRupees(allDirect.totalPaise)}</b>
-            {flat.gatewayPaise > flatAwaazos ? " — the gateway saving alone covers AwaazOS" : ""}.
+            {flat.gatewayPaise > flatAwaazos ? ` — the gateway saving alone covers ${BRAND_NAME}` : ""}.
           </li>
           {gatewayName === "Razorpay" && offerSaving > 0 ? (
             <li>
@@ -401,13 +402,13 @@ function FeeChart({ c }: { c: PricingInputs }) {
   return (
     <section aria-labelledby="pricing-chart" className="rounded-lg border bg-card p-4">
       <h2 id="pricing-chart" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        AwaazOS fee at different sales levels
+        {BRAND_NAME} fee at different sales levels
       </h2>
       <svg
         viewBox={`0 0 ${CHART.w} ${CHART.h}`}
         className="mt-3 w-full"
         role="img"
-        aria-label="AwaazOS fee per month by monthly sales, one line per plan"
+        aria-label={`${BRAND_NAME} fee per month by monthly sales, one line per plan`}
       >
         {[0, 1, 2, 3, 4].map((g) => {
           const v = Math.floor((maxY * g) / 4);
@@ -483,7 +484,7 @@ function PlatformView({
     <>
       <section aria-labelledby="pricing-segments" className="rounded-lg border bg-card p-4">
         <h2 id="pricing-segments" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          Kitchens on AwaazOS
+          Kitchens on {BRAND_NAME}
         </h2>
         <div className="mt-3 space-y-3">
           {raw.map((s, i) => (
@@ -512,7 +513,7 @@ function PlatformView({
 
       <section aria-labelledby="pricing-revenue" className="rounded-lg border bg-card p-4">
         <h2 id="pricing-revenue" className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-          AwaazOS revenue by plan
+          {BRAND_NAME} revenue by plan
         </h2>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full text-sm tabular-nums">

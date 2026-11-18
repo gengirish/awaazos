@@ -8,10 +8,11 @@ import { PLAN_RANK } from "@/lib/constants";
 import { prisma } from "@/lib/prisma";
 
 import { requireSettingsContext } from "../_context";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Counter & voice · Settings · AwaazOS" };
+export const metadata: Metadata = { title: `Counter & voice · Settings · ${BRAND_NAME}` };
 
 export default async function VoiceSettingsPage() {
   const { vendor } = await requireSettingsContext();

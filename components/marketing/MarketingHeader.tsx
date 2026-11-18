@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { HOME_PATH } from "@/lib/home";
 import { cn } from "@/lib/utils";
+import { BRAND_NAME } from "@/lib/brand";
 
 // Phone section pills: the link is the 44px hit area, the pill inside it keeps
 // its 32px look, so the second header row stays as short as it was.
@@ -44,7 +45,7 @@ export function MarketingHeader({ cta, signedIn = false }: { cta: string; signed
             href="/"
             className="inline-flex min-h-11 items-center rounded-md font-display text-xl font-bold tracking-tight text-awaaz-charcoal outline-hidden focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
           >
-            AwaazOS
+            {BRAND_NAME}
           </Link>
           <nav
             aria-label="Primary"

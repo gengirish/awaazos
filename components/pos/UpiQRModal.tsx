@@ -31,6 +31,7 @@ import { counterSaleSource } from "@/lib/pos-sale-source";
 import { discountLabel } from "@/lib/offers";
 import type { PayTotals } from "@/lib/pos-totals";
 import { cn } from "@/lib/utils";
+import { BRAND_NAME } from "@/lib/brand";
 
 /** A sale that committed now, or one saved on the device to sync later. */
 /** `clientRef` is what Undo reverts by (lib/pos-undo.ts). */
@@ -130,7 +131,7 @@ export function UpiQRModal({
   }
 
   const effectiveName = (upiName?.trim() || stallName || "Merchant").slice(0, 80);
-  const billRef = stallName.slice(0, 40) || "AwaazOS";
+  const billRef = stallName.slice(0, 40) || `${BRAND_NAME}`;
 
   // A fresh intent per amount, so the QR always asks for this bill's total.
   const upiLink =

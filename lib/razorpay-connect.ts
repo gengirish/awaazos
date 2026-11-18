@@ -1,3 +1,5 @@
+import { BRAND_NAME } from "@/lib/brand";
+
 /**
  * "Connect Razorpay" links and where the flow comes back to. Pure, client-safe.
  *
@@ -42,7 +44,7 @@ const OUTCOMES: Record<string, { text: string; ok: boolean }> = {
   },
   upgrade: { text: "Online payments are on the Starter plan.", ok: false },
   owner_only: { text: "Only the owner of this store can connect Razorpay.", ok: false },
-  unavailable: { text: "Connect Razorpay isn't switched on for AwaazOS yet. Please use API keys.", ok: false },
+  unavailable: { text: `Connect Razorpay isn't switched on for ${BRAND_NAME} yet. Please use API keys.`, ok: false },
   error: { text: "Couldn't connect to Razorpay. Please try again in a minute.", ok: false },
 };
 

@@ -4,8 +4,9 @@ import { PLAN_MARKETING, TRIAL_THEN_NOTE } from "@/lib/plan-copy";
 import { REFERRED_TRIAL_DAYS } from "@/lib/referral";
 
 import { SignUpForm } from "./_components/SignUpForm";
+import { BRAND_NAME } from "@/lib/brand";
 
-export const metadata = { title: "Create your store · AwaazOS" };
+export const metadata = { title: `Create your store · ${BRAND_NAME}` };
 
 /**
  * Server component so the call-to-action copy (lib/plan-copy.ts) is passed

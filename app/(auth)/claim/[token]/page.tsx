@@ -5,9 +5,10 @@ import { loadClaim } from "@/lib/demo-store";
 import { DEMO_CLAIM_TTL_DAYS } from "@/lib/demo-store-schema";
 
 import { ClaimStoreForm } from "./_components/ClaimStoreForm";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Claim your store · AwaazOS", robots: { index: false, follow: false } };
+export const metadata = { title: `Claim your store · ${BRAND_NAME}`, robots: { index: false, follow: false } };
 
 /**
  * /claim/<token>: a prospect takes over the demo store built for them

@@ -14,10 +14,11 @@ import { shouldAskToRefer } from "@/lib/referral-server";
 import { loadStorePolishNudge } from "@/lib/store-polish-server";
 import { loadSetupChecklist } from "@/lib/setup-checklist-server";
 import { storeVocabulary } from "@/lib/store-vocabulary";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata = { title: "Orders · AwaazOS" };
+export const metadata = { title: `Orders · ${BRAND_NAME}` };
 
 type Props = { searchParams: Promise<Record<string, string | string[] | undefined>> };
 

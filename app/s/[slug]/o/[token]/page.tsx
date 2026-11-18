@@ -58,6 +58,7 @@ import { buildUpiDeepLink } from "@/lib/upi";
 import { cn } from "@/lib/utils";
 import { whatsappCommunityLabel, whatsappCommunityLink } from "@/lib/whatsapp-community";
 import { storeThemeAttribute } from "@/lib/store-theme";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -198,7 +199,7 @@ export async function generateMetadata(
   const params = await props.params;
   const order = await loadOrder(params.slug, params.token);
   return {
-    title: order ? `Your order — ${order.vendor.name}` : "Not found — AwaazOS",
+    title: order ? `Your order — ${order.vendor.name}` : `Not found — ${BRAND_NAME}`,
     robots: { index: false, follow: false },
     referrer: "no-referrer",
   };

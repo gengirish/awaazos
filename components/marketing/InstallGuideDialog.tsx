@@ -9,6 +9,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { INSTALL_STEPS, type InstallGuide } from "@/lib/install-app";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * Written install steps for this device. Loaded on demand by InstallAppButton
@@ -29,7 +30,7 @@ export default function InstallGuideDialog({
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent>
         <ResponsiveDialogHeader>
-          <ResponsiveDialogTitle>Install AwaazOS</ResponsiveDialogTitle>
+          <ResponsiveDialogTitle>Install {BRAND_NAME}</ResponsiveDialogTitle>
           <ResponsiveDialogDescription>{content.intro}</ResponsiveDialogDescription>
         </ResponsiveDialogHeader>
         <ResponsiveDialogBody>

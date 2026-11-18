@@ -1,4 +1,5 @@
 import { isIOS } from "@/lib/push-client";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * "Install AwaazOS" — which install affordance, if any, this browser can be
@@ -30,13 +31,13 @@ export type InstallEnv = {
 export const INSTALL_DISMISS_KEY = "awz_install_hint_dismissed_v1";
 
 export const INSTALL_COPY = {
-  title: "Install AwaazOS",
+  title: `Install ${BRAND_NAME}`,
   prompt: "Opens from your Home Screen like any app, with order alerts.",
   action: "Install app",
   /** Opens the step-by-step dialog (lib/install-guide.ts). */
   guide: "Show me how",
   /** Same steps as the phone-alerts hint in components/push/PushAlertsButton.tsx. */
-  ios: "On iPhone: tap Share → Add to Home Screen, then open AwaazOS from your Home Screen. Order alerts only work from there.",
+  ios: `On iPhone: tap Share → Add to Home Screen, then open ${BRAND_NAME} from your Home Screen. Order alerts only work from there.`,
   iosShort: "Tap Share → Add to Home Screen",
   inApp: "Open this page in Chrome or Safari to install the app.",
   dismiss: "Dismiss install tip",

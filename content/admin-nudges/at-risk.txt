@@ -1,5 +1,5 @@
-Hi {firstName}, this is {senderName} from AwaazOS.
+Hi {firstName}, this is {senderName} from AwaazDo.
 
-I noticed {storeName} hasn't had a paid order on AwaazOS in {daysIdle} days. Is something getting in the way? If it's the app, tell me what and I'll fix it.
+I noticed {storeName} hasn't had a paid order on AwaazDo in {daysIdle} days. Is something getting in the way? If it's the app, tell me what and I'll fix it.
 
 Your store: {storeUrl}

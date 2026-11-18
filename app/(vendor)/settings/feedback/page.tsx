@@ -10,10 +10,11 @@ import { loadRatingSummary } from "@/lib/order-feedback-server";
 import { prisma } from "@/lib/prisma";
 
 import { requireSettingsContext } from "../_context";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Customer feedback · Settings · AwaazOS" };
+export const metadata: Metadata = { title: `Customer feedback · Settings · ${BRAND_NAME}` };
 
 const SHOWN = 50;
 

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { lastPaymentMethodBlockersFrom, lastPaymentMethodMessage } from "@/components/settings/LastPaymentMethodNotice";
 import { connectOutcomeMessage, razorpayConnectHref } from "@/lib/razorpay-connect";
 import type { StoreKind } from "@/lib/store-vocabulary";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * Vendor connects HER OWN Razorpay account so storefront buyers can pay online
@@ -94,7 +95,7 @@ export function RazorpayKeysClient({
       ? issue.kind === "account"
         ? `Razorpay refused a customer's online payment on ${issue.at}. This usually means your Razorpay account isn't activated yet — finish KYC in the Razorpay Dashboard (Account & Settings → Activation). Customers are offered UPI meanwhile.`
         : method === "oauth"
-          ? `Razorpay stopped accepting AwaazOS's access to your account on ${issue.at}. Tap Reconnect Razorpay.`
+          ? `Razorpay stopped accepting ${BRAND_NAME}'s access to your account on ${issue.at}. Tap Reconnect Razorpay.`
           : `Razorpay rejected your saved keys on ${issue.at}. They may have been regenerated — tap Replace keys and paste the new ones.`
       : null;
   const outcomeMsg = outcomeShown ? connectOutcomeMessage(outcomeShown) : null;
@@ -151,7 +152,7 @@ export function RazorpayKeysClient({
         else if (data.error === "invalid_razorpay_keys")
           setError("Razorpay rejected these keys. Check the Key ID and Key Secret, and that they are from the same mode (live/test).");
         else if (data.error === "payments_not_configured")
-          setError("Online payments aren't switched on for AwaazOS yet. Please contact support.");
+          setError(`Online payments aren't switched on for ${BRAND_NAME} yet. Please contact support.`);
         else if (data.error === "razorpay_unreachable")
           setError("Couldn't reach Razorpay to check your keys. Please try again in a minute.");
         else if (res.status === 403) setError("Only the owner can change payment settings.");
@@ -193,7 +194,7 @@ export function RazorpayKeysClient({
     <p className="text-sm text-muted-foreground">
       Customers pay by UPI, card or netbanking on your store page and the order is marked paid automatically.
       The money goes straight into <strong className="font-semibold text-foreground">your own Razorpay account</strong>{" "}
-      — AwaazOS never touches it. Razorpay&apos;s own fees apply.
+      — {BRAND_NAME} never touches it. Razorpay&apos;s own fees apply.
     </p>
   );
 
@@ -237,7 +238,7 @@ export function RazorpayKeysClient({
       <div className="space-y-3">
         {explainer}
         <p className="text-sm text-amber-700">
-          Online payments aren&apos;t switched on for AwaazOS yet. Please contact support.
+          Online payments aren&apos;t switched on for {BRAND_NAME} yet. Please contact support.
         </p>
       </div>
     );
@@ -313,7 +314,7 @@ export function RazorpayKeysClient({
         <div className="space-y-3">
           {connectButton("Connect Razorpay", true)}
           <p className="text-xs text-muted-foreground">
-            You&apos;ll sign in to Razorpay and approve AwaazOS. Nothing to copy or paste.
+            You&apos;ll sign in to Razorpay and approve {BRAND_NAME}. Nothing to copy or paste.
           </p>
           <p className="text-xs text-muted-foreground">
             <strong className="font-semibold text-foreground">No Razorpay account yet?</strong> Tap Connect Razorpay

@@ -13,11 +13,12 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Notice } from "@/components/ui/notice";
 import { RadioOption } from "@/components/ui/radio-option";
 import { HOME_PATH } from "@/lib/home";
+import { BRAND_NAME } from "@/lib/brand";
 
 const ERRORS: Record<string, string> = {
   invalid_or_expired: "This link has already been used or has expired. Ask for a new one.",
-  email_in_use: "An AwaazOS account already uses this email. Ask for the link to be sent to another email.",
-  wrong_password: "That password doesn't match your AwaazOS account. Try again, or reset it.",
+  email_in_use: `An ${BRAND_NAME} account already uses this email. Ask for the link to be sent to another email.`,
+  wrong_password: `That password doesn't match your ${BRAND_NAME} account. Try again, or reset it.`,
   password_not_set: "Your account has no password yet. Set one with “Forgot password”, then open this link again.",
   name_required: "Enter your name.",
 };
@@ -82,7 +83,7 @@ export function ClaimStoreForm({
         <CardDescription>
           {hasAccount ? (
             <>
-              This store was set up for you. You already have an AwaazOS account as{" "}
+              This store was set up for you. You already have an {BRAND_NAME} account as{" "}
               <span className="font-medium text-foreground">{email}</span> — enter its password to add this store
               to it.
             </>
@@ -111,7 +112,7 @@ export function ClaimStoreForm({
             </div>
           )}
           <div className="space-y-2">
-            <Label htmlFor="password">{hasAccount ? "Your AwaazOS password" : "Password"}</Label>
+            <Label htmlFor="password">{hasAccount ? `Your ${BRAND_NAME} password` : "Password"}</Label>
             <PasswordInput
               id="password"
               autoComplete={hasAccount ? "current-password" : "new-password"}

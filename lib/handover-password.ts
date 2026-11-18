@@ -4,6 +4,8 @@
  * (14 characters, lowercase + digits). Pure and client-safe; `random` is injectable
  * for tests and defaults to crypto.getRandomValues.
  */
+import { BRAND_NAME } from "@/lib/brand";
+
 const LETTERS = "abcdefghjkmnpqrstuvwxyz";
 const DIGITS = "23456789";
 
@@ -23,7 +25,7 @@ export function generateHandoverPassword(random: (n: number) => number[] = crypt
 /** What the admin copies to the seller. No store data beyond the name and link. */
 export function handoverLoginText(p: { storeName: string; email: string; password: string; signInUrl: string }): string {
   return [
-    `Your AwaazOS store "${p.storeName}" is ready.`,
+    `Your ${BRAND_NAME} store "${p.storeName}" is ready.`,
     `Sign in: ${p.signInUrl}`,
     `Email: ${p.email}`,
     `Password: ${p.password}`,

@@ -7,6 +7,7 @@ import manifest from "@/app/manifest";
 import { HOME_PATH } from "@/lib/home";
 import { SW_PUSH_MESSAGE } from "@/lib/order-voice";
 import { safeNotificationPath } from "@/lib/push-client";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * public/sw.js has no build step, so it is loaded into a fake worker global
@@ -98,7 +99,7 @@ describe("sw.js push", () => {
       },
     });
     const [title, opts] = showNotification.mock.calls[0]!;
-    expect(title).toBe("AwaazOS");
+    expect(title).toBe(`${BRAND_NAME}`);
     expect(opts.body).toBe("New activity");
     expect(opts.data).toEqual({ url: "/orders" });
   });

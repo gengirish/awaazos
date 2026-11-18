@@ -6,9 +6,10 @@ import { Badge } from "@/components/ui/badge";
 import { ADMIN_INVITE_TTL_DAYS, listPendingAdminInvites, listPlatformAdmins } from "@/lib/admin-invites";
 import { formatIstDate } from "@/lib/datetime";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Admins — AwaazOS" };
+export const metadata = { title: `Admins — ${BRAND_NAME}` };
 
 /**
  * /admin/admins — SUPER_ADMIN only (404 for anyone else). Invite people to run

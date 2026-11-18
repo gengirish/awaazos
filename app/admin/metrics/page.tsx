@@ -17,9 +17,10 @@ import { AuthError, requirePlatformRole } from "@/lib/rbac";
 import { countByBadge, parseBadgeFilter } from "@/lib/seller-heartbeat";
 import { loadNudgeTemplates, loadSellerHeartbeat, nudgeMessageFor } from "@/lib/seller-heartbeat-server";
 import { cn } from "@/lib/utils";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Admin metrics — AwaazOS" };
+export const metadata = { title: `Admin metrics — ${BRAND_NAME}` };
 
 const IST_DATE_TIME_FORMAT = new Intl.DateTimeFormat("en-IN", {
   dateStyle: "medium",
@@ -136,7 +137,7 @@ export default async function AdminMetricsPage(props: {
       </a>
       <header className="mx-auto mb-6 max-w-5xl">
         <p className="text-xs font-medium uppercase tracking-wider text-muted-foreground">Internal · Admin</p>
-        <h1 className="mt-1 font-display text-3xl font-bold text-foreground">AwaazOS — weekly health</h1>
+        <h1 className="mt-1 font-display text-3xl font-bold text-foreground">{BRAND_NAME} — weekly health</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Last 7 complete days in IST, {windowLabel} · Generated {generatedAt}
         </p>

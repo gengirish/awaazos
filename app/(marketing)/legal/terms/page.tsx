@@ -4,10 +4,11 @@ import { BUSINESS_NAME, BusinessDetails } from "@/components/legal/BusinessDetai
 import { TRIAL_DAYS } from "@/lib/constants";
 import { PLAN_MARKETING } from "@/lib/plan-copy";
 import { REFERRED_TRIAL_DAYS } from "@/lib/referral";
+import { BRAND_FORMER_NAME, BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Terms of Service — AwaazOS",
-  description: "Terms governing use of AwaazOS.",
+  title: `Terms of Service — ${BRAND_NAME}`,
+  description: `Terms governing use of ${BRAND_NAME}.`,
 };
 
 const starter = PLAN_MARKETING.STARTER;
@@ -16,13 +17,13 @@ export default function TermsPage() {
   return (
     <>
       <h1>Terms of Service</h1>
-      <p>Last updated: 08 November 2026</p>
+      <p>Last updated: 13 November 2026</p>
 
       <h2>Acceptance</h2>
-      <p>By using AwaazOS, you agree to these Terms.</p>
+      <p>By using {BRAND_NAME}, you agree to these Terms.</p>
 
       <h2>Who we are</h2>
-      <p>AwaazOS is provided by:</p>
+      <p>{BRAND_NAME} (formerly {BRAND_FORMER_NAME}) is provided by:</p>
       <BusinessDetails />
 
       <h2>Account responsibilities</h2>
@@ -33,7 +34,7 @@ export default function TermsPage() {
 
       <h2>Allowed use</h2>
       <ul>
-        <li>Use AwaazOS only for lawful commercial activities.</li>
+        <li>Use {BRAND_NAME} only for lawful commercial activities.</li>
         <li>No abuse of API routes, no credential stuffing, no reverse engineering attempts.</li>
       </ul>
 
@@ -72,8 +73,8 @@ export default function TermsPage() {
 
       <h2>Orders placed with sellers</h2>
       <p>
-        Kitchens, shops and other sellers that use AwaazOS sell to their own customers. Each seller is responsible
-        for its products, prices, taxes, delivery, cancellations and refunds. AwaazOS provides the software only: it
+        Kitchens, shops and other sellers that use {BRAND_NAME} sell to their own customers. Each seller is responsible
+        for its products, prices, taxes, delivery, cancellations and refunds. {BRAND_NAME} provides the software only: it
         is not a party to the sale and does not collect, hold or settle buyers’ payments. A buyer pays the seller
         directly: by UPI, through the seller’s own Razorpay account, or in cash on delivery.
       </p>
@@ -86,7 +87,7 @@ export default function TermsPage() {
 
       <h2>Limitation of liability</h2>
       <p>
-        To the maximum extent permitted by law, AwaazOS is provided on an “as is” basis and {BUSINESS_NAME} is
+        To the maximum extent permitted by law, {BRAND_NAME} is provided on an “as is” basis and {BUSINESS_NAME} is
         not liable for indirect, incidental, or consequential damages.
       </p>
 

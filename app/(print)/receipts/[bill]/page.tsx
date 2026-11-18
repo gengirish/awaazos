@@ -7,11 +7,12 @@ import { AuthError, requireVendorRole } from "@/lib/rbac";
 import { parseReceiptPaper, RECEIPT_PAPER } from "@/lib/receipt";
 import { loadVendorReceipt } from "@/lib/receipt-data";
 import { cn } from "@/lib/utils";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export const metadata: Metadata = { title: "Receipt · AwaazOS", robots: { index: false, follow: false } };
+export const metadata: Metadata = { title: `Receipt · ${BRAND_NAME}`, robots: { index: false, follow: false } };
 
 /**
  * Printable receipt for one bill, staff only. Paper width comes from

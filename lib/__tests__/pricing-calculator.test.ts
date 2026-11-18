@@ -18,6 +18,7 @@ import {
   wholeRupeesToPaise,
   type PricingInputs,
 } from "@/lib/pricing-calculator";
+import { BRAND_NAME } from "@/lib/brand";
 
 // Fixed prices, so a change of list price does not move the arithmetic below.
 const c: PricingInputs = { ...PRICING_DEFAULTS, flatPaise: 29900, capPaise: 29900, annualPaise: 299000 };
@@ -107,7 +108,7 @@ describe("pricing calculator", () => {
     expect(newAccountOfferSavingPaise(1_00_000_00, { ...c, gatewayShareBps: 0 })).toBe(0);
   });
 
-  it("takes Razorpay's fee on the whole amount AwaazOS collects", () => {
+  it(`takes Razorpay's fee on the whole amount ${BRAND_NAME} collects`, () => {
     // ₹352.82 charged: 2% = ₹7.05, + ₹1.26 GST.
     expect(platformGatewayCostPaise("flat", 1_00_000_00, c)).toBe(8_31);
     // ₹3,528.20 once a year: 2% = ₹70.56, + ₹12.70 GST = ₹83.26, over 12 months.

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { PLAN_MARKETING, TRIAL_THEN_NOTE } from "@/lib/plan-copy";
+import { BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
 
 type MockStore = {
   name: string;
@@ -119,12 +120,12 @@ export function Hero() {
     <section className="relative overflow-hidden bg-linear-to-b from-awaaz-cream/80 to-background px-4 pb-16 pt-10 sm:px-6 sm:pb-20 sm:pt-14">
       <div className="mx-auto grid max-w-6xl gap-12 lg:grid-cols-2 lg:items-center lg:gap-16">
         <div>
-          <p className="font-display text-xl font-bold tracking-wide text-awaaz-orange sm:text-2xl">Bol. Bill. Becho.</p>
+          <p className="font-display text-xl font-bold tracking-wide text-awaaz-orange sm:text-2xl">{BRAND_TAGLINE}</p>
           <h1 className="mt-2 font-display text-4xl font-bold leading-tight tracking-tight text-balance text-awaaz-charcoal sm:text-5xl">
             Take orders from Instagram and WhatsApp without the chat chaos
           </h1>
           <p className="mt-4 max-w-xl text-lg text-awaaz-charcoal/85 sm:text-xl">
-            Tell AwaazOS what you&apos;re making this Saturday, by voice or by typing. It builds your store link, takes the
+            Tell {BRAND_NAME} what you&apos;re making this Saturday, by voice or by typing. It builds your store link, takes the
             orders and gets you paid.
           </p>
           <div className="mt-8 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">

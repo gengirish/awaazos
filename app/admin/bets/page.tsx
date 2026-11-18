@@ -9,9 +9,10 @@ import { loadActivation, loadBets, loadTimeline } from "@/lib/admin-bets-server"
 import { getAdminMetrics } from "@/lib/admin-metrics";
 import { loadOrderFunnel } from "@/lib/order-funnel-server";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Bets and timeline — AwaazOS" };
+export const metadata = { title: `Bets and timeline — ${BRAND_NAME}` };
 
 const IST_DATE_TIME_FORMAT = new Intl.DateTimeFormat("en-IN", {
   dateStyle: "medium",

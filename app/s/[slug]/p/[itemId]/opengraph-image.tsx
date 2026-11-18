@@ -3,6 +3,7 @@ import { ImageResponse } from "next/og";
 import { formatPercentBps } from "@/lib/offers";
 import { OG_COLORS as C, Price, storeLogoDataUrl, truncate } from "@/lib/og-parts";
 import { loadStorefrontProduct, type StorefrontProduct } from "@/lib/storefront-product";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * Link-preview card for a product link, /s/<slug>/p/<menuItemId>: what
@@ -23,7 +24,7 @@ import { loadStorefrontProduct, type StorefrontProduct } from "@/lib/storefront-
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-export const alt = "Order on AwaazOS";
+export const alt = `Order on ${BRAND_NAME}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
@@ -45,7 +46,7 @@ function GenericCard() {
         fontFamily: "sans-serif",
       }}
     >
-      <div style={{ display: "flex", fontSize: 72, fontWeight: 700 }}>Order on AwaazOS</div>
+      <div style={{ display: "flex", fontSize: 72, fontWeight: 700 }}>{`Order on ${BRAND_NAME}`}</div>
       <div style={{ display: "flex", fontSize: 36, color: C.muted, marginTop: 16 }}>Order online from local stores</div>
     </div>
   );

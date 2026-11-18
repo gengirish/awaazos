@@ -17,6 +17,7 @@ import {
   type OwnerSurveyAnswers,
 } from "@/lib/owner-survey";
 import { cn } from "@/lib/utils";
+import { BRAND_NAME } from "@/lib/brand";
 
 const CHOICE =
   "flex min-h-11 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 text-sm has-[:checked]:border-primary has-[:checked]:bg-primary/10 has-[:focus-visible]:ring-2 has-[:focus-visible]:ring-ring";
@@ -190,7 +191,7 @@ export function OwnerSurveyForm({
 
       <RadioChoices
         name="willing-to-pay"
-        legend="If AwaazOS fixed the problem that hurts most, what would you pay a month?"
+        legend={`If ${BRAND_NAME} fixed the problem that hurts most, what would you pay a month?`}
         options={WILLING_TO_PAY_BANDS}
         value={willingToPay}
         onChange={(key) => {

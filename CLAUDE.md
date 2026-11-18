@@ -167,6 +167,9 @@ file only a rule that applies across areas.
   on reads, settings, billing, export or finishing an existing order. Code that loads a vendor without
   `requireVendorRole` must select `planExpiresAt` **and** `trialEndsAt`. `plan` / `planExpiresAt` are
   written only through `recordSubscriptionEvent`.
+- **Product name:** shown names read `BRAND_NAME` / `BRAND_TAGLINE` / `BRAND_SIGNOFF` (`lib/brand.ts`), never a
+  literal; `lib/__tests__/brand.test.ts` fails on the former name. Device- and system-held identifiers keep the old
+  spelling (`awaazos-pos`, `awz_*`, `AWZ-`, manifest `id`): see `docs/REBRAND_AWAAZDO_PLAN.md`.
 - **In-app Help:** when you rename a screen, Settings section or button the guide quotes, update
   `lib/help-guide.ts`.
 

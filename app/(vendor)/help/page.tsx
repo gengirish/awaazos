@@ -9,6 +9,7 @@ import { HelpVideoButton } from "@/components/help/HelpVideoButton";
 import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
 import { appNavIcon } from "@/components/shell/nav-icons";
 import { appNavItemsForRole, appTabBarForRole } from "@/lib/app-nav";
+import { BRAND_NAME } from "@/lib/brand";
 import {
   helpGroupsFor,
   helpScreenSummary,
@@ -24,7 +25,7 @@ import { getShellContext } from "../_shell-context";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Help · AwaazOS" };
+export const metadata: Metadata = { title: `Help · ${BRAND_NAME}` };
 
 /** "A, B and C" */
 function listOf(labels: string[]): string {

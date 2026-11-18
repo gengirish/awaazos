@@ -6,10 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
+import { BRAND_NAME } from "@/lib/brand";
 import { generateHandoverPassword, handoverLoginText } from "@/lib/handover-password";
 
 const ERROR_TEXT: Record<string, string> = {
-  email_in_use: "This email already has an AwaazOS account. Send them a claim link instead, so they sign in with their own password.",
+  email_in_use: `This email already has an ${BRAND_NAME} account. Send them a claim link instead, so they sign in with their own password.`,
   not_a_demo_store: "This store has already been handed over.",
   not_found: "This demo store no longer exists. Refresh the page.",
   name_required: "Enter the seller's name.",

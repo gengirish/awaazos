@@ -3,6 +3,7 @@ import { Baloo_2, Nunito } from "next/font/google";
 import { CookieConsentBanner } from "@/components/legal/CookieConsentBanner";
 import { COOKIE_PREF_BOOT_SCRIPT } from "@/lib/cookie-pref";
 import "./globals.css";
+import { BRAND_NAME } from "@/lib/brand";
 
 const baloo = Baloo_2({
   subsets: ["latin", "latin-ext"],
@@ -17,11 +18,11 @@ const nunito = Nunito({
 });
 
 export const metadata: Metadata = {
-  title: "AwaazOS — Orders and UPI billing for Instagram and WhatsApp sellers",
+  title: `${BRAND_NAME} — Orders and UPI billing for Instagram and WhatsApp sellers`,
   description:
     "For home businesses on Instagram and WhatsApp, from bakers and home kitchens to herbal teas, candles and crafts: one store link, pre-orders with a cut-off, online payments that mark orders paid, one orders board and counter billing.",
   // iPhone: Home Screen install is what unlocks web push (iOS 16.4+).
-  appleWebApp: { capable: true, title: "AwaazOS", statusBarStyle: "default" },
+  appleWebApp: { capable: true, title: `${BRAND_NAME}`, statusBarStyle: "default" },
   icons: { apple: "/apple-touch-icon.png" },
 };
 

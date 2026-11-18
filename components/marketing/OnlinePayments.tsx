@@ -1,4 +1,5 @@
 import { CheckCircle2, CreditCard, Landmark, UserPlus, Wallet } from "lucide-react";
+import { BRAND_NAME } from "@/lib/brand";
 
 // The one payment story of the landing page (the feature grid doesn't repeat it).
 // Only what ships (lib/razorpay-oauth.ts, Settings → Payments). The money settles
@@ -12,7 +13,7 @@ const points = [
   {
     icon: Landmark,
     title: "The money is yours",
-    description: "It goes straight into your own Razorpay account. AwaazOS never touches it. Razorpay's own fees apply.",
+    description: `It goes straight into your own Razorpay account. ${BRAND_NAME} never touches it. Razorpay's own fees apply.`,
   },
   {
     icon: UserPlus,

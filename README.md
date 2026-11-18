@@ -1,4 +1,4 @@
-# AwaazOS — Bol. Bill. Becho.
+# AwaazOS — Banao. Batao. Becho.
 
 > **Orders, UPI billing and receipts for India's home kitchens that sell on Instagram and WhatsApp.**
 > Post a batch with a cut-off or an everyday menu → buyers order from your link in bio or on WhatsApp → paid by UPI → cook list and delivery list on the day → receipt on WhatsApp. Voice POS for counter sales. 30 days free.
@@ -398,4 +398,4 @@ Proprietary. © 2026 AwaazOS · IntelliForge AI. Code published for transparency
 
 ## 🇮🇳 Acknowledgements
 
-Built for the chai-wala in Hyderabad, the dosa cart in Bengaluru, the kirana shop in Indore, and the paan stall in Kolkata. **Bol. Bill. Becho.**
+Built for the chai-wala in Hyderabad, the dosa cart in Bengaluru, the kirana shop in Indore, and the paan stall in Kolkata. **Banao. Batao. Becho.**

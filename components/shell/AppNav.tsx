@@ -13,6 +13,7 @@ import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTr
 import { APP_CENTRE_TAB, appNavItemsForRole, appTabBarForRole, isAppNavItemActive } from "@/lib/app-nav";
 import type { StoreKind } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
+import { BRAND_NAME } from "@/lib/brand";
 
 export type AppNavProps = {
   /** The signed-in staff member's role at this vendor (`StaffMember.role`). */
@@ -192,7 +193,7 @@ export function AppRail({ role, vendorId, vendorName, storeKind }: AppNavProps) 
       data-testid="app-rail"
       className="app-shell-chrome fixed bottom-[var(--cookie-banner-h,0px)] left-0 top-0 z-30 hidden w-[var(--app-rail-w)] flex-col border-r border-border bg-background md:flex"
     >
-      <p className="px-2 pb-1 pt-4 text-center font-display text-sm font-semibold text-foreground">AwaazOS</p>
+      <p className="px-2 pb-1 pt-4 text-center font-display text-sm font-semibold text-foreground">{BRAND_NAME}</p>
       <ul className="flex-1 space-y-1 overflow-y-auto px-1.5 py-2">
         {items.map((item) => {
           const active = isAppNavItemActive(item.href, pathname);
