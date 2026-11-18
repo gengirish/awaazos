@@ -1,6 +1,8 @@
 import type { NextAuthConfig } from "next-auth";
 import type { UserRole } from "@prisma/client";
 
+import { canonicalHostFrom, flagOn, legacyHostRedirect } from "@/lib/canonical-host";
+
 /** PWA files fetched by the browser without a session (also excluded in the middleware matcher). */
 const PUBLIC_PWA_FILES = new Set([
   "/sw.js",
@@ -60,6 +62,18 @@ export const authConfig = {
   callbacks: {
     authorized({ auth, request }) {
       const pathname = request.nextUrl.pathname;
+      // Domain move (lib/canonical-host.ts): does nothing until CANONICAL_HOST is set.
+      // Runs before the session check, so a signed-out visitor on the old host
+      // signs in on the new one instead of being sent to the old /sign-in first.
+      const moveTo = legacyHostRedirect({
+        host: request.headers.get("host"),
+        method: request.method,
+        pathname,
+        search: request.nextUrl.search,
+        canonicalHost: canonicalHostFrom(process.env.CANONICAL_HOST),
+        redirectPos: flagOn(process.env.LEGACY_HOST_REDIRECT_POS),
+      });
+      if (moveTo) return Response.redirect(moveTo, 308);
       if (isPublicPath(pathname)) return true;
       // App Router API routes: let handlers return JSON 401/403/402. If middleware
       // returns false, Auth.js redirects to /sign-in; fetch() follows 302/307 and
