@@ -90,6 +90,35 @@ test.describe("POS transaction + atomic billing", () => {
     expect(a.transaction.billNumber).not.toBe(b.transaction.billNumber);
   });
 
+  test("concurrent sales each get their own bill number, with no gaps", async ({ page, request }) => {
+    await createVendorSession(page, request, "pos-race");
+    const item = await createMenuItem(page, { name: "Pani Puri", priceInRupees: 30 });
+    const items = [{ menuItemId: item.id, name: item.name, priceInPaise: item.priceInPaise, qty: 1 }];
+
+    // Two phones at one counter ringing up at the same moment, the first sale
+    // of the day included (that's when BillSequence's upsert has to create the row).
+    const N = 8;
+    const responses = await Promise.all(
+      Array.from({ length: N }, () =>
+        page.request.post("/api/transactions", {
+          data: cartBody(items),
+          headers: { "Content-Type": "application/json" },
+        }),
+      ),
+    );
+    const statuses = responses.map((r) => r.status());
+    expect(statuses, "every concurrent sale must commit").toEqual(Array(N).fill(201));
+
+    const bills = await Promise.all(
+      responses.map(async (r) => ((await r.json()) as TransactionCreated).transaction.billNumber),
+    );
+    for (const b of bills) expect(b).toMatch(BILL_NUMBER);
+    expect(new Set(bills).size, "no two sales share a bill number").toBe(N);
+    const seqs = bills.map((b) => Number(b.slice(-4))).sort((x, y) => x - y);
+    expect(seqs).toEqual(Array.from({ length: N }, (_, i) => seqs[0] + i));
+    expect(seqs[0]).toBe(1);
+  });
+
   test("rejects a client-tampered subtotal and a tampered total", async ({ page, request }) => {
     await createVendorSession(page, request, "pos-tamper");
     const item = await createMenuItem(page, { name: "Lassi", priceInRupees: 40 });
