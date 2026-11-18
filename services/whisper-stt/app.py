@@ -1,5 +1,5 @@
 """
-AwaazOS self-hosted Whisper STT — faster-whisper HTTP service.
+AwaazDo self-hosted Whisper STT — faster-whisper HTTP service.
 
 POST /v1/transcribe
   Authorization: Bearer <WHISPER_STT_SECRET>
@@ -56,7 +56,7 @@ async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
     yield
 
 
-app = FastAPI(title="AwaazOS Whisper STT", lifespan=lifespan)
+app = FastAPI(title="AwaazDo Whisper STT", lifespan=lifespan)
 
 
 def require_auth(

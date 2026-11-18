@@ -1,11 +1,12 @@
 # Rebrand: AwaazOS → AwaazDo
 
-Status: Step 1 built 2026-11-13 as a draft PR, **not to be merged until the name is cleared**. The Step 0
-trademark check found conflicts: Awaaz De Infosystems holds class 42 marks "Awaaz.De" (voice/IVR software),
-awaazdo.in is a pre-launch complaints platform, and Sony holds "Awaaz" in class 9. "AwaazDo" is therefore a
-placeholder. The code reads the name from `lib/brand.ts`, so a different name is a one-line change there plus the
-files that can't import it (`public/sw.js`, `public/offline.html`, `content/admin-nudges/*.txt`,
-`e2e/mobile-sweep.baseline.json`). Prose docs keep "AwaazOS" until the name is final; only the tagline changed in them.
+Status: **Step 1 is live.** PR #203 merged 18/11/2026 and the product reads AwaazDo in production; prose docs and
+agent rules followed in a docs PR the same day. Step 2 (outside the code) is open. The founder confirmed the name
+cleared on 18/11/2026; the Step 0 search had found Awaaz De Infosystems' class 42 marks "Awaaz.De" (voice/IVR
+software), awaazdo.in (a pre-launch complaints platform) and Sony's "Awaaz" in class 9. If the name has to change again,
+the code reads it from `lib/brand.ts`, so it is a one-line change there plus the files that can't import it
+(`public/sw.js`, `public/offline.html`, `content/admin-nudges/*.txt`, `e2e/mobile-sweep.baseline.json`), and a
+`git grep AwaazDo` over the prose docs.
 
 - **Name:** AwaazDo ("awaaz do": give a shout, call it out). It fits the product a seller uses now: they
   announce a drop and buyers come. "OS" came from the counter POS days.
@@ -129,7 +130,7 @@ and `/s/**`. Redirect only marketing pages, and mint new links on the new host. 
 
 ## Order
 
-1. Step 0 checks. Stop if the trademark search finds a conflict.
-2. Step 1 as one PR (about a day of work, mostly copy and test updates).
-3. Step 2 in the days after merge.
+1. Step 0 checks. Conflicts found 13/11/2026; name confirmed cleared 18/11/2026.
+2. Step 1 as one PR: done (#203, live 18/11/2026), prose docs the same day.
+3. Step 2 in the days after merge: open.
 4. Step 3 is undecided (the domain is held and serving; the move itself is not planned).

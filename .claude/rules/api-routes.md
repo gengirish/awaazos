@@ -1,11 +1,11 @@
 ---
-description: Next.js App Router API conventions for AwaazOS
+description: Next.js App Router API conventions for AwaazDo
 paths: ["app/api/**/*.ts"]
 ---
 
 <!-- Generated from .cursor/rules/api-routes.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
 
-# API Route Conventions — AwaazOS
+# API Route Conventions — AwaazDo
 
 ## Route template
 

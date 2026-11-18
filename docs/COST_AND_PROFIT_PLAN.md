@@ -4,7 +4,7 @@ Status: step 1 (cost price) merged 2026-11-12 (#199); step 2 (purchases) built o
 steps 3 and 4 not started. Written 2026-11-12.
 
 Why: a clothing seller (House of Kaara) ran her stock in a small app she built for herself before
-she came to us. It did three things AwaazOS does not: it kept a **cost price** per dress, a dated
+she came to us. It did three things AwaazDo does not: it kept a **cost price** per dress, a dated
 record of every **purchase**, and a report of **profit** and **value of stock left**. Moving her
 over without them takes away the report she built the app for. Stock per size, the fourth thing it
 did, we already have (`docs/INVENTORY_PLAN.md`, phase 2).
@@ -28,7 +28,7 @@ photos in IndexedDB `house_of_kaara_db` / `productImages`).
 
 ## What we have and what is missing
 
-| Her app | AwaazOS today |
+| Her app | AwaazDo today |
 | --- | --- |
 | Stock per size | Yes: `ItemVariant`, per-variant stock, sold online and at the counter |
 | Price actually taken per sale | Yes: `OrderItem.priceInPaise` and `discountPaise` are snapshots |
@@ -181,7 +181,7 @@ off in production until the remaining phase 2 work in `docs/INVENTORY_PLAN.md` l
 2. Should a purchase at a new cost change the item's cost without asking, or ask each time? Built as:
    it changes it, and the dialog says so under the cost field.
 3. Does profit sit behind a plan?
-4. Does she want her past sales visible inside AwaazOS at all? If yes, the smallest honest form is
-   a "before AwaazOS" total per item on the report, not bills.
+4. Does she want her past sales visible inside AwaazDo at all? If yes, the smallest honest form is
+   a "before AwaazDo" total per item on the report, not bills.
 5. The folder we read is the code only. Is her live data in the browser she still uses, and is she
    willing to run the export?

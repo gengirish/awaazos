@@ -1,9 +1,9 @@
 ---
 name: awaazos-claude-pipeline
-description: Build the AwaazOS voice → Claude → cart pipeline. Use when implementing /api/ai/parse-order, /api/ai/transcribe, lib/anthropic.ts, lib/sarvam.ts, hooks/useVoiceOrder.ts, or workers/voiceLog.worker.ts. Covers two-tier Haiku/Sonnet routing, Anthropic tool-use, ephemeral prompt caching, Indic numeral normalization, and the Sarvam STT plumbing.
+description: Build the AwaazDo voice → Claude → cart pipeline. Use when implementing /api/ai/parse-order, /api/ai/transcribe, lib/anthropic.ts, lib/sarvam.ts, hooks/useVoiceOrder.ts, or workers/voiceLog.worker.ts. Covers two-tier Haiku/Sonnet routing, Anthropic tool-use, ephemeral prompt caching, Indic numeral normalization, and the Sarvam STT plumbing.
 ---
 
-# AwaazOS Voice Pipeline
+# AwaazDo Voice Pipeline
 
 This is the project's core differentiator. Read these in order before writing
 any voice/AI code.

@@ -76,7 +76,7 @@ function hookHtml(reel: PainReel, posterDataUri: string): string {
 
 function endHtml(accent: string): string {
   return `<div style="width:${W}px;height:${H}px;background:${gradient(accent)};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;box-sizing:border-box;padding:0 80px;text-align:center;color:#fff;font-family:'Baloo 2',system-ui,sans-serif">
-    <p style="margin:0;font-weight:800;font-size:72px;letter-spacing:.5px;opacity:.9">AwaazOS</p>
+    <p style="margin:0;font-weight:800;font-size:72px;letter-spacing:.5px;opacity:.9">AwaazDo</p>
     <p style="margin:0;font-weight:800;font-size:116px;line-height:1.05;text-wrap:balance;text-shadow:0 4px 20px rgba(0,0,0,.3)">Apna store, ${TRIAL_DAYS} din free</p>
     <p style="margin:0;font-weight:600;font-size:54px;opacity:.95">No card needed. No commission.</p>
     <p style="margin:24px 0 0;font-weight:800;font-size:52px;background:#fff;color:${accent};padding:18px 44px;border-radius:999px">${SITE}</p>

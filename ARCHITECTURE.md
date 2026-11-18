@@ -1,4 +1,4 @@
-# AwaazOS — Architecture
+# AwaazDo — Architecture
 
 A working blueprint of the system as it ships today. Read this top-to-bottom before changing the data model, the AI pipeline, or the deploy topology.
 
@@ -489,7 +489,7 @@ flowchart TD
 
 | Layer | Enum | Values | Stored on | Purpose |
 | --- | --- | --- | --- | --- |
-| Platform | `UserRole` | `USER`, `ADMIN`, `SUPER_ADMIN` | `User.role` | AwaazOS internal admin (us); `/admin/metrics` needs `ADMIN`+; `/admin/vendors` (free access) needs `SUPER_ADMIN` |
+| Platform | `UserRole` | `USER`, `ADMIN`, `SUPER_ADMIN` | `User.role` | AwaazDo internal admin (us); `/admin/metrics` needs `ADMIN`+; `/admin/vendors` (free access) needs `SUPER_ADMIN` |
 | Tenant | `StaffRole` | `OWNER`, `MANAGER`, `CASHIER` | `StaffMember.role` | Per-vendor permissions |
 
 A `User` can be staff at multiple `Vendor`s (multi-org). Active vendor resolution priority: `?vendor=` query param → `awz_vendor` cookie → oldest membership. When `requireVendorRole` returns a non-null `setVendorCookie`, the route sets that cookie on its response.
@@ -662,7 +662,7 @@ The Playwright job is still defined (Postgres 15 service, `prisma db push`, chro
 
 ## 10. What we're NOT building
 
-To stay focused, AwaazOS is explicitly **not**:
+To stay focused, AwaazDo is explicitly **not**:
 
 - A delivery aggregator (no rider network, no Zomato-style discovery)
 - An inventory ERP (we'll do simple deduct, not multi-warehouse)
@@ -817,13 +817,13 @@ An `Offer` is a vendor's quantity plan ("4+ quiches incl. 1 paneer → 10% off")
 
 **Status:** Accepted · **Date:** 2026-10-05
 
-**Context.** Buyers want to pay online at order time. The simplest build is to collect through AwaazOS's own Razorpay account (already used for subscriptions) and pay vendors out. That makes AwaazOS hold and settle third-party money, which under RBI's payment-aggregator guidelines requires PA authorisation, net-worth thresholds and escrow — out of reach and out of scope.
+**Context.** Buyers want to pay online at order time. The simplest build is to collect through AwaazDo's own Razorpay account (already used for subscriptions) and pay vendors out. That makes AwaazDo hold and settle third-party money, which under RBI's payment-aggregator guidelines requires PA authorisation, net-worth thresholds and escrow — out of reach and out of scope.
 
-**Decision.** Online storefront payments go through the **vendor's own Razorpay account**. She pastes her key id, key secret and webhook secret in Settings; secrets are AES-256-GCM encrypted with `PAYMENT_KEYS_ENCRYPTION_KEY` (`lib/secret-box.ts`) and never logged or returned. `lib/storefront-razorpay.ts` calls the Razorpay API with plain `fetch` per vendor (the SDK is a single-account singleton). Platform `RAZORPAY_*` keys and `lib/razorpay.ts` remain for AwaazOS's own billing only. Each vendor's webhook has its own URL, so the path selects which secret to verify against.
+**Decision.** Online storefront payments go through the **vendor's own Razorpay account**. She pastes her key id, key secret and webhook secret in Settings; secrets are AES-256-GCM encrypted with `PAYMENT_KEYS_ENCRYPTION_KEY` (`lib/secret-box.ts`) and never logged or returned. `lib/storefront-razorpay.ts` calls the Razorpay API with plain `fetch` per vendor (the SDK is a single-account singleton). Platform `RAZORPAY_*` keys and `lib/razorpay.ts` remain for AwaazDo's own billing only. Each vendor's webhook has its own URL, so the path selects which secret to verify against.
 
 **Consequences.**
 
-- Money settles straight to the vendor; AwaazOS never touches it, so no PA licence and no payout reconciliation.
+- Money settles straight to the vendor; AwaazDo never touches it, so no PA licence and no payout reconciliation.
 - Onboarding friction: a vendor needs a Razorpay account (KYC). UPI intent + UTR and pay on delivery stay first-class so the feature works without one.
 - The order webhook cannot verify HMAC before *any* DB read — it must load that vendor's encrypted secret first. It reads only that column, and unknown vendor / bad signature both return 400.
 - Losing `PAYMENT_KEYS_ENCRYPTION_KEY` means every vendor re-enters keys; rotating it needs a re-encrypt pass.

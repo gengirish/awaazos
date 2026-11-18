@@ -55,7 +55,7 @@ Stores refer other stores; buyers are not part of it. Rules in the header of `li
 (pure), database side in `lib/referral-server.ts`; design in `docs/REFERRALS.md`.
 
 - The code is the referrer's slug: `/sign-up?ref=<slug>`, shared from Settings → Refer a seller
-  (OWNER: link, wa.me text, story image) and carried by the "Powered by AwaazOS" footer on
+  (OWNER: link, wa.me text, story image) and carried by the "Powered by AwaazDo" footer on
   `/s/[slug]`, the buyer's order page and `/r/[token]` (not on demo stores). The sign-up page keeps
   the code in localStorage for 30 days and posts it as `ref`.
 - `POST /api/auth/register` sets `Vendor.referredByVendorId` once (`resolveReferrerForSignUp`:

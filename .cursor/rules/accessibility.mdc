@@ -4,7 +4,7 @@ globs: ["**/*.tsx"]
 alwaysApply: false
 ---
 
-# Accessibility — AwaazOS
+# Accessibility — AwaazDo
 
 The POS screen is mobile-first (390px) and the **primary input is voice**.
 Every voice-only path MUST have a tap fallback (`QuickAddGrid`).

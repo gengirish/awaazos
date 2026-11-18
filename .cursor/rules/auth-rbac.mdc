@@ -4,7 +4,7 @@ globs: ["app/api/**/*.ts", "app/(vendor)/**/*.tsx", "app/(onboarding)/**/*.tsx",
 alwaysApply: false
 ---
 
-# Auth.js v5 + RBAC — AwaazOS
+# Auth.js v5 + RBAC — AwaazDo
 
 ## The edge split (mandatory)
 

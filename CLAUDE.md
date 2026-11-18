@@ -2,7 +2,7 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
-AwaazOS is multi-tenant pre-ordering and billing for Instagram and WhatsApp home sellers: cloud
+AwaazDo (formerly AwaazOS) is multi-tenant pre-ordering and billing for Instagram and WhatsApp home sellers: cloud
 kitchens first (ICP in `docs/ICP.md`), other home businesses too (the first, from 2026-10-31, sells
 holistic wellness products): storefront link in bio → Drops with a cut-off → UPI → orders board
 and prep sheet.

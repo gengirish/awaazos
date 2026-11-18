@@ -14,7 +14,7 @@ until that column exists.
 
 ## Where we were
 
-AwaazOS was installable but not offline-capable:
+AwaazDo was installable but not offline-capable:
 
 - `app/manifest.ts` serves a standalone manifest (`start_url: "/pos"`, maskable icons). It was added so
   iPhones can receive Web Push.
