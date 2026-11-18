@@ -6,7 +6,8 @@ import "./globals.css";
 import { BRAND_NAME } from "@/lib/brand";
 
 const baloo = Baloo_2({
-  subsets: ["latin", "latin-ext"],
+  // devanagari: the "दो" in the logo (components/brand/BrandLogo.tsx).
+  subsets: ["latin", "latin-ext", "devanagari"],
   variable: "--font-baloo",
   display: "swap",
 });

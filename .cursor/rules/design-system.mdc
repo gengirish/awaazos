@@ -8,7 +8,11 @@ alwaysApply: false
 
 ## Brand
 
-- **Name and tagline:** `BRAND_NAME` / `BRAND_TAGLINE` in `lib/brand.ts` ("Banao. Batao. Becho.", always Latin script in UI; आवाज़ in logo only). Never write the name as a literal.
+- **Name and tagline:** `BRAND_NAME` / `BRAND_TAGLINE` in `lib/brand.ts` ("Banao. Batao. Becho.", always Latin script in UI). Never write the name as a literal.
+- **Logo:** `<BrandLogo>` (`components/brand/BrandLogo.tsx`): the saffron mic tile (`BrandMark`, same mark as
+  `public/icon-*.png`) + "Awaaz" (charcoal) + "दो" (`--awaaz-orange`, Devanagari), split in `BRAND_WORDMARK`.
+  The drawing is `aria-hidden`; screen readers hear `BRAND_NAME`. Use it for the brand in headers and rails, never
+  a hand-styled `{BRAND_NAME}`.
 - **Brand colour:** saffron orange `#FF6B00` — the logo and brand artwork only
   (`brand-saffron`). White text on it is 2.9:1, so it is never a UI fill.
 - **Primary (UI fills, links, focus ring):** `--primary: 25 100% 37%` (`#BD4F00`),
@@ -51,7 +55,7 @@ Every theme primary must keep white text at 4.5:1 or better:
 
 ## Typography
 
-- **Headings:** Baloo 2 (Google Fonts) — has Devanagari for आवाज़ logo
+- **Headings:** Baloo 2 (Google Fonts) — its Devanagari subset is loaded for the "दो" in the logo
 - **Body:** Nunito (Google Fonts)
 - **Data / bills:** Tailwind's default `font-mono` stack (system monospace).
   JetBrains Mono is **not** loaded.

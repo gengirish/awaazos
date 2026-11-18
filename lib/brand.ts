@@ -22,6 +22,13 @@ export const BRAND_NAME = "AwaazDo";
 /** "Make it. Tell people. Sell it." */
 export const BRAND_TAGLINE = "Banao. Batao. Becho.";
 
+/**
+ * The logo's two halves: "Awaaz" in Latin type, "दो" in Devanagari and the
+ * brand orange (components/brand/BrandLogo.tsx). Drawn only; screen readers
+ * and every text surface read BRAND_NAME.
+ */
+export const BRAND_WORDMARK = { latin: "Awaaz", devanagari: "दो" } as const;
+
 /** Email and message sign-off. */
 export const BRAND_SIGNOFF = `${BRAND_NAME} — ${BRAND_TAGLINE}`;
 
