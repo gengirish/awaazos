@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -66,6 +67,7 @@ function SignInForm() {
   return (
     <Card className="w-full max-w-md border-border/80 shadow-lg">
       <CardHeader>
+        <BrandLogo size="sm" className="mb-3" />
         {/* <h1>, not CardTitle (an <h3>): this is the page's only heading. */}
         <h1 className="font-display text-2xl font-semibold leading-none tracking-tight">Sign in</h1>
         <CardDescription>Welcome back.</CardDescription>
