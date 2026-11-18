@@ -186,8 +186,11 @@ export function PaidClaimForm({
           </Label>
           <Input
             id="utr"
+            name="utr"
             inputMode="text"
+            // A payment reference, not an SMS code: never one-time-code, never saved by autofill.
             autoComplete="off"
+            enterKeyHint="send"
             autoCapitalize="characters"
             autoCorrect="off"
             spellCheck={false}
