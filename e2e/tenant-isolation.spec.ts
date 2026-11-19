@@ -412,6 +412,64 @@ test.describe("tenant isolation", () => {
     expect(bodyA.data.succeeded).toEqual([orderId]);
   });
 
+  test("vendor B's menu reorder never touches vendor A's items", async () => {
+    const a1 = await createMenuItem(pageA, { name: "A First", priceInRupees: 10 });
+    const a2 = await createMenuItem(pageA, { name: "A Second", priceInRupees: 20 });
+    const b1 = await createMenuItem(pageB, { name: "B Only", priceInRupees: 30 });
+    const own = await pageA.request.post("/api/menu/reorder", { data: { ids: [a1.id, a2.id] } });
+    expect(((await own.json()) as { data: { updated: number } }).data.updated).toBe(2);
+
+    // B sends A's ids (reversed) mixed with its own: only B's row counts.
+    const cross = await pageB.request.post("/api/menu/reorder", { data: { ids: [a2.id, b1.id, a1.id] } });
+    expect(cross.status()).toBe(200);
+    expect(((await cross.json()) as { data: { updated: number } }).data.updated, "A's ids match nothing").toBe(1);
+
+    const listA = (await (await pageA.request.get("/api/menu")).json()) as { data: MenuItemRow[] };
+    expect(listA.data.map((i) => i.id)).toEqual([a1.id, a2.id]);
+  });
+
+  test("vendor B cannot read, edit, duplicate or delete vendor A's drop (404, not 403)", async () => {
+    const itemA = await createMenuItem(pageA, { name: "A Drop Laddu", priceInRupees: 150 });
+    const ymd = (days: number) =>
+      new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(new Date(Date.now() + days * 86_400_000));
+    const dropBody = {
+      title: "A Private Drop",
+      date: ymd(2),
+      fulfilmentMode: "PICKUP",
+      fulfilmentStart: "17:00",
+      fulfilmentEnd: "19:00",
+      closesAtDate: ymd(2),
+      closesAtTime: "12:00",
+      items: [{ menuItemId: itemA.id, priceInPaise: 15000 }],
+    };
+    const created = await pageA.request.post("/api/drops", { data: dropBody });
+    expect(created.status()).toBe(201);
+    const { data: dropA } = (await created.json()) as { data: { id: string } };
+
+    expect((await pageB.request.get(`/api/drops/${dropA.id}`)).status(), "cross-tenant GET").toBe(404);
+    // B's own item, so the body is valid for B and the drop lookup is what refuses.
+    const itemB = await createMenuItem(pageB, { name: "B Own Laddu", priceInRupees: 120 });
+    const bodyB = { ...dropBody, title: "hijacked", items: [{ menuItemId: itemB.id, priceInPaise: 12000 }] };
+    expect(
+      (await pageB.request.put(`/api/drops/${dropA.id}`, { data: bodyB })).status(),
+      "cross-tenant PUT",
+    ).toBe(404);
+    expect(
+      (await pageB.request.post(`/api/drops/${dropA.id}/duplicate`, { data: { date: ymd(3) } })).status(),
+      "cross-tenant duplicate",
+    ).toBe(404);
+    expect((await pageB.request.delete(`/api/drops/${dropA.id}`)).status(), "cross-tenant DELETE").toBe(404);
+
+    // B's own drop list never shows it; A's drop is untouched and A can still copy it.
+    const listB = (await (await pageB.request.get("/api/drops")).json()) as { data: { id: string }[] };
+    expect(listB.data.map((d) => d.id)).not.toContain(dropA.id);
+    const stillA = (await (await pageA.request.get(`/api/drops/${dropA.id}`)).json()) as { data: { title: string } };
+    expect(stillA.data.title).toBe("A Private Drop");
+    const copy = await pageA.request.post(`/api/drops/${dropA.id}/duplicate`, { data: { date: ymd(3) } });
+    expect(copy.status()).toBe(201);
+    expect(((await copy.json()) as { data: { status: string } }).data.status).toBe("DRAFT");
+  });
+
   test("each vendor's bill sequence is independent", async () => {
     const itemA = await createMenuItem(pageA, { name: "A Item", priceInRupees: 10 });
     const itemB = await createMenuItem(pageB, { name: "B Item", priceInRupees: 10 });

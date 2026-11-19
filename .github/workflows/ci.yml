@@ -86,6 +86,11 @@ jobs:
       ITEM_VARIANTS_ENABLED: "true"
       # Help page films (lib/help-videos.ts); help-videos.spec.ts checks the buttons, not playback.
       HELP_VIDEO_BASE_URL: /help-videos
+      # Dummy machine secrets so webhooks-machine-auth.spec.ts can sign a request the
+      # server accepts, not only check refusals. Nothing else reads them.
+      RAZORPAY_WEBHOOK_SECRET: ci_dummy_razorpay_webhook_secret
+      RAZORPAY_PARTNER_WEBHOOK_SECRET: ci_dummy_razorpay_partner_webhook_secret
+      CRON_SECRET: ci_dummy_cron_secret
     steps:
       - name: Checkout
         uses: actions/checkout@v7
