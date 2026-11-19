@@ -4,7 +4,9 @@ import { redirect } from "next/navigation";
 import { SettingsCard, SettingsPageHeader } from "@/components/settings/SettingsChrome";
 import { settingsSection } from "@/components/settings/sections";
 import { OwnerSurveyForm } from "@/components/survey/OwnerSurveyForm";
+import { env } from "@/lib/env";
 import { loadSurveyAnswers } from "@/lib/owner-survey-server";
+import { surveyHelpFilmByPain } from "@/lib/survey-film";
 
 import { requireSettingsContext } from "../_context";
 import { BRAND_NAME } from "@/lib/brand";
@@ -15,7 +17,7 @@ export const metadata: Metadata = { title: `Tell us what's hard · Settings · $
 
 /** Settings → Tell us what's hard (OWNER of a real store). Rules in lib/owner-survey.ts. */
 export default async function SurveySettingsPage() {
-  const { vendor, isOwner } = await requireSettingsContext();
+  const { vendor, isOwner, storeKind } = await requireSettingsContext();
   if (!isOwner || vendor.isDemo) redirect("/settings");
 
   const section = settingsSection("survey");
@@ -25,7 +27,7 @@ export default async function SurveySettingsPage() {
     <>
       <SettingsPageHeader title={section.title} description={section.description} />
       <SettingsCard title="A few quick questions">
-        <OwnerSurveyForm answers={answers} />
+        <OwnerSurveyForm answers={answers} helpFilmByPain={surveyHelpFilmByPain(storeKind, env.HELP_VIDEO_BASE_URL)} />
       </SettingsCard>
     </>
   );

@@ -43,6 +43,10 @@ test.describe("owner survey", () => {
     await page.getByLabel(/Anything else we should build/).fill("Rider tracking");
     await page.getByRole("button", { name: "Send my answers" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Thank you" })).toBeVisible();
+    // A seller gets the Help film for the job that hurts most (lib/survey-film.ts), not a sign-up Reel.
+    const film = page.getByRole("region", { name: /For “Checking who has paid”: Check a UPI payment/ });
+    await expect(film.locator("video")).toHaveAttribute("src", "/help-videos/b4-check-upi-payment.mp4");
+    await expect(film.getByRole("link", { name: "More videos in Help" })).toHaveAttribute("href", "/help");
 
     await page.goto("/orders");
     await expect(page.getByRole("heading", { level: 1 }).first()).toBeVisible();
@@ -110,6 +114,28 @@ test.describe("public survey link", () => {
     await page.getByRole("button", { name: "Send my answers" }).click();
     await expect(page.getByRole("status").filter({ hasText: "Thank you" })).toBeVisible();
     await expect(page.getByRole("button", { name: "Send my answers" })).toHaveCount(0);
+  });
+
+  test("the thank-you answers with the Reel for the problem that hurts most", async ({ page }) => {
+    await page.goto("/survey");
+    await page.getByLabel("Checking who has paid").check();
+    await page.getByRole("group", { name: /how many orders/ }).getByLabel("10 to 30").check();
+    await page.getByRole("group", { name: /most orders you can handle/ }).getByLabel("30 to 80").check();
+    await page.getByRole("group", { name: /what would you pay/ }).getByLabel("₹199 to ₹499").check();
+    await page.getByRole("button", { name: "Send my answers" }).click();
+
+    const thanks = page.getByRole("region", { name: "Thank you. We read every answer." });
+    await expect(thanks.getByRole("heading", { name: "Thank you. We read every answer." })).toBeFocused();
+    await expect(thanks).toContainText("Here's how sellers fix “Checking who has paid”");
+    const video = thanks.locator("video");
+    await expect(video).toHaveAttribute("src", "/pain-reels/payment_matching.mp4");
+    await expect(video).toHaveAttribute("preload", "none");
+    // No store type is asked, so the other store's version is a link away.
+    await expect(thanks.getByRole("link", { name: "Watch that version" })).toHaveAttribute(
+      "href",
+      "/v/jewellery-payment_matching",
+    );
+    await expect(thanks.getByRole("link", { name: /^Start / })).toHaveAttribute("href", "/sign-up");
   });
 
   test("the API rejects a bad answer and takes a good one", async ({ request }) => {

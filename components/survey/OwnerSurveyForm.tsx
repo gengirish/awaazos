@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { SurveyHelpFilm, SurveyReelThanks } from "@/components/survey/SurveyFilm";
 import { RadioOption } from "@/components/ui/radio-option";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -16,6 +17,8 @@ import {
   WILLING_TO_PAY_BANDS,
   type OwnerSurveyAnswers,
 } from "@/lib/owner-survey";
+import type { ResolvedHelpVideo } from "@/lib/help-videos";
+import type { ResolvedPainReel } from "@/lib/pain-reels";
 import { cn } from "@/lib/utils";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -63,13 +66,22 @@ function RadioChoices({
  *
  * With `isPublic` (the /survey page) nobody is signed in: the answers go to
  * POST /api/survey, tied to no store, and can't be changed once sent.
+ *
+ * Once sent, the answer is a film for the problem that hurts most (lib/survey-film.ts):
+ * a pain-point Reel on /survey (`reelsByPain`), the Help film for the same job in
+ * Settings (`helpFilmByPain`). Both lookups come from the page, built from published
+ * files only; a pain with no film keeps the plain thank-you.
  */
 export function OwnerSurveyForm({
   answers,
   isPublic = false,
+  reelsByPain = {},
+  helpFilmByPain = {},
 }: {
   answers: OwnerSurveyAnswers | null;
   isPublic?: boolean;
+  reelsByPain?: Record<string, readonly ResolvedPainReel[]>;
+  helpFilmByPain?: Record<string, ResolvedHelpVideo>;
 }) {
   const router = useRouter();
   const [pains, setPains] = useState<string[]>([...(answers?.pains ?? [])]);
@@ -125,12 +137,16 @@ export function OwnerSurveyForm({
   }
 
   if (isPublic && saved) {
-    return (
+    const reels = reelsByPain[effectiveTop] ?? [];
+    return reels.length > 0 ? (
+      <SurveyReelThanks pain={effectiveTop} reels={reels} />
+    ) : (
       <p role="status" className="text-sm text-foreground">
         Thank you. We read every answer.
       </p>
     );
   }
+  const helpFilm = saved ? helpFilmByPain[effectiveTop] : undefined;
 
   return (
     <form onSubmit={(e) => void submit(e)} className="space-y-6">
@@ -233,6 +249,7 @@ export function OwnerSurveyForm({
             </p>
           ) : null}
         </div>
+        {helpFilm ? <SurveyHelpFilm pain={effectiveTop} film={helpFilm} /> : null}
       </div>
     </form>
   );
