@@ -41,6 +41,8 @@ export type RazorpayKeysClientProps = {
   /** Razorpay refused to start a buyer's payment (lib/razorpay-issue.ts); `at` is display text. */
   issue: { kind: "auth" | "account"; at: string } | null;
   webhookUrl: string;
+  /** The domain buyers pay from (lib/canonical-host.ts `storeWebsiteHost`); null hides the note. */
+  storeWebsite: string | null;
   planEligible: boolean;
   encryptionConfigured: boolean;
   isOwner: boolean;
@@ -70,6 +72,7 @@ export function RazorpayKeysClient({
   outcome,
   issue,
   webhookUrl,
+  storeWebsite,
   planEligible,
   encryptionConfigured,
   isOwner,
@@ -468,6 +471,15 @@ export function RazorpayKeysClient({
             </div>
           )}
         </>
+      ) : null}
+
+      {storeWebsite ? (
+        <p className="text-xs text-muted-foreground">
+          <strong className="font-semibold text-foreground">Add {storeWebsite} in Razorpay.</strong> In your Razorpay
+          Dashboard go to <strong>My Account → Additional Business Website/App</strong>, tap + and add{" "}
+          <span className="font-mono">{storeWebsite}</span>. Until Razorpay approves it (up to 2 days), Razorpay declines
+          payments from your store page.
+        </p>
       ) : null}
     </div>
   );
