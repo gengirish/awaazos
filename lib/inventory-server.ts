@@ -12,7 +12,7 @@ type Db = PrismaClient | Prisma.TransactionClient;
 export type TrackedItem = { id: string; stockQty: number | null; stockCountedAt: Date | null };
 
 /** Transactions whose lines take stock (lib/inventory.ts rule 3). */
-function stockTakingTxWhere(vendorId: string, now: Date): Prisma.TransactionWhereInput {
+export function stockTakingTxWhere(vendorId: string, now: Date): Prisma.TransactionWhereInput {
   return {
     vendorId,
     isSample: false,

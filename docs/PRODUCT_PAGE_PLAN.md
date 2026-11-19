@@ -1,6 +1,6 @@
 # Product detail and product links plan
 
-Status: step 1 (detail sheet) merged in #205; step 2 (product links) merged in #207; step 3 (photos) in PR #208; step 4 (highlights) built on `feat/item-highlights`; step 5 not started. Written 2026-11-14.
+Status: step 1 (detail sheet) merged in #205; step 2 (product links) in #207; step 3 (photos) in #208; step 4 (highlights) in #210; step 5 (list polish) on `feat/list-polish`. Written 2026-11-14.
 
 Why: on `/s/[slug]` an item is a row (kitchens) or a tile (goods stores), and that is all a buyer
 gets. On a kitchen store the photo and name do nothing when tapped; on a goods store the photo opens

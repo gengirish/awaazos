@@ -71,6 +71,13 @@ Rules every one of them follows:
   EGG`, null = not said), edited in the item form (`ItemDetailFields`) and sent with POST / PATCH `/api/menu`. The
   sheet shows highlights as a two-column list, then the details. The mark (`FoodMark`, the FSSAI shapes plus a word,
   never colour alone) shows on rows and in the sheet for food stores only. None of it reaches the voice prompt.
+- **List polish** (step 5 of `docs/PRODUCT_PAGE_PLAN.md`): rows and tiles show a sale discount first (`ItemPrice`,
+  "↓20% ~~₹399~~ ₹319"); a clothing store's gallery tiles are 3:4 (`ItemPhoto portrait`). Past 12 menu items the menu
+  gets a sort (`lib/catalogue-sort.ts`, `CatalogueSort.tsx`): our order, price both ways (what the card shows), newest;
+  any but "Our order" is one list without headings (the jump bar's category links hide via `<html data-catalogue-sorted>`);
+  remembered per store in localStorage. "Ordered 25+ times" (`lib/item-ordered-count.ts`, one `groupBy` per render in
+  `loadOrderedCounts`, last 30 days, stock-taking orders, no samples or gifts) shows in steps 10+ / 25+ / 50+ / 100+,
+  never the number, never on demo stores, never sets `isPopular`.
 - The vendor's WhatsApp number reaches a public page only through `buyerWhatsappNumber()`
   (`lib/storefront-order.ts`): `VendorSettings.whatsappNumber`, and only once the vendor opts in
   with `acceptWhatsappOrders` (default `false`; Settings → Online orders). A saved number is not
