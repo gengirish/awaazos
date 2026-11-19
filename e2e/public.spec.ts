@@ -87,9 +87,9 @@ test.describe("public surfaces", () => {
     await expect(page.getByRole("link", { name: "+91 85559 60837" })).toHaveAttribute("href", "tel:+918555960837");
     await expect(page.getByText("Hyderabad, Telangana 500084")).toBeVisible();
 
-    await page.getByLabel("Your name").fill("E2E Buyer");
-    await page.getByLabel("Email").fill("e2e@example.test");
-    await page.getByLabel("Message").fill("Does the Lite plan include pre-orders?");
+    await page.getByLabel("Your name", { exact: true }).fill("E2E Buyer");
+    await page.getByLabel("Email", { exact: true }).fill("e2e@example.test");
+    await page.getByLabel("Message", { exact: true }).fill("Does the Lite plan include pre-orders?");
     await page.getByRole("button", { name: "Send message" }).click();
     await expect(page.getByRole("status")).toContainText("we've got your message");
     expect(posted).toMatchObject({ name: "E2E Buyer", email: "e2e@example.test", website: "" });
