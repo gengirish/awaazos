@@ -9,8 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Toaster } from "@/components/ui/sonner";
 import { DEMO_PIPELINE_LIMIT } from "@/lib/admin-demo-stores";
 import { loadPipelineItems } from "@/lib/demo-pipeline-server";
+import { env } from "@/lib/env";
+import { painReelLinks } from "@/lib/pain-reels";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
 import { demoVendorIdsBuiltBy } from "@/lib/sales-scope";
+import { appBaseUrl } from "@/lib/storefront-razorpay";
 import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +65,7 @@ export default async function AdminDemoStoresPage() {
           now={now}
           canDelete={!isSales}
           isSales={isSales}
-          sender={{ senderName, senderIsFounder: superAdmin }}
+          sender={{ senderName, senderIsFounder: superAdmin, reels: painReelLinks(env.PAIN_REEL_BASE_URL, appBaseUrl()) }}
           healthLines={Object.fromEntries(items.map((i) => [i.id, <StoreHealthLine key={i.id} health={i.health} now={now} />]))}
         />
         {items.length === DEMO_PIPELINE_LIMIT ? (

@@ -4,6 +4,7 @@ import { Check } from "lucide-react";
 import { useId, useState } from "react";
 
 import type { MessageContext, PipelineHandlers } from "@/components/admin/pipeline/PipelineClient";
+import { ReelPicker } from "@/components/admin/ReelPicker";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
@@ -18,7 +19,7 @@ import {
 } from "@/components/ui/responsive-dialog";
 import type { PipelineItem } from "@/lib/demo-pipeline-server";
 import { fillTemplate, needsClaimLink } from "@/lib/demo-pipeline";
-import { outreachTemplate } from "@/lib/outreach-message";
+import { outreachTemplate, withReelLink } from "@/lib/outreach-message";
 import { formatIndianMobile } from "@/lib/phone";
 
 const FIELD =
@@ -41,6 +42,10 @@ export function BulkSendDialog({ items, sender, handlers, onClose }: Props) {
   const [template, setTemplate] = useState(() => outreachTemplate("intro", sender));
   const [index, setIndex] = useState<number | null>(null);
   const [sent, setSent] = useState(0);
+  const [reelId, setReelId] = useState<string | null>(null);
+  // One video for the whole batch: list first the row most of these stores are in.
+  const goods = items.filter((i) => i.reelStore === "jewellery").length;
+  const reelStore = goods * 2 > items.length ? "jewellery" : "kitchen";
 
   const fill = (item: PipelineItem) =>
     fillTemplate(template, {
@@ -104,6 +109,15 @@ export function BulkSendDialog({ items, sender, handlers, onClose }: Props) {
                   className={`${FIELD} min-h-44`}
                   value={template}
                   onChange={(e) => setTemplate(e.target.value)}
+                />
+                <ReelPicker
+                  reels={sender.reels ?? []}
+                  store={reelStore}
+                  value={reelId}
+                  onChange={(reel) => {
+                    setReelId(reel?.id ?? null);
+                    setTemplate((t) => withReelLink(t, reel?.url ?? null));
+                  }}
                 />
                 <p className="text-xs text-muted-foreground">
                   You can use {"{firstName} {storeName} {storeUrl} {claimUrl} {area}"}. {"{claimUrl}"} makes a new link for

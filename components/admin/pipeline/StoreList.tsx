@@ -199,6 +199,8 @@ export function StoreList({ items, now, canDelete, sender, handlers, healthLines
                     phone={item.phone}
                     message={templateFor(templateKindFor(item.facts, now), { ...item, contactEmail: null }, sender)}
                     contactEmail={item.contactEmail}
+                    reels={sender.reels}
+                    reelStore={item.reelStore}
                     canDelete={canDelete}
                     canSetLogin={!isSales}
                     onSent={(opened) => handlers.markSent(item, opened)}

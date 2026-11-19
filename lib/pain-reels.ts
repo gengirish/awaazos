@@ -1,5 +1,6 @@
 import { PAIN_REELS, type PainReel } from "@/content/pain-reels/reels";
 import { HELP_VIDEOS, helpVideoBase } from "@/lib/help-videos";
+import type { StoreKind } from "@/lib/store-vocabulary";
 
 /**
  * The pain-point Reels (content/pain-reels/reels.ts) as the app shows them: the
@@ -64,4 +65,24 @@ export function painReelIds(): string[] {
 /** Path of a Reel's own page. */
 export function painReelPath(id: string): string {
   return `/v/${id}`;
+}
+
+/**
+ * The Reels row for a store type: a food store gets the kitchen Reels, any other the
+ * jewellery ones (the landing page's "Jewellery and other products" row).
+ */
+export function painReelStoreFor(kind: StoreKind): PainReelStore {
+  return kind === "goods" ? "jewellery" : "kitchen";
+}
+
+/** A Reel as a message links to it: its page on the site, never the file. */
+export type PainReelLink = Pick<PainReel, "id" | "store" | "title"> & { url: string };
+
+/**
+ * Every Reel's page link on `origin` (no trailing slash), for the outreach messages on
+ * /admin/demo-stores; empty when nothing is published, because the pages then 404.
+ */
+export function painReelLinks(rawBase: string | undefined, origin: string): PainReelLink[] {
+  if (!helpVideoBase(rawBase)) return [];
+  return PAIN_REELS.map((r) => ({ id: r.id, store: r.store, title: r.title, url: `${origin}${painReelPath(r.id)}` }));
 }

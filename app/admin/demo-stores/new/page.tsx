@@ -2,7 +2,10 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { DemoStoreForm } from "@/components/admin/DemoStoreForm";
+import { env } from "@/lib/env";
+import { painReelLinks } from "@/lib/pain-reels";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
+import { appBaseUrl } from "@/lib/storefront-razorpay";
 import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
@@ -43,7 +46,11 @@ export default async function NewDemoStorePage() {
         </nav>
       </header>
       <main id="main" className="mx-auto max-w-3xl">
-        <DemoStoreForm senderName={senderName} senderIsFounder={senderIsFounder} />
+        <DemoStoreForm
+          senderName={senderName}
+          senderIsFounder={senderIsFounder}
+          reels={painReelLinks(env.PAIN_REEL_BASE_URL, appBaseUrl())}
+        />
       </main>
     </div>
   );

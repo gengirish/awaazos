@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 
 import { TRIAL_DAYS } from "@/lib/constants";
-import { firstName, outreachClaimMessage, outreachIntroMessage, outreachWhatsappUrl } from "@/lib/outreach-message";
+import {
+  firstName,
+  outreachClaimMessage,
+  outreachIntroMessage,
+  outreachWhatsappUrl,
+  REEL_LINE_PREFIX,
+  withReelLink,
+} from "@/lib/outreach-message";
 import { BRAND_NAME } from "@/lib/brand";
 
 const STORE_URL = "https://awaazos.intelliforge.tech/s/tasty-treats-by-lah-x5yj";
@@ -77,5 +84,24 @@ describe("firstName", () => {
   it("takes the first word", () => {
     expect(firstName("  Lahari  Pruthvi ")).toBe("Lahari");
     expect(firstName(null)).toBe("");
+  });
+});
+
+describe("withReelLink", () => {
+  const REEL = "https://awaazdo.store/v/orders_scattered";
+  const OTHER = "https://awaazdo.store/v/delivery";
+
+  it("adds the Reel link as its own last line", () => {
+    expect(withReelLink("Hi,\n\nSee the store.\n", REEL)).toBe(`Hi,\n\nSee the store.\n\n${REEL_LINE_PREFIX}${REEL}`);
+  });
+
+  it("swaps the link when another Reel is picked, keeping the admin's edits", () => {
+    const once = withReelLink("Hi Lahari, edited by hand.", REEL);
+    expect(withReelLink(once, OTHER)).toBe(`Hi Lahari, edited by hand.\n\n${REEL_LINE_PREFIX}${OTHER}`);
+  });
+
+  it("takes the line out for No video, even if it was moved up", () => {
+    const moved = `Hi,\n\n${REEL_LINE_PREFIX}${REEL}\n\nThanks`;
+    expect(withReelLink(moved, null)).toBe("Hi,\n\nThanks");
   });
 });

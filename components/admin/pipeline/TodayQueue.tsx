@@ -10,6 +10,7 @@ import Link from "next/link";
 import { useEffect, useId, useRef, useState } from "react";
 
 import { HygieneChips } from "@/components/admin/pipeline/HygieneChips";
+import { ReelPicker } from "@/components/admin/ReelPicker";
 import {
   templateFor,
   type MessageContext,
@@ -35,6 +36,7 @@ import {
   SNOOZE_DAYS,
   templateKindFor,
 } from "@/lib/demo-pipeline";
+import { withReelLink } from "@/lib/outreach-message";
 import { formatIndianMobile } from "@/lib/phone";
 
 const FIELD =
@@ -164,6 +166,7 @@ function QueueCard({
   const kind = templateKindFor(item.facts, now);
   const template = templateFor(kind, item, sender);
   const [edited, setEdited] = useState<string | null>(null);
+  const [reelId, setReelId] = useState<string | null>(null);
   const [name, setName] = useState(item.contactName ?? "");
   const [email, setEmail] = useState(item.contactEmail ?? "");
   const [saving, setSaving] = useState(false);
@@ -304,6 +307,15 @@ function QueueCard({
             ? " A new claim link goes where {claimUrl} is, is emailed to them too, and voids any earlier link."
             : ""}
         </p>
+        <ReelPicker
+          reels={sender.reels ?? []}
+          store={item.reelStore}
+          value={reelId}
+          onChange={(reel) => {
+            setReelId(reel?.id ?? null);
+            setEdited(withReelLink(text, reel?.url ?? null));
+          }}
+        />
         {blockedOnEmail ? (
           <Notice tone="warning" role="alert">
             Save the seller&apos;s email to include a claim link, or take{" "}
