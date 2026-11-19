@@ -128,6 +128,10 @@ literal. Customer stories come from `lib/proof-stories.ts` and render only with 
 writing). The WhatsApp button needs `NEXT_PUBLIC_SUPPORT_WHATSAPP` (build time). `e2e/contrast.spec.ts` runs axe's
 contrast rule here, on a store page and on checkout. The `(marketing)` layout must stay static.
 
+**Contact page** (`/contact`, rules in `lib/contact-message.ts`): business details from `lib/business-contact.ts` (also
+`BusinessDetails` on the legal pages) and a form; `POST /api/contact` (IP-limited, honeypot) emails `SUPPORT_EMAIL` and
+stores nothing, 503 `not_sent` when AgentMail didn't send.
+
 **Pain-point Reels** (`lib/pain-reels.ts`, data in `content/pain-reels/reels.ts`, plan `docs/PAIN_REELS_APP_PLAN.md`): the
 "Sound familiar?" row on `/` (`components/marketing/PainReels.tsx`) and one static page per Reel at `/v/<id>`
 (`generateStaticParams`, `dynamicParams = false`, public in `lib/auth.config.ts`). Films live in the public Blob folder

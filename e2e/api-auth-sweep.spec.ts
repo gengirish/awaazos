@@ -29,6 +29,7 @@ const PUBLIC: { prefix: string; why: string }[] = [
   { prefix: "/api/s/", why: "public storefront (storefront.spec.ts and friends)" },
   { prefix: "/api/d/", why: "rider link, keyed on riderToken (delivery-riders.spec.ts)" },
   { prefix: "/api/survey", why: "public seller survey (owner-survey.spec.ts)" },
+  { prefix: "/api/contact", why: "public contact form, emails our inbox (public.spec.ts)" },
   { prefix: "/api/health", why: "liveness" },
   { prefix: "/api/ready", why: "readiness" },
   { prefix: "/api/webhooks/", why: "HMAC instead of a session (webhooks-machine-auth.spec.ts)" },

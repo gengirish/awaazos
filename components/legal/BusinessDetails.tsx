@@ -1,17 +1,26 @@
 import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
+import {
+  BUSINESS_ADDRESS_LINES,
+  BUSINESS_BRAND,
+  BUSINESS_GSTIN,
+  BUSINESS_NAME,
+  BUSINESS_PROPRIETOR,
+  SUPPORT_PHONE_DISPLAY,
+  SUPPORT_PHONE_E164,
+} from "@/lib/business-contact";
 
-/** Registered trade name on the GST certificate; "IntelliForge AI" is the brand. */
-export const BUSINESS_NAME = "IntelliForge Digital Services";
+export { BUSINESS_NAME };
 
-/** The business that runs AwaazOS, as registered for GST. */
+/** The business that runs AwaazDo, as registered for GST (lib/business-contact.ts). */
 export function BusinessDetails() {
   return (
     <p>
-      {BUSINESS_NAME} (IntelliForge AI)<br />
-      Proprietor: Girish Basavaraj Hiremath<br />
-      Kondapur, Hyderabad 500084<br />
-      GSTIN: 36ADQPH9644E1Z7<br />
-      Email: <SupportEmailLink />
+      {BUSINESS_NAME} ({BUSINESS_BRAND})<br />
+      Proprietor: {BUSINESS_PROPRIETOR}<br />
+      {BUSINESS_ADDRESS_LINES.join(", ")}<br />
+      GSTIN: {BUSINESS_GSTIN}<br />
+      Email: <SupportEmailLink /><br />
+      Phone: <a href={`tel:${SUPPORT_PHONE_E164}`}>{SUPPORT_PHONE_DISPLAY}</a>
     </p>
   );
 }

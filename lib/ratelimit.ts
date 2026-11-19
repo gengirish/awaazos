@@ -110,6 +110,16 @@ export const publicSurveyRateLimit = makeLimiter({
 });
 
 /**
+ * 5 contact-form messages per IP per hour (POST /api/contact). Each one is an
+ * email to our inbox, so this is what keeps a script from filling it.
+ */
+export const contactFormRateLimit = makeLimiter({
+  name: "contact-form",
+  windowMs: 60 * 60_000,
+  max: 5,
+});
+
+/**
  * 30 store-link availability checks per IP per minute (GET /api/auth/store-handle).
  * The forms debounce typing, so a person makes a handful; a scraper of taken
  * handles gets the public /s/<handle> page's answer no faster than this.
