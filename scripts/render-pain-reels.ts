@@ -23,6 +23,7 @@ import path from "node:path";
 import { chromium } from "@playwright/test";
 
 import { PAIN_REELS, type PainReel } from "@/content/pain-reels/reels";
+import { BRAND_NAME } from "@/lib/brand";
 import { TRIAL_DAYS } from "@/lib/constants";
 import { OWNER_PAINS } from "@/lib/owner-survey";
 
@@ -45,7 +46,7 @@ const END_S = 3;
 const FADE_S = 0.25;
 /** The store colour each film was recorded in: the meals demo store is green, the jewellery one red. */
 const ACCENT: Record<PainReel["store"], string> = { kitchen: "#157f3c", jewellery: "#b91c1c" };
-const SITE = "awaazos.intelliforge.tech";
+const SITE = "awaazdo.store";
 
 const FONTS =
   '<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>' +
@@ -76,7 +77,7 @@ function hookHtml(reel: PainReel, posterDataUri: string): string {
 
 function endHtml(accent: string): string {
   return `<div style="width:${W}px;height:${H}px;background:${gradient(accent)};display:flex;flex-direction:column;align-items:center;justify-content:center;gap:36px;box-sizing:border-box;padding:0 80px;text-align:center;color:#fff;font-family:'Baloo 2',system-ui,sans-serif">
-    <p style="margin:0;font-weight:800;font-size:72px;letter-spacing:.5px;opacity:.9">AwaazDo</p>
+    <p style="margin:0;font-weight:800;font-size:72px;letter-spacing:.5px;opacity:.9">${BRAND_NAME}</p>
     <p style="margin:0;font-weight:800;font-size:116px;line-height:1.05;text-wrap:balance;text-shadow:0 4px 20px rgba(0,0,0,.3)">Apna store, ${TRIAL_DAYS} din free</p>
     <p style="margin:0;font-weight:600;font-size:54px;opacity:.95">No card needed. No commission.</p>
     <p style="margin:24px 0 0;font-weight:800;font-size:52px;background:#fff;color:${accent};padding:18px 44px;border-radius:999px">${SITE}</p>
