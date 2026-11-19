@@ -11,8 +11,9 @@
  * context get distinct slugs and consecutive sort orders.
  */
 
-import type { Prisma, PrismaClient } from "@prisma/client";
+import { Prisma, type PrismaClient } from "@prisma/client";
 
+import type { FoodType } from "@/lib/item-highlights";
 import { deduplicateSlug, generateSlug, suggestAliases } from "@/lib/menu-suggestions";
 
 type MenuDb = Pick<PrismaClient, "menuItem"> | Prisma.TransactionClient;
@@ -39,6 +40,10 @@ export type MenuItemCreateFields = {
   unit?: string | null;
   /** One line for buyers, already normalised (lib/zod-menu.ts); null or absent = none. */
   description?: string | null;
+  /** Detail sheet text, already normalised (lib/item-highlights.ts); null or absent = none. */
+  details?: string | null;
+  highlights?: { label: string; value: string }[] | null;
+  foodType?: FoodType | null;
   /** Units on hand (lib/inventory.ts); null or absent = stock not tracked. */
   stockQty?: number | null;
   /** "Low stock" from this many left; null or absent = no warning. */
@@ -91,6 +96,10 @@ export function prepareMenuItemCreate(
     showOnline: input.showOnline,
     unit: input.unit ?? null,
     description: input.description ?? null,
+    details: input.details ?? null,
+    // Json columns take DbNull, not null, for "no value".
+    highlights: input.highlights ?? Prisma.DbNull,
+    foodType: input.foodType ?? null,
     // A count is taken now, so every order from here on comes out of it.
     stockQty,
     stockCountedAt: stockQty === null ? null : now,

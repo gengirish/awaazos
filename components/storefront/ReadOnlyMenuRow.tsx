@@ -9,6 +9,7 @@ import { ItemPhoto } from "@/components/storefront/ItemPhoto";
 import { ItemPriceHero } from "@/components/storefront/ItemPrice";
 import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import { formatINRCompact } from "@/lib/currency";
+import type { FoodType, Highlight } from "@/lib/item-highlights";
 import { variantPriceRange, type StoreSize } from "@/lib/item-variants";
 import { stockBadgeText, type StorefrontStock } from "@/lib/storefront-stock";
 
@@ -25,6 +26,10 @@ export type ReadOnlyMenuItem = {
   imageUrl: string | null;
   /** Photos after the cover, for the detail sheet (lib/item-photos.ts). */
   morePhotos?: string[];
+  /** Detail sheet text and the food mark (lib/item-highlights.ts); the mark only in a food store. */
+  details?: string | null;
+  highlights?: Highlight[];
+  foodType?: FoodType | null;
   priceInPaise: number;
   unit: string | null;
   isPopular: boolean;
@@ -101,6 +106,9 @@ export function ReadOnlyMenuRow({
       emoji={item.emoji}
       imageUrl={item.imageUrl}
       morePhotos={item.morePhotos}
+      details={item.details}
+      highlights={item.highlights}
+      foodType={item.foodType}
       description={item.description}
       dimmed={dimmed}
       price={<ItemPriceHero priceInPaise={fromPaise} sale={null} unit={item.unit} from={range !== null} />}
@@ -114,7 +122,7 @@ export function ReadOnlyMenuRow({
       <li className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-background p-2.5 shadow-xs">
         <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="tile" onOpen={openDetail} dimmed={dimmed} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-          <ItemDetailTrigger detailId={item.id} name={item.name} description={item.description} onOpen={openDetail} />
+          <ItemDetailTrigger detailId={item.id} name={item.name} description={item.description} foodType={item.foodType} onOpen={openDetail} />
           {sizeLine ? <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{sizeLine}</span> : null}
           <span className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-sm">
             {price}
@@ -130,7 +138,7 @@ export function ReadOnlyMenuRow({
       <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="row" onOpen={openDetail} dimmed={dimmed} />
 
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-        <ItemDetailTrigger detailId={item.id} name={item.name} description={item.description} onOpen={openDetail}>
+        <ItemDetailTrigger detailId={item.id} name={item.name} description={item.description} foodType={item.foodType} onOpen={openDetail}>
           {badges}
         </ItemDetailTrigger>
         {sizeLine ? <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{sizeLine}</span> : null}

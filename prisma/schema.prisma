@@ -182,6 +182,13 @@ model SubscriptionEvent {
 
 // ─── MENU ───────────────────────────────────────────────────────────
 
+// The food mark on a store's item (lib/item-highlights.ts): the FSSAI veg / non-veg symbols, plus egg.
+enum FoodType {
+  VEG
+  NON_VEG
+  EGG
+}
+
 model MenuItem {
   id             String    @id @default(cuid())
   vendorId       String
@@ -200,6 +207,11 @@ model MenuItem {
   imageUrl       String?
   unit           String? // Selling unit shown after the price ("kg", "piece"); null = none
   description    String?   @db.VarChar(200) // One line for buyers under the name on /s/[slug]; never in the voice prompt
+  // Detail sheet text (lib/item-highlights.ts): longer text, label / value highlights, and the
+  // food mark (food stores). Never in the voice prompt.
+  details        String?   @db.VarChar(1000)
+  highlights     Json? // [{ label, value }], up to 6
+  foodType       FoodType? // null = not said
   hsnCode        String? // HSN/SAC; falls back to VendorSettings.hsnDefault
   // Inventory (lib/inventory.ts): units on hand at the last count; null = stock not tracked.
   // Left = stockQty − units in stock-holding OrderItems created after stockCountedAt. Never decremented.

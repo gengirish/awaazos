@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { rupeesToPaise } from "@/lib/currency";
+import { FOOD_TYPES, ITEM_DETAILS_MAX, normaliseHighlights, normaliseItemDetails } from "@/lib/item-highlights";
 import { menuUnitSchema } from "@/lib/menu-unit";
 
 /** Split a comma-separated string into a deduplicated, trimmed array. */
@@ -44,6 +45,27 @@ export function normaliseMenuDescription(raw: string | null | undefined): string
   return text === "" ? null : text;
 }
 
+/** `MenuItem.details` (lib/item-highlights.ts rule 3): string (blank clears it) or null, normalised. */
+export const itemDetailsSchema = z
+  .union([z.string().max(ITEM_DETAILS_MAX * 2), z.null()])
+  .transform((v) => normaliseItemDetails(v))
+  .refine((v) => v === null || v.length <= ITEM_DETAILS_MAX, `Keep the details to ${ITEM_DETAILS_MAX} characters`);
+
+/** `MenuItem.highlights` (rule 1): rows (blank rows dropped) or null; refused, never cut. */
+export const itemHighlightsSchema = z
+  .union([z.array(z.object({ label: z.string().max(200), value: z.string().max(500) })).max(20), z.null()])
+  .transform((rows, ctx) => {
+    const result = normaliseHighlights(rows);
+    if (!result.ok) {
+      ctx.addIssue({ code: "custom", message: result.error });
+      return z.NEVER;
+    }
+    return result.value;
+  });
+
+/** `MenuItem.foodType` (rule 4): null = not said. */
+export const foodTypeSchema = z.enum(FOOD_TYPES).nullable();
+
 function preprocessRupeesInput(val: unknown): unknown {
   if (val === "" || val === null || val === undefined) return undefined;
   if (typeof val === "number") return val;
@@ -78,6 +100,10 @@ const menuItemCreateFields = {
     .string()
     .max(MENU_DESCRIPTION_MAX, `Description must be at most ${MENU_DESCRIPTION_MAX} characters`)
     .optional(),
+  /** Detail sheet text (lib/item-highlights.ts). */
+  details: itemDetailsSchema.optional(),
+  highlights: itemHighlightsSchema.optional(),
+  foodType: foodTypeSchema.optional(),
 };
 
 /** Client / RHF input validation (no paise transform). */
@@ -96,6 +122,9 @@ export const menuItemCreateSchema = menuItemCreateInputSchema.transform((data) =
   showOnline: data.showOnline ?? true,
   unit: data.unit ?? null,
   description: normaliseMenuDescription(data.description),
+  details: data.details ?? null,
+  highlights: data.highlights ?? null,
+  foodType: data.foodType ?? null,
 }));
 
 export const menuItemUpdateSchema = z
@@ -117,6 +146,10 @@ export const menuItemUpdateSchema = z
     unit: menuUnitSchema.optional(),
     // `null` or "" clears it.
     description: z.string().max(MENU_DESCRIPTION_MAX).optional().nullable(),
+    // `null` or "" / [] clears them (lib/item-highlights.ts).
+    details: itemDetailsSchema.optional(),
+    highlights: itemHighlightsSchema.optional(),
+    foodType: foodTypeSchema.optional(),
     sortOrder: z.coerce.number().int().optional(),
     // `null` clears the photo; the upload route sets it, the form can unset it.
     imageUrl: z
@@ -142,6 +175,9 @@ export const menuItemUpdateSchema = z
       d.showOnline !== undefined ||
       d.unit !== undefined ||
       d.description !== undefined ||
+      d.details !== undefined ||
+      d.highlights !== undefined ||
+      d.foodType !== undefined ||
       d.sortOrder !== undefined ||
       d.imageUrl !== undefined,
     { message: "At least one field is required", path: ["_root"] },

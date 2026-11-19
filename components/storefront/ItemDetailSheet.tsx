@@ -3,6 +3,7 @@
 import { CalendarClock, Clock, MapPin, Tag, Truck, Wallet } from "lucide-react";
 import type { ReactNode } from "react";
 
+import { FoodMark } from "@/components/storefront/FoodMark";
 import { ItemPhoto } from "@/components/storefront/ItemPhoto";
 import { ItemPhotoGallery } from "@/components/storefront/ItemPhotoGallery";
 import {
@@ -15,6 +16,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import type { DetailFact, DetailFactKind } from "@/lib/item-detail";
+import { FOOD_TYPE_LABEL, type FoodType, type Highlight } from "@/lib/item-highlights";
 import { offerSummary, type ResolvedOffer } from "@/lib/offers";
 
 /**
@@ -40,6 +42,12 @@ export type ItemDetailSheetProps = {
   /** Photos after the cover; with any, the top is a swipeable gallery (ItemPhotoGallery). */
   morePhotos?: readonly string[];
   description?: string | null;
+  /** Label / value pairs, shown as a two-column list (lib/item-highlights.ts). */
+  highlights?: readonly Highlight[];
+  /** The longer text, line breaks kept. */
+  details?: string | null;
+  /** The food mark with its word (kitchens only). */
+  foodType?: FoodType | null;
   /** `ItemPriceHero`. */
   price: ReactNode;
   /** Popular, "Only 3 left", "Sold out", "Max 2 per order". */
@@ -67,7 +75,7 @@ const FACT_ICON: Record<DetailFactKind, typeof Clock> = {
 };
 
 export function ItemDetailSheet(props: ItemDetailSheetProps) {
-  const { open, onOpenChange, triggerId, name, emoji, imageUrl, morePhotos = [], description, price, badges, sizes, offers = [], facts = [], share, footerPrice, action, dimmed } = props;
+  const { open, onOpenChange, triggerId, name, emoji, imageUrl, morePhotos = [], description, highlights = [], details, foodType, price, badges, sizes, offers = [], facts = [], share, footerPrice, action, dimmed } = props;
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent
@@ -95,7 +103,12 @@ export function ItemDetailSheet(props: ItemDetailSheetProps) {
             <ItemPhoto src={imageUrl} emoji={emoji} name={name} size="hero" enlarge dimmed={dimmed} />
           )}
 
-          {badges ? <div className="flex flex-wrap items-center gap-2">{badges}</div> : null}
+          {badges || foodType ? (
+            <div className="flex flex-wrap items-center gap-2">
+              {foodType ? <FoodMark type={foodType} label="visible" /> : null}
+              {badges}
+            </div>
+          ) : null}
 
           {sizes}
 
@@ -112,6 +125,31 @@ export function ItemDetailSheet(props: ItemDetailSheetProps) {
                 </li>
               ))}
             </ul>
+          ) : null}
+
+          {highlights.length > 0 ? (
+            <section aria-labelledby={`${triggerId}-highlights`} className="space-y-2">
+              <h3 id={`${triggerId}-highlights`} className="text-sm font-semibold text-foreground">
+                Highlights
+              </h3>
+              <dl className="grid grid-cols-[minmax(0,2fr)_minmax(0,3fr)] gap-x-3 gap-y-1.5 text-sm">
+                {highlights.map((h) => (
+                  <div key={h.label} className="contents">
+                    <dt className="text-muted-foreground">{h.label}</dt>
+                    <dd className="font-medium text-foreground">{h.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ) : null}
+
+          {details ? (
+            <section aria-labelledby={`${triggerId}-details`} className="space-y-1">
+              <h3 id={`${triggerId}-details`} className="text-sm font-semibold text-foreground">
+                Details
+              </h3>
+              <p className="whitespace-pre-line text-sm leading-relaxed text-foreground">{details}</p>
+            </section>
           ) : null}
 
           {facts.length > 0 ? (
@@ -149,6 +187,7 @@ export function ItemDetailTrigger({
   detailId,
   name,
   description,
+  foodType,
   onOpen,
   children,
 }: {
@@ -156,6 +195,8 @@ export function ItemDetailTrigger({
   detailId: string;
   name: string;
   description?: string | null;
+  /** The food mark (kitchens only), drawn before the name and said after it ("Paneer Tikka (Veg)"). */
+  foodType?: FoodType | null;
   onOpen: () => void;
   /** Extra inline content after the name (badges on the read-only row). */
   children?: ReactNode;
@@ -169,8 +210,10 @@ export function ItemDetailTrigger({
       className="flex min-h-11 w-full min-w-0 flex-col justify-center gap-0.5 rounded-lg text-left focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
     >
       <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+        {foodType ? <FoodMark type={foodType} label="none" /> : null}
         <span className="line-clamp-2 min-w-0 text-[15px] font-semibold leading-snug text-foreground underline-offset-2 hover:underline">
           {name}
+          {foodType ? <span className="sr-only"> ({FOOD_TYPE_LABEL[foodType]})</span> : null}
         </span>
         {children}
       </span>

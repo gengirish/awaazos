@@ -65,6 +65,12 @@ Rules every one of them follows:
   (`ItemPhotoGallery`, scroll-snap). The item form saves each change at once (`GET`/`POST /api/menu/[id]/images`,
   `DELETE …/images/[imageId]` with `cover` for the cover, `PUT …/images/order`, CASHIER, compound scope); every
   change rewrites the whole list under a row lock on the item, and removing the cover moves the next photo up.
+- **Highlights, details and the veg mark** (`lib/item-highlights.ts`, zod-free; request schemas in `lib/zod-menu.ts`):
+  `MenuItem.highlights` (≤ 6 label / value pairs, refused rather than cut, read leniently by `storedHighlights`),
+  `details` (≤ 1000 chars, line breaks kept; `description` keeps its one-line job) and `foodType` (`VEG | NON_VEG |
+  EGG`, null = not said), edited in the item form (`ItemDetailFields`) and sent with POST / PATCH `/api/menu`. The
+  sheet shows highlights as a two-column list, then the details. The mark (`FoodMark`, the FSSAI shapes plus a word,
+  never colour alone) shows on rows and in the sheet for food stores only. None of it reaches the voice prompt.
 - The vendor's WhatsApp number reaches a public page only through `buyerWhatsappNumber()`
   (`lib/storefront-order.ts`): `VendorSettings.whatsappNumber`, and only once the vendor opts in
   with `acceptWhatsappOrders` (default `false`; Settings → Online orders). A saved number is not
