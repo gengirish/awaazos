@@ -5,7 +5,7 @@
  *   npm run seed:demo-store -- --category=bakery --city=Hyderabad --create        # writes it
  *   npm run seed:demo-store -- --category=wellness --city=Bengaluru --name="Tulsi & Thyme" --create
  *
- * Options: --category=bakery|meals|wellness|crafts (default bakery), --city (required),
+ * Options: --category=bakery|meals|wellness|crafts|jewellery (default bakery), --city (required),
  * --name (default: the category's sample name), --ref (the demo store's external ref,
  * default "fixture-<slug>"), --allow-remote (anything but a local database).
  *
@@ -53,6 +53,7 @@ const API_CATEGORY: Record<DemoFixtureCategory, DemoCategory> = {
   meals: "home_kitchen",
   wellness: "wellness",
   crafts: "crafts_decor",
+  jewellery: "jewellery_accessories",
 };
 
 async function main(): Promise<void> {

@@ -80,13 +80,30 @@ scripts/demo-videos/tts_durations.py   # spoken length per caption, run inside v
 A full take: `demo:record` → `demo:voice:prep` (record again only if it says so) → `demo:render` → `demo:voice`.
 Outputs `demo-output/final/<scene>.reel.en.voice.mp4`; vo's run folders go to `demo-output/vo-runs/`.
 
+**Scenes recorded (2026-11-16):** C1, C2, C4, D1 (buyer and offers); B3, B4, B5 (orders board, UPI check, rider);
+F1, F3, F4, F5 (counter: voice, cash, offline, receipts); A3, B1 (voice menu, voice pre-order). Phone only, no
+split-screen yet. Shared set-up in `demo/seed/session.ts` (`quietPhone`, `sellerSignIn`, `placeMenuOrder`,
+`claimPaid`, `setDemoFssai`); `seedStore(…, { fssai: true })` keeps the FSSAI reminder off seller screens that
+film neither the store page nor a receipt. Voice scenes use `demo/stubs/voice.ts`: a fake Web Speech recogniser
+and `page.route` answers for `/api/ai/*`, so no request reaches the server or any AI provider; saving still goes
+through the real local API.
+
+What these scenes fake, so captions stay honest:
+- UPI, WhatsApp and print: the tap is shown, the `upi:` / `wa.me` / print step is blocked, and the caption says
+  what opens. C2 shows the single "Payment done" button (no private Blob store locally, so no screenshot picker).
+- C4: the seller's accept / send-out steps happen off camera through the API.
+- B5 never shows the WhatsApp text; line 3 describes it.
+
+Found while filming (app issues, not fixed here):
+- `/pos` after an offline sale syncs: the "Today" figure drops from the sale's amount to ₹0.00 until a reload.
+- `/menu` at 360 px: each item card's right-hand action button is cut off at the edge.
+- Headless Chrome on Windows 10 draws 🫓 as an empty box; `seedStore` swaps it for 🥙 (demo seed only).
+
 Still to build (Phase 1 onwards):
 
 ```
 demo/
   stubs/
-    speech.ts                    # fake SpeechRecognition (lifted from voice-*.spec.ts into one place)
-    ai.ts                        # route stubs for /api/ai/parse-order | parse-drop | parse-menu | transcribe
     wa.ts                        # catches wa.me popups; shows the message as a caption instead
     razorpay.ts                  # stubbed Checkout for the "Pay online" beat (never a real payment)
   seed/

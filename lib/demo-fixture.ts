@@ -16,7 +16,7 @@
 import type { MenuSlotRule } from "@/lib/menu-slots";
 import { normaliseStoreHandle } from "@/lib/store-handle";
 
-export const DEMO_FIXTURE_CATEGORIES = ["bakery", "meals", "wellness", "crafts"] as const;
+export const DEMO_FIXTURE_CATEGORIES = ["bakery", "meals", "wellness", "crafts", "jewellery"] as const;
 export type DemoFixtureCategory = (typeof DEMO_FIXTURE_CATEGORIES)[number];
 
 export type DemoFixtureItem = {
@@ -27,6 +27,10 @@ export type DemoFixtureItem = {
   emoji: string;
   imageUrl: string;
   unit?: string;
+  /** Stock counted now (lib/inventory.ts). Absent = not tracked. Ignored when the item has colours. */
+  stock?: number;
+  /** Colours sold as item variants (lib/item-variants.ts), each with its own stock when given. */
+  colours?: { label: string; stock?: number }[];
 };
 
 export type DemoFixtureDropItem = DemoFixtureItem & {
@@ -205,6 +209,54 @@ const PRESETS: Record<DemoFixtureCategory, Preset> = {
       ],
     },
     offer: { name: "Free tealight", description: "Order any 2 pieces and get a Mini Tealight Candle free.", minQty: 2 },
+    slots: [{ days: [1, 2, 3, 4, 5, 6], start: "11:00", end: "19:00" }],
+  },
+  jewellery: {
+    defaultName: "Moti Lane",
+    tagline: (city) => `Jhumkas, kundan and everyday pieces, handpicked and packed with love in ${city}`,
+    stallType: "OTHER",
+    stallTypeOther: "Jewellery & accessories",
+    theme: "red",
+    fulfilment: "BOTH",
+    deliveryFeePaise: 6000,
+    pickupNote: "Pick up at the building gate. Call when you're here.",
+    everyday: [
+      {
+        name: "Oxidised Silver Jhumkas", rupees: 450, category: "Earrings", description: "Light enough to wear all day. Silver-tone with a stone.",
+        emoji: "💎", imageUrl: art("jhumka"), colours: [{ label: "Green stone", stock: 4 }, { label: "Red stone", stock: 3 }],
+      },
+      {
+        name: "Kundan Choker Set", rupees: 1200, category: "Necklaces", description: "Choker with matching earrings, in a gift box.",
+        emoji: "📿", imageUrl: art("choker"), stock: 1,
+      },
+      {
+        name: "Pearl Drop Earrings", rupees: 350, category: "Earrings", description: "Pearl-look drops on gold-tone hooks.",
+        emoji: "💎", imageUrl: art("pearl-drops"), colours: [{ label: "White", stock: 5 }, { label: "Pink", stock: 2 }, { label: "Peach", stock: 3 }],
+      },
+      {
+        name: "Adjustable Stone Ring", rupees: 250, category: "Rings", description: "Fits most fingers. Gold-tone.",
+        emoji: "💍", imageUrl: art("stone-ring"), colours: [{ label: "Emerald", stock: 6 }, { label: "Ruby", stock: 4 }, { label: "Sapphire", stock: 2 }],
+      },
+      {
+        name: "Evil Eye Beaded Bracelet", rupees: 220, category: "Bracelets", description: "Adjustable, glass beads.",
+        emoji: "🧿", imageUrl: art("bracelet"), stock: 8,
+      },
+    ],
+    gift: { name: "Velvet Jewellery Pouch", rupees: 80, category: "Gifts", description: "Drawstring pouch to keep your pieces safe.", emoji: "👝", imageUrl: art("pouch") },
+    drop: {
+      title: "Festive Kundan Edit",
+      note: "A small festive batch. Each piece comes gift boxed.",
+      daysAhead: 2,
+      cutoffTime: "21:00",
+      windowStart: "11:00",
+      windowEnd: "19:00",
+      items: [
+        { name: "Kundan Maang Tikka", rupees: 650, category: "Festive", description: "Kundan and pearl, on a gold-tone chain.", emoji: "💎", imageUrl: art("maang-tikka"), maxQty: 3 },
+        { name: "Bridal Bangle Set", rupees: 1500, category: "Festive", description: "Set of 10 in maroon, green and gold.", emoji: "💍", imageUrl: art("bangles"), maxQty: 8 },
+        { name: "Kundan Jhumkas", rupees: 750, category: "Festive", description: "Statement jhumkas with pearl drops.", emoji: "💎", imageUrl: art("jhumka"), maxQty: 10 },
+      ],
+    },
+    offer: { name: "Free velvet pouch", description: "Order any 2 pieces and get a Velvet Jewellery Pouch free.", minQty: 2 },
     slots: [{ days: [1, 2, 3, 4, 5, 6], start: "11:00", end: "19:00" }],
   },
 };
