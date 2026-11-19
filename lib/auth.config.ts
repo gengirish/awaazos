@@ -12,6 +12,8 @@ const PUBLIC_PWA_FILES = new Set([
   "/icon-512.png",
   "/apple-touch-icon.png",
   "/badge-72.png",
+  // The site's link-preview card (app/opengraph-image.png): fetched by WhatsApp / Instagram crawlers.
+  "/opengraph-image.png",
 ]);
 
 function isPublicPath(pathname: string): boolean {
