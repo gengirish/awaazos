@@ -34,6 +34,8 @@ export type ReadOnlyMenuItem = {
   unit: string | null;
   isPopular: boolean;
   description: string | null;
+  /** "Ordered 25+ times" (lib/item-ordered-count.ts); null = nothing to show. */
+  orderedText?: string | null;
 };
 
 export function ReadOnlyMenuRow({
@@ -44,6 +46,7 @@ export function ReadOnlyMenuRow({
   slug,
   storeName,
   initialOpen = false,
+  portrait = false,
 }: {
   item: ReadOnlyMenuItem;
   slug: string;
@@ -54,6 +57,8 @@ export function ReadOnlyMenuRow({
   stock: StorefrontStock | null;
   /** Its sizes / colours (lib/item-variants.ts); absent when it has none. */
   sizes?: StoreSize[];
+  /** A 3:4 gallery tile (clothing stores). */
+  portrait?: boolean;
 }) {
   const [open, setOpen] = useState(initialOpen);
   const openDetail = () => {
@@ -79,6 +84,7 @@ export function ReadOnlyMenuRow({
           Popular
         </span>
       ) : null}
+      {item.orderedText ? <span className="text-xs font-semibold text-muted-foreground">{item.orderedText}</span> : null}
     </>
   );
   const price = (
@@ -112,7 +118,7 @@ export function ReadOnlyMenuRow({
       description={item.description}
       dimmed={dimmed}
       price={<ItemPriceHero priceInPaise={fromPaise} sale={null} unit={item.unit} from={range !== null} />}
-      badges={stockBadgeText(stock) || item.isPopular ? badges : null}
+      badges={stockBadgeText(stock) || item.isPopular || item.orderedText ? badges : null}
       sizes={sizeLine ? <p className="text-sm text-muted-foreground">Sizes: {sizeLine}</p> : null}
     />
   );
@@ -120,7 +126,7 @@ export function ReadOnlyMenuRow({
   if (layout === "gallery") {
     return (
       <li className="flex flex-col gap-2 rounded-2xl border border-border/60 bg-background p-2.5 shadow-xs">
-        <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="tile" onOpen={openDetail} dimmed={dimmed} />
+        <ItemPhoto src={item.imageUrl} emoji={item.emoji} name={item.name} size="tile" portrait={portrait} onOpen={openDetail} dimmed={dimmed} />
         <span className="flex min-w-0 flex-1 flex-col gap-0.5">
           <ItemDetailTrigger detailId={item.id} name={item.name} description={item.description} foodType={item.foodType} onOpen={openDetail} />
           {sizeLine ? <span className="line-clamp-2 text-xs leading-snug text-muted-foreground">{sizeLine}</span> : null}

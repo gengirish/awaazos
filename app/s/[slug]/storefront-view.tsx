@@ -32,6 +32,10 @@ import { CartHubProvider } from "@/components/storefront/CartHub";
 import { DropOrder, type BuyerPrefill, type DropOrderItem } from "@/components/storefront/DropOrder";
 import { MenuOrder, type MenuOrderCategory } from "@/components/storefront/MenuOrder";
 import { ReadOnlyMenuRow } from "@/components/storefront/ReadOnlyMenuRow";
+import { SortableReadOnlyMenu } from "@/components/storefront/CatalogueSort";
+import { showsCatalogueSort } from "@/lib/catalogue-sort";
+import { orderedBadgeText } from "@/lib/item-ordered-count";
+import { loadOrderedCounts } from "@/lib/item-ordered-count-server";
 import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
 import { RecentOrderLink } from "@/components/storefront/RecentOrderLink";
 import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
@@ -328,6 +332,8 @@ export const loadStorefront = cache(async (slug: string) => {
           priceInPaise: true,
           unit: true,
           isPopular: true,
+          // The "Newest" sort (lib/catalogue-sort.ts).
+          createdAt: true,
           imageUrl: true,
           // Extra photos after the cover (lib/item-photos.ts), shown in the detail sheet.
           images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], take: MAX_ITEM_PHOTOS - 1, select: { url: true } },
@@ -831,6 +837,8 @@ export async function StorefrontView(props: {
   const tagline = vendor.settings?.tagline ?? null;
   // A kitchen reads as a menu (rows); anything else as a gallery of its products.
   const layout: CatalogueLayout = storeKind(vendor.stallType) === "goods" ? "gallery" : "list";
+  // Clothing is photographed whole: its gallery tiles are 3:4, not square.
+  const portraitTiles = vendor.stallType === "CLOTHING";
 
   const menuOrdering = (vendor.settings?.acceptMenuOrders ?? false) && categories.length > 0;
   const menuTypes = allowedFulfilmentTypes(vendor.settings?.menuFulfilmentMode ?? "PICKUP");
@@ -903,7 +911,7 @@ export async function StorefrontView(props: {
         },
       )
     : [];
-  const [dropViews, customer, isStaff, ratings] = await Promise.all([
+  const [dropViews, customer, isStaff, ratings, orderedCounts] = await Promise.all([
     buildDropViews(
       vendor.drops,
       now,
@@ -916,7 +924,16 @@ export async function StorefrontView(props: {
     getCurrentCustomer(),
     viewerIsStoreStaff(vendor.id),
     vendor.isDemo ? null : loadRatingSummary(vendor.id),
+    // "Ordered 25+ times" (lib/item-ordered-count.ts): never on a demo store.
+    vendor.isDemo
+      ? new Map<string, number>()
+      : loadOrderedCounts(
+          vendor.id,
+          menuItems.map((i) => i.id),
+          now,
+        ),
   ]);
+  const orderedTextOf = (menuItemId: string) => orderedBadgeText(orderedCounts.get(menuItemId));
   // A buyer arriving, for the order leak map on /admin/metrics (lib/store-views.ts):
   // counted in Upstash in the background, never for demo stores or the store's own staff.
   if (!vendor.isDemo && !isStaff) {
@@ -999,6 +1016,8 @@ export async function StorefrontView(props: {
       description: item.description,
       stock: stockOf(item.id),
       sizes: storeSizes.get(item.id),
+      createdAtMs: item.createdAt.getTime(),
+      orderedText: orderedTextOf(item.id),
     })),
   }));
 
@@ -1246,8 +1265,9 @@ export async function StorefrontView(props: {
                     </a>
                   </li>
                 ) : null}
+                {/* Hidden while a sort is on (CatalogueSort.tsx): the sorted list has no category headings. */}
                 {categories.map(([category], i) => (
-                  <li key={category} className="shrink-0">
+                  <li key={category} className="shrink-0 [[data-catalogue-sorted]_&]:hidden">
                     <a
                       href={`#${categoryAnchor(category, i)}`}
                       className="inline-flex min-h-11 items-center whitespace-nowrap rounded-full border border-border/70 px-4 text-sm font-bold text-muted-foreground transition-colors hover:border-primary/50 hover:bg-primary/10 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
@@ -1376,6 +1396,7 @@ export async function StorefrontView(props: {
                     vendorName={vendor.name}
                     categories={menuCategories}
                     layout={layout}
+                    portraitTiles={portraitTiles}
                     fulfilmentTypes={menuTypes}
                     deliveryFeePaise={vendor.settings?.menuDeliveryFeePaise ?? 0}
                     deliveryAreas={deliveryAreas}
@@ -1401,39 +1422,40 @@ export async function StorefrontView(props: {
                   />
                 ) : null}
 
-                {menuOrdering ? null : categories.map(([category, items], i) => (
-                  <Searchable key={category} texts={items.map((item) => menuItemSearchText(item, category))}>
-                    <section aria-labelledby={categoryAnchor(category, i)}>
-                      <div className="mb-3 flex items-baseline gap-3">
-                        <h3
-                          id={categoryAnchor(category, i)}
-                          className="scroll-mt-20 font-display text-base font-bold text-awaaz-charcoal"
-                        >
-                          {category}
-                        </h3>
-                        <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
-                        <span className="text-xs font-semibold text-muted-foreground">
-                          {items.length}
-                        </span>
-                      </div>
-                      <ul className={CATEGORY_LIST_CLASS[layout]}>
-                        {items.map((item) => (
-                          <Searchable key={item.id} texts={[menuItemSearchText(item, category)]}>
+                {menuOrdering ? null : (
+                  <SortableReadOnlyMenu
+                    slug={vendor.slug}
+                    listClassName={CATEGORY_LIST_CLASS[layout]}
+                    sortable={showsCatalogueSort(menuItems.length)}
+                    categories={categories.map(([category, items], i) => ({
+                      category,
+                      anchor: categoryAnchor(category, i),
+                      rows: items.map(({ createdAt, ...item }) => {
+                        const sizes = storeSizes.get(item.id);
+                        return {
+                          id: item.id,
+                          text: menuItemSearchText(item, category),
+                          key: {
+                            pricePaise: sizes && sizes.length > 0 ? Math.min(...sizes.map((v) => v.priceInPaise)) : item.priceInPaise,
+                            createdAtMs: createdAt.getTime(),
+                          },
+                          node: (
                             <ReadOnlyMenuRow
-                              item={item}
+                              item={{ ...item, orderedText: orderedTextOf(item.id) }}
                               layout={layout}
+                              portrait={portraitTiles}
                               stock={stockOf(item.id)}
-                              sizes={storeSizes.get(item.id)}
+                              sizes={sizes}
                               slug={vendor.slug}
                               storeName={vendor.name}
                               initialOpen={openTarget?.kind === "menu" && openTarget.menuItemId === item.id}
                             />
-                          </Searchable>
-                        ))}
-                      </ul>
-                    </section>
-                  </Searchable>
-                ))}
+                          ),
+                        };
+                      }),
+                    }))}
+                  />
+                )}
               </div>
             )}
 

@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { useCartHubEntry } from "@/components/storefront/CartHub";
+import { CatalogueSortControl, CategoryHeading, useCatalogueSort } from "@/components/storefront/CatalogueSort";
 import { SizePicker } from "@/components/storefront/SizePicker";
 import { ItemDetailSheet, ItemDetailTrigger } from "@/components/storefront/ItemDetailSheet";
 import { enterItemUrl, itemDetailPath, leaveItemUrl, useCloseOnBack } from "@/components/storefront/item-detail-url";
@@ -21,6 +22,7 @@ import {
   type FulfilmentType,
 } from "@/components/storefront/StorefrontCheckout";
 import { ItemPrice, ItemPriceHero } from "@/components/storefront/ItemPrice";
+import { CATALOGUE_SORT_LABELS, showsCatalogueSort, sortCatalogue } from "@/lib/catalogue-sort";
 import { formatINRCompact } from "@/lib/currency";
 import type { FoodType, Highlight } from "@/lib/item-highlights";
 import { OfferCartNote, OfferChips, offerCartNoteText } from "@/components/storefront/OfferNotes";
@@ -95,6 +97,10 @@ export type MenuOrderItem = {
   stock?: StorefrontStock | null;
   /** Its available sizes / colours (lib/item-variants.ts); absent = it has none. */
   sizes?: StoreSize[];
+  /** `MenuItem.createdAt` in epoch ms, for the "Newest" sort (lib/catalogue-sort.ts). */
+  createdAtMs?: number;
+  /** "Ordered 25+ times" (lib/item-ordered-count.ts); null = nothing to show. */
+  orderedText?: string | null;
 };
 
 /** One cart line resolved against the page: the item, and its size when it has them. */
@@ -135,6 +141,8 @@ export type MenuOrderProps = {
   facts?: readonly DetailFact[];
   /** The item whose sheet is open on load (a product link, `/s/<slug>/p/<id>`); null = none. */
   initialDetailId?: string | null;
+  /** Gallery tiles at 3:4 (clothing stores). */
+  portraitTiles?: boolean;
 };
 
 const NO_OFFERS: readonly ResolvedOffer[] = [];
@@ -160,6 +168,7 @@ export function MenuOrder(props: MenuOrderProps) {
     layout = "list",
     facts = NO_FACTS,
     initialDetailId = null,
+    portraitTiles = false,
   } = props;
   const router = useRouter();
 
@@ -213,16 +222,29 @@ export function MenuOrder(props: MenuOrderProps) {
     );
   }
 
+  // Sort (lib/catalogue-sort.ts): only past 12 items; any sort but "Our order" is one list.
+  const sortable = showsCatalogueSort(byId.size);
+  const [sort, setSort] = useCatalogueSort(slug, sortable);
+
   // The store page's search hides rows (and emptied categories); the cart keeps
   // whatever was added, so hidden rows still check out.
   const matchesSearch = useStoreSearchMatch();
-  const visibleCategories = useMemo(
-    () =>
-      categories
-        .map((c) => ({ ...c, items: c.items.filter((i) => matchesSearch(itemSearchText({ name: i.name, description: i.description }, c.category))) }))
-        .filter((c) => c.items.length > 0),
-    [categories, matchesSearch],
-  );
+  const visibleCategories = useMemo(() => {
+    const matching = categories
+      .map((c) => ({ ...c, items: c.items.filter((i) => matchesSearch(itemSearchText({ name: i.name, description: i.description }, c.category))) }))
+      .filter((c) => c.items.length > 0);
+    if (sort === "ours") return matching.map((c) => ({ ...c, heading: true }));
+    const items = sortCatalogue(
+      matching.flatMap((c) => c.items),
+      sort,
+      (i) => {
+        // What the card shows: the cheapest size, after its sale.
+        const base = i.sizes && i.sizes.length > 0 ? Math.min(...i.sizes.map((v) => v.priceInPaise)) : i.priceInPaise;
+        return { pricePaise: salePriceFor(offers, i.id, base)?.salePricePaise ?? base, createdAtMs: i.createdAtMs ?? 0 };
+      },
+    );
+    return items.length > 0 ? [{ category: CATALOGUE_SORT_LABELS[sort], anchor: "menu-sorted", items, heading: false }] : [];
+  }, [categories, matchesSearch, sort, offers]);
 
   // Stock learned from an out_of_stock rejection, until the refreshed props land.
   const [stockOverride, setStockOverride] = useState<Record<string, number>>({});
@@ -369,6 +391,7 @@ export function MenuOrder(props: MenuOrderProps) {
           Popular
         </span>
       ) : null}
+      {item.orderedText ? <span className="text-xs font-semibold text-muted-foreground">{item.orderedText}</span> : null}
     </span>
   );
 
@@ -451,16 +474,16 @@ export function MenuOrder(props: MenuOrderProps) {
 
       <OfferChips offers={offers} />
 
+      {sortable ? <CatalogueSortControl value={sort} onChange={setSort} /> : null}
+
       <div className="space-y-8">
-        {visibleCategories.map(({ category, anchor, items }) => (
-          <section key={anchor} aria-labelledby={anchor}>
-            <div className="mb-3 flex items-baseline gap-3">
-              <h3 id={anchor} className="scroll-mt-20 font-display text-base font-bold text-awaaz-charcoal">
-                {category}
-              </h3>
-              <span className="h-px flex-1 bg-border/70" aria-hidden="true" />
-              <span className="text-xs font-semibold text-muted-foreground">{items.length}</span>
-            </div>
+        {visibleCategories.map(({ category, anchor, items, heading }) => (
+          <section
+            key={anchor}
+            aria-labelledby={heading ? anchor : undefined}
+            aria-label={heading ? undefined : `All items, ${category.toLowerCase()}`}
+          >
+            {heading ? <CategoryHeading id={anchor} category={category} count={items.length} /> : null}
             <ul
               className={
                 layout === "gallery"
@@ -482,6 +505,7 @@ export function MenuOrder(props: MenuOrderProps) {
                       emoji={item.emoji}
                       name={item.name}
                       size="tile"
+                      portrait={portraitTiles}
                       onOpen={openDetail}
                       dimmed={v.itemSoldOut}
                     />
@@ -552,7 +576,7 @@ export function MenuOrder(props: MenuOrderProps) {
             />
           }
           badges={
-            detailBadgeText || detailItem.isPopular ? (
+            detailBadgeText || detailItem.isPopular || detailItem.orderedText ? (
               <>
                 {detailBadgeText ? (
                   <span
@@ -569,6 +593,9 @@ export function MenuOrder(props: MenuOrderProps) {
                     <Sparkles className="h-3 w-3" aria-hidden="true" />
                     Popular
                   </span>
+                ) : null}
+                {detailItem.orderedText ? (
+                  <span className="text-xs font-semibold text-muted-foreground">{detailItem.orderedText}</span>
                 ) : null}
               </>
             ) : null

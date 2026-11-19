@@ -12,7 +12,8 @@ import { cn } from "@/lib/utils";
  *
  * `size="row"` is the 80 px square of the list rows; `size="tile"` fills the
  * width of a gallery card (goods stores); `size="hero"` is the top of an item's
- * detail sheet (ItemDetailSheet.tsx).
+ * detail sheet (ItemDetailSheet.tsx). A `portrait` tile is 3:4 instead of square
+ * (clothing stores: a kurti photographed whole is taller than it is wide).
  *
  * Two ways a tap does something, never both:
  * - `onOpen`: the picture opens the item's detail sheet. The item's name is the
@@ -34,6 +35,8 @@ export type ItemPhotoProps = {
   dimmed?: boolean;
   /** The enlarge button's name; default "See the photo of <name>". */
   label?: string;
+  /** A 3:4 tile instead of a square one (`size="tile"` only). */
+  portrait?: boolean;
 };
 
 const FRAME: Record<ItemPhotoProps["size"], string> = {
@@ -41,6 +44,8 @@ const FRAME: Record<ItemPhotoProps["size"], string> = {
   tile: "aspect-square w-full rounded-xl",
   hero: "aspect-square w-full rounded-2xl",
 };
+
+const PORTRAIT_TILE = "aspect-[3/4] w-full rounded-xl";
 
 const PIXELS: Record<ItemPhotoProps["size"], { px: number; sizes: string }> = {
   row: { px: 80, sizes: "80px" },
@@ -54,22 +59,34 @@ const EMOJI_SIZE: Record<ItemPhotoProps["size"], string> = {
   hero: "text-7xl",
 };
 
-export function ItemPhoto({ src, emoji, name, size, enlarge = false, onOpen, dimmed = false, label }: ItemPhotoProps) {
+export function ItemPhoto({
+  src,
+  emoji,
+  name,
+  size,
+  enlarge = false,
+  onOpen,
+  dimmed = false,
+  label,
+  portrait = false,
+}: ItemPhotoProps) {
   const [open, setOpen] = useState(false);
+  const tall = portrait && size === "tile";
+  const frame = tall ? PORTRAIT_TILE : FRAME[size];
 
   const picture = src ? (
     <Image
       src={src}
       alt=""
       width={PIXELS[size].px}
-      height={PIXELS[size].px}
+      height={tall ? (PIXELS[size].px * 4) / 3 : PIXELS[size].px}
       sizes={PIXELS[size].sizes}
-      className={cn(FRAME[size], "object-cover ring-1 ring-border/60", dimmed && "opacity-50")}
+      className={cn(frame, "object-cover ring-1 ring-border/60", dimmed && "opacity-50")}
     />
   ) : (
     <span
       aria-hidden="true"
-      className={cn(FRAME[size], "flex items-center justify-center bg-primary/10", EMOJI_SIZE[size], dimmed && "opacity-50")}
+      className={cn(frame, "flex items-center justify-center bg-primary/10", EMOJI_SIZE[size], dimmed && "opacity-50")}
     >
       {emoji}
     </span>
@@ -82,7 +99,7 @@ export function ItemPhoto({ src, emoji, name, size, enlarge = false, onOpen, dim
         tabIndex={-1}
         aria-hidden="true"
         onClick={onOpen}
-        className={cn(FRAME[size], "block cursor-pointer overflow-hidden")}
+        className={cn(frame, "block cursor-pointer overflow-hidden")}
       >
         {picture}
       </button>
@@ -98,7 +115,7 @@ export function ItemPhoto({ src, emoji, name, size, enlarge = false, onOpen, dim
         onClick={() => setOpen(true)}
         aria-label={label ?? `See the photo of ${name}`}
         className={cn(
-          FRAME[size],
+          frame,
           "block overflow-hidden ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
         )}
       >
