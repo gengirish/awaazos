@@ -13,7 +13,7 @@
         "overflow": false,
         "tapTargets": {
           "button \"Install app\"": { "count": 1, "size": "89x44" },
-          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"AwaazDo\"": { "count": 1, "size": "80x44" },
           "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"How it works\"": { "count": 1, "size": "96x44" },
           "link \"Pricing\"": { "count": 1, "size": "61x44" },
@@ -30,7 +30,7 @@
         "overflow": false,
         "tapTargets": {
           "button \"Install app\"": { "count": 1, "size": "89x44" },
-          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"AwaazDo\"": { "count": 1, "size": "80x44" },
           "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"How it works\"": { "count": 1, "size": "96x44" },
           "link \"Pricing\"": { "count": 1, "size": "61x44" },
@@ -47,7 +47,7 @@
         "overflow": false,
         "tapTargets": {
           "button \"Install app\"": { "count": 1, "size": "89x44" },
-          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"AwaazDo\"": { "count": 1, "size": "80x44" },
           "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"Home\"": { "count": 1, "size": "62x44" },
           "link \"How it works\"": { "count": 1, "size": "108x44" },
@@ -468,7 +468,7 @@
       "/pricing@360": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"AwaazDo\"": { "count": 1, "size": "80x44" },
           "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"How it works\"": { "count": 1, "size": "96x44" },
           "link \"Pricing\"": { "count": 1, "size": "61x44" },
@@ -483,7 +483,7 @@
       "/pricing@390": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"AwaazDo\"": { "count": 1, "size": "80x44" },
           "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"How it works\"": { "count": 1, "size": "96x44" },
           "link \"Pricing\"": { "count": 1, "size": "61x44" },
@@ -498,7 +498,7 @@
       "/pricing@768": {
         "overflow": false,
         "tapTargets": {
-          "link \"AwaazOS\"": { "count": 1, "size": "80x44" },
+          "link \"AwaazDo\"": { "count": 1, "size": "80x44" },
           "link \"DPDP rights\"": { "count": 1, "size": "79x44" },
           "link \"Home\"": { "count": 1, "size": "62x44" },
           "link \"How it works\"": { "count": 1, "size": "108x44" },
@@ -525,7 +525,7 @@
           "button \"Share\"": { "count": 1, "size": "84x44" },
           "link \"Back to the top of Sweep Kitchen\"": { "count": 1, "size": "44x44" },
           "link \"Drinks\"": { "count": 1, "size": "76x44" },
-          "link \"Powered by AwaazOS · Start your own store\"": { "count": 1, "size": "278x44" },
+          "link \"Powered by AwaazDo · Start your own store\"": { "count": 1, "size": "278x44" },
           "link \"Pre-order · closes tomorrow #:## pm\"": { "count": 1, "size": "312x44" },
           "link \"Pre-order\"": { "count": 1, "size": "119x44" },
           "link \"Sign in\"": { "count": 1, "size": "89x44" },
@@ -546,7 +546,7 @@
           "button \"Share\"": { "count": 1, "size": "84x44" },
           "link \"Back to the top of Sweep Kitchen\"": { "count": 1, "size": "44x44" },
           "link \"Drinks\"": { "count": 1, "size": "76x44" },
-          "link \"Powered by AwaazOS · Start your own store\"": { "count": 1, "size": "278x44" },
+          "link \"Powered by AwaazDo · Start your own store\"": { "count": 1, "size": "278x44" },
           "link \"Pre-order · closes tomorrow #:## pm\"": { "count": 1, "size": "312x44" },
           "link \"Pre-order\"": { "count": 1, "size": "119x44" },
           "link \"Sign in\"": { "count": 1, "size": "89x44" },
@@ -567,7 +567,7 @@
           "button \"Share\"": { "count": 1, "size": "84x44" },
           "link \"Back to the top of Sweep Kitchen\"": { "count": 1, "size": "72x44" },
           "link \"Drinks\"": { "count": 1, "size": "76x44" },
-          "link \"Powered by AwaazOS · Start your own store\"": { "count": 1, "size": "278x44" },
+          "link \"Powered by AwaazDo · Start your own store\"": { "count": 1, "size": "278x44" },
           "link \"Pre-order · closes tomorrow #:## pm\"": { "count": 1, "size": "312x44" },
           "link \"Pre-order\"": { "count": 1, "size": "119x44" },
           "link \"Sign in\"": { "count": 1, "size": "89x44" },

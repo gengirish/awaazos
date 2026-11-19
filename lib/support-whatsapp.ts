@@ -5,8 +5,9 @@
  * button anywhere. It is read at build time, so changing it needs a deploy.
  */
 import { normaliseIndianMobile } from "@/lib/phone";
+import { BRAND_NAME } from "@/lib/brand";
 
-const PREFILL = "Hi! I'd like to know more about AwaazOS for my store.";
+const PREFILL = `Hi! I'd like to know more about ${BRAND_NAME} for my store.`;
 
 /** wa.me link with a prefilled first message, or null when no usable number is set. */
 export function supportWhatsappUrl(raw: string | undefined = process.env.NEXT_PUBLIC_SUPPORT_WHATSAPP): string | null {

@@ -7,9 +7,10 @@ import { formatIstDate } from "@/lib/datetime";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
 import { SALES_SHARE_BPS, SALES_SHARE_MONTHS } from "@/lib/sales-earnings";
 import { loadSalesEarnings, type RepEarnings } from "@/lib/sales-earnings-server";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Sales earnings — AwaazOS" };
+export const metadata = { title: `Sales earnings — ${BRAND_NAME}` };
 
 /**
  * /admin/earnings — a SALES user sees their own share, a SUPER_ADMIN everyone's

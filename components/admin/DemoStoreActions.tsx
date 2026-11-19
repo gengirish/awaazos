@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Notice } from "@/components/ui/notice";
 import { OutreachWhatsApp } from "@/components/admin/OutreachWhatsApp";
+import { SetLoginForm } from "@/components/admin/SetLoginForm";
 import { formatIstDate } from "@/lib/datetime";
 import { outreachClaimMessage } from "@/lib/outreach-message";
 
@@ -35,6 +36,8 @@ type Props = {
   contactEmail: string | null;
   /** A SALES user can't delete a store. */
   canDelete: boolean;
+  /** Platform ADMIN: may hand over with a login they set (a SALES user only sends claim links). */
+  canSetLogin?: boolean;
   /** WhatsApp was opened, or the admin says they already messaged the seller. */
   onSent: (opened: boolean) => void;
   onArchive: () => void;
@@ -44,7 +47,8 @@ type Props = {
 /**
  * A demo store's actions on /admin/demo-stores: message the seller on WhatsApp
  * (wa.me from the admin's own phone, recorded as sent), or email them a claim
- * link (POST …/handover). Archive and delete sit in the ⋯ menu, away from the
+ * link (POST …/handover). An ADMIN can instead set the seller's login and hand
+ * over at once (SetLoginForm). Archive and delete sit in the ⋯ menu, away from the
  * primary action. Claimed stores don't get this component. The claim email is
  * the only thing sent from our side.
  */
@@ -55,6 +59,7 @@ export function DemoStoreActions({
   message,
   contactEmail,
   canDelete,
+  canSetLogin = false,
   onSent,
   onArchive,
   onDelete,
@@ -63,6 +68,7 @@ export function DemoStoreActions({
   const emailId = useId();
   const [open, setOpen] = useState(false);
   const [messaging, setMessaging] = useState(false);
+  const [settingLogin, setSettingLogin] = useState(false);
   const [email, setEmail] = useState(contactEmail ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -166,6 +172,17 @@ export function DemoStoreActions({
             Cancel
           </Button>
         </form>
+      ) : settingLogin ? (
+        <SetLoginForm
+          externalRef={externalRef}
+          storeName={storeName}
+          contactEmail={contactEmail}
+          onCancel={() => setSettingLogin(false)}
+          onDone={() => {
+            setSettingLogin(false);
+            router.refresh();
+          }}
+        />
       ) : messaging ? (
         <div className="space-y-3">
           <OutreachWhatsApp phone={phone} message={message} label="Message on WhatsApp" onOpen={() => onSent(true)} />
@@ -181,6 +198,11 @@ export function DemoStoreActions({
           <Button type="button" size="sm" variant="outline" onClick={() => setOpen(true)}>
             Hand over to the seller
           </Button>
+          {canSetLogin ? (
+            <Button type="button" size="sm" variant="outline" onClick={() => setSettingLogin(true)}>
+              Set up their login
+            </Button>
+          ) : null}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button type="button" size="icon" variant="outline" aria-label={`More actions for ${storeName}`}>

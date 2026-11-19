@@ -18,9 +18,10 @@ import { formatINR } from "@/lib/currency";
 import { formatIstDate } from "@/lib/datetime";
 import { billingAccess } from "@/lib/plan";
 import { AuthError, requirePlatformRole } from "@/lib/rbac";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
-export const metadata = { title: "Admin referrals — AwaazOS" };
+export const metadata = { title: `Admin referrals — ${BRAND_NAME}` };
 
 const BILLING_LABEL = { paid: "Paid", trial: "Trial", locked: "Locked", free: "Free" } as const;
 

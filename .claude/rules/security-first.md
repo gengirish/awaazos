@@ -4,7 +4,7 @@ description: Secure defaults, secret hygiene, PII boundaries
 
 <!-- Generated from .cursor/rules/security-first.mdc by scripts/sync-agent-rules.mjs. Edit the source, then re-run. -->
 
-# Security First — AwaazOS
+# Security First — AwaazDo
 
 ## Secrets
 

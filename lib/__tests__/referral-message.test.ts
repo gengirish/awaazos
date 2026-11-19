@@ -3,20 +3,21 @@ import { describe, expect, it } from "vitest";
 import { TRIAL_DAYS } from "@/lib/constants";
 import { REFERRED_TRIAL_DAYS, referralSignUpUrl } from "@/lib/referral";
 import { referralLinkLabel, referralWhatsappMessage, referralWhatsappUrl } from "@/lib/referral-message";
+import { BRAND_NAME } from "@/lib/brand";
 
 const link = referralSignUpUrl("https://awaazos.example", "sam-store");
 
 describe("referralWhatsappMessage", () => {
   it("names the store, the longer trial and the link", () => {
     const text = referralWhatsappMessage({ storeName: "Sam Store", link });
-    expect(text).toContain("I run Sam Store on AwaazOS.");
+    expect(text).toContain(`I run Sam Store on ${BRAND_NAME}.`);
     expect(text).toContain(`${REFERRED_TRIAL_DAYS} days free instead of ${TRIAL_DAYS}`);
     expect(text.trim().endsWith(link)).toBe(true);
   });
 
   it("reads naturally without a store name", () => {
     const text = referralWhatsappMessage({ storeName: "  ", link });
-    expect(text).toContain("I run my store on AwaazOS.");
+    expect(text).toContain(`I run my store on ${BRAND_NAME}.`);
     expect(text).not.toContain("I run  on");
   });
 

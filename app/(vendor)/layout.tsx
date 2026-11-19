@@ -1,7 +1,10 @@
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 
 import { OrderVoiceAlerts } from "@/components/push/OrderVoiceAlerts";
 import { AppShell } from "@/components/shell/AppShell";
+import { MovedHostNotice } from "@/components/shell/MovedHostNotice";
+import { canonicalHostFrom, isLegacyHost } from "@/lib/canonical-host";
 import { Toaster } from "@/components/ui/sonner";
 
 import { getShellContext } from "./_shell-context";
@@ -23,9 +26,13 @@ import { getShellContext } from "./_shell-context";
  */
 export default async function VendorLayout({ children }: { children: ReactNode }) {
   const { vendor, role, storePath, storeKind } = await getShellContext();
+  // Domain move (lib/canonical-host.ts): null until CANONICAL_HOST is set.
+  const canonicalHost = canonicalHostFrom(process.env.CANONICAL_HOST);
+  const onOldHost = isLegacyHost((await headers()).get("host"), canonicalHost);
   return (
     <>
       <AppShell role={role} vendorId={vendor.id} vendorName={vendor.name} storePath={storePath} storeKind={storeKind}>
+        {onOldHost && canonicalHost ? <MovedHostNotice canonicalHost={canonicalHost} vendorId={vendor.id} /> : null}
         {children}
       </AppShell>
       <Toaster richColors position="top-center" />

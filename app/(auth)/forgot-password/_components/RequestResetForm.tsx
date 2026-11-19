@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BRAND_NAME } from "@/lib/brand";
 
 export function RequestResetForm() {
   const [email, setEmail] = useState("");
@@ -43,7 +44,7 @@ export function RequestResetForm() {
         <CardHeader>
           <h1 className="text-2xl font-semibold leading-none tracking-tight">Check your email</h1>
           <CardDescription>
-            If an AwaazOS account exists for that address, we&apos;ve sent a reset link.
+            If an {BRAND_NAME} account exists for that address, we&apos;ve sent a reset link.
             It is valid for 30 minutes and can be used once.
           </CardDescription>
         </CardHeader>

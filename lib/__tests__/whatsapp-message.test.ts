@@ -5,6 +5,7 @@ import {
   receiptStorefrontUrl,
   receiptWhatsappUrl,
 } from "@/lib/whatsapp-message";
+import { BRAND_NAME } from "@/lib/brand";
 
 describe("formatWhatsAppReceiptMessage", () => {
   it("includes vendor header, bill line, items, total, and footer", () => {
@@ -27,7 +28,7 @@ describe("formatWhatsAppReceiptMessage", () => {
     expect(msg).toContain("Tax:");
     expect(msg).toContain("*Total:");
     expect(msg).toContain("Visit again!");
-    expect(msg).toContain("AwaazOS");
+    expect(msg).toContain(`${BRAND_NAME}`);
   });
 
   it("omits tax line when tax is zero", () => {
@@ -82,7 +83,7 @@ describe("formatWhatsAppReceiptMessage", () => {
       storefrontUrl: "https://awaazos.example/s/ammas-kitchen",
     });
     expect(msg).toContain("Order again: https://awaazos.example/s/ammas-kitchen");
-    expect(msg.trimEnd().endsWith("Powered by AwaazOS")).toBe(true);
+    expect(msg.trimEnd().endsWith(`Powered by ${BRAND_NAME}`)).toBe(true);
   });
 
   it("has no order-again line without a storefront URL", () => {

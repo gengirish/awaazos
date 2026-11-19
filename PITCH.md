@@ -1,4 +1,4 @@
-# AwaazOS — YC Pitch
+# AwaazDo — YC Pitch
 
 > **⚠ Positioning changed (2026-10-09).** The customer is now **Instagram-based cloud kitchens**
 > — see [docs/ICP.md](./docs/ICP.md). Parts A–F below still tell the original street-stall /
@@ -43,7 +43,7 @@ Zero of them want a typing-based POS."
 [0:07–0:15 · B-roll — paper bill book, cash on counter, vendor pouring chai]
 VO: "Right now, this is their stack. Paper. Memory. Dispute."
 
-[0:15–0:25 · phone screen — AwaazOS POS, mic button pulsing]
+[0:15–0:25 · phone screen — AwaazDo POS, mic button pulsing]
 Vendor (in Hindi, into the mic):
 "Do special chai, ek aloo samosa, ek mirchi bajji."
 
@@ -62,20 +62,20 @@ Girish: "Production-deployed today.
 awaazos.vercel.app."
 
 [0:55–1:00 · end card — logo, URL]
-"Bol. Bill. Becho."
+"Banao. Batao. Becho."
 ```
 
 ### 4. What is your company going to make?
 
 A voice-first point-of-sale and digital billing platform for India's micro-merchants — the chai-walas, dosa carts, paan shops, kirana stores, samosa stalls, juice walas, fruit-cart vendors, and roadside dhabas. They don't speak English, often can't read screens fluently, and have never had software built for the way they actually work.
 
-The core loop is: **vendor speaks the order in their language → AwaazOS transcribes & parses against their menu → customer scans a UPI QR → vendor taps Mark as Paid → atomic bill number generated → WhatsApp receipt sent → owner sees real-time analytics.**
+The core loop is: **vendor speaks the order in their language → AwaazDo transcribes & parses against their menu → customer scans a UPI QR → vendor taps Mark as Paid → atomic bill number generated → WhatsApp receipt sent → owner sees real-time analytics.**
 
 It's a POS where the only interface is your voice and your eyes. **Hindi + English at MVP. More languages on roadmap once 50 vendors are active.**
 
 ### 5. Where do you live now, and where would the company be based after YC?
 
-**Hyderabad, India.** Post-YC: SF for the batch, then back to Hyderabad as headquarters with field operations in Mumbai + Bengaluru + Delhi NCR. IntelliForge AI (the operating studio behind AwaazOS) is already incorporated as an Individual Proprietorship in Hyderabad, Telangana.
+**Hyderabad, India.** Post-YC: SF for the batch, then back to Hyderabad as headquarters with field operations in Mumbai + Bengaluru + Delhi NCR. IntelliForge AI (the operating studio behind AwaazDo) is already incorporated as an Individual Proprietorship in Hyderabad, Telangana.
 
 ### 6. Explain your decision regarding location.
 
@@ -93,7 +93,7 @@ In 2012, my first production AI project at a leading semiconductor company was a
 
 Fast-forward through fourteen years of enterprise software (banking, pharma, telecom, fintech, IoT) at Fortune 500 companies, founding [IntelliForge AI](https://www.intelliforge.tech) (Hyderabad-based AI studio) in 2025, and starting an **M.Tech in Data Science & AI at IIIT Dharwad** in March 2026 — Speech & NLP is in my coursework right now.
 
-The AwaazOS prototype shipped end-to-end in **4 weekends in April 2026** because three forces aligned: Sarvam's Saaras models hit 91% Hindi accuracy in conversational speech, UPI saturated to 14B txn/month at 0% MDR, and WhatsApp BAPI dropped to ₹0.30/msg via Gupshup. Two years ago this product literally could not exist.
+The AwaazDo prototype shipped end-to-end in **4 weekends in April 2026** because three forces aligned: Sarvam's Saaras models hit 91% Hindi accuracy in conversational speech, UPI saturated to 14B txn/month at 0% MDR, and WhatsApp BAPI dropped to ₹0.30/msg via Gupshup. Two years ago this product literally could not exist.
 
 The conviction is older than the product.
 
@@ -103,7 +103,7 @@ The conviction is older than the product.
 
 ### 9. Are you (and any other founders) committed to this full-time?
 
-**Committed full-time within 30 days of YC acceptance.** Currently Principal SE at a Compliance & RegTech company in Hyderabad — notice period is 30 days, all conversations transparent. M.Tech at IIIT Dharwad is part-time / weekend-format, designed to be pursued alongside professional work, and the curriculum (Speech & NLP, Generative AI) directly compounds with what AwaazOS needs — not a distraction.
+**Committed full-time within 30 days of YC acceptance.** Currently Principal SE at a Compliance & RegTech company in Hyderabad — notice period is 30 days, all conversations transparent. M.Tech at IIIT Dharwad is part-time / weekend-format, designed to be pursued alongside professional work, and the curriculum (Speech & NLP, Generative AI) directly compounds with what AwaazDo needs — not a distraction.
 
 ### 10. Why did you pick this idea to work on?
 
@@ -111,7 +111,7 @@ Three forcing functions converged in 2026:
 
 1. **Indic voice models crossed the bar.** Sarvam's Saaras models hit 91%+ word-accuracy on Hindi/Telugu/Kannada in conversational speech. Two years ago this was 73%. The product literally was not buildable.
 2. **UPI saturated.** 14B+ monthly transactions as of Q1 2026. Every Indian customer with a smartphone has GPay/PhonePe/Paytm. The MDR is zero. The settlement is real-time. We don't need to convince anyone to adopt anything — we just need to point a QR at them.
-3. **WhatsApp is the receipt channel.** Every customer already has it. AwaazOS opens the vendor's own WhatsApp with the receipt pre-filled (a `wa.me` link) and the vendor taps send, so a receipt costs ₹0 and works on the FREE plan. The Business API route (Gupshup, ~₹0.30/message) is wired in the code for later but not used today.
+3. **WhatsApp is the receipt channel.** Every customer already has it. AwaazDo opens the vendor's own WhatsApp with the receipt pre-filled (a `wa.me` link) and the vendor taps send, so a receipt costs ₹0 and works on the FREE plan. The Business API route (Gupshup, ~₹0.30/message) is wired in the code for later but not used today.
 
 And on the demand side: I've watched the chai-walas in my own neighborhood in Hyderabad lose ₹400-800/day to memory disputes ("I gave you ₹100, give me ₹70 back" / "you didn't, you gave me ₹50") and to forgotten orders during the evening rush. They won't use any current POS — typing English on a 4-inch screen in a monsoon while five customers wait is not a real product. They WILL speak into a microphone in Hindi or Telugu. That's the entire wedge.
 
@@ -169,12 +169,12 @@ Real CAC, NRPM, LTV will be reported here once we have 30 paying vendors. We ref
 1. **Field ops in Mumbai/Bengaluru/Delhi** — 3 reps × 8 vendors/day onboarded × 22 days = 528 vendors/month per rep. Cost ₹35K salary + ₹15K travel = ₹50K/rep/month. CAC ≈ ₹95 per vendor. Activation rate target 60% → real CAC ₹160.
 2. **Vernacular WhatsApp Status + Instagram Reels** — short videos showing the voice POS in action. Tag location. Costs zero, virality plays well in vendor WhatsApp groups.
 3. **Vendor-to-vendor referrals** — the chai-wala next to my chai-wala will see him using it. Built-in referral: "refer a vendor → get a month free Starter". Compound from month 4 onward.
-4. **Partner with FMCG distributors** — Hindustan Unilever and ITC have 4M+ shopkeeper relationships. Bundle AwaazOS Starter into their distributor incentive packs.
+4. **Partner with FMCG distributors** — Hindustan Unilever and ITC have 4M+ shopkeeper relationships. Bundle AwaazDo Starter into their distributor incentive packs.
 5. **Press in vernacular** — Aaj Tak, Dainik Bhaskar, ETV Andhra. National English press is a vanity metric for our segment; Hindi/Telugu vernacular media is the actual reach.
 
 ### 16. Have you incorporated, or formed any legal entity?
 
-**Yes.** [IntelliForge AI](https://www.intelliforge.tech) is registered as an **Individual Proprietorship in Hyderabad, Telangana, India** (active since 2025) — the operating studio behind AwaazOS. For YC acceptance we will spin AwaazOS into a **Delaware C-Corp** (standard YC structure) with the Indian entity becoming a wholly-owned subsidiary for ground operations, payroll, and merchant relationships. Cap table is clean — 100% founder, no prior outside capital, no SAFEs, no loans.
+**Yes.** [IntelliForge AI](https://www.intelliforge.tech) is registered as an **Individual Proprietorship in Hyderabad, Telangana, India** (active since 2025) — the operating studio behind AwaazDo. For YC acceptance we will spin AwaazDo into a **Delaware C-Corp** (standard YC structure) with the Indian entity becoming a wholly-owned subsidiary for ground operations, payroll, and merchant relationships. Cap table is clean — 100% founder, no prior outside capital, no SAFEs, no loans.
 
 ### 17. If you've already started working on it, how long have you been working and how many lines of code (if applicable) have you written?
 
@@ -212,9 +212,9 @@ The bet is simple: voice + UPI + WhatsApp is the *first* technology stack in Ind
 ### Slide 1 — Title
 
 ```
-                    AwaazOS
+                    AwaazDo
             ─────────────────────
-            Bol. Bill. Becho.
+            Banao. Batao. Becho.
 
       Voice-first POS for Bharat's
         60M micro-merchants.
@@ -249,7 +249,7 @@ The bet is simple: voice + UPI + WhatsApp is the *first* technology stack in Ind
 > A POS where the only interface is your **voice** and your **eyes**.
 >
 > 1. Vendor speaks the order in their language
-> 2. AwaazOS transcribes (the browser's Web Speech API for Hindi and English, with a server fallback through OpenAI → Groq → self-hosted Whisper) and parses against their menu (Claude Haiku 4.5 with prompt caching, escalating to Sonnet 4.5 when unsure)
+> 2. AwaazDo transcribes (the browser's Web Speech API for Hindi and English, with a server fallback through OpenAI → Groq → self-hosted Whisper) and parses against their menu (Claude Haiku 4.5 with prompt caching, escalating to Sonnet 4.5 when unsure)
 > 3. Cart fills in real time, total computed in paise
 > 4. Vendor taps **Collect Payment** → instant UPI QR
 > 5. Customer scans → vendor marks paid → atomic bill number `AWZ-YYYYMMDD-NNNN`
@@ -353,7 +353,7 @@ We will not project ARR or vendor count beyond two weeks out until we have W4 of
 >
 > **Why we'll win**:
 > - Production product on day 1 of YC, not day 90 — see https://awaazos.vercel.app
-> - 14-year Indic AI arc — Hindi Reader (2012) → IIIT Dharwad Speech & NLP (2026) → AwaazOS (today)
+> - 14-year Indic AI arc — Hindi Reader (2012) → IIIT Dharwad Speech & NLP (2026) → AwaazDo (today)
 > - Maniacal focus on the chai-wala, not the restaurant
 > - India-first defaults baked into every line of code (see [ARCHITECTURE.md](./ARCHITECTURE.md))
 
@@ -367,7 +367,7 @@ We will not project ARR or vendor count beyond two weeks out until we have W4 of
 > - Hindi-first, English fallback. Other languages added as cohort demands.
 > - Series A conversation starts when weekly active vendors > 1,000 with ≥40% W4 retention. No earlier.
 >
-> **Bol. Bill. Becho.** Built for Bharat. Ready to ship.
+> **Banao. Batao. Becho.** Built for Bharat. Ready to ship.
 
 ---
 
@@ -379,7 +379,7 @@ We will not project ARR or vendor count beyond two weeks out until we have W4 of
 - They're acquirers, not product companies. Their internal incentive is to ship the next payment instrument, not a vertical SaaS.
 - Voice-first UX is not their muscle — they ship dashboards for shopkeepers who already have software, not POS-replacement for shopkeepers who have none.
 - We ship faster. We can be at 50K vendors before they form an internal taskforce.
-- If they do build it, we partner. Razorpay distributing AwaazOS as their default merchant POS is a Series B story, not a competitive threat.
+- If they do build it, we partner. Razorpay distributing AwaazDo as their default merchant POS is a Series B story, not a competitive threat.
 
 ### Q: Sarvam is a vendor risk. What if they shut down or 10× pricing?
 
@@ -425,7 +425,7 @@ YC has funded plenty of single founders who shipped (Drew at Dropbox, Patrick at
 
 ```
 ┌──────────────────────────────────────────────────────────────────┐
-│  AwaazOS — Bol. Bill. Becho.                                    │
+│  AwaazDo — Banao. Batao. Becho.                                  │
 │  Voice-first POS for India's 60M micro-merchants                 │
 │  awaazos.vercel.app  ·  YC W26                                   │
 ├──────────────────────────────────────────────────────────────────┤
@@ -510,7 +510,7 @@ YC has funded plenty of single founders who shipped (Drew at Dropbox, Patrick at
 **4:30–5:00 — Ask & close**
 > "Standard YC deal. 12 months. From design partners → ≥1,000 daily-active vendors in 3 cities. Series A conversation starts when weekly active vendors > 1,000 with ≥40% W4 retention. No earlier.
 >
-> **Bol. Bill. Becho.** Thank you."
+> **Banao. Batao. Becho.** Thank you."
 
 ---
 
@@ -533,4 +533,4 @@ On 24 April 2026 (commit `d5a808f`) the public surface was cut down to one wedge
 
 > Built for the chai-wala in Hyderabad, the dosa cart in Bengaluru, the kirana shop in Indore, the paan stall in Kolkata.
 >
-> 🇮🇳 **AwaazOS — Bol. Bill. Becho.**
+> 🇮🇳 **AwaazDo — Banao. Batao. Becho.**

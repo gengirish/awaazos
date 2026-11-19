@@ -48,6 +48,7 @@ import {
   type OrderApiError,
 } from "@/lib/storefront-order";
 import { cn } from "@/lib/utils";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * Shared buyer-side checkout pieces for the public storefront, used by both
@@ -934,6 +935,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                     <Label htmlFor={ids.name}>Your name</Label>
                     <Input
                       id={ids.name}
+                      name="name"
                       autoComplete="name"
                       value={name}
                       onChange={(e) => {
@@ -960,8 +962,10 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                       </span>
                       <Input
                         id={ids.phone}
+                        name="tel-national"
                         type="tel"
                         inputMode="tel"
+                        // +91 is printed beside the field, so autofill gives the national number.
                         autoComplete="tel-national"
                         placeholder="98765 43210"
                         value={phone}
@@ -1044,6 +1048,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                       // Native, grouped by day: the phone's own picker, and no extra bundle on the store page.
                       <select
                         id={ids.slot}
+                        name="slot"
+                        autoComplete="off"
                         value={slot ?? ""}
                         onChange={(e) => {
                           const v = e.target.value || null;
@@ -1091,6 +1097,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                       <Label htmlFor={ids.address}>House or flat, building, street</Label>
                       <textarea
                         id={ids.address}
+                        name="street-address"
                         autoComplete="street-address"
                         value={address}
                         onChange={(e) => {
@@ -1114,6 +1121,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                           {/* The store delivers only here (lib/delivery-areas.ts): a list, so there is no typo to refuse. */}
                           <select
                             id={ids.locality}
+                            name="address-level3"
+                            // Autofill picks the listed area that matches the saved locality.
+                            autoComplete="address-level3"
                             value={area?.name ?? ""}
                             onChange={(e) => {
                               setLocality(e.target.value);
@@ -1143,6 +1153,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                       ) : (
                         <Input
                           id={ids.locality}
+                          name="address-level3"
                           autoComplete="address-level3"
                           value={locality}
                           onChange={(e) => {
@@ -1164,6 +1175,9 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                         <Label htmlFor={ids.landmark}>Landmark (optional)</Label>
                         <Input
                           id={ids.landmark}
+                          // No autocomplete token means "landmark", and street-address can't share a form
+                          // with address-line2; Chrome's Indian address profile finds it by name and label.
+                          name="landmark"
                           value={landmark}
                           onChange={(e) => setLandmark(e.target.value)}
                           maxLength={LANDMARK_MAX}
@@ -1175,8 +1189,11 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                         <Label htmlFor={ids.pincode}>Pincode (optional)</Label>
                         <Input
                           id={ids.pincode}
+                          name="postal-code"
                           inputMode="numeric"
                           autoComplete="postal-code"
+                          autoCorrect="off"
+                          spellCheck={false}
                           value={pincode}
                           onChange={(e) => {
                             setPincode(e.target.value);
@@ -1211,6 +1228,8 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
                     <Label htmlFor={`${idPrefix}-notes`}>Note for the store (optional)</Label>
                     <Input
                       id={`${idPrefix}-notes`}
+                      name="notes"
+                      autoComplete="off"
                       value={notes}
                       onChange={(e) => setNotes(e.target.value)}
                       maxLength={280}
@@ -1313,7 +1332,7 @@ export function CheckoutSheet(props: CheckoutSheetProps) {
             {/* True on every path: UPI goes to the store's own UPI ID, "Pay online" to its own Razorpay account. */}
             <p className="flex items-start gap-2.5 px-1 text-sm leading-snug text-muted-foreground">
               <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
-              <span>You pay {storeName || "the store"} directly. AwaazOS never holds your money.</span>
+              <span>You pay {storeName || "the store"} directly. {BRAND_NAME} never holds your money.</span>
             </p>
           </ResponsiveDialogBody>
 

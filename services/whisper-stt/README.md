@@ -1,6 +1,6 @@
 # Self-hosted Whisper STT (spike)
 
-Optional last-resort ASR tier for AwaazOS. **Does not replace Sarvam/OpenAI until
+Optional last-resort ASR tier for AwaazDo. **Does not replace Sarvam/OpenAI until
 `tests/golden/stt` pass rates match** the current primary for each language.
 
 ## Local dev

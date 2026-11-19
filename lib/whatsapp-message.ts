@@ -4,6 +4,7 @@ import { formatINR } from "@/lib/currency";
 import { formatIstDateTime } from "@/lib/datetime";
 import { discountLabel } from "@/lib/offers";
 import { DEFAULT_RECEIPT_FOOTER, receiptStatusLine } from "@/lib/receipt";
+import { BRAND_NAME } from "@/lib/brand";
 
 /**
  * What the WhatsApp text needs. A full `ReceiptView` (lib/receipt.ts) fits;
@@ -115,7 +116,7 @@ export function formatWhatsAppReceiptMessage(input: ReceiptMessageInput): string
   if (input.storefrontUrl) {
     lines.push(`Order again: ${input.storefrontUrl}`);
   }
-  lines.push("Powered by AwaazOS");
+  lines.push(`Powered by ${BRAND_NAME}`);
 
   return lines.join("\n");
 }

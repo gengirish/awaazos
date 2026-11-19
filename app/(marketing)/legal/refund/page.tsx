@@ -4,10 +4,11 @@ import { BusinessDetails } from "@/components/legal/BusinessDetails";
 import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
 
 import { TRIAL_DAYS } from "@/lib/constants";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const metadata: Metadata = {
-  title: "Refund Policy — AwaazOS",
-  description: "Refund and cancellation policy for AwaazOS subscriptions.",
+  title: `Refund Policy — ${BRAND_NAME}`,
+  description: `Refund and cancellation policy for ${BRAND_NAME} subscriptions.`,
 };
 
 export default function RefundPage() {
@@ -45,8 +46,8 @@ export default function RefundPage() {
 
       <h2>Orders placed with a seller</h2>
       <p>
-        This policy covers AwaazOS subscription fees only. If you bought something from a seller through its
-        AwaazOS store, your payment went directly to that seller, and AwaazOS never received it. Please contact the
+        This policy covers {BRAND_NAME} subscription fees only. If you bought something from a seller through its
+        {BRAND_NAME} store, your payment went directly to that seller, and {BRAND_NAME} never received it. Please contact the
         seller to cancel an order or ask for a refund.
       </p>
 

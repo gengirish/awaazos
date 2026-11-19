@@ -65,6 +65,9 @@ const envSchema = z.object({
   // "true" offers "Sizes or colours" in a goods store's item form (lib/item-variants.ts).
   // Read on each /menu render, so it needs no rebuild. Stores that already have them keep them.
   ITEM_VARIANTS_ENABLED: z.string().optional(),
+  // Public folder of the Help page's films (lib/help-videos.ts): <base>/<id>.mp4 and .jpg.
+  // Unset → /help shows no video buttons. Read on each /help render, so it needs no rebuild.
+  HELP_VIDEO_BASE_URL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);

@@ -114,7 +114,7 @@ Measure with `npm run perf:budget`; re-record only for a justified growth.
   canonical `/s/<store>/p/<id>`, `noindex` on demo stores like the store page.
 - **Preview image** `app/s/[slug]/p/[itemId]/opengraph-image.tsx` (and `twitter-image`): item photo
   large, name, price (sale-aware, `Price` from `lib/og-parts.tsx`), store name and logo, "Order
-  on AwaazOS". Same gate as the store card; an item not on sale or a hidden store gets the generic
+  on AwaazDo". Same gate as the store card; an item not on sale or a hidden store gets the generic
   card, which carries nothing from the URL. Photo loaded with the same timeout pattern as
   `storeLogoDataUrl`; on timeout the emoji layout.
 - **Buyer share** in the sheet: "Share" with the device share sheet (plain link) and WhatsApp

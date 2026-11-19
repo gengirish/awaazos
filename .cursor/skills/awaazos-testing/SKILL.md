@@ -1,9 +1,9 @@
 ---
 name: awaazos-testing
-description: Testing conventions for AwaazOS — Vitest unit tests (node, plus opt-in DB integration files) + Playwright E2E. Use when adding tests for any new route, lib helper, component, or worker.
+description: Testing conventions for AwaazDo — Vitest unit tests (node, plus opt-in DB integration files) + Playwright E2E. Use when adding tests for any new route, lib helper, component, or worker.
 ---
 
-# AwaazOS Testing
+# AwaazDo Testing
 
 ## Stack
 
@@ -31,6 +31,8 @@ description: Testing conventions for AwaazOS — Vitest unit tests (node, plus o
 | `lib/upi.ts` | Vitest unit (`lib/upi.test.ts`) | Wrong UPI deep-link = customer pays wrong vendor |
 | Every protected API route in `app/api/**` | Playwright (`e2e/`) | Auth + tenant scoping must be enforced against a real session |
 | Cross-tenant access | Playwright (`e2e/tenant-isolation.spec.ts`) | 404-not-403 on forged IDs |
+| Anonymous / non-admin access | Playwright (`e2e/api-auth-sweep.spec.ts`) | Reads `app/api/**/route.ts` itself: every route outside its `PUBLIC` list must 401 anonymous (404 under `/api/admin`), every admin route 404 to a store owner. A new public route goes in `PUBLIC` with a reason |
+| Webhooks, crons, internal API | Playwright (`e2e/webhooks-machine-auth.spec.ts`) | Missing or wrong secret refused; CI sets dummy secrets so the signed cases run |
 | Plan gates | Playwright (`e2e/plan-gates.spec.ts`) | 402 body shape and gate ordering |
 | Voice parser (`/api/ai/parse-order`) | Vitest with a mocked client (`lib/__tests__/anthropic.test.ts`) + the live golden suite | The 6 baseline transcripts in `.cursor/rules/voice-ai.mdc` |
 | `BillSequence` | Playwright (`e2e/pos-transaction.spec.ts`) | Bill-number format, same-day increment, tampered totals, idempotent replay |
@@ -66,14 +68,12 @@ expect(formatINR(200_000)).toBe("₹2,000.00");
 expect(formatINR(123456789)).toBe("₹12,34,567.89");   // lakh formatting
 ```
 
-## BillSequence concurrency — NOT YET COVERED
+## BillSequence concurrency
 
-`e2e/pos-transaction.spec.ts` checks sequential increments only; no test fires
-concurrent `POST /api/transactions` and asserts unique bill numbers. If you add
-one, follow the concurrency pattern already in `lib/__tests__/drops.db.test.ts`
-(`Promise.all` over N writes, then assert the exact success count), either as a
-Playwright spec (real session) or as a `*.db.test.ts` that calls the route
-handler with `@/lib/rbac` mocked.
+`e2e/pos-transaction.spec.ts` fires 8 concurrent `POST /api/transactions` for a new
+vendor (the first sale of the day included, when the upsert creates the row) and
+asserts all 201, unique bill numbers and `0001`…`0008` with no gap. Copy that shape for
+any other counter.
 
 ## Playwright happy path
 

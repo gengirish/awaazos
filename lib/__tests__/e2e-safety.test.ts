@@ -32,7 +32,12 @@ describe("e2eRefusal", () => {
   });
 
   it("always refuses production, even when remote runs are allowed", () => {
-    for (const baseUrl of ["https://awaazos.intelliforge.tech", "https://awaazos.vercel.app/"]) {
+    for (const baseUrl of [
+      "https://awaazos.intelliforge.tech",
+      "https://awaazos.vercel.app/",
+      "https://awaazdo.store",
+      "https://www.awaazdo.store/s/sam-store",
+    ]) {
       expect(e2eRefusal({ ...safe, baseUrl, allowRemote: true })).toMatch(/production/);
     }
   });

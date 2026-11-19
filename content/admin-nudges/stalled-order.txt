@@ -1,4 +1,4 @@
-Hi {firstName}, this is {senderName} from AwaazOS.
+Hi {firstName}, this is {senderName} from AwaazDo.
 
 Order {billNumber} at {storeName} ({amount}, placed {placedAt}) still shows as unpaid. If the buyer has already paid you, you can mark it paid on your orders board: {boardUrl}
 

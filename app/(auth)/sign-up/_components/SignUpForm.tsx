@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
 
+import { BrandLogo } from "@/components/brand/BrandLogo";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -32,6 +33,7 @@ import {
   storeLinkPrefix,
 } from "@/lib/store-handle";
 import type { StallType } from "@prisma/client";
+import { BRAND_NAME } from "@/lib/brand";
 
 // In form order: the first one with an error takes focus. The ids are also the
 // keys of the register API's zod `details` (signUpSchema in lib/zod-auth.ts).
@@ -276,9 +278,10 @@ export function SignUpForm({
   return (
     <Card className="w-full max-w-md border-border/80 shadow-lg">
       <CardHeader>
+        <BrandLogo size="sm" className="mb-3" />
         {/* <h1>, not CardTitle (an <h3>): this is the page's only heading. */}
         <h1 className="font-display text-2xl font-semibold leading-none tracking-tight">Create your store</h1>
-        <CardDescription>One account for your store on AwaazOS. {ctaNote}</CardDescription>
+        <CardDescription>One account for your store on {BRAND_NAME}. {ctaNote}</CardDescription>
       </CardHeader>
       {/* noValidate: onSubmit checks the fields so every error shows under its own field. */}
       <form onSubmit={onSubmit} noValidate>

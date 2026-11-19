@@ -76,14 +76,21 @@ export function CustomerSignIn({ returnTo, storeName }: { returnTo: string; stor
         <Label htmlFor="customer-email">Email</Label>
         <Input
           id="customer-email"
+          name="email"
           type="email"
           inputMode="email"
+          // A magic link, so no password field and no one-time-code: the email is the whole form.
           autoComplete="email"
+          enterKeyHint="send"
+          spellCheck={false}
           value={email}
-          onChange={(e) => setEmail(e.target.value)}
+          onChange={(e) => {
+            setEmail(e.target.value);
+            setError(null);
+          }}
           maxLength={254}
           required
-          aria-describedby="customer-email-hint"
+          aria-describedby={error ? "customer-email-error customer-email-hint" : "customer-email-hint"}
           aria-invalid={error ? true : undefined}
           className="h-11"
         />
@@ -93,7 +100,7 @@ export function CustomerSignIn({ returnTo, storeName }: { returnTo: string; stor
       </div>
 
       {error ? (
-        <p role="alert" className="text-sm font-medium text-destructive">
+        <p id="customer-email-error" role="alert" className="text-sm font-medium text-destructive">
           {error}
         </p>
       ) : null}

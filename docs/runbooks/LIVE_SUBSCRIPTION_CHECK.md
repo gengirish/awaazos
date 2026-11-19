@@ -31,7 +31,7 @@ should get no trial reminder emails after that.
 |---|---|---|
 | 1 | Set `CRON_SECRET` on Vercel (Production), then redeploy | Vercel lists `/api/cron/trial-reminders` under Settings → Cron Jobs |
 | 2 | Run the job from that page | Logs show `trial_reminders.done` with counts |
-| 3 | Use free access on `/admin/vendors` to end a test store's trial in 3 days, then run the job | Its owner gets "Your AwaazOS free trial ends in 3 days", once. A second run sends nothing |
+| 3 | Use free access on `/admin/vendors` to end a test store's trial in 3 days, then run the job | Its owner gets "Your AwaazDo free trial ends in 3 days", once. A second run sends nothing |
 | 4 | On a locked test store, place an order as a buyer | The buyer sees "can't take online orders". The owner gets a push and an email, once a day however many buyers try |
 
 ## If something fails

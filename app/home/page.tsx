@@ -3,13 +3,14 @@ import { redirect } from "next/navigation";
 import { resolveHomePath } from "@/lib/home";
 import { prisma } from "@/lib/prisma";
 import { AuthError, requirePlatformRole, requireVendorRole } from "@/lib/rbac";
+import { BRAND_NAME } from "@/lib/brand";
 
 const ADMIN_HOME_PATH = "/admin/demo-stores";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-export const metadata = { title: "AwaazOS", robots: { index: false, follow: false } };
+export const metadata = { title: `${BRAND_NAME}`, robots: { index: false, follow: false } };
 
 /**
  * The signed-in landing resolver (lib/home.ts): renders nothing, only

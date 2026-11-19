@@ -12,10 +12,11 @@ import { prisma } from "@/lib/prisma";
 import { LIVE_SUBSCRIPTION_STATUSES } from "@/lib/subscription";
 
 import { requireSettingsContext } from "../_context";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Refer a seller · Settings · AwaazOS" };
+export const metadata: Metadata = { title: `Refer a seller · Settings · ${BRAND_NAME}` };
 
 function months(n: number): string {
   return `${n} ${n === 1 ? "month" : "months"}`;

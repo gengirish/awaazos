@@ -216,7 +216,7 @@ STARTER, so trial vendors have it too.
 **Web Push implemented on `feat/web-push`** (option 1 below, plus the small wins): `lib/push.ts`,
 `public/sw.js`, `app/manifest.ts`, `/api/push/**`, Settings → Notifications, "Get alerts on this
 phone" on the orders board. Still unverified: **real delivery on devices** — Android Chrome with the screen
-locked, and an iPhone (iOS 16.4+) with AwaazOS added to the Home Screen. Headless CI can't reach a
+locked, and an iPhone (iOS 16.4+) with AwaazDo added to the Home Screen. Headless CI can't reach a
 push service. Known gap: the button trusts this browser's subscription, so a row removed from another
 device leaves it saying "on" until toggled. The original analysis follows.
 

@@ -23,7 +23,7 @@ Differences from the plan below, as built:
 - Phase 4: `POST /api/transactions` bounds the dormant WhatsApp-receipt enqueue to 2 s (found by
   CI when the trial put every new vendor on a plan with `whatsapp: true`).
 
-Platform SaaS billing: a vendor pays AwaazOS for STARTER through the **platform** Razorpay account
+Platform SaaS billing: a vendor pays AwaazDo for STARTER through the **platform** Razorpay account
 (`RAZORPAY_KEY_ID` / `RAZORPAY_KEY_SECRET`). This is separate from storefront payments, which use
 each vendor's own keys (`lib/storefront-razorpay.ts`) and must stay that way.
 

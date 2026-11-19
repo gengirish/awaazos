@@ -2,6 +2,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { secondaryNav } from "./helpers/nav";
 import { createMenuItem, createVendorSession } from "./helpers/vendor";
+import { BRAND_NAME } from "../lib/brand";
 
 /**
  * "Install AwaazOS" (components/pwa/InstallPrompt.tsx, hooks/useInstallPrompt.ts).
@@ -72,7 +73,7 @@ test.describe("install prompt", () => {
 
     const banner = page.getByTestId(BANNER);
     await offerInstall(page, () => expect(banner).toBeVisible({ timeout: 2_000 }));
-    await expect(banner).toContainText("Install AwaazOS");
+    await expect(banner).toContainText(`Install ${BRAND_NAME}`);
 
     // In flow above the menu: a 44px-tall control that the tab bar does not cover.
     const install = banner.getByRole("button", { name: "Install app", exact: true });
@@ -152,7 +153,7 @@ test.describe("install prompt", () => {
       await showMe.click();
       const dialog = page.locator("pwa-install .install-dialog.apple");
       await expect(dialog).toHaveClass(/available/);
-      await expect(dialog).toContainText("AwaazOS");
+      await expect(dialog).toContainText(`${BRAND_NAME}`);
       await expect(dialog).toContainText("Add to Home Screen");
 
       const close = page.locator("pwa-install button.close");

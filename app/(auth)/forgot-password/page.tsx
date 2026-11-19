@@ -1,8 +1,9 @@
 import Link from "next/link";
 
 import { RequestResetForm } from "./_components/RequestResetForm";
+import { BRAND_NAME } from "@/lib/brand";
 
-export const metadata = { title: "Forgot password · AwaazOS" };
+export const metadata = { title: `Forgot password · ${BRAND_NAME}` };
 
 export default function ForgotPasswordPage() {
   return (

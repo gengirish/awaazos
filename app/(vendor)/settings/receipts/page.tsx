@@ -7,10 +7,11 @@ import { prisma } from "@/lib/prisma";
 import { vendorLocationLine } from "@/lib/receipt";
 
 import { requireSettingsContext } from "../_context";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Receipts · Settings · AwaazOS" };
+export const metadata: Metadata = { title: `Receipts · Settings · ${BRAND_NAME}` };
 
 export default async function ReceiptSettingsPage() {
   const { vendor, isOwner } = await requireSettingsContext();

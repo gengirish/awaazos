@@ -7,10 +7,11 @@ import { OwnerSurveyForm } from "@/components/survey/OwnerSurveyForm";
 import { loadSurveyAnswers } from "@/lib/owner-survey-server";
 
 import { requireSettingsContext } from "../_context";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 
-export const metadata: Metadata = { title: "Tell us what's hard · Settings · AwaazOS" };
+export const metadata: Metadata = { title: `Tell us what's hard · Settings · ${BRAND_NAME}` };
 
 /** Settings → Tell us what's hard (OWNER of a real store). Rules in lib/owner-survey.ts. */
 export default async function SurveySettingsPage() {

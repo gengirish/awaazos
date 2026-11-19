@@ -79,6 +79,7 @@ export function CustomerProfile(props: CustomerProfileProps) {
         <Label htmlFor="profile-name">Name</Label>
         <Input
           id="profile-name"
+          name="name"
           autoComplete="name"
           value={name}
           onChange={(e) => setName(e.target.value)}
@@ -98,6 +99,7 @@ export function CustomerProfile(props: CustomerProfileProps) {
           </span>
           <Input
             id="profile-phone"
+            name="tel-national"
             type="tel"
             inputMode="tel"
             autoComplete="tel-national"
@@ -116,6 +118,7 @@ export function CustomerProfile(props: CustomerProfileProps) {
           <Label htmlFor="profile-address">House or flat, building, street</Label>
           <textarea
             id="profile-address"
+            name="street-address"
             autoComplete="street-address"
             value={address}
             onChange={(e) => setAddress(e.target.value)}
@@ -128,6 +131,7 @@ export function CustomerProfile(props: CustomerProfileProps) {
           <Label htmlFor="profile-locality">Area or locality</Label>
           <Input
             id="profile-locality"
+            name="address-level3"
             autoComplete="address-level3"
             value={locality}
             onChange={(e) => setLocality(e.target.value)}
@@ -140,6 +144,7 @@ export function CustomerProfile(props: CustomerProfileProps) {
             <Label htmlFor="profile-landmark">Landmark (optional)</Label>
             <Input
               id="profile-landmark"
+              name="landmark"
               value={landmark}
               onChange={(e) => setLandmark(e.target.value)}
               maxLength={LANDMARK_MAX}
@@ -150,6 +155,9 @@ export function CustomerProfile(props: CustomerProfileProps) {
             <Label htmlFor="profile-pincode">Pincode (optional)</Label>
             <Input
               id="profile-pincode"
+              name="postal-code"
+              autoCorrect="off"
+              spellCheck={false}
               inputMode="numeric"
               autoComplete="postal-code"
               value={pincode}

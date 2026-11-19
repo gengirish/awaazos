@@ -39,7 +39,7 @@ Use this for **in-person or Zoom** walkthroughs. For **recording a 60s YC video*
    - *Talk track:* “Owner sees what sold and whether voice is being adopted.”
 
 **Close (15s)**  
-“Live stack: Next.js on Vercel, Neon Postgres, Claude for parsing, browser speech plus a multi-provider STT fallback, BullMQ workers on Fly. **Bol. Bill. Becho.**”
+“Live stack: Next.js on Vercel, Neon Postgres, Claude for parsing, browser speech plus a multi-provider STT fallback, BullMQ workers on Fly. **Banao. Batao. Becho.**”
 
 ---
 

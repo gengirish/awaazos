@@ -12,6 +12,7 @@ import { loadCommunityPage, type CommunityPageStore } from "@/lib/community-serv
 import { stallTypeLabel } from "@/lib/stall-type";
 import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
 import { formatIstDeadline } from "@/lib/storefront-order";
+import { BRAND_NAME } from "@/lib/brand";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -40,7 +41,7 @@ const loadPage = cache((slug: string) => loadCommunityPage(slug));
 export async function generateMetadata(props: { params: Promise<{ slug: string }> }): Promise<Metadata> {
   const { slug } = await props.params;
   const page = await loadPage(slug);
-  if (!page) return { title: "Not found — AwaazOS" };
+  if (!page) return { title: `Not found — ${BRAND_NAME}` };
   const where = page.area ? ` in ${page.area}` : "";
   const description = `Home businesses${where}. Order ahead from your neighbours and pay by UPI.`;
   return {

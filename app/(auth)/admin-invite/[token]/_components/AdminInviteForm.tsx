@@ -10,12 +10,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Notice } from "@/components/ui/notice";
+import { BRAND_NAME } from "@/lib/brand";
 
 const LANDING = "/admin/demo-stores";
 
 const ERRORS: Record<string, string> = {
   invalid_or_expired: "This link has already been used or has expired. Ask for a new one.",
-  email_in_use: "An AwaazOS account already uses this email. Sign in with it, then open the link again.",
+  email_in_use: `An ${BRAND_NAME} account already uses this email. Sign in with it, then open the link again.`,
 };
 
 type Props = { mode: "create" | "accept"; token: string; email: string };
@@ -70,7 +71,7 @@ export function AdminInviteForm({ mode, token, email }: Props) {
       <CardHeader>
         <h1 className="text-2xl font-semibold leading-none tracking-tight">Join the outreach team</h1>
         <CardDescription>
-          You&apos;ve been invited to build demo stores for prospects on AwaazOS.{" "}
+          You&apos;ve been invited to build demo stores for prospects on {BRAND_NAME}.{" "}
           {mode === "create" ? (
             <>
               Choose a password. You&apos;ll sign in as <span className="font-medium text-foreground">{email}</span>.
