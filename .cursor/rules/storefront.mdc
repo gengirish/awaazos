@@ -127,3 +127,11 @@ times on each render — no timers. `noindex`: it names a residential society.
 literal. Customer stories come from `lib/proof-stories.ts` and render only with `permission: true` (the owner agreed in
 writing). The WhatsApp button needs `NEXT_PUBLIC_SUPPORT_WHATSAPP` (build time). `e2e/contrast.spec.ts` runs axe's
 contrast rule here, on a store page and on checkout. The `(marketing)` layout must stay static.
+
+**Pain-point Reels** (`lib/pain-reels.ts`, data in `content/pain-reels/reels.ts`, plan `docs/PAIN_REELS_APP_PLAN.md`): the
+"Sound familiar?" row on `/` (`components/marketing/PainReels.tsx`) and one static page per Reel at `/v/<id>`
+(`generateStaticParams`, `dynamicParams = false`, public in `lib/auth.config.ts`). Films live in the public Blob folder
+`PAIN_REEL_BASE_URL` (`npm run pain-reels:publish`); unset → no row and every `/v` page 404s. Read at build: a change
+needs a redeploy. The row is poster links only (no player on `/`); the page's `<video>` is `preload="none"`. Demo films
+only, for sellers, never shown to buyers. A Reel that plays a Help film reads that film's `HELP_VIDEOS` lines as its
+transcript; any other carries its own `lines`.

@@ -3,6 +3,7 @@ import { Features } from "@/components/marketing/Features";
 import { Hero } from "@/components/marketing/Hero";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
 import { OnlinePayments } from "@/components/marketing/OnlinePayments";
+import { PainReels } from "@/components/marketing/PainReels";
 import { PricingTeaser } from "@/components/marketing/PricingTeaser";
 import { ProofStories } from "@/components/marketing/ProofStories";
 
@@ -11,6 +12,7 @@ export default function MarketingHomePage() {
     <>
       <Hero />
       <HowItWorks />
+      <PainReels />
       <OnlinePayments />
       <Features />
       <ProofStories />
