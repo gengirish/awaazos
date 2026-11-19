@@ -28,6 +28,12 @@ test.describe("colour contrast (axe)", () => {
     expect(await contrastViolations(page)).toEqual([]);
   });
 
+  test("a pain-point Reel's page", async ({ page }) => {
+    await page.goto("/v/orders_scattered");
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    expect(await contrastViolations(page)).toEqual([]);
+  });
+
   test("store page and checkout", async ({ page, request, browser }) => {
     test.slow();
     await createVendorSession(page, request, "contrast", "/menu");

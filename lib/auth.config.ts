@@ -32,6 +32,8 @@ function isPublicPath(pathname: string): boolean {
   if (pathname === "/pricing" || pathname.startsWith("/pricing/")) return true;
   // The public seller survey: it collects answers and shows nothing back.
   if (pathname === "/survey") return true;
+  // A pain-point Reel's own page (lib/pain-reels.ts): demo films, linked from the landing page.
+  if (pathname.startsWith("/v/")) return true;
   // Privacy, terms, refund, DPDP rights — linked from the public footer.
   if (pathname === "/legal" || pathname.startsWith("/legal/")) return true;
   // Public vendor storefronts. Opt-in per vendor: the route itself 404s unless

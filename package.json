@@ -44,7 +44,8 @@
     "perf:lighthouse": "node scripts/perf-lighthouse.mjs",
     "precommit:checks": "lint-staged",
     "prepare": "husky",
-    "pain-reels:render": "tsx scripts/render-pain-reels.ts"
+    "pain-reels:render": "tsx scripts/render-pain-reels.ts",
+    "pain-reels:publish": "tsx scripts/publish-pain-reels.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",

@@ -68,6 +68,10 @@ const envSchema = z.object({
   // Public folder of the Help page's films (lib/help-videos.ts): <base>/<id>.mp4 and .jpg.
   // Unset → /help shows no video buttons. Read on each /help render, so it needs no rebuild.
   HELP_VIDEO_BASE_URL: z.string().optional(),
+  // Public folder of the pain-point Reels (lib/pain-reels.ts): <base>/<id>.mp4 and .jpg.
+  // Unset → no "Sound familiar?" row on / and every /v/<id> 404s. Those pages are static,
+  // so a change needs a redeploy.
+  PAIN_REEL_BASE_URL: z.string().optional(),
 });
 
 const parsed = envSchema.safeParse(process.env);
