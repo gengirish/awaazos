@@ -20,7 +20,7 @@ storefront surface** — unauthenticated, and no longer read-only (buyers place 
 | `/s/[slug]/account` | Signed-in buyer's own orders/profile |
 | `/r/[token]` | Customer receipt page (see "Receipt module"; not gated on `publishStorefront`) |
 | `/d/[token]` + `POST /api/d/[token]` | Rider's "Delivered" link (see "Delivery handoff"; not gated on `publishStorefront`) |
-| `/survey` + `POST /api/survey` | Public seller survey: collects answers, shows nothing back (see "Owner survey"; no store involved) |
+| `/survey` + `POST /api/survey` | Public seller survey: collects answers; shows back only the visitor's own top pain, with its pain-point Reel (see "Owner survey"; no store involved) |
 | `/c/[slug]` | Community page: links to the listed stores of one housing society (see "Community pages") |
 | `/api/s/**` | Order placement, UTR submit, "I've received my order", order rating, vendor-Razorpay start/verify, buyer magic-link auth |
 | `/api/webhooks/razorpay-orders/[vendorId]` | Per-vendor Razorpay webhook (vendor's own secret) |

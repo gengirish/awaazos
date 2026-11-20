@@ -3,6 +3,8 @@ import Link from "next/link";
 
 import { OwnerSurveyForm } from "@/components/survey/OwnerSurveyForm";
 import { BRAND_NAME } from "@/lib/brand";
+import { env } from "@/lib/env";
+import { surveyReelsByPain } from "@/lib/survey-film";
 
 export const metadata: Metadata = {
   title: `Tell us what's hard — ${BRAND_NAME}`,
@@ -21,7 +23,7 @@ export default function PublicSurveyPage() {
           things next.
         </p>
         <div className="mt-6 rounded-lg border bg-card p-4 shadow-xs md:p-6">
-          <OwnerSurveyForm answers={null} isPublic />
+          <OwnerSurveyForm answers={null} isPublic reelsByPain={surveyReelsByPain(env.PAIN_REEL_BASE_URL)} />
         </div>
         <p className="mt-4 text-sm text-muted-foreground">
           Already have a store on {BRAND_NAME}?{" "}

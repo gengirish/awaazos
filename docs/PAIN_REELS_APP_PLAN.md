@@ -1,6 +1,6 @@
 # Pain reels in the app: plan
 
-Status: Phase 1 built 2026-11-19 (`/v/<id>` pages, landing row, `pain-reels:publish`). Phases 2–4 not started.
+Status: Phases 1–3 built 2026-11-19 (`/v/<id>` pages and landing row; survey answer; outreach picker). Phase 4 not started.
 
 ## What we have
 
@@ -96,6 +96,10 @@ Tests:
 - `mobile-sweep` covers 44 px tap targets on the cards.
 
 ### Phase 2: answer the survey with its reel
+
+Built 2026-11-19 (`lib/survey-film.ts`, `components/survey/SurveyFilm.tsx`). Two changes from the sketch below: the
+survey asks no store type, so `/survey` shows the kitchen Reel and links the other store's version; and the in-app
+Help film is the one the kitchen Reel is cut from (`PainReel.film`), so there is no separate pain → topic table.
 
 `components/survey/OwnerSurveyForm.tsx` replaces the single "Thank you. We read every answer." line:
 
