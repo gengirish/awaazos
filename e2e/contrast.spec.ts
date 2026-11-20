@@ -51,6 +51,16 @@ test.describe("colour contrast (axe)", () => {
       await buyer.getByRole("button", { name: "Checkout", exact: true }).click();
       const sheet = buyer.getByRole("dialog", { name: "Checkout" });
       await expect(sheet).toBeVisible();
+      // Let the sheet's slide/fade-in finish first: mid-animation axe reads half-faded
+      // colours (it measured #e6e6e6, then #dadada, behind text on white) and fails.
+      await buyer.evaluate(() =>
+        Promise.all(
+          document
+            .getAnimations()
+            .filter((a) => a.effect?.getComputedTiming().iterations !== Infinity)
+            .map((a) => a.finished.catch(() => undefined)),
+        ),
+      );
       expect(await contrastViolations(buyer, "[role='dialog']")).toEqual([]);
     } finally {
       await ctx.close();
