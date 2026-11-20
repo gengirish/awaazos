@@ -66,13 +66,34 @@ test.describe("public surfaces", () => {
     await expect(teaser).toContainText("2 months free");
   });
 
-  for (const path of ["/legal/privacy", "/legal/terms"]) {
+  for (const path of ["/legal/privacy", "/legal/terms", "/legal/refund", "/contact"]) {
     test(`${path} is public (no sign-in redirect)`, async ({ page }) => {
       await page.goto(path);
       await expect(page).toHaveURL(new RegExp(`${path}$`));
       await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
     });
   }
+
+  test("contact page shows how to reach us and sends the form", async ({ page }) => {
+    // The real route emails our inbox: answer it here so the test sends nothing.
+    let posted: Record<string, string> | null = null;
+    await page.route("**/api/contact", async (route) => {
+      posted = route.request().postDataJSON();
+      await route.fulfill({ status: 201, json: { data: { sent: true } } });
+    });
+    await page.goto("/");
+    await page.getByRole("contentinfo").getByRole("link", { name: "Contact us" }).click();
+    await expect(page).toHaveURL(/\/contact$/);
+    await expect(page.getByRole("link", { name: "+91 85559 60837" })).toHaveAttribute("href", "tel:+918555960837");
+    await expect(page.getByText("Hyderabad, Telangana 500084")).toBeVisible();
+
+    await page.getByLabel("Your name", { exact: true }).fill("E2E Buyer");
+    await page.getByLabel("Email", { exact: true }).fill("e2e@example.test");
+    await page.getByLabel("Message", { exact: true }).fill("Does the Lite plan include pre-orders?");
+    await page.getByRole("button", { name: "Send message" }).click();
+    await expect(page.getByRole("status")).toContainText("we've got your message");
+    expect(posted).toMatchObject({ name: "E2E Buyer", email: "e2e@example.test", website: "" });
+  });
 
   test("sign-in form renders email + password + submit", async ({ page }) => {
     await page.goto("/sign-in");

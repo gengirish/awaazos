@@ -23,6 +23,8 @@ import { formatIstDate } from "@/lib/datetime";
 import { logger } from "@/lib/logger";
 import { trialEndsPhrase } from "@/lib/trial-alerts";
 import { BRAND_NAME, BRAND_SIGNOFF } from "@/lib/brand";
+import { SUPPORT_EMAIL } from "@/lib/business-contact";
+import type { ContactMessage } from "@/lib/contact-message";
 
 export type SendPasswordResetEmailInput = {
   to: string;
@@ -482,4 +484,60 @@ export async function sendDemoClaimEmail(input: SendDemoClaimEmailInput): Promis
     },
     "email.demo_claim",
   );
+}
+
+/**
+ * A message from the public contact form (lib/contact-message.ts), to our own
+ * inbox. Never logs the sender or the words: the log line says only whether it went.
+ */
+export async function sendContactMessage(input: ContactMessage): Promise<{ delivered: boolean }> {
+  const event = "email.contact_form";
+  try {
+    const config = getConfig();
+    if (!config) {
+      logger.warn({}, `${event}.unconfigured`);
+      return { delivered: false };
+    }
+    const name = input.name.replace(/[\r\n]+/g, " ").trim();
+    const rows: [string, string][] = [
+      ["Name", name],
+      ["Email", input.email],
+      ["Phone", input.phone || "Not given"],
+    ];
+    const text = [
+      `New message from the ${BRAND_NAME} contact form.`,
+      "",
+      ...rows.map(([k, v]) => `${k}: ${v}`),
+      "",
+      input.message,
+    ].join("\n");
+    const html = `<!doctype html>
+<html>
+<body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;background:#f8fafc;margin:0;padding:32px;">
+  <div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:12px;padding:32px;border:1px solid #e2e8f0;">
+    <div style="font-weight:700;font-size:18px;color:#FF6B00;">${BRAND_NAME} contact form</div>
+    <table style="margin:20px 0;color:#334155;font-size:14px;line-height:1.6;">
+      ${rows.map(([k, v]) => `<tr><td style="padding-right:16px;color:#64748b;">${k}</td><td>${escapeHtml(v)}</td></tr>`).join("")}
+    </table>
+    <p style="color:#1a1a1a;line-height:1.6;white-space:pre-wrap;">${escapeHtml(input.message)}</p>
+  </div>
+</body>
+</html>`;
+    const messageId = await deliver(
+      config,
+      {
+        to: [SUPPORT_EMAIL],
+        subject: `Contact form: ${name}`.slice(0, 120),
+        text,
+        html,
+        labels: ["contact-form"],
+      },
+      event,
+    );
+    logger.info({ messageId, delivered: messageId != null }, `${event}.sent`);
+    return { delivered: messageId != null };
+  } catch {
+    logger.error({}, `${event}.failed`);
+    return { delivered: false };
+  }
 }

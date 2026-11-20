@@ -28,6 +28,12 @@ export function MarketingFooter() {
           className="flex flex-wrap gap-x-6 gap-y-2 text-sm"
         >
           <Link
+            href="/contact"
+            className="inline-flex min-h-11 min-w-11 items-center font-medium text-awaaz-charcoal/80 underline-offset-4 outline-hidden hover:text-awaaz-orange hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+          >
+            Contact us
+          </Link>
+          <Link
             href="/legal/privacy"
             className="inline-flex min-h-11 min-w-11 items-center font-medium text-awaaz-charcoal/80 underline-offset-4 outline-hidden hover:text-awaaz-orange hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
           >
