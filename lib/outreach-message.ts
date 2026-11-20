@@ -117,6 +117,23 @@ export function outreachTemplate(
   }
 }
 
+/** How a picked pain-point Reel (lib/pain-reels.ts) is added to a message: its own last line. */
+export const REEL_LINE_PREFIX = "A short video of how it works: ";
+
+/**
+ * The message with `url` as its last line, replacing any Reel line added before, so
+ * picking another Reel swaps the link. `null` takes the line out. Other edits stay.
+ */
+export function withReelLink(text: string, url: string | null): string {
+  const kept = text
+    .split("\n")
+    .filter((line) => !line.startsWith(REEL_LINE_PREFIX))
+    .join("\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .trimEnd();
+  return url ? `${kept}\n\n${REEL_LINE_PREFIX}${url}` : kept;
+}
+
 /**
  * wa.me link for the admin's own WhatsApp. No phone → WhatsApp asks which
  * chat. null when the phone can't be a valid number.

@@ -2,7 +2,15 @@ import { describe, expect, it } from "vitest";
 
 import { PAIN_REELS } from "@/content/pain-reels/reels";
 import { OWNER_PAINS } from "@/lib/owner-survey";
-import { painReelById, painReelIds, painReelLines, painReelPath, painReelsFor } from "@/lib/pain-reels";
+import {
+  painReelById,
+  painReelIds,
+  painReelLines,
+  painReelLinks,
+  painReelPath,
+  painReelsFor,
+  painReelStoreFor,
+} from "@/lib/pain-reels";
 
 const BASE = "https://store.example/pain-reels";
 
@@ -64,4 +72,26 @@ describe("painReelsFor", () => {
 it("lists every id for the static /v pages", () => {
   expect(painReelIds()).toEqual(PAIN_REELS.map((r) => r.id));
   expect(painReelPath("delivery")).toBe("/v/delivery");
+});
+
+describe("painReelLinks", () => {
+  it("links every Reel's page on the site, not the file", () => {
+    const links = painReelLinks(BASE, "https://awaazdo.store");
+    expect(links).toHaveLength(PAIN_REELS.length);
+    expect(links[0]).toEqual({
+      id: PAIN_REELS[0]!.id,
+      store: PAIN_REELS[0]!.store,
+      title: PAIN_REELS[0]!.title,
+      url: `https://awaazdo.store/v/${PAIN_REELS[0]!.id}`,
+    });
+  });
+
+  it("is empty when nothing is published, because the pages 404 then", () => {
+    expect(painReelLinks(undefined, "https://awaazdo.store")).toEqual([]);
+  });
+
+  it("gives food stores the kitchen row and every other store the jewellery row", () => {
+    expect(painReelStoreFor("food")).toBe("kitchen");
+    expect(painReelStoreFor("goods")).toBe("jewellery");
+  });
 });

@@ -3,10 +3,12 @@
 import { useId, useState } from "react";
 import { MessageCircle } from "lucide-react";
 
+import { ReelPicker } from "@/components/admin/ReelPicker";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { formatIndianMobile } from "@/lib/phone";
-import { outreachWhatsappUrl } from "@/lib/outreach-message";
+import { outreachWhatsappUrl, withReelLink } from "@/lib/outreach-message";
+import type { PainReelLink, PainReelStore } from "@/lib/pain-reels";
 
 const FIELD =
   "flex w-full rounded-md border border-input bg-background px-3 py-2 text-base ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
@@ -20,15 +22,19 @@ type Props = {
   label: string;
   /** The admin opened WhatsApp: the pipeline records it (they may still not tap send). */
   onOpen?: () => void;
+  /** Outreach to a prospect only: the Reels "Add a video" offers, and the lead's row (listed first). */
+  reels?: readonly PainReelLink[];
+  reelStore?: PainReelStore;
 };
 
 /**
  * An editable WhatsApp message and a button that opens the admin's own
  * WhatsApp (wa.me) with it filled in. Nothing is sent until they tap send there.
  */
-export function OutreachWhatsApp({ phone, message, label, onOpen }: Props) {
+export function OutreachWhatsApp({ phone, message, label, onOpen, reels = [], reelStore = "kitchen" }: Props) {
   const id = useId();
   const [text, setText] = useState(message);
+  const [reelId, setReelId] = useState<string | null>(null);
   const href = outreachWhatsappUrl(text, phone);
   const shownPhone = phone ? formatIndianMobile(phone) : null;
 
@@ -40,6 +46,15 @@ export function OutreachWhatsApp({ phone, message, label, onOpen }: Props) {
         className={`${FIELD} min-h-48 text-sm`}
         value={text}
         onChange={(e) => setText(e.target.value)}
+      />
+      <ReelPicker
+        reels={reels}
+        store={reelStore}
+        value={reelId}
+        onChange={(reel) => {
+          setReelId(reel?.id ?? null);
+          setText((t) => withReelLink(t, reel?.url ?? null));
+        }}
       />
       <p className="text-xs text-muted-foreground">
         {shownPhone

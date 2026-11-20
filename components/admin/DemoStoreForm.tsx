@@ -28,6 +28,7 @@ import {
 } from "@/lib/demo-store-schema";
 import { postPipelineAction } from "@/components/admin/pipeline/pipeline-api";
 import { outreachIntroMessage } from "@/lib/outreach-message";
+import { painReelStoreFor, type PainReelLink } from "@/lib/pain-reels";
 
 const FIELD =
   "flex min-h-11 w-full rounded-md border border-input bg-background px-3 text-base ring-offset-background placeholder:text-muted-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60";
@@ -158,7 +159,16 @@ function profileField(payload: unknown, key: string): string {
  * offers the first WhatsApp message to the seller (lib/outreach-message.ts).
  * `senderName` is the signed-in admin's name, for that message.
  */
-export function DemoStoreForm({ senderName, senderIsFounder }: { senderName: string | null; senderIsFounder: boolean }) {
+export function DemoStoreForm({
+  senderName,
+  senderIsFounder,
+  reels = [],
+}: {
+  senderName: string | null;
+  senderIsFounder: boolean;
+  /** The pain-point Reels the message's "Add a video" offers (lib/pain-reels.ts). */
+  reels?: readonly PainReelLink[];
+}) {
   const ids = useId();
   const [mode, setMode] = useState<"form" | "json">("form");
   const [form, setForm] = useState<DemoStoreFormValues>(INITIAL);
@@ -304,6 +314,8 @@ export function DemoStoreForm({ senderName, senderIsFounder }: { senderName: str
             })}
             label="Message on WhatsApp"
             onOpen={() => void postPipelineAction(created.external_ref, { action: "sent" }).catch(() => undefined)}
+            reels={reels}
+            reelStore={painReelStoreFor(storeKind(DEMO_CATEGORIES[form.category]))}
           />
         </section>
         <div className="flex flex-wrap gap-3 border-t pt-4">

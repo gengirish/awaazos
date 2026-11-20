@@ -10,6 +10,7 @@ import { OrdersWaitingBanner } from "@/components/admin/pipeline/OrdersWaitingBa
 import { StoreList } from "@/components/admin/pipeline/StoreList";
 import { TodayQueue } from "@/components/admin/pipeline/TodayQueue";
 import type { PipelineItem } from "@/lib/demo-pipeline-server";
+import type { PainReelLink } from "@/lib/pain-reels";
 import {
   fillTemplate,
   isOrdersWaiting,
@@ -48,7 +49,12 @@ export type PipelineHandlers = {
   undoLast: () => void;
 };
 
-export type MessageContext = { senderName: string | null; senderIsFounder: boolean };
+export type MessageContext = {
+  senderName: string | null;
+  senderIsFounder: boolean;
+  /** The pain-point Reels a message can link to (lib/pain-reels.ts); empty when none are published. */
+  reels?: readonly PainReelLink[];
+};
 
 export function templateFor(
   kind: Parameters<typeof outreachTemplate>[0],

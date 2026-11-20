@@ -116,4 +116,28 @@ test.describe("admin demo-store pipeline", () => {
     await expect(page.getByText("Pipeline clear")).toBeVisible();
     await expect(page.getByRole("progressbar", { name: "Today's actions done" })).toBeVisible();
   });
+
+  test("Add a video puts a pain-point Reel's page link at the end of the message, and swaps it", async ({
+    page,
+    request,
+  }) => {
+    const creds = await createVendorSession(page, request, "pipeline-reels");
+    await setPlatformRole(creds.email, "ADMIN");
+    await build(page, `Reel Store ${tag}`, "reel");
+
+    await page.goto("/admin/demo-stores");
+    const card = page.getByRole("article");
+    const message = card.getByLabel("Message");
+    const picker = card.getByLabel("Add a video");
+    // A kitchen lead (the default type) gets the kitchen Reels listed first.
+    await expect(picker.locator("optgroup").first()).toHaveAttribute("label", "Home kitchens");
+
+    await message.fill("Hi, have a look.");
+    await picker.selectOption("orders_scattered");
+    await expect(message).toHaveValue(/^Hi, have a look\.\n\nA short video of how it works: https?:\/\/[^/]+\/v\/orders_scattered$/);
+    await picker.selectOption("jewellery-overselling");
+    await expect(message).toHaveValue(/^Hi, have a look\.\n\nA short video of how it works: \S+\/v\/jewellery-overselling$/);
+    await picker.selectOption("");
+    await expect(message).toHaveValue("Hi, have a look.");
+  });
 });

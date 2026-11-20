@@ -110,6 +110,10 @@ Tests:
 
 ### Phase 3: reel links in outreach
 
+Built 2026-11-19 ("Add a video", `components/admin/ReelPicker.tsx`). On every outreach message box, including the
+Today queue card and the new store's page; the bulk dialog lists first the row most of its stores are in. The
+optional reel-per-lead note is not built.
+
 `/admin/demo-stores` pipeline (`lib/outreach-message.ts`, `OutreachWhatsApp`, `BulkSendDialog`):
 
 - A "Add a reel" picker under the message, defaulting to the lead's store type (jewellery lead → jewellery reels).

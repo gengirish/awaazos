@@ -15,7 +15,9 @@ import { demoStage, listDemoPipeline, type DemoPipelineRow } from "@/lib/admin-d
 import { createHandover, DemoStoreError, publicStoreUrl } from "@/lib/demo-store";
 import { findDuplicates, looksLikeTestStore, SNOOZE_DAYS, type PipelineFacts } from "@/lib/demo-pipeline";
 import { sendDemoClaimEmail } from "@/lib/email";
+import { painReelStoreFor, type PainReelStore } from "@/lib/pain-reels";
 import { prisma } from "@/lib/prisma";
+import { storeKind } from "@/lib/store-vocabulary";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -29,6 +31,8 @@ export type PipelineItem = {
   name: string;
   area: string | null;
   storeUrl: string;
+  /** Which pain-point Reels the message's "Add a video" lists first. */
+  reelStore: PainReelStore;
   phone: string | null;
   contactName: string | null;
   contactEmail: string | null;
@@ -106,6 +110,7 @@ export async function loadPipelineItems(onlyVendorIds?: string[], now: Date = ne
       name: row.name,
       area: row.city,
       storeUrl: publicStoreUrl(row.slug),
+      reelStore: painReelStoreFor(storeKind(row.stallType)),
       phone: row.settings?.whatsappNumber ?? null,
       contactName: row.demoPipeline?.contactName ?? null,
       contactEmail: row.demoPipeline?.contactEmail ?? null,

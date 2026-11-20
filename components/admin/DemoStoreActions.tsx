@@ -19,6 +19,7 @@ import { OutreachWhatsApp } from "@/components/admin/OutreachWhatsApp";
 import { SetLoginForm } from "@/components/admin/SetLoginForm";
 import { formatIstDate } from "@/lib/datetime";
 import { outreachClaimMessage } from "@/lib/outreach-message";
+import type { PainReelLink, PainReelStore } from "@/lib/pain-reels";
 
 const ERROR_TEXT: Record<string, string> = {
   not_a_demo_store: "This store has been claimed, so it can't be changed here.",
@@ -34,6 +35,9 @@ type Props = {
   message: string;
   /** Saved earlier, so a new claim link needn't ask again. */
   contactEmail: string | null;
+  /** The pain-point Reels the message's "Add a video" offers, and this lead's row. */
+  reels?: readonly PainReelLink[];
+  reelStore?: PainReelStore;
   /** A SALES user can't delete a store. */
   canDelete: boolean;
   /** Platform ADMIN: may hand over with a login they set (a SALES user only sends claim links). */
@@ -58,6 +62,8 @@ export function DemoStoreActions({
   phone,
   message,
   contactEmail,
+  reels,
+  reelStore,
   canDelete,
   canSetLogin = false,
   onSent,
@@ -185,7 +191,14 @@ export function DemoStoreActions({
         />
       ) : messaging ? (
         <div className="space-y-3">
-          <OutreachWhatsApp phone={phone} message={message} label="Message on WhatsApp" onOpen={() => onSent(true)} />
+          <OutreachWhatsApp
+            phone={phone}
+            message={message}
+            label="Message on WhatsApp"
+            onOpen={() => onSent(true)}
+            reels={reels}
+            reelStore={reelStore}
+          />
           <Button type="button" size="sm" variant="outline" onClick={() => setMessaging(false)}>
             Close
           </Button>

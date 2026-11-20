@@ -24,6 +24,7 @@ const DEMO_PIPELINE_SELECT = {
   slug: true,
   name: true,
   city: true,
+  stallType: true,
   isDemo: true,
   demoExternalRef: true,
   createdAt: true,
