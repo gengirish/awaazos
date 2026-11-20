@@ -126,6 +126,31 @@ test.describe("install prompt", () => {
     await expect(banner).toHaveCount(0);
   });
 
+  test("the landing page offers Install app beside Sign in, once the browser offers it", async ({ page }) => {
+    await page.goto("/");
+    const header = page.getByRole("banner");
+    const signIn = header.getByRole("link", { name: "Sign in", exact: true });
+    await expect(signIn).toBeVisible();
+    const install = header.getByRole("button", { name: "Install app", exact: true });
+    await expect(install).toHaveCount(0);
+
+    await offerInstall(page, () => expect(install).toBeVisible({ timeout: 2_000 }));
+    // Same row as Sign in, 44 px, and the row still fits the phone.
+    const [a, b] = [await install.boundingBox(), await signIn.boundingBox()];
+    expect(Math.abs(a!.y + a!.height / 2 - (b!.y + b!.height / 2))).toBeLessThan(4);
+    expect(a!.x).toBeLessThan(b!.x);
+    expect(a!.height).toBeGreaterThanOrEqual(44);
+    expect(a!.width).toBeGreaterThanOrEqual(44);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth),
+    ).toBe(true);
+
+    await install.click();
+    await expect.poll(() => page.evaluate(() => (window as unknown as { __installPrompts?: number }).__installPrompts)).toBe(1);
+    // The browser's offer is single-use: the button goes until it offers again.
+    await expect(install).toHaveCount(0);
+  });
+
   test.describe("iPhone", () => {
     test.use({
       viewport: { width: 390, height: 844 },
@@ -138,6 +163,20 @@ test.describe("install prompt", () => {
     test.beforeEach(async ({ page }) => {
       // Chromium's touch emulation reports too few; a real iPhone reports 5.
       await page.addInitScript(() => Object.defineProperty(navigator, "maxTouchPoints", { get: () => 5 }));
+    });
+
+    test("the landing page's Install app opens the step-by-step dialog", async ({ page }) => {
+      await page.goto("/");
+      const install = page.getByRole("banner").getByRole("button", { name: "Install app", exact: true });
+      await expect(install).toBeVisible();
+      // Logo tile, Install, Sign in and the trial button still fit the narrowest phone.
+      await page.setViewportSize({ width: 360, height: 740 });
+      await expect(page.getByRole("banner").getByRole("link", { name: "Sign in", exact: true })).toBeVisible();
+      await expect
+        .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth))
+        .toBe(true);
+      await install.click();
+      await expect(page.locator("pwa-install .install-dialog.apple")).toHaveClass(/available/);
     });
 
     test("the banner opens the step-by-step dialog, loaded only on the tap", async ({ page, request }) => {
