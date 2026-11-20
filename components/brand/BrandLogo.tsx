@@ -36,6 +36,7 @@ export function BrandLogo({
   showMark = true,
   stacked = false,
   className,
+  wordmarkClassName,
 }: {
   size?: BrandLogoSize;
   /** False for the wordmark alone (tight spaces, or beside another icon). */
@@ -43,12 +44,14 @@ export function BrandLogo({
   /** Mark above the wordmark, for narrow columns (the app rail). */
   stacked?: boolean;
   className?: string;
+  /** Extra classes on the drawn wordmark, e.g. to drop it on a narrow phone and keep the mark. */
+  wordmarkClassName?: string;
 }) {
   const s = SIZES[size];
   return (
     <span className={cn("inline-flex items-center", stacked ? "flex-col gap-1" : s.gap, className)}>
       {showMark ? <BrandMark className={cn("shrink-0", s.tile)} /> : null}
-      <span aria-hidden="true" className={cn("font-display font-bold leading-none tracking-tight", s.text)}>
+      <span aria-hidden="true" className={cn("font-display font-bold leading-none tracking-tight", s.text, wordmarkClassName)}>
         <span className="text-awaaz-charcoal">{BRAND_WORDMARK.latin}</span>
         <span lang="hi" className="text-awaaz-orange">
           {BRAND_WORDMARK.devanagari}

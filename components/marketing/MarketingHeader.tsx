@@ -6,6 +6,8 @@ import { Button } from "@/components/ui/button";
 import { HOME_PATH } from "@/lib/home";
 import { cn } from "@/lib/utils";
 import { BrandLogo } from "@/components/brand/BrandLogo";
+import { InstallHeaderButton } from "@/components/pwa/InstallHeaderButton";
+import { useInstallPrompt } from "@/hooks/useInstallPrompt";
 
 // Phone section pills: the link is the 44px hit area, the pill inside it keeps
 // its 32px look, so the second header row stays as short as it was.
@@ -15,13 +17,17 @@ const sectionPillClass =
   "rounded-full bg-muted px-3 py-2 text-sm font-medium text-foreground";
 
 const navLinkClass =
-  "inline-flex min-h-11 items-center rounded-md px-3 text-sm font-medium text-awaaz-charcoal/90 outline-hidden transition-colors hover:text-awaaz-orange focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2";
+  "inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium text-awaaz-charcoal/90 outline-hidden transition-colors hover:text-awaaz-orange focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2";
 
 const orangeButtonClass =
   "min-h-11 shrink-0 bg-awaaz-orange font-semibold text-white hover:bg-awaaz-orange/90 focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2";
 
 export function MarketingHeader({ cta, signedIn = false }: { cta: string; signedIn?: boolean }) {
   const [scrolled, setScrolled] = useState(false);
+  const install = useInstallPrompt();
+  // Logo, Install, Sign in and the trial button don't all fit a 360 px phone:
+  // while Install shows, a phone under 430 px keeps the mic tile and drops the wordmark.
+  const canInstall = install.mode === "prompt" || install.guide;
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 8);
@@ -40,12 +46,12 @@ export function MarketingHeader({ cta, signedIn = false }: { cta: string; signed
           scrolled && "shadow-xs",
         )}
       >
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-2 px-4 sm:px-6 md:gap-4">
           <Link
             href="/"
             className="inline-flex min-h-11 items-center rounded-md outline-hidden focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
           >
-            <BrandLogo />
+            <BrandLogo wordmarkClassName={canInstall ? "max-[429px]:hidden" : undefined} />
           </Link>
           <nav
             aria-label="Primary"
@@ -60,6 +66,7 @@ export function MarketingHeader({ cta, signedIn = false }: { cta: string; signed
             <Link href="/pricing" className={navLinkClass}>
               Pricing
             </Link>
+            <InstallHeaderButton />
             {signedIn ? (
               <Button asChild className={cn(orangeButtonClass, "ml-2 px-5")}>
                 <Link href={HOME_PATH}>Go to dashboard</Link>
@@ -75,7 +82,8 @@ export function MarketingHeader({ cta, signedIn = false }: { cta: string; signed
               </>
             )}
           </nav>
-          <div className="flex items-center gap-2 md:hidden">
+          <div className="flex items-center gap-1.5 md:hidden">
+            <InstallHeaderButton />
             {signedIn ? (
               <Button asChild className={cn(orangeButtonClass, "px-4")}>
                 <Link href={HOME_PATH}>Go to dashboard</Link>
@@ -84,7 +92,7 @@ export function MarketingHeader({ cta, signedIn = false }: { cta: string; signed
               <>
                 <Link
                   href="/sign-in"
-                  className="inline-flex min-h-11 min-w-[44px] items-center justify-center rounded-md border border-awaaz-charcoal/20 px-3 text-sm font-medium text-awaaz-charcoal outline-hidden hover:bg-muted focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
+                  className="inline-flex min-h-11 min-w-[44px] shrink-0 items-center justify-center whitespace-nowrap rounded-md border border-awaaz-charcoal/20 px-3 text-sm font-medium text-awaaz-charcoal outline-hidden hover:bg-muted focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
                 >
                   Sign in
                 </Link>

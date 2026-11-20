@@ -42,6 +42,8 @@ stores (`hooks/useInstallPrompt.ts`, `hooks/usePushAlerts.ts`) — add a copy, n
 iPhone/iPad also get a step-by-step dialog from `@khmyznikov/pwa-install` (`lib/install-guide.ts`, loaded on
 the tap, version pinned). Never on Chromium: it would replace the one-tap prompt, and its Android sheet has no close button.
 Both are event-driven: no timers, no polling.
+The landing page header has one too, beside Sign in (`components/pwa/InstallHeaderButton.tsx`, icon alone below lg;
+while it shows, a phone under 430 px drops the wordmark from the logo so the row fits at 360 px).
 
 **Setup checklist and billing notices** follow the seller to where they land: `/orders`, `/drops` and
 (collapsed) `/pos` render `SetupChecklistCard` (`components/setup/`, rules in `setupChecklist()` /
