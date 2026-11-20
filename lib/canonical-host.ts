@@ -48,6 +48,21 @@ export function canonicalHostFrom(env: string | undefined): string | null {
   return normaliseHost(env);
 }
 
+/**
+ * The domain buyers pay from: the canonical host once the move is on, else the
+ * app's own origin. A seller has to add it as a business website in their own
+ * Razorpay account or Razorpay declines the payment. Null for localhost.
+ */
+export function storeWebsiteHost(canonicalEnv: string | undefined, appBaseUrl: string): string | null {
+  const canonical = canonicalHostFrom(canonicalEnv);
+  if (canonical) return canonical;
+  try {
+    return normaliseHost(new URL(appBaseUrl).hostname);
+  } catch {
+    return null;
+  }
+}
+
 /** True when this request came in on a host we're moving away from. */
 export function isLegacyHost(host: string | null | undefined, canonicalHost: string | null): boolean {
   const h = normaliseHost(host);

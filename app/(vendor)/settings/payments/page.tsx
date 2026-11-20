@@ -6,6 +6,7 @@ import { SettingsCard, SettingsPageHeader } from "@/components/settings/Settings
 import { PLAN_LIMITS } from "@/lib/constants";
 import { formatIstDateTime } from "@/lib/datetime";
 import { prisma } from "@/lib/prisma";
+import { storeWebsiteHost } from "@/lib/canonical-host";
 import { CONNECT_OUTCOME_RE } from "@/lib/razorpay-connect";
 import { getRazorpayIssue } from "@/lib/razorpay-issue";
 import { isRazorpayOauthConfigured, publicTokenMode } from "@/lib/razorpay-oauth";
@@ -15,6 +16,7 @@ import {
   hasOauthConnection,
   hasStoredRazorpayKeys,
   isOnlinePaymentEnabled,
+  appBaseUrl,
   RAZORPAY_CRED_SELECT,
   vendorWebhookUrl,
 } from "@/lib/storefront-razorpay";
@@ -74,6 +76,7 @@ export default async function PaymentsSettingsPage(props: { searchParams: Promis
             outcome={outcome}
             issue={issue ? { kind: issue.kind, at: formatIstDateTime(issue.at) } : null}
             webhookUrl={isOwner ? vendorWebhookUrl(vendor.id) : ""}
+            storeWebsite={storeWebsiteHost(process.env.CANONICAL_HOST, appBaseUrl())}
             planEligible={PLAN_LIMITS[vendor.plan].razorpayLinks}
             encryptionConfigured={isSecretBoxConfigured()}
             isOwner={isOwner}

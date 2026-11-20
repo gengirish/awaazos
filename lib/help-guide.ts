@@ -454,7 +454,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     group: "setup",
     title: "Set your UPI ID and how customers pay",
     steps:
-      "Enter the UPI ID that money should go to. You can also allow pay on delivery, or tap Connect Razorpay to take card and netbanking payments into your own Razorpay account.",
+      "Enter the UPI ID that money should go to. You can also allow pay on delivery, or tap Connect Razorpay to take card and netbanking payments into your own Razorpay account. Then add your store's web address in Razorpay under My Account → Additional Business Website/App, or Razorpay declines the payments.",
     nav: "settings",
     href: "/settings/payments",
     trail: ["Payments"],

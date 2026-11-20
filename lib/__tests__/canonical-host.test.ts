@@ -6,6 +6,7 @@ import {
   isLegacyHost,
   legacyHostRedirect,
   normaliseHost,
+  storeWebsiteHost,
 } from "../canonical-host";
 
 const NEW = "awaazdo.store";
@@ -120,5 +121,20 @@ describe("flagOn", () => {
     expect(flagOn("1")).toBe(true);
     expect(flagOn(" TRUE ")).toBe(true);
     for (const v of [undefined, "", "0", "false", "yes"]) expect(flagOn(v)).toBe(false);
+  });
+});
+
+describe("storeWebsiteHost", () => {
+  it("is the canonical host once the move is on", () => {
+    expect(storeWebsiteHost(" AwaazDo.Store ", "https://awaazos.intelliforge.tech")).toBe(NEW);
+  });
+
+  it("falls back to the app's own origin", () => {
+    expect(storeWebsiteHost(undefined, "https://awaazos.intelliforge.tech/")).toBe(OLD);
+  });
+
+  it("is null for localhost or a bad URL", () => {
+    expect(storeWebsiteHost(undefined, "http://localhost:3000")).toBeNull();
+    expect(storeWebsiteHost("", "not a url")).toBeNull();
   });
 });
