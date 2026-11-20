@@ -11,15 +11,7 @@
 import { execFileSync } from "node:child_process";
 
 /** GHSA id → why it is safe for now, and the date to look again. */
-const ALLOWED = {
-  "GHSA-fc5q-39xc-vjpf": {
-    // picomatch ≤ 4.0.7 (every release; no patch as of 2026-11-18): ReDoS on a
-    // crafted extglob *pattern*. Only build and dev tools (vite, vitest, Sentry's
-    // bundler plugin, lint-staged) use it, with patterns from our own config,
-    // never from a request.
-    reviewBy: "2026-12-31",
-  },
-};
+const ALLOWED = {};
 
 const FAIL = new Set(["high", "critical"]);
 
