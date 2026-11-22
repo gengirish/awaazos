@@ -102,6 +102,7 @@ describe("signUpSchema.storeHandle", () => {
     password: "password123",
     name: "Owner",
     stallName: "Ravi's Bhel",
+    acceptedTerms: true,
     stallType: StallType.STREET_FOOD,
   };
 

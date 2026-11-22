@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 import { DISCLOSURE_SUMMARY, DisclosureChevron } from "@/components/help/disclosure";
 import { HelpTopicList } from "@/components/help/HelpTopicList";
 import { HelpVideoButton } from "@/components/help/HelpVideoButton";
-import { SupportEmailLink } from "@/components/legal/SupportEmailLink";
+import { SupportContactList } from "@/components/help/SupportContactList";
 import { appNavIcon } from "@/components/shell/nav-icons";
 import { appNavItemsForRole, appTabBarForRole } from "@/lib/app-nav";
 import { BRAND_NAME } from "@/lib/brand";
@@ -201,9 +201,8 @@ export default async function HelpPage() {
           <h2 id="help-contact-heading" className="mb-1 font-display text-lg font-semibold text-foreground">
             Still stuck?
           </h2>
-          <p className="[&_a]:inline-flex [&_a]:min-h-11 [&_a]:items-center [&_a]:font-semibold [&_a]:text-foreground [&_a]:underline [&_a]:underline-offset-4">
-            Write to us at <SupportEmailLink /> and tell us which screen you are on.
-          </p>
+          <p className="mb-3">Tell us which screen you are on and what you were trying to do.</p>
+          <SupportContactList headingId="help-contact-heading" />
         </section>
       </main>
     </div>

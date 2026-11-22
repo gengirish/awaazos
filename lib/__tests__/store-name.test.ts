@@ -39,6 +39,7 @@ describe("storeNameSchema", () => {
       password: "password123",
       name: "Owner",
       stallType: StallType.STREET_FOOD,
+      acceptedTerms: true,
     };
     expect(signUpSchema.safeParse({ ...base, stallName: "a".repeat(STORE_NAME_MAX) }).success).toBe(true);
     expect(signUpSchema.safeParse({ ...base, stallName: "a".repeat(STORE_NAME_MAX + 1) }).success).toBe(false);

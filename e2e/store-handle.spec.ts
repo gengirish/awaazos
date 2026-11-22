@@ -57,6 +57,7 @@ test.describe("store link", () => {
       data: {
         email: `e2e-handle-again-${stamp}@example.com`,
         password: E2E_PASSWORD,
+        acceptedTerms: true,
         name: "E2E Other",
         stallName: "Another store",
         storeHandle: expectedHandle,
@@ -82,6 +83,7 @@ test.describe("store link", () => {
       data: {
         email: `e2e-handle-api-${stamp}@example.com`,
         password: E2E_PASSWORD,
+        acceptedTerms: true,
         name: "E2E Api",
         stallName: "API store",
         storeHandle: free.toUpperCase(),

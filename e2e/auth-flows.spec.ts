@@ -19,6 +19,7 @@ function registrationBody(email: string, overrides: Record<string, unknown> = {}
   return {
     email,
     password: E2E_PASSWORD,
+    acceptedTerms: true,
     name: "E2E Auth",
     stallName: `E2E Auth ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
     stallType: "STREET_FOOD",

@@ -43,7 +43,7 @@ export const HELP_SCREEN_SUMMARY: Record<AppNavId, string> = {
   store: "Your store at a glance: open or hidden, what buyers can order now, ways to bring buyers in, and what is left to make it look like yours.",
   transactions: "Every bill you have made. Search, resend a receipt, or export.",
   analytics: "Sales totals, best-selling {items} and busy hours.",
-  settings: "Your online store, payments, receipts, alerts and plan.",
+  settings: "Your online store, payments, receipts, alerts and plan, and how to contact support.",
   help: "This guide.",
 };
 

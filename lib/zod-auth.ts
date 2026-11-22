@@ -36,6 +36,9 @@ export const signUpSchema = z
   // Referral code from `/sign-up?ref=<slug>` (lib/referral.ts). Free text on
   // purpose: a bad code is ignored by the register route, never a 400.
   ref: z.string().max(80).optional(),
+  // Ticked "I agree to the Terms and Privacy Policy". Required on every call (the
+  // form, demo seeding, e2e) so it can never be skipped; nothing is stored.
+  acceptedTerms: z.literal(true, { message: "Accept the Terms and Privacy Policy to continue." }),
   })
   .superRefine((v, ctx) => {
     if (v.stallType === "OTHER" && !stallTypeOtherSchema.safeParse(v.stallTypeOther ?? "").success) {
