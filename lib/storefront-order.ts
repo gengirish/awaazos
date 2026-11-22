@@ -51,7 +51,7 @@ export function storefrontDropVisibility(
  * and its OG card; the order write path (lib/menu-orders.ts `placeMenuOrder`)
  * applies the same two flags.
  */
-export const STOREFRONT_MENU_ITEM_WHERE = { isAvailable: true, showOnline: true } as const;
+export const STOREFRONT_MENU_ITEM_WHERE = { isAvailable: true, showOnline: true, archivedAt: null } as const;
 
 export type MenuHidingDrop = {
   status: string;

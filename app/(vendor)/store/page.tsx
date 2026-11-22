@@ -44,7 +44,7 @@ export default async function StorePage() {
       },
     }),
     // What a buyer sees on the store page: available and shown online.
-    prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true, showOnline: true } }),
+    prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true, showOnline: true, archivedAt: null } }),
     prisma.drop.findMany({
       where: { vendorId: vendor.id, ...dropWillTakeOrdersWhere(now) },
       select: { title: true, status: true, opensAt: true, closesAt: true },

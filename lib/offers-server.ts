@@ -64,11 +64,12 @@ export async function loadOfferRules(db: Db, vendorId: string, channels: OfferCh
   if (rules.length === 0) return { rules, menuItems: [] };
   const needsTags = rules.some((r) => r.eligibility === "TAG" || (r.requiredTag && r.requiredTagQty > 0));
   // A gift needs its name and price; any availability, so a seller can give
-  // away something they don't sell on its own.
+  // away something they don't sell on its own. A deleted item (lib/menu-archive.ts)
+  // is neither a gift nor counted by tag: its offer simply finds nothing.
   const giftIds = rules.flatMap((r) => (r.discountType === "FREE_ITEM" && r.freeItemId ? [r.freeItemId] : []));
   if (!needsTags && giftIds.length === 0) return { rules, menuItems: [] };
   const menuItems: OfferMenuItemRef[] = await db.menuItem.findMany({
-    where: needsTags ? { vendorId } : { vendorId, id: { in: giftIds } },
+    where: needsTags ? { vendorId, archivedAt: null } : { vendorId, archivedAt: null, id: { in: giftIds } },
     select: { id: true, tags: true, name: true, priceInPaise: true },
   });
   return { rules, menuItems };

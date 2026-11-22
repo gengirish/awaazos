@@ -8,6 +8,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { MenuGrid } from "@/components/menu/MenuGrid";
 import { VoiceMenuPanel } from "@/components/menu/VoiceMenuPanel";
 import { Button } from "@/components/ui/button";
+import { menuCategories } from "@/lib/menu-category";
 import { MENU_CHANGED_EVENT } from "@/lib/menu-events";
 import type { MenuRow } from "@/lib/menu-stock";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
@@ -33,6 +34,8 @@ type MenuScreenProps = {
   canSeeCost?: boolean;
   /** The published store's link name (item product links); null = not published. */
   storeSlug?: string | null;
+  /** MANAGER and up: delete items and rename categories (lib/menu-archive.ts, lib/menu-category.ts). */
+  canManage?: boolean;
 };
 
 /** The header's two actions open things lower down, so the state they share lives here. */
@@ -45,6 +48,7 @@ export function MenuScreen({
   sizesEnabled,
   canSeeCost,
   storeSlug = null,
+  canManage = false,
 }: MenuScreenProps) {
   const router = useRouter();
   const [items, setItems] = useState<MenuRow[]>(initialItems);
@@ -57,7 +61,7 @@ export function MenuScreen({
   const micRef = useRef<HTMLButtonElement>(null);
   const expandRef = useRef<HTMLButtonElement>(null);
 
-  const categories = useMemo(() => [...new Set(items.map((i) => i.category).filter(Boolean))], [items]);
+  const categories = useMemo(() => menuCategories(items), [items]);
 
   useEffect(() => {
     setItems(initialItems);
@@ -151,6 +155,7 @@ export function MenuScreen({
           vocab={vocab}
           canSeeCost={canSeeCost}
           storeSlug={storeSlug}
+          canManage={canManage}
         />
         {formMounted ? (
           <MenuItemForm
@@ -163,6 +168,7 @@ export function MenuScreen({
             vocab={vocab}
             sizesEnabled={sizesEnabled}
             canSeeCost={canSeeCost}
+            canDelete={canManage}
           />
         ) : null}
       </main>

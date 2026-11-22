@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import { rupeesToPaise } from "@/lib/currency";
 import { FOOD_TYPES, ITEM_DETAILS_MAX, normaliseHighlights, normaliseItemDetails } from "@/lib/item-highlights";
+import { MENU_CATEGORY_MAX } from "@/lib/menu-category";
 import { menuUnitSchema } from "@/lib/menu-unit";
 
 /** Split a comma-separated string into a deduplicated, trimmed array. */
@@ -193,6 +194,16 @@ export const MENU_BULK_MAX_ITEMS = 50;
 /** ₹1,00,000 — above this a spoken price is a mishearing, not a menu price. */
 export const MENU_MAX_PRICE_PAISE = 10_000_000;
 export const MENU_NAME_MAX = 80;
+
+/**
+ * PATCH /api/menu/categories: rename one category on every item that has it.
+ * `from` is matched exactly as stored (the list shows it as is); `to` is
+ * trimmed and must not be empty. Renaming onto an existing name merges the two.
+ */
+export const menuCategoryRenameSchema = z.object({
+  from: z.string().min(1, "Choose a category to rename").max(200),
+  to: z.string().trim().min(1, "Category name is required").max(MENU_CATEGORY_MAX, `At most ${MENU_CATEGORY_MAX} characters`),
+});
 
 const bulkItemSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(MENU_NAME_MAX),

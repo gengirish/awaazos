@@ -1,6 +1,6 @@
 ---
 description: Menu catalogue: offers, inventory, sizes, cost price, stock purchases, AI images, moved from CLAUDE.md
-globs: ["lib/offers.ts","lib/pos-offers.ts","lib/inventory*.ts","lib/item-*.ts","lib/stock-purchase.ts","lib/menu-create.ts","lib/ai-image.ts","app/api/menu/**","app/api/offers/**","app/api/vendor/banner/**","app/(vendor)/menu/**","app/(vendor)/settings/offers/**","components/menu/**","components/pos/SizePickerDialog.tsx","components/storefront/SizePicker.tsx","components/storefront/ItemPrice.tsx"]
+globs: ["lib/offers.ts","lib/pos-offers.ts","lib/inventory*.ts","lib/item-*.ts","lib/stock-purchase.ts","lib/menu-create.ts","lib/menu-archive.ts","lib/menu-category.ts","lib/ai-image.ts","app/api/menu/**","app/api/offers/**","app/api/vendor/banner/**","app/(vendor)/menu/**","app/(vendor)/settings/offers/**","components/menu/**","components/pos/SizePickerDialog.tsx","components/storefront/SizePicker.tsx","components/storefront/ItemPrice.tsx"]
 alwaysApply: false
 ---
 
@@ -18,6 +18,15 @@ OWNER) and "Use this banner" sends it through the normal upload. A story backgro
 `NEXT_PUBLIC_AI_IMAGES_ENABLED=true`. Only the seller's own words go to fal, and the prompt is never logged.
 Every call is billed and nothing retries. `reserveFalImage` (`lib/ai-usage-guard.ts`) caps images per plan
 and fails **closed** in production, unlike the POS guards. `requireActiveBilling` applies.
+
+## Deleting items and renaming categories
+
+"Delete dish/product" (`DELETE /api/menu/[id]`, MANAGER) archives: it stamps `MenuItem.archivedAt` and switches
+`isAvailable` off; the row stays for old bills, drops and stock. Every catalogue list filters `archivedAt: null`
+(`ON_MENU`, `STOREFRONT_MENU_ITEM_WHERE`), and per-item edit routes 404 an archived item. Refused (409 `in_open_drop`)
+while a draft / later / open drop holds it; a closed drop that holds one can't reopen (`has_deleted_items`). Rules in the
+header of `lib/menu-archive.ts`. Categories are free text: `PATCH /api/menu/categories { from, to }` (MANAGER) renames
+on every item on the menu (`lib/menu-category.ts`, zod-free; schema `menuCategoryRenameSchema`).
 
 ## Offers (sales and quantity plans)
 

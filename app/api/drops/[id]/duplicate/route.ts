@@ -29,7 +29,9 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
     const src = await prisma.drop.findFirst({
       where: { id: params.id, vendorId },
       include: {
+        // A deleted item (lib/menu-archive.ts) is left out of the copy.
         items: {
+          where: { menuItem: { archivedAt: null } },
           select: {
             menuItemId: true,
             priceInPaise: true,

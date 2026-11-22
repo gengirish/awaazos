@@ -40,7 +40,7 @@ export default async function StoreSettingsPage() {
         ...RAZORPAY_CRED_SELECT,
       },
     }),
-    prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
+    prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true, archivedAt: null } }),
     listVendorCommunities(vendor.id),
   ]);
 

@@ -55,7 +55,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
 
     const variants = await prisma.$transaction(async (tx) => {
       const item = await tx.menuItem.findFirst({
-        where: { id: params.id, vendorId },
+        where: { id: params.id, vendorId, archivedAt: null },
         select: { id: true, stockQty: true, variants: { select: { id: true } } },
       });
       if (!item) throw new VariantsRouteError(404, "Not found");

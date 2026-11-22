@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
     // Ownership check first, so a forged id 404s without an upload happening.
     const existing = await prisma.menuItem.findFirst({
-      where: { id: params.id, vendorId: ctx.vendor.id },
+      where: { id: params.id, vendorId: ctx.vendor.id, archivedAt: null },
       select: { id: true, imageUrl: true },
     });
     if (!existing) {
@@ -93,7 +93,7 @@ export async function DELETE(req: NextRequest, props: { params: Promise<{ id: st
     const ctx = await requireVendorRole("CASHIER", undefined, req);
 
     const existing = await prisma.menuItem.findFirst({
-      where: { id: params.id, vendorId: ctx.vendor.id },
+      where: { id: params.id, vendorId: ctx.vendor.id, archivedAt: null },
       select: { id: true, imageUrl: true },
     });
     if (!existing) {

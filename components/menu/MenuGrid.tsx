@@ -1,17 +1,19 @@
 "use client";
 
-import { LayoutGrid, Search } from "lucide-react";
+import { LayoutGrid, Pencil, Search } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { toast } from "sonner";
 
 import { MenuItemCard, type MenuMoveDirection } from "@/components/menu/MenuItemCard";
 import { ReceiveStockDialog, canReceiveStock } from "@/components/menu/ReceiveStockDialog";
+import { RenameCategoryDialog } from "@/components/menu/RenameCategoryDialog";
 import type { StockSaved } from "@/components/menu/StockStepper";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { RadioOption } from "@/components/ui/radio-option";
+import { menuCategories } from "@/lib/menu-category";
 import {
   MENU_STATUS_LABELS,
   isMenuFilterEmpty,
@@ -39,6 +41,8 @@ type MenuGridProps = {
   canSeeCost?: boolean;
   /** The published store's link name, for each card's product link; null = not published. */
   storeSlug?: string | null;
+  /** MANAGER and up: each category can be renamed (PATCH /api/menu/categories). */
+  canManage?: boolean;
 };
 
 /** One request for the whole order (POST /api/menu/reorder). False when it did not save. */
@@ -55,9 +59,21 @@ async function saveOrder(rows: MenuRow[]): Promise<boolean> {
   }
 }
 
-export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab, canSeeCost = false, storeSlug = null }: MenuGridProps) {
+export function MenuGrid({
+  items,
+  setItems,
+  initialItems,
+  onAdd,
+  onEdit,
+  vocab,
+  canSeeCost = false,
+  storeSlug = null,
+  canManage = false,
+}: MenuGridProps) {
   const router = useRouter();
   const [receiving, setReceiving] = useState<MenuRow | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const categories = useMemo(() => menuCategories(items), [items]);
   const gridRef = useRef<HTMLDivElement>(null);
   // Reorder saves run one at a time; taps made meanwhile collapse into one more save.
   const savingOrder = useRef(false);
@@ -255,6 +271,30 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab, 
               </p>
             </div>
           ) : null}
+          {canManage && categories.length > 0 ? (
+            <section aria-labelledby="menu-categories-heading" className="space-y-2">
+              <h2 id="menu-categories-heading" className="text-xs font-medium text-muted-foreground">
+                Categories: tap one to rename it
+              </h2>
+              <ul className="flex flex-wrap gap-2">
+                {categories.map((category) => (
+                  <li key={category} className="min-w-0 max-w-full">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="min-h-11 min-w-11 max-w-full gap-1.5"
+                      aria-label={`Rename category ${category}`}
+                      onClick={() => setRenaming(category)}
+                    >
+                      <span className="truncate">{category}</span>
+                      <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           {filtering ? (
             // A move between two visible cards would jump over hidden ones.
             <p className="text-sm text-muted-foreground">Clear the search to change the order.</p>
@@ -310,6 +350,7 @@ export function MenuGrid({ items, setItems, initialItems, onAdd, onEdit, vocab, 
         </>
       )}
       <ReceiveStockDialog item={receiving} onClose={() => setReceiving(null)} onSaved={() => void reloadRows()} />
+      <RenameCategoryDialog category={renaming} onClose={() => setRenaming(null)} onRenamed={() => void reloadRows()} />
     </div>
   );
 }

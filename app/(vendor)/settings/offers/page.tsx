@@ -23,7 +23,7 @@ export default async function OffersSettingsPage() {
       select: OFFER_RULE_SELECT,
     }),
     prisma.menuItem.findMany({
-      where: { vendorId: vendor.id, isAvailable: true },
+      where: { vendorId: vendor.id, isAvailable: true, archivedAt: null },
       orderBy: [{ category: "asc" }, { sortOrder: "asc" }, { name: "asc" }],
       select: { id: true, name: true, tags: true },
     }),

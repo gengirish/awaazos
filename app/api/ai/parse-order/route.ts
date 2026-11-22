@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     const body = bodySchema.parse(await req.json());
 
     const menuRows = await prisma.menuItem.findMany({
-      where: { vendorId: ctx.vendor.id, isAvailable: true },
+      where: { vendorId: ctx.vendor.id, isAvailable: true, archivedAt: null },
       select: { id: true, slug: true, name: true, aliases: true, tags: true, priceInPaise: true },
       orderBy: { sortOrder: "asc" },
     });

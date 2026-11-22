@@ -13,7 +13,7 @@ type Db = Prisma.TransactionClient | typeof prisma;
 
 async function readPhotos(db: Db, vendorId: string, menuItemId: string): Promise<PhotoRef[] | null> {
   const item = await db.menuItem.findFirst({
-    where: { id: menuItemId, vendorId },
+    where: { id: menuItemId, vendorId, archivedAt: null },
     select: {
       imageUrl: true,
       images: { orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }], select: { id: true, url: true } },

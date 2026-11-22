@@ -99,7 +99,7 @@ export async function POST(req: NextRequest, props: { params: Promise<{ id: stri
 
     const data = await prisma.$transaction(async (tx) => {
       const item = await tx.menuItem.findFirst({
-        where: { id: params.id, vendorId },
+        where: { id: params.id, vendorId, archivedAt: null },
         select: { id: true, _count: { select: { variants: true } } },
       });
       if (!item) throw new StockRouteError(404, "Not found");

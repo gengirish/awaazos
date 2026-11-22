@@ -54,8 +54,12 @@ export default async function EditDropPage(props: {
 
   const now = new Date();
   const [menuItems, sold, orderCount, settings] = await Promise.all([
+    // Deleted items (lib/menu-archive.ts) leave the picker, except one already in this drop.
     prisma.menuItem.findMany({
-      where: { vendorId: vendor.id },
+      where: {
+        vendorId: vendor.id,
+        OR: [{ archivedAt: null }, { id: { in: drop.items.map((i) => i.menuItemId) } }],
+      },
       orderBy: { sortOrder: "asc" },
       select: { id: true, name: true, emoji: true, priceInPaise: true, isAvailable: true },
     }),

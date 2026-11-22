@@ -69,7 +69,7 @@ describe("storefront OG card", () => {
     const args = findFirst.mock.calls[0]![0] as {
       select: { menuItems: { where: unknown }; drops: { select: Record<string, unknown> } };
     };
-    expect(args.select.menuItems.where).toEqual({ isAvailable: true, showOnline: true });
+    expect(args.select.menuItems.where).toEqual({ isAvailable: true, showOnline: true, archivedAt: null });
     expect(args.select.drops.select.showEverydayMenu).toBe(true);
   });
 

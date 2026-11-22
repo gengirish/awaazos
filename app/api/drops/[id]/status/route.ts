@@ -50,6 +50,11 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
     if (to === "OPEN") {
       if (now.getTime() >= drop.closesAt.getTime()) throw conflict("move_cutoff_first");
       if (drop._count.items === 0) throw conflict("no_items");
+      // A deleted item (lib/menu-archive.ts rule 3) is never back on sale.
+      const deleted = await prisma.dropItem.count({
+        where: { dropId: drop.id, drop: { vendorId }, menuItem: { archivedAt: { not: null } } },
+      });
+      if (deleted > 0) throw conflict("has_deleted_items");
       const settings = await prisma.vendorSettings.findUnique({
         where: { vendorId },
         select: { acceptPayOnDelivery: true, publishStorefront: true, ...RAZORPAY_CRED_SELECT },

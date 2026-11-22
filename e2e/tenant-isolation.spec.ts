@@ -59,6 +59,33 @@ test.describe("tenant isolation", () => {
     expect(stillThere?.isAvailable).toBe(true);
   });
 
+  test("vendor B cannot delete (archive) vendor A's menu item, and A's delete leaves B alone", async () => {
+    const itemA = await createMenuItem(pageA, { name: "A Archive Target", priceInRupees: 25 });
+    const itemB = await createMenuItem(pageB, { name: "B Keeps This", priceInRupees: 30 });
+
+    const del = await pageB.request.delete(`/api/menu/${itemA.id}`);
+    expect(del.status(), "cross-tenant DELETE must 404, never 403").toBe(404);
+    const listA = (await (await pageA.request.get("/api/menu")).json()) as { data: MenuItemRow[] };
+    expect(listA.data.some((i) => i.id === itemA.id), "A's item is still on A's menu").toBe(true);
+
+    // A deletes its own item; B's menu is untouched, and B still can't reach the archived row.
+    expect((await pageA.request.delete(`/api/menu/${itemA.id}`)).status()).toBe(200);
+    expect((await pageB.request.patch(`/api/menu/${itemA.id}`, { data: { isAvailable: true } })).status()).toBe(404);
+    const listB = (await (await pageB.request.get("/api/menu")).json()) as { data: MenuItemRow[] };
+    expect(listB.data.some((i) => i.id === itemB.id)).toBe(true);
+  });
+
+  test("vendor B's category rename never touches vendor A's items (0 updated)", async () => {
+    const itemA = await createMenuItem(pageA, { name: "A Chaat Item", priceInRupees: 40, category: "Shared Name" });
+
+    const renamed = await pageB.request.patch("/api/menu/categories", { data: { from: "Shared Name", to: "Hijacked" } });
+    expect(renamed.status()).toBe(200);
+    expect(await renamed.json()).toEqual({ data: { updated: 0 } });
+
+    const listA = (await (await pageA.request.get("/api/menu")).json()) as { data: (MenuItemRow & { category: string })[] };
+    expect(listA.data.find((i) => i.id === itemA.id)?.category).toBe("Shared Name");
+  });
+
   test("vendor B cannot count or move vendor A's stock (404, not 403)", async () => {
     const itemA = await createMenuItem(pageA, { name: "A Stock Tee", priceInRupees: 499 });
     const tracked = await pageA.request.post(`/api/menu/${itemA.id}/stock`, { data: { set: 8 } });

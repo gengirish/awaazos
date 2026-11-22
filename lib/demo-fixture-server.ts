@@ -136,8 +136,9 @@ export async function applyDemoFixture(
       });
 
       // ── Items: matched by name (case-insensitive) ──────────────────────
+      // A deleted item (lib/menu-archive.ts) is not matched: the fixture adds it afresh.
       const existing = await tx.menuItem.findMany({
-        where: { vendorId: vendor.id },
+        where: { vendorId: vendor.id, archivedAt: null },
         select: { id: true, name: true },
       });
       const byName = new Map(existing.map((m) => [m.name.trim().toLowerCase(), m.id]));

@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
     const body = dropUpsertSchema.parse(await req.json());
 
     const owned = await prisma.menuItem.findMany({
-      where: { vendorId: ctx.vendor.id, id: { in: body.items.map((i) => i.menuItemId) } },
+      where: { vendorId: ctx.vendor.id, archivedAt: null, id: { in: body.items.map((i) => i.menuItemId) } },
       select: { id: true },
     });
     const bad = unknownMenuItems(body.items, new Set(owned.map((m) => m.id)));

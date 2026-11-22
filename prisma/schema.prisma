@@ -221,6 +221,9 @@ model MenuItem {
   // What one unit costs the seller (lib/item-cost.ts); null = not recorded. MANAGER and up only,
   // never in a public select or the voice prompt.
   costInPaise    Int?
+  // Deleted by the seller (DELETE /api/menu/[id]); null = on the menu. The row stays so old
+  // bills, drops and stock records keep resolving; every catalogue list filters it out.
+  archivedAt     DateTime?
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

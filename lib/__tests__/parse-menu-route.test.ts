@@ -150,7 +150,7 @@ describe("POST /api/ai/parse-menu", () => {
 
     expect(h.requireVendorRole).toHaveBeenCalledWith("CASHIER", undefined, expect.anything());
     // All items, unavailable ones included.
-    expect(h.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { vendorId: "v_1" } }));
+    expect(h.findMany).toHaveBeenCalledWith(expect.objectContaining({ where: { vendorId: "v_1", archivedAt: null } }));
     expect(h.reserve).toHaveBeenCalledWith(expect.objectContaining({ vendorId: "v_1", plan: "STARTER" }));
     expect(h.sonnetCreate).not.toHaveBeenCalled();
     expect(res.headers.get("set-cookie")).toContain("awz_vendor=v_1");

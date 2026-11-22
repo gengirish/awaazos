@@ -68,7 +68,7 @@ export default async function PosPage() {
       where: { vendorId_date: { vendorId, date: today } },
     }),
     prisma.menuItem.findMany({
-      where: { vendorId, isAvailable: true },
+      where: { vendorId, isAvailable: true, archivedAt: null },
       orderBy: [{ isPopular: "desc" }, { sortOrder: "asc" }],
       select: {
         id: true,
