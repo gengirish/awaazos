@@ -250,7 +250,9 @@ export function OrderCard({
     uncancel: [
       "Reopen order",
       "Reopen this order?",
-      `It comes back accepted${order.paymentStatus === "REFUNDED" ? " and paid" : ""}, if still in stock.`,
+      order.paymentStatus === "REFUNDED"
+        ? "It comes back accepted and paid, if still in stock. Refunded the buyer? Tap Not paid yet after."
+        : "It comes back accepted, if still in stock.",
     ],
   };
 
