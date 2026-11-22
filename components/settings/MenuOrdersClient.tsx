@@ -250,7 +250,7 @@ export function MenuOrdersClient({
             id="menu-delivery-fee-hint"
             className={cn("text-xs", feeError ? "text-destructive" : "text-muted-foreground")}
           >
-            {feeError ?? "Added to delivery orders only. Enter 0 for free delivery."}
+            {feeError ?? "Added once to each delivery order. Pickup orders pay nothing. Enter 0 for free delivery. A delivery area with its own fee replaces this one (see Delivery areas)."}
           </p>
         </div>
       )}
