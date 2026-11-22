@@ -464,4 +464,168 @@ describe.skipIf(!ENABLED)("storefront (menu) orders — vendor side, DB integrat
     const s = await prisma.vendorSettings.findUniqueOrThrow({ where: { vendorId: d.id } });
     expect(s).toMatchObject({ acceptMenuOrders: true, publishStorefront: false });
   });
+
+  // ─── Fix status: mark_unpaid and uncancel (lib/drops.ts) ──────────
+
+  const row = (id: string) =>
+    prisma.transaction.findUniqueOrThrow({
+      where: { id },
+      select: { fulfilmentStatus: true, paymentStatus: true, paidAt: true, cancelledAt: true },
+    });
+  const errorOf = async (res: Response) => ((await res.json()) as { error?: string }).error;
+
+  it("mark_unpaid reverses exactly what mark_paid booked, once; never a Razorpay payment", async () => {
+    const v = await seedVendor();
+    const placed = await menuOrder(v, "UPI");
+    if (!placed.ok) throw new Error("seed failed");
+    const id = placed.order.id;
+    as(v);
+
+    expect((await patchMenu(id, "mark_paid")).status).toBe(200);
+    expect(await summary(v.id)).toMatchObject({
+      totalRevenuePaise: 5500,
+      totalTransactions: 1,
+      totalItemsSold: 3,
+      upiRevenuePaise: 5500,
+    });
+
+    const undo = await patchMenu(id, "mark_unpaid");
+    expect(undo.status).toBe(200);
+    expect(await row(id)).toMatchObject({ paymentStatus: "PENDING", paidAt: null, fulfilmentStatus: "CONFIRMED" });
+    expect(await summary(v.id)).toMatchObject({
+      totalRevenuePaise: 0,
+      totalTransactions: 0,
+      totalItemsSold: 0,
+      upiRevenuePaise: 0,
+    });
+
+    // Twice is a 409, and the summary is not reversed again.
+    expect((await patchMenu(id, "mark_unpaid")).status).toBe(409);
+    expect(await summary(v.id)).toMatchObject({ totalRevenuePaise: 0, totalTransactions: 0 });
+
+    // Paid through Razorpay: Razorpay's record, not the seller's to take back.
+    await prisma.transaction.update({
+      where: { id },
+      data: { paymentStatus: "PAID", paidAt: new Date(), razorpayPaymentId: "pay_test" },
+    });
+    const online = await patchMenu(id, "mark_unpaid");
+    expect(online.status).toBe(409);
+    expect(await errorOf(online)).toBe("paid_online");
+    expect((await row(id)).paymentStatus).toBe("PAID");
+  }, 20_000);
+
+  it("uncancel restores a paid order exactly (PAID, revenue back); a Razorpay-paid one stays closed", async () => {
+    const v = await seedVendor();
+    const placed = await menuOrder(v, "UPI");
+    if (!placed.ok) throw new Error("seed failed");
+    const id = placed.order.id;
+    as(v);
+
+    expect((await patchMenu(id, "mark_paid")).status).toBe(200);
+    expect((await patchMenu(id, "cancel")).status).toBe(200);
+    expect(await row(id)).toMatchObject({ fulfilmentStatus: "CANCELLED", paymentStatus: "REFUNDED" });
+    expect(await summary(v.id)).toMatchObject({ totalRevenuePaise: 0, totalTransactions: 0 });
+
+    expect((await patchMenu(id, "uncancel")).status).toBe(200);
+    expect(await row(id)).toMatchObject({ fulfilmentStatus: "CONFIRMED", paymentStatus: "PAID", cancelledAt: null });
+    expect(await summary(v.id)).toMatchObject({ totalRevenuePaise: 5500, totalTransactions: 1, totalItemsSold: 3 });
+    // Not cancelled any more: a second reopen is a 409.
+    expect((await patchMenu(id, "uncancel")).status).toBe(409);
+
+    const rzp = await menuOrder(v, "UPI");
+    if (!rzp.ok) throw new Error("seed failed");
+    await prisma.transaction.update({
+      where: { id: rzp.order.id },
+      data: { fulfilmentStatus: "CANCELLED", paymentStatus: "REFUNDED", paidAt: new Date(), razorpayPaymentId: "pay_x" },
+    });
+    const refused = await patchMenu(rzp.order.id, "uncancel");
+    expect(refused.status).toBe(409);
+    expect(await errorOf(refused)).toBe("paid_online");
+  }, 20_000);
+
+  it("uncancel on a menu order: refused out_of_stock while its stock went to another order", async () => {
+    const v = await seedVendor();
+    const samosa = v.menuItems[1]!;
+    // 2 on the shelf, counted before any order.
+    await prisma.menuItem.update({
+      where: { id: samosa.id },
+      data: { stockQty: 2, stockCountedAt: new Date(Date.now() - 60_000) },
+    });
+    const first = await menuOrder(v, "CASH"); // takes both samosas
+    if (!first.ok) throw new Error("seed failed");
+    as(v);
+    expect((await patchMenu(first.order.id, "cancel")).status).toBe(200);
+    expect(await row(first.order.id)).toMatchObject({ fulfilmentStatus: "CANCELLED", paymentStatus: "PENDING" });
+
+    const second = await menuOrder(v, "CASH"); // the freed samosas sell again
+    if (!second.ok) throw new Error("seed failed");
+
+    const refused = await patchMenu(first.order.id, "uncancel");
+    expect(refused.status).toBe(409);
+    expect(await errorOf(refused)).toBe("out_of_stock");
+    expect((await row(first.order.id)).fulfilmentStatus).toBe("CANCELLED");
+
+    // Once the stock is free again it reopens, unpaid and accepted.
+    expect((await patchMenu(second.order.id, "cancel")).status).toBe(200);
+    expect((await patchMenu(first.order.id, "uncancel")).status).toBe(200);
+    expect(await row(first.order.id)).toMatchObject({
+      fulfilmentStatus: "CONFIRMED",
+      paymentStatus: "PENDING",
+      cancelledAt: null,
+    });
+  }, 20_000);
+
+  it("uncancel on a drop order: refused sold_out past the drop's cap; not on a frozen drop", async () => {
+    const v = await seedVendor();
+    const now = new Date();
+    const drop = await prisma.drop.create({
+      data: {
+        vendorId: v.id,
+        title: "One tray",
+        date: new Date(now.toISOString().slice(0, 10) + "T00:00:00.000Z"),
+        fulfilmentMode: "PICKUP",
+        fulfilmentStartsAt: new Date(now.getTime() + 2 * 86_400_000),
+        fulfilmentEndsAt: new Date(now.getTime() + 2 * 86_400_000 + 3_600_000),
+        closesAt: new Date(now.getTime() + 86_400_000),
+        status: "OPEN",
+        items: { create: [{ menuItemId: v.menuItems[0]!.id, priceInPaise: 1500, sortOrder: 0, maxQty: 1 }] },
+      },
+      include: { items: true },
+    });
+    const order = async () => {
+      const r = await drops.placeStorefrontOrder({
+        vendor: { id: v.id, plan: v.plan },
+        acceptPayOnDelivery: true,
+        dropId: drop.id,
+        items: [{ dropItemId: drop.items[0]!.id, qty: 1 }],
+        customerName: "Asha",
+        customerPhone: "+919876543211",
+        fulfilmentType: "PICKUP",
+        paymentMethod: "CASH",
+      });
+      if (!r.ok) throw new Error(`drop order failed: ${r.error.code}`);
+      return r.order.id;
+    };
+    const a = await order();
+    as(v);
+    expect((await patchDrop(drop.id, a, "cancel")).status).toBe(200);
+    const b = await order(); // the one slot goes to someone else
+
+    const refused = await patchDrop(drop.id, a, "uncancel");
+    expect(refused.status).toBe(409);
+    expect(await errorOf(refused)).toBe("sold_out");
+
+    expect((await patchDrop(drop.id, b, "cancel")).status).toBe(200);
+    await prisma.drop.update({ where: { id: drop.id }, data: { status: "FROZEN" } });
+    const frozen = await patchDrop(drop.id, a, "uncancel");
+    expect(frozen.status).toBe(409);
+    expect(await errorOf(frozen)).toBe("drop_frozen");
+
+    await prisma.drop.update({ where: { id: drop.id }, data: { status: "OPEN" } });
+    expect((await patchDrop(drop.id, a, "uncancel")).status).toBe(200);
+    expect((await row(a)).fulfilmentStatus).toBe("CONFIRMED");
+    // Holding its slot again: the drop is full.
+    const remaining = await drops.remainingByDropItem(prisma, v.id, drop);
+    expect(remaining.get(drop.items[0]!.id)).toBe(0);
+  }, 20_000);
 });

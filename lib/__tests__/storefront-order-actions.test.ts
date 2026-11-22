@@ -8,12 +8,14 @@ vi.mock("@/lib/drops", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/lib/drops")>()),
   markOrderPaid: vi.fn(),
   cancelOrder: vi.fn(),
+  markOrderUnpaid: vi.fn(),
+  reopenCancelledOrder: vi.fn(),
 }));
 vi.mock("@/lib/payment-proof", () => ({ deletePaymentProofInBackground: vi.fn() }));
 // lib/env reads the encryption key once at import, so a test can't set it later.
 vi.mock("@/lib/secret-box", () => ({ isSecretBoxConfigured: () => true, decryptSecret: vi.fn(), encryptSecret: vi.fn() }));
 
-import { cancelOrder, markOrderPaid } from "@/lib/drops";
+import { cancelOrder, markOrderPaid, markOrderUnpaid, reopenCancelledOrder } from "@/lib/drops";
 import { deletePaymentProofInBackground } from "@/lib/payment-proof";
 import {
   OrderActionError,
@@ -28,10 +30,12 @@ type OrderState = {
   paymentStatus: PaymentStatus;
   paymentMethod: PaymentMethod;
   paymentProofUrl?: string | null;
+  razorpayPaymentId?: string | null;
 };
 
 /** Long past its hold, on a store without Razorpay: the action rules below are about neither. */
 const ROW_DEFAULTS = {
+  razorpayPaymentId: null,
   upiRef: null,
   paymentClaimedAt: null,
   createdAt: new Date("2026-01-01T00:00:00.000Z"),
@@ -69,6 +73,8 @@ async function expectActionError(p: Promise<unknown>, status: number, code: stri
 beforeEach(() => {
   vi.mocked(markOrderPaid).mockReset().mockResolvedValue(true);
   vi.mocked(cancelOrder).mockReset().mockResolvedValue(true);
+  vi.mocked(markOrderUnpaid).mockReset().mockResolvedValue(true);
+  vi.mocked(reopenCancelledOrder).mockReset().mockResolvedValue({ ok: true });
   vi.mocked(deletePaymentProofInBackground).mockReset();
 });
 
@@ -354,5 +360,83 @@ describe("applyStorefrontOrderAction — payment screenshot", () => {
     await applyStorefrontOrderAction(asTx, { scope: scopeMenu, action: "mark_paid", dropStatus: null });
     expect(clearsProof(tx)).toBe(false);
     expect(deletePaymentProofInBackground).not.toHaveBeenCalled();
+  });
+});
+
+describe("Fix status actions (mark_unpaid, uncancel)", () => {
+  const paidUpi: OrderState = { fulfilmentStatus: "CONFIRMED", paymentStatus: "PAID", paymentMethod: "UPI" };
+  const cancelled: OrderState = { fulfilmentStatus: "CANCELLED", paymentStatus: "PENDING", paymentMethod: "UPI" };
+
+  it("mark_unpaid goes through markOrderUnpaid with the vendor and order", async () => {
+    const { asTx } = fakeTx(paidUpi);
+    await applyStorefrontOrderAction(asTx, { scope: scopeMenu, action: "mark_unpaid", dropStatus: null });
+    expect(markOrderUnpaid).toHaveBeenCalledWith(expect.anything(), { vendorId: "v1", transactionId: "o1" });
+  });
+
+  it("mark_unpaid on a Razorpay payment → 409 paid_online, nothing written", async () => {
+    const { tx, asTx } = fakeTx({ ...paidUpi, razorpayPaymentId: "pay_1" });
+    await expectActionError(
+      applyStorefrontOrderAction(asTx, { scope: scopeMenu, action: "mark_unpaid", dropStatus: null }),
+      409,
+      "paid_online",
+    );
+    expect(markOrderUnpaid).not.toHaveBeenCalled();
+    expect(tx.transaction.updateMany).not.toHaveBeenCalled();
+  });
+
+  it("mark_unpaid on an unpaid order → 409 invalid_state; a lost race too", async () => {
+    const { asTx } = fakeTx({ ...paidUpi, paymentStatus: "PENDING" });
+    await expectActionError(
+      applyStorefrontOrderAction(asTx, { scope: scopeMenu, action: "mark_unpaid", dropStatus: null }),
+      409,
+      "invalid_state",
+    );
+    vi.mocked(markOrderUnpaid).mockResolvedValueOnce(false);
+    const raced = fakeTx(paidUpi);
+    await expectActionError(
+      applyStorefrontOrderAction(raced.asTx, { scope: scopeMenu, action: "mark_unpaid", dropStatus: null }),
+      409,
+      "invalid_state",
+    );
+  });
+
+  it("uncancel goes through reopenCancelledOrder and passes its refusal on", async () => {
+    const { asTx } = fakeTx(cancelled);
+    await applyStorefrontOrderAction(asTx, { scope: scopeDrop, action: "uncancel", dropStatus: "OPEN" });
+    expect(reopenCancelledOrder).toHaveBeenCalledWith(expect.anything(), expect.objectContaining({ vendorId: "v1", transactionId: "o1" }));
+
+    for (const code of ["sold_out", "out_of_stock", "paid_online"] as const) {
+      vi.mocked(reopenCancelledOrder).mockResolvedValueOnce({ ok: false, code });
+      const next = fakeTx(cancelled);
+      await expectActionError(
+        applyStorefrontOrderAction(next.asTx, { scope: scopeDrop, action: "uncancel", dropStatus: "OPEN" }),
+        409,
+        code,
+      );
+    }
+    vi.mocked(reopenCancelledOrder).mockResolvedValueOnce({ ok: false, code: "invalid_state" });
+    const raced = fakeTx(cancelled);
+    await expectActionError(
+      applyStorefrontOrderAction(raced.asTx, { scope: scopeDrop, action: "uncancel", dropStatus: "OPEN" }),
+      409,
+      "invalid_state",
+    );
+  });
+
+  it("uncancel is refused before any lock on a frozen drop, a live order or a Razorpay payment", async () => {
+    const cases: [OrderState, "OPEN" | "FROZEN", string][] = [
+      [cancelled, "FROZEN", "drop_frozen"],
+      [{ ...cancelled, fulfilmentStatus: "CONFIRMED" }, "OPEN", "invalid_state"],
+      [{ ...cancelled, paymentStatus: "REFUNDED", razorpayPaymentId: "pay_1" }, "OPEN", "paid_online"],
+    ];
+    for (const [state, dropStatus, code] of cases) {
+      const { asTx } = fakeTx(state);
+      await expectActionError(
+        applyStorefrontOrderAction(asTx, { scope: scopeDrop, action: "uncancel", dropStatus }),
+        409,
+        code,
+      );
+    }
+    expect(reopenCancelledOrder).not.toHaveBeenCalled();
   });
 });

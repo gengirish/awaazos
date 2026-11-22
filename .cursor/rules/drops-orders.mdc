@@ -139,6 +139,15 @@ next step (`primaryOrderAction`: Accept order → Mark ready / Out for delivery 
 first once the buyer says it arrived); everything else is in the card's ⋯ menu. Search covers every stage. The
 summary is one line: Paid · To collect, plus "N payments to check" when a claim waits.
 
+**Fix status** (mistake fixes, per order only, never bulk or the big button): the card's ⋯ menu lists
+`fixStatusActions()` (`lib/drops-board.ts`, built on `availableOrderActions`), each behind an in-app confirm:
+`unready`, `undeliver`, `mark_unpaid` ("Not paid yet": `markOrderUnpaid` reverses exactly what `markOrderPaid`
+booked, PAID → PENDING, `paidAt`, DailySummary on the `paidAt` day; the PLACED → CONFIRMED step stays) and
+`uncancel` ("Reopen order": `reopenCancelledOrder`, not on a frozen drop). Neither ever touches an order Razorpay paid
+(`razorpayPaymentId`, 409 `paid_online`). Reopening holds stock again, so it takes placement's locks in placement's
+order (drop row, tracked items, sizes) and refuses `sold_out` (drop) / `out_of_stock` (menu). A paid order comes back
+exactly (REFUNDED → PAID, revenue re-credited); an unpaid one comes back CONFIRMED (PLACED vs CONFIRMED isn't stored).
+
 Orders board freshness: order placement and board actions bump one per-vendor Upstash counter
 (`bumpOrderSignal` in `lib/drops-signal.ts`, fire-and-forget). Instant alerts come from Web Push;
 board polling is only a fallback, so the board polls every **6 min** (`BOARD_POLL_MS`), only while
@@ -233,7 +242,7 @@ that mixes sources is split per route on the client (`groupIdsByDrop`). One
 transaction per order, run in sequence, each through `applyStorefrontOrderAction` with the
 single-order compound scope, so one stale order never rolls back the rest. Response
 `{ data: { succeeded, failed: [{ id, error }], orders } }`; unknown and cross-tenant ids are both
-`not_found`. Cancel and undeliver stay per-order. Card buttons and bulk eligibility share
+`not_found`. Cancel and the Fix status actions stay per-order. Card buttons and bulk eligibility share
 `availableOrderActions()` (`lib/drops-board.ts`) — keep them on that one function.
 
 DB-backed drops tests are opt-in: `npm run test:drops:db` (needs a throwaway `DATABASE_URL`).
