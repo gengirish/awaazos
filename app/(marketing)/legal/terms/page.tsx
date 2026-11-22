@@ -17,7 +17,7 @@ export default function TermsPage() {
   return (
     <>
       <h1>Terms of Service</h1>
-      <p>Last updated: 13 November 2026</p>
+      <p>Last updated: 22 November 2026</p>
 
       <h2>Acceptance</h2>
       <p>By using {BRAND_NAME}, you agree to these Terms.</p>

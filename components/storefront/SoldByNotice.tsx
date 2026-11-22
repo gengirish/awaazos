@@ -13,7 +13,7 @@ export function SoldByNotice({ storeName }: { storeName: string }) {
       Sold by {storeName}. {BRAND_NAME} provides the ordering software only.{" "}
       <Link
         href="/legal/terms"
-        className="inline-flex min-h-11 items-center font-medium underline underline-offset-2 hover:text-foreground"
+        className="font-medium underline underline-offset-2 hover:text-foreground"
       >
         Terms
       </Link>
