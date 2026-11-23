@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { productShareCardPath, shareCardMetadata, shareCardVersion, storeShareCardPath } from "@/lib/share-card";
+import {
+  dropShareCardPath,
+  productShareCardPath,
+  shareCardMetadata,
+  shareCardVersion,
+  storeShareCardPath,
+} from "@/lib/share-card";
 
 describe("share card", () => {
   it("version changes with what the card draws and is stable otherwise", () => {
@@ -14,6 +20,8 @@ describe("share card", () => {
     expect(storeShareCardPath("asha")).toBe("/s/asha/share-card");
     expect(storeShareCardPath("asha", "abc")).toBe("/s/asha/share-card?v=abc");
     expect(productShareCardPath("asha", "it 1", "abc")).toBe("/s/asha/p/it%201/share-card?v=abc");
+    expect(dropShareCardPath("asha", "d 1", "abc")).toBe("/s/asha/preorder/d%201/share-card?v=abc");
+    expect(dropShareCardPath("asha", "d1")).toBe("/s/asha/preorder/d1/share-card");
   });
 
   it("sets the same image for Open Graph and X", () => {

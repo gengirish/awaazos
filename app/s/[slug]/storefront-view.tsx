@@ -70,6 +70,7 @@ import { storedHighlights, type Highlight } from "@/lib/item-highlights";
 import { MAX_ITEM_PHOTOS, photoUrls } from "@/lib/item-photos";
 import { allSizesSoldOut, variantPriceRange, variantPricePaise, type StoreSize } from "@/lib/item-variants";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
+import { findFocusedDrop } from "@/lib/storefront-drop";
 import { offersForItems, resolveOffers, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
 import { loadOfferRules, type OfferSource } from "@/lib/offers-server";
 import { orderChannelFor, parseOrderSrc } from "@/lib/order-channel";
@@ -132,6 +133,11 @@ import { shareCardMetadata, shareCardVersion, storeShareCardPath } from "@/lib/s
  * every request (`effectiveDropStatus`), never by a timer — hence force-dynamic,
  * and stock counts are recomputed per render. The order write path is
  * app/api/s/[slug]/orders, held to the same gate.
+ *
+ * A pre-order link (/s/<slug>/preorder/<dropId>, `focusDropId`) renders only
+ * that drop: no other drops, no everyday menu, plus "See everything from …".
+ * Which drop it is comes from `findFocusedDrop` (lib/storefront-drop.ts) among
+ * the drops read here; a miss shows the whole store with a one-line notice.
  *
  * "Order from menu" (`acceptMenuOrders`): the everyday menu becomes orderable
  * (MenuOrder: steppers, cart, checkout) via app/api/s/[slug]/menu-orders, held
@@ -832,21 +838,33 @@ export async function StorefrontView(props: {
   searchParams: Promise<{ src?: string | string[] }>;
   /** `/s/<slug>/p/<menuItemId>`: the item whose detail sheet opens on load (docs/PRODUCT_PAGE_PLAN.md step 2). */
   openItemId?: string;
+  /**
+   * `/s/<slug>/preorder/<dropId>` (docs/DROP_LINK_PLAN.md): show only this drop.
+   * One the page wouldn't list (lib/storefront-drop.ts) shows the whole store with a notice.
+   */
+  focusDropId?: string;
 }) {
   const vendor = await loadStorefront(props.slug);
   if (!vendor) notFound();
 
   const now = new Date();
+  // A pre-order link: that drop alone, no other drops and no everyday menu.
+  const focusDrop = props.focusDropId === undefined ? null : findFocusedDrop(vendor.drops, props.focusDropId, now);
+  const focusMissed = props.focusDropId !== undefined && !focusDrop;
+  const pageDrops = focusDrop ? [focusDrop] : vendor.drops;
   // An open drop with showEverydayMenu=false takes over the page: no menu rows,
   // pills, counts, "Order now" or menu cart — exactly as if the menu were empty.
   // Same server check placeMenuOrder uses, so the page and checkout always agree.
+  // A pre-order link leaves the menu out the same way (`menuOff`); the menu order
+  // route doesn't care, as the menu is one link away.
   const menuHidden = await everydayMenuHiddenByDrop(prisma, vendor.id, now);
+  const menuOff = menuHidden || focusDrop !== null;
   // In a food store, items without a photo get a drawing of the dish when one
   // matches (lib/food-images.ts); display only, nothing is stored. Any other
   // store keeps the emoji: "Tulsi Tea" is a product, not a cup of chai.
   const { foodArt, orderNoteExample } = storeVocabulary(vendor.stallType);
   // Stock columns stay out of the rows (see loadItemStock below).
-  const menuItems = (menuHidden ? [] : vendor.menuItems).map(
+  const menuItems = (menuOff ? [] : vendor.menuItems).map(
     ({ stockQty: _q, stockCountedAt: _c, lowStockAt: _l, variants: _v, images, highlights, foodType, ...item }) => ({
       ...item,
       highlights: storedHighlights(highlights),
@@ -879,13 +897,13 @@ export async function StorefrontView(props: {
   // Rendered here, not by a third-party image URL: no network hop for the buyer,
   // and the payee VPA never leaves our server.
   // Needs items on the page: with nothing to buy there is nothing to pay for.
-  const showOpenAmountQr = !!upiLink && !menuOrdering && !menuHidden && categories.length > 0;
+  const showOpenAmountQr = !!upiLink && !menuOrdering && !menuOff && categories.length > 0;
   const qrLarge = upiLink && showOpenAmountQr ? await qrSvgDataUrl(upiLink, 220) : "";
   // Everyday-menu rows only take orders (and carry row ids) with menu ordering on.
   const orderableMenuIds = new Set(menuOrdering ? menuItems.map((i) => i.id) : []);
   // One read covers both channels; a store with nothing orderable skips it.
   const offerSource: OfferSource =
-    menuOrdering || vendor.drops.length > 0
+    menuOrdering || pageDrops.length > 0
       ? await loadOfferRules(prisma, vendor.id, ["MENU", "DROP"])
       : { rules: [], menuItems: [] };
   // Product stock for every tracked item the page can sell (one read; none when nothing is tracked).
@@ -894,8 +912,8 @@ export async function StorefrontView(props: {
     loadItemStock(
       vendor.id,
       [
-        ...(menuHidden ? [] : vendor.menuItems),
-        ...vendor.drops.flatMap((d) => d.items.map((i) => ({ ...i.menuItem, id: i.menuItemId }))),
+        ...(menuOff ? [] : vendor.menuItems),
+        ...pageDrops.flatMap((d) => d.items.map((i) => ({ ...i.menuItem, id: i.menuItemId }))),
       ],
       giftIds,
       now,
@@ -904,8 +922,8 @@ export async function StorefrontView(props: {
     loadStoreSizes(
       vendor.id,
       [
-        ...(menuHidden ? [] : vendor.menuItems),
-        ...vendor.drops.flatMap((d) =>
+        ...(menuOff ? [] : vendor.menuItems),
+        ...pageDrops.flatMap((d) =>
           d.items.map((i) => ({ id: i.id, priceInPaise: i.priceInPaise, variants: i.menuItem.variants })),
         ),
       ],
@@ -942,7 +960,7 @@ export async function StorefrontView(props: {
     : [];
   const [dropViews, customer, isStaff, ratings, orderedCounts] = await Promise.all([
     buildDropViews(
-      vendor.drops,
+      pageDrops,
       now,
       (id) => (orderableMenuIds.has(id) ? menuItemAnchor(id) : null),
       offerSource,
@@ -1317,6 +1335,11 @@ export async function StorefrontView(props: {
                 That item isn&apos;t on sale right now. Here is everything else.
               </p>
             ) : null}
+            {focusMissed ? (
+              <p role="status" className="mb-6 rounded-xl border border-border/60 bg-background px-3 py-2 text-sm text-muted-foreground">
+                This pre-order isn&apos;t taking orders. Here is what&apos;s on now.
+              </p>
+            ) : null}
             {dropViews.length > 0 ? (
               <div id="drops" className="mb-10 scroll-mt-20 space-y-6">
                 <h2 className="sr-only">Pre-orders</h2>
@@ -1343,6 +1366,15 @@ export async function StorefrontView(props: {
                     />
                   </Searchable>
                 ))}
+                {focusDrop ? (
+                  <Link
+                    href={`/s/${encodeURIComponent(vendor.slug)}`}
+                    className="inline-flex min-h-11 items-center gap-1.5 rounded-full border border-border/70 bg-background px-4 text-sm font-semibold text-foreground shadow-xs transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+                  >
+                    <Store className="h-4 w-4 shrink-0" aria-hidden="true" />
+                    See everything from {vendor.name}
+                  </Link>
+                ) : null}
               </div>
             ) : null}
 

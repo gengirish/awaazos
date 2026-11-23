@@ -27,7 +27,9 @@ import { SHARE_CARD_CACHE_CONTROL, SHARE_CARD_SIZE as size } from "@/lib/share-c
  * online (`isAvailable && showOnline`, popular first) and "Order online ·
  * Pickup/Delivery"; else "See the menu". The menu variant is never used while
  * an open drop hides the everyday menu (`everydayMenuHiddenByDrops`, same rule
- * as the page) — that drop is the card.
+ * as the page) — that drop is the card. A drop shows its first four items and
+ * "+N more". A pre-order link (/s/<slug>/preorder/<dropId>) draws its own drop
+ * with the same layout (`renderShareCard`), never the store's first one.
  *
  * The Prisma `select` is a hand-written allowlist: never `phone` / `email`.
  *
@@ -41,9 +43,35 @@ import { SHARE_CARD_CACHE_CONTROL, SHARE_CARD_SIZE as size } from "@/lib/share-c
 
 const RESPONSE = { ...size, headers: { "Cache-Control": SHARE_CARD_CACHE_CONTROL } };
 
-const MAX_ITEMS = 4;
+/** Item rows a card draws; more than this reads "+N more". */
+export const SHARE_CARD_MAX_ITEMS = 4;
+const MAX_ITEMS = SHARE_CARD_MAX_ITEMS;
 
-async function loadCard(slug: string, now: Date) {
+/** The drop a card draws: the store's first open one, or one pre-order link's drop. */
+export type ShareCardDrop = {
+  title: string;
+  closesAt: Date;
+  fulfilmentMode: string;
+  fulfilmentStartsAt: Date;
+  fulfilmentEndsAt: Date;
+  /** The first SHARE_CARD_MAX_ITEMS, in the drop's order. */
+  items: { priceInPaise: number; menuItem: { name: string } }[];
+  /** All of the drop's items, for "+N more". */
+  itemCount: number;
+  /** Past its cut-off (a pre-order link within the closed grace window). */
+  closed: boolean;
+};
+
+export type ShareCardData = {
+  name: string;
+  city: string | null;
+  tagline: string | null;
+  logo: string | null;
+  drop: ShareCardDrop | null;
+  menuOrdering: { mode: string; items: { name: string; priceInPaise: number }[] } | null;
+};
+
+async function loadCard(slug: string, now: Date): Promise<ShareCardData | null> {
   const vendor = await prisma.vendor.findFirst({
     where: { slug, isActive: true, settings: { is: { publishStorefront: true } } },
     select: {
@@ -78,6 +106,7 @@ async function loadCard(slug: string, now: Date) {
             take: MAX_ITEMS,
             select: { priceInPaise: true, menuItem: { select: { name: true } } },
           },
+          _count: { select: { items: true } },
         },
       },
     },
@@ -86,7 +115,8 @@ async function loadCard(slug: string, now: Date) {
 
   const live = vendor.drops.filter((d) => effectiveDropStatus(d, now) === "OPEN");
   const upcoming = vendor.drops.filter((d) => effectiveDropStatus(d, now) === "SCHEDULED");
-  const drop = live[0] ?? upcoming[0] ?? null; // already sorted by closesAt
+  const first = live[0] ?? upcoming[0] ?? null; // already sorted by closesAt
+  const drop: ShareCardDrop | null = first ? { ...first, itemCount: first._count.items, closed: false } : null;
   const menuHidden = everydayMenuHiddenByDrops(vendor.drops, now);
   const menuOrdering =
     !drop && !menuHidden && (vendor.settings?.acceptMenuOrders ?? false) && vendor.menuItems.length > 0
@@ -146,7 +176,7 @@ function menuOrderLine(mode: string): string {
   return `Order online · ${how}`;
 }
 
-function ItemRows({ items }: { items: { name: string; priceInPaise: number }[] }) {
+function ItemRows({ items, more = 0 }: { items: { name: string; priceInPaise: number }[]; more?: number }) {
   return (
     <div style={{ display: "flex", flexDirection: "column" }}>
       {items.map((it, i) => (
@@ -165,6 +195,9 @@ function ItemRows({ items }: { items: { name: string; priceInPaise: number }[] }
           <Price paise={it.priceInPaise} fontSize={34} />
         </div>
       ))}
+      {more > 0 ? (
+        <div style={{ display: "flex", fontSize: 26, color: C.muted, paddingTop: 8 }}>{`+${more} more`}</div>
+      ) : null}
     </div>
   );
 }
@@ -185,14 +218,21 @@ function GenericCard() {
 
 export async function storeShareCard(slug: string): Promise<Response> {
   const now = new Date();
-  let card: Awaited<ReturnType<typeof loadCard>> = null;
+  let card: ShareCardData | null = null;
   try {
     card = await loadCard(slug, now);
   } catch (err) {
     // A preview image must never 500 — fall back to the generic card.
     console.error("[og] storefront card load failed", err instanceof Error ? err.message : "unknown");
   }
+  return renderShareCard(card);
+}
 
+/**
+ * Draws a card; null is the generic one. Shared with the pre-order link's card
+ * (app/s/[slug]/preorder/[dropId]/share-card), which passes one drop and no menu.
+ */
+export function renderShareCard(card: ShareCardData | null): Response {
   if (!card) return new ImageResponse(<GenericCard />, RESPONSE);
 
   const { drop, menuOrdering } = card;
@@ -233,7 +273,10 @@ export async function storeShareCard(slug: string): Promise<Response> {
         </div>
 
         {drop ? (
-          <ItemRows items={drop.items.map((it) => ({ name: it.menuItem.name, priceInPaise: it.priceInPaise }))} />
+          <ItemRows
+            items={drop.items.map((it) => ({ name: it.menuItem.name, priceInPaise: it.priceInPaise }))}
+            more={drop.itemCount - drop.items.length}
+          />
         ) : menuOrdering ? (
           <ItemRows items={menuOrdering.items} />
         ) : (
@@ -254,7 +297,9 @@ export async function storeShareCard(slug: string): Promise<Response> {
                   padding: "8px 16px",
                 }}
               >
-                {`Order by ${formatIstDayLabel(drop.closesAt)}, ${formatIstTime(drop.closesAt)}`}
+                {drop.closed
+                  ? "Orders closed"
+                  : `Order by ${formatIstDayLabel(drop.closesAt)}, ${formatIstTime(drop.closesAt)}`}
               </div>
               <div style={{ display: "flex", fontSize: 26, color: C.muted, marginTop: 10 }}>
                 {`${fulfilmentModeLabel(drop.fulfilmentMode)} ${formatFulfilmentWindow(drop.fulfilmentStartsAt, drop.fulfilmentEndsAt)}`}

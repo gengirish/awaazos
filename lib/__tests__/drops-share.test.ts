@@ -5,6 +5,7 @@ import {
   buildTaggedWhatsAppShareUrl,
   buildWhatsAppShareUrl,
   formatShareItemList,
+  preorderLinkPath,
 } from "@/lib/drops-share";
 import { istToUtc } from "@/lib/drops-time";
 
@@ -97,5 +98,12 @@ describe("buildTaggedWhatsAppShareUrl", () => {
   it("leaves a message without the link alone", () => {
     expect(decode(buildTaggedWhatsAppShareUrl("Order now", "https://x.test/s/sam"))).toBe("Order now");
     expect(decode(buildTaggedWhatsAppShareUrl("Order now", ""))).toBe("Order now");
+  });
+});
+
+describe("preorderLinkPath", () => {
+  it("is the drop's own store link, escaped", () => {
+    expect(preorderLinkPath("ashas-kitchen", "cm1abc")).toBe("/s/ashas-kitchen/preorder/cm1abc");
+    expect(preorderLinkPath("a b", "d/1")).toBe("/s/a%20b/preorder/d%2F1");
   });
 });

@@ -5,8 +5,9 @@ import type { Metadata } from "next";
 import { BRAND_NAME } from "@/lib/brand";
 
 /**
- * Link-preview cards for store and product links (what WhatsApp and Instagram show
- * when a seller shares /s/<slug> or /s/<slug>/p/<itemId>).
+ * Link-preview cards for store, product and pre-order links (what WhatsApp and
+ * Instagram show when a seller shares /s/<slug>, /s/<slug>/p/<itemId> or
+ * /s/<slug>/preorder/<dropId>).
  *
  * Why these aren't `opengraph-image.tsx` files: Next serves a file-convention image
  * at a URL whose hash comes from the source file, never the store's data, with
@@ -41,6 +42,10 @@ export function storeShareCardPath(slug: string, version?: string): string {
 
 export function productShareCardPath(slug: string, itemId: string, version?: string): string {
   return withVersion(`/s/${encodeURIComponent(slug)}/p/${encodeURIComponent(itemId)}/share-card`, version);
+}
+
+export function dropShareCardPath(slug: string, dropId: string, version?: string): string {
+  return withVersion(`/s/${encodeURIComponent(slug)}/preorder/${encodeURIComponent(dropId)}/share-card`, version);
 }
 
 /** The `openGraph.images` / `twitter` metadata for one card URL. */
