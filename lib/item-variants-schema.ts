@@ -52,6 +52,12 @@ const variantInputSchema = z
     lowStockAt: stockCount.nullable().optional(),
     /** This size's own cost; null = the item's; absent leaves it. MANAGER and up (lib/item-cost.ts). */
     costInRupees: costInRupeesSchema.optional(),
+    /**
+     * One of the item's photos for this option (rule 8); null = none; absent leaves it.
+     * Not checked as a URL here (a demo store's photos are site paths): the route
+     * stores null for anything that isn't one of the item's photos.
+     */
+    imageUrl: z.string().min(1).max(2048).nullable().optional(),
   })
   .strict();
 

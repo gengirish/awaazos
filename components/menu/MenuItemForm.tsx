@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import Image from "next/image";
 import { ChevronDown, Trash2 } from "lucide-react";
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -35,6 +35,7 @@ import {
 } from "@/components/ui/responsive-dialog";
 import { paiseToRupees } from "@/lib/currency";
 import { normaliseHighlights } from "@/lib/item-highlights";
+import type { PhotoRef } from "@/lib/item-photos";
 import {
   sizeDraftsFrom,
   sizeDraftsToBody,
@@ -189,6 +190,11 @@ export function MenuItemForm({
   const costInputRef = useRef<HTMLInputElement>(null);
   // Sizes or colours (lib/item-variants-form.ts): saved after the item, by PUT /api/menu/[id]/variants.
   const [sizes, setSizes] = useState<SizeDraft[]>([]);
+  // The item's photos as ItemPhotosField last loaded them: each colour can pick one (lib/item-variants.ts rule 8).
+  // Kept with the item's id, so another item's list is never offered while this one's loads.
+  const [loadedPhotos, setLoadedPhotos] = useState<{ itemId: string; photos: PhotoRef[] } | null>(null);
+  const itemPhotos = item && loadedPhotos?.itemId === item.id ? loadedPhotos.photos : undefined;
+  const onItemPhotos = useCallback((photos: PhotoRef[], itemId: string) => setLoadedPhotos({ itemId, photos }), []);
   // Highlights, details and the food mark (lib/item-highlights.ts): sent with the item.
   const [detail, setDetail] = useState<ItemDetailDraft>(() => itemDetailDraftFrom(null));
   const [detailError, setDetailError] = useState<string | null>(null);
@@ -368,7 +374,7 @@ export function MenuItemForm({
     if (!stock) return;
     let sizesBody: VariantsBody | null = null;
     if (showSizes && (sizes.length > 0 || hadSizes)) {
-      const built = sizeDraftsToBody(sizes, { cost: canSeeCost });
+      const built = sizeDraftsToBody(sizes, { cost: canSeeCost, photos: itemPhotos?.map((p) => p.url) });
       if ("error" in built) {
         setSizeError(built.error);
         return;
@@ -640,7 +646,7 @@ export function MenuItemForm({
                 )}
               />
               {isEdit && item ? (
-                <ItemPhotosField itemId={item.id} itemName={item.name} onChanged={onSaved} />
+                <ItemPhotosField itemId={item.id} itemName={item.name} onChanged={onSaved} onPhotos={onItemPhotos} />
               ) : (
                 <div className="space-y-2" role="group" aria-labelledby="menu-item-photo-label">
                   <p className="text-sm font-medium leading-none" id="menu-item-photo-label">
@@ -1006,6 +1012,7 @@ export function MenuItemForm({
                   }}
                   error={sizeError}
                   showCost={canSeeCost}
+                  photos={isEdit ? itemPhotos : undefined}
                 />
               ) : null}
               <FormField

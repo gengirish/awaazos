@@ -270,9 +270,9 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "edit-menu",
     group: "menu",
     title: "Add a {item} or change a price",
-    steps: "Tap Add item for a new {item}, or Edit on a {item} to change its name, price, photos, description and category. An {item} can have up to 6 photos: the first is the cover, and buyers swipe through the rest when they open it. Highlights (like Serves or Fabric) and Details add more for buyers who open it; a food store can also mark each item veg, non-veg or egg.",
+    steps: "Tap Add item for a new {item}, or Edit on a {item} to change its name, price, photos, description and category. An {item} can have up to 6 photos: the first is the cover, and buyers swipe through the rest when they open it. A {item} sold in sizes or colours can show a photo for each colour: under each colour, tap the photo buyers should see when they pick it. Highlights (like Serves or Fabric) and Details add more for buyers who open it; a food store can also mark each item veg, non-veg or egg.",
     nav: "menu",
-    keywords: "item rate cost picture image dish product pack size unit description",
+    keywords: "item rate cost picture image dish product pack size colour color unit description",
   },
   {
     id: "voice-menu",

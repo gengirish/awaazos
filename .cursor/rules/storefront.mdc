@@ -66,6 +66,8 @@ Rules every one of them follows:
   (`ItemPhotoGallery`, scroll-snap). The item form saves each change at once (`GET`/`POST /api/menu/[id]/images`,
   `DELETE …/images/[imageId]` with `cover` for the cover, `PUT …/images/order`, CASHIER, compound scope); every
   change rewrites the whole list under a row lock on the item, and removing the cover moves the next photo up.
+  A colour may point at one of these photos (`ItemVariant.imageUrl`, `lib/item-variants.ts` rule 8): picking it on the
+  store shows that photo; removing the photo clears the link.
 - **Highlights, details and the veg mark** (`lib/item-highlights.ts`, zod-free; request schemas in `lib/zod-menu.ts`):
   `MenuItem.highlights` (≤ 6 label / value pairs, refused rather than cut, read leniently by `storedHighlights`),
   `details` (≤ 1000 chars, line breaks kept; `description` keeps its one-line job) and `foodType` (`VEG | NON_VEG |

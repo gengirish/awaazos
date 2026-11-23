@@ -68,7 +68,7 @@ import { whatsappCommunityLabel, whatsappCommunityLink } from "@/lib/whatsapp-co
 import { stockLeftByMenuItem, stockLeftByVariant, type TrackedItem } from "@/lib/inventory-server";
 import { storedHighlights, type Highlight } from "@/lib/item-highlights";
 import { MAX_ITEM_PHOTOS, photoUrls } from "@/lib/item-photos";
-import { allSizesSoldOut, variantPriceRange, variantPricePaise, type StoreSize } from "@/lib/item-variants";
+import { allSizesSoldOut, variantPhoto, variantPriceRange, variantPricePaise, type StoreSize } from "@/lib/item-variants";
 import { everydayMenuHiddenByDrop } from "@/lib/menu-orders";
 import { findFocusedDrop } from "@/lib/storefront-drop";
 import { offersForItems, resolveOffers, withGiftsThatFit, type ResolvedOffer } from "@/lib/offers";
@@ -220,7 +220,15 @@ const FACT_ICON: Record<StoreFactKind, typeof Store> = {
  */
 /** Photos after the cover for the detail sheet; none without a seller's cover (lib/item-photos.ts rule 3). */
 function morePhotosOf(cover: string | null, images: { url: string }[]): string[] {
-  return photoUrls(cover, images.map((p) => p.url)).slice(1);
+  return allPhotosOf(cover, images).slice(1);
+}
+
+/** Every photo the page can show for an item, cover first (lib/item-photos.ts). */
+function allPhotosOf(cover: string | null, images: { url: string }[]): string[] {
+  return photoUrls(
+    cover,
+    images.map((p) => p.url),
+  );
 }
 
 export const loadStorefront = cache(async (slug: string) => {
@@ -321,6 +329,8 @@ export const loadStorefront = cache(async (slug: string) => {
                       stockQty: true,
                       stockCountedAt: true,
                       lowStockAt: true,
+                      // The option's photo (lib/item-variants.ts rule 8), checked against the item's photos.
+                      imageUrl: true,
                     },
                   },
                 },
@@ -365,6 +375,8 @@ export const loadStorefront = cache(async (slug: string) => {
               stockQty: true,
               stockCountedAt: true,
               lowStockAt: true,
+              // The option's photo (lib/item-variants.ts rule 8), checked against the item's photos.
+              imageUrl: true,
             },
           },
         },
@@ -509,12 +521,16 @@ async function loadItemStock(
 /**
  * Each item's sizes / colours as buyers see them (lib/item-variants.ts): the
  * available ones, priced, with buyer-facing stock from one grouped
- * `stockLeftByVariant` read (none when no variant is tracked). Items without
- * variants are absent.
+ * `stockLeftByVariant` read (none when no variant is tracked), and each one's
+ * photo while it is still one of the item's (rule 8). Items without variants
+ * are absent.
  */
 async function loadStoreSizes(
   vendorId: string,
-  items: readonly Pick<StorefrontVendor["menuItems"][number], "id" | "priceInPaise" | "variants">[],
+  items: readonly (Pick<StorefrontVendor["menuItems"][number], "id" | "priceInPaise" | "variants"> & {
+    /** The item's photos, cover first. */
+    photos: readonly string[];
+  })[],
   now: Date,
 ): Promise<Map<string, StoreSize[]>> {
   const out = new Map<string, StoreSize[]>();
@@ -538,6 +554,7 @@ async function loadStoreSizes(
             label: v.label,
             priceInPaise: variantPricePaise(item.priceInPaise, v),
             stock: l === undefined ? null : storefrontStock(l, v.lowStockAt),
+            photoUrl: variantPhoto(v.imageUrl, item.photos),
           };
         }),
     );
@@ -922,9 +939,14 @@ export async function StorefrontView(props: {
     loadStoreSizes(
       vendor.id,
       [
-        ...(menuOff ? [] : vendor.menuItems),
+        ...(menuOff ? [] : vendor.menuItems).map((i) => ({ ...i, photos: allPhotosOf(i.imageUrl, i.images) })),
         ...pageDrops.flatMap((d) =>
-          d.items.map((i) => ({ id: i.id, priceInPaise: i.priceInPaise, variants: i.menuItem.variants })),
+          d.items.map((i) => ({
+            id: i.id,
+            priceInPaise: i.priceInPaise,
+            variants: i.menuItem.variants,
+            photos: allPhotosOf(i.menuItem.imageUrl, i.menuItem.images),
+          })),
         ),
       ],
       now,

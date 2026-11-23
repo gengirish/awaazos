@@ -431,7 +431,10 @@ export function MenuOrder(props: MenuOrderProps) {
         />
       ) : null;
     const sale = salePriceFor(offers, item.id, shownPrice);
+    // The buyer's own pick only: before one, the row keeps the cover (lib/item-variants.ts rule 8).
+    const photo = size && picked[item.id] === size.id ? size.photoUrl : null;
     return {
+      photo,
       itemSoldOut,
       soldOut,
       shownPrice,
@@ -501,7 +504,7 @@ export function MenuOrder(props: MenuOrderProps) {
                     className="flex scroll-mt-20 flex-col gap-2 rounded-2xl border border-border/60 bg-background p-2.5 shadow-xs target:bg-primary/8"
                   >
                     <ItemPhoto
-                      src={item.imageUrl}
+                      src={v.photo ?? item.imageUrl}
                       emoji={item.emoji}
                       name={item.name}
                       size="tile"
@@ -523,7 +526,7 @@ export function MenuOrder(props: MenuOrderProps) {
                     className="flex scroll-mt-20 items-center gap-3 px-3 py-3 target:bg-primary/8 sm:gap-4 sm:px-4"
                   >
                     <ItemPhoto
-                      src={item.imageUrl}
+                      src={v.photo ?? item.imageUrl}
                       emoji={item.emoji}
                       name={item.name}
                       size="row"
@@ -563,6 +566,7 @@ export function MenuOrder(props: MenuOrderProps) {
           emoji={detailItem.emoji}
           imageUrl={detailItem.imageUrl}
           morePhotos={detailItem.morePhotos}
+          focusPhoto={detail.photo}
           details={detailItem.details}
           highlights={detailItem.highlights}
           foodType={detailItem.foodType}

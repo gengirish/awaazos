@@ -1,5 +1,7 @@
 "use client";
 
+import Image from "next/image";
+
 import { RadioOption } from "@/components/ui/radio-option";
 import type { StoreSize } from "@/lib/item-variants";
 
@@ -11,6 +13,8 @@ const SIZE_OPTIONS_MAX = 5;
  * SIZE_OPTIONS_MAX are a row of options, more a native drop-down (the phone's
  * own picker, and no extra script on the store page). A sold-out size can't be
  * picked and says so in words. Under it: which sizes are already in the cart.
+ * An option with its own photo (lib/item-variants.ts rule 8) shows it small
+ * beside its name; the list that owns the picker shows it big once picked.
  */
 export function SizePicker({
   itemId,
@@ -50,17 +54,33 @@ export function SizePicker({
                   checked={v.id === pickedId}
                   disabled={soldOut}
                   onChange={() => onPick(v.id)}
+                  // The first size starts checked, and tapping a checked radio fires no change:
+                  // the click still counts as the buyer's pick (its photo shows, rule 8).
+                  onClick={() => onPick(v.id)}
                   label={
-                    soldOut ? (
-                      <>
-                        <span className="line-through" aria-hidden="true">
-                          {v.label}
-                        </span>
-                        <span className="sr-only">{`${v.label}, sold out`}</span>
-                      </>
-                    ) : (
-                      v.label
-                    )
+                    <span className="flex items-center gap-1.5">
+                      {v.photoUrl ? (
+                        // Decorative: the option's name says which it is; picking it shows the photo big.
+                        <Image
+                          src={v.photoUrl}
+                          alt=""
+                          width={28}
+                          height={28}
+                          sizes="28px"
+                          className="h-7 w-7 shrink-0 rounded-md object-cover ring-1 ring-border/60"
+                        />
+                      ) : null}
+                      {soldOut ? (
+                        <>
+                          <span className="line-through" aria-hidden="true">
+                            {v.label}
+                          </span>
+                          <span className="sr-only">{`${v.label}, sold out`}</span>
+                        </>
+                      ) : (
+                        v.label
+                      )}
+                    </span>
                   }
                 />
               );

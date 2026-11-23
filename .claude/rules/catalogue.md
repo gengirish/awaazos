@@ -108,7 +108,11 @@ it is this vendor's size of that item (live sale otherwise 400 `size_not_found`;
 line without it), never refuses over stock or a missing size, and voice leaves sized items for a tap. Drops sell
 by size too (rule 7): the line is priced from the size, else the drop; `maxQty` / `perOrderLimit` cover all sizes
 of the item; each tracked size caps itself (`sold_out` + `variantId`); the packing list splits each item by size.
-The store page's picker is `components/storefront/SizePicker.tsx` (menu and drops). Not yet: free gifts with sizes
+The store page's picker is `components/storefront/SizePicker.tsx` (menu and drops). A colour can have its own photo
+(rule 8, `ItemVariant.imageUrl`): one of the item's photos by URL, picked per row in the item form once photos exist;
+the PUT stores null for any other URL, removing a photo clears it (`writePhotos`), the store re-checks it
+(`variantPhoto`). Picking it shows that photo on the row or tile and turns the detail sheet's gallery to it; the
+option shows it small. POS, receipts and link previews keep the cover. Not yet: free gifts with sizes
 (that offer is skipped), order again.
 
 **Cost price** (rules in the header of `lib/item-cost.ts`, plan in `docs/COST_AND_PROFIT_PLAN.md`): optional

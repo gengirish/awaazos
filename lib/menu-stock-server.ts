@@ -79,4 +79,6 @@ const VARIANT_ROW_SELECT = {
   stockCountedAt: true,
   lowStockAt: true,
   costInPaise: true,
+  // The option's photo (lib/item-variants.ts rule 8).
+  imageUrl: true,
 } as const;

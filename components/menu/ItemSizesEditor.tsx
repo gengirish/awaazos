@@ -1,10 +1,13 @@
 "use client";
 
 import { Plus, X } from "lucide-react";
+import Image from "next/image";
 import { useId } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { RadioOption } from "@/components/ui/radio-option";
+import type { PhotoRef } from "@/lib/item-photos";
 import { MAX_VARIANTS_PER_ITEM, VARIANT_LABEL_MAX } from "@/lib/item-variants";
 import { newSizeDraft, type SizeDraft, type SizeDraftError } from "@/lib/item-variants-form";
 
@@ -12,21 +15,29 @@ import { newSizeDraft, type SizeDraft, type SizeDraftError } from "@/lib/item-va
  * The item form's "Sizes or colours" rows (lib/item-variants-form.ts): a name,
  * an optional price and an optional count per row. Controlled; the form saves
  * them after the item itself.
+ *
+ * With the item's photos known (an existing item), each row also picks which
+ * photo buyers see for it (lib/item-variants.ts rule 8): "None" or one of the
+ * photos, as small pictures to tap.
  */
 export function ItemSizesEditor({
   drafts,
   onChange,
   error,
   showCost = false,
+  photos,
 }: {
   drafts: SizeDraft[];
   onChange: (next: SizeDraft[]) => void;
   error: SizeDraftError | null;
   /** A cost per row, for MANAGER and up (lib/item-cost.ts). */
   showCost?: boolean;
+  /** The item's photos, cover first; absent = not known yet (a new item), so no photo choice. */
+  photos?: readonly PhotoRef[];
 }) {
   const uid = useId();
   const helpId = `${uid}-help`;
+  const photoUrlsNow = photos?.map((p) => p.url) ?? [];
 
   function update(index: number, patch: Partial<SizeDraft>) {
     onChange(drafts.map((d, i) => (i === index ? { ...d, ...patch } : d)));
@@ -37,7 +48,13 @@ export function ItemSizesEditor({
       <legend className="text-sm font-medium">Sizes or colours (optional)</legend>
       <p id={helpId} className="text-xs text-muted-foreground">
         {drafts.length > 0
-          ? `Buyers pick one. Each has its own count, which includes any packed for orders not handed over yet. A blank price${showCost ? " or cost" : ""} means the same as the item.`
+          ? `Buyers pick one. Each has its own count, which includes any packed for orders not handed over yet. A blank price${showCost ? " or cost" : ""} means the same as the item.${
+              photos === undefined
+                ? ""
+                : photos.length > 0
+                  ? " Pick the photo of each colour: buyers see it when they choose that colour."
+                  : " Add a photo of each colour under Photos to show buyers the colour they pick."
+            }`
           : "For one product in S, M, L, or in red and blue. Each gets its own stock."}
       </p>
       {drafts.length > 0 ? (
@@ -122,6 +139,50 @@ export function ItemSizesEditor({
                   <p id={errorId} className="text-xs text-destructive">
                     {rowError.message}
                   </p>
+                ) : null}
+                {photos && photos.length > 0 ? (
+                  <fieldset>
+                    <legend className="mb-1 text-xs font-medium text-muted-foreground">
+                      {`Photo buyers see for ${d.label.trim() || `row ${i + 1}`}`}
+                    </legend>
+                    <div className="flex flex-wrap gap-1.5">
+                      <RadioOption
+                        name={`${uid}-${d.key}-photo`}
+                        value=""
+                        size="compact"
+                        inputClassName="sr-only"
+                        className="min-w-11 px-3 text-xs"
+                        checked={!photoUrlsNow.includes(d.photo)}
+                        onChange={() => update(i, { photo: "" })}
+                        label="None"
+                      />
+                      {photos.map((p, n) => (
+                        <RadioOption
+                          key={p.id}
+                          name={`${uid}-${d.key}-photo`}
+                          value={p.url}
+                          size="compact"
+                          inputClassName="sr-only"
+                          className="p-1"
+                          checked={d.photo === p.url}
+                          onChange={() => update(i, { photo: p.url })}
+                          label={
+                            <>
+                              <Image
+                                src={p.url}
+                                alt=""
+                                width={36}
+                                height={36}
+                                sizes="36px"
+                                className="h-9 w-9 rounded-md object-cover"
+                              />
+                              <span className="sr-only">{n === 0 ? "Photo 1, the cover" : `Photo ${n + 1}`}</span>
+                            </>
+                          }
+                        />
+                      ))}
+                    </div>
+                  </fieldset>
                 ) : null}
               </li>
             );
