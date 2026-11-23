@@ -43,6 +43,7 @@ test.describe("account deletion", () => {
       data: {
         email: creds.email,
         password: E2E_PASSWORD,
+        acceptedTerms: true,
         name: "E2E erase again",
         stallName: `${creds.stallName} again`,
         stallType: "STREET_FOOD",

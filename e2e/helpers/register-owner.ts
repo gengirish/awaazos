@@ -16,6 +16,7 @@ export async function registerOwnerAndSignIn(page: Page, request: APIRequestCont
     data: {
       email,
       password: E2E_PASSWORD,
+      acceptedTerms: true,
       name: "E2E Billing Vendor",
       stallName: `E2E Stall ${suffix}`,
       stallType: "STREET_FOOD",
