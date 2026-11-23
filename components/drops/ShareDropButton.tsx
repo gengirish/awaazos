@@ -4,7 +4,7 @@ import { Check, Copy, MessageCircle, Share2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { InstagramStoryButton } from "@/components/drops/InstagramStoryButton";
-import { buildDropShareText, buildTaggedWhatsAppShareUrl } from "@/lib/drops-share";
+import { buildDropShareText, buildTaggedWhatsAppShareUrl, preorderLinkPath } from "@/lib/drops-share";
 import { cn } from "@/lib/utils";
 
 export type ShareDropButtonProps = {
@@ -60,7 +60,8 @@ export function ShareDropButton(props: ShareDropButtonProps) {
     return () => clearTimeout(t);
   }, [copied]);
 
-  const url = `${origin}/s/${encodeURIComponent(vendorSlug)}`;
+  // The drop's own link: its page and preview show this pre-order only (docs/DROP_LINK_PLAN.md).
+  const url = `${origin}${preorderLinkPath(vendorSlug, dropId)}`;
 
   const text = useMemo(
     () =>

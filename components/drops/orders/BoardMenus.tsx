@@ -43,7 +43,7 @@ import {
   ResponsiveDialogTitle,
 } from "@/components/ui/responsive-dialog";
 import { AI_IMAGES_ENABLED } from "@/lib/ai-image-types";
-import { buildDropShareText, buildTaggedWhatsAppShareUrl, shareOrOpenWhatsApp } from "@/lib/drops-share";
+import { buildDropShareText, buildTaggedWhatsAppShareUrl, preorderLinkPath, shareOrOpenWhatsApp } from "@/lib/drops-share";
 import { cn } from "@/lib/utils";
 
 /**
@@ -118,7 +118,8 @@ export function BoardShareMenu({
   }, [copied]);
 
   const storeHref = `/s/${encodeURIComponent(vendorSlug)}`;
-  const url = `${origin}${storeHref}`;
+  // A drop is shared by its own link (docs/DROP_LINK_PLAN.md); "View store" stays the store.
+  const url = `${origin}${drop ? preorderLinkPath(vendorSlug, drop.id) : storeHref}`;
   const canShare = drop !== null || shareStore;
 
   const shareText = useMemo(

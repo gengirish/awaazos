@@ -50,6 +50,7 @@ later start, everyday menu), and a new drop takes its handover details from the 
 
 Money and plan rules:
 
+- **Share this pre-order** sends the drop's own link, `/s/<slug>/preorder/<dropId>` (`preorderLinkPath`, `lib/drops-share.ts`), from the drop cards, the edit page and the board's Share menu: its page shows that drop only and its preview card draws only its items (`app/s/[slug]/preorder/[dropId]/share-card`). Which drop a link shows is `findFocusedDrop` (`lib/storefront-drop.ts`) and nowhere else.
 - **Instagram story image:** `GET /api/drops/[id]/story-image` (CASHIER, compound `{ id, vendorId }`)
 renders `lib/drop-story-image.tsx` at 1080×1920, inside Instagram's top/bottom overlay zones, with
 `Cache-Control: private, no-store`. `InstagramStoryButton` fetches it on the first tap and shares the

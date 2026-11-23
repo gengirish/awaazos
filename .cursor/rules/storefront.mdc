@@ -15,6 +15,7 @@ storefront surface** — unauthenticated, and no longer read-only (buyers place 
 | --- | --- |
 | `/s/[slug]` | Menu + open drops + checkout |
 | `/s/[slug]/p/[itemId]` | Product link: the store page with that item's detail sheet open, its own title and preview image (`lib/storefront-product.ts`); an item not on sale shows the store with a notice, never a 404 |
+| `/s/[slug]/preorder/[dropId]` | Pre-order link: the store page showing that drop only (no other drops, no everyday menu), its own title and preview image of that drop's items (`lib/storefront-drop.ts`, `docs/DROP_LINK_PLAN.md`); a drop the page wouldn't list shows the store with a notice, never a 404; `noindex` |
 | `/s/[slug]/o/[token]` | Buyer's order page (status, UPI pay, "I've paid" claim) |
 | `/s/[slug]/account` | Signed-in buyer's own orders/profile |
 | `/r/[token]` | Customer receipt page (see "Receipt module"; not gated on `publishStorefront`) |

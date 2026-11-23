@@ -21,6 +21,7 @@ vi.mock("next/og", () => ({
   },
 }));
 
+import { dropShareCard } from "@/app/s/[slug]/preorder/[dropId]/share-card/drop-card";
 import { storeShareCard } from "@/app/s/[slug]/share-card/store-card";
 
 const H = 60 * 60 * 1000;
@@ -37,6 +38,7 @@ function drop(over: Record<string, unknown> = {}) {
     fulfilmentEndsAt: new Date(now + 22 * H),
     showEverydayMenu: false,
     items: [{ priceInPaise: 9900, menuItem: { name: "Kaju Katli" } }],
+    _count: { items: 1 },
     ...over,
   };
 }
@@ -104,5 +106,62 @@ describe("storefront OG card", () => {
     findFirst.mockResolvedValue({ ...vendor([]), settings: { acceptMenuOrders: false, menuFulfilmentMode: "PICKUP" } });
     const html = await card();
     expect(html).toContain("Browse the store");
+  });
+});
+
+describe("storefront OG card: more items than rows", () => {
+  beforeEach(() => findFirst.mockReset());
+
+  it("says how many more items the drop has", async () => {
+    findFirst.mockResolvedValue(vendor([drop({ _count: { items: 7 } })]));
+    expect(await card()).toContain("+6 more");
+  });
+});
+
+/** The pre-order link's card (app/s/[slug]/preorder/[dropId]/share-card/drop-card.tsx). */
+async function preorderCard(dropId = "d1"): Promise<string> {
+  const res = (await dropShareCard("asha", dropId)) as unknown as { el: ReactElement };
+  return renderToStaticMarkup(res.el);
+}
+
+describe("pre-order link OG card", () => {
+  beforeEach(() => findFirst.mockReset());
+
+  it("reads that drop only, with the slug's vendor and the page's filter", async () => {
+    findFirst.mockResolvedValue({ ...vendor([drop({ id: "d1", title: "Festive Boxes" })]), menuItems: undefined });
+    const html = await preorderCard("d1");
+    expect(html).toContain("Festive Boxes");
+    expect(html).toContain("Kaju Katli");
+    expect(html).not.toContain("Online Samosa");
+    const args = findFirst.mock.calls[0]![0] as {
+      where: { slug: string; settings: unknown };
+      select: { drops: { where: { id: string; status: string } }; menuItems?: unknown };
+    };
+    expect(args.where.slug).toBe("asha");
+    expect(args.where.settings).toEqual({ is: { publishStorefront: true } });
+    expect(args.select.drops.where).toMatchObject({ id: "d1", status: "OPEN" });
+    expect(args.select.menuItems).toBeUndefined();
+  });
+
+  it("a drop just past its cut-off says orders are closed", async () => {
+    findFirst.mockResolvedValue(vendor([drop({ id: "d1", closesAt: new Date(Date.now() - H) })]));
+    const html = await preorderCard("d1");
+    expect(html).toContain("Orders closed");
+    expect(html).not.toContain("Order by");
+  });
+
+  it("a drop the page wouldn't show → the store's own card", async () => {
+    // First read: the store, without that drop. Second: the store card's own read.
+    findFirst.mockResolvedValueOnce(vendor([])).mockResolvedValueOnce(vendor([]));
+    const html = await preorderCard("draft-or-other-store");
+    expect(html).toContain("Online Samosa");
+    expect(findFirst).toHaveBeenCalledTimes(2);
+  });
+
+  it("an unpublished store → the generic card, nothing from the slug", async () => {
+    findFirst.mockResolvedValue(null);
+    const html = await preorderCard("d1");
+    expect(html).toContain("Order online from local stores");
+    expect(html).not.toContain("Asha");
   });
 });

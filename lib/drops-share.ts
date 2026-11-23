@@ -3,13 +3,23 @@
  * share button and tests build exactly the same message.
  *
  * Kept short on purpose: WhatsApp collapses long messages behind "Read more",
- * and the link preview (app/s/[slug]/share-card/store-card.tsx) carries the detail.
+ * and the link preview of the drop's own link (app/s/[slug]/preorder/[dropId]/share-card)
+ * carries the detail.
  */
 
 import { formatFulfilmentWindow, formatIstTime } from "@/lib/drops-time";
 import { withWhatsAppTag } from "@/lib/order-channel";
 
 export const SHARE_MAX_ITEMS = 6;
+
+/**
+ * A drop's own link, /s/<slug>/preorder/<dropId> (docs/DROP_LINK_PLAN.md): the
+ * store page showing only this pre-order, with a preview of its items. "preorder",
+ * not "drop": buyers read the address.
+ */
+export function preorderLinkPath(slug: string, dropId: string): string {
+  return `/s/${encodeURIComponent(slug)}/preorder/${encodeURIComponent(dropId)}`;
+}
 
 export type DropShareInput = {
   vendorName: string;
