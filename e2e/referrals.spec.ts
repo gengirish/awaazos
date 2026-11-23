@@ -29,6 +29,7 @@ async function register(
     data: {
       email: who.email,
       password: E2E_PASSWORD,
+      acceptedTerms: true,
       name: "E2E Ref",
       stallName: who.stallName,
       storeHandle: who.handle,

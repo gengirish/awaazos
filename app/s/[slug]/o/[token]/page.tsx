@@ -28,6 +28,7 @@ import { OrderRefresh } from "@/components/storefront/OrderRefresh";
 import { OtherCartsNotice } from "@/components/storefront/OtherCartsNotice";
 import { PaidClaimForm } from "@/components/storefront/PaidClaimForm";
 import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
+import { SoldByNotice } from "@/components/storefront/SoldByNotice";
 import { SaveQrButton } from "@/components/storefront/SaveQrButton";
 import { UpiPayOptions } from "@/components/storefront/UpiPayOptions";
 import { UpiQrImage } from "@/components/storefront/UpiQrImage";
@@ -845,6 +846,7 @@ export default async function StorefrontOrderPage(props: {
 
       <footer className="space-y-2 px-4 pb-10 pt-2 text-center text-xs text-muted-foreground">
         {vendor.settings?.fssaiNumber ? <p>FSSAI Lic. No. {vendor.settings.fssaiNumber}</p> : null}
+        <SoldByNotice storeName={vendor.name} />
         <PoweredByFooter slug={vendor.slug} isDemo={vendor.isDemo} />
       </footer>
     </div>
