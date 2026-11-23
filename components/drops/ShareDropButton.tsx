@@ -4,7 +4,7 @@ import { Check, Copy, MessageCircle, Share2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
 import { InstagramStoryButton } from "@/components/drops/InstagramStoryButton";
-import { buildDropShareText, buildTaggedWhatsAppShareUrl, preorderLinkPath } from "@/lib/drops-share";
+import { buildDropShareText, buildTaggedWhatsAppShareUrl, preorderLinkPath, shareSheetData } from "@/lib/drops-share";
 import { cn } from "@/lib/utils";
 
 export type ShareDropButtonProps = {
@@ -86,9 +86,8 @@ export function ShareDropButton(props: ShareDropButtonProps) {
     setStatus("");
     if (typeof navigator !== "undefined" && typeof navigator.share === "function") {
       try {
-        // `text` already ends with the link; passing `url` too lets apps that
-        // ignore text (some mail clients) still get it.
-        await navigator.share({ title: `${dropTitle} by ${vendorName}`, text, url });
+        // `text` already ends with the link, so `url` is left out (else WhatsApp shows it twice).
+        await navigator.share(shareSheetData({ title: `${dropTitle} by ${vendorName}`, text, url }));
         return;
       } catch (err) {
         if (err instanceof Error && err.name === "AbortError") return; // vendor dismissed the sheet

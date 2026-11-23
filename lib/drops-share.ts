@@ -79,13 +79,23 @@ export function buildTaggedWhatsAppShareUrl(text: string, storeUrl: string): str
 }
 
 /**
+ * What to hand `navigator.share`. When the message already carries the link,
+ * `url` is left out: WhatsApp and other apps append `url` after `text`, so the
+ * buyer would get the link twice. Apps that ignore `text` are rare enough that
+ * one clean message wins.
+ */
+export function shareSheetData({ title, text, url }: { title: string; text: string; url: string }): ShareData {
+  return url && text.includes(url) ? { title, text } : { title, text, url };
+}
+
+/**
  * The device's share sheet, else a wa.me link. A dismissed sheet (AbortError) is
  * not an error; a refused one falls through to WhatsApp. Call it from a tap.
  */
 export async function shareOrOpenWhatsApp({ title, text, url }: { title: string; text: string; url: string }): Promise<void> {
   if (typeof navigator.share === "function") {
     try {
-      await navigator.share({ title, text, url });
+      await navigator.share(shareSheetData({ title, text, url }));
       return;
     } catch (err) {
       if (err instanceof Error && err.name === "AbortError") return;
