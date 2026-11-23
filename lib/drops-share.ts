@@ -3,7 +3,7 @@
  * share button and tests build exactly the same message.
  *
  * Kept short on purpose: WhatsApp collapses long messages behind "Read more",
- * and the link preview (app/s/[slug]/opengraph-image.tsx) carries the detail.
+ * and the link preview (app/s/[slug]/share-card/store-card.tsx) carries the detail.
  */
 
 import { formatFulfilmentWindow, formatIstTime } from "@/lib/drops-time";

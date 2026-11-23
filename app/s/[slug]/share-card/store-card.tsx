@@ -7,6 +7,7 @@ import { fulfilmentModeLabel, OG_COLORS as C, Price, storeLogoDataUrl, truncate 
 import { prisma } from "@/lib/prisma";
 import { everydayMenuHiddenByDrops, STOREFRONT_MENU_ITEM_WHERE } from "@/lib/storefront-order";
 import { BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
+import { SHARE_CARD_CACHE_CONTROL, SHARE_CARD_SIZE as size } from "@/lib/share-card";
 
 /**
  * Link-preview card for /s/<slug> — what WhatsApp shows when a vendor shares
@@ -33,14 +34,12 @@ import { BRAND_NAME, BRAND_TAGLINE } from "@/lib/brand";
  * Satori only supports inline styles; the shared colours, ₹ glyph and price
  * row live in lib/og-parts.tsx (also used by the Instagram story image).
  *
- * Rendered only when a crawler fetches a shared link — event-driven, no timer.
+ * Served by ./route.tsx at /s/<slug>/share-card (why not opengraph-image.tsx:
+ * lib/share-card.ts). Rendered only when a crawler fetches a shared link —
+ * event-driven, no timer.
  */
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const alt = `Order on ${BRAND_NAME}`;
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+const RESPONSE = { ...size, headers: { "Cache-Control": SHARE_CARD_CACHE_CONTROL } };
 
 const MAX_ITEMS = 4;
 
@@ -184,18 +183,17 @@ function GenericCard() {
   );
 }
 
-export default async function Image(props: { params: Promise<{ slug: string }> }) {
-  const params = await props.params;
+export async function storeShareCard(slug: string): Promise<Response> {
   const now = new Date();
   let card: Awaited<ReturnType<typeof loadCard>> = null;
   try {
-    card = await loadCard(params.slug, now);
+    card = await loadCard(slug, now);
   } catch (err) {
     // A preview image must never 500 — fall back to the generic card.
     console.error("[og] storefront card load failed", err instanceof Error ? err.message : "unknown");
   }
 
-  if (!card) return new ImageResponse(<GenericCard />, size);
+  if (!card) return new ImageResponse(<GenericCard />, RESPONSE);
 
   const { drop, menuOrdering } = card;
   return new ImageResponse(
@@ -283,6 +281,6 @@ export default async function Image(props: { params: Promise<{ slug: string }> }
         </div>
       </Frame>
     ),
-    size,
+    RESPONSE,
   );
 }

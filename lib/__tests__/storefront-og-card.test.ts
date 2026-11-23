@@ -4,7 +4,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * The storefront OG card's variant choice (app/s/[slug]/opengraph-image.tsx).
+ * The storefront OG card's variant choice (app/s/[slug]/share-card/store-card.tsx).
  * Rendered through a stubbed ImageResponse because next/og's font loader
  * can't resolve its bundled font path on Windows outside a real deploy.
  */
@@ -21,7 +21,7 @@ vi.mock("next/og", () => ({
   },
 }));
 
-import Image from "@/app/s/[slug]/opengraph-image";
+import { storeShareCard } from "@/app/s/[slug]/share-card/store-card";
 
 const H = 60 * 60 * 1000;
 
@@ -53,7 +53,7 @@ function vendor(drops: unknown[]) {
 }
 
 async function card(): Promise<string> {
-  const res = (await Image({ params: Promise.resolve({ slug: "asha" }) })) as unknown as { el: ReactElement };
+  const res = (await storeShareCard("asha")) as unknown as { el: ReactElement };
   return renderToStaticMarkup(res.el);
 }
 
