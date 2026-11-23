@@ -29,7 +29,10 @@ import { SHARE_CARD_CACHE_CONTROL, SHARE_CARD_SIZE as size } from "@/lib/share-c
  * an open drop hides the everyday menu (`everydayMenuHiddenByDrops`, same rule
  * as the page) — that drop is the card. A drop shows its first four items and
  * "+N more". A pre-order link (/s/<slug>/preorder/<dropId>) draws its own drop
- * with the same layout (`renderShareCard`), never the store's first one.
+ * with the same layout (`renderShareCard`), never the store's first one, and as
+ * photo tiles when at least one of its first items has a photo that loaded
+ * (`ItemTiles`; an item without one gets a tile with its initial). This card
+ * passes no photos, so it keeps the text rows.
  *
  * The Prisma `select` is a hand-written allowlist: never `phone` / `email`.
  *
@@ -54,8 +57,11 @@ export type ShareCardDrop = {
   fulfilmentMode: string;
   fulfilmentStartsAt: Date;
   fulfilmentEndsAt: Date;
-  /** The first SHARE_CARD_MAX_ITEMS, in the drop's order. */
-  items: { priceInPaise: number; menuItem: { name: string } }[];
+  /**
+   * The first SHARE_CARD_MAX_ITEMS, in the drop's order. `photo` is a loaded
+   * PNG/JPEG data URL (`storeLogoDataUrl`), set only by the pre-order card.
+   */
+  items: { priceInPaise: number; menuItem: { name: string }; photo?: string | null }[];
   /** All of the drop's items, for "+N more". */
   itemCount: number;
   /** Past its cut-off (a pre-order link within the closed grace window). */
@@ -202,6 +208,64 @@ function ItemRows({ items, more = 0 }: { items: { name: string; priceInPaise: nu
   );
 }
 
+/** Photo tile size: four across the card's 1056 px content width. */
+const TILE_W = 246;
+const TILE_PHOTO_H = 132;
+
+/** A drop's items as photo tiles: photo, name, price. Same "+N more" as ItemRows. */
+function ItemTiles({
+  items,
+  more,
+}: {
+  items: { name: string; priceInPaise: number; photo: string | null }[];
+  more: number;
+}) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column" }}>
+      <div style={{ display: "flex" }}>
+        {items.map((it, i) => (
+          <div key={i} style={{ display: "flex", flexDirection: "column", width: TILE_W, marginRight: i < items.length - 1 ? 24 : 0 }}>
+            {it.photo ? (
+              // eslint-disable-next-line @next/next/no-img-element -- Satori draws a plain <img>
+              <img
+                src={it.photo}
+                alt=""
+                width={TILE_W}
+                height={TILE_PHOTO_H}
+                style={{ width: TILE_W, height: TILE_PHOTO_H, borderRadius: 16, objectFit: "cover" }}
+              />
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: TILE_W,
+                  height: TILE_PHOTO_H,
+                  borderRadius: 16,
+                  background: C.tint,
+                  color: C.muted,
+                  fontSize: 64,
+                  fontWeight: 700,
+                }}
+              >
+                {(it.name.trim()[0] ?? "").toUpperCase()}
+              </div>
+            )}
+            <div style={{ display: "flex", fontSize: 26, marginTop: 8 }}>{truncate(it.name, 16)}</div>
+            <div style={{ display: "flex", marginTop: 2 }}>
+              <Price paise={it.priceInPaise} fontSize={28} />
+            </div>
+          </div>
+        ))}
+      </div>
+      {more > 0 ? (
+        <div style={{ display: "flex", fontSize: 26, color: C.muted, paddingTop: 6 }}>{`+${more} more`}</div>
+      ) : null}
+    </div>
+  );
+}
+
 function GenericCard() {
   return (
     <Frame>
@@ -272,7 +336,16 @@ export function renderShareCard(card: ShareCardData | null): Response {
           ) : null}
         </div>
 
-        {drop ? (
+        {drop && drop.items.some((it) => it.photo) ? (
+          <ItemTiles
+            items={drop.items.map((it) => ({
+              name: it.menuItem.name,
+              priceInPaise: it.priceInPaise,
+              photo: it.photo ?? null,
+            }))}
+            more={drop.itemCount - drop.items.length}
+          />
+        ) : drop ? (
           <ItemRows
             items={drop.items.map((it) => ({ name: it.menuItem.name, priceInPaise: it.priceInPaise }))}
             more={drop.itemCount - drop.items.length}

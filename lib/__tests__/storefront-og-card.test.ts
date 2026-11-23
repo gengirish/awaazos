@@ -165,3 +165,57 @@ describe("pre-order link OG card", () => {
     expect(html).not.toContain("Asha");
   });
 });
+
+describe("pre-order link OG card: item photos", () => {
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
+  const fetchMock = vi.fn();
+
+  beforeEach(() => {
+    findFirst.mockReset();
+    fetchMock.mockReset();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  function photoDrop() {
+    return drop({
+      id: "d1",
+      items: [
+        { priceInPaise: 9900, menuItem: { name: "Kaju Katli", imageUrl: "https://blob.example/kaju.png" } },
+        { priceInPaise: 5000, menuItem: { name: "Ladoo", imageUrl: null } },
+      ],
+      _count: { items: 2 },
+    });
+  }
+
+  it("draws photo tiles when a photo loads, an initial for an item without one", async () => {
+    fetchMock.mockResolvedValue(new Response(PNG, { headers: { "content-type": "image/png" } }));
+    findFirst.mockResolvedValue(vendor([photoDrop()]));
+    const html = await preorderCard("d1");
+    expect(html).toContain("data:image/png;base64,");
+    expect(html).toContain("Kaju Katli");
+    expect(html).toContain(">L<"); // Ladoo's tile
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]![0]).toBe("https://blob.example/kaju.png");
+    const args = findFirst.mock.calls[0]![0] as {
+      select: { drops: { select: { items: { select: { menuItem: { select: Record<string, boolean> } } } } } };
+    };
+    expect(args.select.drops.select.items.select.menuItem.select).toEqual({ name: true, imageUrl: true });
+  });
+
+  it("keeps the text rows when no photo loads", async () => {
+    fetchMock.mockRejectedValue(new Error("timeout"));
+    findFirst.mockResolvedValue(vendor([photoDrop()]));
+    const html = await preorderCard("d1");
+    expect(html).not.toContain("data:image");
+    expect(html).toContain("Kaju Katli");
+    expect(html).not.toContain(">L<");
+  });
+
+  it("never fetches a photo that isn't https", async () => {
+    findFirst.mockResolvedValue(
+      vendor([drop({ id: "d1", items: [{ priceInPaise: 9900, menuItem: { name: "Kaju Katli", imageUrl: "http://x/k.png" } }] })]),
+    );
+    await preorderCard("d1");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});

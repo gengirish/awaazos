@@ -49,7 +49,7 @@ export async function generateMetadata(props: { params: Params }): Promise<Metad
     closesAt: drop.closesAt,
     mode: drop.fulfilmentMode,
     window: [drop.fulfilmentStartsAt, drop.fulfilmentEndsAt],
-    items: drop.items.map((i) => [i.menuItem.name, i.priceInPaise]),
+    items: drop.items.map((i) => [i.menuItem.name, i.priceInPaise, i.menuItem.imageUrl]),
   });
   return {
     title,
