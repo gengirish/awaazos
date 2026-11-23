@@ -33,6 +33,7 @@ import { loadReferralSummary } from "@/lib/referral-server";
 import { fillVocabulary } from "@/lib/store-vocabulary";
 import { hasStoredRazorpayCreds, isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 
+import { SupportContactList } from "@/components/help/SupportContactList";
 import { requireSettingsContext } from "./_context";
 import { BRAND_NAME } from "@/lib/brand";
 
@@ -200,6 +201,13 @@ export default async function SettingsHubPage() {
           </div>
         ))}
       </nav>
+
+      <section aria-labelledby="support-heading" className="mt-6">
+        <h2 id="support-heading" className="mb-2 font-display text-base font-semibold text-foreground">
+          Contact support
+        </h2>
+        <SupportContactList headingId="support-heading" />
+      </section>
 
       <section aria-labelledby="account-heading" className="mt-6">
         <h2 id="account-heading" className="mb-2 font-display text-base font-semibold text-foreground">

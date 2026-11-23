@@ -17,7 +17,7 @@ export default function TermsPage() {
   return (
     <>
       <h1>Terms of Service</h1>
-      <p>Last updated: 13 November 2026</p>
+      <p>Last updated: 22 November 2026</p>
 
       <h2>Acceptance</h2>
       <p>By using {BRAND_NAME}, you agree to these Terms.</p>
@@ -77,6 +77,15 @@ export default function TermsPage() {
         for its products, prices, taxes, delivery, cancellations and refunds. {BRAND_NAME} provides the software only: it
         is not a party to the sale and does not collect, hold or settle buyers’ payments. A buyer pays the seller
         directly: by UPI, through the seller’s own Razorpay account, or in cash on delivery.
+      </p>
+
+      <h2>Seller responsibility</h2>
+      <p>
+        If you sell through {BRAND_NAME}, you alone are responsible for what you sell and how you sell it. That
+        includes the safety and quality of your food or products, every licence and registration your business needs
+        (for food businesses, FSSAI registration or licence), GST and other taxes, accurate descriptions, photos and
+        prices, and delivering what the buyer ordered. {BRAND_NAME} is software only. We are not a seller, a
+        marketplace or a payment aggregator, and we are not a party to the sale between you and your buyer.
       </p>
 
       <h2>Service availability</h2>

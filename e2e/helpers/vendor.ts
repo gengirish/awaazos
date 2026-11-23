@@ -69,6 +69,7 @@ export async function registerVendor(
     data: {
       email,
       password: E2E_PASSWORD,
+      acceptedTerms: true,
       name: `E2E ${label}`,
       stallName,
       stallType: "STREET_FOOD",

@@ -14,6 +14,7 @@ import { StoreTaglineClient } from "@/components/settings/StoreTaglineClient";
 import { StoreThemeClient } from "@/components/settings/StoreThemeClient";
 import { StorefrontClient } from "@/components/settings/StorefrontClient";
 import { listVendorCommunities } from "@/lib/community-server";
+import { FSSAI_WARNING_TEXT, showFssaiWarning } from "@/lib/fssai";
 import { prisma } from "@/lib/prisma";
 import { isOnlinePaymentEnabled, RAZORPAY_CRED_SELECT } from "@/lib/storefront-razorpay";
 
@@ -51,6 +52,22 @@ export default async function StoreSettingsPage() {
         title="Online store"
         description={`A web page with your ${vocab.catalogue} that customers open from a QR or a WhatsApp link.`}
       />
+      {showFssaiWarning({
+        kind: storeKind,
+        publishStorefront: settings?.publishStorefront ?? false,
+        fssaiNumber: settings?.fssaiNumber,
+      }) ? (
+        <div role="note" className="mb-4 rounded-lg border border-warning bg-warning/10 p-4 text-sm text-foreground">
+          <p className="font-semibold">FSSAI number missing</p>
+          <p className="mt-1">{FSSAI_WARNING_TEXT}</p>
+          <a
+            href="#fssai-number"
+            className="mt-1 inline-flex min-h-11 items-center font-semibold underline underline-offset-4 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            Go to the food licence field
+          </a>
+        </div>
+      ) : null}
       <div className="space-y-4">
         <SettingsCard title="Store name">
           <StoreNameClient initialName={vendor.name} isOwner={isOwner} />

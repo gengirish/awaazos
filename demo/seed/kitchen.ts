@@ -77,6 +77,7 @@ export async function seedStore(
     data: {
       email,
       password: E2E_PASSWORD,
+      acceptedTerms: true,
       name: "Demo Owner",
       stallName: f.name,
       stallType: f.stallType,
