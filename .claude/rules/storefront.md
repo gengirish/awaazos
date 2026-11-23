@@ -50,6 +50,7 @@ Rules every one of them follows:
   image. `MenuItem.description` (≤ 200 chars, item form) is one line under the item's name. Neither
   reaches the voice prompt (`stableMenuJson()` selects its fields). A goods store (`storeKind() ===
   "goods"`) lists items as a photo gallery (two columns); a kitchen keeps the rows.
+- **Link-preview cards** (`/s/<slug>/share-card`, `/s/<slug>/p/<itemId>/share-card`, rules in `lib/share-card.ts`): never an `opengraph-image.tsx` file (Next serves it at a fixed URL, cached immutable for a year, so WhatsApp kept the first card). The page's `og:image` carries `?v=<hash of what the card draws>` from data it already loaded; the route ignores `v` and draws the current card with a 5-minute cache. A new card input must join the version.
 - **Item detail sheet** (`components/storefront/ItemDetailSheet.tsx`, plan in `docs/PRODUCT_PAGE_PLAN.md`):
   tapping an item's name or photo, on any list (menu, pre-order, read-only), opens a sheet with the big
   photo (tap → full size), discount-first price, sizes, stock, the whole description, the offers it

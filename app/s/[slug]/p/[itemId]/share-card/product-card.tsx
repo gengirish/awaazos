@@ -4,6 +4,7 @@ import { formatPercentBps } from "@/lib/offers";
 import { OG_COLORS as C, Price, storeLogoDataUrl, truncate } from "@/lib/og-parts";
 import { loadStorefrontProduct, type StorefrontProduct } from "@/lib/storefront-product";
 import { BRAND_NAME } from "@/lib/brand";
+import { SHARE_CARD_CACHE_CONTROL, SHARE_CARD_SIZE as size } from "@/lib/share-card";
 
 /**
  * Link-preview card for a product link, /s/<slug>/p/<menuItemId>: what
@@ -19,14 +20,12 @@ import { BRAND_NAME } from "@/lib/brand";
  * draw WebP; seller uploads are shrunk to JPEG / PNG in the browser, so a
  * WebP is rare). Otherwise the item's emoji takes its place.
  *
- * Rendered only when a crawler fetches a shared link: event-driven, no timer.
+ * Served by ./route.tsx at /s/<slug>/p/<itemId>/share-card (why not
+ * opengraph-image.tsx: lib/share-card.ts). Rendered only when a crawler fetches a
+ * shared link: event-driven, no timer.
  */
 
-export const runtime = "nodejs";
-export const dynamic = "force-dynamic";
-export const alt = `Order on ${BRAND_NAME}`;
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+const RESPONSE = { ...size, headers: { "Cache-Control": SHARE_CARD_CACHE_CONTROL } };
 
 const PHOTO = 630;
 
@@ -134,8 +133,7 @@ function ProductCard({
   );
 }
 
-export default async function Image(props: { params: Promise<{ slug: string; itemId: string }> }) {
-  const { slug, itemId } = await props.params;
+export async function productShareCard(slug: string, itemId: string): Promise<Response> {
   let product: StorefrontProduct | null = null;
   try {
     product = await loadStorefrontProduct(slug, itemId);
@@ -143,10 +141,10 @@ export default async function Image(props: { params: Promise<{ slug: string; ite
     // A preview image must never 500: fall back to the generic card.
     console.error("[og] product card load failed", err instanceof Error ? err.message : "unknown");
   }
-  if (!product) return new ImageResponse(<GenericCard />, size);
+  if (!product) return new ImageResponse(<GenericCard />, RESPONSE);
 
   // Only absolute URLs (seller uploads on Blob); a relative dish drawing is WebP anyway.
   const photoUrl = product.item.imageUrl?.startsWith("https://") ? product.item.imageUrl : null;
   const [photo, logo] = await Promise.all([storeLogoDataUrl(photoUrl), storeLogoDataUrl(product.store.logoUrl)]);
-  return new ImageResponse(<ProductCard product={product} photo={photo} logo={logo} />, size);
+  return new ImageResponse(<ProductCard product={product} photo={photo} logo={logo} />, RESPONSE);
 }

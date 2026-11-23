@@ -3,6 +3,7 @@ import type { Metadata } from "next";
 import { StorefrontView, storefrontMetadata } from "@/app/s/[slug]/storefront-view";
 import { formatINRCompact } from "@/lib/currency";
 import { displayStoreName } from "@/lib/demo-store-schema";
+import { productShareCardPath, shareCardMetadata, shareCardVersion } from "@/lib/share-card";
 import { loadStorefrontProduct } from "@/lib/storefront-product";
 
 /**
@@ -34,7 +35,11 @@ export async function generateMetadata(props: { params: Params }): Promise<Metad
     title,
     description,
     alternates: { canonical: `/s/${encodeURIComponent(slug)}/p/${encodeURIComponent(item.id)}` },
-    openGraph: { title, description, type: "website" },
+    // The version covers everything share-card/product-card.tsx draws (lib/share-card.ts).
+    ...shareCardMetadata(
+      productShareCardPath(slug, item.id, shareCardVersion([store.name, store.city, store.logoUrl, item])),
+      { title, description },
+    ),
     ...(store.isDemo ? { robots: { index: false, follow: false } } : {}),
   };
 }

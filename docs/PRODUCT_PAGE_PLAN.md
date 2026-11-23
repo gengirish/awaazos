@@ -112,7 +112,7 @@ Measure with `npm run perf:budget`; re-record only for a justified growth.
   button apply. Store views are counted the same way (`countStoreView`), `src` included.
 - **Metadata**: title "<item> · <store>", the item's description (else the store tagline),
   canonical `/s/<store>/p/<id>`, `noindex` on demo stores like the store page.
-- **Preview image** `app/s/[slug]/p/[itemId]/opengraph-image.tsx` (and `twitter-image`): item photo
+- **Preview image** `app/s/[slug]/p/[itemId]/share-card/` (versioned URL, short cache: `lib/share-card.ts`): item photo
   large, name, price (sale-aware, `Price` from `lib/og-parts.tsx`), store name and logo, "Order
   on AwaazDo". Same gate as the store card; an item not on sale or a hidden store gets the generic
   card, which carries nothing from the URL. Photo loaded with the same timeout pattern as

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import type { ReactNode } from "react";
 
 import { displayStoreName } from "@/lib/demo-store-schema";
+import { shareCardMetadata, storeShareCardPath } from "@/lib/share-card";
 import { storeAppIconPath, storeManifestPath, storeThemeHex } from "@/lib/store-app";
 import { loadStoreApp } from "@/lib/store-app-server";
 
@@ -26,6 +27,9 @@ export async function generateMetadata(props: { params: Params }): Promise<Metad
     manifest: storeManifestPath(store.slug),
     appleWebApp: { capable: true, title: name, statusBarStyle: "default" },
     icons: { apple: storeAppIconPath(store.slug, 180) },
+    // Default preview for pages below the store (order, account): the store card,
+    // unversioned. The store and product pages set their own, versioned (lib/share-card.ts).
+    ...shareCardMetadata(storeShareCardPath(store.slug), { title: name }),
   };
 }
 

@@ -108,9 +108,13 @@ test.describe("storefront: item detail sheet", () => {
     // Link previews: the item's own title and card.
     const html = await (await request.get(`/s/${slug}/p/${item.id}`)).text();
     expect(html).toContain(`<title>${kurti} · `);
-    const og = await request.get(`/s/${slug}/p/${item.id}/opengraph-image`);
+    // The card URL carries a content version, so a changed item is a new URL for crawlers.
+    const ogUrl = html.match(/<meta property="og:image" content="([^"]+)"/)?.[1];
+    expect(ogUrl).toContain(`/s/${slug}/p/${item.id}/share-card?v=`);
+    const og = await request.get(new URL(ogUrl!).pathname + new URL(ogUrl!).search);
     expect(og.status()).toBe(200);
     expect(og.headers()["content-type"]).toContain("image/png");
+    expect(og.headers()["cache-control"]).not.toContain("immutable");
 
     const ctx = await browser.newContext(CONTEXT_OPTIONS);
     try {

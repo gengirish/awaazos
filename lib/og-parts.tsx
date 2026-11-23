@@ -2,7 +2,7 @@ import { formatINR } from "@/lib/currency";
 
 /**
  * Building blocks shared by the Satori-rendered images: the storefront link
- * preview (app/s/[slug]/opengraph-image.tsx) and the Instagram story image
+ * preview (app/s/[slug]/share-card/store-card.tsx) and the Instagram story image
  * (lib/drop-story-image.tsx, lib/store-story-image.tsx).
  *
  * Satori only supports inline styles, so colours are literal here — CSS

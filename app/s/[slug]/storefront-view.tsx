@@ -103,6 +103,7 @@ import { storeBackgroundStyle } from "@/lib/store-background";
 import { storeThemeAttribute } from "@/lib/store-theme";
 import { countStoreView } from "@/lib/store-views";
 import { BRAND_NAME } from "@/lib/brand";
+import { shareCardMetadata, shareCardVersion, storeShareCardPath } from "@/lib/share-card";
 
 // The routes that render this (page.tsx, p/[itemId]/page.tsx) set `dynamic = "force-dynamic"` and
 // `runtime = "nodejs"` themselves: route-segment config is read from the route file only.
@@ -387,10 +388,37 @@ export async function storefrontMetadata(slug: string): Promise<Metadata> {
   return {
     title,
     description,
-    openGraph: { title, description, type: "website" },
+    ...shareCardMetadata(storeShareCardPath(vendor.slug, storeCardVersion(vendor, new Date())), { title, description }),
     // Demo stores (lib/demo-store.ts) stay out of search results.
     ...(vendor.isDemo ? { robots: { index: false, follow: false } } : {}),
   };
+}
+
+/**
+ * Cache key for the share card (lib/share-card.ts): everything
+ * share-card/store-card.tsx can draw, from the page's own query. A superset is
+ * fine (a new URL costs a crawler one fetch); a missing input would keep a stale card.
+ */
+function storeCardVersion(vendor: NonNullable<Awaited<ReturnType<typeof loadStorefront>>>, now: Date): string {
+  return shareCardVersion({
+    name: vendor.name,
+    city: vendor.city,
+    logo: vendor.logoUrl,
+    tagline: vendor.settings?.tagline ?? null,
+    menuOrders: vendor.settings?.acceptMenuOrders ?? false,
+    mode: vendor.settings?.menuFulfilmentMode ?? null,
+    items: vendor.menuItems.map((i) => [i.name, i.priceInPaise, i.isPopular]),
+    drops: vendor.drops.map((d) => [
+      d.title,
+      effectiveDropStatus(d, now),
+      d.closesAt,
+      d.fulfilmentMode,
+      d.fulfilmentStartsAt,
+      d.fulfilmentEndsAt,
+      d.showEverydayMenu,
+      d.items.map((i) => [i.menuItem.name, i.priceInPaise]),
+    ]),
+  });
 }
 
 /** "Pickup" / "Delivery" / "Pickup or delivery" — mirrors the OG card's line. */

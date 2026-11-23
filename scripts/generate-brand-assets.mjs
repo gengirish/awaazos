@@ -9,7 +9,7 @@
  *                        (components/brand/BrandLogo.tsx), orange with a white mic.
  * app/opengraph-image.png 1200×630 card: mark, "Awaaz" + "दो" wordmark, tagline.
  *                        What WhatsApp / Instagram show for an awaazdo.store link.
- *                        Store pages keep their own (app/s/[slug]/opengraph-image.tsx).
+ *                        Store pages keep their own (app/s/[slug]/share-card/store-card.tsx).
  *
  * Both are static files Next serves as metadata, so nothing renders per request.
  * The card is drawn here rather than in Satori because Satori has no Devanagari
