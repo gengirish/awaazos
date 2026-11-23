@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import Image from "next/image";
-import { ChevronDown } from "lucide-react";
+import { ChevronDown, Trash2 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import { ItemDetailFields, itemDetailDraftFrom, type ItemDetailDraft } from "@/c
 import { ItemPhotosField } from "@/components/menu/ItemPhotosField";
 import { ItemSizesEditor } from "@/components/menu/ItemSizesEditor";
 import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Form,
   FormControl,
@@ -43,6 +44,8 @@ import {
   type VariantsBody,
 } from "@/lib/item-variants-form";
 import { costLine, parseCostInput } from "@/lib/item-cost";
+import { deleteItemTitle, inOpenDropMessage } from "@/lib/menu-archive";
+import { MENU_CHANGED_EVENT } from "@/lib/menu-events";
 import { onShelfCount, parseStockInput, setAsideHint, type MenuRow, type MenuStockFields } from "@/lib/menu-stock";
 import { suggestEmoji } from "@/lib/menu-suggestions";
 import { isValidMenuUnit, MENU_UNIT_MAX, MENU_UNIT_MESSAGE, normaliseMenuUnit } from "@/lib/menu-unit";
@@ -110,6 +113,8 @@ type MenuItemFormProps = {
   sizesEnabled?: boolean;
   /** Show and send the cost price: MANAGER and up (lib/item-cost.ts rule 2). */
   canSeeCost?: boolean;
+  /** Offer "Delete dish" on edit: MANAGER and up (lib/menu-archive.ts rule 1). */
+  canDelete?: boolean;
 };
 
 const FOOD_VOCAB = vocabularyForKind("food");
@@ -141,6 +146,7 @@ export function MenuItemForm({
   vocab = FOOD_VOCAB,
   sizesEnabled = false,
   canSeeCost = false,
+  canDelete = false,
 }: MenuItemFormProps) {
   const baseEmoji = defaultEmoji(vocab);
   const starterEmojis = emojiChoices(vocab);
@@ -152,6 +158,8 @@ export function MenuItemForm({
   const categorySuggestions = useMemo(() => categoryOptions(categories), [categories]);
   // Aliases, tags, HSN/SAC and the emoji: rarely needed, so they start folded away.
   const [moreOpen, setMoreOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // The photo is not part of the RHF schema: it round-trips through
   // /api/menu/[id]/image, which needs an item id. On create we hold the file and
@@ -452,6 +460,37 @@ export function MenuItemForm({
       onSaved();
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Something went wrong");
+    }
+  }
+
+  /** DELETE /api/menu/[id]: archives the item (lib/menu-archive.ts). No undo. */
+  async function deleteItem() {
+    if (!item) return;
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/menu/${item.id}`, { method: "DELETE" });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 409 && json?.error === "in_open_drop") {
+        const titles: string[] = Array.isArray(json.drops)
+          ? json.drops.map((d: { title?: unknown }) => (typeof d?.title === "string" ? d.title : ""))
+          : [];
+        toast.error(`Could not delete ${item.name}`, { description: inOpenDropMessage(titles) });
+        return;
+      }
+      // 404: already gone (deleted on another phone); the list catches up all the same.
+      if (!res.ok && res.status !== 404) {
+        toast.error(`Could not delete ${item.name}`);
+        return;
+      }
+      toast.success(`${item.name} deleted`);
+      onOpenChange(false);
+      // The list reads its rows itself (see MenuScreen): router.refresh() alone is sometimes not applied.
+      window.dispatchEvent(new Event(MENU_CHANGED_EVENT));
+      onSaved();
+    } catch {
+      toast.error(`Could not delete ${item.name}. Check your connection and try again.`);
+    } finally {
+      setDeleting(false);
     }
   }
 
@@ -991,6 +1030,33 @@ export function MenuItemForm({
                   </FormItem>
                 )}
               />
+              {isEdit && item && canDelete ? (
+                <div className="space-y-2 border-t pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11 gap-2 border-destructive/50 text-destructive hover:bg-destructive/10 hover:text-destructive"
+                    disabled={deleting || isSubmitting}
+                    aria-describedby={`${uid}-delete-help`}
+                    onClick={() => setConfirmDelete(true)}
+                  >
+                    <Trash2 aria-hidden="true" />
+                    {deleting ? "Deleting…" : `Delete ${vocab.item}`}
+                  </Button>
+                  <p id={`${uid}-delete-help`} className="text-xs text-muted-foreground">
+                    Takes it off your {vocab.catalogue}, store page and counter for good. Past bills keep it. To hide
+                    it for a while, switch off Selling now instead.
+                  </p>
+                  <ConfirmDialog
+                    open={confirmDelete}
+                    onOpenChange={setConfirmDelete}
+                    title={deleteItemTitle(item.name)}
+                    description={`It comes off your ${vocab.catalogue}, your store page and the counter. Past bills and orders keep it. This can't be undone.`}
+                    confirmLabel="Delete"
+                    onConfirm={() => void deleteItem()}
+                  />
+                </div>
+              ) : null}
             </ResponsiveDialogBody>
             <ResponsiveDialogFooter className="flex-row flex-wrap md:border-t md:py-4">
               {!isEdit ? (

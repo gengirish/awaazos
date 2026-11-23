@@ -56,8 +56,14 @@ export async function PUT(req: NextRequest, props: Params) {
     const vendorId = ctx.vendor.id;
     const body = dropUpsertSchema.parse(await req.json());
 
+    // A deleted item (lib/menu-archive.ts) can't be added, but one already in this drop
+    // may stay: it may have orders, and those can't be removed.
     const owned = await prisma.menuItem.findMany({
-      where: { vendorId, id: { in: body.items.map((i) => i.menuItemId) } },
+      where: {
+        vendorId,
+        id: { in: body.items.map((i) => i.menuItemId) },
+        OR: [{ archivedAt: null }, { dropItems: { some: { dropId: params.id, drop: { vendorId } } } }],
+      },
       select: { id: true },
     });
     const bad = unknownMenuItems(body.items, new Set(owned.map((m) => m.id)));

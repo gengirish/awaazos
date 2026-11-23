@@ -317,6 +317,8 @@ export const DROP_CONFLICT_MESSAGE: Record<string, string> = {
   invalid_transition: "That change isn't possible from the pre-order's current state. Refresh and try again.",
   move_cutoff_first: "The order cut-off has already passed. Move the cut-off later, save, then reopen orders.",
   no_items: "Add at least one item before opening orders.",
+  has_deleted_items:
+    "This pre-order has an item you deleted, so it can't take orders again. Use \"Copy for tomorrow\" instead: the copy leaves that item out.",
   no_payment_method:
     "Customers have no way to pay yet. Add your UPI ID, or allow pay on delivery, in Settings → Payments.",
   storefront_not_published:

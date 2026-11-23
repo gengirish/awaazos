@@ -44,7 +44,7 @@ export async function POST(req: NextRequest) {
     const results = await prisma.$transaction(
       ids.map((id, index) =>
         prisma.menuItem.updateMany({
-          where: { id, vendorId },
+          where: { id, vendorId, archivedAt: null },
           data: { sortOrder: index },
         }),
       ),

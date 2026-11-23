@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
         const updated: MenuItem[] = [];
         for (const u of updates) {
           const { count } = await tx.menuItem.updateMany({
-            where: { id: u.id, vendorId },
+            where: { id: u.id, vendorId, archivedAt: null },
             data: { priceInPaise: u.priceInPaise },
           });
           if (count === 0) {

@@ -57,7 +57,7 @@ export async function loadSetupChecklist({ vendor, role, known }: SetupChecklist
           where: { vendorId: vendor.id },
           select: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true, fssaiNumber: true },
         }),
-    known?.availableItemCount ?? prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
+    known?.availableItemCount ?? prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true, archivedAt: null } }),
     prisma.drop.count({ where: { vendorId: vendor.id } }),
   ]);
 

@@ -28,8 +28,9 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
 export async function GET(req: NextRequest) {
   try {
     const ctx = await requireVendorRole("CASHIER", undefined, req);
+    // Deleted items (lib/menu-archive.ts) are off the list for good.
     const items = await prisma.menuItem.findMany({
-      where: { vendorId: ctx.vendor.id },
+      where: { vendorId: ctx.vendor.id, archivedAt: null },
       orderBy: { sortOrder: "asc" },
     });
     // `stockLeft` is derived (lib/inventory.ts rule 2); null on untracked rows.

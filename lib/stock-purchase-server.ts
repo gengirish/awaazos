@@ -60,7 +60,7 @@ export async function receiveStock(tx: Prisma.TransactionClient, input: ReceiveS
   const now = input.now ?? new Date();
 
   const item = await tx.menuItem.findFirst({
-    where: { id: menuItemId, vendorId },
+    where: { id: menuItemId, vendorId, archivedAt: null },
     select: { id: true, costInPaise: true, variants: { select: { id: true, label: true, costInPaise: true } } },
   });
   if (!item) throw new ReceiveStockError(404, "Not found");

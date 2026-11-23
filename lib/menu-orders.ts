@@ -215,7 +215,7 @@ export async function placeMenuOrder(input: PlaceMenuOrderInput): Promise<PlaceM
     const order = await prisma.$transaction(async (tx) => {
       // Compound filter = tenant isolation; unavailable items can't be ordered.
       const menuItems = await tx.menuItem.findMany({
-        where: { vendorId, isAvailable: true, showOnline: true, id: { in: lines.map((l) => l.menuItemId) } },
+        where: { vendorId, isAvailable: true, showOnline: true, archivedAt: null, id: { in: lines.map((l) => l.menuItemId) } },
         select: {
           id: true,
           name: true,

@@ -5,7 +5,7 @@ import { env } from "@/lib/env";
 import { canSeeCost, rowsForRole } from "@/lib/item-cost";
 import { withStockLeft, withVariants } from "@/lib/menu-stock-server";
 import { prisma } from "@/lib/prisma";
-import { AuthError, requireVendorRole } from "@/lib/rbac";
+import { AuthError, requireVendorRole, staffRoleAtLeast } from "@/lib/rbac";
 import { storeVocabulary, type StoreVocabulary } from "@/lib/store-vocabulary";
 
 export default async function MenuPage(props: {
@@ -40,7 +40,8 @@ export default async function MenuPage(props: {
   const [items, settings] = await Promise.all([
     prisma.menuItem
       .findMany({
-        where: { vendorId },
+        // Deleted items (lib/menu-archive.ts) are off the list for good.
+        where: { vendorId, archivedAt: null },
         orderBy: { sortOrder: "asc" },
       })
       // Stock left is derived (lib/inventory.ts); no query when nothing is tracked.
@@ -61,6 +62,8 @@ export default async function MenuPage(props: {
         vocab={vocab}
         sizesEnabled={env.ITEM_VARIANTS_ENABLED === "true"}
         canSeeCost={seesCost}
+        // Delete an item, rename a category: the same bar as the /menu tab (lib/app-nav.ts).
+        canManage={staffRoleAtLeast(role, "MANAGER")}
         // Product links (/s/<slug>/p/<id>) exist only once the store is published.
         storeSlug={settings?.publishStorefront ? vendorSlug : null}
       />

@@ -3,9 +3,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
 import { rupeesToPaise } from "@/lib/currency";
+import { effectiveDropStatus } from "@/lib/drops";
 import { canSeeCost, hideCost } from "@/lib/item-cost";
 import { takeCostField } from "@/lib/item-cost-schema";
 import { recordStockCount } from "@/lib/inventory-server";
+import { ON_MENU, dropBlocksArchive } from "@/lib/menu-archive";
 import { hasStockFields, menuStockFieldsSchema, splitStockFields } from "@/lib/menu-stock";
 import { withStockLeft } from "@/lib/menu-stock-server";
 import { deduplicateSlug, generateSlug } from "@/lib/menu-suggestions";
@@ -95,8 +97,9 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
       const vendorId = ctx.vendor.id;
       const updated = await prisma.$transaction(async (tx) => {
         // Also the tenant check: P2025 for another vendor's id, before any count is written.
+        // A deleted item (lib/menu-archive.ts) can't be edited back onto the menu.
         let row = await tx.menuItem.update({
-          where: { id: params.id, vendorId },
+          where: { id: params.id, vendorId, ...ON_MENU },
           data: data as Prisma.MenuItemUpdateInput,
         });
         if (stockFields.stockQty !== undefined) {
@@ -140,24 +143,47 @@ export async function PATCH(req: NextRequest, props: { params: Promise<{ id: str
   }
 }
 
+/**
+ * Delete an item (lib/menu-archive.ts): it is archived, not removed, so old bills,
+ * drops and stock records keep resolving. MANAGER and up, the same bar as the
+ * /menu tab: there is no undo, and a cashier can still mark an item sold out.
+ */
 export async function DELETE(req: NextRequest, props: { params: Promise<{ id: string }> }) {
   const params = await props.params;
   try {
-    const ctx = await requireVendorRole("CASHIER", undefined, req);
+    const ctx = await requireVendorRole("MANAGER", undefined, req);
+    const vendorId = ctx.vendor.id;
+    const now = new Date();
 
-    try {
-      await prisma.menuItem.update({
-        where: { id: params.id, vendorId: ctx.vendor.id },
-        data: { isAvailable: false },
-      });
-      const res = NextResponse.json({ success: true });
-      return withVendorCookie(res, ctx.setVendorCookie);
-    } catch (e) {
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2025") {
-        return NextResponse.json({ error: "Not found" }, { status: 404 });
-      }
-      throw e;
+    // Another vendor's id, an unknown one and an already deleted item all read the same.
+    const item = await prisma.menuItem.findFirst({
+      where: { id: params.id, vendorId, ...ON_MENU },
+      select: { id: true },
+    });
+    if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+    // Rule 3: a drop sells its items whatever isAvailable says, so a pre-order that is
+    // a draft, opens later or is taking orders keeps the item until it is removed there.
+    const drops = await prisma.drop.findMany({
+      where: { vendorId, status: { in: ["DRAFT", "OPEN"] }, items: { some: { menuItemId: item.id } } },
+      select: { id: true, title: true, status: true, opensAt: true, closesAt: true },
+      orderBy: { closesAt: "asc" },
+    });
+    const blocking = drops.filter((d) => dropBlocksArchive(effectiveDropStatus(d, now)));
+    if (blocking.length > 0) {
+      return NextResponse.json(
+        { error: "in_open_drop", drops: blocking.map((d) => ({ id: d.id, title: d.title })) },
+        { status: 409 },
+      );
     }
+
+    const { count } = await prisma.menuItem.updateMany({
+      where: { id: item.id, vendorId, ...ON_MENU },
+      data: { archivedAt: now, isAvailable: false },
+    });
+    if (count === 0) return NextResponse.json({ error: "Not found" }, { status: 404 });
+    const res = NextResponse.json({ success: true });
+    return withVendorCookie(res, ctx.setVendorCookie);
   } catch (err) {
     if (err instanceof AuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

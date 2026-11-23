@@ -16,7 +16,7 @@ export async function loadStorePolishNudge(
 ): Promise<StorePolishNudge | null> {
   if (role !== "OWNER" || vendor.isDemo || !store.published) return null;
   const items = await prisma.menuItem.findMany({
-    where: { vendorId: vendor.id, isAvailable: true, showOnline: true },
+    where: { vendorId: vendor.id, isAvailable: true, showOnline: true, archivedAt: null },
     select: { name: true },
     orderBy: { sortOrder: "asc" },
     take: 200,

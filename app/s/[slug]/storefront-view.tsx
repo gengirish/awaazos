@@ -460,7 +460,7 @@ async function loadItemStock(
   const missingGifts = Array.from(new Set(giftIds.filter((id) => !known.has(id))));
   if (missingGifts.length > 0) {
     const gifts = await prisma.menuItem.findMany({
-      where: { vendorId, id: { in: missingGifts }, stockQty: { not: null } },
+      where: { vendorId, id: { in: missingGifts }, stockQty: { not: null }, archivedAt: null },
       select: { id: true, stockQty: true, stockCountedAt: true, lowStockAt: true },
     });
     for (const g of gifts) byId.set(g.id, g);

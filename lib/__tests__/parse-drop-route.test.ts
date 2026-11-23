@@ -134,7 +134,7 @@ describe("POST /api/ai/parse-drop", () => {
 
     expect(h.requireVendorRole).toHaveBeenCalledWith("MANAGER", undefined, expect.anything());
     expect(h.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { vendorId: "v_1", isAvailable: true } }),
+      expect.objectContaining({ where: { vendorId: "v_1", isAvailable: true, archivedAt: null } }),
     );
     expect(h.reserve).toHaveBeenCalledWith(expect.objectContaining({ vendorId: "v_1", plan: "STARTER" }));
     expect(h.sonnetCreate).not.toHaveBeenCalled();

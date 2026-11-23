@@ -45,7 +45,7 @@ export async function GET(req: NextRequest, props: { params: Promise<{ id: strin
   try {
     const ctx = await requireVendorRole("MANAGER", undefined, req);
     const item = await prisma.menuItem.findFirst({
-      where: { id: params.id, vendorId: ctx.vendor.id },
+      where: { id: params.id, vendorId: ctx.vendor.id, archivedAt: null },
       select: { id: true },
     });
     if (!item) return NextResponse.json({ error: "Not found" }, { status: 404 });

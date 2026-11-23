@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
 
     // Available items only; showOnline=false (counter-only) items may still go in a drop.
     const menuRows = await prisma.menuItem.findMany({
-      where: { vendorId: ctx.vendor.id, isAvailable: true },
+      where: { vendorId: ctx.vendor.id, isAvailable: true, archivedAt: null },
       select: { id: true, slug: true, name: true, aliases: true, tags: true, priceInPaise: true },
       orderBy: { sortOrder: "asc" },
     });

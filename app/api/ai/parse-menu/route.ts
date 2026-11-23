@@ -52,8 +52,9 @@ export async function POST(req: NextRequest) {
     }
 
     // The whole menu (unavailable items too): "samosa 20" must find the hidden samosa, not duplicate it.
+    // Deleted items are not on it (lib/menu-archive.ts): saying one again adds it afresh.
     const menuRows = await prisma.menuItem.findMany({
-      where: { vendorId: ctx.vendor.id },
+      where: { vendorId: ctx.vendor.id, archivedAt: null },
       select: {
         id: true,
         slug: true,

@@ -36,17 +36,76 @@ test.describe("menu CRUD", () => {
     const patched = (await patch.json()) as { data: MenuItemRow };
     expect(patched.data.priceInPaise).toBe(3000);
 
-    // DELETE is a soft delete — the row must survive so historical bills that
-    // reference it keep resolving.
+    // DELETE archives (lib/menu-archive.ts): the row stays so historical bills that
+    // reference it keep resolving, but it leaves every catalogue list.
     const del = await page.request.delete(`/api/menu/${created.id}`);
     expect(del.status()).toBe(200);
     expect(await del.json()).toEqual({ success: true });
 
     const after = await page.request.get("/api/menu");
     const afterBody = (await after.json()) as { data: MenuItemRow[] };
-    const row = afterBody.data.find((i) => i.id === created.id);
-    expect(row, "soft delete must keep the row").toBeTruthy();
-    expect(row?.isAvailable).toBe(false);
+    expect(afterBody.data.some((i) => i.id === created.id), "a deleted item leaves the list").toBe(false);
+
+    // Gone for good: no second delete, no edit back onto the menu.
+    expect((await page.request.delete(`/api/menu/${created.id}`)).status()).toBe(404);
+    expect((await page.request.patch(`/api/menu/${created.id}`, { data: { isAvailable: true } })).status()).toBe(404);
+
+    // The name is free again (slug gets the usual suffix).
+    const again = await createMenuItem(page, { name: "Bhel Puri", priceInRupees: 25, category: "Chaat" });
+    expect(again.id).not.toBe(created.id);
+  });
+
+  test("delete is refused while an open pre-order sells the item", async ({ page, request }) => {
+    await createVendorSession(page, request, "menu-del-drop");
+    const item = await createMenuItem(page, { name: "Drop Samosa", priceInRupees: 20 });
+    const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kolkata" }).format(
+      new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
+    );
+    const created = await page.request.post("/api/drops", {
+      data: {
+        title: "Saturday Samosas",
+        date: ymd,
+        fulfilmentMode: "PICKUP",
+        fulfilmentStart: "17:00",
+        fulfilmentEnd: "19:00",
+        closesAtDate: ymd,
+        closesAtTime: "12:00",
+        items: [{ menuItemId: item.id, priceInPaise: 2000 }],
+      },
+    });
+    expect(created.status()).toBe(201);
+    const { data: drop } = (await created.json()) as { data: { id: string } };
+
+    // A draft can still open, so it blocks too.
+    const refused = await page.request.delete(`/api/menu/${item.id}`);
+    expect(refused.status()).toBe(409);
+    expect(await refused.json()).toEqual({ error: "in_open_drop", drops: [{ id: drop.id, title: "Saturday Samosas" }] });
+    const list = (await (await page.request.get("/api/menu")).json()) as { data: MenuItemRow[] };
+    expect(list.data.some((i) => i.id === item.id)).toBe(true);
+
+    // Once the drop is gone, the delete goes through.
+    expect((await page.request.delete(`/api/drops/${drop.id}`)).status()).toBe(200);
+    expect((await page.request.delete(`/api/menu/${item.id}`)).status()).toBe(200);
+  });
+
+  test("rename a category on every item that has it", async ({ page, request }) => {
+    await createVendorSession(page, request, "menu-cat");
+    const a = await createMenuItem(page, { name: "Pani Puri", priceInRupees: 30, category: "Chat" });
+    const b = await createMenuItem(page, { name: "Sev Puri", priceInRupees: 35, category: "Chat" });
+    const c = await createMenuItem(page, { name: "Lassi", priceInRupees: 40, category: "Drinks" });
+
+    const empty = await page.request.patch("/api/menu/categories", { data: { from: "Chat", to: "   " } });
+    expect(empty.status()).toBe(400);
+
+    const renamed = await page.request.patch("/api/menu/categories", { data: { from: "Chat", to: "  Chaat " } });
+    expect(renamed.status()).toBe(200);
+    expect(await renamed.json()).toEqual({ data: { updated: 2 } });
+
+    const list = (await (await page.request.get("/api/menu")).json()) as { data: (MenuItemRow & { category: string })[] };
+    const byId = new Map(list.data.map((i) => [i.id, i.category]));
+    expect(byId.get(a.id)).toBe("Chaat");
+    expect(byId.get(b.id)).toBe("Chaat");
+    expect(byId.get(c.id)).toBe("Drinks");
   });
 
   test("rejects prices that cannot be represented as integer paise", async ({
@@ -133,5 +192,31 @@ test.describe("menu CRUD", () => {
       () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
     );
     expect(overflow, "the menu page should not scroll sideways").toBeLessThanOrEqual(0);
+  });
+});
+
+test.describe("menu screen: delete and rename", () => {
+  test("delete a dish from its form, rename a category from its chip", async ({ page, request }) => {
+    await createVendorSession(page, request, "menu-ui-del");
+    await createMenuItem(page, { name: "Test Junk Item", priceInRupees: 10, category: "Snaks" });
+    await createMenuItem(page, { name: "Keeper Vada", priceInRupees: 20, category: "Snaks" });
+
+    await page.goto("/menu");
+    await page.getByRole("button", { name: "Edit Test Junk Item" }).click();
+    const form = page.getByRole("dialog", { name: "Edit item" });
+    await form.getByRole("button", { name: "Delete dish" }).click();
+    const confirm = page.getByRole("dialog", { name: "Delete Test Junk Item?" });
+    await confirm.getByRole("button", { name: "Delete", exact: true }).click();
+    await expect(page.getByText("Test Junk Item deleted")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit Test Junk Item" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Edit Keeper Vada" })).toBeVisible();
+
+    await page.getByRole("button", { name: "Rename category Snaks" }).click();
+    const sheet = page.getByRole("dialog", { name: "Rename category" });
+    await sheet.getByLabel("New name").fill("Snacks");
+    await sheet.getByRole("button", { name: "Rename" }).click();
+    await expect(page.getByText("Renamed to “Snacks” (1 item)")).toBeVisible();
+    await expect(page.getByRole("button", { name: "Rename category Snacks" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Rename category Snaks" })).toHaveCount(0);
   });
 });

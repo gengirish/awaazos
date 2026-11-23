@@ -28,7 +28,7 @@ export default async function NewDropPage() {
 
   const [menuItems, settings, lastDrop] = await Promise.all([
     prisma.menuItem.findMany({
-      where: { vendorId },
+      where: { vendorId, archivedAt: null },
       orderBy: { sortOrder: "asc" },
       select: { id: true, name: true, emoji: true, priceInPaise: true, isAvailable: true },
     }),

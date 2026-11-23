@@ -291,6 +291,22 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     keywords: "unavailable hide out of stock availability",
   },
   {
+    id: "delete-item",
+    group: "menu",
+    title: "Delete a {item}",
+    steps: "Tap Edit on the {item}, then Delete {item} at the bottom and confirm. It goes from your {catalogue}, Sell and your online store for good; past bills keep it. A {item} in a pre-order that is still open has to come out of that pre-order first. An owner or manager can delete. To hide a {item} for a while, mark it sold out instead.",
+    nav: "menu",
+    keywords: "delete remove test item get rid clean up trash",
+  },
+  {
+    id: "rename-category",
+    group: "menu",
+    title: "Rename a category",
+    steps: "On the {catalogueTitle} screen, tap the category under Categories, type the new name and tap Rename. Every {item} in it moves to the new name. Type a name you already use to merge the two. An owner or manager can rename.",
+    nav: "menu",
+    keywords: "category section heading group rename edit name merge",
+  },
+  {
     id: "track-stock",
     group: "menu",
     title: "Keep count of how many you have",

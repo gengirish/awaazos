@@ -99,7 +99,7 @@ export default async function SettingsHubPage() {
         ...RAZORPAY_CRED_SELECT,
       },
     }),
-    prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true } }),
+    prisma.menuItem.count({ where: { vendorId: vendor.id, isAvailable: true, archivedAt: null } }),
     pushConfigured ? countVendorPushDevices(vendor.id) : Promise.resolve(0),
     prisma.offer.count({ where: { vendorId: vendor.id, isActive: true } }),
     prisma.drop.count({ where: { vendorId: vendor.id } }),

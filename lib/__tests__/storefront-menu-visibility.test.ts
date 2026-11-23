@@ -85,7 +85,7 @@ describe("everydayMenuHiddenByDrops", () => {
 
 describe("storefront menu item filter", () => {
   it("offers only available items that are shown online", () => {
-    expect(STOREFRONT_MENU_ITEM_WHERE).toEqual({ isAvailable: true, showOnline: true });
+    expect(STOREFRONT_MENU_ITEM_WHERE).toEqual({ isAvailable: true, showOnline: true, archivedAt: null });
   });
 });
 
