@@ -44,11 +44,13 @@ import { RATING_WORDS } from "@/lib/order-feedback";
 import {
   balanceDuePaise,
   availableOrderActions,
+  fixStatusActions,
   markPaidNeedsConfirm,
   orderStateLabel,
   paymentBadge,
   primaryOrderAction,
   type BoardOrder,
+  type FixStatusAction,
   type OrderAction,
   type PaymentBadgeKind,
 } from "@/lib/drops-board";
@@ -132,6 +134,10 @@ export function OrderCard({
 }: Props) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmPaid, setConfirmPaid] = useState(false);
+  // "Fix status": the corrective action waiting for its confirm. Kept after close
+  // so the dialog's words don't change while it animates out.
+  const [fixing, setFixing] = useState<FixStatusAction>("unready");
+  const [fixOpen, setFixOpen] = useState(false);
   // The card's "⋯": a bottom sheet on phones (the dialog this card already loads
   // for Cancel), so the board's first load carries no menu library.
   const [moreOpen, setMoreOpen] = useState(false);
@@ -176,10 +182,10 @@ export function OrderCard({
   // The buyer tapped "I've received my order" and it still waits on the seller (unpaid).
   const receivedAt = order.buyerReceivedAt ? new Date(order.buyerReceivedAt) : null;
   const buyerSaysReceived = receivedAt !== null && (fs === "PLACED" || fs === "CONFIRMED");
-  const canUndeliver = actions.has("undeliver");
   const canCancel = actions.has("cancel");
   const canMarkReady = actions.has("mark_ready");
-  const canUnready = actions.has("unready");
+  // Mistake fixes, per order only (never bulk, never the big button).
+  const fixes = fixStatusActions(order, frozen);
 
   const deliverLabel =
     order.paymentMethod === "CASH" && unpaid
@@ -226,7 +232,29 @@ export function OrderCard({
   const cardButtons = shown.filter((b) => onCard(b.action)).sort((a) => (a.action === primary ? -1 : 1));
   const menuButtons = shown.filter((b) => !onCard(b.action));
   const primaryButton = shown.find((b) => b.action === primary) ?? null;
-  const hasMenu = menuButtons.length > 0 || canUnready || canUndeliver || canCancel;
+  const hasMenu = menuButtons.length > 0 || fixes.length > 0 || canCancel;
+
+  // Each fix's menu label and its confirm (title, then what happens).
+  const FIX_COPY: Record<FixStatusAction, [label: string, title: string, description: string]> = {
+    unready: [
+      outForDelivery ? "Not out for delivery yet" : "Not ready yet",
+      "Move it back to Preparing?",
+      "Its customer page says so too.",
+    ],
+    undeliver: [
+      isPickup ? "Undo picked up" : "Undo delivered",
+      "Move it back to Ready?",
+      "Payment stays as it is.",
+    ],
+    mark_unpaid: ["Not paid yet", "Mark it not paid?", "It comes off your sales."],
+    uncancel: [
+      "Reopen order",
+      "Reopen this order?",
+      order.paymentStatus === "REFUNDED"
+        ? "It comes back accepted and paid, if still in stock. Refunded the buyer? Tap Not paid yet after."
+        : "It comes back accepted, if still in stock.",
+    ],
+  };
 
   const btn = ({ action, label, icon }: (typeof BUTTONS)[number]) => {
     const isPrimary = action === primary;
@@ -659,36 +687,31 @@ export function OrderCard({
                   </Button>
                 </li>
               ))}
-              {canUnready && (
-                <li>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-12 w-full justify-start text-sm font-medium"
-                    onClick={() => {
-                      setMoreOpen(false);
-                      onAction(order.id, "unready");
-                    }}
-                  >
-                    <Undo2 aria-hidden />
-                    {outForDelivery ? "Not out for delivery yet" : "Not ready yet"}
-                  </Button>
-                </li>
-              )}
-              {canUndeliver && (
-                <li>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="min-h-12 w-full justify-start text-sm font-medium"
-                    onClick={() => {
-                      setMoreOpen(false);
-                      onAction(order.id, "undeliver");
-                    }}
-                  >
-                    <Undo2 aria-hidden />
-                    {isPickup ? "Undo picked up" : "Undo delivered"}
-                  </Button>
+              {fixes.length > 0 && (
+                // Mistake fixes, set apart under their own heading; each asks first.
+                <li className="mt-2 border-t pt-3">
+                  <p id={`${titleId}-fix`} className="mb-2 text-sm font-semibold">
+                    Fix status
+                  </p>
+                  <ul className="flex flex-col gap-2" aria-labelledby={`${titleId}-fix`}>
+                    {fixes.map((a) => (
+                      <li key={a}>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          className="min-h-12 w-full justify-start text-sm font-medium"
+                          onClick={() => {
+                            setMoreOpen(false);
+                            setFixing(a);
+                            setFixOpen(true);
+                          }}
+                        >
+                          <Undo2 aria-hidden />
+                          {FIX_COPY[a][0]}
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
                 </li>
               )}
               {canCancel && (
@@ -712,6 +735,17 @@ export function OrderCard({
           </ResponsiveDialogBody>
         </ResponsiveDialogContent>
       </ResponsiveDialog>
+
+      <ConfirmDialog
+        open={fixOpen}
+        onOpenChange={setFixOpen}
+        title={FIX_COPY[fixing][1]}
+        description={`${order.billNumber} · ${formatINR(order.totalPaise)}. ${FIX_COPY[fixing][2]}`}
+        confirmLabel="Yes, change it"
+        cancelLabel="Go back"
+        destructive={fixing === "mark_unpaid"}
+        onConfirm={() => onAction(order.id, fixing)}
+      />
 
       <ConfirmDialog
         open={confirmPaid}

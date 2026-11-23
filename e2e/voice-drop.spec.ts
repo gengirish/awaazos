@@ -106,7 +106,10 @@ test.describe("voice drop builder", () => {
     });
 
     await page.goto("/drops/new");
+    // Voice sits last, closed: the manual form comes first.
     const panel = page.getByRole("region", { name: "Fill this form by voice" });
+    await expect(panel).toBeHidden();
+    await page.getByText("Fill by voice", { exact: true }).click();
     await expect(panel).toBeVisible();
     await expect(panel.getByText(/For example:/)).toBeVisible();
 
@@ -205,6 +208,7 @@ test.describe("voice drop builder", () => {
     ]);
 
     // Edit page: the panel warns that voice replaces saved values.
+    await page.getByText("Fill by voice", { exact: true }).click();
     const editPanel = page.getByRole("region", { name: "Fill this form by voice" });
     await expect(editPanel.getByText(/Nothing is saved until you press Save changes/)).toBeVisible();
   });
@@ -224,6 +228,7 @@ test.describe("voice drop builder", () => {
 
     await page.goto("/drops/new");
     const panel = page.getByRole("region", { name: "Fill this form by voice" });
+    await page.getByText("Fill by voice", { exact: true }).click();
     await panel.getByRole("button", { name: "Speak your pre-order" }).click();
     await expect(panel.getByRole("alert")).toHaveText("Voice isn't available right now — fill the form below.");
     await expect(page.getByText("From voice", { exact: true })).toHaveCount(0);
@@ -268,6 +273,7 @@ test.describe("voice drop builder", () => {
 
     await page.goto("/drops/new");
     const panel = page.getByRole("region", { name: "Fill this form by voice" });
+    await page.getByText("Fill by voice", { exact: true }).click();
     await expect(panel.getByText("తెలుగు (Telugu)")).toBeVisible();
     const mic = panel.getByRole("button", { name: "Speak your pre-order" });
     await mic.click();

@@ -151,7 +151,7 @@ describe("store wording", () => {
     expect(text).not.toMatch(/\bdish(es)?\b|\bcook|Menu screen|Prep sheet|home kitchens/i);
     const byId = new Map(helpTopicsForRole("OWNER", false, "goods").map((t) => [t.id, t]));
     expect(byId.get("prep-sheet")).toMatchObject({ title: "Find out how much to pack", path: ["Orders", "choose the pre-order", "Packing list"] });
-    expect(byId.get("voice-menu")!.steps).toContain("Add products by voice at the top of the Products screen");
+    expect(byId.get("voice-menu")!.steps).toContain("Add products by voice");
     expect(byId.get("edit-menu")!.path).toEqual(["Products"]);
   });
 });

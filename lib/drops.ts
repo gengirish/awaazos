@@ -19,6 +19,8 @@
  *      by size: the drop's cap and per-order limit count every size of the
  *      item together, each tracked size's own stock caps that size (locked
  *      after the items), and the line is priced from the size, else the drop.
+ *      Reopening a cancelled order (`reopenCancelledOrder`) makes it hold stock
+ *      again, so it takes the same locks in the same order and must still fit.
  *
  *   3. **Sold counts are derived, never stored.** An unpaid UPI order holds its
  *      stock for PENDING_HOLD_MINUTES, then silently stops counting. Cancelling
@@ -26,7 +28,8 @@
  *
  * Money is integer paise throughout. DailySummary is credited when a storefront
  * order is *paid*, not when it is placed — unpaid orders must not inflate
- * revenue.
+ * revenue. Every move goes through markOrderPaid / cancelOrder and their two
+ * mistake fixes, markOrderUnpaid and reopenCancelledOrder.
  */
 
 import { randomBytes } from "node:crypto";
@@ -814,6 +817,182 @@ export async function cancelOrder(
     });
   }
   return true;
+}
+
+/**
+ * Undo a wrong "Payment received" (`mark_unpaid`): the exact reverse of what
+ * `markOrderPaid` booked. PAID → PENDING, `paidAt` cleared, and the revenue,
+ * items and transaction it credited come off DailySummary on the IST day they
+ * went on (the `paidAt` day, as `cancelOrder` does). Manual payments only: an
+ * order Razorpay paid (`razorpayPaymentId`) is never touched. The PLACED →
+ * CONFIRMED step is not undone: the seller has accepted the order either way.
+ * A buyer's claim or UTR still on the row comes back as "Payment to check".
+ * Returns false when the order isn't a paid, live, manually paid storefront order.
+ */
+export async function markOrderUnpaid(
+  tx: Prisma.TransactionClient,
+  args: { vendorId: string; transactionId: string },
+): Promise<boolean> {
+  const where: Prisma.TransactionWhereInput = {
+    id: args.transactionId,
+    vendorId: args.vendorId,
+    source: "STOREFRONT",
+    paymentStatus: "PAID",
+    fulfilmentStatus: { not: "CANCELLED" },
+    razorpayPaymentId: null,
+  };
+  const t = await tx.transaction.findFirst({
+    where,
+    select: { paidAt: true, totalPaise: true, paymentMethod: true, isSample: true, orderItems: { select: { qty: true } } },
+  });
+  if (!t) return false;
+
+  // Conditional on still being PAID: two phones undoing at once reverse it once.
+  const res = await tx.transaction.updateMany({ where, data: { paymentStatus: "PENDING", paidAt: null } });
+  if (res.count === 0) return false;
+
+  if (t.paidAt && !t.isSample) {
+    await applyToDailySummary(tx, {
+      vendorId: args.vendorId,
+      date: getIstTodayStart(t.paidAt),
+      totalPaise: t.totalPaise,
+      itemsSold: t.orderItems.reduce((s, i) => s + i.qty, 0),
+      paymentMethod: t.paymentMethod,
+      sign: -1,
+    });
+  }
+  return true;
+}
+
+export type ReopenOrderResult =
+  | { ok: true }
+  | { ok: false; code: "invalid_state" | "paid_online" | "sold_out" | "out_of_stock" };
+
+/**
+ * Reopen an order the seller cancelled (`uncancel`). Only the seller cancels a
+ * storefront order (`cancelOrder`), so every CANCELLED row qualifies, except one
+ * Razorpay paid (`paid_online`): its money is refunded or owed back, so it stays closed.
+ *
+ * It holds stock again, so it must still fit, checked as placement does and
+ * under the same locks in the same order (rule 2): the drop row (`FOR UPDATE`),
+ * then the tracked MenuItem rows by id, then tracked sizes. The cancelled order
+ * holds nothing, so what is left already excludes it. A drop order that no
+ * longer fits the drop's caps or its products' stock is refused `sold_out`; a
+ * menu order short of stock `out_of_stock`, as at checkout. Not re-checked: the
+ * cut-off, `isAvailable`, the plan cap and the buyer-facing rules (per-order
+ * limit, areas, slots), which were met when it was placed.
+ *
+ * What comes back: cancel keeps every stamp (readyAt, outForDeliveryAt, the
+ * claim) and changes only `fulfilmentStatus`, `cancelledAt` and, for a paid
+ * order, PAID → REFUNDED. So a paid order is restored exactly: PAID again
+ * (paid orders are always CONFIRMED, `markOrderPaid`), its revenue re-credited
+ * on its `paidAt` day where cancel took it off. An unpaid one comes back
+ * CONFIRMED and unpaid, because PLACED vs CONFIRMED before the cancel is not
+ * stored, and a reopened PLACED order past its 15-minute hold would lapse at once.
+ */
+export async function reopenCancelledOrder(
+  tx: Prisma.TransactionClient,
+  args: { vendorId: string; transactionId: string; now?: Date },
+): Promise<ReopenOrderResult> {
+  const now = args.now ?? new Date();
+  const { vendorId, transactionId } = args;
+  const where: Prisma.TransactionWhereInput = {
+    id: transactionId,
+    vendorId,
+    source: "STOREFRONT",
+    fulfilmentStatus: "CANCELLED",
+  };
+  const t = await tx.transaction.findFirst({
+    where,
+    select: {
+      dropId: true,
+      paymentStatus: true,
+      paymentMethod: true,
+      paidAt: true,
+      totalPaise: true,
+      isSample: true,
+      razorpayPaymentId: true,
+      orderItems: { select: { dropItemId: true, menuItemId: true, variantId: true, qty: true } },
+    },
+  });
+  if (!t) return { ok: false, code: "invalid_state" };
+  if (t.razorpayPaymentId) return { ok: false, code: "paid_online" };
+
+  const lines = t.orderItems;
+  const short = t.dropId ? "sold_out" : "out_of_stock";
+  if (t.dropId) {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM drops WHERE id = ${t.dropId} AND "vendorId" = ${vendorId} FOR UPDATE`;
+    if (locked.length === 0) return { ok: false, code: "invalid_state" };
+  }
+
+  // A sample order never takes stock (lib/inventory.ts rule 3), so there is nothing to fit.
+  if (!t.isSample) {
+    const sum = (key: (l: (typeof lines)[number]) => string | null) => {
+      const m = new Map<string, number>();
+      for (const l of lines) {
+        const k = key(l);
+        if (k) m.set(k, (m.get(k) ?? 0) + l.qty);
+      }
+      return m;
+    };
+
+    // The drop's own caps: every line of a drop item counts, sizes and gifts included.
+    if (t.dropId) {
+      const byDropItem = sum((l) => l.dropItemId);
+      if (byDropItem.size > 0) {
+        const capped = await tx.dropItem.findMany({
+          where: { dropId: t.dropId, drop: { vendorId }, id: { in: [...byDropItem.keys()] }, maxQty: { not: null } },
+          select: { id: true, maxQty: true },
+        });
+        if (capped.length > 0) {
+          const sold = await soldQtyByDropItem(tx, t.dropId, now);
+          for (const d of capped) {
+            const left = remainingQty(d.maxQty, sold.get(d.id) ?? 0);
+            if (left !== null && (byDropItem.get(d.id) ?? 0) > left) return { ok: false, code: "sold_out" };
+          }
+        }
+      }
+    }
+
+    // Product stock, then sizes; a line without a size counts against its item.
+    const tracked = await lockTrackedMenuItems(
+      tx,
+      vendorId,
+      lines.flatMap((l) => (l.menuItemId ? [l.menuItemId] : [])),
+    );
+    const left = await stockLeftByMenuItem(tx, vendorId, tracked, now);
+    if (firstShortfall(sum((l) => (l.variantId ? null : l.menuItemId)), left)) return { ok: false, code: short };
+
+    const sizeNeed = sum((l) => l.variantId);
+    const trackedSizes = await lockTrackedVariants(tx, vendorId, [...sizeNeed.keys()]);
+    const sizeLeft = await stockLeftByVariant(tx, vendorId, trackedSizes, now);
+    if (firstShortfall(sizeNeed, sizeLeft)) return { ok: false, code: short };
+  }
+
+  // Cancel turns PAID into REFUNDED and nothing else does on a storefront order.
+  const wasPaid = t.paymentStatus === "REFUNDED";
+  const res = await tx.transaction.updateMany({
+    where: { ...where, razorpayPaymentId: null },
+    data: {
+      fulfilmentStatus: "CONFIRMED",
+      cancelledAt: null,
+      ...(wasPaid ? { paymentStatus: "PAID" as const } : {}),
+    },
+  });
+  if (res.count === 0) return { ok: false, code: "invalid_state" };
+
+  if (wasPaid && t.paidAt && !t.isSample) {
+    await applyToDailySummary(tx, {
+      vendorId,
+      date: getIstTodayStart(t.paidAt),
+      totalPaise: t.totalPaise,
+      itemsSold: lines.reduce((s, i) => s + i.qty, 0),
+      paymentMethod: t.paymentMethod,
+      sign: 1,
+    });
+  }
+  return { ok: true };
 }
 
 async function applyToDailySummary(

@@ -186,4 +186,57 @@ test.describe("Orders board: menu and drop orders together", () => {
       .evaluateAll((labels) => labels.filter((l) => l.scrollWidth > l.clientWidth).length);
     expect(overflowing).toBe(0);
   });
+
+  test("Fix status: reopen a cancelled paid order, then take back the payment", async ({ page, request }) => {
+    await createVendorSession(page, request, "board-fix");
+    const json = { "Content-Type": "application/json" };
+    const settings = await page.request.patch("/api/vendor", {
+      data: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true },
+      headers: json,
+    });
+    expect(settings.status()).toBe(200);
+    const { vendor } = (await (await page.request.get("/api/vendor")).json()) as { vendor: { slug: string } };
+    const poha = await createMenuItem(page, { name: "Fix Poha", priceInRupees: 40 });
+
+    const placed = await request.post(`/api/s/${vendor.slug}/menu-orders`, {
+      data: {
+        items: [{ menuItemId: poha.id, qty: 1 }],
+        customerName: "Fix Farah",
+        customerPhone: "+919848054331",
+        fulfilmentType: "PICKUP",
+        paymentMethod: "CASH",
+      },
+      headers: json,
+    });
+    expect(placed.status()).toBe(201);
+    const list = (await (await page.request.get("/api/storefront-orders")).json()) as { data: { id: string }[] };
+    const orderId = list.data[0]!.id;
+    // Paid by hand, then cancelled by mistake.
+    for (const action of ["mark_paid", "cancel"]) {
+      const res = await page.request.patch(`/api/storefront-orders/${orderId}`, { data: { action }, headers: json });
+      expect(res.status(), action).toBe(200);
+    }
+
+    await page.goto("/orders");
+    await page.getByRole("tab", { name: /^Done/ }).click();
+    const card = page.getByRole("article", { name: /Fix Farah/ });
+    await card.getByRole("button", { name: /show details/i }).click();
+    await card.getByRole("button", { name: /^More for/ }).click();
+    const more = page.getByRole("dialog", { name: /Fix Farah.s order/ });
+    await expect(more.getByText("Fix status", { exact: true })).toBeVisible();
+    await more.getByRole("button", { name: "Reopen order" }).click();
+    const reopen = page.getByRole("dialog", { name: "Reopen this order?" });
+    await expect(reopen).toBeVisible();
+    await reopen.getByRole("button", { name: "Yes, change it" }).click();
+    await expect(page.getByText("Order reopened")).toBeVisible();
+
+    await page.getByRole("tab", { name: /^Preparing \(1\)/ }).click();
+    await expect(card.getByText("Paid", { exact: true })).toBeVisible();
+    await card.getByRole("button", { name: /show details/i }).click();
+    await card.getByRole("button", { name: /^More for/ }).click();
+    await more.getByRole("button", { name: "Not paid yet" }).click();
+    await page.getByRole("dialog", { name: "Mark it not paid?" }).getByRole("button", { name: "Yes, change it" }).click();
+    await expect(page.getByText("Marked not paid")).toBeVisible();
+    await expect(card.getByText("Pay at pickup")).toBeVisible();
+  });
 });
