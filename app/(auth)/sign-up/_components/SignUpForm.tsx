@@ -37,9 +37,11 @@ import { BRAND_NAME } from "@/lib/brand";
 
 // In form order: the first one with an error takes focus. The ids are also the
 // keys of the register API's zod `details` (signUpSchema in lib/zod-auth.ts).
-const FIELDS = ["name", "email", "password", "stallName", "storeHandle", "stallType", "stallTypeOther", "phone"] as const;
+const FIELDS = ["name", "email", "password", "stallName", "storeHandle", "stallType", "stallTypeOther", "phone", "acceptedTerms"] as const;
 type Field = (typeof FIELDS)[number];
 type FieldErrors = Partial<Record<Field, string>>;
+
+const TERMS_MESSAGE = "Tick the box to agree to the Terms and Privacy Policy.";
 
 // Our own wording for a field the server's schema rejected (zod's is not for sellers).
 const SERVER_FIELD_MESSAGE: Record<Field, string> = {
@@ -51,6 +53,7 @@ const SERVER_FIELD_MESSAGE: Record<Field, string> = {
   stallType: "Choose what you sell.",
   stallTypeOther: STALL_TYPE_OTHER_MESSAGE,
   phone: "Enter a valid +91 Indian mobile number.",
+  acceptedTerms: TERMS_MESSAGE,
 };
 
 const textLinkClass = "inline-flex min-h-11 min-w-11 items-center justify-center rounded-md px-1 font-medium text-primary hover:underline";
@@ -71,6 +74,7 @@ function validate(values: {
   storeHandle: string;
   stallType: StallType;
   stallTypeOther: string;
+  acceptedTerms: boolean;
 }): FieldErrors {
   const errors: FieldErrors = {};
   if (!values.name.trim()) errors.name = "Enter your name.";
@@ -83,6 +87,7 @@ function validate(values: {
   if (values.stallType === "OTHER" && !stallTypeOtherSchema.safeParse(values.stallTypeOther).success) {
     errors.stallTypeOther = STALL_TYPE_OTHER_MESSAGE;
   }
+  if (!values.acceptedTerms) errors.acceptedTerms = TERMS_MESSAGE;
   return errors;
 }
 
@@ -143,6 +148,7 @@ export function SignUpForm({
   const [stallType, setStallType] = useState<StallType>("GENERAL");
   const [stallTypeOther, setStallTypeOther] = useState("");
   const [phone, setPhone] = useState("");
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [fieldErrors, setFieldErrors] = useState<FieldErrors>({});
   const [emailTaken, setEmailTaken] = useState(false);
@@ -201,7 +207,7 @@ export function SignUpForm({
 
     const handle = normaliseStoreHandle(storeHandle);
     setStoreHandle(handle);
-    const invalid = validate({ name, email, password, stallName, storeHandle: handle, stallType, stallTypeOther });
+    const invalid = validate({ name, email, password, stallName, storeHandle: handle, stallType, stallTypeOther, acceptedTerms });
     if (Object.keys(invalid).length > 0) {
       showFieldErrors(invalid);
       return;
@@ -222,6 +228,7 @@ export function SignUpForm({
           stallName,
           storeHandle: handle,
           stallType,
+          acceptedTerms,
           ...(stallType === "OTHER" ? { stallTypeOther } : {}),
           phone: phone.trim() || undefined,
           ...(referralCode ? { ref: referralCode } : {}),
@@ -452,22 +459,38 @@ export function SignUpForm({
             />
             {fieldError("phone")}
           </div>
+          <div className="space-y-2">
+            <label htmlFor="acceptedTerms" className="flex min-h-11 items-start gap-3 text-sm text-foreground">
+              <input
+                id="acceptedTerms"
+                name="acceptedTerms"
+                type="checkbox"
+                required
+                className="mt-0.5 h-5 w-5 shrink-0 accent-primary"
+                aria-invalid={fieldErrors.acceptedTerms ? true : undefined}
+                aria-describedby={describedBy("acceptedTerms")}
+                checked={acceptedTerms}
+                onChange={(e) => setAcceptedTerms(e.target.checked)}
+              />
+              <span>
+                I agree to the{" "}
+                <Link href="/legal/terms" target="_blank" rel="noopener" className="font-medium text-primary underline">
+                  Terms
+                </Link>{" "}
+                and{" "}
+                <Link href="/legal/privacy" target="_blank" rel="noopener" className="font-medium text-primary underline">
+                  Privacy Policy
+                </Link>
+                . I am responsible for what I sell.
+              </span>
+            </label>
+            {fieldError("acceptedTerms")}
+          </div>
         </CardContent>
         <CardFooter className="flex flex-col items-stretch gap-2">
           <Button type="submit" className="w-full" disabled={submitting}>
             {submitting ? "Creating…" : referralCode ? referredCtaLabel : ctaLabel}
           </Button>
-          <p className="text-center text-xs text-muted-foreground">
-            By continuing you agree to the{" "}
-            <Link href="/legal/terms" className={textLinkClass}>
-              Terms
-            </Link>{" "}
-            and{" "}
-            <Link href="/legal/privacy" className={textLinkClass}>
-              Privacy Policy
-            </Link>
-            .
-          </p>
           <p className="text-center text-sm text-muted-foreground">
             Already have an account?{" "}
             <Link href="/sign-in" className={textLinkClass}>

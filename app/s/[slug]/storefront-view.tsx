@@ -37,6 +37,7 @@ import { showsCatalogueSort } from "@/lib/catalogue-sort";
 import { orderedBadgeText } from "@/lib/item-ordered-count";
 import { loadOrderedCounts } from "@/lib/item-ordered-count-server";
 import { PoweredByFooter } from "@/components/storefront/PoweredByFooter";
+import { SoldByNotice } from "@/components/storefront/SoldByNotice";
 import { RecentOrderLink } from "@/components/storefront/RecentOrderLink";
 import { ShareStoreButton } from "@/components/storefront/ShareStoreButton";
 import { StoreBackButton } from "@/components/storefront/StoreBackButton";
@@ -1502,7 +1503,8 @@ export async function StorefrontView(props: {
             )}
           </main>
 
-          <footer className="px-4 pb-10 pt-2 text-center">
+          <footer className="space-y-1 px-4 pb-10 pt-2 text-center">
+            <SoldByNotice storeName={vendor.name} />
             <PoweredByFooter slug={vendor.slug} isDemo={vendor.isDemo} />
           </footer>
         </CartHubProvider>

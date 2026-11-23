@@ -9,6 +9,7 @@ const SIGN_UP = {
   password: "Str0ng-pass",
   name: "Riya",
   stallName: "Riya's Pickles",
+  acceptedTerms: true,
 };
 
 describe("store type: Other", () => {
