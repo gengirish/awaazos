@@ -1237,7 +1237,7 @@ export function OnboardingForm({ razorpay }: { razorpay: RazorpayStep }) {
                     />
                     <FieldError id="delivery-fee" message={errors["delivery-fee"]} />
                     <p id="delivery-fee-hint" className="text-sm text-muted-foreground">
-                      Added to delivery orders only. Enter 0 for free delivery.
+                      Added once to each delivery order. Pickup orders pay nothing. Enter 0 for free delivery.
                     </p>
                   </div>
 

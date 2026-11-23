@@ -278,7 +278,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "voice-menu",
     group: "menu",
     title: "Add many {items} by speaking",
-    steps: "Open Add {items} by voice at the top of the {catalogueTitle} screen and say each {item} with its price. Check the list it shows before you save.",
+    steps: "Open More options at the bottom of the {catalogueTitle} screen, tap Add {items} by voice, and say each {item} with its price. Check the list it shows before you save.",
     nav: "menu",
     keywords: "voice mic bulk list",
   },

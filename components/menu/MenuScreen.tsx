@@ -35,7 +35,7 @@ type MenuScreenProps = {
   storeSlug?: string | null;
 };
 
-/** The header's two actions open things lower down, so the state they share lives here. */
+/** "Add item" and the voice builder (under More options) open things lower down, so the state they share lives here. */
 export function MenuScreen({
   initialItems,
   voiceLang,
@@ -49,6 +49,8 @@ export function MenuScreen({
   const router = useRouter();
   const [items, setItems] = useState<MenuRow[]>(initialItems);
   const [voiceExpanded, setVoiceExpanded] = useState(initialItems.length === 0 || voiceOpen);
+  // Closed unless the voice builder starts expanded (empty menu, or /menu?voice=1).
+  const [moreOpen, setMoreOpen] = useState(initialItems.length === 0 || voiceOpen);
   const [formOpen, setFormOpen] = useState(Boolean(prefillName));
   // Mounted from the first open on, so closing still plays the dialog's exit.
   const [formMounted, setFormMounted] = useState(Boolean(prefillName));
@@ -101,19 +103,43 @@ export function MenuScreen({
           <h1 className="font-display text-2xl font-semibold text-foreground">{vocab.catalogueTitle}</h1>
           <p className="text-sm text-muted-foreground">Add items, set their order, and mark what is sold out.</p>
         </div>
-        {items.length > 0 || !voiceExpanded ? (
+        {items.length > 0 ? (
           <div className="flex flex-col gap-2 sm:shrink-0 sm:flex-row">
             {/* While the menu is empty, the empty state has the only "Add item". */}
-            {items.length > 0 ? (
-              <Button type="button" variant="outline" className="min-h-11 gap-2" onClick={openCreate}>
-                <Plus aria-hidden="true" />
-                Add item
-              </Button>
-            ) : null}
+            <Button type="button" variant="outline" className="min-h-11 gap-2" onClick={openCreate}>
+              <Plus aria-hidden="true" />
+              Add item
+            </Button>
+          </div>
+        ) : null}
+      </header>
+      <main id="main-menu" className="mx-auto max-w-5xl space-y-6">
+        <MenuGrid
+          items={items}
+          setItems={setItems}
+          initialItems={initialItems}
+          onAdd={openCreate}
+          onEdit={openEdit}
+          vocab={vocab}
+          canSeeCost={canSeeCost}
+          storeSlug={storeSlug}
+        />
+        {/* Voice is optional, so it sits last and closed: the list and "Add item" come first. */}
+        <details
+          open={moreOpen}
+          onToggle={(e) => setMoreOpen(e.currentTarget.open)}
+          className="rounded-xl border border-border bg-card"
+        >
+          <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl p-4 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring">
+            <span className="font-display text-lg font-semibold">More options</span>
+            <span className="min-w-0 truncate text-sm text-muted-foreground">Add {vocab.items} by voice</span>
+          </summary>
+          <div className="space-y-4 border-t border-border p-4">
             {!voiceExpanded ? (
               <Button
                 ref={expandRef}
                 type="button"
+                variant="outline"
                 className="min-h-11 gap-2"
                 aria-expanded={false}
                 onClick={() => {
@@ -125,33 +151,21 @@ export function MenuScreen({
                 Add {vocab.items} by voice
               </Button>
             ) : null}
+            <VoiceMenuPanel
+              voiceLang={voiceLang}
+              categories={categories}
+              itemCount={initialItems.length}
+              expanded={voiceExpanded}
+              onCollapse={() => {
+                setVoiceExpanded(false);
+                requestAnimationFrame(() => expandRef.current?.focus());
+              }}
+              micRef={micRef}
+              defaultOpen={voiceOpen}
+              vocab={vocab}
+            />
           </div>
-        ) : null}
-      </header>
-      <main id="main-menu" className="mx-auto max-w-5xl space-y-6">
-        <VoiceMenuPanel
-          voiceLang={voiceLang}
-          categories={categories}
-          itemCount={initialItems.length}
-          expanded={voiceExpanded}
-          onCollapse={() => {
-            setVoiceExpanded(false);
-            requestAnimationFrame(() => expandRef.current?.focus());
-          }}
-          micRef={micRef}
-          defaultOpen={voiceOpen}
-          vocab={vocab}
-        />
-        <MenuGrid
-          items={items}
-          setItems={setItems}
-          initialItems={initialItems}
-          onAdd={openCreate}
-          onEdit={openEdit}
-          vocab={vocab}
-          canSeeCost={canSeeCost}
-          storeSlug={storeSlug}
-        />
+        </details>
         {formMounted ? (
           <MenuItemForm
             open={formOpen}

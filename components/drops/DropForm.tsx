@@ -687,19 +687,6 @@ export function DropForm({
         </p>
       ) : null}
 
-      {voiceLang && !locked ? (
-        <VoiceDropPanel
-          voiceLang={voiceLang}
-          isEdit={Boolean(dropId)}
-          onDraft={applyVoiceDraft}
-          onUndo={undoVoice}
-          canUndo={beforeVoice !== null}
-          onMenuItemAdded={addMenuItem}
-          canManageBilling={isOwner}
-          vocab={vocab}
-        />
-      ) : null}
-
       <fieldset disabled={locked || pending} className="space-y-6">
         {/* ── Items ── */}
         <section aria-labelledby="drop-items" className="space-y-4 rounded-xl border border-border bg-card p-4">
@@ -951,8 +938,15 @@ export function DropForm({
                 value={form.deliveryFee}
                 onChange={(e) => set("deliveryFee", e.target.value)}
                 {...errProps("deliveryFeePaise")}
+                aria-describedby={describedBy("deliveryFeePaise", "drop-fee-hint")}
               />
-              <p className="text-xs text-muted-foreground">Enter 0 for free delivery.</p>
+              <p id="drop-fee-hint" className="text-xs text-muted-foreground">
+                {form.fulfilmentMode === "BOTH"
+                  ? "Added once to each delivery order. Pickup orders pay nothing."
+                  : "Added once to each delivery order."}{" "}
+                Enter 0 for free delivery. A delivery area with its own fee replaces this one (Settings → Online
+                orders → Delivery areas).
+              </p>
               {err("deliveryFeePaise")}
             </div>
           ) : null}
@@ -1124,6 +1118,28 @@ export function DropForm({
           </div>
         </details>
       </fieldset>
+
+      {/* Voice is optional, so it sits last and closed: the form above is what a seller sees first. */}
+      {voiceLang && !locked ? (
+        <details className="rounded-xl border border-border bg-card">
+          <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl p-4 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring">
+            <span className="font-display text-lg font-semibold">Fill by voice</span>
+            <span className="min-w-0 truncate text-sm text-muted-foreground">Optional</span>
+          </summary>
+          <div className="border-t border-border p-4">
+            <VoiceDropPanel
+              voiceLang={voiceLang}
+              isEdit={Boolean(dropId)}
+              onDraft={applyVoiceDraft}
+              onUndo={undoVoice}
+              canUndo={beforeVoice !== null}
+              onMenuItemAdded={addMenuItem}
+              canManageBilling={isOwner}
+              vocab={vocab}
+            />
+          </div>
+        </details>
+      ) : null}
 
       {!locked ? (
         <div className="sticky bottom-[var(--app-bottom-inset,0px)] z-20 -mx-4 space-y-2 border-t border-border bg-background/95 px-4 py-3 backdrop-blur-sm">
