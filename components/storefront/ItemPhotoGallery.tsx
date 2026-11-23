@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
  * the in-between positions are ignored (`pending`), so a second quick tap moves
  * on from where the first was going, not from where the scroll happened to be.
  * A finger or wheel on the photos hands control back to the scroll position.
+ * Picking a colour with its own photo (`focus`) turns the track to it.
  */
 /** Which photo the track is showing, from its scroll position. */
 function positionIn(el: HTMLDivElement, count: number): number {
@@ -32,12 +33,40 @@ function arrived(pending: { current: number | null }, setIndex: (i: number) => v
   setIndex(at);
 }
 
-export function ItemPhotoGallery({ photos, name, dimmed }: { photos: readonly string[]; name: string; dimmed?: boolean }) {
+export function ItemPhotoGallery({
+  photos,
+  name,
+  dimmed,
+  focus = null,
+}: {
+  photos: readonly string[];
+  name: string;
+  dimmed?: boolean;
+  /** A photo to turn to: the picked colour's (lib/item-variants.ts rule 8). Each new value moves once. */
+  focus?: string | null;
+}) {
   const track = useRef<HTMLDivElement>(null);
   const [index, setIndex] = useState(0);
   /** The photo an arrow is scrolling to; null once it arrives or the buyer takes over. */
   const pending = useRef<number | null>(null);
   const count = photos.length;
+
+  // The buyer picked a colour with its own photo: turn to it (at once when the sheet opens).
+  // Keyed on the index, not the array: the sheet builds a new `photos` on every render,
+  // and a re-render must never pull the buyer's swipe back.
+  const focusIndex = focus === null ? -1 : photos.indexOf(focus);
+  const moved = useRef(false);
+  useEffect(() => {
+    const el = track.current;
+    if (!el || focusIndex === -1 || el.clientWidth === 0) return;
+    // The first turn (the sheet opening on a picked colour) is instant; later picks glide.
+    const first = !moved.current;
+    moved.current = true;
+    const reduce = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    pending.current = focusIndex === positionIn(el, count) ? null : focusIndex;
+    el.scrollTo({ left: focusIndex * el.clientWidth, behavior: first || reduce ? "auto" : "smooth" });
+    setIndex(focusIndex);
+  }, [focusIndex, count]);
 
   function onScroll() {
     const el = track.current;

@@ -6,12 +6,13 @@ import {
   normaliseVariantLabel,
   parseCartLineKey,
   variantLineName,
+  variantPhoto,
   variantPriceRange,
   variantPricePaise,
   type StoreSize,
   type VariantRow,
 } from "@/lib/item-variants";
-import { sizeDraftsFrom, sizeDraftsToBody, newSizeDraft, variantsErrorMessage } from "@/lib/item-variants-form";
+import { rowPhoto, sizeDraftsFrom, sizeDraftsToBody, newSizeDraft, variantsErrorMessage } from "@/lib/item-variants-form";
 import { itemVariantsSchema } from "@/lib/item-variants-schema";
 import { toMenuOrderLines } from "@/lib/storefront-order";
 
@@ -55,6 +56,7 @@ describe("item variants: pure rules", () => {
       label: "M",
       priceInPaise: 100,
       stock: soldOut === null ? null : { soldOut, onlyLeft: null, maxQty: soldOut ? 0 : 5 },
+      photoUrl: null,
     });
     expect(allSizesSoldOut([])).toBe(true);
     expect(allSizesSoldOut([size(true), size(true)])).toBe(true);
@@ -106,11 +108,12 @@ describe("item variants: the form's rows", () => {
     lowStockAt: null,
     stockLeft: 3,
     stockSetAside: 1,
+    imageUrl: null,
   };
 
   it("starts a saved size from what is on the shelf (left + set aside)", () => {
     expect(sizeDraftsFrom([saved])).toEqual([
-      { key: "v1", id: "v1", label: "S", price: "", cost: "", stock: "4", initialStock: "4", isAvailable: true },
+      { key: "v1", id: "v1", label: "S", price: "", cost: "", stock: "4", initialStock: "4", isAvailable: true, photo: "" },
     ]);
     expect(sizeDraftsFrom(undefined)).toEqual([]);
   });
@@ -118,7 +121,7 @@ describe("item variants: the form's rows", () => {
   it("sends a count only when it changed, and one for a new size only when typed", () => {
     const [s] = sizeDraftsFrom([saved]);
     const same = sizeDraftsToBody([s]);
-    expect(same).toEqual({ body: { variants: [{ id: "v1", label: "S", priceInRupees: null, isAvailable: true }] } });
+    expect(same).toEqual({ body: { variants: [{ id: "v1", label: "S", priceInRupees: null, isAvailable: true, imageUrl: null }] } });
     const changed = sizeDraftsToBody([{ ...s, stock: "6" }]);
     expect(changed).toMatchObject({ body: { variants: [{ id: "v1", stockQty: 6 }] } });
     const cleared = sizeDraftsToBody([{ ...s, stock: "" }]);
@@ -126,7 +129,7 @@ describe("item variants: the form's rows", () => {
 
     const fresh = { ...newSizeDraft(), label: "M", price: "649" };
     expect(sizeDraftsToBody([fresh])).toEqual({
-      body: { variants: [{ label: "M", priceInRupees: 649, isAvailable: true }] },
+      body: { variants: [{ label: "M", priceInRupees: 649, isAvailable: true, imageUrl: null }] },
     });
     expect(sizeDraftsToBody([{ ...fresh, stock: "2" }])).toMatchObject({ body: { variants: [{ stockQty: 2 }] } });
   });
@@ -146,5 +149,54 @@ describe("item variants: the form's rows", () => {
   it("explains a refusal", () => {
     expect(variantsErrorMessage("has_variants")).toBe("has_variants");
     expect(variantsErrorMessage(undefined)).toBe("Could not save the sizes or colours");
+  });
+});
+
+describe("item variants: a photo per colour (rule 8)", () => {
+  const red = "https://blob.example/red.jpg";
+  const green = "https://blob.example/green.jpg";
+  const photos = [red, green];
+
+  it("shows an option's photo only while the item still has it", () => {
+    expect(variantPhoto(green, photos)).toBe(green);
+    expect(variantPhoto("https://elsewhere.example/x.jpg", photos)).toBeNull();
+    expect(variantPhoto(red, [])).toBeNull();
+    expect(variantPhoto(null, photos)).toBeNull();
+  });
+
+  it("starts a saved colour from its photo and sends it back", () => {
+    const saved: VariantRow = {
+      id: "v1",
+      label: "Red",
+      costInPaise: null,
+      priceInPaise: null,
+      isAvailable: true,
+      sortOrder: 0,
+      stockQty: null,
+      lowStockAt: null,
+      stockLeft: null,
+      stockSetAside: null,
+      imageUrl: red,
+    };
+    const [d] = sizeDraftsFrom([saved]);
+    expect(d.photo).toBe(red);
+    expect(sizeDraftsToBody([d], { photos })).toMatchObject({ body: { variants: [{ id: "v1", imageUrl: red }] } });
+    expect(sizeDraftsToBody([{ ...d, photo: "" }], { photos })).toMatchObject({ body: { variants: [{ imageUrl: null }] } });
+  });
+
+  it("drops a pick whose photo was removed, but keeps it while the list isn't loaded", () => {
+    expect(rowPhoto(red, [green])).toBeNull();
+    expect(rowPhoto(red, photos)).toBe(red);
+    expect(rowPhoto(red, undefined)).toBe(red);
+    expect(rowPhoto("", photos)).toBeNull();
+  });
+
+  it("accepts a photo URL, none, or nothing at all, and refuses anything else", () => {
+    expect(itemVariantsSchema.parse({ variants: [{ label: "Red", imageUrl: red }] }).variants[0].imageUrl).toBe(red);
+    expect(itemVariantsSchema.parse({ variants: [{ label: "Red", imageUrl: null }] }).variants[0].imageUrl).toBeNull();
+    expect(itemVariantsSchema.parse({ variants: [{ label: "Red" }] }).variants[0].imageUrl).toBeUndefined();
+    expect(itemVariantsSchema.safeParse({ variants: [{ label: "Red", imageUrl: "" }] }).success).toBe(false);
+    expect(itemVariantsSchema.safeParse({ variants: [{ label: "Red", imageUrl: 7 }] }).success).toBe(false);
+    expect(itemVariantsSchema.safeParse({ variants: [{ label: "Red", imageUrl: "x".repeat(2049) }] }).success).toBe(false);
   });
 });

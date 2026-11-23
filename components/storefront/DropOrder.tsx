@@ -455,7 +455,9 @@ export function DropOrder(props: DropOrderProps) {
           <ArrowDown className="h-3.5 w-3.5" aria-hidden="true" />
         </a>
       ) : null);
-    return { soldOut, sizeSoldOut, shownPrice, sale, badge, badges, sizes, stepper, action };
+    // The buyer's own pick only: before one, the row keeps the cover (lib/item-variants.ts rule 8).
+    const photo = size && picked[item.id] === size.id ? size.photoUrl : null;
+    return { soldOut, sizeSoldOut, shownPrice, sale, badge, badges, sizes, stepper, action, photo };
   }
 
   const detailItem = detailId ? (byId.get(detailId) ?? null) : null;
@@ -474,7 +476,7 @@ export function DropOrder(props: DropOrderProps) {
           return (
             <li key={item.id} className="flex items-center gap-3 py-3 sm:gap-4">
               <ItemPhoto
-                src={item.imageUrl}
+                src={v.photo ?? item.imageUrl}
                 emoji={item.emoji}
                 name={item.name}
                 size="row"
@@ -514,6 +516,7 @@ export function DropOrder(props: DropOrderProps) {
           emoji={detailItem.emoji}
           imageUrl={detailItem.imageUrl}
           morePhotos={detailItem.morePhotos}
+          focusPhoto={detail.photo}
           details={detailItem.details}
           highlights={detailItem.highlights}
           foodType={detailItem.foodType}

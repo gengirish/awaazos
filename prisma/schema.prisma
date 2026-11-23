@@ -256,6 +256,7 @@ model ItemVariant {
   stockCountedAt DateTime?
   lowStockAt     Int?
   costInPaise    Int? // null = the item's cost (lib/item-cost.ts)
+  imageUrl       String? // one of the item's photos, shown when a buyer picks this colour (lib/item-variants.ts rule 8)
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
 

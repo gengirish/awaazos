@@ -26,22 +26,46 @@ import { canAddPhoto, MAX_ITEM_PHOTOS, movePhoto, type PhotoRef } from "@/lib/it
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 4 * 1024 * 1024;
 
-export function ItemPhotosField({ itemId, itemName, onChanged }: { itemId: string; itemName: string; onChanged: () => void }) {
-  const [photos, setPhotos] = useState<PhotoRef[] | null>(null);
+export function ItemPhotosField({
+  itemId,
+  itemName,
+  onChanged,
+  onPhotos,
+}: {
+  itemId: string;
+  itemName: string;
+  onChanged: () => void;
+  /** The list each time it loads or changes, with the item it belongs to: the sizes editor offers these per colour. */
+  onPhotos?: (photos: PhotoRef[], itemId: string) => void;
+}) {
+  const [photos, setPhotosState] = useState<PhotoRef[] | null>(null);
+  // Each list the server sends is also reported, tagged with the item it was loaded for.
+  const reported = useRef(onPhotos);
+  useEffect(() => {
+    reported.current = onPhotos;
+  }, [onPhotos]);
+  function showPhotos(list: PhotoRef[], forItem: string) {
+    setPhotosState(list);
+    reported.current?.(list, forItem);
+  }
   const [busy, setBusy] = useState<string | null>(null);
   const galleryRef = useRef<HTMLInputElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     let stale = false;
-    setPhotos(null);
+    setPhotosState(null);
     fetch(`/api/menu/${itemId}/images`, { credentials: "include" })
       .then((res) => (res.ok ? res.json() : null))
       .then((body: { data?: PhotoRef[] } | null) => {
-        if (!stale) setPhotos(body?.data ?? []);
+        if (stale) return;
+        const list = body?.data;
+        setPhotosState(list ?? []);
+        // A failed read reports nothing: an empty list would clear every colour's photo on save.
+        if (list) reported.current?.(list, itemId);
       })
       .catch(() => {
-        if (!stale) setPhotos([]);
+        if (!stale) setPhotosState([]);
       });
     return () => {
       stale = true;
@@ -54,7 +78,7 @@ export function ItemPhotosField({ itemId, itemName, onChanged }: { itemId: strin
     try {
       const res = await run();
       const body = (await res.json().catch(() => ({}))) as { data?: PhotoRef[]; error?: string };
-      if (Array.isArray(body.data)) setPhotos(body.data);
+      if (Array.isArray(body.data)) showPhotos(body.data, itemId);
       if (!res.ok) {
         toast.error(errorText(body.error));
         return;

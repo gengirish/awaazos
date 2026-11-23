@@ -41,6 +41,8 @@ export type ItemDetailSheetProps = {
   imageUrl: string | null;
   /** Photos after the cover; with any, the top is a swipeable gallery (ItemPhotoGallery). */
   morePhotos?: readonly string[];
+  /** The picked colour's photo (lib/item-variants.ts rule 8): the gallery turns to it. */
+  focusPhoto?: string | null;
   description?: string | null;
   /** Label / value pairs, shown as a two-column list (lib/item-highlights.ts). */
   highlights?: readonly Highlight[];
@@ -75,7 +77,7 @@ const FACT_ICON: Record<DetailFactKind, typeof Clock> = {
 };
 
 export function ItemDetailSheet(props: ItemDetailSheetProps) {
-  const { open, onOpenChange, triggerId, name, emoji, imageUrl, morePhotos = [], description, highlights = [], details, foodType, price, badges, sizes, offers = [], facts = [], share, footerPrice, action, dimmed } = props;
+  const { open, onOpenChange, triggerId, name, emoji, imageUrl, morePhotos = [], focusPhoto = null, description, highlights = [], details, foodType, price, badges, sizes, offers = [], facts = [], share, footerPrice, action, dimmed } = props;
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent
@@ -98,7 +100,7 @@ export function ItemDetailSheet(props: ItemDetailSheetProps) {
         </ResponsiveDialogHeader>
         <ResponsiveDialogBody className="space-y-4">
           {imageUrl && morePhotos.length > 0 ? (
-            <ItemPhotoGallery photos={[imageUrl, ...morePhotos]} name={name} dimmed={dimmed} />
+            <ItemPhotoGallery photos={[imageUrl, ...morePhotos]} name={name} dimmed={dimmed} focus={focusPhoto} />
           ) : (
             <ItemPhoto src={imageUrl} emoji={emoji} name={name} size="hero" enlarge dimmed={dimmed} />
           )}

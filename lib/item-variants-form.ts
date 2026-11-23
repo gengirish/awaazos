@@ -32,6 +32,8 @@ export type SizeDraft = {
   /** `stock` as first shown, to tell whether the seller changed it. */
   initialStock: string;
   isAvailable: boolean;
+  /** One of the item's photo URLs for this option (lib/item-variants.ts rule 8); blank = none. */
+  photo: string;
 };
 
 export type SizeDraftField = "label" | "price" | "cost" | "stock";
@@ -54,13 +56,14 @@ export function sizeDraftsFrom(variants: readonly VariantRow[] | undefined): Siz
     stock: shelfText(v),
     initialStock: shelfText(v),
     isAvailable: v.isAvailable,
+    photo: v.imageUrl ?? "",
   }));
 }
 
 let nextKey = 0;
 export function newSizeDraft(): SizeDraft {
   nextKey += 1;
-  return { key: `new-${nextKey}`, label: "", price: "", cost: "", stock: "", initialStock: "", isAvailable: true };
+  return { key: `new-${nextKey}`, label: "", price: "", cost: "", stock: "", initialStock: "", isAvailable: true, photo: "" };
 }
 
 export type VariantsBody = {
@@ -71,16 +74,28 @@ export type VariantsBody = {
     isAvailable: boolean;
     stockQty?: number | null;
     costInRupees?: number | null;
+    imageUrl: string | null;
   }[];
 };
 
 /**
+ * The photo a row sends: its pick while that is still one of `photos` (the
+ * item's list as the form last loaded it), none once it was removed. Without a
+ * list (not loaded) the pick goes as is; the server checks it either way.
+ */
+export function rowPhoto(photo: string, photos?: readonly string[]): string | null {
+  if (photo === "") return null;
+  return photos === undefined || photos.includes(photo) ? photo : null;
+}
+
+/**
  * The PUT body, or the first row problem to show beside its field. `cost`:
  * send each row's cost (the viewer may set it); otherwise costs are left as saved.
+ * `photos`: the item's photo URLs as the form shows them (see `rowPhoto`).
  */
 export function sizeDraftsToBody(
   drafts: readonly SizeDraft[],
-  opts: { cost?: boolean } = {},
+  opts: { cost?: boolean; photos?: readonly string[] } = {},
 ): { body: VariantsBody } | { error: SizeDraftError } {
   if (drafts.length > MAX_VARIANTS_PER_ITEM) {
     return { error: { index: MAX_VARIANTS_PER_ITEM, field: "label", message: `At most ${MAX_VARIANTS_PER_ITEM}` } };
@@ -121,6 +136,7 @@ export function sizeDraftsToBody(
       isAvailable: d.isAvailable,
       ...(changed ? { stockQty: stock.value } : {}),
       ...(opts.cost ? { costInRupees } : {}),
+      imageUrl: rowPhoto(d.photo, opts.photos),
     });
   }
   return { body: { variants } };

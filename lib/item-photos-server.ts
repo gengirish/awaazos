@@ -35,6 +35,13 @@ async function writePhotos(tx: Prisma.TransactionClient, vendorId: string, menuI
   if (extras.length > 0) {
     await tx.menuItemImage.createMany({ data: extras.map((e) => ({ ...e, vendorId, menuItemId })) });
   }
+  // A colour whose photo is gone shows none (lib/item-variants.ts rule 8). The link is by URL,
+  // so a reorder or a new cover keeps it.
+  const keptUrls = [...(cover ? [cover] : []), ...extras.map((e) => e.url)];
+  await tx.itemVariant.updateMany({
+    where: { vendorId, menuItemId, imageUrl: { not: null, notIn: keptUrls } },
+    data: { imageUrl: null },
+  });
 }
 
 export type PhotoChange<T> = { urls: readonly string[]; result: T } | { refuse: T };

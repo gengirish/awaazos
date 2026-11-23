@@ -4,6 +4,8 @@ import { z } from "zod";
 
 import { rupeesToPaise } from "@/lib/currency";
 import { canSeeCost } from "@/lib/item-cost";
+import { photoUrls } from "@/lib/item-photos";
+import { variantPhoto } from "@/lib/item-variants";
 import { itemVariantsSchema } from "@/lib/item-variants-schema";
 import { withVariants } from "@/lib/menu-stock-server";
 import { prisma } from "@/lib/prisma";
@@ -39,7 +41,8 @@ class VariantsRouteError extends Error {
  * `{ variants: [...] }`, in that order (rules in lib/item-variants.ts). Ids not
  * in the list are deleted; their bills keep the name snapshot. A variant's
  * `stockQty` records a new count only when sent (null stops tracking). Giving
- * an item variants stops its own count. An item in a drop may get sizes too:
+ * an item variants stops its own count. A variant's `imageUrl` must be one of
+ * the item's photos, else null is stored (rule 8). An item in a drop may get sizes too:
  * from then on its drop orders name one (lib/item-variants.ts rule 7). Returns
  * the item's variants with their stock.
  */
@@ -56,10 +59,21 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
     const variants = await prisma.$transaction(async (tx) => {
       const item = await tx.menuItem.findFirst({
         where: { id: params.id, vendorId, archivedAt: null },
-        select: { id: true, stockQty: true, variants: { select: { id: true } } },
+        select: {
+          id: true,
+          stockQty: true,
+          imageUrl: true,
+          images: { select: { url: true } },
+          variants: { select: { id: true } },
+        },
       });
       if (!item) throw new VariantsRouteError(404, "Not found");
       const menuItemId = item.id;
+      // An option's photo is one this item already has (rule 8); any other URL is stored as none.
+      const itemPhotos = photoUrls(
+        item.imageUrl,
+        item.images.map((p) => p.url),
+      );
 
       // Every id sent must be one of this item's variants: another item's or
       // another store's is a 404, never a quiet move.
@@ -79,6 +93,7 @@ export async function PUT(req: NextRequest, props: { params: Promise<{ id: strin
           ...(seesCost && v.costInRupees !== undefined
             ? { costInPaise: v.costInRupees === null ? null : rupeesToPaise(v.costInRupees) }
             : {}),
+          ...(v.imageUrl !== undefined ? { imageUrl: variantPhoto(v.imageUrl, itemPhotos) } : {}),
           // A new count moves its time (lib/inventory.ts rule 2); absent leaves both.
           ...(v.stockQty !== undefined ? { stockQty: v.stockQty, stockCountedAt: v.stockQty === null ? null : now } : {}),
         };

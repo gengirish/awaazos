@@ -37,6 +37,15 @@
  *      `variantId`). An item in a drop may get sizes at any time; older lines
  *      without one show as "Size not given" on the packing list, which splits
  *      each item by size (`prepFromOrders`).
+ *   8. A colour can have its own photo: `ItemVariant.imageUrl` names one of the
+ *      item's photos (lib/item-photos.ts) by URL, so a photo reorder or a
+ *      cover change keeps the link, and several sizes ("Red / M", "Red / L")
+ *      can share one. It is only ever a photo the item already has: the
+ *      variants PUT stores null for any other URL, removing a photo clears the
+ *      variants that showed it, and every read checks it again
+ *      (`variantPhoto`). On the store page, picking that option shows its
+ *      photo on the row or tile and turns the detail sheet's gallery to it.
+ *      The POS, receipts and link previews keep the item's cover.
  */
 
 /** Most variants one item can have. */
@@ -97,7 +106,17 @@ export type VariantRow = {
   stockSetAside: number | null;
   /** This size's own cost; null = the item's, or hidden from this viewer (lib/item-cost.ts). */
   costInPaise: number | null;
+  /** The item photo shown for this option (rule 8); null = none. */
+  imageUrl: string | null;
 };
+
+/**
+ * The photo an option shows (rule 8): its `imageUrl` while that is still one of
+ * the item's photos, else null. `itemPhotos` is the item's whole list, cover first.
+ */
+export function variantPhoto(imageUrl: string | null, itemPhotos: readonly string[]): string | null {
+  return imageUrl !== null && itemPhotos.includes(imageUrl) ? imageUrl : null;
+}
 
 /**
  * One size / colour as the public store page gets it: the price it sells for
@@ -109,6 +128,8 @@ export type StoreSize = {
   priceInPaise: number;
   /** "Sold out" / "Only N left" and the stepper's ceiling; null = not tracked. */
   stock: { soldOut: boolean; onlyLeft: number | null; maxQty: number | null } | null;
+  /** One of the item's photos, shown when this option is picked (rule 8); null = none. */
+  photoUrl: string | null;
 };
 
 /** An item with sizes is sold out when none of them can be bought. */

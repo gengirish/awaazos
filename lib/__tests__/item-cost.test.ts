@@ -99,24 +99,25 @@ describe("cost price: the form's size rows", () => {
     lowStockAt: null,
     stockLeft: null,
     stockSetAside: null,
+    imageUrl: null,
   };
 
   it("shows a saved cost and sends it back only when the viewer may set it", () => {
     const drafts = sizeDraftsFrom([saved]);
     expect(drafts[0].cost).toBe("300");
     expect(sizeDraftsToBody(drafts, { cost: true })).toEqual({
-      body: { variants: [{ id: "v1", label: "M", priceInRupees: null, isAvailable: true, costInRupees: 300 }] },
+      body: { variants: [{ id: "v1", label: "M", priceInRupees: null, isAvailable: true, costInRupees: 300, imageUrl: null }] },
     });
     // A cashier's rows carry no cost; the body leaves the saved one alone.
     expect(sizeDraftsToBody(sizeDraftsFrom([{ ...saved, costInPaise: null }]))).toEqual({
-      body: { variants: [{ id: "v1", label: "M", priceInRupees: null, isAvailable: true }] },
+      body: { variants: [{ id: "v1", label: "M", priceInRupees: null, isAvailable: true, imageUrl: null }] },
     });
   });
 
   it("a blank cost clears it, a bad one is the row's error", () => {
     const [d] = sizeDraftsFrom([saved]);
     expect(sizeDraftsToBody([{ ...d, cost: "" }], { cost: true })).toEqual({
-      body: { variants: [{ id: "v1", label: "M", priceInRupees: null, isAvailable: true, costInRupees: null }] },
+      body: { variants: [{ id: "v1", label: "M", priceInRupees: null, isAvailable: true, costInRupees: null, imageUrl: null }] },
     });
     expect(sizeDraftsToBody([{ ...d, cost: "1.234" }], { cost: true })).toEqual({
       error: { index: 0, field: "cost", message: "Use at most 2 decimal places" },
