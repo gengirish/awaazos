@@ -170,6 +170,8 @@ const ACTION_DONE: Record<OrderAction, string> = {
   dispatch: "Out for delivery. It's in Ready.",
   deliver: "Marked delivered",
   undeliver: "Moved back: not handed over yet",
+  mark_unpaid: "Marked not paid",
+  uncancel: "Order reopened",
 };
 
 /** What an empty tab says when the store has orders, just none at this stage. */
@@ -528,6 +530,10 @@ export function OrdersBoard({
       }
       if (body.error === "drop_frozen") {
         toast.error("Orders are locked. Only payment and delivery can change now.");
+      } else if (body.error === "sold_out" || body.error === "out_of_stock") {
+        toast.error("Can't reopen: not enough left in stock.");
+      } else if (body.error === "paid_online") {
+        toast.error("Paid online, so this can't be changed.");
       } else if (body.error === "invalid_state") {
         toast.error("This order changed on another device. Refreshed.");
       } else if (res.status === 404) {

@@ -38,6 +38,10 @@ const FAILURE_CODE: Record<OrderActionErrorCode, BulkFailureCode> = {
   "Not found": "not_found",
   drop_frozen: "drop_frozen",
   invalid_state: "invalid_state",
+  // Corrective actions only, which bulk never runs.
+  paid_online: "invalid_state",
+  sold_out: "invalid_state",
+  out_of_stock: "invalid_state",
 };
 
 export async function runBulkStorefrontOrderAction(args: {

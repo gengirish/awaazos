@@ -40,8 +40,10 @@ function withVendorCookie(res: NextResponse, slug: string | null) {
  *   dispatch   delivery order handed to a rider: stamps outForDeliveryAt (+ `riderName`)
  *   deliver    PLACED|CONFIRMED → DELIVERED; unpaid CASH is marked paid in the same txn
  *   undeliver  DELIVERED → CONFIRMED (mistake fix; payment untouched)
+ *   mark_unpaid  undo a manual "Payment received" (409 paid_online for Razorpay)
+ *   uncancel   reopen a cancelled order if it still fits (409 sold_out / paid_online)
  *
- * FROZEN / FULFILLED drops only allow mark_paid / deliver / undeliver.
+ * FROZEN / FULFILLED drops allow only payment and handover bookkeeping (no confirm, cancel, uncancel).
  * The action logic is shared with menu orders: lib/storefront-order-actions.ts.
  */
 export async function PATCH(

@@ -18,6 +18,15 @@
  *              stamps outForDeliveryAt (+ riderName). Sending it again restamps.
  *   deliver    PLACED|CONFIRMED → DELIVERED; unpaid CASH is marked paid in the same txn
  *   undeliver  DELIVERED → CONFIRMED (mistake fix; payment untouched)
+ *   mark_unpaid  "Not paid yet" (mistake fix): markOrderUnpaid reverses exactly what
+ *              mark_paid booked (PAID → PENDING, paidAt, DailySummary). Manual
+ *              payments only: never an order Razorpay paid (409 paid_online).
+ *   uncancel   "Reopen order" (mistake fix): reopenCancelledOrder, CANCELLED →
+ *              CONFIRMED (PAID again if it was paid), only while it still fits
+ *              the drop's caps and the stock (409 sold_out / out_of_stock), never
+ *              one Razorpay paid (409 paid_online). Not on a frozen drop.
+ *
+ * Corrective actions are per order only: bulk (lib/order-bulk.ts) stays forward-only.
  *
  * While a Razorpay store's new order waits for the buyer to pay, only cancel
  * applies (`isAwaitingOnlinePay`), so a stale board can't make it hold stock for good.
@@ -34,7 +43,14 @@
 
 import type { DropStatus, Prisma } from "@prisma/client";
 
-import { cancelOrder, generateOrderToken, markOrderPaid, orderDisplayState } from "@/lib/drops";
+import {
+  cancelOrder,
+  generateOrderToken,
+  markOrderPaid,
+  markOrderUnpaid,
+  orderDisplayState,
+  reopenCancelledOrder,
+} from "@/lib/drops";
 import { checkOrderAction, isAwaitingOnlinePay, type OrderAction } from "@/lib/drops-board";
 import { boardOrderSelect, type BoardOrderRow } from "@/lib/drops-board-server";
 import { deletePaymentProofInBackground } from "@/lib/payment-proof";
@@ -50,7 +66,16 @@ export type StorefrontOrderScope = {
   dropId: string | null;
 };
 
-export type OrderActionErrorCode = "Not found" | "drop_frozen" | "invalid_state";
+export type OrderActionErrorCode =
+  | "Not found"
+  | "drop_frozen"
+  | "invalid_state"
+  /** mark_unpaid / uncancel on an order Razorpay paid. */
+  | "paid_online"
+  /** uncancel: a drop order no longer fits the drop's caps or its stock. */
+  | "sold_out"
+  /** uncancel: a menu order no longer fits the stock. */
+  | "out_of_stock";
 
 /** Thrown inside the transaction so it rolls back; routes map it to `{ error: code }`. */
 export class OrderActionError extends Error {
@@ -110,6 +135,7 @@ export async function applyStorefrontOrderAction(
       upiRef: true,
       paymentClaimedAt: true,
       createdAt: true,
+      razorpayPaymentId: true,
       vendor: { select: ONLINE_PAYMENT_VENDOR_SELECT },
     },
   });
@@ -125,6 +151,7 @@ export async function applyStorefrontOrderAction(
       fulfilmentStatus: order.fulfilmentStatus,
       onlineStore: vendorTakesOnlinePayment(order.vendor, now),
     }),
+    paidOnline: order.razorpayPaymentId !== null,
   });
   if (!check.ok) throw new OrderActionError(409, check.error);
 
@@ -214,12 +241,24 @@ export async function applyStorefrontOrderAction(
       applied = r.count === 1;
       break;
     }
+    case "mark_unpaid": {
+      // Order already verified in this txn against the full compound scope.
+      applied = await markOrderUnpaid(tx, { vendorId, transactionId });
+      break;
+    }
+    case "uncancel": {
+      const r = await reopenCancelledOrder(tx, { vendorId, transactionId, now: args.now });
+      if (!r.ok && r.code !== "invalid_state") throw new OrderActionError(409, r.code);
+      applied = r.ok;
+      break;
+    }
   }
   if (!applied) throw new OrderActionError(409, "invalid_state");
 
   // A delivery placed before rider links existed gets one when it is confirmed
   // (incl. by being paid) or sent out. `riderToken: null` in the where keeps the first one minted.
-  const confirms = action === "confirm" || action === "mark_paid" || action === "mark_ready" || action === "dispatch";
+  const confirms =
+    action === "confirm" || action === "mark_paid" || action === "mark_ready" || action === "dispatch" || action === "uncancel";
   if (confirms && order.fulfilmentType === "DELIVERY" && !order.riderToken) {
     await tx.transaction.updateMany({ where: { ...scope, riderToken: null }, data: { riderToken: generateOrderToken() } });
   }

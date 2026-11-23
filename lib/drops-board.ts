@@ -387,6 +387,8 @@ export const ORDER_ACTIONS = [
   "dispatch",
   "deliver",
   "undeliver",
+  "mark_unpaid",
+  "uncancel",
 ] as const;
 export type OrderAction = (typeof ORDER_ACTIONS)[number];
 
@@ -399,9 +401,10 @@ const FROZEN_ALLOWED: ReadonlySet<OrderAction> = new Set<OrderAction>([
   "dispatch",
   "deliver",
   "undeliver",
+  "mark_unpaid",
 ]);
 
-export type ActionCheck = { ok: true } | { ok: false; error: "drop_frozen" | "invalid_state" };
+export type ActionCheck = { ok: true } | { ok: false; error: "drop_frozen" | "invalid_state" | "paid_online" };
 
 /**
  * Pre-flight for a vendor action. The route still uses conditional
@@ -420,12 +423,17 @@ export function checkOrderAction(
     fulfilmentType?: FulfilmentType | null;
     /** `isAwaitingOnlinePay`: only cancel applies, so nothing holds its stock for good. */
     awaitingOnlinePay?: boolean;
+    /** Razorpay took the payment (`razorpayPaymentId`): mark_unpaid and uncancel never apply. */
+    paidOnline?: boolean;
   },
 ): ActionCheck {
   if ((dropStatus === "FROZEN" || dropStatus === "FULFILLED") && !FROZEN_ALLOWED.has(action)) {
     return { ok: false, error: "drop_frozen" };
   }
   if (o.awaitingOnlinePay && action !== "cancel") return { ok: false, error: "invalid_state" };
+  // A Razorpay payment is Razorpay's record, not the seller's tap: it is never
+  // taken back by hand, and its cancelled order (refunded or to be refunded) stays closed.
+  if (o.paidOnline && (action === "mark_unpaid" || action === "uncancel")) return { ok: false, error: "paid_online" };
   const fs = o.fulfilmentStatus;
   const ok = (() => {
     switch (action) {
@@ -451,6 +459,12 @@ export function checkOrderAction(
         return fs === "PLACED" || fs === "CONFIRMED";
       case "undeliver":
         return fs === "DELIVERED";
+      case "mark_unpaid":
+        // Undo a wrong "Payment received" (a cancelled paid order is REFUNDED, not PAID).
+        return fs !== "CANCELLED" && o.paymentStatus === "PAID";
+      case "uncancel":
+        // Reopen a cancelled order; whether it still fits is checked under the locks.
+        return fs === "CANCELLED";
     }
   })();
   return ok ? { ok: true } : { ok: false, error: "invalid_state" };
@@ -465,7 +479,9 @@ export function checkOrderAction(
  * marked paid confirms the order too (`markOrderPaid`), so "Payment received"
  * is the one answer. "Mark ready" is for an order the buyer collects (a delivery
  * goes "Out for delivery" instead); "Not ready" takes either stamp back. An
- * `awaiting_online` order offers only Cancel. Bulk selection
+ * `awaiting_online` order offers only Cancel. "Not paid yet" (`mark_unpaid`) and "Reopen
+ * order" (`uncancel`) are the card's mistake fixes (`fixStatusActions`), never for an
+ * order Razorpay paid. Bulk selection
  * (lib/order-bulk.ts) builds on the same list, so the card and the bulk bar never
  * disagree about what an order can do.
  */
@@ -481,6 +497,8 @@ export function availableOrderActions(
     /** The buyer tapped "I've received my order": the handover is the next step. */
     buyerReceivedAt?: string | null;
     bucket?: BoardBucket;
+    /** Razorpay took the payment: no "Not paid yet", no "Reopen order". */
+    paidOnline?: boolean;
   },
   frozen: boolean,
 ): Set<OrderAction> {
@@ -502,7 +520,26 @@ export function availableOrderActions(
   if (live) out.add("deliver");
   if (fs === "DELIVERED") out.add("undeliver");
   if (live && !frozen) out.add("cancel");
+  if (fs !== "CANCELLED" && o.paymentStatus === "PAID" && !o.paidOnline) out.add("mark_unpaid");
+  if (fs === "CANCELLED" && !frozen && !o.paidOnline) out.add("uncancel");
   return out;
+}
+
+/**
+ * The corrective actions, in the order the card's "Fix status" list shows them.
+ * Never bulk (lib/order-bulk.ts stays forward-only), never the card's big button.
+ */
+export const FIX_STATUS_ACTIONS = ["unready", "undeliver", "mark_unpaid", "uncancel"] as const satisfies readonly OrderAction[];
+export type FixStatusAction = (typeof FIX_STATUS_ACTIONS)[number];
+
+/**
+ * What the card's "Fix status" list offers for this order right now: the
+ * corrective actions `availableOrderActions` allows, so it never offers one the
+ * server would refuse on state alone (stock for a reopen is checked on the server).
+ */
+export function fixStatusActions(o: CardOrder, frozen: boolean): FixStatusAction[] {
+  const all = availableOrderActions(o, frozen);
+  return FIX_STATUS_ACTIONS.filter((a) => all.has(a));
 }
 
 type CardOrder = Parameters<typeof availableOrderActions>[0];

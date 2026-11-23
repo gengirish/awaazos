@@ -114,7 +114,7 @@ export const ORDER_JOURNEY: readonly OrderJourneyStep[] = [
     id: "finish",
     who: "You",
     title: "Finish the order",
-    text: "If nobody tapped Delivered, tap Delivered or Picked up yourself, and the order moves to Done. For a pay-on-delivery order the button says Delivered · and the amount collected, and marks it paid. Tapped it by mistake? Use Undo, or Undo delivered in the order's ⋯ menu.",
+    text: "If nobody tapped Delivered, tap Delivered or Picked up yourself, and the order moves to Done. For a pay-on-delivery order the button says Delivered · and the amount collected, and marks it paid. Tapped it by mistake? Use Undo, or Undo delivered under Fix status in the order's ⋯ menu.",
   },
 ];
 
@@ -196,6 +196,14 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     steps: "Tap Delivered (or Picked up) on the order in Ready. To finish several at once, select them and use the bar that appears under the list. Your rider can also tap Delivered on the link in their message, and a customer can tap I've received my order: a paid order is then finished for you, and an unpaid one shows Customer got it so you can collect the payment.",
     nav: "orders",
     keywords: "complete done pickup bulk cash on delivery collected rider link received customer got it",
+  },
+  {
+    id: "fix-order-status",
+    group: "orders",
+    title: "Fix a mistake on an order",
+    steps: "Open the order's ⋯ menu and look under Fix status. Not ready yet moves it back to Preparing, Undo delivered (or Undo picked up) back to Ready, and Not paid yet takes back a Payment received you tapped by mistake. A cancelled order has Reopen order: it comes back as accepted, still paid if it was, as long as its items have not sold out since. Each one asks before it changes anything. An order paid online through Razorpay can't be marked not paid or reopened.",
+    nav: "orders",
+    keywords: "undo wrong status change edit mistake reopen uncancel unpaid not paid undo delivered not ready",
   },
   {
     id: "rider-handoff",
