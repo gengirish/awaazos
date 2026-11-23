@@ -13,9 +13,10 @@ import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
  * Transactions are hidden from cashiers by product choice (they're owner tools).
  * Help (`/help`, content in lib/help-guide.ts) describes only what this list shows a role.
  *
- * The list is in the seller's daily order: orders in, the catalogue, the store
- * buyers see, then the less used screens. The rail shows it as is; the phone
- * bar (`appTabBarForRole`) takes four of them, with Store in the middle.
+ * The list is in the order sellers asked for: the catalogue, orders in, the
+ * store buyers see, pre-orders, then the less used screens, Settings last.
+ * The rail shows it as is; the phone bar (`appTabBarForRole`) takes four of
+ * them, with Store in the middle and More as the last tab.
  *
  * Labels follow what the store sells (lib/store-vocabulary.ts): `/menu` is
  * "Menu" for a kitchen and "Products" for any other store.
@@ -41,15 +42,15 @@ export type AppNavItem = {
 };
 
 export const APP_NAV_ITEMS: readonly AppNavItem[] = [
-  { id: "orders", href: "/orders", label: "Orders", managerOnly: false },
   { id: "menu", href: "/menu", label: "Menu", managerOnly: true },
+  { id: "orders", href: "/orders", label: "Orders", managerOnly: false },
   { id: "store", href: "/store", label: "Store", managerOnly: false },
   { id: "drops", href: "/drops", label: "Pre-orders", managerOnly: true },
   { id: "sell", href: "/pos", label: "Sell", managerOnly: false },
   { id: "transactions", href: "/transactions", label: "Transactions", managerOnly: true },
   { id: "analytics", href: "/analytics", label: "Analytics", managerOnly: true },
-  { id: "settings", href: "/settings", label: "Settings", managerOnly: false },
   { id: "help", href: "/help", label: "Help", managerOnly: false },
+  { id: "settings", href: "/settings", label: "Settings", managerOnly: false },
 ];
 
 /** The destinations a staff member of this role is shown, in display order, labelled for the store's kind. */
@@ -68,15 +69,16 @@ export const APP_TAB_BAR_SLOTS = 4;
 export const APP_CENTRE_TAB: AppNavId = "store";
 
 /**
- * The phone bar, left to right, before "More". Store sits in the middle of the
- * five slots. The fourth slot follows how the store sells: a published store
- * takes orders online, so Settings (payments, store, alerts) is worth more than
- * the counter till; an unpublished one sells at the counter, so Sell stays.
+ * The phone bar, left to right, before "More": Menu, Orders, Store (the middle
+ * of the five slots), then a fourth slot that follows how the store sells. A
+ * published store takes pre-orders online, so Pre-orders is fourth; an
+ * unpublished one sells at the counter (and lands on /pos), so Sell stays.
+ * Settings is always behind More, the last tab.
  * A cashier has no catalogue: Orders, Sell, Store, with Settings behind More.
  */
 const TAB_BAR: Record<"published" | "unpublished" | "cashier", readonly AppNavId[]> = {
-  published: ["orders", "menu", "store", "settings"],
-  unpublished: ["orders", "menu", "store", "sell"],
+  published: ["menu", "orders", "store", "drops"],
+  unpublished: ["menu", "orders", "store", "sell"],
   cashier: ["orders", "sell", "store"],
 };
 

@@ -51,9 +51,9 @@ while it shows, a phone under 430 px drops the wordmark from the logo so the row
 `checklistForRole()` in `lib/settings-overview.ts`, loaded by `lib/setup-checklist-server.ts` on page
 render only) and `BillingAccessNotice` (`components/billing/TrialNotice.tsx`). Steps are role-trimmed;
 a CASHIER sees none. The phone tab bar depends on the store too: `appTabBarForRole(role, published)`
-in `lib/app-nav.ts` is Orders · Menu · Store · Settings for a published store (Sell for an unpublished
-one; a cashier gets Orders · Sell · Store), Store raised in the middle (`APP_CENTRE_TAB`); Drops and the
-rest are behind More. `/store` (`components/store/StoreHubClient.tsx`, words in `lib/store-hub.ts`) is a
+in `lib/app-nav.ts` is Menu · Orders · Store · Pre-orders for a published store (Sell for an unpublished
+one; a cashier gets Orders · Sell · Store), Store raised in the middle (`APP_CENTRE_TAB`); Settings and the
+rest are behind More, the last tab. The rail (md+) is `APP_NAV_ITEMS` as is: Menu first, Settings last. `/store` (`components/store/StoreHubClient.tsx`, words in `lib/store-hub.ts`) is a
 header preview, what buyers can order now, the tagged Instagram bio / WhatsApp links, story image, QR, the
 owner's Publish and look rows into `/settings/store#<card>`. `/help` must use the same function (`helpTopicsForRole(role, published)`).
 
