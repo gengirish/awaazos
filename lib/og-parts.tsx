@@ -57,9 +57,24 @@ export function fulfilmentModeLabel(mode: string): string {
 const LOGO_MAX_BYTES = 1_500_000;
 
 /**
+ * PNG or JPEG from the file's first bytes, else null. Never from the
+ * Content-Type header: some stored photos are PNG bytes saved as `.jpg` and
+ * served as image/jpeg, and Satori, told "jpeg", throws mid-stream while
+ * reading PNG bytes, so the card answered 500 with no image.
+ */
+export function imageTypeOf(bytes: Uint8Array): "image/png" | "image/jpeg" | null {
+  if (bytes.length >= 8 && bytes[0] === 0x89 && bytes[1] === 0x50 && bytes[2] === 0x4e && bytes[3] === 0x47) {
+    return "image/png";
+  }
+  if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff) return "image/jpeg";
+  return null;
+}
+
+/**
  * The store logo as a data URL for Satori, or null. A slow or missing blob
  * degrades to "no logo" rather than a broken image or a 500 half-way through
- * the render. PNG / JPEG only (Satori can't draw WebP). Used by the link
+ * the render. PNG / JPEG only (Satori can't draw WebP), told apart by the bytes
+ * (`imageTypeOf`). Used by the link
  * preview, the store's app icon (app/s/[slug]/app-icon/[size]) and a product link's
  * preview, which draws the item's photo with it (app/s/[slug]/p/[itemId]).
  */
@@ -68,10 +83,10 @@ export async function storeLogoDataUrl(url: string | null): Promise<string | nul
   try {
     const res = await fetch(url, { signal: AbortSignal.timeout(2500) });
     if (!res.ok) return null;
-    const type = (res.headers.get("content-type") ?? "").split(";")[0].trim();
-    if (type !== "image/png" && type !== "image/jpeg") return null;
     const bytes = Buffer.from(await res.arrayBuffer());
     if (bytes.byteLength === 0 || bytes.byteLength > LOGO_MAX_BYTES) return null;
+    const type = imageTypeOf(bytes);
+    if (!type) return null;
     return `data:${type};base64,${bytes.toString("base64")}`;
   } catch {
     return null;

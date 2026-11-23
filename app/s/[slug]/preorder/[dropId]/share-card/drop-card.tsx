@@ -15,6 +15,10 @@ import { findFocusedDrop, focusedDropVisibility, isPlausibleDropId } from "@/lib
  * published gets the generic card; a drop that doesn't show (draft, closed for
  * good, another store's id) gets the store's own card, as the page shows the store.
  *
+ * Item photos (`MenuItem.imageUrl`, the cover) are fetched in parallel with the
+ * logo and drawn only when they load in time as PNG or JPEG, as on the product
+ * card; when none does, the card keeps the text rows.
+ *
  * The Prisma `select` is a hand-written allowlist: never `phone` / `email`.
  */
 
@@ -42,7 +46,7 @@ async function loadDropCard(slug: string, dropId: string, now: Date): Promise<Sh
           items: {
             orderBy: [{ sortOrder: "asc" }, { id: "asc" }],
             take: SHARE_CARD_MAX_ITEMS,
-            select: { priceInPaise: true, menuItem: { select: { name: true } } },
+            select: { priceInPaise: true, menuItem: { select: { name: true, imageUrl: true } } },
           },
           _count: { select: { items: true } },
         },
@@ -52,18 +56,28 @@ async function loadDropCard(slug: string, dropId: string, now: Date): Promise<Sh
   if (!vendor) return null;
   const drop = findFocusedDrop(vendor.drops, dropId, now);
   if (!drop) return "store";
+  const [logo, ...photos] = await Promise.all([
+    storeLogoDataUrl(vendor.logoUrl),
+    ...drop.items.map((it) => storeLogoDataUrl(httpsPhoto(it.menuItem.imageUrl))),
+  ]);
   return {
     name: vendor.name,
     city: vendor.city,
     tagline: vendor.settings?.tagline ?? null,
-    logo: await storeLogoDataUrl(vendor.logoUrl),
+    logo,
     drop: {
       ...drop,
+      items: drop.items.map((it, i) => ({ ...it, photo: photos[i] ?? null })),
       itemCount: drop._count.items,
       closed: focusedDropVisibility(drop, now) === "closed",
     },
     menuOrdering: null,
   };
+}
+
+/** Only a stored https photo is fetched (as the product card). */
+function httpsPhoto(url: string | null): string | null {
+  return url?.startsWith("https://") ? url : null;
 }
 
 export async function dropShareCard(slug: string, dropId: string): Promise<Response> {
