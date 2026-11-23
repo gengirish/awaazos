@@ -121,10 +121,18 @@ function ProductCard({
               style={{ width: 88, height: 88, borderRadius: 18, objectFit: "cover", marginRight: 20 }}
             />
           ) : null}
-          <div style={{ display: "flex", flexDirection: "column" }}>
-            <div style={{ display: "flex", fontSize: 34, fontWeight: 700 }}>{truncate(store.name, 28)}</div>
+          {/* minWidth 0 lets this column shrink beside the logo instead of running off the card. */}
+          <div style={{ display: "flex", flexDirection: "column", flex: 1, minWidth: 0 }}>
+            <div style={{ display: "block", fontSize: 32, fontWeight: 700, lineHeight: 1.15, lineClamp: 2 }}>
+              {truncate(store.name, 60)}
+            </div>
             <div style={{ display: "flex", fontSize: 26, color: C.muted, marginTop: 4 }}>
-              {store.city ? `${truncate(store.city, 20)} · Order online` : "Order online"}
+              {store.city ? (
+                <span style={{ display: "block", minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", textOverflow: "ellipsis" }}>
+                  {truncate(store.city, 40)}
+                </span>
+              ) : null}
+              <span style={{ display: "flex", flexShrink: 0 }}>{store.city ? " · Order online" : "Order online"}</span>
             </div>
           </div>
         </div>
