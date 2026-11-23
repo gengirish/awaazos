@@ -132,7 +132,10 @@ function ProductCard({
                   {truncate(store.city, 40)}
                 </span>
               ) : null}
-              <span style={{ display: "flex", flexShrink: 0 }}>{store.city ? " · Order online" : "Order online"}</span>
+              {/* A margin, not a leading space: Satori drops leading whitespace in a span. */}
+              <span style={{ display: "flex", flexShrink: 0, marginLeft: store.city ? 8 : 0 }}>
+                {store.city ? "· Order online" : "Order online"}
+              </span>
             </div>
           </div>
         </div>
