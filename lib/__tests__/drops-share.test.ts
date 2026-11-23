@@ -6,6 +6,7 @@ import {
   buildWhatsAppShareUrl,
   formatShareItemList,
   preorderLinkPath,
+  shareSheetData,
 } from "@/lib/drops-share";
 import { istToUtc } from "@/lib/drops-time";
 
@@ -98,6 +99,21 @@ describe("buildTaggedWhatsAppShareUrl", () => {
   it("leaves a message without the link alone", () => {
     expect(decode(buildTaggedWhatsAppShareUrl("Order now", "https://x.test/s/sam"))).toBe("Order now");
     expect(decode(buildTaggedWhatsAppShareUrl("Order now", ""))).toBe("Order now");
+  });
+});
+
+describe("shareSheetData", () => {
+  it("leaves out url when the message already has the link, so WhatsApp shows it once", () => {
+    const text = buildDropShareText(base);
+    expect(shareSheetData({ title: "T", text, url: base.url })).toEqual({ title: "T", text });
+  });
+
+  it("keeps url when the message doesn't carry it", () => {
+    expect(shareSheetData({ title: "T", text: "Order now", url: base.url })).toEqual({
+      title: "T",
+      text: "Order now",
+      url: base.url,
+    });
   });
 });
 
