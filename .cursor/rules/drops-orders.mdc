@@ -15,7 +15,9 @@ Core rules live in `lib/drops.ts` (read its header before touching it); buyers o
 `/s/[slug]`, the vendor builds drops on `/drops`, works their orders on `/orders` (the one orders
 board, see "One orders board" below) and prints from `/drops/[id]/prep`.
 `/drops` is a table per section (Upcoming, Past) whose actions are 44 px icon tiles (`dropRowActionClass`,
-`components/drops/drop-row-action.tsx`), with a tiny word under each below `lg` and the row's next step filled.
+`components/drops/drop-row-action.tsx`), with a 12 px one-line word under each below `lg` (Orders · Share · Edit ·
+Duplicate · Print prep; each aria-label starts with that word and names the pre-order). Share (taking orders) or
+Duplicate (past) is filled; a draft or closed one has no filled tile, since it is opened or reopened on its edit page.
 
 **"Drop" is the code's word only. Sellers and buyers read "Pre-order"** ("New pre-order", the
 "Pre-orders" tab, "Share this pre-order"). Wording only, like the store vocabulary: routes (`/drops`,

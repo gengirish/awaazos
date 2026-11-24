@@ -166,35 +166,44 @@
       "/drops@360": {
         "overflow": false,
         "tapTargets": {
-          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "177x44" },
+          "button \"Duplicate pre-order: Weekend bakes\"": { "count": 1, "size": "62x44" },
           "button \"Not now\"": { "count": 1, "size": "86x44" },
-          "button \"Share this pre-order: Weekend bakes\"": { "count": 1, "size": "294x44" },
+          "button \"Share this pre-order: Weekend bakes\"": { "count": 1, "size": "44x44" },
           "link \"Answer now\"": { "count": 1, "size": "112x44" },
-          "link \"Edit Weekend bakes\"": { "count": 1, "size": "109x44" },
-          "link \"New pre-order\"": { "count": 1, "size": "328x44" }
+          "link \"Edit Weekend bakes\"": { "count": 1, "size": "44x44" },
+          "link \"New pre-order\"": { "count": 1, "size": "328x44" },
+          "link \"Orders for Weekend bakes\"": { "count": 1, "size": "47x44" },
+          "link \"Print prep sheet for Weekend bakes\"": { "count": 1, "size": "64x44" },
+          "link \"Weekend bakes\"": { "count": 1, "size": "174x44" }
         }
       },
       "/drops@390": {
         "overflow": false,
         "tapTargets": {
-          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "177x44" },
+          "button \"Duplicate pre-order: Weekend bakes\"": { "count": 1, "size": "62x44" },
           "button \"Not now\"": { "count": 1, "size": "86x44" },
-          "button \"Share this pre-order: Weekend bakes\"": { "count": 1, "size": "324x44" },
+          "button \"Share this pre-order: Weekend bakes\"": { "count": 1, "size": "44x44" },
           "link \"Answer now\"": { "count": 1, "size": "112x44" },
-          "link \"Edit Weekend bakes\"": { "count": 1, "size": "139x44" },
-          "link \"New pre-order\"": { "count": 1, "size": "358x44" }
+          "link \"Edit Weekend bakes\"": { "count": 1, "size": "44x44" },
+          "link \"New pre-order\"": { "count": 1, "size": "358x44" },
+          "link \"Orders for Weekend bakes\"": { "count": 1, "size": "47x44" },
+          "link \"Print prep sheet for Weekend bakes\"": { "count": 1, "size": "64x44" },
+          "link \"Weekend bakes\"": { "count": 1, "size": "204x44" }
         }
       },
       "/drops@768": {
         "overflow": false,
         "tapTargets": {
-          "button \"Copy Weekend bakes for tomorrow\"": { "count": 1, "size": "291x44" },
+          "button \"Duplicate pre-order: Weekend bakes\"": { "count": 1, "size": "62x44" },
           "button \"Not now\"": { "count": 1, "size": "86x44" },
-          "button \"Share this pre-order: Weekend bakes\"": { "count": 1, "size": "582x44" },
+          "button \"Share this pre-order: Weekend bakes\"": { "count": 1, "size": "44x44" },
           "link \"Add your FSSAI number so buyers can trust your foodGo to Onl…\"": { "count": 1, "size": "614x44" },
           "link \"Answer now\"": { "count": 1, "size": "112x44" },
-          "link \"Edit Weekend bakes\"": { "count": 1, "size": "283x44" },
-          "link \"New pre-order\"": { "count": 1, "size": "119x44" }
+          "link \"Edit Weekend bakes\"": { "count": 1, "size": "44x44" },
+          "link \"New pre-order\"": { "count": 1, "size": "150x44" },
+          "link \"Orders for Weekend bakes\"": { "count": 1, "size": "47x44" },
+          "link \"Print prep sheet for Weekend bakes\"": { "count": 1, "size": "64x44" },
+          "link \"Weekend bakes\"": { "count": 1, "size": "323x44" }
         }
       },
       "/menu (add item dialog)@390": {

@@ -1624,7 +1624,7 @@ export function DropStatusBadge({ status, label }: { status: EffectiveDropStatus
 }
 
 /**
- * "Copy for tomorrow" — duplicates a drop onto tomorrow's IST date and opens the copy.
+ * "Duplicate" — copies a drop onto tomorrow's IST date and opens the copy.
  * An icon tile in the pre-orders table (`dropRowActionClass`), filled when it is the row's next step.
  */
 export function CopyDropButton({
@@ -1661,7 +1661,7 @@ export function CopyDropButton({
     });
   }
 
-  const name = `Copy ${title} for tomorrow`;
+  const name = `Duplicate pre-order: ${title}`;
   return (
     <button
       type="button"
@@ -1677,7 +1677,7 @@ export function CopyDropButton({
       ) : (
         <CopyPlus aria-hidden="true" />
       )}
-      <DropRowActionLabel>{pending ? "Copying" : "Copy"}</DropRowActionLabel>
+      <DropRowActionLabel>{pending ? "Duplicating" : "Duplicate"}</DropRowActionLabel>
     </button>
   );
 }
