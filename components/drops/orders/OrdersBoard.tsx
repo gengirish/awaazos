@@ -1197,6 +1197,7 @@ export function OrdersBoard({
                     selected={activeSelected.has(o.id)}
                     onToggleSelect={toggleSelect}
                     locked={bulkPending !== null}
+                    storeKind={vocab.kind}
                   />
                 </li>
               ))}

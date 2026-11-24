@@ -5,6 +5,7 @@ import {
   Ban,
   Bike,
   CalendarClock,
+  ChefHat,
   CheckCircle2,
   ChevronDown,
   ChevronUp,
@@ -14,6 +15,7 @@ import {
   LayoutGrid,
   Loader2,
   MoreHorizontal,
+  Package,
   PackageCheck,
   Phone,
   Send,
@@ -46,14 +48,16 @@ import {
   availableOrderActions,
   fixStatusActions,
   markPaidNeedsConfirm,
-  orderStateLabel,
+  orderStatusLine,
   paymentBadge,
   primaryOrderAction,
   type BoardOrder,
   type FixStatusAction,
   type OrderAction,
+  type OrderStatusKind,
   type PaymentBadgeKind,
 } from "@/lib/drops-board";
+import type { StoreKind } from "@/lib/store-vocabulary";
 import { formatIstDate, formatIstDayLabel, formatIstTime, utcToIstParts } from "@/lib/drops-time";
 import { orderSlotLabel } from "@/lib/menu-slots";
 import { cn } from "@/lib/utils";
@@ -80,6 +84,8 @@ type Props = {
   onToggleSelect?: (orderId: string) => void;
   /** A bulk run is in progress: the card's own buttons wait. */
   locked?: boolean;
+  /** What the store sells (`storeKind`): an accepted order is "Being made" or "Being packed". */
+  storeKind?: StoreKind;
 };
 
 const BADGE_STYLE: Record<PaymentBadgeKind, string> = {
@@ -88,10 +94,38 @@ const BADGE_STYLE: Record<PaymentBadgeKind, string> = {
   check: "border-amber-500/60 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100",
   cash: "border-border bg-secondary text-secondary-foreground",
   unpaid: "border-amber-500/60 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100",
-  waiting_online: "border-border bg-muted text-muted-foreground",
-  cancelled: "border-destructive/40 bg-destructive/10 text-foreground",
-  expired: "border-border bg-muted text-muted-foreground",
 };
+
+/** The status pill: neutral, except the ones that need the seller now and the ones that are over. */
+const STATUS_STYLE: Partial<Record<OrderStatusKind, string>> = {
+  check_payment: "border-amber-500/60 bg-amber-50 text-amber-900 dark:bg-amber-950/40 dark:text-amber-100",
+  to_accept: "border-primary/50 bg-primary/5 text-foreground",
+  cancelled: "border-destructive/40 bg-destructive/10 text-foreground",
+  lapsed: "border-border bg-muted text-muted-foreground",
+  waiting_online: "border-border bg-muted text-muted-foreground",
+};
+
+function StatusIcon({ kind, storeKind }: { kind: OrderStatusKind; storeKind: StoreKind }) {
+  const cls = "h-4 w-4 shrink-0";
+  switch (kind) {
+    case "waiting_online":
+    case "to_accept":
+      return <Clock className={cls} aria-hidden />;
+    case "check_payment":
+      return <AlertTriangle className={cls} aria-hidden />;
+    case "preparing":
+      return storeKind === "goods" ? <Package className={cls} aria-hidden /> : <ChefHat className={cls} aria-hidden />;
+    case "ready":
+      return <PackageCheck className={cls} aria-hidden />;
+    case "on_the_way":
+      return <Bike className={cls} aria-hidden />;
+    case "handed_over":
+      return <CheckCircle2 className={cls} aria-hidden />;
+    case "cancelled":
+    case "lapsed":
+      return <XCircle className={cls} aria-hidden />;
+  }
+}
 
 /** "7:58 pm" for an order from today (IST), "Wed, 28 Oct · 7:58 pm" for an older one. */
 function placedLabel(d: Date): string {
@@ -108,13 +142,9 @@ function BadgeIcon({ kind }: { kind: PaymentBadgeKind }) {
     case "check":
       return <AlertTriangle className={cls} aria-hidden />;
     case "unpaid":
-    case "waiting_online":
-    case "expired":
       return <Clock className={cls} aria-hidden />;
     case "cash":
       return <IndianRupee className={cls} aria-hidden />;
-    case "cancelled":
-      return <XCircle className={cls} aria-hidden />;
   }
 }
 
@@ -131,6 +161,7 @@ export function OrderCard({
   selected = false,
   onToggleSelect,
   locked = false,
+  storeKind = "food",
 }: Props) {
   const [confirmCancel, setConfirmCancel] = useState(false);
   const [confirmPaid, setConfirmPaid] = useState(false);
@@ -163,11 +194,11 @@ export function OrderCard({
   const slotLabel = orderSlotLabel(order.fulfilAt, order.fulfilUntil, new Date());
   const isMenuOrder = order.dropId === null;
   const firstItem = order.items[0];
-  const stateLabel = orderStateLabel(order);
+  // Every card says where the order is first, then where its money stands.
+  const status = orderStatusLine(order, storeKind);
   const badge = paymentBadge(order);
-  const handedOver = order.displayState === "DELIVERED";
-  // Collapsed: a finished order says how it ended; a live one, where its money stands.
-  const summaryLabel = handedOver ? `${stateLabel}${badge.kind === "due" ? " · Payment due" : ""}` : badge.label;
+  // These statuses already say pickup or delivery, so the folded line doesn't repeat it.
+  const statusSaysHandover = status.kind === "ready" || status.kind === "on_the_way" || status.kind === "handed_over";
 
   const actions = availableOrderActions(order, frozen);
   const canConfirm = actions.has("confirm");
@@ -178,7 +209,13 @@ export function OrderCard({
   const outAt = order.outForDeliveryAt ? new Date(order.outForDeliveryAt) : null;
   const outForDelivery = outAt !== null && (fs === "PLACED" || fs === "CONFIRMED");
   const readyAt = order.readyAt ? new Date(order.readyAt) : null;
-  const readyNow = readyAt !== null && fs === "CONFIRMED" && !outForDelivery;
+  // When it got there, on the open card's status pill.
+  const statusSince =
+    status.kind === "ready" && readyAt
+      ? `since ${formatIstTime(readyAt)}`
+      : status.kind === "on_the_way" && outAt
+        ? `left ${formatIstTime(outAt)}`
+        : null;
   // The buyer tapped "I've received my order" and it still waits on the seller (unpaid).
   const receivedAt = order.buyerReceivedAt ? new Date(order.buyerReceivedAt) : null;
   const buyerSaysReceived = receivedAt !== null && (fs === "PLACED" || fs === "CONFIRMED");
@@ -187,12 +224,10 @@ export function OrderCard({
   // Mistake fixes, per order only (never bulk, never the big button).
   const fixes = fixStatusActions(order, frozen);
 
+  // Buttons are verbs, so they never read like a status.
+  const deliverVerb = isPickup ? "Mark picked up" : "Mark delivered";
   const deliverLabel =
-    order.paymentMethod === "CASH" && unpaid
-      ? `${isPickup ? "Picked up" : "Delivered"} · ${formatINR(order.totalPaise)} collected`
-      : isPickup
-        ? "Picked up"
-        : "Delivered";
+    order.paymentMethod === "CASH" && unpaid ? `${deliverVerb} · ${formatINR(order.totalPaise)} collected` : deliverVerb;
 
   // One big button per order: its stage's next step (`primaryOrderAction`).
   // Everything else is in the card's "⋯" menu.
@@ -213,12 +248,12 @@ export function OrderCard({
       action: "mark_paid",
       show: canMarkPaid,
       // Answering the buyer's claim; being paid accepts a new order too (`markOrderPaid`).
-      label: claimWaiting ? "Yes, received" : "Payment received",
+      label: claimWaiting ? "Yes, received" : "Mark paid",
       icon: <IndianRupee aria-hidden />,
     },
     { action: "reject_payment", show: canRejectPayment, label: "Not received", icon: <XCircle aria-hidden /> },
     { action: "mark_ready", show: canMarkReady, label: "Mark ready", icon: <PackageCheck aria-hidden /> },
-    { action: "dispatch", show: canDispatch, label: "Out for delivery", icon: <Send aria-hidden /> },
+    { action: "dispatch", show: canDispatch, label: "Mark out for delivery", icon: <Send aria-hidden /> },
     {
       action: "deliver",
       show: canDeliver,
@@ -234,10 +269,11 @@ export function OrderCard({
   const primaryButton = shown.find((b) => b.action === primary) ?? null;
   const hasMenu = menuButtons.length > 0 || fixes.length > 0 || canCancel;
 
-  // Each fix's menu label and its confirm (title, then what happens).
+  // Each fix's menu label and its confirm (title, then what happens). The labels say
+  // "Undo …" so none of them reads like a status ("Not paid yet" is the badge's).
   const FIX_COPY: Record<FixStatusAction, [label: string, title: string, description: string]> = {
     unready: [
-      outForDelivery ? "Not out for delivery yet" : "Not ready yet",
+      outForDelivery ? "Undo out for delivery" : "Undo ready",
       "Move it back to Preparing?",
       "Its customer page says so too.",
     ],
@@ -246,12 +282,12 @@ export function OrderCard({
       "Move it back to Ready?",
       "Payment stays as it is.",
     ],
-    mark_unpaid: ["Not paid yet", "Mark it not paid?", "It comes off your sales."],
+    mark_unpaid: ["Undo paid", "Mark it not paid?", "It comes off your sales."],
     uncancel: [
       "Reopen order",
       "Reopen this order?",
       order.paymentStatus === "REFUNDED"
-        ? "It comes back accepted and paid, if still in stock. Refunded the buyer? Tap Not paid yet after."
+        ? "It comes back accepted and paid, if still in stock. Refunded the buyer? Tap Undo paid after."
         : "It comes back accepted, if still in stock.",
     ],
   };
@@ -376,17 +412,16 @@ export function OrderCard({
               <span className="min-w-0 flex-1 text-muted-foreground">Hide details</span>
             ) : (
               <span className="flex min-w-0 flex-1 flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                <BadgeIcon kind={handedOver && badge.kind !== "due" ? "paid" : badge.kind} />
-                <span className="font-semibold">{summaryLabel}</span>
+                <StatusIcon kind={status.kind} storeKind={storeKind} />
+                <span className="font-semibold">{status.label}</span>
+                {badge && (
+                  <span className={badge.kind === "due" || badge.kind === "check" ? "font-semibold" : "text-muted-foreground"}>
+                    · <span>{badge.label}</span>
+                  </span>
+                )}
                 <span className="text-muted-foreground">
-                  · {itemCount} {itemCount === 1 ? "item" : "items"} ·{" "}
-                  {isPickup
-                    ? readyNow
-                      ? "Ready for pickup"
-                      : "Pickup"
-                    : outForDelivery
-                      ? `Out for delivery${order.riderName ? ` with ${order.riderName}` : ""}`
-                      : "Delivery"}
+                  · {itemCount} {itemCount === 1 ? "item" : "items"}
+                  {statusSaysHandover ? "" : isPickup ? " · Pickup" : " · Delivery"}
                   {!isPickup && order.deliveryLocality ? ` · ${order.deliveryLocality}` : ""}
                   {slotLabel ? ` · ${slotLabel}` : ""}
                 </span>
@@ -435,21 +470,29 @@ export function OrderCard({
         {expanded && (
           <>
             <div className="mt-3 flex flex-wrap items-center gap-1.5">
-              {handedOver && (
-                <p className="inline-flex items-center gap-1.5 rounded-full border border-border bg-muted px-2.5 py-1 text-xs font-semibold text-foreground">
-                  <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden />
-                  {stateLabel}
-                </p>
-              )}
               <p
                 className={cn(
                   "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
-                  BADGE_STYLE[badge.kind],
+                  STATUS_STYLE[status.kind] ?? "border-border bg-muted text-foreground",
                 )}
               >
-                <BadgeIcon kind={badge.kind} />
-                {badge.label}
+                <StatusIcon kind={status.kind} storeKind={storeKind} />
+                <span className="sr-only">Status: </span>
+                {status.label}
+                {statusSince && <span className="font-normal text-muted-foreground"> · {statusSince}</span>}
               </p>
+              {badge && (
+                <p
+                  className={cn(
+                    "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-semibold",
+                    BADGE_STYLE[badge.kind],
+                  )}
+                >
+                  <BadgeIcon kind={badge.kind} />
+                  <span className="sr-only">Payment: </span>
+                  {badge.label}
+                </p>
+              )}
               {source && (
                 <p className="inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground">
                   {source.kind === "drop" ? (
@@ -568,7 +611,7 @@ export function OrderCard({
           <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
           <span>
             <span className="font-semibold">Customer says they got it</span> · {formatIstTime(receivedAt)}
-            {unpaid && <span className="block">Collect the payment, then tap Delivered.</span>}
+            {unpaid && <span className="block">Collect the payment, then tap {deliverVerb}.</span>}
           </span>
         </p>
       )}
@@ -585,30 +628,6 @@ export function OrderCard({
             )}
           </p>
         </div>
-      )}
-
-      {readyNow && readyAt && (
-        <p className="mt-2 flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold">
-          <PackageCheck className="h-4 w-4 shrink-0" aria-hidden />
-          <span>
-            Ready for pickup
-            <span className="font-normal text-muted-foreground"> · since {formatIstTime(readyAt)}</span>
-          </span>
-        </p>
-      )}
-
-      {outForDelivery && outAt && (
-        <p className="mt-2 flex items-center gap-2 rounded-md border border-primary/40 bg-primary/5 px-3 py-2 text-sm font-semibold">
-          <Send className="h-4 w-4 shrink-0" aria-hidden />
-          <span>
-            Out for delivery
-            <span className="font-normal text-muted-foreground">
-              {" "}
-              · {formatIstTime(outAt)}
-              {order.riderName ? ` · with ${order.riderName}` : ""}
-            </span>
-          </span>
-        </p>
       )}
 
       {!isPickup && fs !== "CANCELLED" && fs !== "DELIVERED" && !awaitingOnline && (

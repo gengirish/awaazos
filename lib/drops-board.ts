@@ -19,6 +19,7 @@ import type {
 
 import type { EffectiveDropStatus, OrderDisplayState } from "@/lib/drops";
 import { formatFulfilmentWindow } from "@/lib/drops-time";
+import type { StoreKind } from "@/lib/store-vocabulary";
 
 export const ORDER_DISPLAY_STATES: readonly OrderDisplayState[] = [
   "AWAITING_PAYMENT",
@@ -726,22 +727,70 @@ export function newOrdersTab(unseen: { bucket: BoardBucket }[]): "new" | "prepar
   return unseen.length > 0 && unseen.every((o) => o.bucket === "preparing") ? "preparing" : "new";
 }
 
-export const DISPLAY_STATE_LABEL: Record<OrderDisplayState, string> = {
-  AWAITING_PAYMENT: "Awaiting payment",
-  PAYMENT_SUBMITTED: "Customer says paid",
-  PAY_ON_DELIVERY: "Pay on delivery",
-  PAID: "Paid",
-  DELIVERED: "Delivered",
-  CANCELLED: "Cancelled",
-  EXPIRED: "Expired (unpaid)",
-};
 
-export type PaymentBadgeKind = "paid" | "due" | "check" | "cash" | "unpaid" | "waiting_online" | "cancelled" | "expired";
+// ─── What a card says ───────────────────────────────────────────────
+
+export type OrderStatusKind =
+  | "waiting_online"
+  | "check_payment"
+  | "to_accept"
+  | "preparing"
+  | "ready"
+  | "on_the_way"
+  | "handed_over"
+  | "cancelled"
+  | "lapsed";
 
 /**
- * The payment badge on an order card. Payment is never a board stage, so this is
- * where it shows: words always, colour only repeats them. A handed-over order
- * still unpaid is "Payment due", the one that must not be forgotten.
+ * The card's status line: where the order is and what comes next, in the
+ * seller's words. It is the first thing a card says, open or folded, so a card
+ * found by search reads right outside its tab. Payment has its own badge
+ * (`paymentBadge`); this line never talks about money except when the next step
+ * is answering the buyer's "I've paid". `kind` is the store's (`storeKind`):
+ * a kitchen's accepted order is "Being made", a product seller's "Being packed".
+ */
+export function orderStatusLine(
+  o: {
+    displayState: OrderDisplayState;
+    fulfilmentStatus: FulfilmentStatus | null;
+    fulfilmentType: FulfilmentType | null;
+    readyAt?: string | Date | null;
+    outForDeliveryAt?: string | Date | null;
+    riderName?: string | null;
+    bucket?: BoardBucket;
+  },
+  kind: StoreKind = "food",
+): { kind: OrderStatusKind; label: string } {
+  const isPickup = o.fulfilmentType === "PICKUP";
+  if (o.bucket === "awaiting_online") return { kind: "waiting_online", label: "Waiting for online payment" };
+  switch (o.displayState) {
+    case "CANCELLED":
+      return { kind: "cancelled", label: "Cancelled" };
+    case "EXPIRED":
+      return { kind: "lapsed", label: "Not paid in time" };
+    case "DELIVERED":
+      return { kind: "handed_over", label: isPickup ? "Picked up" : "Delivered" };
+    case "PAYMENT_SUBMITTED":
+      return { kind: "check_payment", label: "Check payment" };
+  }
+  // A stamp says more than "not accepted": an order can be sent out or packed before Accept.
+  if (o.outForDeliveryAt) {
+    const rider = o.riderName?.trim();
+    return { kind: "on_the_way", label: rider ? `On the way with ${rider}` : "On the way" };
+  }
+  if (o.readyAt) return { kind: "ready", label: isPickup ? "Ready for pickup" : "Ready to send" };
+  if (o.fulfilmentStatus === "PLACED") return { kind: "to_accept", label: "Waiting for you to accept" };
+  return { kind: "preparing", label: kind === "goods" ? "Being packed" : "Being made" };
+}
+
+export type PaymentBadgeKind = "paid" | "due" | "check" | "cash" | "unpaid";
+
+/**
+ * The payment badge on an order card: where the money stands, and only that.
+ * Words always, colour only repeats them. A handed-over order still unpaid is
+ * "Payment due", the one that must not be forgotten. No badge on a cancelled or
+ * lapsed order, or one waiting for an online payment: the status line says it
+ * all, and there is no money to act on.
  */
 export function paymentBadge(o: {
   displayState: OrderDisplayState;
@@ -749,24 +798,14 @@ export function paymentBadge(o: {
   fulfilmentType: FulfilmentType | null;
   paidOnline?: boolean;
   bucket?: BoardBucket;
-}): { kind: PaymentBadgeKind; label: string } {
-  if (o.displayState === "CANCELLED") return { kind: "cancelled", label: "Cancelled" };
-  if (o.displayState === "EXPIRED") return { kind: "expired", label: "Expired (unpaid)" };
+}): { kind: PaymentBadgeKind; label: string } | null {
+  if (o.displayState === "CANCELLED" || o.displayState === "EXPIRED") return null;
   if (o.paymentStatus === "PAID") return { kind: "paid", label: o.paidOnline ? "Paid online" : "Paid" };
+  if (o.bucket === "awaiting_online") return null;
   if (o.displayState === "DELIVERED") return { kind: "due", label: "Payment due" };
-  if (o.displayState === "PAYMENT_SUBMITTED") return { kind: "check", label: "Payment to check" };
+  if (o.displayState === "PAYMENT_SUBMITTED") return { kind: "check", label: "Customer says paid" };
   if (o.displayState === "PAY_ON_DELIVERY") {
-    return { kind: "cash", label: o.fulfilmentType === "PICKUP" ? "Pay at pickup" : "Pay on delivery" };
+    return { kind: "cash", label: o.fulfilmentType === "PICKUP" ? "Collect at pickup" : "Collect on delivery" };
   }
-  if (o.bucket === "awaiting_online") return { kind: "waiting_online", label: "Waiting for online payment" };
   return { kind: "unpaid", label: "Not paid yet" };
-}
-
-/** `DISPLAY_STATE_LABEL`, except a handed-over pickup order reads "Picked up". */
-export function orderStateLabel(o: {
-  displayState: OrderDisplayState;
-  fulfilmentType: FulfilmentType | null;
-}): string {
-  if (o.displayState === "DELIVERED" && o.fulfilmentType === "PICKUP") return "Picked up";
-  return DISPLAY_STATE_LABEL[o.displayState];
 }

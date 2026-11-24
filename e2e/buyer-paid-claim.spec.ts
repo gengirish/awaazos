@@ -69,7 +69,7 @@ test.describe("buyer marks an order paid, seller confirms or rejects", () => {
       // ── Seller: sees the claim, answers "Not received" ──────────────
       await page.goto("/orders");
       const card = page.getByRole("article", { name: /Claim Buyer/ });
-      await expect(card.getByText(/payment to check/i).first()).toBeVisible();
+      await expect(card.getByText(/customer says paid/i).first()).toBeVisible();
       await expect(card.getByText("Did ₹120.00 reach your UPI app?")).toBeVisible();
       await expect(card.getByRole("button", { name: "Yes, received" })).toBeVisible();
       const notReceived = card.getByRole("button", { name: "Not received" });

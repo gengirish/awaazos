@@ -57,7 +57,7 @@ test("B3 seller works one order across the board", async ({ page, browser, reque
   await expect(card).toBeVisible();
 
   await d.say("When they pick it up, one tap books the cash.", { wait: 600 });
-  await d.tap(card.getByRole("button", { name: /^Picked up/ }), { after: 1200 });
+  await d.tap(card.getByRole("button", { name: /^Mark picked up/ }), { after: 1200 });
   await d.tap(tab("Done"), { after: 900 });
   await expect(card).toBeVisible();
   await d.beat(800);
