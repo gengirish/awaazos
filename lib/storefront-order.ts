@@ -18,8 +18,8 @@ const IST = "Asia/Kolkata";
 /** Schema ceiling on a single line's qty (storefrontOrderSchema: max 99). */
 export const MAX_LINE_QTY = 99;
 
-/** A drop past its cut-off keeps showing "Orders closed" for this long, then hides. */
-export const CLOSED_DROP_GRACE_MS = 12 * 60 * 60 * 1000;
+/** A drop past its cut-off keeps showing "Orders closed" for this long (1 hour), then hides. */
+export const CLOSED_DROP_GRACE_MS = 60 * 60 * 1000;
 
 // ─── Drop visibility on the storefront ──────────────────────────────
 

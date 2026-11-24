@@ -13,7 +13,7 @@ const at = (ms: number) => new Date(now.getTime() + ms);
 
 const open = { id: "open", status: "OPEN" as const, opensAt: null, closesAt: at(5 * hour) };
 const later = { id: "later", status: "OPEN" as const, opensAt: at(2 * hour), closesAt: at(9 * hour) };
-const justClosed = { id: "just-closed", status: "OPEN" as const, opensAt: null, closesAt: at(-hour) };
+const justClosed = { id: "just-closed", status: "OPEN" as const, opensAt: null, closesAt: at(-hour / 2) };
 const longClosed = { id: "long-closed", status: "OPEN" as const, opensAt: null, closesAt: at(-CLOSED_DROP_GRACE_MS - hour) };
 const draft = { id: "draft", status: "DRAFT" as const, opensAt: null, closesAt: at(5 * hour) };
 const drops = [open, later, justClosed, longClosed, draft];
