@@ -553,7 +553,12 @@ export function OrderCard({
               )}
             </div>
 
-            {progress && <ProgressRow steps={progress} />}
+            {/*
+              Not on a To accept card: its status already says "Waiting for you to accept",
+              and a row whose next step reads "(•) Accepted" looked like the opposite, on a
+              card that is the tallest on the board.
+            */}
+            {progress && order.bucket !== "new" && <ProgressRow steps={progress} />}
 
             {awaitingOnline && (
               <p className="mt-3 text-sm text-muted-foreground">
