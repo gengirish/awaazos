@@ -37,8 +37,10 @@ import { formatINR } from "@/lib/currency";
 import { dropStateLabel } from "@/lib/drop-state";
 import type { EffectiveDropStatus } from "@/lib/drops";
 import {
-  BOARD_FILTERS,
+  BOARD_FILTER_IDS,
+  boardFilterLabel,
   boardPollKind,
+  boardSections,
   countByFilter,
   dropOrdersHref,
   filterByHandover,
@@ -82,7 +84,7 @@ import {
   writeOrderSoundPref,
   type PushArrivedDetail,
 } from "@/lib/order-voice";
-import type { StoreVocabulary } from "@/lib/store-vocabulary";
+import type { StoreKind, StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
 // The select primitives are heavy and only a vendor with two or more sources
@@ -160,26 +162,49 @@ function catalogueBoardScope(vocab: StoreVocabulary): string {
   return `Orders customers placed from your ${vocab.catalogue} in the last 3 days, plus older ones still open.`;
 }
 
-const ACTION_DONE: Record<OrderAction, string> = {
-  confirm: "Order accepted. It's in Preparing.",
-  mark_paid: "Marked paid",
-  reject_payment: "Marked not received",
-  cancel: "Order cancelled",
-  mark_ready: "Marked ready. It's in Ready.",
-  unready: "Back in Preparing",
-  dispatch: "Out for delivery. It's in Ready.",
-  deliver: "Marked delivered",
-  undeliver: "Moved back: not handed over yet",
-  mark_unpaid: "Marked not paid",
-  uncancel: "Order reopened",
-};
+/** The toast after an action. It names the tab the order moved to, as the tab row does. */
+function actionDone(action: OrderAction, kind: StoreKind): string {
+  const toMake = boardFilterLabel("preparing", kind);
+  const toHandOver = boardFilterLabel("ready", kind);
+  switch (action) {
+    case "confirm":
+      return `Order accepted. It's in ${toMake}.`;
+    case "mark_paid":
+      return "Marked paid";
+    case "reject_payment":
+      return "Marked not received";
+    case "cancel":
+      return "Order cancelled";
+    case "mark_ready":
+      return `Marked ready. It's in ${toHandOver}.`;
+    case "unready":
+      return `Back in ${toMake}`;
+    case "dispatch":
+      return `Out for delivery. It's in ${toHandOver}.`;
+    case "deliver":
+      return "Marked delivered";
+    case "undeliver":
+      return "Moved back: not handed over yet";
+    case "mark_unpaid":
+      return "Marked not paid";
+    case "uncancel":
+      return "Order reopened";
+  }
+}
 
 /** What an empty tab says when the store has orders, just none at this stage. */
-const EMPTY_STAGE: Record<Exclude<BoardFilter, "new">, string> = {
-  preparing: "Nothing being prepared right now. Accepted orders wait here.",
-  ready: "Nothing waiting to be picked up or delivered.",
-  done: "No finished orders in the last 3 days.",
-};
+function emptyStage(filter: Exclude<BoardFilter, "new">, kind: StoreKind): string {
+  switch (filter) {
+    case "preparing":
+      return kind === "goods"
+        ? "Nothing to pack right now. Accepted orders wait here."
+        : "Nothing to make right now. Accepted orders wait here.";
+    case "ready":
+      return "Nothing waiting to be picked up or delivered.";
+    case "done":
+      return "No finished orders in the last 3 days.";
+  }
+}
 
 const SEGMENT_BTN =
   "inline-flex min-h-11 items-center justify-center gap-1 rounded-md border px-2 text-sm font-medium focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring";
@@ -516,7 +541,7 @@ export function OrdersBoard({
         if (action === "deliver") {
           // A slip of the thumb at the door: one tap puts it back (the card's own
           // "Undo delivered" is a filter away by now).
-          toast.success(updated.fulfilmentType === "PICKUP" ? "Marked picked up" : ACTION_DONE.deliver, {
+          toast.success(updated.fulfilmentType === "PICKUP" ? "Marked picked up" : actionDone("deliver", vocab.kind), {
             duration: 8000,
             classNames: { actionButton: "min-h-11" },
             action: { label: "Undo", onClick: () => void runAction(updated.id, "undeliver") },
@@ -524,7 +549,7 @@ export function OrdersBoard({
         } else if (action === "dispatch" && opts?.riderName) {
           toast.success(`Out for delivery with ${opts.riderName}`);
         } else {
-          toast.success(ACTION_DONE[action]);
+          toast.success(actionDone(action, vocab.kind));
         }
         return;
       }
@@ -575,6 +600,14 @@ export function OrdersBoard({
   const visible = useMemo(
     () => (trimmedQuery ? searchOrders(scoped, trimmedQuery) : filterByHandover(inFilter, activeHandover)),
     [scoped, inFilter, activeHandover, trimmedQuery],
+  );
+  // The tab's groups (To hand over: waiting for pickup, ready to send, on the way).
+  const sections = useMemo(
+    () =>
+      trimmedQuery
+        ? [{ id: "results", heading: "", showHeading: false, orders: visible }]
+        : boardSections(visible, vocab.kind),
+    [trimmedQuery, visible, vocab.kind],
   );
   const showSearch = scoped.length >= SEARCH_MIN_ORDERS || query !== "";
   const searchExpanded = searchOpen || query !== "";
@@ -629,8 +662,8 @@ export function OrdersBoard({
 
   // Arrow keys move between the filter tabs (one tab stop for the whole row).
   const onTabKeyDown = (e: KeyboardEvent<HTMLDivElement>) => {
-    const i = BOARD_FILTERS.findIndex((f) => f.id === filter);
-    const last = BOARD_FILTERS.length - 1;
+    const i = BOARD_FILTER_IDS.indexOf(filter);
+    const last = BOARD_FILTER_IDS.length - 1;
     const next =
       e.key === "ArrowRight"
         ? i === last
@@ -647,7 +680,7 @@ export function OrdersBoard({
               : -1;
     if (next < 0) return;
     e.preventDefault();
-    const id = BOARD_FILTERS[next]!.id;
+    const id = BOARD_FILTER_IDS[next]!;
     changeFilter(id);
     tabRefs.current[id]?.focus();
   };
@@ -839,11 +872,11 @@ export function OrdersBoard({
             action:
               counts.preparing > 0 ? (
                 <Button type="button" variant="outline" onClick={() => changeFilter("preparing")}>
-                  Show preparing ({counts.preparing})
+                  Orders {boardFilterLabel("preparing", vocab.kind).toLowerCase()} ({counts.preparing})
                 </Button>
               ) : undefined,
           }
-        : { description: EMPTY_STAGE[filter] };
+        : { description: emptyStage(filter, vocab.kind) };
   } else if (drop) {
     empty =
       effective === "OPEN"
@@ -1048,7 +1081,8 @@ export function OrdersBoard({
             // Four stage tabs share the row; the search icon (when shown) sits beside them.
             className="grid min-w-0 flex-1 grid-cols-4 gap-0.5 md:flex md:gap-2 md:overflow-x-auto md:p-0.5"
           >
-            {BOARD_FILTERS.map((f) => {
+            {BOARD_FILTER_IDS.map((id) => {
+              const f = { id, label: boardFilterLabel(id, vocab.kind) };
               const active = filter === f.id;
               return (
                 <button
@@ -1181,27 +1215,46 @@ export function OrdersBoard({
                 </label>
               </div>
             )}
-            <ul className="flex flex-col gap-3">
-              {visible.map((o) => (
-                <li key={o.id}>
-                  <OrderCard
-                    order={o}
-                    vendorName={vendorName}
-                    riders={riders}
-                    frozen={isFrozen(o)}
-                    source={sourceOf(o)}
-                    isNew={newIds.has(o.id)}
-                    pendingAction={pending?.orderId === o.id ? pending.action : null}
-                    onAction={runAction}
-                    selectable={isBulkSelectable(o, isFrozen(o))}
-                    selected={activeSelected.has(o.id)}
-                    onToggleSelect={toggleSelect}
-                    locked={bulkPending !== null}
-                    storeKind={vocab.kind}
-                  />
-                </li>
+            {/* One list per group (On the way, Cancelled …); search results stay one list across tabs. */}
+            <div className="flex flex-col gap-5">
+              {sections.map((section) => (
+                <section
+                  key={section.id}
+                  aria-labelledby={section.showHeading ? `orders-section-${section.id}` : undefined}
+                  className="flex flex-col gap-2"
+                >
+                  {section.showHeading && (
+                    <h2
+                      id={`orders-section-${section.id}`}
+                      className="text-sm font-semibold text-muted-foreground"
+                    >
+                      {section.heading} <span className="font-mono tabular-nums">({section.orders.length})</span>
+                    </h2>
+                  )}
+                  <ul className="flex flex-col gap-3">
+                    {section.orders.map((o) => (
+                      <li key={o.id}>
+                        <OrderCard
+                          order={o}
+                          vendorName={vendorName}
+                          riders={riders}
+                          frozen={isFrozen(o)}
+                          source={sourceOf(o)}
+                          isNew={newIds.has(o.id)}
+                          pendingAction={pending?.orderId === o.id ? pending.action : null}
+                          onAction={runAction}
+                          selectable={isBulkSelectable(o, isFrozen(o))}
+                          selected={activeSelected.has(o.id)}
+                          onToggleSelect={toggleSelect}
+                          locked={bulkPending !== null}
+                          storeKind={vocab.kind}
+                        />
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ))}
-            </ul>
+            </div>
           </>
         )}
         {activeSelected.size > 0 && (

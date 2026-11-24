@@ -104,9 +104,9 @@ test.describe("delivery riders", () => {
 
     // ── Tapping it hands the order over: out for delivery, with Ramesh ─
     await send.click();
-    // It was a new order; gone out, it moves to Ready: follow it there.
-    await page.getByRole("tab", { name: /^Ready/ }).click();
-    // Collapsed on Ready: the summary line already says so; the details give the time.
+    // It was a new order; gone out, it moves to To hand over: follow it there.
+    await page.getByRole("tab", { name: /^To hand over/ }).click();
+    // Collapsed on To hand over: the summary line already says so; the details give the time.
     await expect(order).toContainText("On the way with Ramesh");
     await order.getByRole("button", { name: /Show details/ }).click();
     await expect(order).toContainText(/On the way with Ramesh · left .+/);
@@ -131,7 +131,7 @@ test.describe("delivery riders", () => {
     await page.getByRole("button", { name: "Remove Ramesh" }).click();
     await expect(page.getByRole("region", { name: "Delivery riders" }).getByText("No riders saved yet.")).toBeVisible();
     await page.goto("/orders");
-    await page.getByRole("tab", { name: /^Ready/ }).click();
+    await page.getByRole("tab", { name: /^To hand over/ }).click();
     const after = page.getByRole("article", { name: /Asha Rider-Test/ });
     await after.getByRole("button", { name: /Show details/ }).click();
     await expect(after.getByRole("button", { name: /Copy for rider/ })).toBeVisible();
@@ -197,7 +197,7 @@ test.describe("delivery riders", () => {
     const token = await placeDeliveryOrder(request, slug, menuItemId, "Meena Got-It");
     await page.goto("/orders");
     await page.getByRole("article", { name: /Meena Got-It/ }).getByRole("button", { name: "Accept order" }).click();
-    await expect(page.getByRole("tab", { name: /^Preparing \(1\)/ })).toBeVisible();
+    await expect(page.getByRole("tab", { name: /^To make \(1\)/ })).toBeVisible();
 
     const buyerCtx = await browser.newContext(CONTEXT_OPTIONS);
     try {
@@ -210,7 +210,7 @@ test.describe("delivery riders", () => {
     }
 
     await page.goto("/orders");
-    await page.getByRole("tab", { name: /^Preparing/ }).click();
+    await page.getByRole("tab", { name: /^To make/ }).click();
     const got = page.getByRole("article", { name: /Meena Got-It/ });
     await expect(got).toContainText("Customer got it");
     await got.getByRole("button", { name: /Show details/ }).click();

@@ -91,7 +91,7 @@ test.describe("Orders board: menu and drop orders together", () => {
     await expect(dropCard).toBeVisible();
     await expect(menuCard.getByText("Menu order", { exact: true })).toBeVisible();
     await expect(dropCard.getByText(dropTitle, { exact: true })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "New (2)" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "To accept (2)" })).toBeVisible();
 
     // ── One bulk accept over both: each order goes to its own route ──────
     // "Last checked" is set on mount, so it marks the board as hydrated; a tap
@@ -99,9 +99,9 @@ test.describe("Orders board: menu and drop orders together", () => {
     await expect(page.getByText(/^Last checked/)).toBeVisible();
     await page.getByRole("checkbox", { name: /select all/i }).check();
     await page.getByRole("region", { name: "Bulk actions" }).getByRole("button", { name: "Accept 2 orders" }).click();
-    await expect(page.getByRole("tab", { name: "Preparing (2)" })).toBeVisible();
-    await expect(page.getByRole("tab", { name: "New (0)" })).toBeVisible();
-    await page.getByRole("tab", { name: /^Preparing/ }).click();
+    await expect(page.getByRole("tab", { name: "To make (2)" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "To accept (0)" })).toBeVisible();
+    await page.getByRole("tab", { name: /^To make/ }).click();
     await expect(menuCard).toBeVisible();
     await expect(dropCard).toBeVisible();
 
@@ -131,12 +131,12 @@ test.describe("Orders board: menu and drop orders together", () => {
     await expect(page).toHaveURL(new RegExp(`/orders\\?drop=${drop.id}$`));
     await expect(page.getByRole("heading", { level: 1, name: "Orders", exact: true })).toBeVisible();
     // Only the drop's one order is counted: the menu order is out of this view.
-    await expect(page.getByRole("tab", { name: "Preparing (1)" })).toBeVisible();
+    await expect(page.getByRole("tab", { name: "To make (1)" })).toBeVisible();
     await expect(page.getByRole("tab", { name: "Done (0)" })).toBeVisible();
     await expect(page.locator("p", { hasText: "To cook:" })).toContainText("Board Laddu 1");
   });
 
-  test("the Preparing list splits into pickup and delivery, one radio at a time", async ({ page, request }) => {
+  test("the To make list splits into pickup and delivery, one radio at a time", async ({ page, request }) => {
     await createVendorSession(page, request, "board-handover");
     const json = { "Content-Type": "application/json" };
     const settings = await page.request.patch("/api/vendor", {
@@ -172,7 +172,7 @@ test.describe("Orders board: menu and drop orders together", () => {
 
     await page.setViewportSize({ width: 360, height: 740 });
     await page.goto("/orders");
-    await page.getByRole("tab", { name: /^Preparing/ }).click();
+    await page.getByRole("tab", { name: /^To make/ }).click();
     const group = page.getByRole("radiogroup", { name: "Pickup or delivery" });
     await expect(group.getByRole("radio", { name: "All (3)" })).toBeChecked();
 
@@ -185,6 +185,72 @@ test.describe("Orders board: menu and drop orders together", () => {
       .locator("label")
       .evaluateAll((labels) => labels.filter((l) => l.scrollWidth > l.clientWidth).length);
     expect(overflowing).toBe(0);
+  });
+
+  test("To hand over and Done are grouped, and an open card shows its progress", async ({ page, request }) => {
+    await createVendorSession(page, request, "board-groups");
+    const json = { "Content-Type": "application/json" };
+    const settings = await page.request.patch("/api/vendor", {
+      data: { publishStorefront: true, acceptPayOnDelivery: true, acceptMenuOrders: true, menuFulfilmentMode: "BOTH" },
+      headers: json,
+    });
+    expect(settings.status()).toBe(200);
+    const { vendor } = (await (await page.request.get("/api/vendor")).json()) as { vendor: { slug: string } };
+    const poha = await createMenuItem(page, { name: "Group Poha", priceInRupees: 40 });
+
+    const buyers = [
+      ["Gita Pickup", "PICKUP"],
+      ["Gopal Delivery", "DELIVERY"],
+      ["Ganesh Cancel", "PICKUP"],
+    ] as const;
+    for (const [i, [customerName, fulfilmentType]] of buyers.entries()) {
+      const placed = await request.post(`/api/s/${vendor.slug}/menu-orders`, {
+        data: {
+          items: [{ menuItemId: poha.id, qty: 1 }],
+          customerName,
+          customerPhone: `+91984805434${i}`,
+          fulfilmentType,
+          deliveryAddress: "12 Lake Road",
+          paymentMethod: "CASH",
+        },
+        headers: json,
+      });
+      expect(placed.status()).toBe(201);
+    }
+    const list = (await (await page.request.get("/api/storefront-orders")).json()) as {
+      data: { id: string; customerName: string | null }[];
+    };
+    const idOf = (name: string) => list.data.find((o) => o.customerName === name)!.id;
+    const act = async (name: string, action: string) => {
+      const res = await page.request.patch(`/api/storefront-orders/${idOf(name)}`, { data: { action }, headers: json });
+      expect(res.status(), `${name}: ${action}`).toBe(200);
+    };
+    await act("Gita Pickup", "confirm");
+    await act("Gita Pickup", "mark_ready");
+    await act("Gopal Delivery", "confirm");
+    await act("Gopal Delivery", "dispatch");
+    await act("Ganesh Cancel", "cancel");
+
+    await page.goto("/orders");
+    await page.getByRole("tab", { name: /^To hand over \(2\)/ }).click();
+    const pickups = page.getByRole("region", { name: "Waiting for pickup (1)" });
+    const onTheWay = page.getByRole("region", { name: "On the way (1)" });
+    await expect(pickups.getByRole("article", { name: /Gita Pickup/ })).toBeVisible();
+    await expect(onTheWay.getByRole("article", { name: /Gopal Delivery/ })).toBeVisible();
+
+    // Open, the pickup says how far it has got: accepted and ready, picking up is next.
+    const card = page.getByRole("article", { name: /Gita Pickup/ });
+    await card.getByRole("button", { name: /show details/i }).click();
+    const progress = card.getByRole("list", { name: "Progress" });
+    await expect(progress).toContainText("Accepted, done");
+    await expect(progress).toContainText("Ready, done");
+    await expect(progress.locator('[aria-current="step"]')).toContainText("Picked up");
+
+    // Done keeps the cancelled order under its own heading, even alone.
+    await page.getByRole("tab", { name: /^Done \(1\)/ }).click();
+    await expect(
+      page.getByRole("region", { name: "Cancelled or not paid in time (1)" }).getByRole("article", { name: /Ganesh Cancel/ }),
+    ).toBeVisible();
   });
 
   test("Fix status: reopen a cancelled paid order, then take back the payment", async ({ page, request }) => {
@@ -230,7 +296,7 @@ test.describe("Orders board: menu and drop orders together", () => {
     await reopen.getByRole("button", { name: "Yes, change it" }).click();
     await expect(page.getByText("Order reopened")).toBeVisible();
 
-    await page.getByRole("tab", { name: /^Preparing \(1\)/ }).click();
+    await page.getByRole("tab", { name: /^To make \(1\)/ }).click();
     await expect(card.getByText("Paid", { exact: true })).toBeVisible();
     await card.getByRole("button", { name: /show details/i }).click();
     await card.getByRole("button", { name: /^More for/ }).click();

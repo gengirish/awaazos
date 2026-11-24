@@ -113,7 +113,7 @@ test.describe("menu orders: order straight from the everyday menu", () => {
     await expect(page.getByRole("heading", { name: "To make" })).toBeVisible();
 
     // Every filter tab is on screen at once (a phone used to cut the later ones off).
-    for (const name of [/^New/, /^Preparing/, /^Ready/, /^Done/]) {
+    for (const name of [/^To accept/, /^To make/, /^To hand over/, /^Done/]) {
       await expect(page.getByRole("tab", { name })).toBeInViewport();
     }
 
@@ -127,11 +127,11 @@ test.describe("menu orders: order straight from the everyday menu", () => {
     await expect(card.getByText(`2 × ${bhel}`)).toBeVisible();
     await card.getByRole("button", { name: "Accept order" }).click();
 
-    // Accepting moves the order to Preparing, Mark ready to Ready; follow it there.
-    await page.getByRole("tab", { name: /^Preparing/ }).click();
+    // Accepting moves the order to To make, Mark ready to To hand over; follow it there.
+    await page.getByRole("tab", { name: /^To make/ }).click();
     const confirmed = page.getByRole("article", { name: /Ravi Buyer/ });
     await confirmed.getByRole("button", { name: "Mark ready" }).click();
-    await page.getByRole("tab", { name: /^Ready/ }).click();
+    await page.getByRole("tab", { name: /^To hand over/ }).click();
     await confirmed.getByRole("button", { name: /picked up · ₹200\.00 collected/i }).click();
 
     await page.getByRole("tab", { name: /^Done/ }).click();

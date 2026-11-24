@@ -49,9 +49,9 @@ test.describe("order feedback", () => {
       // ── Seller hands it over ─────────────────────────────────────────
       await page.goto("/orders");
       await page.getByRole("article", { name: /Ravi Buyer/ }).getByRole("button", { name: "Accept order" }).click();
-      await page.getByRole("tab", { name: /^Preparing/ }).click();
+      await page.getByRole("tab", { name: /^To make/ }).click();
       await page.getByRole("article", { name: /Ravi Buyer/ }).getByRole("button", { name: "Mark ready" }).click();
-      await page.getByRole("tab", { name: /^Ready/ }).click();
+      await page.getByRole("tab", { name: /^To hand over/ }).click();
       await page
         .getByRole("article", { name: /Ravi Buyer/ })
         .getByRole("button", { name: /picked up · ₹75\.00 collected/i })

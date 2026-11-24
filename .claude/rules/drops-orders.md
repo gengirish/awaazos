@@ -72,7 +72,7 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
 - **A Razorpay store's seller hears about paid orders** (`lib/storefront-online-paid.ts`). Placing a UPI order there
   only moves the board signal; verify or the webhook, whichever wins `markOrderPaid`, sends the one "New paid order" push.
   On the board a new order the buyer hasn't paid (`isAwaitingOnlinePay`) is bucket `awaiting_online`: listed last under
-  New with no count, not in the summary, no chime, Cancel its only action (`checkOrderAction` agrees, so a stale board can't make it
+  To accept, under its own heading, with no count, not in the summary, no chime, Cancel its only action (`checkOrderAction` agrees, so a stale board can't make it
   hold stock for good). Stock and prep sheets still count it. A claim or an expired hold puts it back on the normal
   path, so a direct UPI payment can still be marked paid. `BoardOrder.paidOnline` and the buyer's page say "Paid online"
   from `razorpayPaymentId`, and the buyer's progress drops Confirmed.
@@ -133,9 +133,16 @@ Billing notices and a checklist with open steps sit outside the slot. The header
 menu (`BoardMenus.tsx`). In menu scope the status pill sets `acceptMenuOrders` for an OWNER through `PATCH
 /api/vendor`; it does not touch drops. Refresh, Sound and phone alerts are in the live sync bar at the bottom.
 
-**Stages** (`boardBucket` in `lib/drops-board.ts`): the board's tabs are New → Preparing → Ready → Done. New =
-not accepted, or a buyer's claim unanswered; Preparing = accepted; Ready = `Transaction.readyAt` ("Mark ready",
-pickups) or `outForDeliveryAt` ("Mark out for delivery"); Done = handed over, cancelled, expired. Payment is never a
+**Stages** (`boardBucket` in `lib/drops-board.ts`): the board's tabs are named after the seller's next job
+(`boardFilterLabel`): To accept → To make / To pack (`toMakeTab` in the store vocabulary) → To hand over → Done; the ids
+stay `new` / `preparing` / `ready` / `done`. To accept = not accepted, or a buyer's claim unanswered; To make = accepted;
+To hand over = `Transaction.readyAt` ("Mark ready", pickups) or `outForDeliveryAt` ("Mark out for delivery"); Done =
+handed over, cancelled, expired. Inside a tab the list is grouped (`boardSections`): To accept ends with "Waiting for
+online payment" (`awaiting_online`, outside the count, so the count matches the cards above it), To hand over splits into
+Waiting for pickup / Ready to send / On the way, and Done keeps "Cancelled or not paid in time" apart. A heading shows once
+a tab has two groups, and always on those two that aren't the tab's job; search results stay one list. An open card
+that still has a step to take shows a progress row (`orderProgressSteps`: Accepted · Ready · Picked up, or Accepted · On
+the way · Delivered), words plus icons, payment never a step. Payment is never a
 stage. Every card says two things, in words: its status line (`orderStatusLine`: "Waiting for you to accept",
 "Check payment", "Being made" / "Being packed" by `storeKind`, "Ready for pickup", "On the way with <rider>", "Picked up" /
 "Delivered", "Cancelled", "Not paid in time"), first on the card open or folded, and a payment badge (`paymentBadge`,

@@ -2,9 +2,11 @@ import type { DropStatus, FulfilmentStatus, PaymentMethod, PaymentStatus } from 
 import { describe, expect, it } from "vitest";
 
 import {
-  BOARD_FILTERS,
+  BOARD_FILTER_IDS,
   availableOrderActions,
   boardBucket,
+  boardFilterLabel,
+  boardSections,
   boardPollKind,
   checkOrderAction,
   countByFilter,
@@ -20,6 +22,7 @@ import {
   newOrderIds,
   newOrdersTab,
   orderActionBase,
+  orderProgressSteps,
   ordersInScope,
   ordersToPack,
   prepFromOrders,
@@ -68,7 +71,14 @@ describe("boardBucket (the stage tabs)", () => {
   });
 
   it("has four tabs, and filters and counts by them", () => {
-    expect(BOARD_FILTERS.map((f) => f.label)).toEqual(["New", "Preparing", "Ready", "Done"]);
+    expect(BOARD_FILTER_IDS.map((id) => boardFilterLabel(id))).toEqual(["To accept", "To make", "To hand over", "Done"]);
+    // A product seller packs orders; nobody cooks them.
+    expect(BOARD_FILTER_IDS.map((id) => boardFilterLabel(id, "goods"))).toEqual([
+      "To accept",
+      "To pack",
+      "To hand over",
+      "Done",
+    ]);
     const orders = [
       { id: "a", bucket: "new" as const },
       { id: "b", bucket: "preparing" as const },
@@ -107,7 +117,7 @@ describe("a Razorpay store's unpaid new order (awaiting_online)", () => {
 
   it("has no tab or count of its own: it is listed last under New", () => {
     const orders = [{ id: "a", bucket: "awaiting_online" as const }, { id: "b", bucket: "new" as const }];
-    expect(BOARD_FILTERS.map((f) => f.id)).not.toContain("awaiting_online");
+    expect(BOARD_FILTER_IDS).not.toContain("awaiting_online");
     expect(filterOrders(orders, "new").map((o) => o.id)).toEqual(["b", "a"]);
     expect(filterOrders(orders, "preparing")).toEqual([]);
     expect(countByFilter(orders)).toEqual({ new: 1, preparing: 0, ready: 0, done: 0 });
@@ -735,5 +745,129 @@ describe("searchOrders / filterByHandover", () => {
     expect(filterByHandover(orders, "all")).toHaveLength(3);
     expect(filterByHandover(orders, "pickup").map((x) => x.id)).toEqual(["a"]);
     expect(filterByHandover(orders, "delivery").map((x) => x.id)).toEqual(["b", "c"]);
+  });
+});
+
+describe("boardSections", () => {
+  const at = "2026-10-05T09:00:00.000Z";
+  const order = (
+    id: string,
+    bucket: "new" | "preparing" | "ready" | "done" | "awaiting_online",
+    extra: Partial<{
+      displayState: OrderDisplayState;
+      fulfilmentType: "PICKUP" | "DELIVERY" | null;
+      readyAt: string;
+      outForDeliveryAt: string;
+    }> = {},
+  ) => ({ id, bucket, displayState: "PAID" as OrderDisplayState, fulfilmentType: "PICKUP" as const, ...extra });
+  const shape = (orders: ReturnType<typeof order>[], kind?: "food" | "goods") =>
+    boardSections(orders, kind).map((s) => ({
+      id: s.id,
+      heading: s.showHeading ? s.heading : null,
+      ids: s.orders.map((o) => o.id),
+    }));
+
+  it("one group on its own has no heading", () => {
+    expect(shape([order("a", "preparing"), order("b", "preparing")])).toEqual([
+      { id: "to_make", heading: null, ids: ["a", "b"] },
+    ]);
+    expect(shape([order("a", "new")])).toEqual([{ id: "to_accept", heading: null, ids: ["a"] }]);
+  });
+
+  it("puts unpaid online orders under their own heading, after the ones to accept", () => {
+    expect(shape([order("w", "awaiting_online"), order("a", "new")])).toEqual([
+      { id: "to_accept", heading: "To accept", ids: ["a"] },
+      { id: "waiting_online", heading: "Waiting for online payment", ids: ["w"] },
+    ]);
+    // Alone, the heading still says why these cards aren't in the tab's count.
+    expect(shape([order("w", "awaiting_online")])).toEqual([
+      { id: "waiting_online", heading: "Waiting for online payment", ids: ["w"] },
+    ]);
+  });
+
+  it("splits To hand over into waiting for pickup, ready to send and on the way", () => {
+    const orders = [
+      order("out", "ready", { fulfilmentType: "DELIVERY", outForDeliveryAt: at }),
+      order("pick", "ready", { readyAt: at }),
+      order("send", "ready", { fulfilmentType: "DELIVERY", readyAt: at }),
+      order("pick2", "ready", { readyAt: at }),
+    ];
+    expect(shape(orders)).toEqual([
+      { id: "waiting_pickup", heading: "Waiting for pickup", ids: ["pick", "pick2"] },
+      { id: "ready_to_send", heading: "Ready to send", ids: ["send"] },
+      { id: "on_the_way", heading: "On the way", ids: ["out"] },
+    ]);
+    // Only pickups: one group, no heading (the status line says it).
+    expect(shape([order("pick", "ready", { readyAt: at })])).toEqual([
+      { id: "waiting_pickup", heading: null, ids: ["pick"] },
+    ]);
+  });
+
+  it("keeps cancelled and lapsed orders apart in Done, always headed", () => {
+    const orders = [
+      order("x", "done", { displayState: "CANCELLED" }),
+      order("d", "done", { displayState: "DELIVERED" }),
+      order("e", "done", { displayState: "EXPIRED" }),
+    ];
+    expect(shape(orders)).toEqual([
+      { id: "handed_over", heading: "Handed over", ids: ["d"] },
+      { id: "closed", heading: "Cancelled or not paid in time", ids: ["x", "e"] },
+    ]);
+    expect(shape([order("x", "done", { displayState: "CANCELLED" })])).toEqual([
+      { id: "closed", heading: "Cancelled or not paid in time", ids: ["x"] },
+    ]);
+    expect(shape([order("d", "done", { displayState: "DELIVERED" })])).toEqual([
+      { id: "handed_over", heading: null, ids: ["d"] },
+    ]);
+  });
+
+  it("an empty tab has no groups", () => {
+    expect(boardSections([])).toEqual([]);
+  });
+});
+
+describe("orderProgressSteps", () => {
+  const at = "2026-10-05T09:00:00.000Z";
+  const steps = (o: Parameters<typeof orderProgressSteps>[0]) =>
+    orderProgressSteps(o)?.map((s) => `${s.label}${s.done ? " ✓" : ""}`) ?? null;
+
+  it("a pickup: Accepted · Ready · Picked up", () => {
+    const base = { displayState: "PAID" as const, fulfilmentType: "PICKUP" as const };
+    expect(steps({ ...base, fulfilmentStatus: "PLACED" })).toEqual(["Accepted", "Ready", "Picked up"]);
+    expect(steps({ ...base, fulfilmentStatus: "CONFIRMED" })).toEqual(["Accepted ✓", "Ready", "Picked up"]);
+    expect(steps({ ...base, fulfilmentStatus: "CONFIRMED", readyAt: at })).toEqual([
+      "Accepted ✓",
+      "Ready ✓",
+      "Picked up",
+    ]);
+  });
+
+  it("a delivery: Accepted · On the way · Delivered", () => {
+    const base = { displayState: "PAY_ON_DELIVERY" as const, fulfilmentType: "DELIVERY" as const };
+    expect(steps({ ...base, fulfilmentStatus: "CONFIRMED" })).toEqual(["Accepted ✓", "On the way", "Delivered"]);
+    // Packed but not sent yet: still not on the way.
+    expect(steps({ ...base, fulfilmentStatus: "CONFIRMED", readyAt: at })).toEqual([
+      "Accepted ✓",
+      "On the way",
+      "Delivered",
+    ]);
+    // Sent out before Accept: a later step done means the earlier one is too.
+    expect(steps({ ...base, fulfilmentStatus: "PLACED", outForDeliveryAt: at })).toEqual([
+      "Accepted ✓",
+      "On the way ✓",
+      "Delivered",
+    ]);
+    // No handover type on an old row reads as a delivery, as everywhere on the board.
+    expect(steps({ ...base, fulfilmentType: null, fulfilmentStatus: "CONFIRMED" })?.[1]).toBe("On the way");
+  });
+
+  it("none once there is no step left, or nothing to do yet", () => {
+    const base = { fulfilmentStatus: "CONFIRMED" as const, fulfilmentType: "PICKUP" as const };
+    expect(steps({ ...base, displayState: "DELIVERED" })).toBeNull();
+    expect(steps({ ...base, displayState: "CANCELLED" })).toBeNull();
+    expect(steps({ ...base, displayState: "EXPIRED" })).toBeNull();
+    expect(
+      steps({ displayState: "AWAITING_PAYMENT", fulfilmentStatus: "PLACED", fulfilmentType: "PICKUP", bucket: "awaiting_online" }),
+    ).toBeNull();
   });
 });
