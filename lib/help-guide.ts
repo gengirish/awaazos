@@ -233,7 +233,7 @@ export const HELP_TOPICS: readonly HelpTopic[] = [
     id: "new-drop",
     group: "drops",
     title: "Create a pre-order",
-    steps: "Tap New pre-order. Add the {items}, how many you can make, the pickup or delivery time and the order cut-off. You can also speak the plan.",
+    steps: "Tap New pre-order. Give it a name and a note for customers, pick the pickup or delivery time, add the {items} and how many you can make, then set the order cut-off. You can also speak the plan.",
     nav: "drops",
     href: "/drops/new",
     trail: ["New pre-order"],

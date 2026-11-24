@@ -210,8 +210,6 @@ export type DropFormProps = {
 
 /** The fields under "More options". All have a sensible default, so a seller can ignore them. */
 const MORE_OPTION_FIELDS: (keyof FormState)[] = [
-  "title",
-  "note",
   "useOpensAt",
   "opensAtDate",
   "opensAtTime",
@@ -250,7 +248,7 @@ export function DropForm({
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [askPublish, setAskPublish] = useState(false);
   const [moreOpen, setMoreOpen] = useState(() =>
-    Boolean(initial.note?.trim() || (initial.opensAtDate && initial.opensAtTime) || initial.showEverydayMenu),
+    Boolean((initial.opensAtDate && initial.opensAtTime) || initial.showEverydayMenu),
   );
   const [limitShown, setLimitShown] = useState<string[]>([]);
 
@@ -688,6 +686,185 @@ export function DropForm({
       ) : null}
 
       <fieldset disabled={locked || pending} className="space-y-6">
+        {/* ── Name and note ── */}
+        <section aria-labelledby="drop-about" className="space-y-4 rounded-xl border border-border bg-card p-4">
+          <div className={sectionHeadCls}>
+            <h2 id="drop-about" className="font-display text-lg font-semibold">
+              Name your pre-order
+            </h2>
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="drop-title" className="text-sm font-medium">
+                Title
+              </label>
+              <FromVoiceBadge show={fromVoice("title")} />
+            </div>
+            <input
+              id="drop-title"
+              className={inputCls}
+              maxLength={80}
+              placeholder={vocab.dropExample}
+              value={form.title}
+              onChange={(e) => {
+                setTitleAuto(false);
+                set("title", e.target.value);
+              }}
+              {...errProps("title")}
+              aria-describedby={describedBy("title", titleAuto ? "drop-title-hint" : null)}
+            />
+            {titleAuto ? (
+              <p id="drop-title-hint" className="text-xs text-muted-foreground">
+                Named after the {vocab.makeDay.toLowerCase()}. Type your own name to change it.
+              </p>
+            ) : null}
+            {err("title")}
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="drop-note" className="text-sm font-medium">
+                Note for customers <span className="font-normal text-muted-foreground">(optional)</span>
+              </label>
+              <FromVoiceBadge show={fromVoice("note")} />
+            </div>
+            <textarea
+              id="drop-note"
+              className={`${inputCls} min-h-20 py-2`}
+              maxLength={280}
+              placeholder="Fresh eggless cakes, made to order"
+              value={form.note}
+              onChange={(e) => set("note", e.target.value)}
+              {...errProps("note")}
+            />
+            {err("note")}
+          </div>
+        </section>
+
+        {/* ── Fulfilment ── */}
+        <section aria-labelledby="drop-fulfilment" className="space-y-4 rounded-xl border border-border bg-card p-4">
+          <div className={sectionHeadCls}>
+            <h2 id="drop-fulfilment" className="font-display text-lg font-semibold">
+              When do customers get it?
+            </h2>
+            <FromVoiceBadge show={fromVoice("fulfilmentMode")} />
+          </div>
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <label htmlFor="drop-date" className="text-sm font-medium">
+                {vocab.makeDay}
+              </label>
+              <FromVoiceBadge show={fromVoice("date")} />
+            </div>
+            <input
+              id="drop-date"
+              type="date"
+              className={pickerCls}
+              value={form.date}
+              onChange={(e) => setCookingDate(e.target.value)}
+              {...errProps("date")}
+            />
+            <p className="text-xs text-muted-foreground">{ymdHint(form.date)}</p>
+            {err("date")}
+          </div>
+          <div role="radiogroup" aria-label={`How customers get their ${vocab.goods}`} className="grid grid-cols-3 gap-2">
+            {MODES.map((m) => (
+              <RadioOption
+                key={m.value}
+                size="compact"
+                name="drop-fulfilment-mode"
+                value={m.value}
+                checked={form.fulfilmentMode === m.value}
+                onChange={() => set("fulfilmentMode", m.value)}
+                label={m.label}
+              />
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="drop-start" className="text-sm font-medium">
+                  From
+                </label>
+                <FromVoiceBadge show={fromVoice("fulfilmentStart")} />
+              </div>
+              <input
+                id="drop-start"
+                type="time"
+                className={pickerCls}
+                value={form.fulfilmentStart}
+                onChange={(e) => set("fulfilmentStart", e.target.value)}
+                {...errProps("fulfilmentStart")}
+              />
+              {err("fulfilmentStart")}
+            </div>
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="drop-end" className="text-sm font-medium">
+                  Until
+                </label>
+                <FromVoiceBadge show={fromVoice("fulfilmentEnd")} />
+              </div>
+              <input
+                id="drop-end"
+                type="time"
+                className={pickerCls}
+                value={form.fulfilmentEnd}
+                onChange={(e) => set("fulfilmentEnd", e.target.value)}
+                {...errProps("fulfilmentEnd")}
+              />
+              {err("fulfilmentEnd")}
+            </div>
+          </div>
+          {form.fulfilmentMode !== "PICKUP" ? (
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="drop-fee" className="text-sm font-medium">
+                  Delivery fee (₹)
+                </label>
+                <FromVoiceBadge show={fromVoice("deliveryFee")} />
+              </div>
+              <input
+                id="drop-fee"
+                inputMode="decimal"
+                className={inputCls}
+                placeholder="30"
+                value={form.deliveryFee}
+                onChange={(e) => set("deliveryFee", e.target.value)}
+                {...errProps("deliveryFeePaise")}
+                aria-describedby={describedBy("deliveryFeePaise", "drop-fee-hint")}
+              />
+              <p id="drop-fee-hint" className="text-xs text-muted-foreground">
+                {form.fulfilmentMode === "BOTH"
+                  ? "Added once to each delivery order. Pickup orders pay nothing."
+                  : "Added once to each delivery order."}{" "}
+                Enter 0 for free delivery. A delivery area with its own fee replaces this one (Settings → Online
+                orders → Delivery areas).
+              </p>
+              {err("deliveryFeePaise")}
+            </div>
+          ) : null}
+          {form.fulfilmentMode !== "DELIVERY" ? (
+            <div className="space-y-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <label htmlFor="drop-pickup" className="text-sm font-medium">
+                  Pickup instructions <span className="font-normal text-muted-foreground">(optional)</span>
+                </label>
+                <FromVoiceBadge show={fromVoice("pickupNote")} />
+              </div>
+              <input
+                id="drop-pickup"
+                className={inputCls}
+                maxLength={200}
+                placeholder="Collect from Gate 2, Block C"
+                value={form.pickupNote}
+                onChange={(e) => set("pickupNote", e.target.value)}
+                {...errProps("pickupNote")}
+              />
+              {err("pickupNote")}
+            </div>
+          ) : null}
+        </section>
+
         {/* ── Items ── */}
         <section aria-labelledby="drop-items" className="space-y-4 rounded-xl border border-border bg-card p-4">
           <div className={sectionHeadCls}>
@@ -847,131 +1024,6 @@ export function DropForm({
           )}
         </section>
 
-        {/* ── Fulfilment ── */}
-        <section aria-labelledby="drop-fulfilment" className="space-y-4 rounded-xl border border-border bg-card p-4">
-          <div className={sectionHeadCls}>
-            <h2 id="drop-fulfilment" className="font-display text-lg font-semibold">
-              When do customers get it?
-            </h2>
-            <FromVoiceBadge show={fromVoice("fulfilmentMode")} />
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <label htmlFor="drop-date" className="text-sm font-medium">
-                {vocab.makeDay}
-              </label>
-              <FromVoiceBadge show={fromVoice("date")} />
-            </div>
-            <input
-              id="drop-date"
-              type="date"
-              className={pickerCls}
-              value={form.date}
-              onChange={(e) => setCookingDate(e.target.value)}
-              {...errProps("date")}
-            />
-            <p className="text-xs text-muted-foreground">{ymdHint(form.date)}</p>
-            {err("date")}
-          </div>
-          <div role="radiogroup" aria-label={`How customers get their ${vocab.goods}`} className="grid grid-cols-3 gap-2">
-            {MODES.map((m) => (
-              <RadioOption
-                key={m.value}
-                size="compact"
-                name="drop-fulfilment-mode"
-                value={m.value}
-                checked={form.fulfilmentMode === m.value}
-                onChange={() => set("fulfilmentMode", m.value)}
-                label={m.label}
-              />
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label htmlFor="drop-start" className="text-sm font-medium">
-                  From
-                </label>
-                <FromVoiceBadge show={fromVoice("fulfilmentStart")} />
-              </div>
-              <input
-                id="drop-start"
-                type="time"
-                className={pickerCls}
-                value={form.fulfilmentStart}
-                onChange={(e) => set("fulfilmentStart", e.target.value)}
-                {...errProps("fulfilmentStart")}
-              />
-              {err("fulfilmentStart")}
-            </div>
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label htmlFor="drop-end" className="text-sm font-medium">
-                  Until
-                </label>
-                <FromVoiceBadge show={fromVoice("fulfilmentEnd")} />
-              </div>
-              <input
-                id="drop-end"
-                type="time"
-                className={pickerCls}
-                value={form.fulfilmentEnd}
-                onChange={(e) => set("fulfilmentEnd", e.target.value)}
-                {...errProps("fulfilmentEnd")}
-              />
-              {err("fulfilmentEnd")}
-            </div>
-          </div>
-          {form.fulfilmentMode !== "PICKUP" ? (
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label htmlFor="drop-fee" className="text-sm font-medium">
-                  Delivery fee (₹)
-                </label>
-                <FromVoiceBadge show={fromVoice("deliveryFee")} />
-              </div>
-              <input
-                id="drop-fee"
-                inputMode="decimal"
-                className={inputCls}
-                placeholder="30"
-                value={form.deliveryFee}
-                onChange={(e) => set("deliveryFee", e.target.value)}
-                {...errProps("deliveryFeePaise")}
-                aria-describedby={describedBy("deliveryFeePaise", "drop-fee-hint")}
-              />
-              <p id="drop-fee-hint" className="text-xs text-muted-foreground">
-                {form.fulfilmentMode === "BOTH"
-                  ? "Added once to each delivery order. Pickup orders pay nothing."
-                  : "Added once to each delivery order."}{" "}
-                Enter 0 for free delivery. A delivery area with its own fee replaces this one (Settings → Online
-                orders → Delivery areas).
-              </p>
-              {err("deliveryFeePaise")}
-            </div>
-          ) : null}
-          {form.fulfilmentMode !== "DELIVERY" ? (
-            <div className="space-y-1.5">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <label htmlFor="drop-pickup" className="text-sm font-medium">
-                  Pickup instructions <span className="font-normal text-muted-foreground">(optional)</span>
-                </label>
-                <FromVoiceBadge show={fromVoice("pickupNote")} />
-              </div>
-              <input
-                id="drop-pickup"
-                className={inputCls}
-                maxLength={200}
-                placeholder="Collect from Gate 2, Block C"
-                value={form.pickupNote}
-                onChange={(e) => set("pickupNote", e.target.value)}
-                {...errProps("pickupNote")}
-              />
-              {err("pickupNote")}
-            </div>
-          ) : null}
-        </section>
-
         {/* ── Ordering window ── */}
         <section aria-labelledby="drop-window" className="space-y-4 rounded-xl border border-border bg-card p-4">
           <div className={sectionHeadCls}>
@@ -1016,54 +1068,8 @@ export function DropForm({
         >
           <summary className="flex min-h-11 cursor-pointer items-center justify-between gap-3 rounded-xl p-4 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring">
             <span className="font-display text-lg font-semibold">More options</span>
-            <span className="min-w-0 truncate text-sm text-muted-foreground">{form.title.trim()}</span>
           </summary>
           <div className="space-y-4 border-t border-border p-4">
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <label htmlFor="drop-title" className="text-sm font-medium">
-                Title
-              </label>
-              <FromVoiceBadge show={fromVoice("title")} />
-            </div>
-            <input
-              id="drop-title"
-              className={inputCls}
-              maxLength={80}
-              placeholder={vocab.dropExample}
-              value={form.title}
-              onChange={(e) => {
-                setTitleAuto(false);
-                set("title", e.target.value);
-              }}
-              {...errProps("title")}
-              aria-describedby={describedBy("title", titleAuto ? "drop-title-hint" : null)}
-            />
-            {titleAuto ? (
-              <p id="drop-title-hint" className="text-xs text-muted-foreground">
-                Named after the {vocab.makeDay.toLowerCase()}. Type your own name to change it.
-              </p>
-            ) : null}
-            {err("title")}
-          </div>
-          <div className="space-y-1.5">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <label htmlFor="drop-note" className="text-sm font-medium">
-                Note for customers <span className="font-normal text-muted-foreground">(optional)</span>
-              </label>
-              <FromVoiceBadge show={fromVoice("note")} />
-            </div>
-            <textarea
-              id="drop-note"
-              className={`${inputCls} min-h-20 py-2`}
-              maxLength={280}
-              placeholder="Fresh eggless cakes, made to order"
-              value={form.note}
-              onChange={(e) => set("note", e.target.value)}
-              {...errProps("note")}
-            />
-            {err("note")}
-          </div>
           <div className="flex items-center justify-between gap-4">
             <label htmlFor="drop-opens-later" className="text-sm font-medium">
               Start taking orders later, not as soon as I open the pre-order

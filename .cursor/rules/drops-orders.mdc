@@ -43,8 +43,8 @@ MANAGER sending it gets 403 `owner_required`).
 the form's "Open orders" button, which saves what is on screen first; a closed one has "Reopen orders"
 in the Status panel. The cut-off closes a drop by itself and no tap follows it. `FROZEN` and `FULFILLED`
 are older rows only: nothing moves a drop into them now, they stay read-only, and they keep the
-`drop_frozen` / `drop_locked` rules. The form's "More options" holds what has a default (name, note,
-later start, everyday menu), and a new drop takes its handover details from the store's last one
+`drop_frozen` / `drop_locked` rules. The form runs name and note, handover, items, cut-off; "More options"
+holds the rest that has a default (later start, everyday menu), and a new drop takes its handover details from the store's last one
 (`lastDropDefaults`), or for a first drop from its menu pickup / delivery answer (`storeHandoverDefaults`).
 
 Money and plan rules:
