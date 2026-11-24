@@ -169,11 +169,11 @@ test.describe("drops: home-kitchen pre-order day", () => {
       await expect(await boardMenuItem(page, "Share", "Instagram story")).toBeVisible();
       await closeBoardMenu(page);
 
-      // New → Preparing → Ready → Done, one big button each.
+      // To accept → To make → To hand over → Done, one big button each.
       await card.getByRole("button", { name: "Accept order" }).click();
-      await page.getByRole("tab", { name: /^Preparing/ }).click();
+      await page.getByRole("tab", { name: /^To make/ }).click();
       await card.getByRole("button", { name: "Mark ready" }).click();
-      await page.getByRole("tab", { name: /^Ready/ }).click();
+      await page.getByRole("tab", { name: /^To hand over/ }).click();
       await card.getByRole("button", { name: /picked up · ₹240\.00 collected/i }).click();
 
       await page.getByRole("tab", { name: /^Done/ }).click();

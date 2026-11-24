@@ -19,7 +19,7 @@ import type {
 
 import type { EffectiveDropStatus, OrderDisplayState } from "@/lib/drops";
 import { formatFulfilmentWindow } from "@/lib/drops-time";
-import type { StoreKind } from "@/lib/store-vocabulary";
+import { vocabularyForKind, type StoreKind } from "@/lib/store-vocabulary";
 
 export const ORDER_DISPLAY_STATES: readonly OrderDisplayState[] = [
   "AWAITING_PAYMENT",
@@ -114,18 +114,29 @@ export function balanceDuePaise(o: Pick<BoardOrder, "paymentStatus" | "totalPais
 // ─── Stages (the board's tabs) ──────────────────────────────────────
 
 /**
- * Where an order is in its life, one tab each: New → Preparing → Ready → Done.
- * `awaiting_online` has no tab and no count: it is listed at the end of New.
+ * Where an order is in its life, one tab each, named after the seller's next job:
+ * To accept → To make (To pack) → To hand over → Done. The ids stay the code's words.
+ * `awaiting_online` has no tab and no count: it is listed at the end of To accept
+ * under its own heading (`boardSections`), so the count matches the cards above it.
  */
 export type BoardBucket = "new" | "preparing" | "ready" | "done" | "awaiting_online";
 export type BoardFilter = Exclude<BoardBucket, "awaiting_online">;
 
-export const BOARD_FILTERS: { id: BoardFilter; label: string }[] = [
-  { id: "new", label: "New" },
-  { id: "preparing", label: "Preparing" },
-  { id: "ready", label: "Ready" },
-  { id: "done", label: "Done" },
-];
+export const BOARD_FILTER_IDS: readonly BoardFilter[] = ["new", "preparing", "ready", "done"];
+
+/** A tab's name. `kind` is the store's (`storeKind`): a kitchen makes its orders, a product seller packs them. */
+export function boardFilterLabel(id: BoardFilter, kind: StoreKind = "food"): string {
+  switch (id) {
+    case "new":
+      return "To accept";
+    case "preparing":
+      return vocabularyForKind(kind).toMakeTab;
+    case "ready":
+      return "To hand over";
+    case "done":
+      return "Done";
+  }
+}
 
 /**
  * A new order on a Razorpay store that the buyer hasn't paid yet. There is nothing
@@ -184,6 +195,97 @@ export function countByFilter(orders: { bucket: BoardBucket }[]): Record<BoardFi
   const out: Record<BoardFilter, number> = { new: 0, preparing: 0, ready: 0, done: 0 };
   for (const o of orders) if (o.bucket !== "awaiting_online") out[o.bucket] += 1;
   return out;
+}
+
+export type BoardSectionId =
+  | "to_accept"
+  | "waiting_online"
+  | "to_make"
+  | "waiting_pickup"
+  | "ready_to_send"
+  | "on_the_way"
+  | "handed_over"
+  | "closed";
+
+export type BoardSection<T> = {
+  id: BoardSectionId;
+  heading: string;
+  /** Show the heading even when it is the tab's only group: these cards are not the tab's job. */
+  showHeading: boolean;
+  orders: T[];
+};
+
+type SectionOrder = {
+  bucket: BoardBucket;
+  displayState: OrderDisplayState;
+  fulfilmentType: FulfilmentType | null;
+  readyAt?: string | Date | null;
+  outForDeliveryAt?: string | Date | null;
+};
+
+const SECTION_HEADING: Record<BoardSectionId, string> = {
+  to_accept: "To accept",
+  waiting_online: "Waiting for online payment",
+  to_make: "To make",
+  waiting_pickup: "Waiting for pickup",
+  ready_to_send: "Ready to send",
+  on_the_way: "On the way",
+  handed_over: "Handed over",
+  closed: "Cancelled or not paid in time",
+};
+
+/** Groups that are never the tab's own job: their heading shows even when they are alone. */
+const ALWAYS_HEADED: ReadonlySet<BoardSectionId> = new Set(["waiting_online", "closed"]);
+
+function sectionOf(o: SectionOrder): BoardSectionId {
+  switch (o.bucket) {
+    case "awaiting_online":
+      return "waiting_online";
+    case "new":
+      return "to_accept";
+    case "preparing":
+      return "to_make";
+    case "ready":
+      if (o.outForDeliveryAt) return "on_the_way";
+      return o.fulfilmentType === "PICKUP" ? "waiting_pickup" : "ready_to_send";
+    case "done":
+      return o.displayState === "DELIVERED" ? "handed_over" : "closed";
+  }
+}
+
+const SECTION_ORDER: BoardSectionId[] = [
+  "to_accept",
+  "waiting_online",
+  "to_make",
+  "waiting_pickup",
+  "ready_to_send",
+  "on_the_way",
+  "handed_over",
+  "closed",
+];
+
+/**
+ * A tab's list in groups, each keeping the list's order. To accept ends with the
+ * orders waiting for an online payment; To hand over splits into waiting for
+ * pickup, ready to send and on the way; Done puts cancelled and lapsed orders
+ * apart from the handed-over ones. Empty groups are left out. A heading shows
+ * once a tab has two groups, and always on the groups that aren't the tab's job.
+ */
+export function boardSections<T extends SectionOrder>(orders: T[], kind: StoreKind = "food"): BoardSection<T>[] {
+  const byId = new Map<BoardSectionId, T[]>();
+  for (const o of orders) {
+    const id = sectionOf(o);
+    const list = byId.get(id);
+    if (list) list.push(o);
+    else byId.set(id, [o]);
+  }
+  const present = SECTION_ORDER.filter((id) => byId.has(id));
+  return present.map((id) => ({
+    id,
+    heading: id === "to_make" ? boardFilterLabel("preparing", kind) : SECTION_HEADING[id],
+    showHeading: present.length > 1 || ALWAYS_HEADED.has(id),
+    orders: byId.get(id)!,
+  }));
 }
 
 // ─── Search and handover filter (client-side, over the loaded list) ──
@@ -808,4 +910,39 @@ export function paymentBadge(o: {
     return { kind: "cash", label: o.fulfilmentType === "PICKUP" ? "Collect at pickup" : "Collect on delivery" };
   }
   return { kind: "unpaid", label: "Not paid yet" };
+}
+
+export type OrderProgressStep = {
+  key: "accepted" | "ready" | "on_the_way" | "handed_over";
+  label: string;
+  done: boolean;
+};
+
+/**
+ * The open card's progress row: the handover steps only, payment stays the badge.
+ * A pickup is Accepted · Ready · Picked up; a delivery Accepted · On the way ·
+ * Delivered. A later step done means the earlier ones are too (an order can be
+ * sent out before Accept). None once there is no step left to take: handed over,
+ * cancelled or lapsed, or waiting for an online payment (nothing to do yet).
+ */
+export function orderProgressSteps(o: {
+  displayState: OrderDisplayState;
+  fulfilmentStatus: FulfilmentStatus | null;
+  fulfilmentType: FulfilmentType | null;
+  readyAt?: string | Date | null;
+  outForDeliveryAt?: string | Date | null;
+  bucket?: BoardBucket;
+}): OrderProgressStep[] | null {
+  if (o.bucket === "awaiting_online") return null;
+  if (o.displayState === "CANCELLED" || o.displayState === "EXPIRED" || o.displayState === "DELIVERED") return null;
+  const isPickup = o.fulfilmentType === "PICKUP";
+  const middle = isPickup ? Boolean(o.readyAt) : Boolean(o.outForDeliveryAt);
+  const accepted = o.fulfilmentStatus !== "PLACED" || middle;
+  return [
+    { key: "accepted", label: "Accepted", done: accepted },
+    isPickup
+      ? { key: "ready", label: "Ready", done: middle }
+      : { key: "on_the_way", label: "On the way", done: middle },
+    { key: "handed_over", label: isPickup ? "Picked up" : "Delivered", done: false },
+  ];
 }

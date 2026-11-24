@@ -109,7 +109,7 @@ test.describe("buyer says the order arrived", () => {
       fulfilmentStatus: "CONFIRMED",
     });
     await page.goto("/orders");
-    await page.getByRole("tab", { name: /^Preparing/ }).click();
+    await page.getByRole("tab", { name: /^To make/ }).click();
     const card = page.getByRole("article", { name: /Asha Received/ });
     // The folded card's summary carries it; the details say what to do next.
     const summary = card.getByRole("button", { name: /Show details/ });

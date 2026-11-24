@@ -46,14 +46,17 @@ import { RATING_WORDS } from "@/lib/order-feedback";
 import {
   balanceDuePaise,
   availableOrderActions,
+  boardFilterLabel,
   fixStatusActions,
   markPaidNeedsConfirm,
+  orderProgressSteps,
   orderStatusLine,
   paymentBadge,
   primaryOrderAction,
   type BoardOrder,
   type FixStatusAction,
   type OrderAction,
+  type OrderProgressStep,
   type OrderStatusKind,
   type PaymentBadgeKind,
 } from "@/lib/drops-board";
@@ -127,6 +130,49 @@ function StatusIcon({ kind, storeKind }: { kind: OrderStatusKind; storeKind: Sto
   }
 }
 
+/**
+ * Accepted · Ready · Picked up (or On the way · Delivered): each step an icon plus
+ * its word, the next one marked for screen readers too, so colour only repeats it.
+ * Payment is not a step: the badge above says it.
+ */
+function ProgressRow({ steps }: { steps: OrderProgressStep[] }) {
+  const current = steps.findIndex((s) => !s.done);
+  return (
+    <ol aria-label="Progress" className="mt-2 flex flex-wrap items-center gap-x-1.5 gap-y-1 text-xs">
+      {steps.map((step, i) => {
+        const isCurrent = i === current;
+        return (
+          <li
+            key={step.key}
+            aria-current={isCurrent ? "step" : undefined}
+            className="inline-flex items-center gap-1"
+          >
+            {i > 0 && <span className="h-px w-3 bg-border" aria-hidden />}
+            {/* A tick when done; a ring otherwise, filled in the middle for the next step. */}
+            {step.done ? (
+              <CheckCircle2 className="h-4 w-4 shrink-0 text-success" aria-hidden />
+            ) : (
+              <span
+                className={cn(
+                  "flex h-3.5 w-3.5 shrink-0 items-center justify-center rounded-full border-2",
+                  isCurrent ? "border-primary" : "border-muted-foreground/60",
+                )}
+                aria-hidden
+              >
+                {isCurrent && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
+              </span>
+            )}
+            <span className={step.done || isCurrent ? "font-semibold text-foreground" : "text-muted-foreground"}>
+              {step.label}
+            </span>
+            <span className="sr-only">{step.done ? ", done" : isCurrent ? ", next" : ", not yet"}</span>
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
 /** "7:58 pm" for an order from today (IST), "Wed, 28 Oct · 7:58 pm" for an older one. */
 function placedLabel(d: Date): string {
   const today = utcToIstParts(new Date()).ymd === utcToIstParts(d).ymd;
@@ -197,6 +243,7 @@ export function OrderCard({
   // Every card says where the order is first, then where its money stands.
   const status = orderStatusLine(order, storeKind);
   const badge = paymentBadge(order);
+  const progress = orderProgressSteps(order);
   // These statuses already say pickup or delivery, so the folded line doesn't repeat it.
   const statusSaysHandover = status.kind === "ready" || status.kind === "on_the_way" || status.kind === "handed_over";
 
@@ -274,12 +321,12 @@ export function OrderCard({
   const FIX_COPY: Record<FixStatusAction, [label: string, title: string, description: string]> = {
     unready: [
       outForDelivery ? "Undo out for delivery" : "Undo ready",
-      "Move it back to Preparing?",
+      `Move it back to ${boardFilterLabel("preparing", storeKind)}?`,
       "Its customer page says so too.",
     ],
     undeliver: [
       isPickup ? "Undo picked up" : "Undo delivered",
-      "Move it back to Ready?",
+      `Move it back to ${boardFilterLabel("ready", storeKind)}?`,
       "Payment stays as it is.",
     ],
     mark_unpaid: ["Undo paid", "Mark it not paid?", "It comes off your sales."],
@@ -505,6 +552,8 @@ export function OrderCard({
                 </p>
               )}
             </div>
+
+            {progress && <ProgressRow steps={progress} />}
 
             {awaitingOnline && (
               <p className="mt-3 text-sm text-muted-foreground">

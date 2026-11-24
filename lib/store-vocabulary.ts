@@ -62,6 +62,8 @@ export type StoreVocabulary = {
   prepSheet: string;
   /** Its quantities line on the board: "To cook" / "To pack". */
   toPrepare: string;
+  /** The orders board tab for accepted orders: "To make" / "To pack". */
+  toMakeTab: string;
   /** The day a drop is made: "Cooking day" / "Packing day". */
   makeDay: string;
   /** "before you start cooking" / "before you start packing". */
@@ -91,6 +93,7 @@ const FOOD: StoreVocabulary = {
   catalogueOrder: "Menu order",
   prepSheet: "Prep sheet",
   toPrepare: "To cook",
+  toMakeTab: "To make",
   makeDay: "Cooking day",
   making: "cooking",
   goods: "food",
@@ -113,6 +116,7 @@ const GOODS: StoreVocabulary = {
   catalogueOrder: "Everyday order",
   prepSheet: "Packing list",
   toPrepare: "To pack",
+  toMakeTab: "To pack",
   makeDay: "Packing day",
   making: "packing",
   goods: "order",

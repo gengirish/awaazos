@@ -198,12 +198,14 @@ test.describe("Razorpay first on the order page", () => {
       await placeOrder(buyer, slug, item);
       await expect(buyer.getByRole("button", { name: PAY_ONLINE })).toBeVisible();
 
-      // ── Not paid: not counted, listed last under New, with only Cancel ──
+      // ── Not paid: not counted, listed last under To accept, under its own heading, with only Cancel ──
       await page.goto("/orders");
       const card = page.getByRole("article").filter({ hasText: "Online Buyer" });
-      await expect(page.getByRole("tab", { name: /^new \(0\)/i })).toBeVisible();
+      await expect(page.getByRole("tab", { name: /^to accept \(0\)/i })).toBeVisible();
       await expect(card).toBeVisible();
       await expect(card.getByText("Waiting for online payment")).toBeVisible();
+      // Its own heading says why the tab counts 0 with a card on it.
+      await expect(page.getByRole("heading", { name: "Waiting for online payment (1)" })).toBeVisible();
       await expect(card.getByRole("checkbox")).toHaveCount(0);
       await card.getByRole("button", { name: /show details/i }).click();
       await expect(card.getByText(/hasn.t paid yet/i)).toBeVisible();
@@ -228,8 +230,8 @@ test.describe("Razorpay first on the order page", () => {
       // ── Paid: confirmed for the seller, one next step, and the buyer's page agrees ──
       await markPaidOnlineByOrderId(orderId);
       await page.goto("/orders");
-      await expect(page.getByRole("tab", { name: /^new \(0\)/i })).toBeVisible();
-      await page.getByRole("tab", { name: /^preparing \(1\)/i }).click();
+      await expect(page.getByRole("tab", { name: /^to accept \(0\)/i })).toBeVisible();
+      await page.getByRole("tab", { name: /^to make \(1\)/i }).click();
       await expect(card).toBeVisible();
       await expect(card.getByText("Paid online")).toBeVisible();
       await expect(card.getByRole("button", { name: "Mark ready" })).toBeVisible();

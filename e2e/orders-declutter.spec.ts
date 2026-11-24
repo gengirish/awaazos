@@ -213,7 +213,7 @@ test.describe("orders board layout", () => {
     await expect(tile).toHaveText("1 payment to check");
     await expect(tile.locator("svg")).toBeVisible();
     await tile.click();
-    await expect(page.getByRole("tab", { name: /^New/ })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByRole("tab", { name: /^To accept/ })).toHaveAttribute("aria-selected", "true");
     await expect(page.getByText(/reach your UPI app\?/)).toBeVisible();
 
     // Sound toggles from the bar and says so.
@@ -262,7 +262,7 @@ test.describe("orders board layout", () => {
     await page.setViewportSize({ width: 1280, height: 800 });
     await page.goto("/orders");
     await expect(page.getByRole("link", { name: /Add your FSSAI number/ })).toBeVisible();
-    await expect(page.getByRole("tab", { name: /^New/ })).toBeInViewport({ ratio: 1 });
+    await expect(page.getByRole("tab", { name: /^To accept/ })).toBeInViewport({ ratio: 1 });
     await expect(page.getByRole("article").first()).toBeInViewport();
   });
 });
