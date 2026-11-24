@@ -3,6 +3,7 @@
 import { Check, Copy, MessageCircle, Share2 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 
+import { DropRowActionLabel, dropRowActionClass } from "@/components/drops/drop-row-action";
 import { InstagramStoryButton } from "@/components/drops/InstagramStoryButton";
 import { buildDropShareText, buildTaggedWhatsAppShareUrl, preorderLinkPath, shareSheetData } from "@/lib/drops-share";
 import { cn } from "@/lib/utils";
@@ -17,8 +18,10 @@ export type ShareDropButtonProps = {
   fulfilmentEndsAt: string; // ISO
   fulfilmentMode: "DELIVERY" | "PICKUP" | "BOTH";
   itemNames: string[];
-  /** Only the main Share button (drop list cards). Copy, WhatsApp and the story image stay on the edit page. */
+  /** Only the main Share button. Copy, WhatsApp and the story image stay on the edit page. */
   compact?: boolean;
+  /** An icon tile for the pre-orders table (`dropRowActionClass`); implies `compact`. */
+  icon?: { primary: boolean };
 };
 
 const baseBtn =
@@ -43,6 +46,7 @@ export function ShareDropButton(props: ShareDropButtonProps) {
     fulfilmentMode,
     itemNames,
     compact = false,
+    icon,
   } = props;
 
   // window is unavailable during SSR; fill the origin in after mount.
@@ -105,6 +109,16 @@ export function ShareDropButton(props: ShareDropButtonProps) {
     } catch {
       setStatus("Couldn't copy — use the WhatsApp button instead");
     }
+  }
+
+  if (icon) {
+    const name = `Share this pre-order: ${dropTitle}`;
+    return (
+      <button type="button" onClick={share} aria-label={name} title={name} className={dropRowActionClass(icon.primary)}>
+        <Share2 aria-hidden="true" />
+        <DropRowActionLabel>Share</DropRowActionLabel>
+      </button>
+    );
   }
 
   if (compact) {
