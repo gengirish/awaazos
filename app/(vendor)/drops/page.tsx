@@ -1,18 +1,21 @@
 import {
-  ChevronRight,
+  CirclePlay,
   ClipboardList,
   Package,
   Pencil,
   Plus,
+  Printer,
 } from "lucide-react";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 import { BillingAccessNotice } from "@/components/billing/TrialNotice";
 import { CopyDropButton, DropStatusBadge } from "@/components/drops/DropForm";
+import { DropRowActionLabel, dropRowActionClass } from "@/components/drops/drop-row-action";
 import { ShareDropButton } from "@/components/drops/ShareDropButton";
 import { SetupChecklistCard } from "@/components/setup/SetupChecklistCard";
 import { EmptyState } from "@/components/ui/empty-state";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { liveDropOrderWhere } from "@/lib/drops-api";
 import { dropOrdersHref } from "@/lib/drops-board";
 import { groupDropsByDay, istTodayYmd } from "@/lib/drops-builder";
@@ -57,9 +60,6 @@ type Store = { name: string; slug: string };
 const primaryLinkBtn =
   "inline-flex min-h-11 items-center justify-center gap-2 rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground ring-offset-background transition-colors hover:bg-primary/90 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
 
-const linkBtn =
-  "inline-flex min-h-11 items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium ring-offset-background transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
-
 export default async function DropsPage() {
   let ctx: Awaited<ReturnType<typeof requireVendorRole>>;
   let vendorId: string;
@@ -82,7 +82,7 @@ export default async function DropsPage() {
       orderBy: [{ date: "desc" }, { createdAt: "desc" }],
       take: 60,
       include: {
-        // Names only, for the share message on an open drop's card.
+        // Names only, for the share message on an open drop's row.
         items: {
           orderBy: { sortOrder: "asc" },
           select: { id: true, maxQty: true, menuItem: { select: { name: true } } },
@@ -128,7 +128,7 @@ export default async function DropsPage() {
 
   return (
     <div className="bg-background p-4 pb-10 md:p-6">
-      <header className="mx-auto mb-6 flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <header className="mx-auto mb-6 flex max-w-3xl flex-col gap-3 sm:flex-row sm:items-center sm:justify-between lg:max-w-5xl">
         <div>
           <h1 className="font-display text-2xl font-semibold text-foreground">
             Pre-orders
@@ -150,7 +150,7 @@ export default async function DropsPage() {
         </div>
       </header>
 
-      <main id="main-drops" className="mx-auto max-w-3xl space-y-8">
+      <main id="main-drops" className="mx-auto max-w-3xl space-y-8 lg:max-w-5xl">
         {(ctx.access.kind !== "paid" || setup.items.length > 0) && (
           <div>
             <BillingAccessNotice
@@ -188,51 +188,48 @@ export default async function DropsPage() {
   );
 }
 
+/** When orders close ("28/11/2026 21:00", the date only when it isn't the cooking day), while it is or will be taking them. */
+function closesAtText(d: Row): string | null {
+  if (d.effectiveStatus !== "OPEN" && d.effectiveStatus !== "SCHEDULED") return null;
+  const sameDay = dbDateToYmd(d.dateObj) === utcToIstParts(d.closesAt).ymd;
+  return `${sameDay ? "" : `${formatIstDate(d.closesAt)} `}${formatIstTime(d.closesAt)}`;
+}
+
+function plural(n: number, one: string, many: string): string {
+  return `${n} ${n === 1 ? one : many}`;
+}
+
 /**
- * The card's main button is the next step for that drop: open orders on an
- * upcoming one that isn't taking them, share one that is, sell a past one again.
- * "Copy for tomorrow" is the main button only on past drops.
+ * The row's icon tiles, always in the same order so the columns line up:
+ * Orders · Open or Share · Edit · Copy · Prep. The filled tile is the next step,
+ * as the old cards' big button was: open orders on an upcoming one that isn't
+ * taking them, share one that is, copy a past one to sell it again.
  */
-function DropActions({ d, store, past }: { d: Row; store: Store; past: boolean }) {
-  const edit = (
-    <Link
-      href={`/drops/${d.id}/edit`}
-      className={`${linkBtn} flex-1`}
-      aria-label={`Edit ${d.title}`}
-    >
-      <Pencil className="h-4 w-4" aria-hidden="true" />
-      Edit
-    </Link>
-  );
-  if (past) {
-    return (
-      <div className="mt-3 flex flex-wrap gap-2">
-        <CopyDropButton dropId={d.id} title={d.title} />
-        {edit}
-      </div>
-    );
-  }
+function DropRowActions({ d, store, past }: { d: Row; store: Store; past: boolean }) {
   // Upcoming, not taking orders: the edit page saves and opens it (or reopens a closed one).
-  if (d.stateKind === "draft" || d.stateKind === "cutoff_passed" || d.stateKind === "closed_by_seller") {
-    return (
-      <div className="mt-3 flex flex-wrap gap-2">
-        <Link
-          href={`/drops/${d.id}/edit`}
-          className={`${primaryLinkBtn} flex-1`}
-          aria-label={`Open orders for ${d.title}`}
-        >
-          Open orders
-          <ChevronRight className="h-4 w-4" aria-hidden="true" />
+  const needsOpening =
+    !past && (d.stateKind === "draft" || d.stateKind === "cutoff_passed" || d.stateKind === "closed_by_seller");
+  const shareable = !past && !needsOpening && (d.effectiveStatus === "OPEN" || d.effectiveStatus === "SCHEDULED");
+  const ordersName = `Orders for ${d.title}`;
+  const openName = `Open orders for ${d.title}`;
+  const editName = `Edit ${d.title}`;
+  const prepName = `Prep sheet for ${d.title}`;
+
+  return (
+    <div className="flex flex-wrap items-center gap-1.5 lg:flex-nowrap">
+      <Link href={dropOrdersHref(d.id)} aria-label={ordersName} title={ordersName} className={dropRowActionClass(false)}>
+        <ClipboardList aria-hidden="true" />
+        <DropRowActionLabel>Orders</DropRowActionLabel>
+      </Link>
+      {needsOpening ? (
+        <Link href={`/drops/${d.id}/edit`} aria-label={openName} title={openName} className={dropRowActionClass(true)}>
+          <CirclePlay aria-hidden="true" />
+          <DropRowActionLabel>Open</DropRowActionLabel>
         </Link>
-        <CopyDropButton dropId={d.id} title={d.title} secondary />
-      </div>
-    );
-  }
-  if (d.effectiveStatus === "OPEN" || d.effectiveStatus === "SCHEDULED") {
-    return (
-      <div className="mt-3 space-y-2">
+      ) : null}
+      {shareable ? (
         <ShareDropButton
-          compact
+          icon={{ primary: true }}
           dropId={d.id}
           vendorName={store.name}
           vendorSlug={store.slug}
@@ -243,21 +240,30 @@ function DropActions({ d, store, past }: { d: Row; store: Store; past: boolean }
           fulfilmentMode={d.fulfilmentMode}
           itemNames={d.itemNames}
         />
-        <div className="flex flex-wrap gap-2">
-          {edit}
-          <CopyDropButton dropId={d.id} title={d.title} secondary />
-        </div>
-      </div>
-    );
-  }
-  return (
-    <div className="mt-3 flex flex-wrap gap-2">
-      {edit}
-      <CopyDropButton dropId={d.id} title={d.title} secondary />
+      ) : null}
+      {needsOpening ? null : (
+        <Link href={`/drops/${d.id}/edit`} aria-label={editName} title={editName} className={dropRowActionClass(false)}>
+          <Pencil aria-hidden="true" />
+          <DropRowActionLabel>Edit</DropRowActionLabel>
+        </Link>
+      )}
+      <CopyDropButton dropId={d.id} title={d.title} primary={past} />
+      {d.orderCount > 0 ? (
+        <Link href={`/drops/${d.id}/prep`} aria-label={prepName} title={prepName} className={dropRowActionClass(false)}>
+          <Printer aria-hidden="true" />
+          <DropRowActionLabel>Prep</DropRowActionLabel>
+        </Link>
+      ) : null}
     </div>
   );
 }
 
+/**
+ * One table per section. From `lg` it is a real grid (Date, Pre-order, Status,
+ * Items, Orders, actions). Narrower, each row stacks into two blocks, the details
+ * then the icon tiles with their words, so a 360 px phone never scrolls sideways.
+ * Explicit roles keep the table semantics when a row's display is changed.
+ */
 function DropSection({
   title,
   rows,
@@ -275,50 +281,78 @@ function DropSection({
       <h2 id={id} className="font-display text-lg font-semibold">
         {title}
       </h2>
-      <ul className="space-y-3">
-        {rows.map((d) => (
-          <li
-            key={d.id}
-            className="rounded-xl border border-border bg-card p-4 shadow-xs"
-          >
-            <Link
-              href={dropOrdersHref(d.id)}
-              className="-m-1 flex items-start justify-between gap-3 rounded-md p-1 focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
-            >
-              <div className="min-w-0 space-y-1">
-                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                  {formatDropDayLabel(d.dateObj)} · {formatIstDate(d.dateObj)}
-                </p>
-                <p className="truncate font-display text-lg font-semibold">
-                  {d.title}
-                </p>
-                <p className="text-sm text-muted-foreground">{d.window}</p>
-                <p className="text-sm text-muted-foreground">
-                  {d.itemCount} {d.itemCount === 1 ? "item" : "items"} ·{" "}
-                  {d.orderCount} {d.orderCount === 1 ? "order" : "orders"}
-                  {d.effectiveStatus === "OPEN" ||
-                  d.effectiveStatus === "SCHEDULED"
-                    ? ` · orders close ${
-                        dbDateToYmd(d.dateObj) === utcToIstParts(d.closesAt).ymd
-                          ? ""
-                          : `${formatIstDate(d.closesAt)} `
-                      }${formatIstTime(d.closesAt)}`
-                    : ""}
-                </p>
-              </div>
-              <div className="flex shrink-0 flex-col items-end gap-2">
-                <DropStatusBadge status={d.effectiveStatus} label={d.stateLabel} />
-                <span className="inline-flex items-center gap-1 text-sm font-medium text-primary">
-                  <ClipboardList className="h-4 w-4" aria-hidden="true" />
-                  Orders
-                  <ChevronRight className="h-4 w-4" aria-hidden="true" />
-                </span>
-              </div>
-            </Link>
-            <DropActions d={d} store={store} past={past} />
-          </li>
-        ))}
-      </ul>
+      <div className="rounded-xl border border-border bg-card shadow-xs">
+        <Table role="table" aria-labelledby={id}>
+          <TableHeader className="hidden lg:table-header-group">
+            <TableRow role="row" className="hover:bg-transparent">
+              <TableHead role="columnheader" scope="col">Date</TableHead>
+              <TableHead role="columnheader" scope="col">Pre-order</TableHead>
+              <TableHead role="columnheader" scope="col">Status</TableHead>
+              <TableHead role="columnheader" scope="col" className="text-right">Items</TableHead>
+              <TableHead role="columnheader" scope="col" className="text-right">Orders</TableHead>
+              <TableHead role="columnheader" scope="col">
+                <span className="sr-only">Actions</span>
+              </TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((d) => {
+              const closes = closesAtText(d);
+              const day = `${formatDropDayLabel(d.dateObj)} · ${formatIstDate(d.dateObj)}`;
+              return (
+                <TableRow
+                  key={d.id}
+                  role="row"
+                  data-testid="drop-row"
+                  className="flex flex-col gap-3 p-4 lg:table-row lg:p-0"
+                >
+                  <TableCell role="cell" className="hidden whitespace-nowrap text-muted-foreground lg:table-cell">
+                    {day}
+                  </TableCell>
+                  <TableCell role="cell" className="block p-0 lg:table-cell lg:p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0 space-y-1">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground lg:hidden">
+                          {day}
+                        </p>
+                        <Link
+                          href={dropOrdersHref(d.id)}
+                          className="-my-2 flex min-h-11 min-w-0 items-center rounded-md font-display text-lg font-semibold [overflow-wrap:anywhere] hover:underline focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring lg:text-base"
+                        >
+                          {d.title}
+                        </Link>
+                        <p className="text-sm text-muted-foreground">{d.window}</p>
+                        <p className="text-sm text-muted-foreground lg:hidden">
+                          {plural(d.itemCount, "item", "items")} · {plural(d.orderCount, "order", "orders")}
+                          {closes ? ` · orders close ${closes}` : ""}
+                        </p>
+                        {closes ? (
+                          <p className="hidden text-sm text-muted-foreground lg:block">Orders close {closes}</p>
+                        ) : null}
+                      </div>
+                      <div className="shrink-0 lg:hidden">
+                        <DropStatusBadge status={d.effectiveStatus} label={d.stateLabel} />
+                      </div>
+                    </div>
+                  </TableCell>
+                  <TableCell role="cell" className="hidden whitespace-nowrap lg:table-cell">
+                    <DropStatusBadge status={d.effectiveStatus} label={d.stateLabel} />
+                  </TableCell>
+                  <TableCell role="cell" className="hidden text-right tabular-nums lg:table-cell">
+                    {d.itemCount}
+                  </TableCell>
+                  <TableCell role="cell" className="hidden text-right tabular-nums lg:table-cell">
+                    {d.orderCount}
+                  </TableCell>
+                  <TableCell role="cell" className="block p-0 lg:table-cell lg:p-4">
+                    <DropRowActions d={d} store={store} past={past} />
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </div>
     </section>
   );
 }

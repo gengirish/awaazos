@@ -1,13 +1,14 @@
 "use client";
 
 import type { DropStatus } from "@prisma/client";
-import { AlertTriangle, CircleCheck, Copy, Loader2, Lock, Mic, Trash2 } from "lucide-react";
+import { AlertTriangle, CircleCheck, CopyPlus, Loader2, Lock, Mic, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 
 import type { AddedMenuItem } from "@/components/drops/AddMenuItemDialog";
+import { DropRowActionLabel, dropRowActionClass } from "@/components/drops/drop-row-action";
 import { VoiceDropPanel, type VoiceApplyResult } from "@/components/drops/VoiceDropPanel";
 import { Button } from "@/components/ui/button";
 import { RadioOption } from "@/components/ui/radio-option";
@@ -1624,16 +1625,16 @@ export function DropStatusBadge({ status, label }: { status: EffectiveDropStatus
 
 /**
  * "Copy for tomorrow" — duplicates a drop onto tomorrow's IST date and opens the copy.
- * `secondary`: the outline version, for cards whose main action is something else.
+ * An icon tile in the pre-orders table (`dropRowActionClass`), filled when it is the row's next step.
  */
 export function CopyDropButton({
   dropId,
   title,
-  secondary = false,
+  primary = false,
 }: {
   dropId: string;
   title: string;
-  secondary?: boolean;
+  primary?: boolean;
 }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
@@ -1660,21 +1661,23 @@ export function CopyDropButton({
     });
   }
 
+  const name = `Copy ${title} for tomorrow`;
   return (
-    <Button
+    <button
       type="button"
-      variant={secondary ? "outline" : "default"}
-      className="min-h-11 flex-1"
       onClick={copy}
       disabled={pending}
-      aria-label={`Copy ${title} for tomorrow`}
+      aria-busy={pending || undefined}
+      aria-label={name}
+      title={name}
+      className={dropRowActionClass(primary)}
     >
       {pending ? (
         <Loader2 className="animate-spin motion-reduce:animate-none" aria-hidden="true" />
       ) : (
-        <Copy aria-hidden="true" />
+        <CopyPlus aria-hidden="true" />
       )}
-      {pending ? "Copying…" : "Copy for tomorrow"}
-    </Button>
+      <DropRowActionLabel>{pending ? "Copying" : "Copy"}</DropRowActionLabel>
+    </button>
   );
 }

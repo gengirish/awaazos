@@ -15,6 +15,8 @@ A `Drop` is one batch a home kitchen sells ahead of time ("Saturday bakes, order
 Core rules live in `lib/drops.ts` (read its header before touching it); buyers order on
 `/s/[slug]`, the vendor builds drops on `/drops`, works their orders on `/orders` (the one orders
 board, see "One orders board" below) and prints from `/drops/[id]/prep`.
+`/drops` is a table per section (Upcoming, Past) whose actions are 44 px icon tiles (`dropRowActionClass`,
+`components/drops/drop-row-action.tsx`), with a tiny word under each below `lg` and the row's next step filled.
 
 **"Drop" is the code's word only. Sellers and buyers read "Pre-order"** ("New pre-order", the
 "Pre-orders" tab, "Share this pre-order"). Wording only, like the store vocabulary: routes (`/drops`,
@@ -50,7 +52,7 @@ holds the rest that has a default (later start, everyday menu), and a new drop t
 
 Money and plan rules:
 
-- **Share this pre-order** sends the drop's own link, `/s/<slug>/preorder/<dropId>` (`preorderLinkPath`, `lib/drops-share.ts`), from the drop cards, the edit page and the board's Share menu: its page shows that drop only and its preview card draws only its items (`app/s/[slug]/preorder/[dropId]/share-card`). Which drop a link shows is `findFocusedDrop` (`lib/storefront-drop.ts`) and nowhere else.
+- **Share this pre-order** sends the drop's own link, `/s/<slug>/preorder/<dropId>` (`preorderLinkPath`, `lib/drops-share.ts`), from the pre-orders table, the edit page and the board's Share menu: its page shows that drop only and its preview card draws only its items (`app/s/[slug]/preorder/[dropId]/share-card`). Which drop a link shows is `findFocusedDrop` (`lib/storefront-drop.ts`) and nowhere else.
 - **Instagram story image:** `GET /api/drops/[id]/story-image` (CASHIER, compound `{ id, vendorId }`)
 renders `lib/drop-story-image.tsx` at 1080×1920, inside Instagram's top/bottom overlay zones, with
 `Cache-Control: private, no-store`. `InstagramStoryButton` fetches it on the first tap and shares the
