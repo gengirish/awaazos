@@ -123,8 +123,8 @@ test.describe("app shell navigation", () => {
 
     const tab = (name: string) => tabs.getByRole("link", { name, exact: true });
     // Not published yet: Store sits in the middle and Sell keeps the fourth slot.
-    await expect(tabs.getByRole("link")).toHaveText(["Orders", "Menu", "Store", "Sell"]);
-    for (const name of ["Orders", "Menu", "Store", "Sell"]) {
+    await expect(tabs.getByRole("link")).toHaveText(["Menu", "Orders", "Store", "Sell"]);
+    for (const name of ["Menu", "Orders", "Store", "Sell"]) {
       await expect(tab(name)).toBeVisible();
       await expectTapTarget(tab(name), `${name} tab`);
     }
@@ -143,9 +143,7 @@ test.describe("app shell navigation", () => {
     await more.click();
     const sheet = page.getByRole("dialog", { name: "More" });
     await expect(sheet).toBeVisible();
-    for (const name of ["Pre-orders", "Transactions", "Analytics", "Settings", "Help"]) {
-      await expect(sheet.getByRole("link", { name, exact: true })).toBeVisible();
-    }
+    await expect(sheet.getByRole("link")).toHaveText(["Pre-orders", "Transactions", "Analytics", "Help", "Settings"]);
     await expect(sheet.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
     // The store's link lives on the Store screen now, not in this sheet.
     await expect(sheet.getByRole("link", { name: /Live store/ })).toHaveCount(0);
@@ -195,8 +193,8 @@ test.describe("app shell navigation", () => {
     await expect(page.getByRole("heading", { name: "Bring buyers to your store" })).toBeVisible();
     await expect(page.getByRole("button", { name: /Copy Instagram bio link/ })).toBeVisible();
 
-    // Published: Settings takes the fourth slot, Sell and Drops move behind More, Store stays in the middle.
-    await expect(tabs.getByRole("link")).toHaveText(["Orders", "Menu", "Store", "Settings"]);
+    // Published: Pre-orders takes the fourth slot, Sell and Settings move behind More, Store stays in the middle.
+    await expect(tabs.getByRole("link")).toHaveText(["Menu", "Orders", "Store", "Pre-orders"]);
     await expect(tabs.getByRole("link", { name: "Store", exact: true })).toHaveAttribute("aria-current", "page");
     await expectTapTarget(tabs.getByRole("link", { name: "Store", exact: true }), "Store tab");
 
@@ -211,9 +209,8 @@ test.describe("app shell navigation", () => {
 
     await tabs.getByRole("button", { name: "More" }).click();
     const sheet = page.getByRole("dialog", { name: "More" });
-    for (const name of ["Pre-orders", "Sell"]) {
-      await expect(sheet.getByRole("link", { name, exact: true })).toBeVisible();
-    }    await page.keyboard.press("Escape");
+    await expect(sheet.getByRole("link")).toHaveText(["Sell", "Transactions", "Analytics", "Help", "Settings"]);
+    await page.keyboard.press("Escape");
 
     // A look row opens Settings → Online store scrolled to its card.
     await tabs.getByRole("link", { name: "Store", exact: true }).click();
@@ -234,17 +231,17 @@ test.describe("app shell navigation", () => {
 
     const item = (name: string) => rail.getByRole("link", { name, exact: true });
     await expect(rail.getByRole("link")).toHaveText([
-      "Orders",
       "Menu",
+      "Orders",
       "Store",
       "Pre-orders",
       "Sell",
       "Transactions",
       "Analytics",
-      "Settings",
       "Help",
+      "Settings",
     ]);
-    for (const name of ["Orders", "Menu", "Store", "Pre-orders", "Sell", "Transactions", "Analytics", "Settings", "Help"]) {
+    for (const name of ["Menu", "Orders", "Store", "Pre-orders", "Sell", "Transactions", "Analytics", "Help", "Settings"]) {
       await expect(item(name)).toBeVisible();
       await expectTapTarget(item(name), `${name} rail link`);
     }
@@ -294,7 +291,7 @@ test.describe("app shell navigation", () => {
 
     await page.setViewportSize(DESKTOP);
     const rail = page.getByRole("navigation", { name: "Main" });
-    await expect(rail.getByRole("link")).toHaveText(["Orders", "Store", "Sell", "Settings", "Help"]);
+    await expect(rail.getByRole("link")).toHaveText(["Orders", "Store", "Sell", "Help", "Settings"]);
 
     // Hiding links is cosmetic: the server still turns a cashier away from /drops.
     await page.goto("/drops");

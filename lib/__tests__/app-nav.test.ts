@@ -10,14 +10,14 @@ import {
 } from "@/lib/app-nav";
 
 describe("appNavItemsForRole", () => {
-  it("shows an owner and a manager every destination, in the seller's daily order", () => {
-    const all = ["orders", "menu", "store", "drops", "sell", "transactions", "analytics", "settings", "help"];
+  it("shows an owner and a manager every destination, Menu first, Settings last", () => {
+    const all = ["menu", "orders", "store", "drops", "sell", "transactions", "analytics", "help", "settings"];
     expect(appNavItemsForRole("OWNER").map((i) => i.id)).toEqual(all);
     expect(appNavItemsForRole("MANAGER").map((i) => i.id)).toEqual(all);
   });
 
-  it("trims a cashier to Orders, Store, Sell, Settings and Help", () => {
-    expect(appNavItemsForRole("CASHIER").map((i) => i.id)).toEqual(["orders", "store", "sell", "settings", "help"]);
+  it("trims a cashier to Orders, Store, Sell, Help and Settings", () => {
+    expect(appNavItemsForRole("CASHIER").map((i) => i.id)).toEqual(["orders", "store", "sell", "help", "settings"]);
   });
 
   it("names the catalogue for the store", () => {
@@ -32,11 +32,11 @@ describe("appTabBarForRole", () => {
     return { tabs: tabs.map((i) => i.id), more: more.map((i) => i.id) };
   };
 
-  it("puts Store in the middle and Settings fourth once the store is published", () => {
+  it("puts Menu first, Store in the middle and Pre-orders fourth once the store is published", () => {
     for (const role of ["OWNER", "MANAGER"] as const) {
       expect(ids(role, true)).toEqual({
-        tabs: ["orders", "menu", "store", "settings"],
-        more: ["drops", "sell", "transactions", "analytics", "help"],
+        tabs: ["menu", "orders", "store", "drops"],
+        more: ["sell", "transactions", "analytics", "help", "settings"],
       });
     }
   });
@@ -44,15 +44,15 @@ describe("appTabBarForRole", () => {
   it("keeps Sell fourth while the store is not published: it sells at the counter", () => {
     for (const role of ["OWNER", "MANAGER"] as const) {
       expect(ids(role, false)).toEqual({
-        tabs: ["orders", "menu", "store", "sell"],
-        more: ["drops", "transactions", "analytics", "settings", "help"],
+        tabs: ["menu", "orders", "store", "sell"],
+        more: ["drops", "transactions", "analytics", "help", "settings"],
       });
     }
   });
 
   it("gives a cashier Orders, Sell and Store, with Settings and Help behind More", () => {
     for (const published of [false, true]) {
-      expect(ids("CASHIER", published)).toEqual({ tabs: ["orders", "sell", "store"], more: ["settings", "help"] });
+      expect(ids("CASHIER", published)).toEqual({ tabs: ["orders", "sell", "store"], more: ["help", "settings"] });
     }
   });
 
@@ -73,10 +73,10 @@ describe("appTabBarForRole", () => {
 
   it("labels the bar's catalogue tab for a product store", () => {
     expect(appTabBarForRole("OWNER", true, "goods").tabs.map((i) => i.label)).toEqual([
-      "Orders",
       "Products",
+      "Orders",
       "Store",
-      "Settings",
+      "Pre-orders",
     ]);
   });
 });
