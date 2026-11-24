@@ -234,9 +234,9 @@ test.describe("Orders board: menu and drop orders together", () => {
     await expect(card.getByText("Paid", { exact: true })).toBeVisible();
     await card.getByRole("button", { name: /show details/i }).click();
     await card.getByRole("button", { name: /^More for/ }).click();
-    await more.getByRole("button", { name: "Not paid yet" }).click();
+    await more.getByRole("button", { name: "Undo paid" }).click();
     await page.getByRole("dialog", { name: "Mark it not paid?" }).getByRole("button", { name: "Yes, change it" }).click();
     await expect(page.getByText("Marked not paid")).toBeVisible();
-    await expect(card.getByText("Pay at pickup")).toBeVisible();
+    await expect(card.getByText("Collect at pickup")).toBeVisible();
   });
 });

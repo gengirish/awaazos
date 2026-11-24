@@ -79,9 +79,9 @@ test("B5 seller hands a delivery to a rider", async ({ page, browser, request })
   await page.bringToFront();
   await d.beat(800);
 
-  await d.say("The order moves to Ready, out for delivery with your rider.", { wait: 600 });
+  await d.say("The order moves to Ready, on the way with your rider.", { wait: 600 });
   await d.tap(page.getByRole("tab", { name: /^Ready/ }), { after: 600 });
-  await expect(card).toContainText(`Out for delivery with ${RIDER.name}`);
+  await expect(card).toContainText(`On the way with ${RIDER.name}`);
   await d.reveal(card);
   await d.beat(1200);
 

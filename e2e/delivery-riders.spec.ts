@@ -107,12 +107,12 @@ test.describe("delivery riders", () => {
     // It was a new order; gone out, it moves to Ready: follow it there.
     await page.getByRole("tab", { name: /^Ready/ }).click();
     // Collapsed on Ready: the summary line already says so; the details give the time.
-    await expect(order).toContainText("Out for delivery with Ramesh");
+    await expect(order).toContainText("On the way with Ramesh");
     await order.getByRole("button", { name: /Show details/ }).click();
-    await expect(order).toContainText(/Out for delivery · .+ · with Ramesh/);
-    // Gone out: no separate "Out for delivery" button any more; Delivered is next.
-    await expect(order.getByRole("button", { name: "Out for delivery" })).toHaveCount(0);
-    await expect(order.getByRole("button", { name: /Delivered · ₹300\.00 collected/ })).toBeVisible();
+    await expect(order).toContainText(/On the way with Ramesh · left .+/);
+    // Gone out: no "Mark out for delivery" button any more; Mark delivered is next.
+    await expect(order.getByRole("button", { name: "Mark out for delivery" })).toHaveCount(0);
+    await expect(order.getByRole("button", { name: /Mark delivered · ₹300\.00 collected/ })).toBeVisible();
 
     // ── The buyer sees "On the way" (and never the rider's name) ───────
     const buyerCtx = await browser.newContext(CONTEXT_OPTIONS);
@@ -214,6 +214,6 @@ test.describe("delivery riders", () => {
     const got = page.getByRole("article", { name: /Meena Got-It/ });
     await expect(got).toContainText("Customer got it");
     await got.getByRole("button", { name: /Show details/ }).click();
-    await expect(got).toContainText("Collect the payment, then tap Delivered.");
+    await expect(got).toContainText("Collect the payment, then tap Mark delivered.");
   });
 });

@@ -157,7 +157,7 @@ test.describe("drops: home-kitchen pre-order day", () => {
       const card = page.getByRole("article", { name: /Priya Buyer/ });
       await expect(card).toBeVisible();
       await expect(card.getByText(`2 × ${laddu}`)).toBeVisible();
-      await expect(card.getByText("Pay at pickup")).toBeVisible();
+      await expect(card.getByText("Collect at pickup")).toBeVisible();
 
       await expect(page.getByRole("button", { name: "Refresh", exact: true })).toBeVisible();
       await expect(await boardMenuItem(page, "More actions", "Prep sheet")).toHaveAttribute(

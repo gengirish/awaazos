@@ -95,7 +95,7 @@ file on the second (iOS drops the gesture across a fetch). Shared Satori parts: 
   (`PaidClaimForm`), or one "Payment done" button with no private Blob store. A direct UPI payment is
   invisible to us, so this signal stays: it is what keeps a drop's stock held. `POST /api/s/[slug]/orders/[token]/utr` records
   `Transaction.paymentClaimedAt` (UTR optional) → display state `PAYMENT_SUBMITTED`. The vendor answers
-  on the board: "Payment received" (`mark_paid` → `markOrderPaid`) or "Not received"
+  on the board: "Yes, received" (`mark_paid` → `markOrderPaid`) or "Not received"
   (`reject_payment`: clears the claim and UTR, stamps `paymentRejectedAt`, per-order only). After a
   rejection the next claim needs a UTR (400 `reference_required`), so a hold can't be renewed by tapping.
 - **Payment screenshot** (`lib/payment-proof.ts`): with the claim, the buyer may attach a screenshot
@@ -135,17 +135,20 @@ menu (`BoardMenus.tsx`). In menu scope the status pill sets `acceptMenuOrders` f
 
 **Stages** (`boardBucket` in `lib/drops-board.ts`): the board's tabs are New → Preparing → Ready → Done. New =
 not accepted, or a buyer's claim unanswered; Preparing = accepted; Ready = `Transaction.readyAt` ("Mark ready",
-pickups) or `outForDeliveryAt` ("Out for delivery"); Done = handed over, cancelled, expired. Payment is never a
-stage: the card shows it as a badge (`paymentBadge`), and a handed-over order still unpaid is Done with "Payment
-due". `readyAt` is a stamp like `outForDeliveryAt`, not a `FulfilmentStatus` (the order stays CONFIRMED);
-`mark_ready` sets it, `unready` ("Not ready yet") clears both stamps. Each card has one big button, its stage's
-next step (`primaryOrderAction`: Accept order → Mark ready / Out for delivery → Picked up / Delivered; Delivered
-first once the buyer says it arrived); everything else is in the card's ⋯ menu. Search covers every stage. The
+pickups) or `outForDeliveryAt` ("Mark out for delivery"); Done = handed over, cancelled, expired. Payment is never a
+stage. Every card says two things, in words: its status line (`orderStatusLine`: "Waiting for you to accept",
+"Check payment", "Being made" / "Being packed" by `storeKind`, "Ready for pickup", "On the way with <rider>", "Picked up" /
+"Delivered", "Cancelled", "Not paid in time"), first on the card open or folded, and a payment badge (`paymentBadge`,
+money only, none on a cancelled, lapsed or awaiting-online order); a handed-over order still unpaid is Done with
+"Payment due". Buttons are verbs ("Mark paid", "Mark picked up") so none reads like a status, and the fixes say "Undo …". `readyAt` is a stamp like `outForDeliveryAt`, not a `FulfilmentStatus` (the order stays CONFIRMED);
+`mark_ready` sets it, `unready` ("Undo ready") clears both stamps. Each card has one big button, its stage's
+next step (`primaryOrderAction`: Accept order → Mark ready / Mark out for delivery → Mark picked up / Mark delivered;
+Mark delivered first once the buyer says it arrived); everything else is in the card's ⋯ menu. Search covers every stage. The
 summary is one line: Paid · To collect, plus "N payments to check" when a claim waits.
 
 **Fix status** (mistake fixes, per order only, never bulk or the big button): the card's ⋯ menu lists
 `fixStatusActions()` (`lib/drops-board.ts`, built on `availableOrderActions`), each behind an in-app confirm:
-`unready`, `undeliver`, `mark_unpaid` ("Not paid yet": `markOrderUnpaid` reverses exactly what `markOrderPaid`
+`unready`, `undeliver`, `mark_unpaid` ("Undo paid": `markOrderUnpaid` reverses exactly what `markOrderPaid`
 booked, PAID → PENDING, `paidAt`, DailySummary on the `paidAt` day; the PLACED → CONFIRMED step stays) and
 `uncancel` ("Reopen order": `reopenCancelledOrder`, not on a frozen drop). Neither ever touches an order Razorpay paid
 (`razorpayPaymentId`, 409 `paid_online`). Reopening holds stock again, so it takes placement's locks in placement's

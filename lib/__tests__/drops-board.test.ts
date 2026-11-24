@@ -27,7 +27,8 @@ import {
   primaryOrderAction,
   searchOrders,
   shouldPollForOrders,
-  orderStateLabel,
+  ORDER_DISPLAY_STATES,
+  orderStatusLine,
   paymentBadge,
   type BoardBucket,
   summarizeOrders,
@@ -178,12 +179,66 @@ describe("summarizeOrders", () => {
   });
 });
 
-describe("orderStateLabel", () => {
-  it("says Picked up for a handed-over pickup order, Delivered otherwise", () => {
-    expect(orderStateLabel({ displayState: "DELIVERED", fulfilmentType: "PICKUP" })).toBe("Picked up");
-    expect(orderStateLabel({ displayState: "DELIVERED", fulfilmentType: "DELIVERY" })).toBe("Delivered");
-    expect(orderStateLabel({ displayState: "DELIVERED", fulfilmentType: null })).toBe("Delivered");
-    expect(orderStateLabel({ displayState: "PAID", fulfilmentType: "PICKUP" })).toBe("Paid");
+describe("orderStatusLine", () => {
+  type In = Parameters<typeof orderStatusLine>[0];
+  const s = (o: Partial<In>, kind?: "food" | "goods") =>
+    orderStatusLine(
+      { displayState: "AWAITING_PAYMENT", fulfilmentStatus: "CONFIRMED", fulfilmentType: "PICKUP", ...o },
+      kind,
+    );
+
+  it("says where the order is and what comes next", () => {
+    expect(s({ fulfilmentStatus: "PLACED" })).toEqual({ kind: "to_accept", label: "Waiting for you to accept" });
+    expect(s({ displayState: "PAYMENT_SUBMITTED", fulfilmentStatus: "PLACED" })).toEqual({
+      kind: "check_payment",
+      label: "Check payment",
+    });
+    expect(s({})).toEqual({ kind: "preparing", label: "Being made" });
+    expect(s({ displayState: "PAID" })).toEqual({ kind: "preparing", label: "Being made" });
+    expect(s({ readyAt: "2026-11-23T10:00:00.000Z" })).toEqual({ kind: "ready", label: "Ready for pickup" });
+    expect(s({ fulfilmentType: "DELIVERY", outForDeliveryAt: "2026-11-23T10:00:00.000Z" }).label).toBe("On the way");
+    expect(
+      s({ fulfilmentType: "DELIVERY", outForDeliveryAt: "2026-11-23T10:00:00.000Z", riderName: " Ravi " }).label,
+    ).toBe("On the way with Ravi");
+  });
+
+  it("uses the store's words for an accepted order", () => {
+    expect(s({}, "goods").label).toBe("Being packed");
+    expect(s({}, "food").label).toBe("Being made");
+  });
+
+  it("says how a finished order ended: Picked up for a pickup, Delivered otherwise", () => {
+    expect(s({ displayState: "DELIVERED", fulfilmentStatus: "DELIVERED" })).toEqual({
+      kind: "handed_over",
+      label: "Picked up",
+    });
+    expect(s({ displayState: "DELIVERED", fulfilmentStatus: "DELIVERED", fulfilmentType: "DELIVERY" }).label).toBe(
+      "Delivered",
+    );
+    expect(s({ displayState: "DELIVERED", fulfilmentStatus: "DELIVERED", fulfilmentType: null }).label).toBe("Delivered");
+    expect(s({ displayState: "CANCELLED", fulfilmentStatus: "CANCELLED" }).kind).toBe("cancelled");
+    expect(s({ displayState: "EXPIRED", fulfilmentStatus: "PLACED" })).toEqual({ kind: "lapsed", label: "Not paid in time" });
+  });
+
+  it("a stamp wins over not-accepted: an order sent out before Accept says On the way", () => {
+    expect(s({ fulfilmentStatus: "PLACED", fulfilmentType: "DELIVERY", outForDeliveryAt: "2026-11-23T10:00:00.000Z" }).kind).toBe(
+      "on_the_way",
+    );
+  });
+
+  it("an order waiting for an online payment says so", () => {
+    expect(s({ fulfilmentStatus: "PLACED", bucket: "awaiting_online" })).toEqual({
+      kind: "waiting_online",
+      label: "Waiting for online payment",
+    });
+  });
+
+  it("every order on the board gets a status, never an empty one", () => {
+    for (const displayState of ORDER_DISPLAY_STATES) {
+      for (const fulfilmentStatus of ["PLACED", "CONFIRMED", "DELIVERED", "CANCELLED", null] as const) {
+        expect(s({ displayState, fulfilmentStatus }).label).not.toBe("");
+      }
+    }
   });
 });
 
@@ -433,15 +488,19 @@ describe("paymentBadge", () => {
 
   it("says where the money stands, in words", () => {
     expect(b("PAID", "PAID")).toEqual({ kind: "paid", label: "Paid" });
-    expect(b("PAID", "PAID", { paidOnline: true }).label).toBe("Paid online");
+    expect(b("PAID", "PAID", { paidOnline: true })?.label).toBe("Paid online");
     expect(b("DELIVERED", "PAID")).toEqual({ kind: "paid", label: "Paid" });
-    expect(b("PAYMENT_SUBMITTED", "PENDING")).toEqual({ kind: "check", label: "Payment to check" });
-    expect(b("PAY_ON_DELIVERY", "PENDING").label).toBe("Pay on delivery");
-    expect(b("PAY_ON_DELIVERY", "PENDING", { fulfilmentType: "PICKUP" }).label).toBe("Pay at pickup");
+    expect(b("PAYMENT_SUBMITTED", "PENDING")).toEqual({ kind: "check", label: "Customer says paid" });
+    expect(b("PAY_ON_DELIVERY", "PENDING")?.label).toBe("Collect on delivery");
+    expect(b("PAY_ON_DELIVERY", "PENDING", { fulfilmentType: "PICKUP" })?.label).toBe("Collect at pickup");
     expect(b("AWAITING_PAYMENT", "PENDING")).toEqual({ kind: "unpaid", label: "Not paid yet" });
-    expect(b("AWAITING_PAYMENT", "PENDING", { bucket: "awaiting_online" }).kind).toBe("waiting_online");
-    expect(b("CANCELLED", "PAID").kind).toBe("cancelled");
-    expect(b("EXPIRED", "PENDING").kind).toBe("expired");
+  });
+
+  it("is about money only: none when the status line says it all", () => {
+    expect(b("AWAITING_PAYMENT", "PENDING", { bucket: "awaiting_online" })).toBeNull();
+    expect(b("CANCELLED", "PAID")).toBeNull();
+    expect(b("CANCELLED", "REFUNDED")).toBeNull();
+    expect(b("EXPIRED", "PENDING")).toBeNull();
   });
 
   it("flags a handed-over order that is still unpaid", () => {

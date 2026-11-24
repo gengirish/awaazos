@@ -49,7 +49,7 @@ test("G4 jewellery seller checks a buyer's UPI payment", async ({ page, browser,
 
   await d.start();
   await d.say("Buyers pay you straight on UPI, so no money passes through us.");
-  await d.say("When they say they've paid, the order shows a payment to check.", { wait: 900 });
+  await d.say("When they say they've paid, the order says Check payment.", { wait: 900 });
   await d.reveal(question, { margin: 140 });
   await d.beat(800);
 

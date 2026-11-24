@@ -209,7 +209,7 @@ test.describe("Razorpay first on the order page", () => {
       await expect(card.getByText(/hasn.t paid yet/i)).toBeVisible();
       await expect(card.getByRole("button", { name: "Accept order", exact: true })).toHaveCount(0);
       await expect(card.getByRole("button", { name: /received/i })).toHaveCount(0);
-      await expect(card.getByRole("button", { name: /^delivered|^picked up|^mark ready/i })).toHaveCount(0);
+      await expect(card.getByRole("button", { name: /^mark (delivered|picked up|ready)/i })).toHaveCount(0);
       await card.getByRole("button", { name: /^More for/ }).click();
       const more = page.getByRole("dialog", { name: /Online Buyer.s order/ });
       await expect(more.getByRole("button", { name: "Cancel order" })).toBeVisible();

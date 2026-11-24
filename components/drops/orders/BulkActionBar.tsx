@@ -29,9 +29,9 @@ type Props = {
 
 const LABEL: Record<BulkOrderAction, string> = {
   confirm: "Accept",
-  mark_paid: "Payment received",
+  mark_paid: "Mark paid",
   mark_ready: "Mark ready",
-  deliver: "Delivered",
+  deliver: "Mark delivered",
 };
 
 const ICON: Record<BulkOrderAction, ReactNode> = {
