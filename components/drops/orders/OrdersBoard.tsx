@@ -4,6 +4,7 @@ import type { FulfilmentMode, StaffRole } from "@prisma/client";
 import {
   BellRing,
   ChefHat,
+  ChevronDown,
   CircleAlert,
   Loader2,
   PackageCheck,
@@ -62,10 +63,11 @@ import {
   type BoardScope,
   type HandoverFilter,
   type OrderAction,
+  type PrepRow,
 } from "@/lib/drops-board";
 import type { BoardDrop } from "@/lib/drops-board-server";
 import { shareOrOpenWhatsApp } from "@/lib/drops-share";
-import { formatIstDate, formatIstTime } from "@/lib/drops-time";
+import { formatIstTime, formatRelativeIstDay, formatWindowWithDay } from "@/lib/drops-time";
 import { BOARD_POLL_MS, toMakeFromOrders } from "@/lib/menu-orders-board";
 import {
   BULK_ORDER_MAX,
@@ -84,7 +86,7 @@ import {
   writeOrderSoundPref,
   type PushArrivedDetail,
 } from "@/lib/order-voice";
-import type { StoreKind, StoreVocabulary } from "@/lib/store-vocabulary";
+import { countItems, type StoreKind, type StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
 // The select primitives are heavy and only a vendor with two or more sources
@@ -1007,17 +1009,7 @@ export function OrdersBoard({
             </button>
           )}
         </p>
-        {toCook.length > 0 && (
-          <p className="mt-2 text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{vocab.toPrepare}: </span>
-            {toCook
-              .map(
-                (p) =>
-                  `${p.name} ${p.qtyOrdered}${p.maxQty !== null ? `/${p.maxQty}` : ""}${p.qtyFree > 0 ? ` (${p.qtyFree} free)` : ""}`,
-              )
-              .join(" · ")}
-          </p>
-        )}
+        {toCook.length > 0 && <ToPrepareList rows={toCook} vocab={vocab} />}
         {showToMake && (
           <div className="mt-2 flex items-start gap-2" aria-live="polite">
             <h3 className="shrink-0 text-sm font-semibold leading-7">
@@ -1449,35 +1441,80 @@ function DropDetails({
   /** The picker already names the drop; without one, say it here. */
   named: boolean;
 }) {
+  const now = new Date();
   const closesAt = new Date(drop.closesAt);
   const fStart = new Date(drop.fulfilmentStartsAt);
   const fEnd = new Date(drop.fulfilmentEndsAt);
+  // Status, cut-off and handover share one wrapping row ("Thu 26 Nov · 5–9 pm", the
+  // board's window wording), so on a phone they take two short lines, not four.
   return (
     <div className="mt-2">
-      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-        {!named && <h2 className="min-w-0 break-words text-base font-semibold text-foreground">{drop.title}</h2>}
+      {!named && <h2 className="mb-1 min-w-0 break-words text-base font-semibold text-foreground">{drop.title}</h2>}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-muted-foreground">
         <span
           className={cn(STATUS_BADGE, effective === "OPEN" ? "border-primary bg-primary/10" : "border-border bg-muted")}
         >
-          {dropStateLabel(drop, new Date())}
+          {dropStateLabel(drop, now)}
         </span>
+        <dl className="contents">
+          <div>
+            <dt className="inline font-medium text-foreground">Closes: </dt>
+            <dd className="inline">
+              {formatRelativeIstDay(closesAt, now)}, {formatIstTime(closesAt)}
+            </dd>
+          </div>
+          <div>
+            <dt className="inline font-medium text-foreground">
+              {drop.fulfilmentMode === "PICKUP" ? "Pickup" : drop.fulfilmentMode === "DELIVERY" ? "Delivery" : "Delivery / pickup"}:{" "}
+            </dt>
+            <dd className="inline">{formatWindowWithDay(fStart, fEnd, now)}</dd>
+          </div>
+        </dl>
       </div>
-      <dl className="mt-2 grid grid-cols-1 gap-1 text-sm text-muted-foreground sm:grid-cols-2">
-        <div>
-          <dt className="inline font-medium text-foreground">Orders close: </dt>
-          <dd className="inline">
-            {formatIstDate(closesAt)}, {formatIstTime(closesAt)}
-          </dd>
-        </div>
-        <div>
-          <dt className="inline font-medium text-foreground">
-            {drop.fulfilmentMode === "PICKUP" ? "Pickup" : drop.fulfilmentMode === "DELIVERY" ? "Delivery" : "Delivery / pickup"}:{" "}
-          </dt>
-          <dd className="inline">
-            {formatIstDate(fStart)}, {formatIstTime(fStart)} – {formatIstTime(fEnd)}
-          </dd>
-        </div>
-      </dl>
+    </div>
+  );
+}
+
+/**
+ * What the orders add up to ("To cook: Ragi Laddu 3 · Gulab Jamun 2/20 …"). It grows
+ * with every item on the drop, and on a phone it sat above the tabs and pushed the
+ * first order off the screen. So below md it is one summary row ("To cook · 5 dishes,
+ * 15 in all") that opens the list; from md the list is always shown. The switch is
+ * CSS only, so nothing remounts.
+ */
+function ToPrepareList({ rows, vocab }: { rows: PrepRow[]; vocab: StoreVocabulary }) {
+  const [open, setOpen] = useState(false);
+  const total = rows.reduce((sum, r) => sum + r.qtyOrdered, 0);
+  return (
+    <div className="mt-1 md:mt-2">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="to-prepare-list"
+        onClick={() => setOpen((v) => !v)}
+        className="-mx-2 flex min-h-11 w-[calc(100%+1rem)] items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-accent focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring md:hidden"
+      >
+        <span className="min-w-0 flex-1">
+          <span className="font-medium text-foreground">{vocab.toPrepare}</span>
+          <span className="text-muted-foreground">
+            {" "}
+            · {countItems(vocab, rows.length)}, {total} in all
+          </span>
+        </span>
+        <ChevronDown
+          className={cn("h-5 w-5 shrink-0 text-muted-foreground transition-transform", open && "rotate-180")}
+          aria-hidden
+        />
+      </button>
+      <p id="to-prepare-list" className={cn("text-sm text-muted-foreground", !open && "max-md:hidden")}>
+        <span className="font-medium text-foreground max-md:hidden">{vocab.toPrepare}: </span>
+        {rows
+          .map(
+            (p) =>
+              `${p.name} ${p.qtyOrdered}${p.maxQty !== null ? `/${p.maxQty}` : ""}${p.qtyFree > 0 ? ` (${p.qtyFree} free)` : ""}`,
+          )
+          .join(" · ")}
+      </p>
     </div>
   );
 }

@@ -132,6 +132,8 @@ compound scope; the frozen rule is per order (`isDropFrozen` on its drop).
 Billing notices and a checklist with open steps sit outside the slot. The header has one Share menu and one "⋯"
 menu (`BoardMenus.tsx`). In menu scope the status pill sets `acceptMenuOrders` for an OWNER through `PATCH
 /api/vendor`; it does not touch drops. Refresh, Sound and phone alerts are in the live sync bar at the bottom.
+In drop scope the header is one wrapping row (status, "Closes:", handover via `formatWindowWithDay`); below `md` the
+"To cook" list folds to one row (`ToPrepareList`: "To cook · 5 dishes, 15 in all") so it never pushes the orders off a phone.
 
 **Stages** (`boardBucket` in `lib/drops-board.ts`): the board's tabs are named after the seller's next job
 (`boardFilterLabel`): To accept → To make / To pack (`toMakeTab` in the store vocabulary) → To hand over → Done; the ids
@@ -141,7 +143,7 @@ handed over, cancelled, expired. Inside a tab the list is grouped (`boardSection
 online payment" (`awaiting_online`, outside the count, so the count matches the cards above it), To hand over splits into
 Waiting for pickup / Ready to send / On the way, and Done keeps "Cancelled or not paid in time" apart. A heading shows once
 a tab has two groups, and always on those two that aren't the tab's job; search results stay one list. An open card
-that still has a step to take shows a progress row (`orderProgressSteps`: Accepted · Ready · Picked up, or Accepted · On
+that still has a step to take, except on To accept (its status line already says it), shows a progress row (`orderProgressSteps`: Accepted · Ready · Picked up, or Accepted · On
 the way · Delivered), words plus icons, payment never a step. Payment is never a
 stage. Every card says two things, in words: its status line (`orderStatusLine`: "Waiting for you to accept",
 "Check payment", "Being made" / "Being packed" by `storeKind`, "Ready for pickup", "On the way with <rider>", "Picked up" /
