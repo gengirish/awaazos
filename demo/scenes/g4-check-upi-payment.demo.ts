@@ -62,8 +62,8 @@ test("G4 jewellery seller checks a buyer's UPI payment", async ({ page, browser,
   await expect(card.getByRole("button", { name: "Yes, received" })).toHaveCount(0);
 
   await d.say("The order is paid and accepted in one tap.", { wait: 600 });
-  await page.getByRole("tab", { name: /^Preparing/ }).waitFor();
-  await d.tap(page.getByRole("tab", { name: /^Preparing/ }), { after: 1000 });
+  await page.getByRole("tab", { name: /^To pack/ }).waitFor();
+  await d.tap(page.getByRole("tab", { name: /^To pack/ }), { after: 1000 });
   await d.reveal(card);
   await d.beat(1000);
   await d.say("Not in your app? Tap Not received, and they're asked for the reference again.");
