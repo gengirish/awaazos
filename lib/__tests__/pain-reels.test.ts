@@ -9,6 +9,9 @@ import {
   painReelLinks,
   painReelPath,
   painReelsFor,
+  mostCommonReelStore,
+  PAIN_REEL_STORES,
+  painReelRowsFirst,
   painReelStoreFor,
 } from "@/lib/pain-reels";
 
@@ -57,11 +60,12 @@ describe("painReelById", () => {
 
 describe("painReelsFor", () => {
   it("splits the Reels by the store they were filmed in", () => {
-    const kitchen = painReelsFor("kitchen", BASE);
-    const jewellery = painReelsFor("jewellery", BASE);
-    expect(kitchen.length + jewellery.length).toBe(PAIN_REELS.length);
-    expect(kitchen.every((r) => r.store === "kitchen")).toBe(true);
-    expect(jewellery.every((r) => r.store === "jewellery")).toBe(true);
+    const rows = PAIN_REEL_STORES.map((store) => painReelsFor(store, BASE));
+    expect(rows.reduce((n, row) => n + row.length, 0)).toBe(PAIN_REELS.length);
+    PAIN_REEL_STORES.forEach((store, i) => {
+      expect(rows[i]!.length).toBeGreaterThan(0);
+      expect(rows[i]!.every((r) => r.store === store)).toBe(true);
+    });
   });
 
   it("is empty when nothing is published", () => {
@@ -90,8 +94,26 @@ describe("painReelLinks", () => {
     expect(painReelLinks(undefined, "https://awaazdo.store")).toEqual([]);
   });
 
-  it("gives food stores the kitchen row and every other store the jewellery row", () => {
-    expect(painReelStoreFor("food")).toBe("kitchen");
-    expect(painReelStoreFor("goods")).toBe("jewellery");
+  it("gives food stores the kitchen row, clothing stores theirs and every other store the jewellery row", () => {
+    expect(painReelStoreFor("HOME_KITCHEN")).toBe("kitchen");
+    expect(painReelStoreFor("GENERAL")).toBe("kitchen");
+    expect(painReelStoreFor(null)).toBe("kitchen");
+    expect(painReelStoreFor("CLOTHING")).toBe("clothing");
+    expect(painReelStoreFor("OTHER")).toBe("jewellery");
+    expect(painReelStoreFor("KIRANA")).toBe("jewellery");
+  });
+});
+
+describe("Reel rows", () => {
+  it("lists the lead's row first, then the rest in landing-page order", () => {
+    expect(painReelRowsFirst("clothing")).toEqual(["clothing", "kitchen", "jewellery"]);
+    expect(painReelRowsFirst("kitchen")).toEqual([...PAIN_REEL_STORES]);
+  });
+
+  it("picks the row most of a batch is in, kitchen for an empty one", () => {
+    const of = (...rows: ("kitchen" | "jewellery" | "clothing")[]) => rows.map((reelStore) => ({ reelStore }));
+    expect(mostCommonReelStore(of("clothing", "clothing", "kitchen"))).toBe("clothing");
+    expect(mostCommonReelStore(of("jewellery", "clothing"))).toBe("jewellery");
+    expect(mostCommonReelStore([])).toBe("kitchen");
   });
 });

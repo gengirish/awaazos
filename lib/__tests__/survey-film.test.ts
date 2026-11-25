@@ -9,12 +9,16 @@ describe("surveyReelsByPain", () => {
   const byPain = surveyReelsByPain(REELS);
 
   it("gives a pain its Reels with the kitchen one first", () => {
-    expect(byPain.orders_scattered?.map((r) => r.id)).toEqual(["orders_scattered", "jewellery-orders_scattered"]);
+    expect(byPain.orders_scattered?.map((r) => r.id)).toEqual([
+      "orders_scattered",
+      "jewellery-orders_scattered",
+      "clothing-orders_scattered",
+    ]);
     expect(byPain.delivery?.map((r) => r.id)).toEqual(["delivery"]);
   });
 
   it("uses the only Reel a pain has, even when it isn't the kitchen's", () => {
-    expect(byPain.ingredients?.map((r) => r.id)).toEqual(["jewellery-ingredients"]);
+    expect(byPain.ingredients?.map((r) => r.id)).toEqual(["jewellery-ingredients", "clothing-ingredients"]);
   });
 
   it("leaves out pains no film shows, so the form keeps its plain thank-you", () => {

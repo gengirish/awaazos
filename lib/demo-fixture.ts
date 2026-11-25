@@ -11,12 +11,13 @@
  * - weekly pickup / delivery slots, so checkout asks "when".
  *
  * Pictures are files in /public: the dish drawings in /food for food stores,
- * the /demo drawings for wellness and crafts. Nothing is uploaded.
+ * the /demo drawings for the product stores (3:4 for clothing, whose store page shows tall tiles).
+ * Nothing is uploaded.
  */
 import type { MenuSlotRule } from "@/lib/menu-slots";
 import { normaliseStoreHandle } from "@/lib/store-handle";
 
-export const DEMO_FIXTURE_CATEGORIES = ["bakery", "meals", "wellness", "crafts", "jewellery"] as const;
+export const DEMO_FIXTURE_CATEGORIES = ["bakery", "meals", "wellness", "crafts", "jewellery", "clothing"] as const;
 export type DemoFixtureCategory = (typeof DEMO_FIXTURE_CATEGORIES)[number];
 
 export type DemoFixtureItem = {
@@ -29,7 +30,7 @@ export type DemoFixtureItem = {
   unit?: string;
   /** Stock counted now (lib/inventory.ts). Absent = not tracked. Ignored when the item has colours. */
   stock?: number;
-  /** Colours sold as item variants (lib/item-variants.ts), each with its own stock when given. */
+  /** Colours or sizes sold as item variants (lib/item-variants.ts), each with its own stock when given. */
   colours?: { label: string; stock?: number }[];
 };
 
@@ -42,7 +43,7 @@ export type DemoFixture = {
   name: string;
   slug: string;
   city: string;
-  stallType: "HOME_BAKERY" | "HOME_KITCHEN" | "OTHER";
+  stallType: "HOME_BAKERY" | "HOME_KITCHEN" | "CLOTHING" | "OTHER";
   /** Shown as the store type when stallType is OTHER. */
   stallTypeOther: string | null;
   tagline: string;
@@ -257,6 +258,58 @@ const PRESETS: Record<DemoFixtureCategory, Preset> = {
       ],
     },
     offer: { name: "Free velvet pouch", description: "Order any 2 pieces and get a Velvet Jewellery Pouch free.", minQty: 2 },
+    slots: [{ days: [1, 2, 3, 4, 5, 6], start: "11:00", end: "19:00" }],
+  },
+  clothing: {
+    defaultName: "Saanjh Threads",
+    tagline: (city) => `Handloom cotton dresses, sets and kids' frocks, stitched in small batches in ${city}`,
+    stallType: "CLOTHING",
+    stallTypeOther: null,
+    theme: "purple",
+    fulfilment: "BOTH",
+    deliveryFeePaise: 3000,
+    pickupNote: "Pick up at the building gate. Call when you're here.",
+    everyday: [
+      {
+        name: "Narayanpet Cotton Anarkali", rupees: 2099, category: "Dresses", description: "Handloom cotton with a zari border on the hem and sleeves.",
+        emoji: "👗", imageUrl: art("anarkali"), colours: [{ label: "M", stock: 2 }, { label: "L", stock: 3 }, { label: "XL", stock: 2 }, { label: "XXL", stock: 1 }],
+      },
+      {
+        name: "Kota Checks Tiered Midi", rupees: 2099, category: "Dresses", description: "Light kota cotton, tiered, with a square neck.",
+        emoji: "👗", imageUrl: art("midi"), colours: [{ label: "M", stock: 3 }, { label: "L", stock: 1 }, { label: "XL", stock: 2 }, { label: "XXL", stock: 2 }],
+      },
+      {
+        name: "Chanderi 3 Piece Set", rupees: 3499, category: "Three piece sets", description: "Kurta, pants and an organza dupatta.",
+        emoji: "👘", imageUrl: art("three-piece"), colours: [{ label: "M", stock: 2 }, { label: "L", stock: 2 }, { label: "XL", stock: 1 }, { label: "XXL", stock: 1 }],
+      },
+      {
+        name: "Gingham Bunny Frock", rupees: 799, category: "Kids", description: "Soft cotton, puff sleeves and a bow at the waist.",
+        emoji: "👗", imageUrl: art("kids-frock"), colours: [{ label: "6-12M", stock: 3 }, { label: "1-2Y", stock: 4 }, { label: "2-3Y", stock: 2 }, { label: "3-4Y", stock: 2 }],
+      },
+      {
+        name: "Kalamkari Silk Saree", rupees: 4500, category: "Sarees", description: "Hand-painted kalamkari. One of a kind.",
+        emoji: "🥻", imageUrl: art("saree"), stock: 1,
+      },
+      {
+        name: "Mul Cotton Dupatta", rupees: 650, category: "Dupattas", description: "Soft mul with a printed border. Goes with any kurta.",
+        emoji: "🧣", imageUrl: art("dupatta"), stock: 5,
+      },
+    ],
+    gift: { name: "Fabric Potli Bag", rupees: 150, category: "Gifts", description: "Drawstring potli with a zari trim.", emoji: "👝", imageUrl: art("potli") },
+    drop: {
+      title: "Festive Cotton Edit",
+      note: "A small festive batch, stitched to order.",
+      daysAhead: 2,
+      cutoffTime: "21:00",
+      windowStart: "11:00",
+      windowEnd: "19:00",
+      items: [
+        { name: "Zari Border Anarkali", rupees: 2799, category: "Festive", description: "Festive anarkali with a wide zari border.", emoji: "👗", imageUrl: art("anarkali"), maxQty: 3 },
+        { name: "Raw Silk 3 Piece Set", rupees: 3999, category: "Festive", description: "Raw silk kurta, pants and a kalamkari dupatta.", emoji: "👘", imageUrl: art("three-piece"), maxQty: 6 },
+        { name: "Festive Kids Frock", rupees: 999, category: "Festive", description: "Tiered frock with a lace bow.", emoji: "👗", imageUrl: art("kids-frock"), maxQty: 8 },
+      ],
+    },
+    offer: { name: "Free potli bag", description: "Order any 2 pieces and get a Fabric Potli Bag free.", minQty: 2 },
     slots: [{ days: [1, 2, 3, 4, 5, 6], start: "11:00", end: "19:00" }],
   },
 };

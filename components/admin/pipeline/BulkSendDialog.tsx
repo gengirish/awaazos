@@ -20,6 +20,7 @@ import {
 import type { PipelineItem } from "@/lib/demo-pipeline-server";
 import { fillTemplate, needsClaimLink } from "@/lib/demo-pipeline";
 import { outreachTemplate, withReelLink } from "@/lib/outreach-message";
+import { mostCommonReelStore } from "@/lib/pain-reels";
 import { formatIndianMobile } from "@/lib/phone";
 
 const FIELD =
@@ -44,8 +45,7 @@ export function BulkSendDialog({ items, sender, handlers, onClose }: Props) {
   const [sent, setSent] = useState(0);
   const [reelId, setReelId] = useState<string | null>(null);
   // One video for the whole batch: list first the row most of these stores are in.
-  const goods = items.filter((i) => i.reelStore === "jewellery").length;
-  const reelStore = goods * 2 > items.length ? "jewellery" : "kitchen";
+  const reelStore = mostCommonReelStore(items);
 
   const fill = (item: PipelineItem) =>
     fillTemplate(template, {

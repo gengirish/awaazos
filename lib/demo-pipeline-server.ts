@@ -17,7 +17,6 @@ import { findDuplicates, looksLikeTestStore, SNOOZE_DAYS, type PipelineFacts } f
 import { sendDemoClaimEmail } from "@/lib/email";
 import { painReelStoreFor, type PainReelStore } from "@/lib/pain-reels";
 import { prisma } from "@/lib/prisma";
-import { storeKind } from "@/lib/store-vocabulary";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -110,7 +109,7 @@ export async function loadPipelineItems(onlyVendorIds?: string[], now: Date = ne
       name: row.name,
       area: row.city,
       storeUrl: publicStoreUrl(row.slug),
-      reelStore: painReelStoreFor(storeKind(row.stallType)),
+      reelStore: painReelStoreFor(row.stallType),
       phone: row.settings?.whatsappNumber ?? null,
       contactName: row.demoPipeline?.contactName ?? null,
       contactEmail: row.demoPipeline?.contactEmail ?? null,

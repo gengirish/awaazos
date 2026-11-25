@@ -44,8 +44,8 @@ const H = 1920;
 const HOOK_S = 2.4;
 const END_S = 3;
 const FADE_S = 0.25;
-/** The store colour each film was recorded in: the meals demo store is green, the jewellery one red. */
-const ACCENT: Record<PainReel["store"], string> = { kitchen: "#157f3c", jewellery: "#b91c1c" };
+/** The store colour each film was recorded in: the meals demo store is green, the jewellery one red, the clothing one purple. */
+const ACCENT: Record<PainReel["store"], string> = { kitchen: "#157f3c", jewellery: "#b91c1c", clothing: "#7e22ce" };
 const SITE = "awaazdo.store";
 
 const FONTS =

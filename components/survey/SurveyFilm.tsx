@@ -21,6 +21,7 @@ function Film({ src, poster, className }: { src: string; poster: string; classNa
 const OTHER_ROW: Record<ResolvedPainReel["store"], string> = {
   kitchen: "Run a home kitchen?",
   jewellery: "Sell jewellery or other products?",
+  clothing: "Sell clothes?",
 };
 
 /**
@@ -31,7 +32,7 @@ const OTHER_ROW: Record<ResolvedPainReel["store"], string> = {
 export function SurveyReelThanks({ pain, reels }: { pain: string; reels: readonly ResolvedPainReel[] }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
-  const [reel, other] = reels;
+  const [reel, ...others] = reels;
 
   return (
     <section aria-labelledby="survey-thanks" className="space-y-4">
@@ -57,8 +58,8 @@ export function SurveyReelThanks({ pain, reels }: { pain: string; reels: readonl
               {reel.sub} · {formatVideoLength(reel.seconds)}
             </p>
           </div>
-          {other ? (
-            <p className="text-sm text-muted-foreground">
+          {others.map((other) => (
+            <p key={other.id} className="text-sm text-muted-foreground">
               {OTHER_ROW[other.store]}{" "}
               <Link
                 href={painReelPath(other.id)}
@@ -67,7 +68,7 @@ export function SurveyReelThanks({ pain, reels }: { pain: string; reels: readonl
                 Watch that version
               </Link>
             </p>
-          ) : null}
+          ))}
           <div>
             <Button asChild size="lg" className="min-h-12 w-full px-8 text-base font-semibold sm:w-auto">
               <Link href="/sign-up">{PLAN_MARKETING.STARTER.cta}</Link>

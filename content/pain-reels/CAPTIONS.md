@@ -360,3 +360,112 @@ Say "stock" and "cost", never "profit report" (not built yet).
 **WhatsApp**
 > How do you keep track of stock and what each piece cost you? When new pieces arrive you enter the count and the
 > price you paid, and each piece shows its margin. Video: <link>
+
+# Clothing stores
+
+Films w1–w6, recorded in the demo store "Saanjh Threads" (`lib/demo-fixture.ts`, category `clothing`; drawings in
+`public/demo`), a made-up store laid out like a real home clothing seller's: dresses in M–XXL, kids' frocks by age,
+3-piece sets, one saree. Reels are `demo-output/pain-reels/clothing-<pain>.mp4`. Hashtags (pick 5–8): #ethnicwear
+#handloom #cottondresses #anarkali #kurtaset #kidswear #smallbusinessindia #instagramseller #shopsmall
+
+## W1. "Size available? Price?" in the DMs (`same_questions`)
+
+**Reel:** `clothing-same_questions.mp4` (a dress opens from a post link)
+
+**Caption**
+> "Size available? Price?" 🙄 x 50, every day?
+>
+> Put the link to the dress in your post or story. It opens on your own store with the photo, price and every
+> size, and shows "Only 2 left" when a size is running out. One tap adds it to the cart.
+>
+> Each product has its own link: Products → "Copy link for Instagram".
+
+**Story**
+1. "Size? Price? 🙄"
+2. "Link the dress. Price, photo, sizes." (screen: dress with sizes)
+3. "30 days free" + link
+
+**WhatsApp**
+> Hi! Love your collection. Do you get "size available?" on every post? Each dress can have its own link that
+> shows the photo, price and sizes left, so buyers can order without a DM. 20-sec video: <link>
+
+## W2. Orders lost in DMs (`orders_scattered`)
+
+**Reel:** `clothing-orders_scattered.mp4`
+
+**Caption**
+> DM mein order aaya, phir bhool gaye? 😬
+>
+> One link in your bio. Buyers browse every outfit, pick their size, and order with a pickup or delivery time.
+> Order 2 pieces and the free potli bag joins by itself. Every order lands in one list, not 40 chats.
+>
+> They pay you straight on UPI. No commission.
+
+**Story**
+1. "Order DM mein kho gaya?"
+2. "One link. Buyers order themselves." (screen: gallery)
+3. "30 days free" + link
+
+**WhatsApp**
+> Do orders ever slip through in DMs when a post does well? Buyers can order from your bio link, size and all,
+> and every order sits in one list. Video: <link>
+
+## W3. Sold the same piece twice (`overselling`)
+
+**Reel:** `clothing-overselling.mp4` (the last saree)
+
+**Caption**
+> Ek hi saree do logon ko bech di? 😓
+>
+> Set how many you have, per product or per size. Your store shows "Only 1 left", and once it's ordered everyone
+> else sees "Sold out". Stock goes down with every order by itself, so the last piece sells once.
+
+**Story**
+1. "Last piece, do buyers 😬"
+2. "Only 1 left → Sold out" (screen)
+3. "30 days free" + link
+
+## W4. Checking who has paid (`payment_matching`)
+
+**Reel:** `clothing-payment_matching.mp4`
+
+Use the kitchen caption for #2 (Checking who has paid) with "outfit" for "plate"; the film shows a clothing order.
+
+## W5. One piece and gone (no survey pain: selling more)
+
+**Reel:** `clothing-free-potli.mp4` (making the "2+ pieces → free potli" offer)
+
+**Caption**
+> Sirf ek piece leke chale jaate hain?
+>
+> Give a reason to take two. Make an offer in a minute: 2 pieces or more, and a potli bag (or any product you
+> choose) is free. Buyers see it on your store, and the gift joins their cart by itself. Switch it off any time.
+
+Free gifts are for online orders only, not counter sales.
+
+**Story**
+1. "Ek se do 💕"
+2. "2+ pieces → free potli" (screen: offer)
+3. "30 days free" + link
+
+## W6. Stock and costs (`ingredients`)
+
+**Reel:** `clothing-ingredients.mp4` (received stock with what you paid)
+
+**Caption**
+> Kitna maal bacha, kitne mein liya? 📦
+>
+> New stock in from your weaver? Tap "Received stock", enter how many came in and what you paid for each. The
+> count goes up, and every product shows its cost and margin, for you and your managers only (never cashiers or
+> buyers).
+
+Say "stock" and "cost", never "profit report" (not built yet).
+
+**Story**
+1. "Maal aaya! Ab hisaab?"
+2. "Received stock + cost price" (screen)
+3. "30 days free" + link
+
+**WhatsApp**
+> How do you keep track of stock and what each piece cost you? When new stock arrives you enter the count and the
+> price you paid, and each product shows its margin. Video: <link>

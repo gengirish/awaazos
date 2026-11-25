@@ -1,6 +1,8 @@
+import type { StallType } from "@prisma/client";
+
 import { PAIN_REELS, type PainReel } from "@/content/pain-reels/reels";
 import { HELP_VIDEOS, helpVideoBase } from "@/lib/help-videos";
-import type { StoreKind } from "@/lib/store-vocabulary";
+import { storeKind } from "@/lib/store-vocabulary";
 
 /**
  * The pain-point Reels (content/pain-reels/reels.ts) as the app shows them: the
@@ -68,12 +70,33 @@ export function painReelPath(id: string): string {
 }
 
 /**
- * The Reels row for a store type: a food store gets the kitchen Reels, any other the
- * jewellery ones (the landing page's "Jewellery and other products" row).
+ * The Reels row for a store type: a food store gets the kitchen Reels, a clothing
+ * store the clothing ones, any other the jewellery ones (the landing page's
+ * "Jewellery and other products" row).
  */
-export function painReelStoreFor(kind: StoreKind): PainReelStore {
-  return kind === "goods" ? "jewellery" : "kitchen";
+export function painReelStoreFor(stallType: StallType | null | undefined): PainReelStore {
+  if (storeKind(stallType) === "food") return "kitchen";
+  return stallType === "CLOTHING" ? "clothing" : "jewellery";
 }
+
+/** Every row, the given one first: the order the outreach Reel picker lists them in. */
+export function painReelRowsFirst(store: PainReelStore): PainReelStore[] {
+  return [store, ...PAIN_REEL_STORES.filter((s) => s !== store)];
+}
+
+/** The row most of these stores are in (ties go to the earlier row); kitchen for none. */
+export function mostCommonReelStore(stores: readonly { reelStore: PainReelStore }[]): PainReelStore {
+  let best: PainReelStore = "kitchen";
+  let bestCount = 0;
+  for (const row of PAIN_REEL_STORES) {
+    const count = stores.filter((s) => s.reelStore === row).length;
+    if (count > bestCount) [best, bestCount] = [row, count];
+  }
+  return best;
+}
+
+/** The rows, in landing-page order. */
+export const PAIN_REEL_STORES: readonly PainReelStore[] = ["kitchen", "jewellery", "clothing"];
 
 /** A Reel as a message links to it: its page on the site, never the file. */
 export type PainReelLink = Pick<PainReel, "id" | "store" | "title"> & { url: string };

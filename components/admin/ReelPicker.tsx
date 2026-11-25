@@ -3,7 +3,7 @@
 import { useId } from "react";
 
 import { Label } from "@/components/ui/label";
-import type { PainReelLink, PainReelStore } from "@/lib/pain-reels";
+import { painReelRowsFirst, type PainReelLink, type PainReelStore } from "@/lib/pain-reels";
 
 const FIELD =
   "flex min-h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2";
@@ -11,6 +11,7 @@ const FIELD =
 const ROW_LABEL: Record<PainReelStore, string> = {
   kitchen: "Home kitchens",
   jewellery: "Jewellery and other products",
+  clothing: "Clothing",
 };
 
 type Props = {
@@ -24,13 +25,13 @@ type Props = {
 /**
  * "Add a video" under an outreach message: picks one pain-point Reel, whose page link
  * the caller adds to the text (withReelLink in lib/outreach-message.ts). The lead's
- * store type comes first; the other row stays pickable. Nothing renders when no Reel
+ * store type comes first; the other rows stay pickable. Nothing renders when no Reel
  * is published.
  */
 export function ReelPicker({ reels, store, value, onChange }: Props) {
   const id = useId();
   if (reels.length === 0) return null;
-  const rows: PainReelStore[] = store === "kitchen" ? ["kitchen", "jewellery"] : ["jewellery", "kitchen"];
+  const rows = painReelRowsFirst(store).filter((row) => reels.some((r) => r.store === row));
 
   return (
     <div className="space-y-1">
