@@ -838,7 +838,7 @@ export function OrdersBoard({
       ? undefined
       : o.dropId === null
         ? { kind: "menu", label: vocab.catalogueOrder }
-        : { kind: "drop", label: dropTitles.get(o.dropId) ?? "Pre-order" };
+        : { kind: "drop", label: dropTitles.get(o.dropId) ?? "" };
 
   const storeIsLive = acceptMenuOrders || drops.some((d) => liveEffectiveStatus(d, now) === "OPEN");
 

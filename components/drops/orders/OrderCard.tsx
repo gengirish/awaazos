@@ -65,8 +65,45 @@ import { formatIstDate, formatIstDayLabel, formatIstTime, utcToIstParts } from "
 import { orderSlotLabel } from "@/lib/menu-slots";
 import { cn } from "@/lib/utils";
 
-/** Where an order came from: the everyday menu, or a drop (label = its title). */
+/**
+ * Where an order came from: the everyday menu (label = "Menu order" / "Everyday order"
+ * from the store vocabulary), or a drop (label = its title, may be empty).
+ */
 export type OrderSource = { kind: "menu" | "drop"; label: string };
+
+/**
+ * First line of a card on a mixed board: a filled pill in the source's own colour
+ * (purple pre-order, blue everyday: neither is a status colour), with an icon and
+ * words, so colour is never the only sign. White on either fill is above 5:1, in
+ * light and dark mode alike.
+ */
+function SourceTag({ source }: { source: OrderSource }) {
+  const isDrop = source.kind === "drop";
+  const title = source.label.trim();
+  return (
+    <p
+      className={cn(
+        "mb-1 inline-flex max-w-full items-center gap-1 rounded-full px-2 py-0.5 text-xs font-semibold text-white",
+        isDrop ? "bg-brand-purple" : "bg-brand-blue",
+      )}
+    >
+      {isDrop ? (
+        <CalendarClock className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      ) : (
+        <LayoutGrid className="h-3.5 w-3.5 shrink-0" aria-hidden />
+      )}
+      <span className="sr-only">From: </span>
+      {isDrop ? (
+        <span className="min-w-0 truncate">
+          Pre-order
+          {title && <span className="font-medium"> · {title}</span>}
+        </span>
+      ) : (
+        <span className="min-w-0 truncate">{source.label}</span>
+      )}
+    </p>
+  );
+}
 
 type Props = {
   order: BoardOrder;
@@ -368,6 +405,10 @@ export function OrderCard({
       aria-labelledby={titleId}
       className={cn(
         "rounded-lg border bg-card p-4 text-card-foreground shadow-xs",
+        // The source stripe, so a mixed board can be scanned by colour; the tag says it in words.
+        source && "border-l-4",
+        source?.kind === "drop" && "border-l-brand-purple",
+        source?.kind === "menu" && "border-l-brand-blue",
         isNew && "ring-2 ring-primary",
         selected && "border-primary bg-primary/5 ring-2 ring-primary",
         (order.displayState === "CANCELLED" || order.displayState === "EXPIRED") && "opacity-80",
@@ -387,6 +428,7 @@ export function OrderCard({
           </label>
         )}
         <div className="min-w-0 flex-1">
+          {source && <SourceTag source={source} />}
           <h3 id={titleId} className="truncate text-base font-semibold">
             {customerLabel}
             {isNew && (
@@ -538,17 +580,6 @@ export function OrderCard({
                   <BadgeIcon kind={badge.kind} />
                   <span className="sr-only">Payment: </span>
                   {badge.label}
-                </p>
-              )}
-              {source && (
-                <p className="inline-flex min-w-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs font-medium text-muted-foreground">
-                  {source.kind === "drop" ? (
-                    <CalendarClock className="h-4 w-4 shrink-0" aria-hidden />
-                  ) : (
-                    <LayoutGrid className="h-4 w-4 shrink-0" aria-hidden />
-                  )}
-                  <span className="sr-only">From: </span>
-                  <span className="truncate">{source.label}</span>
                 </p>
               )}
             </div>
