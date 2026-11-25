@@ -13,19 +13,35 @@ import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Input } from "@/components/ui/input";
 import { RadioOption } from "@/components/ui/radio-option";
-import { menuCategories } from "@/lib/menu-category";
+import {
+  dropWithinCategory,
+  groupMenuRows,
+  menuCategories,
+  menuCategoryOf,
+  moveWithinCategory,
+} from "@/lib/menu-category";
 import {
   MENU_STATUS_LABELS,
+  hidesInsideSections,
   isMenuFilterEmpty,
   menuItemMatches,
   menuStatusFilters,
+  showsMenuFilter,
+  type MenuFilter,
   type MenuStatusFilter,
 } from "@/lib/menu-search";
 import type { MenuRow } from "@/lib/menu-stock";
-import { STAFF_SEARCH_MIN_ITEMS, searchTerms } from "@/lib/store-search";
+import { searchTerms } from "@/lib/store-search";
 import type { StoreVocabulary } from "@/lib/store-vocabulary";
 import { cn } from "@/lib/utils";
 
+/** The empty state's title: what the seller asked for, in words. */
+function noMatchTitle(query: string, status: MenuStatusFilter, category: string | null): string {
+  const where = category ? ` in ${category}` : "";
+  if (query) return `No items${where} match “${query}”`;
+  if (status !== "all") return `No ${MENU_STATUS_LABELS[status].toLowerCase()} items${where}`;
+  return `No items${where}`;
+}
 
 type MenuGridProps = {
   /** The list on screen; MenuScreen owns it because the page header needs it too. */
@@ -82,26 +98,47 @@ export function MenuGrid({
   const refocusMove = useRef<{ id: string; direction: MenuMoveDirection } | null>(null);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState<MenuStatusFilter>("all");
+  const [category, setCategory] = useState<string | null>(null);
 
-  // Search and the Selling / Sold out filter only earn their space on a long
-  // list (lib/menu-search.ts). They hide cards; `items` stays the whole menu.
-  const searchable = items.length > STAFF_SEARCH_MIN_ITEMS;
+  // One section per category (lib/menu-category.ts); with one category, no sections.
+  const sections = useMemo(() => groupMenuRows(items), [items]);
+  const sectioned = sections.length > 1;
+  // A category renamed or emptied away falls back to every category.
+  const shownCategory = sectioned && category && sections.some((s) => s.category === category) ? category : null;
+  // Search and the Selling / Sold out filter show from a few items (lib/menu-search.ts).
+  // They hide cards; `items` stays the whole menu.
+  const searchable = showsMenuFilter(items.length);
   // "Low stock" joins the filter once any item tracks stock; a kitchen sees no change.
   const statusFilters = menuStatusFilters(items.some((item) => item.stockQty !== null));
   const shownStatus = statusFilters.includes(status) ? status : "all";
-  const filter = useMemo(
-    () => (searchable ? { terms: searchTerms(query), status: shownStatus } : { terms: [], status: "all" as const }),
-    [searchable, query, shownStatus],
+  const filter = useMemo<MenuFilter>(
+    () => ({
+      terms: searchable ? searchTerms(query) : [],
+      status: searchable ? shownStatus : "all",
+      category: shownCategory,
+    }),
+    [searchable, query, shownStatus, shownCategory],
   );
   const filtering = !isMenuFilterEmpty(filter);
-  const visibleItems = useMemo(
-    () => (filtering ? items.filter((item) => menuItemMatches(item, filter)) : items),
-    [items, filter, filtering],
+  // Words or a status hide cards inside a section, so moves would jump over them. A category alone doesn't.
+  const reorderOff = hidesInsideSections(filter);
+  const visibleSections = useMemo(
+    () =>
+      filtering
+        ? sections
+            .map((section) => ({ ...section, items: section.items.filter((item) => menuItemMatches(item, filter)) }))
+            .filter((section) => section.items.length > 0)
+        : sections,
+    [sections, filter, filtering],
   );
+  const visibleCount = visibleSections.reduce((n, section) => n + section.items.length, 0);
+  // Rename is offered for a category the items really carry, not the "General" a blank reads as.
+  const renamable = new Set(categories);
 
   function clearFilter() {
     setQuery("");
     setStatus("all");
+    setCategory(null);
   }
 
   // Moving a card re-inserts its DOM node, which drops focus in some browsers.
@@ -171,12 +208,10 @@ export function MenuGrid({
     refresh();
   }
 
+  // Cards move inside their own section only (lib/menu-category.ts rule 3).
   function move(item: MenuRow, direction: MenuMoveDirection) {
-    const from = items.findIndex((x) => x.id === item.id);
-    const to = direction === "up" ? from - 1 : from + 1;
-    if (from < 0 || to < 0 || to >= items.length) return;
-    const next = [...items];
-    [next[from], next[to]] = [next[to], next[from]];
+    const next = moveWithinCategory(items, item.id, direction);
+    if (!next) return;
     refocusMove.current = { id: item.id, direction };
     void applyReorder(next);
   }
@@ -195,13 +230,50 @@ export function MenuGrid({
     e.preventDefault();
     const dragId = e.dataTransfer.getData("text/plain");
     if (!dragId || dragId === dropId) return;
-    const from = items.findIndex((x) => x.id === dragId);
-    const to = items.findIndex((x) => x.id === dropId);
-    if (from < 0 || to < 0) return;
-    const next = [...items];
-    const [moved] = next.splice(from, 1);
-    next.splice(to, 0, moved);
-    void applyReorder(next);
+    const next = dropWithinCategory(items, dragId, dropId);
+    if (next) {
+      void applyReorder(next);
+      return;
+    }
+    const dragged = items.find((x) => x.id === dragId);
+    const target = items.find((x) => x.id === dropId);
+    if (dragged && target && menuCategoryOf(dragged) !== menuCategoryOf(target)) {
+      toast.message(`To move ${dragged.name} to ${menuCategoryOf(target)}, change its category in Edit.`, {
+        id: "menu-order",
+      });
+    }
+  }
+
+  function renderCards(sectionItems: MenuRow[]) {
+    return (
+      // grid-cols-1, not an implicit column: that one grows to the longest description line
+      // and pushes every card off a 360 px screen (and off-centres dialogs opened over it).
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {sectionItems.map((item, index) => (
+          <div
+            key={item.id}
+            draggable={!reorderOff}
+            onDragStart={reorderOff ? undefined : (e) => onDragStart(e, item.id)}
+            onDragOver={reorderOff ? undefined : onDragOver}
+            onDrop={reorderOff ? undefined : (e) => onDrop(e, item.id)}
+            className={reorderOff ? undefined : "pointer-fine:cursor-grab pointer-fine:active:cursor-grabbing"}
+          >
+            <MenuItemCard
+              item={item}
+              onEdit={onEdit}
+              onChanged={refresh}
+              onStockSaved={onStockSaved}
+              onReceive={canSeeCost && canReceiveStock(item) ? setReceiving : undefined}
+              onMove={reorderOff ? undefined : move}
+              // With reordering on, every section is shown whole, so its edges are the card's limits.
+              canMoveUp={index > 0}
+              canMoveDown={index < sectionItems.length - 1}
+              storeSlug={storeSlug}
+            />
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -266,28 +338,64 @@ export function MenuGrid({
                   />
                 ))}
               </div>
-              <p aria-live="polite" className="sr-only">
-                {filtering ? (visibleItems.length === 1 ? "1 item shown" : `${visibleItems.length} items shown`) : ""}
-              </p>
             </div>
           ) : null}
-          {canManage && categories.length > 0 ? (
+          {sectioned ? (
+            <div className="space-y-1">
+              <p id="menu-category-label" className="text-xs font-medium text-muted-foreground">
+                Category
+              </p>
+              <div role="radiogroup" aria-labelledby="menu-category-label" className="flex flex-wrap gap-2">
+                <RadioOption
+                  size="compact"
+                  name="menu-category"
+                  value=""
+                  label="All categories"
+                  className="px-3"
+                  checked={shownCategory === null}
+                  onChange={() => setCategory(null)}
+                />
+                {sections.map((section) => (
+                  <RadioOption
+                    key={section.category}
+                    size="compact"
+                    name="menu-category"
+                    value={section.category}
+                    label={
+                      <span className="flex min-w-0 items-center gap-1.5">
+                        <span className="truncate">{section.category}</span>
+                        <span className="font-normal tabular-nums text-muted-foreground">{section.items.length}</span>
+                      </span>
+                    }
+                    className="max-w-full px-3"
+                    checked={shownCategory === section.category}
+                    onChange={() => setCategory(section.category)}
+                  />
+                ))}
+              </div>
+            </div>
+          ) : null}
+          <p aria-live="polite" className="sr-only">
+            {filtering ? (visibleCount === 1 ? "1 item shown" : `${visibleCount} items shown`) : ""}
+          </p>
+          {/* With sections, each heading has its own rename button instead. */}
+          {canManage && !sectioned && categories.length > 0 ? (
             <section aria-labelledby="menu-categories-heading" className="space-y-2">
               <h2 id="menu-categories-heading" className="text-xs font-medium text-muted-foreground">
                 Categories: tap one to rename it
               </h2>
               <ul className="flex flex-wrap gap-2">
-                {categories.map((category) => (
-                  <li key={category} className="min-w-0 max-w-full">
+                {categories.map((name) => (
+                  <li key={name} className="min-w-0 max-w-full">
                     <Button
                       type="button"
                       variant="outline"
                       size="sm"
                       className="min-h-11 min-w-11 max-w-full gap-1.5"
-                      aria-label={`Rename category ${category}`}
-                      onClick={() => setRenaming(category)}
+                      aria-label={`Rename category ${name}`}
+                      onClick={() => setRenaming(name)}
                     >
-                      <span className="truncate">{category}</span>
+                      <span className="truncate">{name}</span>
                       <Pencil className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                     </Button>
                   </li>
@@ -295,23 +403,24 @@ export function MenuGrid({
               </ul>
             </section>
           ) : null}
-          {filtering ? (
+          {reorderOff ? (
             // A move between two visible cards would jump over hidden ones.
             <p className="text-sm text-muted-foreground">Clear the search to change the order.</p>
           ) : items.length > 1 ? (
             <>
               <p className="text-sm text-muted-foreground pointer-coarse:hidden">
-                Drag cards to reorder. Order is saved when you drop.
+                Drag cards to reorder{sectioned ? " within a category" : ""}. Order is saved when you drop.
               </p>
               <p className="hidden text-sm text-muted-foreground pointer-coarse:block">
-                Use the arrows on a card to move it up or down. The order is saved as you go.
+                Use the arrows on a card to move it up or down{sectioned ? " within its category" : ""}. The order is
+                saved as you go.
               </p>
             </>
           ) : null}
-          {visibleItems.length === 0 ? (
+          {visibleCount === 0 ? (
             <EmptyState
               role="status"
-              title={query.trim() ? `No items match “${query.trim()}”` : `No ${MENU_STATUS_LABELS[shownStatus].toLowerCase()} items`}
+              title={noMatchTitle(query.trim(), shownStatus, shownCategory)}
               description="Try another word, or clear the search to see everything."
               action={
                 <Button type="button" variant="outline" className="min-h-11" onClick={clearFilter}>
@@ -319,33 +428,36 @@ export function MenuGrid({
                 </Button>
               }
             />
-          ) : (
-            // grid-cols-1, not an implicit column: that one grows to the longest description line
-            // and pushes every card off a 360 px screen (and off-centres dialogs opened over it).
-            <div ref={gridRef} className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {visibleItems.map((item, index) => (
-                <div
-                  key={item.id}
-                  draggable={!filtering}
-                  onDragStart={filtering ? undefined : (e) => onDragStart(e, item.id)}
-                  onDragOver={filtering ? undefined : onDragOver}
-                  onDrop={filtering ? undefined : (e) => onDrop(e, item.id)}
-                  className={filtering ? undefined : "pointer-fine:cursor-grab pointer-fine:active:cursor-grabbing"}
-                >
-                  <MenuItemCard
-                    item={item}
-                    onEdit={onEdit}
-                    onChanged={refresh}
-                    onStockSaved={onStockSaved}
-                    onReceive={canSeeCost && canReceiveStock(item) ? setReceiving : undefined}
-                    onMove={filtering ? undefined : move}
-                    canMoveUp={index > 0}
-                    canMoveDown={index < items.length - 1}
-                    storeSlug={storeSlug}
-                  />
-                </div>
+          ) : sectioned ? (
+            <div ref={gridRef} className="space-y-6">
+              {visibleSections.map((section, i) => (
+                <section key={section.category} aria-labelledby={`menu-section-${i}`} className="space-y-3">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <h2 id={`menu-section-${i}`} className="min-w-0 truncate font-display text-lg font-semibold">
+                      {section.category}
+                    </h2>
+                    <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+                      {section.items.length === 1 ? `1 ${vocab.item}` : `${section.items.length} ${vocab.items}`}
+                    </span>
+                    {canManage && renamable.has(section.category) ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="shrink-0"
+                        aria-label={`Rename category ${section.category}`}
+                        onClick={() => setRenaming(section.category)}
+                      >
+                        <Pencil className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                    ) : null}
+                  </div>
+                  {renderCards(section.items)}
+                </section>
               ))}
             </div>
+          ) : (
+            <div ref={gridRef}>{renderCards(visibleSections[0]?.items ?? [])}</div>
           )}
         </>
       )}
