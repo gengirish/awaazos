@@ -31,8 +31,9 @@ test("B5 seller hands a delivery to a rider", async ({ page, browser, request })
     paymentMethod: "CASH",
   });
 
-  // The wa.me tab never leaves the machine.
-  await page.context().route(/^https:\/\/(wa\.me|api\.whatsapp\.com)\//, (route) => route.fulfill({ status: 204, body: "" }));
+  // The wa.me tab never leaves the machine. A page, not a 204: a popup whose first
+  // load never commits holds the tap (and the camera) for ~12 s.
+  await page.context().route(/^https:\/\/(wa\.me|api\.whatsapp\.com)\//, (route) => route.fulfill({ status: 200, contentType: "text/html", body: "<title>WhatsApp</title>" }));
   await Director.prepare(page);
   await sellerSignIn(page, store, "/orders");
   const riders = await page.request.patch("/api/vendor", {
@@ -46,8 +47,8 @@ test("B5 seller hands a delivery to a rider", async ({ page, browser, request })
   const card = page.getByRole("article", { name: new RegExp(arjun.name) });
   // Accepted already, unfilmed: this scene starts at the handover.
   await card.getByRole("button", { name: "Accept order" }).click();
-  await page.getByRole("tab", { name: /^Preparing/ }).click();
-  // Collapsed on Preparing: open it so the rider buttons show.
+  await page.getByRole("tab", { name: /^To make/ }).click();
+  // Collapsed on To make: open it so the rider buttons show.
   await card.getByRole("button", { name: /Show details/ }).click();
   const send = card.getByRole("link", { name: new RegExp(`to ${RIDER.name} on WhatsApp`) });
   await expect(send).toBeVisible();
@@ -79,8 +80,8 @@ test("B5 seller hands a delivery to a rider", async ({ page, browser, request })
   await page.bringToFront();
   await d.beat(800);
 
-  await d.say("The order moves to Ready, on the way with your rider.", { wait: 600 });
-  await d.tap(page.getByRole("tab", { name: /^Ready/ }), { after: 600 });
+  await d.say("The order moves to To hand over, on the way with your rider.", { wait: 600 });
+  await d.tap(page.getByRole("tab", { name: /^To hand over/ }), { after: 600 });
   await expect(card).toContainText(`On the way with ${RIDER.name}`);
   await d.reveal(card);
   await d.beat(1200);

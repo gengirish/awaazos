@@ -13,7 +13,7 @@ export type PainReel = {
   /** Output file name: `<id>.mp4`, `<id>.cover.jpg`. */
   id: string;
   /** Which store the film shows, so the cards take its colour. */
-  store: "kitchen" | "jewellery";
+  store: "kitchen" | "jewellery" | "clothing";
   /** The OWNER_PAINS key it answers; null for a Reel about selling more, which no survey pain names. */
   pain: string | null;
   /** Scene id of the film in demo-output/final. */
@@ -226,6 +226,119 @@ export const PAIN_REELS: readonly PainReel[] = [
       "Enter how many came in, and what you paid for each.",
       "Add it, and your stock goes up.",
       "Your cost and margin show on the piece, for you only.",
+    ],
+  },
+
+  // ── Clothing store (Saanjh Threads, lib/demo-fixture.ts "clothing"; scenes w1–w6) ──
+  {
+    id: "clothing-same_questions",
+    store: "clothing",
+    pain: "same_questions",
+    film: "w1-product-link",
+    hook: "“Size available? Price?” DMs, din bhar?",
+    sub: "Link each dress. Photo, price and sizes open in one tap.",
+    title: "Size and price questions in your DMs",
+    seconds: 35,
+    lines: [
+      "A buyer likes a dress in your post and taps the link.",
+      "The dress opens on your store, with its photo and price.",
+      "Nobody has to DM you to ask the price or the sizes.",
+      "They pick their size, and see when only a few are left.",
+      "One tap adds it to the cart.",
+      "Close it, and the rest of your collection is right there.",
+    ],
+  },
+  {
+    id: "clothing-orders_scattered",
+    store: "clothing",
+    pain: "orders_scattered",
+    film: "w2-buyer-order",
+    hook: "DM mein order aaya, phir bhool gaye?",
+    sub: "Buyers order from your bio link. Every order in one place.",
+    title: "Orders lost in DMs",
+    seconds: 58,
+    lines: [
+      "Your buyer taps the link in your Instagram bio.",
+      "Your store opens: every outfit, with photos and prices.",
+      "They tap the anarkali and pick their size.",
+      "Add a dupatta, and the free potli bag joins by itself.",
+      "Checkout takes a few seconds.",
+      "They pick pickup or delivery, and a time that suits you.",
+      "One tap and the order is yours.",
+      "They pay you straight on UPI. No commission.",
+      "No more orders lost in your DMs.",
+    ],
+  },
+  {
+    id: "clothing-overselling",
+    store: "clothing",
+    pain: "overselling",
+    film: "w3-last-piece",
+    hook: "Ek hi saree do logon ko bech di?",
+    sub: "Stock counts itself. The last piece sells once.",
+    title: "The same piece sold twice",
+    seconds: 29,
+    lines: [
+      "One hand-painted saree left, and two buyers want it.",
+      "Your store shows it: only one left.",
+      "The first buyer orders it.",
+      "Everyone else now sees Sold out.",
+      "You never sell the same piece twice.",
+      "Stock goes down with every order, by itself.",
+    ],
+  },
+  {
+    id: "clothing-payment_matching",
+    store: "clothing",
+    pain: "payment_matching",
+    film: "w4-check-upi-payment",
+    hook: "Kisne pay kiya, kisne nahi?",
+    sub: "Check each UPI payment with one tap.",
+    title: "Who has paid?",
+    seconds: 32,
+    lines: [
+      "Buyers pay you straight on UPI, so no money passes through us.",
+      "When they say they've paid, the order says Check payment.",
+      "They sent the UPI reference. Match it in your UPI app.",
+      "It's there? Tap Yes, received.",
+      "The order is paid and accepted in one tap.",
+      "Not in your app? Tap Not received, and they're asked for the reference again.",
+    ],
+  },
+  {
+    id: "clothing-free-potli",
+    store: "clothing",
+    pain: null,
+    film: "w5-free-potli-offer",
+    hook: "Sirf ek piece leke chale jaate hain?",
+    sub: "A free potli with 2 pieces. It joins the cart by itself.",
+    title: "Getting buyers to take two pieces",
+    seconds: 38,
+    lines: [
+      "Want buyers to take two pieces, not one?",
+      "Add an offer: a free potli bag with two pieces or more.",
+      "Pick the gift from your own products.",
+      "Save it, and it's live on your store.",
+      "Buyers see it on your store, and the potli joins their cart by itself.",
+      "Switch it off any time with one tap.",
+    ],
+  },
+  {
+    id: "clothing-ingredients",
+    store: "clothing",
+    pain: "ingredients",
+    film: "w6-received-stock",
+    hook: "Kitna maal bacha, kitne mein liya?",
+    sub: "Received stock and what you paid, on every product.",
+    title: "Stock left, and what you paid",
+    seconds: 32,
+    lines: [
+      "New stock in from your weaver?",
+      "Every product shows how many you have left.",
+      "Tap Received stock on the product.",
+      "Enter how many came in, and what you paid for each.",
+      "Add it, and your stock goes up.",
+      "Your cost and margin show on the product, for you only.",
     ],
   },
 ];

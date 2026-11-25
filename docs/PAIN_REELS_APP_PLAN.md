@@ -1,6 +1,8 @@
 # Pain reels in the app: plan
 
 Status: Phases 1–3 built 2026-11-19 (`/v/<id>` pages and landing row; survey answer; outreach picker). Phase 4 not started.
+2026-11-25: a third row, 6 clothing Reels (films w1–w6, store "Saanjh Threads"); `painReelStoreFor` takes the stall
+type, so a `CLOTHING` store gets the clothing row and every other goods store keeps the jewellery one.
 
 ## What we have
 

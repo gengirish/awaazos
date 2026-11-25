@@ -34,7 +34,7 @@ sellers with no account. `PublicSurveyResponse` holds the answers and nothing el
 `/admin/survey` counts them apart from the stores', because anyone can answer twice, and they never inform a price.
 
 Once sent, the form answers with a film for the top pain (`lib/survey-film.ts`): on `/survey` that pain's Reel
-(kitchen first, the other store's version linked, since the survey asks no store type) and "Start your free store";
+(kitchen first, the other stores' versions linked by name, since the survey asks no store type) and "Start your free store";
 in Settings the Help film the kitchen Reel is cut from, when the store is offered it. A pain no film shows keeps the
 plain thank-you. Only published files go into the page; nothing about the answers comes back from the server.
 
@@ -108,7 +108,7 @@ only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts`
   message (`lib/outreach-message.ts`) to the seller's saved business number; nothing is sent server-side.
   Every outreach message box (queue card, store list, bulk send, the new store's page) has "Add a video"
   (`ReelPicker`): a pain-point Reel's `/v/<id>` page link becomes the message's last line (`withReelLink`), the
-  lead's row first (`painReelStoreFor`: food → kitchen, else jewellery). Hidden while no Reel is published.
+  lead's row first (`painReelStoreFor`: food → kitchen, Clothing → clothing, else jewellery). Hidden while no Reel is published.
   Making a claim link here also emails it to the seller (`sendDemoClaimEmail`), and the response says whether it
   went (`emailed`). The internal API's handover still sends nothing.
   A platform ADMIN (never SALES) can instead "Set up their login" (`POST …/handover/login`, `handOverWithLogin`):
@@ -128,9 +128,9 @@ only; unset → 401), not `requireVendorRole`. Rules live in `lib/demo-store.ts`
   its first charge, read from `SubscriptionEvent`); it moves no money, records no payouts and doesn't see refunds.
 
 **Fixture demo stores** (`lib/demo-fixture.ts`, `lib/demo-fixture-server.ts`): `npm run seed:demo-store --
---category=bakery|meals|wellness|crafts|jewellery --city=<city> [--name=…] [--create] [--allow-remote]` builds a clean
+--category=bakery|meals|wellness|crafts|jewellery|clothing --city=<city> [--name=…] [--create] [--allow-remote]` builds a clean
 outreach store through `createDemoStore`, then `applyDemoFixture` adds the tagline, pictures (`public/food`,
-`public/demo`), one open drop (cut-off ~2 days out, one item at 3), a "2+ → free item" plan and slots (jewellery adds colours with stock per colour and one last piece). Idempotent,
+`public/demo`), one open drop (cut-off ~2 days out, one item at 3), a "2+ → free item" plan and slots (jewellery adds colours with stock per colour and one last piece; clothing adds sizes the same way, 3:4 drawings). Idempotent,
 dry run by default, demo stores only. Decisions and the review it came from: `docs/UX_REVIEW_2026-11.md`.
 
 Also added with it, for real orders too: `MenuItem.unit` ("₹1,200 / kg" on the storefront),

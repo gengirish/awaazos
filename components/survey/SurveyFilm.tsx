@@ -21,6 +21,14 @@ function Film({ src, poster, className }: { src: string; poster: string; classNa
 const OTHER_ROW: Record<ResolvedPainReel["store"], string> = {
   kitchen: "Run a home kitchen?",
   jewellery: "Sell jewellery or other products?",
+  clothing: "Sell clothes?",
+};
+
+/** Each link names its own store, so two of them never read the same to a screen reader. */
+const OTHER_LINK: Record<ResolvedPainReel["store"], string> = {
+  kitchen: "Watch the kitchen version",
+  jewellery: "Watch the jewellery version",
+  clothing: "Watch the clothing version",
 };
 
 /**
@@ -31,7 +39,7 @@ const OTHER_ROW: Record<ResolvedPainReel["store"], string> = {
 export function SurveyReelThanks({ pain, reels }: { pain: string; reels: readonly ResolvedPainReel[] }) {
   const heading = useRef<HTMLHeadingElement>(null);
   useEffect(() => heading.current?.focus(), []);
-  const [reel, other] = reels;
+  const [reel, ...others] = reels;
 
   return (
     <section aria-labelledby="survey-thanks" className="space-y-4">
@@ -57,17 +65,17 @@ export function SurveyReelThanks({ pain, reels }: { pain: string; reels: readonl
               {reel.sub} · {formatVideoLength(reel.seconds)}
             </p>
           </div>
-          {other ? (
-            <p className="text-sm text-muted-foreground">
+          {others.map((other) => (
+            <p key={other.id} className="text-sm text-muted-foreground">
               {OTHER_ROW[other.store]}{" "}
               <Link
                 href={painReelPath(other.id)}
                 className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-4"
               >
-                Watch that version
+                {OTHER_LINK[other.store]}
               </Link>
             </p>
-          ) : null}
+          ))}
           <div>
             <Button asChild size="lg" className="min-h-12 w-full px-8 text-base font-semibold sm:w-auto">
               <Link href="/sign-up">{PLAN_MARKETING.STARTER.cta}</Link>

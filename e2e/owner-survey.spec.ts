@@ -130,10 +130,14 @@ test.describe("public survey link", () => {
     const video = thanks.locator("video");
     await expect(video).toHaveAttribute("src", "/pain-reels/payment_matching.mp4");
     await expect(video).toHaveAttribute("preload", "none");
-    // No store type is asked, so the other store's version is a link away.
-    await expect(thanks.getByRole("link", { name: "Watch that version" })).toHaveAttribute(
+    // No store type is asked, so the other stores' versions are a link away.
+    await expect(thanks.getByRole("link", { name: "Watch the jewellery version" })).toHaveAttribute(
       "href",
       "/v/jewellery-payment_matching",
+    );
+    await expect(thanks.getByRole("link", { name: "Watch the clothing version" })).toHaveAttribute(
+      "href",
+      "/v/clothing-payment_matching",
     );
     await expect(thanks.getByRole("link", { name: /^Start / })).toHaveAttribute("href", "/sign-up");
   });

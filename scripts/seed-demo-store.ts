@@ -54,6 +54,7 @@ const API_CATEGORY: Record<DemoFixtureCategory, DemoCategory> = {
   wellness: "wellness",
   crafts: "crafts_decor",
   jewellery: "jewellery_accessories",
+  clothing: "clothing",
 };
 
 async function main(): Promise<void> {

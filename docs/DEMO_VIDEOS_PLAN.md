@@ -312,6 +312,24 @@ No scheduled run in Phase 4: re-record on demand, after UI changes that touch a 
    colours as sizes, stock, "2+ → free pouch"), added to `lib/demo-fixture.ts` in Phase 2 so outreach demo stores
    get it too.
 
+## Clothing set (2026-11-25)
+
+Six films like g1–g6 for clothing sellers, scenes `w1`–`w6` (w for wear), recorded in the `clothing` fixture
+("Saanjh Threads", made up; laid out like a real home seller's store: dresses in M–XXL, kids' frocks by age, 3-piece
+sets, a one-of-a-kind saree, a dupatta, a free potli bag; 3:4 drawings in `public/demo` because a `CLOTHING` store
+shows tall tiles). Sizes are item variants with stock per size, like the jewellery colours. The real store it was
+modelled on is never shown: no real seller in a video without their written yes. The Reels are the third row,
+`clothing-<pain>` (content/pain-reels/reels.ts).
+
+| # | Scene | Story beats |
+| --- | --- | --- |
+| W1 | A dress from your post | Post link → dress sheet with sizes and "Only 2 left" → pick M → add |
+| W2 | From Instagram bio to order | Store → anarkali in L → dupatta (free potli joins) → checkout → order page |
+| W3 | The last piece | One saree, "Only 1 left" → another buyer orders it → "Sold out" |
+| W4 | Check a UPI payment | B4 / G4 with a clothing order; "To pack" tab |
+| W5 | A free potli with two pieces | Settings → Offers → 2+ pieces → free potli bag |
+| W6 | Received stock | Dupattas in from the weaver: 10 at ₹280 → 15 in stock, cost and margin |
+
 ## Open questions
 
 1. Hindi captions: written by hand or machine-translated and checked by a Hindi speaker?

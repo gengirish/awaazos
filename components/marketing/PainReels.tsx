@@ -5,6 +5,7 @@ import { painReelsFor, type PainReelStore, type ResolvedPainReel } from "@/lib/p
 const ROWS: readonly { store: PainReelStore; label: string }[] = [
   { store: "kitchen", label: "Home kitchens" },
   { store: "jewellery", label: "Jewellery and other products" },
+  { store: "clothing", label: "Clothing" },
 ];
 
 /**

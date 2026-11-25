@@ -315,7 +315,7 @@ export function DemoStoreForm({
             label="Message on WhatsApp"
             onOpen={() => void postPipelineAction(created.external_ref, { action: "sent" }).catch(() => undefined)}
             reels={reels}
-            reelStore={painReelStoreFor(storeKind(DEMO_CATEGORIES[form.category]))}
+            reelStore={painReelStoreFor(DEMO_CATEGORIES[form.category])}
           />
         </section>
         <div className="flex flex-wrap gap-3 border-t pt-4">

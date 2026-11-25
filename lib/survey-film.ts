@@ -9,7 +9,7 @@ import type { StoreKind } from "@/lib/store-vocabulary";
  * Pure and client-safe. Plan: docs/PAIN_REELS_APP_PLAN.md, Phase 2.
  *
  * - Public /survey (no account): the pain-point Reels for that pain, kitchen first. The
- *   survey asks no store type, so the form shows the first and links to the other.
+ *   survey asks no store type, so the form shows the first and links to the others.
  * - Settings → Tell us what's hard (already a seller): the Help film for the same job.
  *   It is the film the kitchen Reel is cut from (`PainReel.film`), so the two never point
  *   at different screens, and it must be one the store's type is offered on /help.
