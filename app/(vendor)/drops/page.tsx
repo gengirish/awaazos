@@ -1,5 +1,4 @@
 import {
-  CirclePlay,
   ClipboardList,
   Package,
   Pencil,
@@ -201,19 +200,19 @@ function plural(n: number, one: string, many: string): string {
 
 /**
  * The row's icon tiles, always in the same order so the columns line up:
- * Orders · Open or Share · Edit · Copy · Prep. The filled tile is the next step,
- * as the old cards' big button was: open orders on an upcoming one that isn't
- * taking them, share one that is, copy a past one to sell it again.
+ * Orders · Share · Edit · Duplicate · Print prep. Each word says what the tile
+ * does. The filled tile is the next step: share one that is taking orders,
+ * duplicate a past one to sell it again. A draft or closed pre-order has no
+ * filled tile: it is opened or reopened on the edit page, so its tile is Edit.
  */
 function DropRowActions({ d, store, past }: { d: Row; store: Store; past: boolean }) {
-  // Upcoming, not taking orders: the edit page saves and opens it (or reopens a closed one).
-  const needsOpening =
+  // Upcoming but not taking orders (draft, cut-off passed, closed by you): nothing to share yet.
+  const notTakingOrders =
     !past && (d.stateKind === "draft" || d.stateKind === "cutoff_passed" || d.stateKind === "closed_by_seller");
-  const shareable = !past && !needsOpening && (d.effectiveStatus === "OPEN" || d.effectiveStatus === "SCHEDULED");
+  const shareable = !past && !notTakingOrders && (d.effectiveStatus === "OPEN" || d.effectiveStatus === "SCHEDULED");
   const ordersName = `Orders for ${d.title}`;
-  const openName = `Open orders for ${d.title}`;
   const editName = `Edit ${d.title}`;
-  const prepName = `Prep sheet for ${d.title}`;
+  const prepName = `Print prep sheet for ${d.title}`;
 
   return (
     <div className="flex flex-wrap items-center gap-1.5 lg:flex-nowrap">
@@ -221,12 +220,6 @@ function DropRowActions({ d, store, past }: { d: Row; store: Store; past: boolea
         <ClipboardList aria-hidden="true" />
         <DropRowActionLabel>Orders</DropRowActionLabel>
       </Link>
-      {needsOpening ? (
-        <Link href={`/drops/${d.id}/edit`} aria-label={openName} title={openName} className={dropRowActionClass(true)}>
-          <CirclePlay aria-hidden="true" />
-          <DropRowActionLabel>Open</DropRowActionLabel>
-        </Link>
-      ) : null}
       {shareable ? (
         <ShareDropButton
           icon={{ primary: true }}
@@ -241,17 +234,15 @@ function DropRowActions({ d, store, past }: { d: Row; store: Store; past: boolea
           itemNames={d.itemNames}
         />
       ) : null}
-      {needsOpening ? null : (
-        <Link href={`/drops/${d.id}/edit`} aria-label={editName} title={editName} className={dropRowActionClass(false)}>
-          <Pencil aria-hidden="true" />
-          <DropRowActionLabel>Edit</DropRowActionLabel>
-        </Link>
-      )}
+      <Link href={`/drops/${d.id}/edit`} aria-label={editName} title={editName} className={dropRowActionClass(false)}>
+        <Pencil aria-hidden="true" />
+        <DropRowActionLabel>Edit</DropRowActionLabel>
+      </Link>
       <CopyDropButton dropId={d.id} title={d.title} primary={past} />
       {d.orderCount > 0 ? (
         <Link href={`/drops/${d.id}/prep`} aria-label={prepName} title={prepName} className={dropRowActionClass(false)}>
           <Printer aria-hidden="true" />
-          <DropRowActionLabel>Prep</DropRowActionLabel>
+          <DropRowActionLabel>Print prep</DropRowActionLabel>
         </Link>
       ) : null}
     </div>

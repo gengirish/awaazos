@@ -1,13 +1,13 @@
 import {
+  ArrowLeftRight,
   BarChart3,
-  Calculator,
   CalendarClock,
   CircleHelp,
   ClipboardList,
-  LayoutGrid,
-  ReceiptText,
+  IndianRupee,
   Settings,
   Store,
+  UtensilsCrossed,
   type LucideIcon,
 } from "lucide-react";
 
@@ -17,16 +17,21 @@ import type { AppNavId } from "@/lib/app-nav";
  * One icon per shell destination. Not a client module on purpose: the shell
  * (client) and the Help page (server) both draw from it.
  *
- * The catalogue (`/menu`) is a grid for every store: the app sells more than
- * food, and a kitchen on the GENERAL sign-up type may not be one.
+ * Each icon says what the screen does, and no two look alike:
+ * - Menu is the plate (`UtensilsCrossed`) for every store, goods ones included:
+ *   one icon for the catalogue keeps the bar the same for every seller.
+ * - Sell (`/pos`) is the rupee: the counter takes cash and UPI, so a QR would
+ *   name only one of the two.
+ * - Transactions is money in and out (`ArrowLeftRight`), not a document, so it
+ *   never reads like Orders' clipboard.
  */
 export const APP_NAV_ICONS: Record<AppNavId, LucideIcon> = {
   orders: ClipboardList,
   drops: CalendarClock,
-  sell: Calculator,
-  menu: LayoutGrid,
+  sell: IndianRupee,
+  menu: UtensilsCrossed,
   store: Store,
-  transactions: ReceiptText,
+  transactions: ArrowLeftRight,
   analytics: BarChart3,
   settings: Settings,
   help: CircleHelp,

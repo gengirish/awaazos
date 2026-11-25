@@ -4,11 +4,13 @@ import { cn } from "@/lib/utils";
 
 /**
  * One icon action in a row of the pre-orders table (`/drops`). Shared by the
- * server-rendered links and the client buttons (Share, Copy for tomorrow) so
+ * server-rendered links and the client buttons (Share, Duplicate) so
  * every tile is the same size.
  *
  * - 44×44 at every width (tablets in landscape reach `lg` with a finger).
- * - Below `lg` a tiny word sits under the icon; from `lg` the icon stands
+ * - 4 px side padding: five tiles ("Print prep" the widest) fit one row on a
+ *   360 px phone.
+ * - Below `lg` a 12 px word sits under the icon; from `lg` the icon stands
  *   alone and the `title` tooltip names it for mouse users.
  * - The accessible name is the caller's `aria-label`, which starts with the
  *   visible word (label-in-name) and names the pre-order.
@@ -17,7 +19,7 @@ import { cn } from "@/lib/utils";
  */
 export function dropRowActionClass(primary: boolean, className?: string): string {
   return cn(
-    "inline-flex min-h-11 min-w-11 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-1.5 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60 [&_svg]:size-4 [&_svg]:shrink-0",
+    "inline-flex min-h-11 min-w-11 shrink-0 flex-col items-center justify-center gap-0.5 rounded-md px-1 text-sm font-medium ring-offset-background transition-colors focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60 [&_svg]:size-4 [&_svg]:shrink-0",
     primary
       ? "bg-primary text-primary-foreground hover:bg-primary/90"
       : "border border-input bg-background text-foreground hover:bg-accent hover:text-accent-foreground",
@@ -25,10 +27,13 @@ export function dropRowActionClass(primary: boolean, className?: string): string
   );
 }
 
-/** The word under the icon on phones and tablets; hidden from `lg` (the aria-label names the tile). */
+/**
+ * The word under the icon on phones and tablets, 12 px and on one line (the
+ * tile widens to fit it); hidden from `lg` (the aria-label names the tile).
+ */
 export function DropRowActionLabel({ children }: { children: ReactNode }) {
   return (
-    <span className="text-[10px] leading-none lg:hidden" aria-hidden="true">
+    <span className="whitespace-nowrap text-xs leading-none lg:hidden" aria-hidden="true">
       {children}
     </span>
   );
