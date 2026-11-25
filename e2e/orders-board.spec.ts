@@ -1,6 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 import { boardMenuItem, closeBoardMenu } from "./helpers/board";
+import { isPhoneLayout } from "./helpers/nav";
 import { createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
@@ -114,6 +115,17 @@ test.describe("Orders board: menu and drop orders together", () => {
     await expect(dropCard).toBeVisible();
     await expect(menuCard).toHaveCount(0);
     await expect(page.locator("p", { hasText: "To cook:" })).toContainText("Board Laddu 1");
+    if (isPhoneLayout(page)) {
+      // On a phone the list folds to one row above the tabs, so it can't push the orders off the screen.
+      const toCook = page.getByRole("button", { name: "To cook · 1 dish, 1 in all" });
+      await expect(toCook).toHaveAttribute("aria-expanded", "false");
+      await expect(page.locator("#to-prepare-list")).toBeHidden();
+      await toCook.click();
+      await expect(page.locator("#to-prepare-list")).toBeVisible();
+      await expect(page.locator("#to-prepare-list")).toContainText("Board Laddu 1");
+    } else {
+      await expect(page.locator("#to-prepare-list")).toBeVisible();
+    }
     await expect(await boardMenuItem(page, "More actions", "Prep sheet")).toHaveAttribute("href", `/drops/${drop.id}/prep`);
     await expect(await boardMenuItem(page, "More actions", "Edit")).toHaveAttribute("href", `/drops/${drop.id}/edit`);
     await closeBoardMenu(page);

@@ -144,7 +144,7 @@ describe("pre-order link OG card", () => {
   });
 
   it("a drop just past its cut-off says orders are closed", async () => {
-    findFirst.mockResolvedValue(vendor([drop({ id: "d1", closesAt: new Date(Date.now() - H) })]));
+    findFirst.mockResolvedValue(vendor([drop({ id: "d1", closesAt: new Date(Date.now() - H / 2) })]));
     const html = await preorderCard("d1");
     expect(html).toContain("Orders closed");
     expect(html).not.toContain("Order by");

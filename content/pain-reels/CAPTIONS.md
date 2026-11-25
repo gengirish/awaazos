@@ -101,7 +101,7 @@ Hashtags for every post (pick 5–8): #homekitchen #homebaker #cloudkitchen #hom
 > Aaj kya banana hai, aur kiske liye? 📝
 >
 > No more notebook + chats + screenshots. The board shows what to make (2 × Veg Thali, 1 × Chicken
-> Curry…) and every order moves New → Preparing → Ready → Done. The top line keeps count of what's
+> Curry…) and every order moves To accept → To make → To hand over → Done. The top line keeps count of what's
 > paid and what's still to collect.
 
 **Story**

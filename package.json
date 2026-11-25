@@ -92,7 +92,7 @@
   "devDependencies": {
     "@axe-core/playwright": "^4.14.0",
     "@eslint/eslintrc": "^3.3.7",
-    "@next/bundle-analyzer": "^15.5.27",
+    "@next/bundle-analyzer": "^16.4.6",
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4.3.3",
     "@types/bcryptjs": "^2.4.6",
