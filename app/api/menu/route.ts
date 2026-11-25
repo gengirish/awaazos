@@ -31,7 +31,8 @@ export async function GET(req: NextRequest) {
     // Deleted items (lib/menu-archive.ts) are off the list for good.
     const items = await prisma.menuItem.findMany({
       where: { vendorId: ctx.vendor.id, archivedAt: null },
-      orderBy: { sortOrder: "asc" },
+      // Same order as /menu and the store page: category A–Z, then sortOrder (lib/menu-category.ts rule 1).
+      orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
     });
     // `stockLeft` is derived (lib/inventory.ts rule 2); null on untracked rows.
     // `variants`: sizes / colours, each with its own stock (lib/item-variants.ts).

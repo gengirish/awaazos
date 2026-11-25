@@ -1,11 +1,13 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  hidesInsideSections,
   isMenuFilterEmpty,
   isMenuItemLowStock,
   isMenuItemSoldOut,
   menuItemMatches,
   menuStatusFilters,
+  showsMenuFilter,
 } from "@/lib/menu-search";
 import { searchTerms } from "@/lib/store-search";
 
@@ -35,6 +37,25 @@ describe("menu filter", () => {
     expect(isMenuFilterEmpty({ terms: [], status: "all" })).toBe(true);
     expect(isMenuFilterEmpty({ terms: ["x"], status: "all" })).toBe(false);
     expect(isMenuFilterEmpty({ terms: [], status: "sold_out" })).toBe(false);
+    expect(isMenuFilterEmpty({ terms: [], status: "all", category: "Drinks" })).toBe(false);
+  });
+
+  it("filters by one category, together with the words and status", () => {
+    expect(menuItemMatches(chai, { terms: [], status: "all", category: "Drinks" })).toBe(true);
+    expect(menuItemMatches(laddu, { terms: [], status: "all", category: "Drinks" })).toBe(false);
+    expect(menuItemMatches(chai, { terms: searchTerms("chai"), status: "sold_out", category: "Drinks" })).toBe(false);
+    expect(menuItemMatches(chai, { terms: [], status: "all", category: null })).toBe(true);
+  });
+
+  it("keeps reordering on with a category alone", () => {
+    expect(hidesInsideSections({ terms: [], status: "all", category: "Drinks" })).toBe(false);
+    expect(hidesInsideSections({ terms: ["x"], status: "all" })).toBe(true);
+    expect(hidesInsideSections({ terms: [], status: "selling" })).toBe(true);
+  });
+
+  it("shows search from 6 items", () => {
+    expect(showsMenuFilter(5)).toBe(false);
+    expect(showsMenuFilter(6)).toBe(true);
   });
 });
 

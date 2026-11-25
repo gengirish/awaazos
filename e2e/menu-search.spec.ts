@@ -4,7 +4,7 @@ import { createMenuItem, createVendorSession } from "./helpers/vendor";
 
 /**
  * The seller's Menu screen gets a search box and a Selling / Sold out filter
- * once the list is long (lib/menu-search.ts). Filtering only hides cards;
+ * from 6 items (lib/menu-search.ts). Filtering only hides cards;
  * reordering is off until it is cleared.
  */
 test.describe("menu screen search", () => {
@@ -61,17 +61,25 @@ test.describe("menu screen search", () => {
     await expect(page.getByText(/No items match/)).toBeVisible();
     await page.getByRole("button", { name: "Clear search" }).click();
     await expect(search).toHaveValue("");
-    await expect(page.getByRole("radio", { name: "All" })).toBeChecked();
+    await expect(page.getByRole("radio", { name: "All", exact: true })).toBeChecked();
+    await expect(page.getByRole("radio", { name: "All categories" })).toBeChecked();
     await expect(card("Ragi Laddu")).toBeVisible();
     await expect(card("Samosa")).toBeVisible();
     await expect(page.getByRole("button", { name: /Move .* up/ }).first()).toBeAttached();
   });
 
-  test("a short menu has no search box", async ({ page, request }) => {
+  test("a short menu has no search box, 6 items do", async ({ page, request }) => {
     await createVendorSession(page, request, "menu-search-short", "/menu");
     await createMenuItem(page, { name: "Samosa", priceInRupees: 20, category: "Snacks" });
     await page.goto("/menu");
     await expect(page.getByText("Samosa", { exact: true })).toBeVisible();
     await expect(page.getByLabel("Search menu")).toHaveCount(0);
+
+    // From 6 items the search shows (MENU_FILTER_MIN_ITEMS).
+    for (const name of ["Kachori", "Vada Pav", "Dabeli", "Bhel Puri", "Sev Puri"]) {
+      await createMenuItem(page, { name, priceInRupees: 20, category: "Snacks" });
+    }
+    await page.goto("/menu");
+    await expect(page.getByLabel("Search menu")).toBeVisible();
   });
 });

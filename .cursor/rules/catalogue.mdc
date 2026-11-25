@@ -19,6 +19,14 @@ OWNER) and "Use this banner" sends it through the normal upload. A story backgro
 Every call is billed and nothing retries. `reserveFalImage` (`lib/ai-usage-guard.ts`) caps images per plan
 and fails **closed** in production, unlike the POS guards. `requireActiveBilling` applies.
 
+## Sections and filters on /menu
+
+`/menu` lists items in one section per category, in the store page's order (category A–Z, then `sortOrder`: the page
+and `GET /api/menu` order by it). A card moves only inside its section; changing section is a change of category in
+the item form. A "Category" choice shows from two categories, search and Selling / Sold out from 6 items
+(`MENU_FILTER_MIN_ITEMS`); reordering stays on with a category alone. Rules in the headers of `lib/menu-category.ts`
+and `lib/menu-search.ts`, plan in `docs/MENU_CATEGORY_FILTER_PLAN.md`. One category: no sections, as before.
+
 ## Deleting items and renaming categories
 
 "Delete dish/product" (`DELETE /api/menu/[id]`, MANAGER) archives: it stamps `MenuItem.archivedAt` and switches

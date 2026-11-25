@@ -42,7 +42,8 @@ export default async function MenuPage(props: {
       .findMany({
         // Deleted items (lib/menu-archive.ts) are off the list for good.
         where: { vendorId, archivedAt: null },
-        orderBy: { sortOrder: "asc" },
+        // Sections in the store page's order: category A–Z, then the seller's order (lib/menu-category.ts rule 1).
+        orderBy: [{ category: "asc" }, { sortOrder: "asc" }],
       })
       // Stock left is derived (lib/inventory.ts); no query when nothing is tracked.
       .then((rows) => withStockLeft(prisma, vendorId, rows))
