@@ -66,6 +66,11 @@ export type ItemDetailSheetProps = {
   /** The stepper, or a "Sold out" note; absent = no footer. */
   action?: ReactNode;
   dimmed?: boolean;
+  /**
+   * The store's colour (`storeThemeAttribute`). The sheet is portalled to
+   * <body>, outside the page's `data-theme`, so it carries its own.
+   */
+  theme?: string;
 };
 
 const FACT_ICON: Record<DetailFactKind, typeof Clock> = {
@@ -77,10 +82,11 @@ const FACT_ICON: Record<DetailFactKind, typeof Clock> = {
 };
 
 export function ItemDetailSheet(props: ItemDetailSheetProps) {
-  const { open, onOpenChange, triggerId, name, emoji, imageUrl, morePhotos = [], focusPhoto = null, description, highlights = [], details, foodType, price, badges, sizes, offers = [], facts = [], share, footerPrice, action, dimmed } = props;
+  const { open, onOpenChange, triggerId, name, emoji, imageUrl, morePhotos = [], focusPhoto = null, description, highlights = [], details, foodType, price, badges, sizes, offers = [], facts = [], share, footerPrice, action, dimmed, theme } = props;
   return (
     <ResponsiveDialog open={open} onOpenChange={onOpenChange}>
       <ResponsiveDialogContent
+        data-theme={theme}
         className="md:max-w-xl"
         // Radix returns focus only to its own Trigger; this sheet opens from a plain button.
         onCloseAutoFocus={(e) => {

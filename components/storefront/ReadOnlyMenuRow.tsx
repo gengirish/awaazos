@@ -47,6 +47,7 @@ export function ReadOnlyMenuRow({
   storeName,
   initialOpen = false,
   portrait = false,
+  theme,
 }: {
   item: ReadOnlyMenuItem;
   slug: string;
@@ -59,6 +60,8 @@ export function ReadOnlyMenuRow({
   sizes?: StoreSize[];
   /** A 3:4 gallery tile (clothing stores). */
   portrait?: boolean;
+  /** The store's colour, for the portalled detail sheet (`storeThemeAttribute`). */
+  theme?: string;
 }) {
   const [open, setOpen] = useState(initialOpen);
   const openDetail = () => {
@@ -97,6 +100,7 @@ export function ReadOnlyMenuRow({
 
   const sheet = (
     <ItemDetailSheet
+      theme={theme}
       open={open}
       triggerId={item.id}
       onOpenChange={onOpenChange}
