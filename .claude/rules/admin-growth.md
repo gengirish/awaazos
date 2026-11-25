@@ -35,7 +35,7 @@ sellers with no account. `PublicSurveyResponse` holds the answers and nothing el
 `/admin/survey` counts them apart from the stores', because anyone can answer twice, and they never inform a price.
 
 Once sent, the form answers with a film for the top pain (`lib/survey-film.ts`): on `/survey` that pain's Reel
-(kitchen first, the other store's version linked, since the survey asks no store type) and "Start your free store";
+(kitchen first, the other stores' versions linked by name, since the survey asks no store type) and "Start your free store";
 in Settings the Help film the kitchen Reel is cut from, when the store is offered it. A pain no film shows keeps the
 plain thank-you. Only published files go into the page; nothing about the answers comes back from the server.
 

@@ -24,6 +24,13 @@ const OTHER_ROW: Record<ResolvedPainReel["store"], string> = {
   clothing: "Sell clothes?",
 };
 
+/** Each link names its own store, so two of them never read the same to a screen reader. */
+const OTHER_LINK: Record<ResolvedPainReel["store"], string> = {
+  kitchen: "Watch the kitchen version",
+  jewellery: "Watch the jewellery version",
+  clothing: "Watch the clothing version",
+};
+
 /**
  * Public /survey, once sent: the Reel for the problem that hurts most, and the way to
  * start a store. Shows the visitor only their own answer back. Focus moves to the
@@ -65,7 +72,7 @@ export function SurveyReelThanks({ pain, reels }: { pain: string; reels: readonl
                 href={painReelPath(other.id)}
                 className="inline-flex min-h-11 items-center font-medium text-primary underline underline-offset-4"
               >
-                Watch that version
+                {OTHER_LINK[other.store]}
               </Link>
             </p>
           ))}
