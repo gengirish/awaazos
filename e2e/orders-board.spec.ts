@@ -91,7 +91,7 @@ test.describe("Orders board: menu and drop orders together", () => {
     await expect(menuCard).toBeVisible();
     await expect(dropCard).toBeVisible();
     await expect(menuCard.getByText("Menu order", { exact: true })).toBeVisible();
-    await expect(dropCard.getByText(dropTitle, { exact: true })).toBeVisible();
+    await expect(dropCard.getByText(`Pre-order · ${dropTitle}`, { exact: true })).toBeVisible();
     await expect(page.getByRole("tab", { name: "To accept (2)" })).toBeVisible();
 
     // ── One bulk accept over both: each order goes to its own route ──────
