@@ -551,6 +551,7 @@ export function MenuOrder(props: MenuOrderProps) {
 
       {detailItem && detail ? (
         <ItemDetailSheet
+          theme={theme}
           open={detailOpen}
           triggerId={detailItem.id}
           onOpenChange={onDetailOpenChange}

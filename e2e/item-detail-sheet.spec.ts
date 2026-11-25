@@ -27,8 +27,9 @@ test.describe("storefront: item detail sheet", () => {
     expect(sale.status(), "create a 25% sale").toBe(201);
 
     // Before menu orders are on, the menu is read-only: the sheet opens without Add.
+    // A store colour too: the sheet is portalled outside the page, so it must carry its own.
     const pub = await page.request.patch("/api/vendor", {
-      data: { publishStorefront: true },
+      data: { publishStorefront: true, theme: "purple" },
       headers: { "Content-Type": "application/json" },
     });
     expect(pub.ok()).toBe(true);
@@ -42,6 +43,7 @@ test.describe("storefront: item detail sheet", () => {
       await buyer.getByRole("button", { name: new RegExp(`^${dosa}`) }).click();
       const readOnly = buyer.getByRole("dialog", { name: dosa });
       await expect(readOnly).toBeVisible();
+      await expect(readOnly).toHaveAttribute("data-theme", "purple");
       await expect(readOnly.getByText(description)).toBeVisible();
       await expect(readOnly.getByRole("button", { name: `Add ${dosa}` })).toHaveCount(0);
       await buyer.keyboard.press("Escape");
@@ -61,6 +63,7 @@ test.describe("storefront: item detail sheet", () => {
       await trigger.click();
       const sheet = buyer.getByRole("dialog", { name: dosa });
       await expect(sheet).toBeVisible();
+      await expect(sheet).toHaveAttribute("data-theme", "purple");
 
       // Price discount first: 25% off ₹80 is ₹60, said in one sentence to a screen reader.
       await expect(sheet.getByText("₹60, 25% off, was ₹80 (Festive sale)")).toBeAttached();

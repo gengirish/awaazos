@@ -1527,6 +1527,7 @@ export async function StorefrontView(props: {
                               item={{ ...item, orderedText: orderedTextOf(item.id) }}
                               layout={layout}
                               portrait={portraitTiles}
+                              theme={theme}
                               stock={stockOf(item.id)}
                               sizes={sizes}
                               slug={vendor.slug}

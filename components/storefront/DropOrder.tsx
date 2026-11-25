@@ -501,6 +501,7 @@ export function DropOrder(props: DropOrderProps) {
 
       {detailItem && detail ? (
         <ItemDetailSheet
+          theme={theme}
           open={detailOpen}
           triggerId={detailItem.id}
           onOpenChange={onDetailOpenChange}
