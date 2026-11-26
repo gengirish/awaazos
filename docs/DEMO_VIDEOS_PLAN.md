@@ -290,7 +290,7 @@ No scheduled run in Phase 4: re-record on demand, after UI changes that touch a 
 
 ## Decisions (2026-11-15)
 
-1. **Voice-over is text-to-speech, through our own local `vo` tool** (`D:\codebase\video-pipeline`, Kokoro-82M on
+1. **Voice-over is text-to-speech, through our own local `vo` tool** (the `video-pipeline` checkout beside this repo, or `VO_PROJECT`; Kokoro-82M on
    ONNX Runtime). Nothing leaves the machine and nothing is billed. Built 2026-11-16:
    - Each caption cue (`director.say()`) is also the spoken line, so a cue is one short sentence.
    - `npm run demo:voice:prep` measures every recorded caption with vo's own engine

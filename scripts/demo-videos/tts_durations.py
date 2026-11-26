@@ -1,6 +1,6 @@
 """How long each caption takes to speak, measured with the voice-over tool's own engine.
 
-Run inside the `vo` project (D:\\codebase\\video-pipeline, see docs/DEMO_VIDEOS_PLAN.md):
+Run inside the `vo` project (../video-pipeline beside this repo, or $VO_PROJECT; see docs/DEMO_VIDEOS_PLAN.md):
 
     uv run --project <vo> python scripts/demo-videos/tts_durations.py < request.json
 
