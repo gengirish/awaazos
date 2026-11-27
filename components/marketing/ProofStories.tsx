@@ -52,9 +52,10 @@ export function ProofStories() {
                   {href ? (
                     <Link
                       href={href}
+                      aria-label={`See their store: ${s.storeName}`}
                       className="mt-auto inline-flex min-h-11 items-center gap-1.5 self-start rounded-md text-sm font-semibold text-awaaz-orange underline-offset-4 outline-hidden hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
                     >
-                      See their store<span className="sr-only">: {s.storeName}</span>
+                      See their store
                       <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
                     </Link>
                   ) : null}

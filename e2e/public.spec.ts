@@ -26,7 +26,8 @@ test.describe("public surfaces", () => {
     await expect(page.getByRole("heading", { name: /^pro$/i })).toBeVisible();
     await expect(page.getByText("Best value", { exact: true })).toBeVisible();
     await expect(page.getByRole("heading", { level: 1 })).toContainText("30 days free");
-    await expect(page.getByText("₹6,490/yr + GST")).toBeVisible();
+    // Exact: the FAQ below repeats the price inside a sentence.
+    await expect(page.getByText("₹6,490/yr + GST", { exact: true })).toBeVisible();
     await expect(page.getByText(/2 months free/i).first()).toBeVisible();
     // Scoped to <main>: the header carries the same call to action.
     await expect(page.getByRole("main").getByRole("link", { name: /start 30 days free/i }).first()).toHaveAttribute(
