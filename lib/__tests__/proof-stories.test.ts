@@ -32,7 +32,7 @@ describe("publicProofStories", () => {
     ]);
   });
 
-  it("ships the real stores as live examples, each with a link and a short summary", () => {
+  it("ships the real stores as live examples, each with a link, a short summary and the owner's words", () => {
     const shown = publicProofStories(PROOF_STORIES);
     expect(shown.map((s) => s.storeName)).toEqual([
       "Pravarha Holistic Services",
@@ -44,6 +44,9 @@ describe("publicProofStories", () => {
       expect(s.summary.trim()).not.toBe("");
       expect(s.summary.length).toBeLessThan(140);
       expect(s.city.trim()).not.toBe("");
+      expect(s.quote.trim()).not.toBe("");
+      expect(s.quote.length).toBeLessThan(200);
+      expect(s.quote).not.toBe(s.summary);
     }
     expect(new Set(shown.map((s) => s.storeSlug)).size).toBe(shown.length);
   });
