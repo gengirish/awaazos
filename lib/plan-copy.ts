@@ -222,7 +222,17 @@ export const PLANS_FROM = formatINRCompact(
 
 /**
  * Beside the sign-up call to action on the landing page and the sign-up form:
- * "No card needed. Then plans from ₹599/month + GST." The trial runs on Starter,
- * then the seller picks any plan, so the anchor is the cheapest one, not Starter.
+ * "No card needed. Try Starter free, then pick any plan from ₹599/month + GST."
+ * The trial runs on Starter, then the seller picks any plan, so the anchor is the
+ * cheapest one. The note names Starter so "from ₹599" can't read as the price of
+ * the plan being tried.
  */
-export const TRIAL_THEN_NOTE = `No card needed. Then plans from ${PLANS_FROM}/month + GST.`;
+export const TRIAL_THEN_NOTE = `No card needed. Try ${PLAN_LIMITS.STARTER.label} free, then pick any plan from ${PLANS_FROM}/month + GST.`;
+
+/**
+ * What happens when the trial ends, said where the plans are listed. Nothing is
+ * charged by itself (there is no card on file): the store stops taking new orders
+ * until the seller subscribes (`billingAccess` → `locked`).
+ */
+const MARKETED_LABELS = MARKETED_PLANS.map((plan) => PLAN_LIMITS[plan].label);
+export const TRIAL_END_NOTE = `Every store starts with ${trial} on ${PLAN_LIMITS.STARTER.label}, no card needed. Nothing is charged when it ends: you pick ${MARKETED_LABELS.slice(0, -1).join(", ")} or ${MARKETED_LABELS[MARKETED_LABELS.length - 1]}, monthly or yearly.`;

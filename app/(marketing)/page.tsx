@@ -1,4 +1,5 @@
 import { CtaBanner } from "@/components/marketing/CtaBanner";
+import { Faq } from "@/components/marketing/Faq";
 import { Features } from "@/components/marketing/Features";
 import { Hero } from "@/components/marketing/Hero";
 import { HowItWorks } from "@/components/marketing/HowItWorks";
@@ -17,6 +18,7 @@ export default function MarketingHomePage() {
       <Features />
       <ProofStories />
       <PricingTeaser />
+      <Faq />
       <CtaBanner />
     </>
   );

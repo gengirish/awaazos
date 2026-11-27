@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { PricingPlanButtons } from "@/components/billing/PricingPlanButtons";
+import { Faq } from "@/components/marketing/Faq";
 import { auth } from "@/lib/auth";
 import { TRIAL_DAYS } from "@/lib/constants";
 import { MARKETED_PLANS, PLAN_COMPARISON, PLAN_MARKETING, YEARLY_DISCOUNT } from "@/lib/plan-copy";
@@ -117,6 +118,8 @@ export default async function PricingPage() {
           </Link>
           .
         </p>
+
+        <Faq className="mt-16" />
 
         {/* HIDDEN — see PITCH.md "minimal product" cut list. Re-enable when STARTER GA.
         <div className="mt-12 overflow-x-auto rounded-lg border">

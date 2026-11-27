@@ -7,6 +7,7 @@ import {
   PLAN_COMPARISON,
   PLAN_MARKETING,
   PLANS_FROM,
+  TRIAL_END_NOTE,
   TRIAL_THEN_NOTE,
   YEARLY_DISCOUNT,
   YEARLY_MONTHS_FREE,
@@ -149,6 +150,16 @@ describe("TRIAL_THEN_NOTE", () => {
   it("anchors on the cheapest plan, not Starter", () => {
     const cheapest = Math.min(...MARKETED_PLANS.map((p) => PLAN_PRICES_PAISE[p]));
     expect(PLANS_FROM).toBe(formatINRCompact(cheapest));
-    expect(TRIAL_THEN_NOTE).toBe(`No card needed. Then plans from ${formatINRCompact(cheapest)}/month + GST.`);
+    expect(TRIAL_THEN_NOTE).toBe(
+      `No card needed. Try Starter free, then pick any plan from ${formatINRCompact(cheapest)}/month + GST.`,
+    );
+  });
+});
+
+describe("TRIAL_END_NOTE", () => {
+  it("says the trial is on Starter and that nothing is charged when it ends", () => {
+    expect(TRIAL_END_NOTE).toBe(
+      `Every store starts with ${TRIAL_DAYS} days free on Starter, no card needed. Nothing is charged when it ends: you pick Lite, Starter or Pro, monthly or yearly.`,
+    );
   });
 });

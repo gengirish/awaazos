@@ -24,7 +24,7 @@ const leadFeatures = [
     icon: PackageCheck,
     title: "No overselling",
     description:
-      "Set how many of each item you can make. Once they are taken, nobody else can order them. No apologies, no refunds.",
+      "Set how many of each item you can make. Once they are taken, ordering stops, so you never have to cancel an order you can't fill.",
   },
   {
     icon: Mic,
