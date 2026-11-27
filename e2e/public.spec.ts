@@ -64,6 +64,23 @@ test.describe("public surfaces", () => {
     for (const amount of ["₹599", "₹649", "₹1,149"]) await expect(teaser).toContainText(amount);
     await expect(teaser).toContainText("Best value");
     await expect(teaser).toContainText("2 months free");
+    // The trial is on Starter and ends with nothing charged; each card has its yearly price.
+    await expect(teaser).toContainText("Nothing is charged when it ends");
+    await expect(teaser).toContainText("₹6,490/yr + GST");
+  });
+
+  test("landing page answers seller questions, and the mockup says its stores are examples", async ({ page }) => {
+    await page.goto("/");
+    await expect(page.getByText("Example stores, to show what buyers see")).toBeVisible();
+    const proof = page.getByRole("region", { name: /sellers already using it/i });
+    await expect(proof.getByRole("link", { name: /see their store: house of kaara/i })).toHaveAttribute(
+      "href",
+      "/s/house-of-kaara",
+    );
+    const faq = page.getByRole("region", { name: /questions sellers ask/i });
+    const question = faq.getByText("What happens when the trial ends?");
+    await question.click();
+    await expect(faq.getByText(/Nothing is charged, because there is no card on file/)).toBeVisible();
   });
 
   for (const path of ["/legal/privacy", "/legal/terms", "/legal/refund", "/contact"]) {

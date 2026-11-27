@@ -17,7 +17,7 @@ export function MarketingFooter() {
             <SupportWhatsappLink />
           </p>
           <div>
-            <InstallAppButton />
+            <InstallAppButton hint />
           </div>
           <p className="text-sm text-muted-foreground">
             © {new Date().getFullYear()} {BRAND_NAME}. All rights reserved.

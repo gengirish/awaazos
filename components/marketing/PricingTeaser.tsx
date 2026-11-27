@@ -2,7 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { MARKETED_PLANS, PLAN_MARKETING } from "@/lib/plan-copy";
+import { MARKETED_PLANS, PLAN_MARKETING, TRIAL_END_NOTE } from "@/lib/plan-copy";
 
 // Tier copy lives in lib/plan-copy.ts (one source with the pricing page).
 const tiers = MARKETED_PLANS.map((plan) => ({ name: plan, ...PLAN_MARKETING[plan] }));
@@ -15,8 +15,7 @@ export function PricingTeaser() {
           Simple plans
         </h2>
         <p className="mt-3 max-w-2xl text-muted-foreground">
-          {PLAN_MARKETING.STARTER.trial} on {PLAN_MARKETING.STARTER.label}, no card needed. Then pick your plan, or pay
-          yearly for {PLAN_MARKETING.STARTER.yearlyNote}.
+          {TRIAL_END_NOTE} Yearly gets you {PLAN_MARKETING.STARTER.yearlyNote}.
         </p>
         <div className="mt-10 grid max-w-md gap-6 md:max-w-none md:grid-cols-3">
           {tiers.map((tier) => (
@@ -24,20 +23,26 @@ export function PricingTeaser() {
               key={tier.name}
               className={
                 tier.emphasis
-                  ? "border-2 border-awaaz-orange bg-awaaz-cream/30 shadow-md"
-                  : "border-border/80 bg-card shadow-xs"
+                  ? "relative border-2 border-awaaz-orange bg-awaaz-cream/30 shadow-md"
+                  : "relative border-border/80 bg-card shadow-xs"
               }
             >
+              {/* On the card's top border, so in one column it can't read as the card above's. */}
+              {tier.badge ? (
+                <p className="absolute -top-3 left-6 rounded-full bg-awaaz-orange px-3 py-0.5 text-sm font-semibold text-white shadow-xs">
+                  {tier.badge}
+                </p>
+              ) : null}
               <CardHeader>
-                {tier.badge ? (
-                  <p className="text-sm font-semibold uppercase tracking-wider text-primary">{tier.badge}</p>
-                ) : null}
                 <CardTitle className="font-display text-lg text-awaaz-charcoal">{tier.label}</CardTitle>
                 <p className="mt-2 font-display text-3xl font-bold text-awaaz-charcoal">
                   {tier.amount}
                   <span className="text-base font-normal text-muted-foreground">
                     {tier.period} {tier.taxNote}
                   </span>
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  or <span className="font-medium text-awaaz-charcoal">{tier.yearlyPrice}</span>, {tier.yearlyNote}
                 </p>
               </CardHeader>
               <CardContent>

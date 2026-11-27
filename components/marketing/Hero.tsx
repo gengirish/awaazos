@@ -144,9 +144,13 @@ export function Hero() {
             </Badge>
           </div>
         </div>
-        <div className="flex justify-center lg:justify-end">
+        {/* The mockup stores are made up: say so, so they never pass for customers (real ones are in ProofStories). */}
+        <figure className="flex flex-col items-center lg:items-end">
           <StorefrontMockup />
-        </div>
+          <figcaption className="mt-3 w-full max-w-[272px] text-center text-sm text-awaaz-charcoal/80">
+            Example stores, to show what buyers see
+          </figcaption>
+        </figure>
       </div>
     </section>
   );

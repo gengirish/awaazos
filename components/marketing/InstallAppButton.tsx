@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { Download } from "lucide-react";
 import { detectInstallGuide, type BeforeInstallPromptEvent, type InstallGuide } from "@/lib/install-app";
 import { isStandalone } from "@/lib/push-client";
+import { BRAND_NAME } from "@/lib/brand";
 
 // The written steps (and the dialog primitives) load on the first tap.
 const InstallGuideDialog = dynamic(() => import("@/components/marketing/InstallGuideDialog"), { ssr: false });
@@ -15,7 +16,7 @@ const InstallGuideDialog = dynamic(() => import("@/components/marketing/InstallG
  * Chromium offers one (`beforeinstallprompt`); otherwise opens written steps
  * for this device. Hidden once the site is running as an installed app.
  */
-export function InstallAppButton() {
+export function InstallAppButton({ hint = false }: { hint?: boolean } = {}) {
   const promptRef = useRef<BeforeInstallPromptEvent | null>(null);
   const [installed, setInstalled] = useState(false);
   // `guide` stays set after closing so the dialog can play its exit animation.
@@ -65,11 +66,16 @@ export function InstallAppButton() {
       <button
         type="button"
         onClick={onClick}
+        aria-haspopup="dialog"
         className="inline-flex min-h-11 items-center gap-1.5 rounded-md text-sm font-medium text-awaaz-charcoal/80 underline-offset-4 outline-hidden hover:text-awaaz-orange hover:underline focus-visible:ring-2 focus-visible:ring-awaaz-orange focus-visible:ring-offset-2"
       >
         <Download className="h-4 w-4" aria-hidden="true" />
         Install app
       </button>
+      {/* A text-styled button reads as a link that goes nowhere; say what it does. */}
+      {hint ? (
+        <p className="text-sm text-muted-foreground">Add {BRAND_NAME} to your phone&apos;s Home Screen. It opens like any app.</p>
+      ) : null}
       {guide ? <InstallGuideDialog guide={guide} open={open} onOpenChange={setOpen} /> : null}
     </>
   );

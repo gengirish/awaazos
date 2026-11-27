@@ -129,8 +129,10 @@ times on each render — no timers. `noindex`: it names a residential society.
 ## Landing page (`/`)
 
 `components/marketing/`. Prices and the "from ₹X" anchor come from `lib/plan-copy.ts` (`TRIAL_THEN_NOTE`), never a
-literal. Customer stories come from `lib/proof-stories.ts` and render only with `permission: true` (the owner agreed in
-writing). The WhatsApp button needs `NEXT_PUBLIC_SUPPORT_WHATSAPP` (build time). `e2e/contrast.spec.ts` runs axe's
+literal; the trial is on Starter and ends with nothing charged (`TRIAL_END_NOTE`). Customer stories come from
+`lib/proof-stories.ts` and render only with `permission: true` (the owner agreed), with a link to their live store
+and our own `summary` line; `quote` is only ever the owner's words; the hero's mockup stores are captioned as examples. The FAQ (`lib/marketing-faq.ts`, native
+`<details>`, also on `/pricing`) states only what ships. The WhatsApp button needs `NEXT_PUBLIC_SUPPORT_WHATSAPP` (build time). `e2e/contrast.spec.ts` runs axe's
 contrast rule here, on a store page and on checkout. The `(marketing)` layout must stay static.
 
 **Contact page** (`/contact`, rules in `lib/contact-message.ts`): business details from `lib/business-contact.ts` (also
